@@ -1,0 +1,34 @@
+# ================================================
+# إعدادات البوت الطبي - Hetzner VPS
+# ================================================
+
+# 🤖 توكن البوت من @BotFather
+BOT_TOKEN: "8309645711:AAHr2ObgOWG1H_MHo3t1ijRl90r4gpPVcEo"
+
+# 👑 معرفات الإداريين
+ADMIN_IDS: "2116274898"
+
+# 🌍 المنطقة الزمنية
+TIMEZONE: "Asia/Kolkata"
+
+# 🧠 إعدادات الذكاء الاصطناعي
+AI_ENABLED: "true"
+AI_MODEL_NAME: "gpt-4"
+AI_MAX_TOKENS: "2000"
+
+# 🔑 OpenAI API Key
+OPENAI_API_KEY: "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"
+
+# OpenAI Model
+OPENAI_MODEL: "gpt-4o"
+
+# 🗂️ إعدادات قاعدة البيانات
+DATABASE_PATH: "/home/botuser/medical-bot/db/medical_reports.db"
+
+# 🌐 إعدادات الاستضافة
+WEBHOOK_URL: ""
+PORT: "8080"
+
+# 📊 إعدادات إضافية
+WEB_CONCURRENCY: "1"
+PYTHONUNBUFFERED: "1"

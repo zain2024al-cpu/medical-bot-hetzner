@@ -1,0 +1,1062 @@
+# 1060 طبيب
+
+Dr. R Prasada Reddy | AIG Hospitals, Gachibowli Hyderabad | أمراض القلب | Cardiology
+Dr. C Narasimhan | AIG Hospitals, Gachibowli Hyderabad | فيزيولوجيا كهربائية القلب | Electrophysiology & Cardiology
+Dr. Sundeep Lakhtakia | AIG Hospitals, Gachibowli Hyderabad | مناظير متقدمة | Endoscopy & EUS
+Dr. D Nageshwar Reddy | AIG Hospitals, Gachibowli Hyderabad | الجهاز الهضمي | Gastroenterology
+Dr. Rupa Banerjee | AIG Hospitals, Gachibowli Hyderabad | أمراض الأمعاء ومناظير | IBD & Endoscopy
+Dr. Naveen Reddy Podduturi | AIG Hospitals, Gachibowli Hyderabad | طب باطني | Internal Medicine
+Dr. Mohan Ramchandani | AIG Hospitals, Gachibowli Hyderabad | مناظير الجهاز الهضمي | Interventional Endoscopy
+Dr. P Nagaraja Rao | AIG Hospitals, Gachibowli Hyderabad | أمراض وزراعة الكبد | Liver Sciences & Transplant Hepatology
+Dr. P. Balachandran Menon | AIG Hospitals, Gachibowli Hyderabad | زراعة الكبد والجراحة الكبدية | Liver Transplant & Hepatobiliary Surgery
+Dr. G. V. Rao | AIG Hospitals, Gachibowli Hyderabad | الجراحة طفيفة التوغل والجهاز الهضمي | Surgical Gastroenterology & Minimally Invasive Surgery
+Dr. Jayanthi Thumsi | Apollo Hospital, Bannerghatta Bangalore | أورام الثدي | Breast Oncology
+Dr. Linu Jacob | Apollo Hospital, Bannerghatta Bangalore | أورام الثدي | Breast Oncology
+Dr. Satyaki Nambyala | Apollo Hospital, Bannerghatta Bangalore | جراحة القلب والصدر والأوعية | CTVS
+Dr. Sathyaki P Nambala | Apollo Hospital, Bannerghatta Bangalore | جراحة القلب | Cardiac Surgery
+Dr. Abhijit Vilas Kulkarni | Apollo Hospital, Bannerghatta Bangalore | أمراض القلب | Cardiology
+Dr. B. Ramesh | Apollo Hospital, Bannerghatta Bangalore | أمراض القلب | Cardiology
+Dr. Girish B Navasundhi | Apollo Hospital, Bannerghatta Bangalore | أمراض القلب | Cardiology
+Dr. K.B. Prasad | Apollo Hospital, Bannerghatta Bangalore | أمراض القلب | Cardiology
+Dr. Lakshimikant | Apollo Hospital, Bannerghatta Bangalore | أمراض القلب | Cardiology
+Dr. Vittal Bhagi | Apollo Hospital, Bannerghatta Bangalore | أمراض القلب | Cardiology
+Dr. Sugami Ramesh | Apollo Hospital, Bannerghatta Bangalore | علم النفس | Clinical Psychology
+Dr. Narasimhaiah Srinivasaiah | Apollo Hospital, Bannerghatta Bangalore | سرطان القولون والمستقيم | Colon & Rectal Cancer
+Dr. Ashwini Shetty | Apollo Hospital, Bannerghatta Bangalore | جلدية | Dermatology
+Dr. Girish Panth | Apollo Hospital, Bannerghatta Bangalore | جلدية | Dermatology
+Dr. Surendra V H | Apollo Hospital, Bannerghatta Bangalore | جلدية | Dermatology
+Dr. Vanita Mathew | Apollo Hospital, Bannerghatta Bangalore | جلدية | Dermatology
+Dr. Aanchal A Mittal | Apollo Hospital, Bannerghatta Bangalore | أنف وأذن وحنجرة | ENT
+Dr. Nagamani | Apollo Hospital, Bannerghatta Bangalore | أنف وأذن وحنجرة | ENT
+Dr. Pradeep Hosamani | Apollo Hospital, Bannerghatta Bangalore | أنف وأذن وحنجرة | ENT
+Dr. Sumit Kumar Gaur | Apollo Hospital, Bannerghatta Bangalore | أنف وأذن وحنجرة | ENT
+Dr. Sunil Narayan Dutt | Apollo Hospital, Bannerghatta Bangalore | أنف وأذن وحنجرة | ENT
+Dr. Dwarkanath | Apollo Hospital, Bannerghatta Bangalore | الغدد الصماء | Endocrinology
+Dr. Suyadevara Varun | Apollo Hospital, Bannerghatta Bangalore | الغدد الصماء | Endocrinology
+Dr. Dinesh Kini | Apollo Hospital, Bannerghatta Bangalore | جهاز هضمي | Gastroenterology
+Dr. Prasanna K.S | Apollo Hospital, Bannerghatta Bangalore | جهاز هضمي | Gastroenterology
+Dr. Vijay Kumar | Apollo Hospital, Bannerghatta Bangalore | جهاز هضمي | Gastroenterology
+Dr. Dinesh Kumar | Apollo Hospital, Bannerghatta Bangalore | جراحة عامة | General Surgery
+Dr. Gautham | Apollo Hospital, Bannerghatta Bangalore | جراحة عامة | General Surgery
+Dr. Kiran KJ | Apollo Hospital, Bannerghatta Bangalore | جراحة عامة | General Surgery
+Dr. Prashanth C | Apollo Hospital, Bannerghatta Bangalore | جراحة عامة | General Surgery
+Dr. Ravishankar Bhat | Apollo Hospital, Bannerghatta Bangalore | جراحة عامة | General Surgery
+Dr. Satyajit Godhi | Apollo Hospital, Bannerghatta Bangalore | جراحة عامة | General Surgery
+Dr. Saurabh Mishra | Apollo Hospital, Bannerghatta Bangalore | جراحة عامة | General Surgery
+Dr. Aarathi Kannan | Apollo Hospital, Bannerghatta Bangalore | طب باطني | Geriatric Internal Medicine
+Dr. Steve Paul Manjaly | Apollo Hospital, Bannerghatta Bangalore | طب باطني | Geriatric Internal Medicine
+Dr. Rani A Bhat | Apollo Hospital, Bannerghatta Bangalore | أورام نسائية | Gynaecological Cancer
+Dr. Chitra Ramamurthy | Apollo Hospital, Bannerghatta Bangalore | أمراض النساء | Gynaecology
+Dr. Harshitha Ramamurthy | Apollo Hospital, Bannerghatta Bangalore | أمراض النساء | Gynaecology
+Dr. Preethi Prabhakar Shetty | Apollo Hospital, Bannerghatta Bangalore | أمراض النساء | Gynaecology
+Dr. Sunitha Shreedhar | Apollo Hospital, Bannerghatta Bangalore | أمراض النساء | Gynaecology
+Dr. Neema Bhat | Apollo Hospital, Bannerghatta Bangalore | أمراض الدم وأورام الأطفال | Haematology & Paediatric Oncology
+Dr. Krishnamurthy | Apollo Hospital, Bannerghatta Bangalore | جراحة الرأس والرقبة | Head & Neck Cancer
+Dr. Satish Nair | Apollo Hospital, Bannerghatta Bangalore | جراحة الرأس والرقبة | Head & Neck Cancer
+Dr. P Subramanya Rao | Apollo Hospital, Bannerghatta Bangalore | جراحة الرأس والرقبة | Head & Neck Oncology
+Dr. Sandeep Satsangi | Apollo Hospital, Bannerghatta Bangalore | أمراض الكبد | Hepatology
+Dr. Vinay D | Apollo Hospital, Bannerghatta Bangalore | أمراض معدية | Infectious Disease
+Dr. Hina Mehara | Apollo Hospital, Bannerghatta Bangalore | طب باطني | Internal Medicine
+Dr. Jyotsna Krishnappa | Apollo Hospital, Bannerghatta Bangalore | طب باطني | Internal Medicine
+Dr. Kalpana Janardhan | Apollo Hospital, Bannerghatta Bangalore | طب باطني | Internal Medicine
+Dr. Malla Reddy | Apollo Hospital, Bannerghatta Bangalore | طب باطني | Internal Medicine
+Dr. Rajeeva Mogar | Apollo Hospital, Bannerghatta Bangalore | طب باطني | Internal Medicine
+Dr. Ramesh B.S | Apollo Hospital, Bannerghatta Bangalore | طب باطني | Internal Medicine
+Dr. Raza Shah | Apollo Hospital, Bannerghatta Bangalore | طب باطني | Internal Medicine
+Dr. Swarna Das | Apollo Hospital, Bannerghatta Bangalore | طب باطني | Internal Medicine
+Dr. Jayath Reddy | Apollo Hospital, Bannerghatta Bangalore | زراعة الكبد | Liver Transplant
+Dr. Sanjay Govil | Apollo Hospital, Bannerghatta Bangalore | زراعة الكبد | Liver Transplant
+Dr. Suresh Ragavaiah | Apollo Hospital, Bannerghatta Bangalore | زراعة الكبد | Liver Transplant
+Dr. Kiran Kumar Sajjan Shetty | Apollo Hospital, Bannerghatta Bangalore | أورام طبية | Medical Oncology
+Dr. Poonam Maurya | Apollo Hospital, Bannerghatta Bangalore | أورام طبية | Medical Oncology
+Dr. Vijay Agarwal | Apollo Hospital, Bannerghatta Bangalore | أورام طبية | Medical Oncology
+Dr. Vishwanath S | Apollo Hospital, Bannerghatta Bangalore | أورام طبية | Medical Oncology
+Dr. Arpana Bansal | Apollo Hospital, Bannerghatta Bangalore | حديثي الولادة | Neonatology
+Dr. Prashanth Urs | Apollo Hospital, Bannerghatta Bangalore | حديثي الولادة | Neonatology
+Dr. Gokulnath | Apollo Hospital, Bannerghatta Bangalore | أمراض الكلى | Nephrology
+Dr. Vinod Kumar | Apollo Hospital, Bannerghatta Bangalore | أمراض الكلى | Nephrology
+Dr. Gurucharan Adhoor | Apollo Hospital, Bannerghatta Bangalore | طب الأعصاب | Neurology
+Dr. Suryanarayana Sharma P M | Apollo Hospital, Bannerghatta Bangalore | طب الأعصاب | Neurology
+Dr. Vikram Kamath | Apollo Hospital, Bannerghatta Bangalore | طب الأعصاب | Neurology
+Dr. Kumbhar Kartik Revanappa | Apollo Hospital, Bannerghatta Bangalore | جراحة المخ والأعصاب | Neurosurgery
+Dr. Sachin G | Apollo Hospital, Bannerghatta Bangalore | جراحة المخ والأعصاب | Neurosurgery
+Dr. Satish Satyanarayan | Apollo Hospital, Bannerghatta Bangalore | جراحة المخ والأعصاب | Neurosurgery
+Dr. Govindarajan M J | Apollo Hospital, Bannerghatta Bangalore | تصوير الأورام | Onco Imaging
+Dr. Murthy S | Apollo Hospital, Bannerghatta Bangalore | تصوير الأورام | Onco Imaging
+Dr. Savith Kumar | Apollo Hospital, Bannerghatta Bangalore | تصوير الأورام | Onco Imaging
+Dr. Swarna Shivakumar | Apollo Hospital, Bannerghatta Bangalore | تصوير الأورام | Onco Imaging
+Dr. Shalini Shetty | Apollo Hospital, Bannerghatta Bangalore | طب العيون | Ophthalmology
+Dr. Adarsh | Apollo Hospital, Bannerghatta Bangalore | جراحة العظام | Orthopaedic
+Dr. Ajith Prabhu | Apollo Hospital, Bannerghatta Bangalore | جراحة العظام | Orthopaedic
+Dr. Manish Samson | Apollo Hospital, Bannerghatta Bangalore | جراحة العظام | Orthopaedic
+Dr. Pradeep Kochheppan | Apollo Hospital, Bannerghatta Bangalore | جراحة العظام | Orthopaedic
+Dr. Rajshekar K T | Apollo Hospital, Bannerghatta Bangalore | جراحة العظام | Orthopaedic
+Dr. Raviraj A | Apollo Hospital, Bannerghatta Bangalore | جراحة العظام | Orthopaedic
+Dr. Shashikumar H.K | Apollo Hospital, Bannerghatta Bangalore | جراحة العظام | Orthopaedic
+Dr. Vidya Sagar | Apollo Hospital, Bannerghatta Bangalore | جراحة العظام | Orthopaedic
+Dr. Vivek Kumar | Apollo Hospital, Bannerghatta Bangalore | جراحة العظام | Orthopaedic
+Dr. Srimanth B S | Apollo Hospital, Bannerghatta Bangalore | أورام عظام | Orthopaedic Oncology
+Dr. Anjana Hulse | Apollo Hospital, Bannerghatta Bangalore | الغدد الصماء للأطفال | Paediatric Endocrinology
+Dr. Manohar Babu | Apollo Hospital, Bannerghatta Bangalore | عظام الأطفال | Paediatric Ortho
+Dr. Anand Alladi | Apollo Hospital, Bannerghatta Bangalore | جراحة الأطفال | Paediatric Surgeon
+Dr. Chitra Ramu | Apollo Hospital, Bannerghatta Bangalore | جراحة الأطفال | Paediatric Surgery
+Dr. Poonam Shetty | Apollo Hospital, Bannerghatta Bangalore | طب أطفال | Paediatrics
+Dr. Radhakrisha Hegde | Apollo Hospital, Bannerghatta Bangalore | طب أطفال | Paediatrics
+Dr. Raghavan P.S | Apollo Hospital, Bannerghatta Bangalore | طب أطفال | Paediatrics
+Dr. Shwetha S Rao | Apollo Hospital, Bannerghatta Bangalore | طب أطفال | Paediatrics
+Dr. Sowmya C.C | Apollo Hospital, Bannerghatta Bangalore | طب أطفال | Paediatrics
+Dr. Roshan Jain | Apollo Hospital, Bannerghatta Bangalore | طب نفسي | Psychiatry
+Dr. Shobha Krishna | Apollo Hospital, Bannerghatta Bangalore | طب نفسي | Psychiatry
+Dr. Srinivas Reddy | Apollo Hospital, Bannerghatta Bangalore | طب نفسي | Psychiatry
+Dr. Hariprasad | Apollo Hospital, Bannerghatta Bangalore | أمراض الرئة | Pulmonology
+Dr. Ravindra Mehta | Apollo Hospital, Bannerghatta Bangalore | أمراض الرئة | Pulmonology
+Dr. Sumanth Mantri | Apollo Hospital, Bannerghatta Bangalore | أمراض الرئة | Pulmonology
+Dr. B K M Reddy | Apollo Hospital, Bannerghatta Bangalore | علاج الأورام بالإشعاع | Radiation Oncology
+Dr. Kumara Swamy | Apollo Hospital, Bannerghatta Bangalore | علاج الأورام بالإشعاع | Radiation Oncology
+Dr. Natarajan V | Apollo Hospital, Bannerghatta Bangalore | علاج الأورام بالإشعاع | Radiation Oncology
+Dr. Sridhar P S | Apollo Hospital, Bannerghatta Bangalore | علاج الأورام بالإشعاع | Radiation Oncology
+Dr. Vijay Bhaskar L | Apollo Hospital, Bannerghatta Bangalore | علاج الأورام بالإشعاع | Radiation Oncology
+Dr. Vikram Maiya M | Apollo Hospital, Bannerghatta Bangalore | علاج الأورام بالإشعاع | Radiation Oncology
+Dr. Vinay Ural | Apollo Hospital, Bannerghatta Bangalore | علاج الأورام بالإشعاع | Radiation Oncology
+Dr. Roopa Tekkatte | Apollo Hospital, Bannerghatta Bangalore | أمراض الروماتيزم | Rheumatology
+Dr. Anil Kamat | Apollo Hospital, Bannerghatta Bangalore | جراحة الأورام | Surgical Oncology
+Dr. Sunil Navalgund | Apollo Hospital, Bannerghatta Bangalore | جراحة الأورام | Surgical Oncology
+Dr. Manohar T | Apollo Hospital, Bannerghatta Bangalore | أورام المسالك البولية | Uro Oncology
+Dr. Ravi Chandran K | Apollo Hospital, Bannerghatta Bangalore | أورام المسالك البولية | Uro Oncology
+Dr. Sundar Narasimhan | Apollo Hospital, Bannerghatta Bangalore | جراحة الأوعية الدموية | Vascular Surgery
+Dr. Amit Jassal | Artemis Hospital, Delhi | تخدير | Anaesthesia
+Dr. Amit Kalsotra | Artemis Hospital, Delhi | تخدير | Anaesthesia
+Dr. G. Arya Prakash | Artemis Hospital, Delhi | تخدير | Anaesthesia
+Dr. Narender Kumar | Artemis Hospital, Delhi | تخدير | Anaesthesia
+Dr. Rajesh Misra | Artemis Hospital, Delhi | تخدير | Anaesthesia
+Dr. Shelly Mittal | Artemis Hospital, Delhi | تخدير | Anaesthesia
+Dr. Swati Aggarwal | Artemis Hospital, Delhi | تخدير | Anaesthesia
+Dr. Vijay Mohan Hanjoora | Artemis Hospital, Delhi | تخدير | Anaesthesia
+Dr. Y Naveen | Artemis Hospital, Delhi | تخدير | Anaesthesia
+Dr. (Brig.) Anil Khetarpal | Artemis Hospital, Delhi | طب نقل الدم | Blood Centre & Transfusion Medicine
+Dr. Deepak Jha | Artemis Hospital, Delhi | جراحة الثدي | Breast Surgery / Oncology
+Dr. (Col) Balbir Kalra | Artemis Hospital, Delhi | أمراض القلب | Cardiology
+Dr. D.K. Jhamb | Artemis Hospital, Delhi | أمراض القلب | Cardiology
+Dr. Rahul Mehrotra | Artemis Hospital, Delhi | أمراض القلب | Cardiology
+Dr. Surendra Nath Khanna | Artemis Hospital, Delhi | جراحة أوعية وقلب | Cardiothoracic & Vascular Surgery
+Dr. Ankur Bhatia | Artemis Hospital, Delhi | جراحة تجميل | Cosmetic & Plastic Surgery
+Dr. Pradeep Kumar Singh | Artemis Hospital, Delhi | جراحة تجميل | Cosmetic & Plastic Surgery
+Dr. Anjana Satyajit | Artemis Hospital, Delhi | طب الأسنان | Dentistry
+Dr. Monica Bambroo | Artemis Hospital, Delhi | جلدية وتجميل | Dermatology & Cosmetology
+Dr. Noor Sharma | Artemis Hospital, Delhi | جلدية وتجميل | Dermatology & Cosmetology
+Dr. Shifa Yadav | Artemis Hospital, Delhi | جلدية وتجميل | Dermatology & Cosmetology
+Dr. Trisha Srivastava | Artemis Hospital, Delhi | أنف وأذن وحنجرة | ENT
+Dr. Dilpreet Bajwa | Artemis Hospital, Delhi | أنف وأذن وحنجرة | ENT Surgery
+Dr. Poonam Gautam | Artemis Hospital, Delhi | أنف وأذن وحنجرة | ENT Surgery
+Dr. Shashidhar TB | Artemis Hospital, Delhi | أنف وأذن وحنجرة | ENT Surgery
+Dr. Sameer Mehrotra | Artemis Hospital, Delhi | كهروفسيولوجيا القلب | Electrophysiology & Interventional Cardiology
+Dr. Rajesh Kumar Singh | Artemis Hospital, Delhi | الطوارئ | Emergency & Trauma
+Dr. (Col) Suvasish Chakraberty | Artemis Hospital, Delhi | الطوارئ | Emergency & Trauma Services
+Dr. Anjana Kharbanda | Artemis Hospital, Delhi | الطوارئ | Emergency & Trauma Services
+Dr. Ellora Nanda | Artemis Hospital, Delhi | الطوارئ | Emergency & Trauma Services
+Dr. Yatin Kukreja | Artemis Hospital, Delhi | الطوارئ | Emergency & Trauma Services
+Dr. Dheeraj Kapoor | Artemis Hospital, Delhi | سكري وغدد | Endocrinology
+Dr. Ashutosh Gupta | Artemis Hospital, Delhi | طب الأجنة والوراثة | Fetal Medicine & Genetics
+Dr. Bimal Kumar Sahu | Artemis Hospital, Delhi | الجهاز الهضمي | Gastroenterology / GI Surgery
+Dr. M.A Mir | Artemis Hospital, Delhi | الجهاز الهضمي | Gastroenterology / GI Surgery
+Dr. Hitender Singh Chauhan | Artemis Hospital, Delhi | جراحة عامة ومناظير | General & Minimally Invasive Surgery
+Dr. Kanika Singh | Artemis Hospital, Delhi | الوراثة | Genetics
+Dr. Meenal Thakral | Artemis Hospital, Delhi | طب الشيخوخة | Geriatric Medicine
+Dr. Prasun Chatterjee | Artemis Hospital, Delhi | طب الشيخوخة | Geriatric Medicine
+Dr. Nutan Agarwal | Artemis Hospital, Delhi | غدد نسائية | Gynaecological Endocrinology
+Dr. Amita Naithani | Artemis Hospital, Delhi | أورام النساء | Gynaecological Oncology
+Dr. Rupinder Sekhon | Artemis Hospital, Delhi | أورام نسائية | Gynaecological Oncology
+Dr. Biswarup Purkayastha | Artemis Hospital, Delhi | زراعة القلب والرئة | Heart & Lung Transplant
+Dr. Gaurav Dixit | Artemis Hospital, Delhi | أمراض الدم وزراعة نخاع | Hematology & BMT
+Dr. Lalit Kumar | Artemis Hospital, Delhi | أمراض الدم و BMT | Hematology & BMT
+Dr. Rahul Naithani | Artemis Hospital, Delhi | أمراض الدم وBMT | Hematology & BMT
+Dr. Gajanand Yadav | Artemis Hospital, Delhi | استبدال مفاصل | Hip & Knee Arthroplasty
+Dr. Jeetendra Sharma | Artemis Hospital, Delhi | العناية المركزة | ICU / Critical Care
+Dr. Kuldeep Singh | Artemis Hospital, Delhi | العناية المركزة | ICU / Critical Care
+Dr. Mukesh Kumar Gupta | Artemis Hospital, Delhi | العناية المركزة | ICU / Critical Care
+Dr. Rati Bansal Goel | Artemis Hospital, Delhi | عناية مركزة | ICU / Critical Care
+Dr. Reshma Tewari | Artemis Hospital, Delhi | عناية مركزة | ICU / Critical Care
+Dr. Kiran Arora | Artemis Hospital, Delhi | أطفال الأنابيب | IVF & Reproductive Medicine
+Dr. Parul Prakash | Artemis Hospital, Delhi | أطفال الأنابيب | IVF & Reproductive Medicine
+Dr. Sarabpreet Singh | Artemis Hospital, Delhi | أطفال الأنابيب | IVF & Reproductive Medicine
+Dr. Arpit Jain | Artemis Hospital, Delhi | طب باطني | Internal Medicine
+Dr. P Venkata Krishnan | Artemis Hospital, Delhi | طب باطني | Internal Medicine
+Dr. Seema Dhir | Artemis Hospital, Delhi | طب باطني | Internal Medicine
+Dr. Kuldeep Arora | Artemis Hospital, Delhi | أمراض القلب التداخلية | Interventional Cardiology
+Dr. Sushant Mishra | Artemis Hospital, Delhi | قلب تداخلي | Interventional Cardiology
+Dr. Amit Kumar Chaurasia | Artemis Hospital, Delhi | أمراض القلب التداخلية | Interventional Cardiology & Structural Heart
+Dr. Gaurav Singhal | Artemis Hospital, Delhi | زراعة الكلى | Kidney Transplant & Nephrology
+Dr. Lakshmi Kant Tripathi | Artemis Hospital, Delhi | زراعة الكلى | Kidney Transplant & Nephrology
+Dr. Manju Aggarwal | Artemis Hospital, Delhi | زراعة الكلى | Kidney Transplant & Nephrology
+Dr. Kunal Vinayak | Artemis Hospital, Delhi | زراعة الكلى والمسالك | Kidney Transplant & Urology
+Dr. Varun Mittal | Artemis Hospital, Delhi | زراعة الكلى والمسالك | Kidney Transplant & Urology
+Dr. Deepa Goel | Artemis Hospital, Delhi | طب المختبرات | Laboratory Medicine
+Dr. Namita Jaggi | Artemis Hospital, Delhi | طب المختبرات | Laboratory Medicine
+Dr. Nandini Vasdev | Artemis Hospital, Delhi | طب المختبرات | Laboratory Medicine
+Dr. Ritika Singla | Artemis Hospital, Delhi | طب المختبرات | Laboratory Medicine
+Dr. Vineeta Raina | Artemis Hospital, Delhi | طب المختبرات | Laboratory Services
+Dr. Giriraj Bora | Artemis Hospital, Delhi | زراعة الكبد | Liver Transplant
+Dr. Shyam Sunder Mahansaria | Artemis Hospital, Delhi | زراعة الكبد | Liver Transplant
+Dr. Puneet Dwevedi | Artemis Hospital, Delhi | الصحة النفسية | Mental Health
+Dr. Rahul Chandhok | Artemis Hospital, Delhi | الصحة النفسية | Mental Health
+Dr. Chandrima Misra Mukherjee | Artemis Hospital, Delhi | الصحة النفسية | Mental Health & Behavioural Sciences
+Dr. Manjul Bawa | Artemis Hospital, Delhi | جراحة عامة ومناظير وروبوت | Minimally Invasive & Robotic Surgery
+Dr. Paritosh S Gupta | Artemis Hospital, Delhi | جراحة عامة ومناظير | Minimally Invasive Surgery
+Dr. Rakesh Durkhure | Artemis Hospital, Delhi | جراحة مناظير | Minimally Invasive Surgery
+Dr. Suresh Kumar Chhabra | Artemis Hospital, Delhi | جراحة مناظير | Minimally Invasive Surgery
+Dr. Dinesh Bansal | Artemis Hospital, Delhi | أمراض الكلى | Nephrology
+Dr. Deepak Solanki | Artemis Hospital, Delhi | العناية المركزة العصبية | Neuro Critical Care
+Dr. Raman Deep Kaur | Artemis Hospital, Delhi | عناية مركزة عصبية | Neuro Critical Care
+Dr. Saurabh Anand | Artemis Hospital, Delhi | عناية مركزة عصبية | Neuro Critical Care
+Dr. Seema Lachala | Artemis Hospital, Delhi | عناية مركزة عصبية | Neuro Critical Care
+Dr. Sweetha Susanne Mohan | Artemis Hospital, Delhi | عناية مركزة عصبية | Neuro Critical Care
+Dr. Ashish Chakravarty | Artemis Hospital, Delhi | العناية المركزة العصبية | Neuroanaesthesia & Neuro Critical Care
+Dr. Mukesh Kumar | Artemis Hospital, Delhi | جراحة الأعصاب التداخلية | Neurointerventional Surgery
+Dr. Tariq Matin | Artemis Hospital, Delhi | جراحة عصبية تداخلية | Neurointerventional Surgery
+Dr. Mohit Anand | Artemis Hospital, Delhi | طب الأعصاب | Neurology
+Dr. Sameer Arora | Artemis Hospital, Delhi | طب الأعصاب | Neurology
+Dr. Sumit Singh | Artemis Hospital, Delhi | طب الأعصاب | Neurology
+Dr. Vivek Barun | Artemis Hospital, Delhi | طب الأعصاب | Neurology
+Dr. Aditya Gupta | Artemis Hospital, Delhi | جراحة المخ والأعصاب | Neurosurgery
+Dr. Anuvrat Sinha | Artemis Hospital, Delhi | جراحة المخ والأعصاب | Neurosurgery
+Dr. Pawan Goyal | Artemis Hospital, Delhi | جراحة المخ والأعصاب | Neurosurgery
+Dr. Sanjeev Srivastava | Artemis Hospital, Delhi | جراحة المخ والأعصاب | Neurosurgery
+Dr. Noaline Sinha | Artemis Hospital, Delhi | طب نووي | Nuclear Medicine
+Dr. Tajamul Syed Malik | Artemis Hospital, Delhi | طب نووي | Nuclear Medicine
+Dr. Shabana Parveen | Artemis Hospital, Delhi | تغذية علاجية | Nutrition & Dietetics
+Dr. Deepa Maheshwari | Artemis Hospital, Delhi | نساء وولادة | Obstetrics & Gynaecology
+Dr. Nidhi Jain | Artemis Hospital, Delhi | نساء وولادة | Obstetrics & Gynaecology
+Dr. Nidhi Rajotia | Artemis Hospital, Delhi | نساء وولادة | Obstetrics & Gynaecology
+Dr. Renu Raina Sehgal | Artemis Hospital, Delhi | نساء وولادة | Obstetrics & Gynaecology
+Dr. Seerat Sandhu | Artemis Hospital, Delhi | نساء وولادة | Obstetrics & Gynaecology
+Dr. Biswajyoti Hazarika | Artemis Hospital, Delhi | الأورام | Oncology
+Dr. Kamal Verma | Artemis Hospital, Delhi | الأورام | Oncology
+Dr. Preeti Vijayakumaran | Artemis Hospital, Delhi | أورام | Oncology
+Dr. Priya Tiwari | Artemis Hospital, Delhi | أورام | Oncology
+Dr. Priyanka Raina | Artemis Hospital, Delhi | أورام | Oncology
+Dr. S Jayalakshmi | Artemis Hospital, Delhi | أورام | Oncology
+Dr. Sandeep Goel | Artemis Hospital, Delhi | أورام | Oncology
+Dr. Subodh Chandra Pande | Artemis Hospital, Delhi | أورام | Oncology
+Dr. Parveen Yadav | Artemis Hospital, Delhi | جراحة أورام | Oncology Surgery
+Dr. Vishal Arora | Artemis Hospital, Delhi | طب العيون | Ophthalmology
+Dr. Abhinandan Mukhopadhyay | Artemis Hospital, Delhi | زراعة الأعضاء والمسالك | Organ Transplant & Urology
+Dr. (Prof.) Ravi Sauhta | Artemis Hospital, Delhi | جراحة العظام | Orthopaedics
+Dr. Devendra Singh Solanki | Artemis Hospital, Delhi | جراحة العظام | Orthopaedics
+Dr. Devendra Yadav | Artemis Hospital, Delhi | جراحة العظام | Orthopaedics
+Dr. Mohd Irfan Banday | Artemis Hospital, Delhi | جراحة العظام | Orthopaedics
+Dr. Sandeep Chauhan | Artemis Hospital, Delhi | جراحة عظام | Orthopaedics
+Dr. Vipin Maheshwari | Artemis Hospital, Delhi | جراحة العظام | Orthopaedics
+Dr. Vivek Vaibhav | Artemis Hospital, Delhi | جراحة العظام | Orthopaedics
+Dr. Aseem R. Srivastava | Artemis Hospital, Delhi | قلب أطفال وجراحة قلب | Paediatric Cardiac Surgery & Cardiology
+Dr. Nidhi Rawal | Artemis Hospital, Delhi | قلب أطفال | Paediatric Cardiology
+Dr. Shubhra Shri Gupta | Artemis Hospital, Delhi | قلب أطفال | Paediatric Cardiology
+Dr. Sumeet Arora | Artemis Hospital, Delhi | غدد أطفال ومراهقين | Paediatric Endocrinology
+Dr. Sakshi Karkra | Artemis Hospital, Delhi | جهاز هضمي أطفال | Paediatric Gastroenterology & Hepatology
+Dr. Sukriti Gupta | Artemis Hospital, Delhi | أمراض الدم وزراعة نخاع للأطفال | Paediatric Haemato-Oncology & BMT
+Dr. Anju Singh | Artemis Hospital, Delhi | أمراض الدم وروماتيزم الأطفال | Paediatric Haemato-Oncology & Rheumatology
+Dr. Ajit Singh Baghela | Artemis Hospital, Delhi | طب أعصاب الأطفال | Paediatric Neurology
+Dr. Sanjay Sarup | Artemis Hospital, Delhi | جراحة أطفال وعمود فقري | Paediatric Orthopaedics & Spine Surgery
+Dr. Nitin Goel | Artemis Hospital, Delhi | جراحة الأطفال | Paediatric Surgery
+Dr. Hemant K. Gogia | Artemis Hospital, Delhi | طب أطفال | Paediatrics
+Dr. Padam Yadav | Artemis Hospital, Delhi | طب أطفال | Paediatrics
+Dr. Prabhat Maheshwari | Artemis Hospital, Delhi | طب أطفال | Paediatrics
+Dr. Rajiv Chhabra | Artemis Hospital, Delhi | طب أطفال | Paediatrics
+Dr. Ashu Kumar Jain | Artemis Hospital, Delhi | طب الألم | Pain Medicine & Palliative Care
+Dr. Sachin Sethi | Artemis Hospital, Delhi | علاج طبيعي | Physiotherapy & Rehab
+Dr. Anjali Vaish | Artemis Hospital, Delhi | العلاج الطبيعي وإعادة التأهيل | Physiotherapy & Rehabilitation
+Dr. Arun Chowdary Kotaru | Artemis Hospital, Delhi | أمراض الصدر | Pulmonology
+Dr. Shweta Bansal | Artemis Hospital, Delhi | أمراض الصدر | Pulmonology
+Dr. Aditi Dixit | Artemis Hospital, Delhi | أشعة | Radiology
+Dr. Gurpreet Makkar | Artemis Hospital, Delhi | أشعة | Radiology
+Dr. Rajiv Sharma | Artemis Hospital, Delhi | أشعة | Radiology
+Dr. Sanjay Mehta | Artemis Hospital, Delhi | أشعة | Radiology
+Dr. Syed Tauqueer Fazal | Artemis Hospital, Delhi | أشعة | Radiology
+Dr. Sumeet Agrawal | Artemis Hospital, Delhi | روماتيزم ومناعة | Rheumatology & Clinical Immunology
+Dr. Tapan Singh Chauhan | Artemis Hospital, Delhi | أورام روبوتية | Robotic Oncology Surgery
+Dr. I P S Oberoi | Artemis Hospital, Delhi | جراحة روبوتية للعظام | Robotic Orthopaedic Surgery
+Dr. Ramkinkar Jha | Artemis Hospital, Delhi | جراحة روبوتية للعظام | Robotic Orthopaedic Surgery
+Dr. Ankit Goel | Artemis Hospital, Delhi | الجراحة الروبوتية والمسالك | Robotic Surgery & Urology
+Dr. Rajiv Yadav | Artemis Hospital, Delhi | جراحة روبوتية ومسالك | Robotic Urology
+Dr. SK Rajan | Artemis Hospital, Delhi | جراحة العمود الفقري | Spine Neurosurgery
+Dr. Sumit Kumar | Artemis Hospital, Delhi | جراحة العمود الفقري | Spine Surgery
+Dr. Varun Khanna | Artemis Hospital, Delhi | جراحة العمود الفقري | Spine Surgery
+Dr. Dheeraj Batheja | Artemis Hospital, Delhi | جراحة العمود الفقري | Spine Surgery / Orthopaedics
+Dr. Hitesh Garg | Artemis Hospital, Delhi | جراحة العمود الفقري | Spine Surgery / Scoliosis
+Dr. (Col) S. V. Kotwal | Artemis Hospital, Delhi | جراحة المسالك البولية | Urology
+Dr. Piyush Gupta | Artemis Hospital, Delhi | جراحة المسالك البولية | Urology
+Dr. Arul Dominic Furtado | Aster CMI Hospital, Bangalore | جراحة القلب | Cardiac Surgery
+Dr. Ganeshakrishnan Iyer | Aster CMI Hospital, Bangalore | جراحة القلب | Cardiac Surgery
+Dr. Prashanth Y M | Aster CMI Hospital, Bangalore | جراحة القلب | Cardiac Surgery
+Dr. Madhusudan Raikar | Aster CMI Hospital, Bangalore | أمراض القلب | Cardiology
+Dr. Nagamalesh U M | Aster CMI Hospital, Bangalore | أمراض القلب | Cardiology
+Dr. Sanjay Bhat | Aster CMI Hospital, Bangalore | أمراض القلب | Cardiology
+Dr. Sudhir Kumar Kale | Aster CMI Hospital, Bangalore | الأشعة التداخلية | Clinical Imaging & Interventional Radiology
+Dr. Shireen Furtado | Aster CMI Hospital, Bangalore | الأمراض الجلدية | Dermatology
+Dr. Prakrutha S | Aster CMI Hospital, Bangalore | أطفال الأنابيب وأمراض النساء | Fertility, IVF & Obstetrics
+Dr. Puneeth Thalasta | Aster CMI Hospital, Bangalore | الجراحة العامة وجراحة الجهاز الهضمي | General & Surgical Gastroenterology
+Dr. Santosh MP | Aster CMI Hospital, Bangalore | جراحة عامة | General Surgery & Allied Specialities
+Dr. Anoop P | Aster CMI Hospital, Bangalore | أمراض الدم والأورام وزراعة نخاع العظم | Haematology, Haemato Oncology & BMT
+Dr. Girish S. Shetkar | Aster CMI Hospital, Bangalore | أورام الرأس والرقبة | Head & Neck Oncology
+Dr. Sonal Asthana | Aster CMI Hospital, Bangalore | زراعة الكبد | Integrated Liver Care, Liver Transplant
+Dr. Veerabhadra Guptha K | Aster CMI Hospital, Bangalore | أمراض الكلى | Nephrology
+Dr. Akshay Hari | Aster CMI Hospital, Bangalore | جراحة المخ والأعصاب والعمود الفقري | Neuro & Spine Surgery
+Dr. Deepak B S | Aster CMI Hospital, Bangalore | جراحة المخ والأعصاب والعمود الفقري | Neuro & Spine Surgery
+Dr. Nirmala S | Aster CMI Hospital, Bangalore | جراحة المخ والأعصاب | Neuro Surgery
+Dr. Ravi Gopal Varma | Aster CMI Hospital, Bangalore | جراحة المخ والأعصاب | Neuro Surgery
+Dr. Santhosh N U | Aster CMI Hospital, Bangalore | جراحة المخ والأعصاب | Neuro Surgery
+Dr. Anuradha H K | Aster CMI Hospital, Bangalore | طب الأعصاب | Neurology
+Dr. Lokesh B | Aster CMI Hospital, Bangalore | طب الأعصاب | Neurology
+Dr. Nikhil C. Hiremath | Aster CMI Hospital, Bangalore | طب الأعصاب | Neurology
+Dr. Keni Ravish Rajiv | Aster CMI Hospital, Bangalore | طب الأعصاب والصرع | Neurology & Epilepsy Centre
+Dr. Mythri Shankar | Aster CMI Hospital, Bangalore | الطب النووي | Nuclear Medicine
+Dr. Bhavani Stalin | Aster CMI Hospital, Bangalore | أمراض النساء والولادة | Obstetrics & Gynaecology
+Dr. Chetana V | Aster CMI Hospital, Bangalore | أمراض النساء والولادة | Obstetrics & Gynaecology
+Dr. Soumya Lakshmi T V | Aster CMI Hospital, Bangalore | أمراض النساء والولادة | Obstetrics & Gynaecology
+Dr. Varsha Desai Kale | Aster CMI Hospital, Bangalore | أمراض النساء والولادة | Obstetrics & Gynaecology
+Dr. Sagar Bhattad | Aster CMI Hospital, Bangalore | روماتيزم الأطفال والمناعة | Paediatric Rheumatology & Immunology
+Dr. Chetan Ginigeri | Aster CMI Hospital, Bangalore | طب الأطفال وحديثي الولادة | Paediatrics & Neonatology
+Dr. Parimala V Thirumalesh | Aster CMI Hospital, Bangalore | أطفال وحديثي الولادة | Paediatrics & Neonatology
+Dr. Raghuram CP | Aster CMI Hospital, Bangalore | أطفال وحديثي الولادة | Paediatrics & Neonatology
+Dr. Stalin Ramprakash | Aster CMI Hospital, Bangalore | أطفال وحديثي الولادة | Paediatrics & Neonatology
+Dr. Ravi Kumar C P | Aster CMI Hospital, Bangalore | أطفال وحديثي الولادة وأمراض الأعصاب للأطفال | Paediatrics, Neonatology & NeuKIDS
+Dr. Rohit Kumar C | Aster CMI Hospital, Bangalore | جراحة الأورام ورأس الرقبة | Surgical & Head & Neck Oncology
+Dr. Ashwin K R | Aster CMI Hospital, Bangalore | جراحة الأورام | Surgical Oncology
+Dr. Somashekhar S P | Aster CMI Hospital, Bangalore | جراحة الأورام | Surgical Oncology
+Dr. Vijay K Ahuja | Aster CMI Hospital, Bangalore | جراحة الأورام | Surgical Oncology
+Dr. Avinash T S | Aster CMI Hospital, Bangalore | جراحة المسالك البولية | Urology
+Dr. Giriraja Velayutham | Aster CMI Hospital, Bangalore | جراحة المسالك البولية | Urology
+Dr. Shashank M S | Aster CMI Hospital, Bangalore | جراحة المسالك البولية | Urology
+Dr. Divakar Bhat | Aster RV Hospital, Bangalore | جراحة القلب | Cardiac Surgery
+Dr. Ganesh Krishnan Iyer | Aster RV Hospital, Bangalore | جراحة القلب | Cardiac Surgery
+Dr. Shyam Sunder K R | Aster RV Hospital, Bangalore | أمراض القلب | Cardiology
+Prof. Dr. Nagamalesh U M | Aster RV Hospital, Bangalore | أمراض القلب | Cardiology
+Dr. Amogh V N | Aster RV Hospital, Bangalore | الأشعة التداخلية | Clinical Imaging & Interventional Radiology
+Dr. Ravindra B Kamble | Aster RV Hospital, Bangalore | الأشعة التداخلية | Clinical Imaging & Interventional Radiology
+Dr. Sudhakar Banakar | Aster RV Hospital, Bangalore | الأشعة التداخلية | Clinical Imaging & Interventional Radiology
+Dr. Vijaya Bhaskar S M | Aster RV Hospital, Bangalore | الأنف والأذن والحنجرة وزراعة السماعات | ENT & Hearing Implantology
+Dr. S Satish Kumar | Aster RV Hospital, Bangalore | الغدد الصماء والسكري | Endocrinology & Diabetology
+Dr. Girish P. Veeranna | Aster RV Hospital, Bangalore | طب الجهاز الهضمي | Gastro Science
+Dr. Madhu M P | Aster RV Hospital, Bangalore | طب الجهاز الهضمي | Gastro Science
+Dr. Ajay Kumar A V | Aster RV Hospital, Bangalore | جراحة عامة وجراحة الجهاز الهضمي | General & GI Surgery
+Dr. Satyajit Godhi | Aster RV Hospital, Bangalore | جراحة عامة وجراحة الجهاز الهضمي | General & GI Surgery
+Dr. Anoop P | Aster RV Hospital, Bangalore | أمراض الدم والأورام وزراعة نخاع العظم | Haematology, Haemato Oncology & BMT
+Dr. Sonal Asthana | Aster RV Hospital, Bangalore | رعاية الكبد وزراعة الكبد | Integrated Liver Care
+Dr. Harsha Kumar H N | Aster RV Hospital, Bangalore | أمراض الكلى | Nephrology
+Dr. Veerabhadra Guptha K | Aster RV Hospital, Bangalore | أمراض الكلى | Nephrology
+Dr. Dhananjaya I Bhat | Aster RV Hospital, Bangalore | جراحة المخ والأعصاب | Neuro Surgery
+Dr. Ravi Gopal Varma | Aster RV Hospital, Bangalore | جراحة المخ والأعصاب | Neuro Surgery
+Dr. B K Madhusudhan | Aster RV Hospital, Bangalore | طب الأعصاب | Neurology
+Dr. Shakthi K J S | Aster RV Hospital, Bangalore | طب الأعصاب | Neurology
+Dr. Jayashree K Bhat | Aster RV Hospital, Bangalore | طب العيون | Ophthalmology
+Dr. J V Srinivas | Aster RV Hospital, Bangalore | جراحة العظام | Orthopaedics
+Dr. Sagar Bhattad | Aster RV Hospital, Bangalore | روماتيزم الأطفال والمناعة | Paediatric Rheumatology & Immunology
+Dr. Chetan Ginigeri | Aster RV Hospital, Bangalore | طب الأطفال وحديثي الولادة | Paediatrics & Neonatology
+Dr. Raghuram CP | Aster RV Hospital, Bangalore | طب الأطفال وحديثي الولادة | Paediatrics & Neonatology
+Dr. Stalin Ramprakash | Aster RV Hospital, Bangalore | طب الأطفال وحديثي الولادة | Paediatrics & Neonatology
+Dr. Loganathan Venkatachalam | Aster RV Hospital, Bangalore | الطب الفيزيائي وإعادة التأهيل | Physical Medicine & Rehabilitation
+Dr. Murali Krishna | Aster RV Hospital, Bangalore | الطب النفسي | Psychiatry & Counselling Services
+Dr. Sandeep Attawar | Aster RV Hospital, Bangalore | أمراض الصدر | Pulmonology
+Dr. Somashekhar S P | Aster RV Hospital, Bangalore | جراحة الأورام | Surgical Oncology
+Dr. Rohit Kumar C | Aster RV Hospital, Bangalore | جراحة الأورام ورأس الرقبة | Surgical Oncology, Head & Neck Oncology
+Dr. Caranj S Venugopal | Aster RV Hospital, Bangalore | جراحة المسالك البولية | Urology
+Dr. Santhosh Bethur | Aster RV Hospital, Bangalore | جراحة المسالك البولية | Urology
+Dr. Yogesh K | Aster Whitefield Hospital, Bangalore | مناظير المفاصل | Arthroscopy & Sports Injury
+Dr. Nashi Semitha | Aster Whitefield Hospital, Bangalore | جراحة أورام الثدي | Breast Surgery
+Dr. Prashanth Y M | Aster Whitefield Hospital, Bangalore | جراحة القلب والصدر | CTVS
+Dr. Chirag D | Aster Whitefield Hospital, Bangalore | أمراض القلب | Cardiology
+Dr. Ajith Kumar A K | Aster Whitefield Hospital, Bangalore | العناية المركزة | Critical Care
+Dr. Nikhil Narayanaswamy | Aster Whitefield Hospital, Bangalore | العناية المركزة | Critical Care
+Dr. Pooja Murthy | Aster Whitefield Hospital, Bangalore | العناية المركزة | Critical Care
+Dr. Venkatesha Gupta K V | Aster Whitefield Hospital, Bangalore | العناية المركزة | Critical Care
+Dr. Khushboo Lath | Aster Whitefield Hospital, Bangalore | طب الأسنان | Dentistry
+Dr. Kushi C S | Aster Whitefield Hospital, Bangalore | طب الأسنان | Dentistry
+Dr. Sindhu U Muktamath | Aster Whitefield Hospital, Bangalore | طب الأسنان | Dentistry
+Dr. Priyanka Kuri | Aster Whitefield Hospital, Bangalore | جلدية | Dermatology
+Dr. Suma K R | Aster Whitefield Hospital, Bangalore | جلدية | Dermatology
+Dr. Bhuvaneshwari Parthiban | Aster Whitefield Hospital, Bangalore | أنف وأذن وحنجرة | ENT
+Dr. Jyotirmay S Hegde | Aster Whitefield Hospital, Bangalore | أنف وأذن وحنجرة | ENT & Skull Base Surgery
+Dr. Ashray V | Aster Whitefield Hospital, Bangalore | طب الطوارئ | Emergency Medicine
+Dr. Kushal Pandya | Aster Whitefield Hospital, Bangalore | طب الطوارئ | Emergency Medicine
+Dr. Narendra B S | Aster Whitefield Hospital, Bangalore | الغدد الصماء | Endocrinology
+Dr. Amulya R | Aster Whitefield Hospital, Bangalore | طب الأجنة | Fetal Medicine
+Dr. Shreshta Bhat | Aster Whitefield Hospital, Bangalore | طب الأجنة | Fetal Medicine
+Dr. Smitha D S | Aster Whitefield Hospital, Bangalore | طب الأجنة | Fetal Medicine
+Dr. Prabhakar B | Aster Whitefield Hospital, Bangalore | جراحة عامة ومناظير وروبوت | General & Laparoscopic Surgery
+Dr. Karthik A S | Aster Whitefield Hospital, Bangalore | جراحة عامة | General Surgery
+Dr. Esha R Shanbhag | Aster Whitefield Hospital, Bangalore | أورام النساء | Gynecologic Oncology
+Dr. Mythili Kundur | Aster Whitefield Hospital, Bangalore | أورام النساء | Gynecologic Oncology
+Dr. Vijay K Ahuja | Aster Whitefield Hospital, Bangalore | أورام النساء | Gynecologic Oncology
+Dr. H R S Girn | Aster Whitefield Hospital, Bangalore | زراعة الكبد | HPB & Transplant
+Dr. Anoop P | Aster Whitefield Hospital, Bangalore | أمراض الدم وزراعة نخاع | Haematology, Paediatric Haemato-Oncology & BMT
+Dr. Girish S. Shetkar | Aster Whitefield Hospital, Bangalore | أورام الرأس والرقبة | Head & Neck Oncology
+Dr. Narayana Subramaniam | Aster Whitefield Hospital, Bangalore | جراحة الرأس والرقبة | Head & Neck Surgery & Oncology
+Dr. Revanth Boddu | Aster Whitefield Hospital, Bangalore | أمراض الدم وزراعة نخاع | Hematology & BMT
+Dr. Akhil Deshmukh | Aster Whitefield Hospital, Bangalore | كبد | Hepatology
+Dr. Naveen Ganjoo | Aster Whitefield Hospital, Bangalore | كبد | Hepatology
+Dr. Mallikarjun Sakpal | Aster Whitefield Hospital, Bangalore | كبد | Hepatology & Transplant Physician
+Dr. Nayana D H | Aster Whitefield Hospital, Bangalore | أطفال الأنابيب | IVF & Reproductive Medicine
+Dr. Aishwarya R | Aster Whitefield Hospital, Bangalore | الأمراض المعدية | Infectious Diseases
+Dr. Abinaya Rathinasami | Aster Whitefield Hospital, Bangalore | الطب الباطني | Internal Medicine
+Dr. Basavaraj S Kumbar | Aster Whitefield Hospital, Bangalore | الطب الباطني | Internal Medicine
+Dr. Suchismitha Rajamanya | Aster Whitefield Hospital, Bangalore | الطب الباطني | Internal Medicine
+Dr. Naveen Chandra G S | Aster Whitefield Hospital, Bangalore | أمراض القلب التداخلية | Interventional Cardiology
+Dr. Dheeraj Shyam V N | Aster Whitefield Hospital, Bangalore | الأشعة التداخلية | Interventional Radiology
+Dr. Nischal Kundaragi | Aster Whitefield Hospital, Bangalore | الأشعة التداخلية | Interventional Radiology
+Dr. Rajaraman V | Aster Whitefield Hospital, Bangalore | الأشعة التداخلية | Interventional Radiology
+Dr. Vachan S Hukkeri | Aster Whitefield Hospital, Bangalore | زراعة الكبد | Liver Transplant
+Dr. Sonal Asthana | Aster Whitefield Hospital, Bangalore | زراعة الكبد | Liver Transplant & HPB Surgery
+Dr. Sreekanth P Kunjumon | Aster Whitefield Hospital, Bangalore | طب الأسنان | Maxillofacial Radiology
+Dr. C N Patil | Aster Whitefield Hospital, Bangalore | أورام طبية ودم | Medical & Haemato Oncology
+Dr. Abhijith B R | Aster Whitefield Hospital, Bangalore | أمراض الجهاز الهضمي | Medical Gastroenterology
+Dr. Ajay B R | Aster Whitefield Hospital, Bangalore | أمراض الجهاز الهضمي | Medical Gastroenterology
+Dr. Mallikarjun R Patil | Aster Whitefield Hospital, Bangalore | الوراثة الطبية | Medical Genetics
+Dr. Sai Vivek V | Aster Whitefield Hospital, Bangalore | أورام طبية | Medical Oncology
+Dr. Sneha Kommineni | Aster Whitefield Hospital, Bangalore | أورام طبية | Medical Oncology
+Dr. Vaishnavi Joshi | Aster Whitefield Hospital, Bangalore | أورام طبية | Medical Oncology
+Dr. Dheeraj Masapu | Aster Whitefield Hospital, Bangalore | تخدير الأعصاب | Neuro Anaesthesia
+Dr. Aravind P R | Aster Whitefield Hospital, Bangalore | طب التأهيل العصبي | Neuro Rehabilitation
+Dr. Balaji B S | Aster Whitefield Hospital, Bangalore | طب الأعصاب | Neurology & Epileptology
+Dr. Keni Ravish Rajiv | Aster Whitefield Hospital, Bangalore | طب الأعصاب | Neurology, Epilepsy
+Prof. Dr. Satish Rudrappa | Aster Whitefield Hospital, Bangalore | جراحة الأعصاب والعمود الفقري | Neurosurgery
+Prof. Dr. Swaroop Gopal | Aster Whitefield Hospital, Bangalore | جراحة الأعصاب | Neurosurgery
+Dr. Avinash Tupalli | Aster Whitefield Hospital, Bangalore | الطب النووي | Nuclear Medicine
+Dr. Mythri Shankar | Aster Whitefield Hospital, Bangalore | الطب النووي | Nuclear Medicine
+Dr. Prathap H J | Aster Whitefield Hospital, Bangalore | الطب النووي | Nuclear Medicine, Theranostics
+Dr. Deepthi Ashwin | Aster Whitefield Hospital, Bangalore | نساء وولادة | Obstetrics & Gynaecology
+Dr. Kavitha Kovi | Aster Whitefield Hospital, Bangalore | نساء وولادة | Obstetrics & Gynaecology
+Dr. Sandhya Rani | Aster Whitefield Hospital, Bangalore | نساء وولادة | Obstetrics & Gynaecology
+Dr. Vishnu Priya | Aster Whitefield Hospital, Bangalore | نساء وولادة | Obstetrics & Gynaecology
+Dr. Harsha G N | Aster Whitefield Hospital, Bangalore | جراحة العظام | Orthopedics, Joint Replacement
+Dr. C P Raghuram | Aster Whitefield Hospital, Bangalore | أمراض الدم للأطفال وBMT | Paediatric Haemato-Oncology & BMT
+Dr. Stalin Ramprakash | Aster Whitefield Hospital, Bangalore | أمراض الدم للأطفال وBMT | Paediatric Haemato-Oncology & BMT
+Dr. Sumithra S | Aster Whitefield Hospital, Bangalore | عناية الأطفال | Paediatric Intensive Care
+Dr. Manjiri Somashekhar | Aster Whitefield Hospital, Bangalore | جراحة الأطفال | Paediatric Surgery
+Dr. Palak Singhai | Aster Whitefield Hospital, Bangalore | جراحة الأطفال | Paediatric Surgery
+Dr. Lathiesh Kumar Kambham | Aster Whitefield Hospital, Bangalore | أطفال وحديثي الولادة | Paediatrics & Neonatology
+Dr. Srinivasa Murthy C L | Aster Whitefield Hospital, Bangalore | أطفال وحديثي الولادة | Paediatrics & Neonatology
+Dr. Amelia Sahana Michael | Aster Whitefield Hospital, Bangalore | الرعاية التلطيفية | Palliative Medicine
+Dr. Madhavi Thuyamani | Aster Whitefield Hospital, Bangalore | الرعاية التلطيفية | Palliative Medicine
+Dr. Raghavendra Ramanjulu | Aster Whitefield Hospital, Bangalore | الرعاية التلطيفية | Palliative Medicine & Rehab
+Dr. Abhijit Prakash Chougule | Aster Whitefield Hospital, Bangalore | علم الأمراض | Pathology
+Dr. Anand M S | Aster Whitefield Hospital, Bangalore | علم الأمراض | Pathology
+Dr. Susmita Rakshith | Aster Whitefield Hospital, Bangalore | علم الأمراض | Pathology & Histopathology
+Dr. Bharath A P | Aster Whitefield Hospital, Bangalore | قلب أطفال | Pediatric Cardiology
+Dr. Sujatha Thyagarajan | Aster Whitefield Hospital, Bangalore | طوارئ الأطفال | Pediatric Emergency & PICU
+Dr. Jahnavi M | Aster Whitefield Hospital, Bangalore | الغدد الصماء أطفال | Pediatric Endocrinology
+Dr. N. Kavitha Bhat | Aster Whitefield Hospital, Bangalore | الغدد الصماء أطفال | Pediatric Endocrinology
+Dr. Ashritha A | Aster Whitefield Hospital, Bangalore | أمراض الكبد للأطفال | Pediatric Hepatology
+Dr. Srikanta J T | Aster Whitefield Hospital, Bangalore | صدر أطفال | Pediatric Pulmonology
+Dr. Tejaswi Chandra | Aster Whitefield Hospital, Bangalore | صدر أطفال | Pediatric Pulmonology
+Dr. Jyothi Raghuram | Aster Whitefield Hospital, Bangalore | روماتيزم أطفال | Pediatric Rheumatology
+Dr. N Sudarshan Reddy | Aster Whitefield Hospital, Bangalore | جراحة التجميل | Plastic & Reconstructive Surgery
+Dr. Ashok B C | Aster Whitefield Hospital, Bangalore | جراحة التجميل | Plastic, Reconstructive & Aesthetic Surgery
+Dr. Pretty Duggar Gupta | Aster Whitefield Hospital, Bangalore | الطب النفسي | Psychiatry
+Ms. Neha K | Aster Whitefield Hospital, Bangalore | علم النفس | Psychology
+Dr. Rohit Shirgaonkar | Aster Whitefield Hospital, Bangalore | أمراض الصدر | Pulmonology
+Dr. Srivatsa Lokeshwaran | Aster Whitefield Hospital, Bangalore | أمراض الصدر | Pulmonology & Lung Transplant
+Dr. Jayant J B | Aster Whitefield Hospital, Bangalore | علاج الأورام بالإشعاع | Radiation Oncology
+Dr. M S Belliappa | Aster Whitefield Hospital, Bangalore | علاج الأورام بالإشعاع | Radiation Oncology
+Dr. Prathima Sivaguru | Aster Whitefield Hospital, Bangalore | علاج الأورام بالإشعاع | Radiation Oncology
+Dr. Pushpa Naga C H | Aster Whitefield Hospital, Bangalore | علاج الأورام بالإشعاع | Radiation Oncology
+Dr. Ram Charith Alva | Aster Whitefield Hospital, Bangalore | علاج الأورام بالإشعاع | Radiation Oncology
+Dr. Suneetha N | Aster Whitefield Hospital, Bangalore | علاج الأورام بالإشعاع | Radiation Oncology
+Dr. Namita Verma | Aster Whitefield Hospital, Bangalore | الأشعة | Radiology
+Dr. Sudhirkumar Kale | Aster Whitefield Hospital, Bangalore | الأشعة | Radiology
+Dr. Kiran K | Aster Whitefield Hospital, Bangalore | علم الأمراض | Renal & Transplant Pathology
+Dr. Yathish G C | Aster Whitefield Hospital, Bangalore | أمراض الروماتيزم | Rheumatology
+Dr. Ramachandran G | Aster Whitefield Hospital, Bangalore | جراحة العمود الفقري | Spine Surgery
+Prof. Dr. Somashekhar S P | Aster Whitefield Hospital, Bangalore | جراحة الأورام النسائية والروبوت | Surgical & Gynaecological Oncology / Robotic Surgery, HIPEC, PIPAC
+Dr. Vinodha Reddy K | Aster Whitefield Hospital, Bangalore | جراحة الجهاز الهضمي والمناظير | Surgical Gastroenterology & Bariatric
+Dr. Darshan Patil | Aster Whitefield Hospital, Bangalore | جراحة الأورام | Surgical Oncology
+Dr. Elvis Peter Joseph | Aster Whitefield Hospital, Bangalore | جراحة الأورام | Surgical Oncology
+Dr. Kushal Agrawal | Aster Whitefield Hospital, Bangalore | جراحة الأورام | Surgical Oncology
+Dr. Deo Ravindra Padmakar | Aster Whitefield Hospital, Bangalore | جراحة الأورام والرأس والرقبة | Surgical Oncology & Head & Neck Oncology
+Dr. Jagannath Dixit | Aster Whitefield Hospital, Bangalore | جراحة الأورام والمناظير والروبوت | Surgical Oncology & Robotic
+Dr. Ashwin K R | Aster Whitefield Hospital, Bangalore | جراحة الأورام والروبوت | Surgical Oncology & Robotic Surgery
+Dr. Rohit Kumar C | Aster Whitefield Hospital, Bangalore | جراحة الأورام | Surgical Oncology & Robotic Surgery
+Dr. Sachin Arakere Nataraj | Aster Whitefield Hospital, Bangalore | أورام المسالك والروبوت | Uro-oncology & Robotic Surgery
+Dr. Gokulakrishnan P J | Aster Whitefield Hospital, Bangalore | جراحة المسالك | Urology
+Dr. Anoop T | Aster Whitefield Hospital, Bangalore | جراحة الأوعية الدموية | Vascular Surgery
+Dr. Murali Manohhar | Fortis Hospital, BG Road Bangalore | جراحة القلب | Cardiac Surgery
+Dr. Vivek Jawali | Fortis Hospital, BG Road Bangalore | جراحة القلب | Cardiac Surgery
+Dr. Rajpal Singh R L | Fortis Hospital, BG Road Bangalore | أمراض القلب | Cardiology
+Dr. Shashidhara | Fortis Hospital, BG Road Bangalore | أمراض القلب | Cardiology
+Dr. Srinivas Prasad | Fortis Hospital, BG Road Bangalore | أمراض القلب | Cardiology
+Dr. Susheen Dutt | Fortis Hospital, BG Road Bangalore | أنف وأذن وحنجرة | ENT
+Dr. Srinivas Munigoti / Srinivasa Phanidhar Munigoti | Fortis Hospital, BG Road Bangalore | الغدد الصماء أو طب عام | Endocrinology / General Medicine
+Dr. Sreedhara V. | Fortis Hospital, BG Road Bangalore | جراحة السمنة والمناظير | GI, Minimal Access & Bariatric Surgery
+Dr. Ravindra B.S | Fortis Hospital, BG Road Bangalore | الجهاز الهضمي | Gastroenterology
+Dr. Sunil Kasturi | Fortis Hospital, BG Road Bangalore | الجهاز الهضمي أو طب عام | Gastroenterology / General
+Dr. Girikumar Venati | Fortis Hospital, BG Road Bangalore | طبيب عام وسكري | General Physician & Diabetologist
+Dr. Manish Joshi | Fortis Hospital, BG Road Bangalore | جراحة عامة | General Surgery
+Dr. Shashikiran | Fortis Hospital, BG Road Bangalore | جراحة عامة | General Surgery
+Dr. Kishore U.S.B | Fortis Hospital, BG Road Bangalore | زراعة الكبد | HBP & Liver Transplant
+Dr. Sheela Murali Chakravarthy | Fortis Hospital, BG Road Bangalore | الطب الباطني | Internal Medicine
+Dr. Sudha Vinod Menon | Fortis Hospital, BG Road Bangalore | الطب الباطني | Internal Medicine
+Dr. Prajwith Rai | Fortis Hospital, BG Road Bangalore | أشعة تداخلية | Interventional Radiology
+Dr. Niti Raizada | Fortis Hospital, BG Road Bangalore | أورام طبية | Medical Oncology
+Dr. Ashish Parek / Aashish Parekh | Fortis Hospital, BG Road Bangalore | أمراض الكلى | Nephrology
+Dr. Rajanna Sreedhara | Fortis Hospital, BG Road Bangalore | أمراض الكلى | Nephrology
+Dr. Rajakumar D.V | Fortis Hospital, BG Road Bangalore | جراحة العمود الفقري والمخ والاعصاب | Neuro & Spine Surgery
+Dr. Grober | Fortis Hospital, BG Road Bangalore | طب الأعصاب | Neurology
+Dr. Sreekanta Swamy | Fortis Hospital, BG Road Bangalore | طب الأعصاب | Neurology
+Dr. Deshpande Vasudevarao Rajakumar | Fortis Hospital, BG Road Bangalore | جراحة المخ والأعصاب | Neurosurgery
+Dr. Murali Krishna | Fortis Hospital, BG Road Bangalore | جراحة الأعصاب | Neurosurgery
+Dr. Gayana | Fortis Hospital, BG Road Bangalore | الطب النووي | Nuclear Medicine
+Dr. Mohan Karisankappa Puttaswamy | Fortis Hospital, BG Road Bangalore | جراحة العظام | Orthopaedics
+Dr. Narayan Hulse | Fortis Hospital, BG Road Bangalore | جراحة العظام | Orthopaedics
+Dr. Naveen D | Fortis Hospital, BG Road Bangalore | جراحة العظام | Orthopaedics
+Dr. Mohan Puttaswamy | Fortis Hospital, BG Road Bangalore | جراحة العظام | Orthopedics
+Dr. Venu Gopal | Fortis Hospital, BG Road Bangalore | جراحة العظام | Orthopedics
+Dr. Vivek Anand Padegal | Fortis Hospital, BG Road Bangalore | أمراض الصدر | Pulmonology
+Dr. Srinivasa C | Fortis Hospital, BG Road Bangalore | أمراض الروماتيزم أو طب عام | Rheumatology / General Medicine
+Dr. Sudarshan | Fortis Hospital, BG Road Bangalore | جراحة القلب الروبوتية | Robotic Cardiac Surgery
+Dr. Karibasavaraja | Fortis Hospital, BG Road Bangalore | جراحة المسالك البولية | Urology
+Dr. Mohan Keshavamurthy | Fortis Hospital, BG Road Bangalore | جراحة المسالك البولية | Urology
+Dr. Nlgar | Fortis Hospital, BG Road Bangalore | جراحة المسالك البولية | Urology
+Dr. Hosahalli Rajanna Sunilkumar | HCG Hospital, K R Road Bangalore | تخدير | Anesthesia
+Dr. Anand Subraya Bhat | HCG Hospital, K R Road Bangalore | جراحة القلب والصدر والأوعية | Cardiothoracic & Vascular Surgery
+Dr. Brindha Sitaram | HCG Hospital, K R Road Bangalore | علم النفس الإكلينيكي | Clinical Psychology
+Dr. Gaurav Shankar Medikeri | HCG Hospital, K R Road Bangalore | أنف وأذن وحنجرة | ENT
+Dr. Jeevan H R | HCG Hospital, K R Road Bangalore | الجهاز الهضمي | Gastroenterology
+Dr. Bharat Gadhavi | HCG Hospital, K R Road Bangalore | جراحة عامة | General Surgery
+Dr. Gaurav Medikeri | HCG Hospital, K R Road Bangalore | جراحة عامة | General Surgery
+Dr. Abhilasha Narayan | HCG Hospital, K R Road Bangalore | أورام نسائية | Gynecologic Oncology
+Dr. Ganesh Datta Borewad | HCG Hospital, K R Road Bangalore | أورام الرأس والعنق | Head & Neck Oncology
+Dr. K Bhavya | HCG Hospital, K R Road Bangalore | أورام الرأس والعنق | Head & Neck Oncology
+Dr. Aishwarya N | HCG Hospital, K R Road Bangalore | عناية مشددة | Intensive Care
+Dr. Divya Gangoli | HCG Hospital, K R Road Bangalore | عناية مشددة | Intensive Care
+Dr. Abhideep Chaudhary | HCG Hospital, K R Road Bangalore | زراعة الكبد | Liver Transplant
+Dr. Basant Mahadevappa | HCG Hospital, K R Road Bangalore | زراعة الكبد | Liver Transplant
+Dr. Bhushan Chittawadagi | HCG Hospital, K R Road Bangalore | زراعة الكبد | Liver Transplant
+Dr. B J Srinivasa | HCG Hospital, K R Road Bangalore | أورام طبية | Medical Oncology
+Dr. Intezar Mehdi | HCG Hospital, K R Road Bangalore | أورام طبية | Medical Oncology
+Dr. Amresh Bhaganagare | HCG Hospital, K R Road Bangalore | جراحة المخ والأعصاب | Neurosurgery
+Dr. Kumarswamy Gangadharayya Kallur | HCG Hospital, K R Road Bangalore | الطب النووي | Nuclear Medicine
+Dr. Jayashree K Bhat | HCG Hospital, K R Road Bangalore | طب العيون | Ophthalmology
+Dr. Apoorva Narasimha Iyengar | HCG Hospital, K R Road Bangalore | جراحة الفم والوجه والفكين | Oral & Maxillofacial Surgery
+Dr. Arun Krishna A R | HCG Hospital, K R Road Bangalore | جراحة الفم والوجه والفكين | Oral & Maxillofacial Surgery
+Dr. Govinda Kishor Auradkar | HCG Hospital, K R Road Bangalore | أمراض قلب الأطفال | Paediatric Cardiology
+Dr. Amit Galgali | HCG Hospital, K R Road Bangalore | طب أطفال أورام | Paediatric Oncology
+Dr. Mahendra Kumar Kulkarni | HCG Hospital, K R Road Bangalore | جراحة التجميل | Plastic Surgery
+Dr. Kedar Ravi Hibare | HCG Hospital, K R Road Bangalore | أمراض الصدر | Pulmonology
+Dr. Ajay G V | HCG Hospital, K R Road Bangalore | علاج الأورام بالإشعاع | Radiation Oncology
+Dr. Anirudh V S | HCG Hospital, K R Road Bangalore | علاج الأورام بالإشعاع | Radiation Oncology
+Dr. Hasib Abdul Gaffor | HCG Hospital, K R Road Bangalore | علاج الأورام بالإشعاع | Radiation Oncology
+Dr. Kirthi Koushik A.S | HCG Hospital, K R Road Bangalore | علاج الأورام بالإشعاع | Radiation Oncology
+Dr. Krithikaa S | HCG Hospital, K R Road Bangalore | علاج الأورام بالإشعاع | Radiation Oncology
+Dr. Lohith G | HCG Hospital, K R Road Bangalore | علاج الأورام بالإشعاع | Radiation Oncology
+Dr. Anand S | HCG Hospital, K R Road Bangalore | جراحة الأورام | Surgical Oncology
+Dr. Dinesh M G | HCG Hospital, K R Road Bangalore | جراحة الأورام | Surgical Oncology
+Dr. Krithika Murugan | HCG Hospital, K R Road Bangalore | جراحة الأورام | Surgical Oncology
+Dr. Deepak Krishnappa | HCG Hospital, K R Road Bangalore | جراحة المسالك البولية | Urology
+Dr. Lingesh Sairam Chelliah | HCG Hospital, K R Road Bangalore | جراحة المسالك البولية | Urology
+Dr. Mudit Tyagi | L V Prasad Eye Institute, Hyderabad | الساد والعدسات | Cataract & IOL
+Dr. Jagat Ram | L V Prasad Eye Institute, Hyderabad | الساد والعدسات | Cataract & IOL Services
+Dr. Swapna Kakade | L V Prasad Eye Institute, Hyderabad | عيون شاملة | Comprehensive Ophthalmology
+Dr. Debananda Padhy | L V Prasad Eye Institute, Hyderabad | القرنية | Cornea
+Dr. Murugesan Vanathi | L V Prasad Eye Institute, Hyderabad | القرنية | Cornea
+Dr. Radhika Tandon | L V Prasad Eye Institute, Hyderabad | القرنية | Cornea
+Dr. Prashant Garg | L V Prasad Eye Institute, Hyderabad | القرنية | Cornea & External Diseases
+Dr. Sayan Basu | L V Prasad Eye Institute, Hyderabad | القرنية والسطح العيني | Cornea & Ocular Surface
+Dr. Srinivas K. Rao | L V Prasad Eye Institute, Hyderabad | القرنية وتصحيح النظر | Cornea & Refractive Surgery
+Dr. Virender S. Sangwan | L V Prasad Eye Institute, Hyderabad | القرنية والخلايا الجذعية | Cornea & Stem Cell
+Dr. Somasheila I. Murthy | L V Prasad Eye Institute, Hyderabad | القرنية | Cornea Services
+Dr. Bhagabat Nayak | L V Prasad Eye Institute, Hyderabad | المياه الزرقاء | Glaucoma
+Dr. Sirisha Senthil | L V Prasad Eye Institute, Hyderabad | المياه الزرقاء | Glaucoma
+Dr. Rohit Khanna | L V Prasad Eye Institute, Hyderabad | المياه الزرقاء | Glaucoma Services
+Dr. Sudheer Kumar Shantha Kumari | L V Prasad Eye Institute, Hyderabad | أعصاب العين | Neuro Ophthalmology
+Dr. Sumita Agarkar | L V Prasad Eye Institute, Hyderabad | أعصاب العين | Neuro Ophthalmology
+Dr. Aparna Ramasubramanian | L V Prasad Eye Institute, Hyderabad | أورام العين | Ocular Oncology
+Dr. Madan Deshpande | L V Prasad Eye Institute, Hyderabad | تجميل الجفون | Oculoplasty
+Dr. Mohammad Javed Ali | L V Prasad Eye Institute, Hyderabad | تجميل الجفون والقناة الدمعية | Oculoplasty & Lacrimal
+Dr. Santosh G. Honavar | L V Prasad Eye Institute, Hyderabad | تجميل الجفون وأورام العين | Oculoplasty & Oncology
+Dr. Joveeta Joseph | L V Prasad Eye Institute, Hyderabad | عيون الأطفال | Paediatric Ophthalmology
+Dr. Ramesh Kekunnaya | L V Prasad Eye Institute, Hyderabad | عيون الأطفال | Paediatric Ophthalmology
+Dr. Taraprasad Das | L V Prasad Eye Institute, Hyderabad | الشبكية والزجاجية | Retina & Vitreous
+Dr. Subhadra Jalali | L V Prasad Eye Institute, Hyderabad | اعتلال الشبكية لدى الأطفال الخدّج | Retinopathy of Prematurity
+Dr. Muralidhar Ramappa | L V Prasad Eye Institute, Hyderabad | التهاب العنبية | Uveitis Services
+Dr. Anthony Vipin Das | L V Prasad Eye Institute, Hyderabad | الشبكية | Vitreoretinal Services
+Dr. Gowri Shankar Gopi | L V Prasad Eye Institute, Hyderabad | الشبكية | Vitreoretinal Services
+Dr. Rajeev Reddy Pappuru | L V Prasad Eye Institute, Hyderabad | جراحة الشبكية | Vitreoretinal Surgery
+Dr. Vivek P. Dave | L V Prasad Eye Institute, Hyderabad | جراحة الشبكية | Vitreoretinal Surgery
+Dr. Aruna C Ramesh | M S Ramaiah Memorial Hospital, Bangalore | طب الطوارئ | Accident & Emergency (Emergency Medicine)
+Dr. Hariprasad K V | M S Ramaiah Memorial Hospital, Bangalore | طب الطوارئ | Accident & Emergency (Emergency Medicine)
+Dr. Jerry Jacob | M S Ramaiah Memorial Hospital, Bangalore | طب الطوارئ | Accident & Emergency (Emergency Medicine)
+Dr. Keshava Murthy M R | M S Ramaiah Memorial Hospital, Bangalore | طب الطوارئ | Accident & Emergency (Emergency Medicine)
+Dr. Shruthi Deshpande | M S Ramaiah Memorial Hospital, Bangalore | طب الطوارئ | Accident & Emergency (Emergency Medicine)
+Dr. Treepti | M S Ramaiah Memorial Hospital, Bangalore | طب الطوارئ | Accident & Emergency (Emergency Medicine)
+Dr. Archana S | M S Ramaiah Memorial Hospital, Bangalore | تخدير | Anesthesiology
+Dr. Ashwini Turai | M S Ramaiah Memorial Hospital, Bangalore | تخدير | Anesthesiology
+Dr. Balakrishna Shenoy | M S Ramaiah Memorial Hospital, Bangalore | تخدير | Anesthesiology
+Dr. Chandana Balram | M S Ramaiah Memorial Hospital, Bangalore | تخدير | Anesthesiology
+Dr. Geetha C R | M S Ramaiah Memorial Hospital, Bangalore | تخدير | Anesthesiology
+Dr. Guru Police Patel | M S Ramaiah Memorial Hospital, Bangalore | تخدير | Anesthesiology
+Dr. Leena H P | M S Ramaiah Memorial Hospital, Bangalore | تخدير | Anesthesiology
+Dr. Nanditha Shreedhar | M S Ramaiah Memorial Hospital, Bangalore | تخدير | Anesthesiology
+Dr. Navdeep | M S Ramaiah Memorial Hospital, Bangalore | تخدير | Anesthesiology
+Dr. Prapti Rath | M S Ramaiah Memorial Hospital, Bangalore | تخدير | Anesthesiology
+Dr. Prathima P T | M S Ramaiah Memorial Hospital, Bangalore | تخدير | Anesthesiology
+Dr. Sandya Rani | M S Ramaiah Memorial Hospital, Bangalore | تخدير | Anesthesiology
+Dr. Sharmila | M S Ramaiah Memorial Hospital, Bangalore | تخدير | Anesthesiology
+Dr. Shruthi N S | M S Ramaiah Memorial Hospital, Bangalore | تخدير | Anesthesiology
+Dr. Tejesh C A | M S Ramaiah Memorial Hospital, Bangalore | تخدير | Anesthesiology
+Dr. Yatish B | M S Ramaiah Memorial Hospital, Bangalore | تخدير | Anesthesiology
+Dr. Manjunath A C | M S Ramaiah Memorial Hospital, Bangalore | تخدير وإدارة الألم | Anesthesiology & Pain Management
+Dr. D. Deepa | M S Ramaiah Memorial Hospital, Bangalore | بنك الدم | Blood Bank / Transfusion Medicine
+Dr. Nanda Kishore V | M S Ramaiah Memorial Hospital, Bangalore | بنك الدم | Blood Bank / Transfusion Medicine
+Dr. Nandakishore Alva N | M S Ramaiah Memorial Hospital, Bangalore | بنك الدم | Blood Bank / Transfusion Medicine
+Dr. Anandathirtha H. S | M S Ramaiah Memorial Hospital, Bangalore | جراحة القلب والصدر | Cardio Thoracic Surgery
+Dr. Anupama V Hegde | M S Ramaiah Memorial Hospital, Bangalore | أمراض القلب | Cardiology
+Dr. Prakash V S | M S Ramaiah Memorial Hospital, Bangalore | أمراض القلب | Cardiology
+Dr. Ramkumar S | M S Ramaiah Memorial Hospital, Bangalore | أمراض القلب | Cardiology
+Dr. Ravi Narayan | M S Ramaiah Memorial Hospital, Bangalore | أمراض القلب | Cardiology
+Dr. Varsha Rakshitha P | M S Ramaiah Memorial Hospital, Bangalore | أمراض القلب | Cardiology
+Dr. Mukundan Seshadri | M S Ramaiah Memorial Hospital, Bangalore | جراحة القلب والصدر والأوعية | Cardiovascular & Thoracic Surgery (CTVS)
+Dr. Bhagyalakshmi. M | M S Ramaiah Memorial Hospital, Bangalore | عناية مركزة | Critical Care Medicine
+Dr. Deepak. T. S | M S Ramaiah Memorial Hospital, Bangalore | عناية مركزة | Critical Care Medicine
+Dr. Faizya Taskeen | M S Ramaiah Memorial Hospital, Bangalore | عناية مركزة | Critical Care Medicine
+Dr. Radha. M. G | M S Ramaiah Memorial Hospital, Bangalore | عناية مركزة | Critical Care Medicine
+Dr. Ramya. D. M | M S Ramaiah Memorial Hospital, Bangalore | عناية مركزة | Critical Care Medicine
+Dr. Rooparani. K | M S Ramaiah Memorial Hospital, Bangalore | عناية مركزة | Critical Care Medicine
+Dr. Thejeswini | M S Ramaiah Memorial Hospital, Bangalore | عناية مركزة | Critical Care Medicine
+Dr. Vikas. K. N | M S Ramaiah Memorial Hospital, Bangalore | عناية مركزة | Critical Care Medicine
+Dr. Vinay. R | M S Ramaiah Memorial Hospital, Bangalore | عناية مركزة | Critical Care Medicine
+Dr. A. S. Madhura | M S Ramaiah Memorial Hospital, Bangalore | طب الأسنان | Dental Surgery
+Dr. Amulya V. Rai | M S Ramaiah Memorial Hospital, Bangalore | طب الأسنان | Dental Surgery
+Dr. Madhubala | M S Ramaiah Memorial Hospital, Bangalore | طب الأسنان | Dental Surgery
+Dr. O. P. Kharbanda | M S Ramaiah Memorial Hospital, Bangalore | طب الأسنان | Dental Surgery
+Dr. Priyanka Rawat | M S Ramaiah Memorial Hospital, Bangalore | طب الأسنان | Dental Surgery
+Dr. Renu Kharbanda | M S Ramaiah Memorial Hospital, Bangalore | طب الأسنان | Dental Surgery
+Dr. Sayanthi Hazra | M S Ramaiah Memorial Hospital, Bangalore | طب الأسنان | Dental Surgery
+Dr. Deena Patil | M S Ramaiah Memorial Hospital, Bangalore | جلدية وتجميل | Dermatology & Cosmetology
+Dr. K. N. Shivaswamy | M S Ramaiah Memorial Hospital, Bangalore | جلدية وتجميل | Dermatology & Cosmetology
+Dr. Praveen Kumar S | M S Ramaiah Memorial Hospital, Bangalore | جلدية وتجميل | Dermatology & Cosmetology
+Dr. Sudha Banti | M S Ramaiah Memorial Hospital, Bangalore | جلدية وتجميل | Dermatology & Cosmetology
+Dr. Suparna. M. Y | M S Ramaiah Memorial Hospital, Bangalore | جلدية وتجميل | Dermatology & Cosmetology
+Dr. T. K. Sumathy | M S Ramaiah Memorial Hospital, Bangalore | جلدية وتجميل | Dermatology & Cosmetology
+Dr. Chandrakiran C. | M S Ramaiah Memorial Hospital, Bangalore | أنف وأذن وحنجرة | ENT
+Dr. Harshavardhan N. Reddy | M S Ramaiah Memorial Hospital, Bangalore | أنف وأذن وحنجرة | ENT
+Dr. Sanjay B Patil | M S Ramaiah Memorial Hospital, Bangalore | أنف وأذن وحنجرة | ENT
+Dr. Soujanya Balaraj | M S Ramaiah Memorial Hospital, Bangalore | أنف وأذن وحنجرة | ENT
+Dr. Sumanth K. R. | M S Ramaiah Memorial Hospital, Bangalore | أنف وأذن وحنجرة | ENT
+Dr. Surya Prakash D. R. | M S Ramaiah Memorial Hospital, Bangalore | أنف وأذن وحنجرة | ENT
+Dr. Chitra. S | M S Ramaiah Memorial Hospital, Bangalore | الغدد الصماء | Endocrinology
+Dr. Ganavi. Y. P | M S Ramaiah Memorial Hospital, Bangalore | الغدد الصماء | Endocrinology
+Dr. K. M. Suryanarayana | M S Ramaiah Memorial Hospital, Bangalore | الغدد الصماء | Endocrinology
+Dr. Manjunath P R | M S Ramaiah Memorial Hospital, Bangalore | الغدد الصماء | Endocrinology
+Dr. Pramila Kalra | M S Ramaiah Memorial Hospital, Bangalore | الغدد الصماء | Endocrinology
+Dr. Akshay Rao | M S Ramaiah Memorial Hospital, Bangalore | طب عام | General Medicine
+Dr. Anil Kumar T | M S Ramaiah Memorial Hospital, Bangalore | طب عام | General Medicine
+Dr. Ashwin Kulkarni | M S Ramaiah Memorial Hospital, Bangalore | طب عام | General Medicine
+Dr. Divya Prabhu | M S Ramaiah Memorial Hospital, Bangalore | طب عام | General Medicine
+Dr. Megha Reddy | M S Ramaiah Memorial Hospital, Bangalore | طب عام | General Medicine
+Dr. Mohammed Suhail K | M S Ramaiah Memorial Hospital, Bangalore | طب عام | General Medicine
+Dr. Nagesh Kumar | M S Ramaiah Memorial Hospital, Bangalore | طب عام | General Medicine
+Dr. Shaikh Mohammed Aslam S | M S Ramaiah Memorial Hospital, Bangalore | طب عام | General Medicine
+Dr. Srikanth | M S Ramaiah Memorial Hospital, Bangalore | طب عام | General Medicine
+Dr. Tharanath Shankar | M S Ramaiah Memorial Hospital, Bangalore | طب عام | General Medicine
+Dr. Vijayashree Thyagaraj | M S Ramaiah Memorial Hospital, Bangalore | طب عام | General Medicine
+Dr Nandakumar B M | M S Ramaiah Memorial Hospital, Bangalore | جراحة عامة | General Surgery
+Dr. Bharati V Hiremath | M S Ramaiah Memorial Hospital, Bangalore | جراحة عامة | General Surgery
+Dr. Kalaivani V | M S Ramaiah Memorial Hospital, Bangalore | جراحة عامة | General Surgery
+Dr. Madan K | M S Ramaiah Memorial Hospital, Bangalore | جراحة عامة | General Surgery
+Dr. Narayana Swamy Chetty | M S Ramaiah Memorial Hospital, Bangalore | جراحة عامة | General Surgery
+Dr. Navyashree C | M S Ramaiah Memorial Hospital, Bangalore | جراحة عامة | General Surgery
+Dr. Sagar Z | M S Ramaiah Memorial Hospital, Bangalore | جراحة عامة | General Surgery
+Dr. Shaik Mohammad Safiuddin | M S Ramaiah Memorial Hospital, Bangalore | جراحة عامة | General Surgery
+Dr. Shashank G | M S Ramaiah Memorial Hospital, Bangalore | جراحة عامة | General Surgery
+Dr. Sreekar Pai A | M S Ramaiah Memorial Hospital, Bangalore | جراحة عامة | General Surgery
+Dr. Sreevathsa M R | M S Ramaiah Memorial Hospital, Bangalore | جراحة عامة | General Surgery
+Dr. Srikantaiah H C | M S Ramaiah Memorial Hospital, Bangalore | جراحة عامة | General Surgery
+Dr. Sudharshan S. Murthy | M S Ramaiah Memorial Hospital, Bangalore | جراحة عامة | General Surgery
+Dr. Suhas Devanathan | M S Ramaiah Memorial Hospital, Bangalore | جراحة عامة | General Surgery
+Dr. Syed Faizan | M S Ramaiah Memorial Hospital, Bangalore | جراحة عامة | General Surgery
+Dr. Avinash B | M S Ramaiah Memorial Hospital, Bangalore | أمراض الجهاز الهضمي | Medical Gastroenterology
+Dr. Harshavardhan Rao B | M S Ramaiah Memorial Hospital, Bangalore | أمراض الجهاز الهضمي | Medical Gastroenterology
+Dr. Nishil Gowda | M S Ramaiah Memorial Hospital, Bangalore | أورام طبية | Medical Oncology
+Dr. Rasmi Palassery | M S Ramaiah Memorial Hospital, Bangalore | أورام طبية | Medical Oncology
+Dr. Santhosh Devadas | M S Ramaiah Memorial Hospital, Bangalore | أورام طبية | Medical Oncology
+Dr. Vinayak Maka | M S Ramaiah Memorial Hospital, Bangalore | أورام طبية | Medical Oncology
+Dr. Krithika | M S Ramaiah Memorial Hospital, Bangalore | حديثي الولادة | Neonatology
+Dr. Pradeep G C M | M S Ramaiah Memorial Hospital, Bangalore | حديثي الولادة | Neonatology
+Dr. Sharanabasavesh. M | M S Ramaiah Memorial Hospital, Bangalore | حديثي الولادة | Neonatology
+Dr. Gireesh M. S. | M S Ramaiah Memorial Hospital, Bangalore | أمراض الكلى | Nephrology
+Dr. Mahesh E | M S Ramaiah Memorial Hospital, Bangalore | أمراض الكلى | Nephrology
+Dr. Mohammad Yousuff | M S Ramaiah Memorial Hospital, Bangalore | أمراض الكلى | Nephrology
+Dr. Pooja Prakash Prabhu | M S Ramaiah Memorial Hospital, Bangalore | أمراض الكلى | Nephrology
+Dr.Rajashekar MD, DM | M S Ramaiah Memorial Hospital, Bangalore | أمراض الكلى | Nephrology
+Dr. Geetha. L | M S Ramaiah Memorial Hospital, Bangalore | تخدير أعصاب وعناية عصبية | Neuroanesthesia & Neurocritical Care
+Dr. Madhusudhana Rao | M S Ramaiah Memorial Hospital, Bangalore | تخدير أعصاب وعناية عصبية | Neuroanesthesia & Neurocritical Care
+Dr. Seham Syeda | M S Ramaiah Memorial Hospital, Bangalore | تخدير أعصاب وعناية عصبية | Neuroanesthesia & Neurocritical Care
+Dr. Anish Mehta | M S Ramaiah Memorial Hospital, Bangalore | طب الأعصاب | Neurology
+Dr. Divya Nagabushana | M S Ramaiah Memorial Hospital, Bangalore | طب الأعصاب | Neurology
+Dr. Kumara Swamy | M S Ramaiah Memorial Hospital, Bangalore | طب الأعصاب | Neurology
+Dr. Mahendra. J. V | M S Ramaiah Memorial Hospital, Bangalore | طب الأعصاب | Neurology
+Dr. P. T. Acharya | M S Ramaiah Memorial Hospital, Bangalore | طب الأعصاب | Neurology
+Dr. Pradeep R | M S Ramaiah Memorial Hospital, Bangalore | طب الأعصاب | Neurology
+Dr. Nishchit Hegde | M S Ramaiah Memorial Hospital, Bangalore | جراحة المخ والأعصاب | Neurosurgery
+Dr. Parichay J Perikal | M S Ramaiah Memorial Hospital, Bangalore | جراحة المخ والأعصاب | Neurosurgery
+Dr. Rakshith Srinivasa | M S Ramaiah Memorial Hospital, Bangalore | جراحة المخ والأعصاب | Neurosurgery
+Dr. Shabari Girishan K. V. | M S Ramaiah Memorial Hospital, Bangalore | جراحة المخ والأعصاب | Neurosurgery
+Dr. Sunil Valentine Furtado | M S Ramaiah Memorial Hospital, Bangalore | جراحة المخ والأعصاب | Neurosurgery
+Dr.(Prof) A. S. Hegde | M S Ramaiah Memorial Hospital, Bangalore | جراحة المخ والأعصاب | Neurosurgery
+Dr. Asha Swaroop | M S Ramaiah Memorial Hospital, Bangalore | نساء وولادة | Obstetrics & Gynecology
+Dr. Gayatri Devi | M S Ramaiah Memorial Hospital, Bangalore | نساء وولادة | Obstetrics & Gynecology
+Dr. Jyothi G. S | M S Ramaiah Memorial Hospital, Bangalore | نساء وولادة | Obstetrics & Gynecology
+Dr. K. Padma | M S Ramaiah Memorial Hospital, Bangalore | نساء وولادة | Obstetrics & Gynecology
+Dr. Mamatha | M S Ramaiah Memorial Hospital, Bangalore | نساء وولادة | Obstetrics & Gynecology
+Dr. Manjula. N. V. | M S Ramaiah Memorial Hospital, Bangalore | نساء وولادة | Obstetrics & Gynecology
+Dr. Nandini. G. | M S Ramaiah Memorial Hospital, Bangalore | نساء وولادة | Obstetrics & Gynecology
+Dr. Nivedita Reshme | M S Ramaiah Memorial Hospital, Bangalore | نساء وولادة | Obstetrics & Gynecology
+Dr. Seema Mehrotra | M S Ramaiah Memorial Hospital, Bangalore | نساء وولادة | Obstetrics & Gynecology
+Dr. Sujani. B. K | M S Ramaiah Memorial Hospital, Bangalore | نساء وولادة | Obstetrics & Gynecology
+Dr. Sundari N | M S Ramaiah Memorial Hospital, Bangalore | نساء وولادة | Obstetrics & Gynecology
+Dr. Umadevi. K | M S Ramaiah Memorial Hospital, Bangalore | نساء وولادة | Obstetrics & Gynecology
+Dr. Urvashi | M S Ramaiah Memorial Hospital, Bangalore | نساء وولادة | Obstetrics & Gynecology
+Dr. Ananth Bhandary S. | M S Ramaiah Memorial Hospital, Bangalore | طب العيون | Ophthalmology
+Dr. Divya D Sundaresh | M S Ramaiah Memorial Hospital, Bangalore | طب العيون | Ophthalmology
+Dr. Ksheeraja. Y | M S Ramaiah Memorial Hospital, Bangalore | طب العيون | Ophthalmology
+Dr. Soumya Ramani | M S Ramaiah Memorial Hospital, Bangalore | طب العيون | Ophthalmology
+Dr. Thanuja G P | M S Ramaiah Memorial Hospital, Bangalore | طب العيون | Ophthalmology
+Dr Ponnanna K M | M S Ramaiah Memorial Hospital, Bangalore | جراحة العظام | Orthopaedics
+Dr. Ajoy S M | M S Ramaiah Memorial Hospital, Bangalore | جراحة العظام | Orthopaedics
+Dr. Ashok Kumar P | M S Ramaiah Memorial Hospital, Bangalore | جراحة العظام | Orthopaedics
+Dr. Harshad. M. Shah | M S Ramaiah Memorial Hospital, Bangalore | جراحة العظام | Orthopaedics
+Dr. Karthik Badarayan V | M S Ramaiah Memorial Hospital, Bangalore | جراحة العظام | Orthopaedics
+Dr. Rahul P | M S Ramaiah Memorial Hospital, Bangalore | جراحة العظام | Orthopaedics
+Dr. Ravikumar T V | M S Ramaiah Memorial Hospital, Bangalore | جراحة العظام | Orthopaedics
+Dr. Sandeep Reddy R | M S Ramaiah Memorial Hospital, Bangalore | جراحة العظام | Orthopaedics
+Dr. Sathish Shervegar | M S Ramaiah Memorial Hospital, Bangalore | جراحة العظام | Orthopaedics
+Dr. Yashwanth Kumar. C | M S Ramaiah Memorial Hospital, Bangalore | جراحة العظام | Orthopaedics
+Dr. Bopanna K | Manipal Hospital, Old Airport Road | جراحة المخ والأعصاب | Adult Neurosurgery
+Dr. G. Moinoddin | Manipal Hospital, Old Airport Road | جراحة السمنة والأيض | Bariatric & Metabolic Surgery
+Dr. Devananda N | Manipal Hospital, Old Airport Road | جراحة القلب والصدر والأوعية | Cardiothoracic & Vascular Surgery
+Dr. Devananda N S | Manipal Hospital, Old Airport Road | جراحة القلب والصدر والأوعية وزراعة القلب والرئة | Cardiothoracic Vascular & Heart-Lung Transplant Surgery
+Dr. (Prof) Sampath Chandra Prasad Rao | Manipal Hospital, Old Airport Road | جراحة الرأس والعنق وقاعدة الجمجمة | ENT, Head & Neck Surgery, Skull Base Surgery, Cochlear Implantology
+Dr. Darshan Kirshnappa | Manipal Hospital, Old Airport Road | كهرباء القلب | Electrophysiology
+Dr. Hemanth Kumar | Manipal Hospital, Old Airport Road | جراحة عامة و سمنة | General & Bariatric Surgery
+Dr. Mohit Shetti | Manipal Hospital, Old Airport Road | طب عام | General Medicine
+Dr. Sampath Kumar | Manipal Hospital, Old Airport Road | طب عام | General Medicine
+Dr. Sumit Talwar | Manipal Hospital, Old Airport Road | طب عام | General Medicine
+Dr. Bharath Kadadi | Manipal Hospital, Old Airport Road | جراحة اليد | Hand Surgery
+Dr. Satish Nair | Manipal Hospital, Old Airport Road | جراحة أورام الرأس والعنق | Head & Neck Oncology Surgery
+Dr. Amit | Manipal Hospital, Old Airport Road | أورام دموية | Hematologic Oncology
+Dr. Ashish | Manipal Hospital, Old Airport Road | زرع نخاع العظم | Hematology & Bone Marrow Transplantation
+Dr. Mallikarjun | Manipal Hospital, Old Airport Road | زرع نخاع العظم | Hematology & Bone Marrow Transplantation
+Dr. Raj Vigna | Manipal Hospital, Old Airport Road | أمراض الكبد والجهاز الهضمي | Hepato-Gastroenterology
+Dr. Sridhar G | Manipal Hospital, Old Airport Road | أمراض القلب التداخلية | Interventional Cardiology
+Dr. Amit Rauthan | Manipal Hospital, Old Airport Road | أورام طبية | Medical Oncology, Immunotherapy & Precision Medicine
+Dr. Bhavana M V | Manipal Hospital, Old Airport Road | علم الميكروبات | Microbiology & Laboratory Medicine
+Dr. Ajit Kumar | Manipal Hospital, Old Airport Road | طب الأعصاب | Neurology
+Dr. Pramod Krishnan | Manipal Hospital, Old Airport Road | طب الأعصاب والصرع | Neurology & Epilepsy
+Dr. Bopanna K M | Manipal Hospital, Old Airport Road | جراحة المخ والأعصاب | Neurosurgery
+Dr. Praveen M | Manipal Hospital, Old Airport Road | جراحة المخ والأعصاب | Neurosurgery
+Dr. Sunil G | Manipal Hospital, Old Airport Road | جراحة العظام والمفاصل | Orthopedic & Joint Surgery
+Dr. Srimanth B | Manipal Hospital, Old Airport Road | جراحة عظام أورام | Orthopedic Oncology
+Dr. Kavya Mallikarjun | Manipal Hospital, Old Airport Road | أمراض قلب الأطفال | Pediatric Cardiology
+Dr. A Sivagnanam | Manipal Hospital, Old Airport Road | طب الأطفال | Pediatric Emergency
+Dr. Dheeraj A | Manipal Hospital, Old Airport Road | الطب الفيزيائي وإعادة التأهيل | Physical Medicine & Rehabilitation
+Dr. Vadhiraja | Manipal Hospital, Old Airport Road | علاج الأورام بالإشعاع | Radiation Oncology
+Dr. Abhishek Patil | Manipal Hospital, Old Airport Road | أمراض المناعة السريرية والروماتيزم | Rheumatology & Clinical Immunology
+Dr. Shabber Zaveri | Manipal Hospital, Old Airport Road | جراحة الأورام | Surgical Oncology
+Dr. Deepak Dubey | Manipal Hospital, Old Airport Road | زراعة الكلى والمسالك | Uro-Oncology, Robotic Surgery & Renal Transplantation
+Deepak | Manipal Hospital, Old Airport Road | جراحة المسالك البولية | Urology
+Dr. Azeez Pasha | Manipal Hospital, Old Airport Road | جراحة الأوعية الدموية | Vascular Surgery
+Dr. Venkatesh Reddy | Manipal Hospital, Old Airport Road | جراحة الأوعية الدموية | Vascular Surgery
+Dr. Pramod Krishnappa | NU Hospitals, Rajajinagar Bangalore | جراحة المسالك وأمراض الذكورة | Andrology & Urology
+Dr. Jyoti Sridhar | NU Hospitals, Rajajinagar Bangalore | العناية المركزة والتخدير | Critical Care & Anaesthesia
+Dr. Sridhar Pandit | NU Hospitals, Rajajinagar Bangalore | جراحة عامة ومناظير | General & Laparoscopic Surgery
+Dr. Shakuntala V Modi | NU Hospitals, Rajajinagar Bangalore | أمراض الكلى | Nephrology
+Dr. Aashish S | NU Hospitals, Rajajinagar Bangalore | زراعة الكلى وزراعة الأعضاء | Nephrology & Transplant Physician
+Dr. Padmanabhan S | NU Hospitals, Rajajinagar Bangalore | أمراض الكلى | Nephrology & Transplant Physician
+Dr. Ashvini Koti | NU Hospitals, Rajajinagar Bangalore | علم الأمراض | Pathology (Sr. Pathologist & Lab Director)
+Dr. Nitin Nayak | NU Hospitals, Rajajinagar Bangalore | أمراض كلى الأطفال | Pediatric Nephrology
+Dr. Prasanna Venkatesh M K | NU Hospitals, Rajajinagar Bangalore | زراعة الكلى | Pediatric Urology, Robotic & Renal Transplant Surgery
+Dr. Keval P Jain | NU Hospitals, Rajajinagar Bangalore | الأشعة التشخيصية | Radiodiagnosis
+Dr. Swathi Matippa | NU Hospitals, Rajajinagar Bangalore | الأشعة التشخيصية | Radiodiagnosis
+Dr. Krishna Prasad T | NU Hospitals, Rajajinagar Bangalore | زراعة الكلى | Uro-Oncology, Robotic & Renal Transplant Surgery
+Dr. Nagarjuna Reddy Danduri | NU Hospitals, Rajajinagar Bangalore | جراحة المسالك البولية | Urology
+Dr. Srinivas M. | Narayana Hospital, Bommasandra Bangalore | التخدير | Anaesthesia
+Dr. Devi Shetty | Narayana Hospital, Bommasandra Bangalore | جراحة القلب | Cardiac Surgery
+Dr. Sandeep Attawar | Narayana Hospital, Bommasandra Bangalore | جراحة القلب | Cardiac Transplant Surgery
+Dr. Manjunath C. N. | Narayana Hospital, Bommasandra Bangalore | أمراض القلب | Cardiology
+Dr. Anil Bhan | Narayana Hospital, Bommasandra Bangalore | جراحة القلب | Cardiothoracic Surgery
+Dr. Sathyaki Nambala | Narayana Hospital, Bommasandra Bangalore | جراحة القلب | Cardiothoracic Surgery
+Dr. Pratap Reddy | Narayana Hospital, Bommasandra Bangalore | العناية المركزة | Critical Care
+Dr. Smitha Shetty | Narayana Hospital, Bommasandra Bangalore | الأمراض الجلدية | Dermatology
+Dr. Ashok Pillai | Narayana Hospital, Bommasandra Bangalore | الأنف والأذن والحنجرة | ENT
+Dr. H. S. Sreevathsa | Narayana Hospital, Bommasandra Bangalore | الغدد الصماء | Endocrinology
+Dr. Malini Saba | Narayana Hospital, Bommasandra Bangalore | طب الأسرة | Family Medicine
+Dr. Suresh Ramaswamy | Narayana Hospital, Bommasandra Bangalore | الجهاز الهضمي | Gastroenterology
+Dr. Dilip Raja | Narayana Hospital, Bommasandra Bangalore | جراحة عامة | General Surgery
+Dr. Shobha Badiger | Narayana Hospital, Bommasandra Bangalore | أمراض النساء | Gynaecology
+Dr. Harish Nanjappa | Narayana Hospital, Bommasandra Bangalore | أمراض الدم | Haematology
+Dr. Pradeep Mahajan | Narayana Hospital, Bommasandra Bangalore | الطب الباطني | Internal Medicine
+Dr. Ravi Kishore | Narayana Hospital, Bommasandra Bangalore | أمراض القلب التداخلية | Interventional Cardiology
+Dr. Ravi Prasad | Narayana Hospital, Bommasandra Bangalore | الأورام الطبية | Medical Oncology
+Dr. Roopa K. | Narayana Hospital, Bommasandra Bangalore | حديثي الولادة | Neonatology
+Dr. Santosh Benjamin | Narayana Hospital, Bommasandra Bangalore | أمراض الكلى | Nephrology
+Dr. Sanjay Desai | Narayana Hospital, Bommasandra Bangalore | طب الأعصاب | Neurology
+Dr. Ashwin Borkar | Narayana Hospital, Bommasandra Bangalore | جراحة الأعصاب | Neurosurgery
+Dr. Anand Rao | Narayana Hospital, Bommasandra Bangalore | طب العيون | Ophthalmology
+Dr. Suresh H. Rao | Narayana Hospital, Bommasandra Bangalore | جراحة العظام | Orthopaedic Surgery
+Dr. Gaurav Ganguly | Narayana Hospital, Bommasandra Bangalore | جراحة العظام | Orthopaedics
+Dr. Viveka Kumar | Narayana Hospital, Bommasandra Bangalore | أمراض قلب الأطفال | Paediatric Cardiology
+Dr. Prabha Adhikari | Narayana Hospital, Bommasandra Bangalore | طب الأطفال | Paediatrics
+Dr. R. R. Kasliwal | Narayana Hospital, Bommasandra Bangalore | أمراض القلب الوقائية | Preventive Cardiology
+Dr. Rajesh Kumar | Narayana Hospital, Bommasandra Bangalore | الطب النفسي | Psychiatry
+Dr. K. R. Suresh | Narayana Hospital, Bommasandra Bangalore | أمراض الصدر | Pulmonology
+Dr. Girish Rao | Narayana Hospital, Bommasandra Bangalore | الأشعة | Radiology
+Dr. Sanjay Mehrotra | Narayana Hospital, Bommasandra Bangalore | زراعة الكلى | Renal Transplant
+Dr. Venkatesh K. | Narayana Hospital, Bommasandra Bangalore | جراحة الأورام | Surgical Oncology
+Dr. Rajeev Jayadevan | Narayana Hospital, Bommasandra Bangalore | جراحة المسالك البولية | Urology
+Dr. B. C. Srinivasa | Narayana Hospital, Bommasandra Bangalore | جراحة الأوعية الدموية | Vascular Surgery
+Dr. Praveena Shenoi | Rainbow Children's Hospital, Marathahalli | نساء وولادة | Clinical Director Obstetrics & Gynecology
+Dr. Arvind Shenoi | Rainbow Children's Hospital, Marathahalli | طب الأطفال | Clinical Director Pediatrics
+Dr. Chandrashekar Changappa | Rainbow Children's Hospital, Marathahalli | طب الأطفال | Consultant Pediatrician
+Dr. Rachana Shilpakar | Rainbow Children's Hospital, Marathahalli | جلدية | Dermatology
+Dr. Rajaram G | Rainbow Children's Hospital, Marathahalli | أطفال | General Pediatrics
+Dr. Srikanth Kulkarni | Rainbow Children's Hospital, Marathahalli | أطفال | General Pediatrics
+Dr. Vinu N | Rainbow Children's Hospital, Marathahalli | أطفال | General Pediatrics
+Dr. Plabani Sarkar | Rainbow Children's Hospital, Marathahalli | طب الإنجاب | IVF
+Dr. Sandeep R | Rainbow Children's Hospital, Marathahalli | عناية مركزة حديثي الولادة | Neonatal Intensive Care
+Dr. Aruna Thangapandy | Rainbow Children's Hospital, Marathahalli | نساء وولادة | Obstetrics & Gynecology
+Dr. Meghana Jetty | Rainbow Children's Hospital, Marathahalli | نساء وولادة | Obstetrics, Gynecology & Laparoscopic Surgery
+Dr. Supriya Shetty | Rainbow Children's Hospital, Marathahalli | طب العيون | Ophthalmology
+Dr. Nandana Bala | Rainbow Children's Hospital, Marathahalli | أمراض الجهاز التنفسي للأطفال | Pediatric Allergy & Respiratory Medicine
+Dr. Prabhavathi H B | Rainbow Children's Hospital, Marathahalli | أسنان أطفال | Pediatric Dentistry
+Dr. Shilpa H | Rainbow Children's Hospital, Marathahalli | أنف وأذن وحنجرة أطفال | Pediatric ENT
+Dr. Rachana G | Rainbow Children's Hospital, Marathahalli | أنف وأذن وحنجرة أطفال / اضطرابات التطور | Pediatric ENT / Development
+Dr. Tejasvi Sheshadri | Rainbow Children's Hospital, Marathahalli | غدد أطفال | Pediatric Endocrinology
+Dr. Lavenya R P | Rainbow Children's Hospital, Marathahalli | أمراض الجهاز الهضمي والكبد للأطفال | Pediatric Gastroenterology & Hepatology
+Dr. V R Nagendra Kumar | Rainbow Children's Hospital, Marathahalli | أمراض الكبد والجهاز الهضمي للأطفال | Pediatric Gastroenterology & Hepatology
+Dr. Manojit Chakraborty | Rainbow Children's Hospital, Marathahalli | أورام وزرع نخاع للأطفال | Pediatric Hemato Oncology & Bone Marrow Transplant
+Dr. Vasudha N R | Rainbow Children's Hospital, Marathahalli | أورام وزرع نخاع للأطفال | Pediatric Hemato Oncology & Bone Marrow Transplant
+Dr. Manu Chaudhary | Rainbow Children's Hospital, Marathahalli | أمراض معدية للأطفال | Pediatric Infectious Diseases
+Dr. Deepak R | Rainbow Children's Hospital, Marathahalli | عناية مركزة للأطفال / طب أطفال | Pediatric Intensive Care / General Pediatrics
+Dr. Rakshay Shetty | Rainbow Children's Hospital, Marathahalli | عناية مركزة وأطفال عام | Pediatric Intensivist & General Pediatrician
+Dr. Saumil Gaur | Rainbow Children's Hospital, Marathahalli | أمراض الكلى للأطفال | Pediatric Nephrology
+Dr. N Balamurugan | Rainbow Children's Hospital, Marathahalli | جراحة أعصاب الأطفال | Pediatric Neurology & Neuro Surgery
+Dr. Aniruddha Tekkatte Jagannatha | Rainbow Children's Hospital, Marathahalli | جراحة أعصاب الأطفال | Pediatric Neurology & Neurosurgery
+Dr. Jayanth Sundar Sampath | Rainbow Children's Hospital, Marathahalli | جراحة عظام الأطفال | Pediatric Orthopedics
+Dr. Ruchi Gupta | Rainbow Children's Hospital, Marathahalli | طب نفسي أطفال | Pediatric Psychiatry
+Dr. Anupama Menon | Rainbow Children's Hospital, Marathahalli | أمراض الصدر للأطفال | Pediatric Pulmonologist
+Dr. Chandrika S Bhat | Rainbow Children's Hospital, Marathahalli | أمراض الروماتيزم للأطفال | Pediatric Rheumatology
+Dr. Antony Robert | Rainbow Children's Hospital, Marathahalli | جراحة الأطفال والمسالك | Pediatric Surgery & Pediatric Urology / Laparoscopy
+Dr. Shounak Choudhury | Rainbow Children's Hospital, Marathahalli | جراحة الأطفال والمسالك | Pediatric Surgery & Urology
+Dr. Priyadarshan K | Rainbow Children's Hospital, Marathahalli | جراحة تجميلية وترميمية | Plastic & Reconstructive Surgery
+Dr. Jyoti Singh | Rainbow Children's Hospital, Marathahalli | الأشعة | Radiology
+Dr. Krishna Kumar | Rela Hospital, Chennai | التخدير | Anaesthesia
+Dr. C. Narasimhan | Rela Hospital, Chennai | كهرباء القلب | Cardiac Electrophysiology
+Dr. Murali Mohan B. V. | Rela Hospital, Chennai | جراحة القلب | Cardiac Surgery
+Dr. Ravi Mohanka | Rela Hospital, Chennai | جراحة القلب | Cardiac Surgery
+Dr. R. Prasada Reddy | Rela Hospital, Chennai | أمراض القلب | Cardiology
+Dr. Ramesh Babu | Rela Hospital, Chennai | أمراض القلب | Cardiology
+Dr. Sandhya Sundaram | Rela Hospital, Chennai | أمراض القلب | Cardiology
+Dr. Vijay Shankar | Rela Hospital, Chennai | جراحة القلب | Cardiothoracic Surgery
+Dr. Lakshmi Venkataraman | Rela Hospital, Chennai | التغذية الإكلينيكية | Clinical Nutrition
+Dr. Rohit Vadala | Rela Hospital, Chennai | العناية المركزة | Critical Care
+Dr. Sandhya Rajagopal | Rela Hospital, Chennai | الأمراض الجلدية | Dermatology
+Dr. Raghavan Varadarajan | Rela Hospital, Chennai | الأنف والأذن والحنجرة | ENT
+Dr. Kavitha Rajagopalan | Rela Hospital, Chennai | طب الطوارئ | Emergency Medicine
+Dr. Sundeep Lakhtakia | Rela Hospital, Chennai | المناظير | Endoscopy & EUS
+Dr. Suresh Kumar | Rela Hospital, Chennai | طب الأسرة | Family Medicine
+Dr. D. Nageshwar Reddy | Rela Hospital, Chennai | الجهاز الهضمي | Gastroenterology
+Dr. Seema Rao | Rela Hospital, Chennai | أمراض النساء | Gynaecology
+Dr. Ashwin Rammohan | Rela Hospital, Chennai | جراحة الكبد | HPB Surgery
+Dr. Niranjan Rao | Rela Hospital, Chennai | أمراض الدم | Haematology
+Dr. Anil Arora | Rela Hospital, Chennai | أمراض الكبد | Hepatology
+Dr. Dinesh Jothimani | Rela Hospital, Chennai | أمراض الكبد | Hepatology
+Dr. P. Nagaraja Rao | Rela Hospital, Chennai | أمراض الكبد | Hepatology
+Dr. Sanjay Kumar Yadav | Rela Hospital, Chennai | أمراض الكبد | Hepatology
+Dr. Rupa Banerjee | Rela Hospital, Chennai | أمراض الأمعاء الالتهابية | IBD Specialist
+Dr. Harish Kumar | Rela Hospital, Chennai | الطب الباطني | Internal Medicine
+Dr. Naveen Reddy Podduturi | Rela Hospital, Chennai | الطب الباطني | Internal Medicine
+Dr. Mohan Ramchandani | Rela Hospital, Chennai | المناظير | Interventional Endoscopy
+Dr. Rohan Arora | Rela Hospital, Chennai | الأشعة التداخلية | Interventional Radiology
+Dr. Mettu Srinivas Reddy | Rela Hospital, Chennai | تخدير زراعة الأعضاء | Liver Transplant Anaesthesia
+Dr. Ilankumaran Kaliamurthy | Rela Hospital, Chennai | جراحة الكبد | Liver Transplant Surgery
+Dr. P. Balachandran Menon | Rela Hospital, Chennai | زراعة الكبد | Liver Transplant Surgery
+Dr. Mohamed Rela | Rela Hospital, Chennai | زراعة الكبد | Liver Transplantation
+Dr. Prashant Bhangui | Rela Hospital, Chennai | زراعة الكبد | Liver Transplantation
+Dr. G. V. Rao | Rela Hospital, Chennai | الجراحة طفيفة التوغل | Minimally Invasive Surgery
+Dr. Bindu Garg | Rela Hospital, Chennai | حديثي الولادة | Neonatology
+Dr. Vikram Venkateswaran | Rela Hospital, Chennai | أمراض الكلى | Nephrology
+Dr. Sankar Narayanan | Rela Hospital, Chennai | طب الأعصاب | Neurology
+Dr. Jayaraman Kumaravelu | Rela Hospital, Chennai | جراحة الأعصاب | Neurosurgery
+Dr. Padmini Ramesh | Rela Hospital, Chennai | طب العيون | Ophthalmology
+Dr. R. Ravi | Rela Hospital, Chennai | جراحة العظام | Orthopaedics
+Dr. Gomathy Narasimhan | Rela Hospital, Chennai | أمراض الكبد للأطفال | Paediatric Hepatology
+Dr. Joy Varghese | Rela Hospital, Chennai | جراحة الأطفال | Paediatric Surgery
+Dr. Anand Kumar | Rela Hospital, Chennai | طب الأطفال | Paediatrics
+Dr. Mohan Rajesh | Rela Hospital, Chennai | جراحة التجميل | Plastic Surgery
+Dr. Sujatha Siddappa | Rela Hospital, Chennai | الطب النفسي | Psychiatry
+Dr. Pradeep Rangappa | Rela Hospital, Chennai | أمراض الصدر | Pulmonology
+Dr. Vijayalakshmi Balasubramanian | Rela Hospital, Chennai | الأشعة | Radiology
+Dr. Somashekhar S. P. | Rela Hospital, Chennai | جراحة الأورام | Surgical Oncology
+Dr. Arvind Kumar | Rela Hospital, Chennai | جراحة الصدر | Thoracic Surgery
+Dr. Anand Alur | Rela Hospital, Chennai | جراحة المسالك البولية | Urology
+Dr. Subramaniam Venkatesh | Rela Hospital, Chennai | جراحة الأوعية الدموية | Vascular Surgery
+Dr. Chaithannya N S | SPARSH Hospital, Hennur Road | تخدير | Anaesthesiology
+Dr. Deepa Chandran | SPARSH Hospital, Hennur Road | تخدير | Anaesthesiology
+Dr. Anand Kumar K | SPARSH Hospital, Hennur Road | زرع نخاع العظم | Bone Marrow Transplant
+Dr. Anand K | SPARSH Hospital, Hennur Road | جراحة تجميلية وعلاج تجميلي | Cosmetology & Cosmetic Surgery
+Dr. Chetan Dev K | SPARSH Hospital, Hennur Road | الغدد الصماء والسكري | Endocrinology & Diabetology
+Dr. Deepanju D Changkakoti | SPARSH Hospital, Hennur Road | طب الأسرة | Family Medicine
+Dr. Anto Gnana Delasalle M | SPARSH Hospital, Hennur Road | أمراض الجهاز الهضمي | Gastroenterology
+Dr. Praveen Mathew | SPARSH Hospital, Hennur Road | أمراض الجهاز الهضمي | Gastroenterology
+Dr. Deepmala Karmakar | SPARSH Hospital, Hennur Road | أشعة تداخلية | Interventional Radiology
+Dr. Ann Agnes Mathew | SPARSH Hospital, Hennur Road | طب الأعصاب | Neuroscience / Neurology
+Dr. Avinash Lakha | SPARSH Hospital, Hennur Road | طب الأعصاب | Neuroscience / Neurology
+Dr. Arpi Sagar Lodha | SPARSH Hospital, Hennur Road | نساء وولادة | Obstetrics & Gynaecology
+Dr. Linu Abraham Jacob | SPARSH Hospital, Hennur Road | طب الأورام | Oncology
+Dr. Abhijit Chavan | SPARSH Hospital, Hennur Road | جراحة العظام | Orthopaedics
+Dr. Chaynika Agarwal | SPARSH Hospital, Hennur Road | أشعة | Radiology
+Dr. Abhilash V | SPARSH Hospital, Hennur Road | جراحة الأوعية الدموية | Vascular & Endovascular Surgery
+Dr. Ranjan Shetty | SPARSH Hospital, Infantry Road | أمراض القلب | Cardiac Sciences
+Dr. Anand K | SPARSH Hospital, Infantry Road | جراحة تجميلية وعلاج تجميلي | Cosmetology & Cosmetic Surgery
+Dr. Kishan Nag | SPARSH Hospital, Infantry Road | جراحة الأسنان | Dental Surgery
+Dr. Aditi Ravindra | SPARSH Hospital, Infantry Road | أنف وأذن وحنجرة | ENT
+Dr. Sanjana Rai | SPARSH Hospital, Infantry Road | طب عام وباطنة | General Medicine
+Dr. Abhinay Indrakumar Reddy | SPARSH Hospital, Infantry Road | جراحة الرأس والرقبة | Head & Neck Surgery
+Dr. Deepmala Karmakar | SPARSH Hospital, Infantry Road | أشعة تداخلية | Interventional Radiology
+Dr. Arun | SPARSH Hospital, Infantry Road | زراعة الكبد وجراحة الكبد والبنكرياس | Liver Transplant & HPB Surgery
+Dr. Dinesh Kumar | SPARSH Hospital, Infantry Road | أمراض الكلى والمسالك | Nephrology & Urology
+Dr. Divyashree Bhat | SPARSH Hospital, Infantry Road | أمراض الكلى والمسالك | Nephrology & Urology
+Dr. Arvind Bhateja | SPARSH Hospital, Infantry Road | طب الأعصاب | Neuroscience / Neurology
+Dr. Chirag Jain | SPARSH Hospital, Infantry Road | طب الأعصاب | Neuroscience / Neurology
+Dr. Deepthi Bawa | SPARSH Hospital, Infantry Road | نساء وولادة | Obstetrics & Gynaecology
+Dr. Geeth Monnappa | SPARSH Hospital, Infantry Road | نساء وولادة | Obstetrics & Gynaecology
+Dr. Linu Abraham Jacob | SPARSH Hospital, Infantry Road | طب الأورام | Oncology
+Dr. Sharan Shivaraj Patil | SPARSH Hospital, Infantry Road | جراحة العظام | Orthopaedics
+Dr. Abram Harsha Vardhan | SPARSH Hospital, Infantry Road | طب الأطفال | Paediatrics
+Dr. Gaurang Sudhir Deshpande | SPARSH Hospital, Infantry Road | أمراض الروماتيزم | Rheumatology
+Dr. Dhananjay D. N. | Sakra World Hospital, Bangalore | تخدير | Anaesthesiology
+Dr. Shishir Chandrashekhar | Sakra World Hospital, Bangalore | تخدير | Anaesthesiology
+Dr. Nanda Rajaneesh | Sakra World Hospital, Bangalore | جراحة سمنة وثدي وجهاز هضمي | Bariatric, Breast & Surgical Gastroenterology
+Dr. Sunil Kumar N. K. | Sakra World Hospital, Bangalore | تخدير قلبي | Cardiac Anaesthesiology
+Dr. Bharat Raj | Sakra World Hospital, Bangalore | الفيزيولوجيا الكهربائية للقلب | Cardiac Electrophysiology
+Dr. Adil Sadiq | Sakra World Hospital, Bangalore | جراحة القلب والصدر والأوعية | Cardio Thoracic & Vascular Surgery (CTVS)
+Dr. Srikanth | Sakra World Hospital, Bangalore | أمراض القلب | Cardiology
+Dr. Anand Bandachar Mamdapur | Sakra World Hospital, Bangalore | العناية المركزة | Critical Care Medicine
+Dr. Divya Hirolli | Sakra World Hospital, Bangalore | العناية المركزة | Critical Care Medicine
+Dr. Sandeep Anehosur | Sakra World Hospital, Bangalore | العناية المركزة | Critical Care Medicine
+Dr. Shashidhar B. G | Sakra World Hospital, Bangalore | العناية المركزة | Critical Care Medicine
+Dr. A. Chris Deepak | Sakra World Hospital, Bangalore | طب الأسنان | Dental Surgery
+Dr. Akshay Shetty | Sakra World Hospital, Bangalore | طب الأسنان | Dental Surgery
+Dr. Deepak Pathak | Sakra World Hospital, Bangalore | طب الأسنان | Dental Surgery
+Dr. Swati Vishwakarma | Sakra World Hospital, Bangalore | طب الأسنان | Dental Surgery
+Dr. Priyanka Dutta | Sakra World Hospital, Bangalore | طب الأسنان | Dentistry
+Dr. Dali Chandran | Sakra World Hospital, Bangalore | أنف وأذن وحنجرة | ENT
+Dr. Shantanu Tandon | Sakra World Hospital, Bangalore | أنف وأذن وحنجرة | ENT
+Dr. Sadiq Saleem Sikora | Sakra World Hospital, Bangalore | جراحة الجهاز الهضمي وزراعة الكبد | GI Surgery & Liver Transplant
+Dr. Lawrence Peter | Sakra World Hospital, Bangalore | أمراض الجهاز الهضمي | Gastroenterology
+Dr. Akshay Deshpande | Sakra World Hospital, Bangalore | جهاز هضمي وكبد | Gastroenterology & Hepatology
+Dr. Amruthesh T. M. | Sakra World Hospital, Bangalore | جهاز هضمي وكبد | Gastroenterology & Hepatology
+Dr. Honey Ashok | Sakra World Hospital, Bangalore | جراحة أورام الرأس والرقبة | Head & Neck Onco-Surgery
+Dr. Sreekanth B. Shetty | Sakra World Hospital, Bangalore | أمراض القلب التداخلي | Interventional Cardiology
+Dr. Vineet Gupta | Sakra World Hospital, Bangalore | أورام باطنية وأمراض دم | Medical Oncology & Haematology
+Dr. Sushma Rani | Sakra World Hospital, Bangalore | أمراض الكلى | Nephrology
+Dr. Amit Kulkarni | Sakra World Hospital, Bangalore | طب الأعصاب والسكتات | Neurology & Stroke
+Dr. Alok Mohan Uppar | Sakra World Hospital, Bangalore | جراحة المخ والأعصاب | Neurosurgery
+Dr. Arjun Srivatsa | Sakra World Hospital, Bangalore | جراحة المخ والأعصاب | Neurosurgery
+Dr. Lakshmi Mahesh | Sakra World Hospital, Bangalore | تجميل عيون/قناة دمعية | Oculoplastic & Lacrimal Surgery
+Dr. Chandrashekar | Sakra World Hospital, Bangalore | جراحة العظام والمفاصل | Orthopedic & Joint Surgery
+Dr. Adarsh Babu K | Sakra World Hospital, Bangalore | جراحة العظام | Orthopedics
+Dr. Anil Kumar Pura Lingegowda | Sakra World Hospital, Bangalore | جراحة الأطفال | Paediatric Surgery
+Dr. Apoorva Gudadhe | Sakra World Hospital, Bangalore | أسنان أطفال | Pediatric Dentistry
+Dr. Anil Kumar | Sakra World Hospital, Bangalore | جراحة الأطفال | Pediatric Surgery
+Dr. Rajendra S. Gujjalanavar | Sakra World Hospital, Bangalore | جراحة تجميلية وترميمية | Plastic & Reconstructive Surgery
+Dr. Sachin Kumar | Sakra World Hospital, Bangalore | أمراض الصدر | Pulmonology
+Dr. Ajay Handa | Sakra World Hospital, Bangalore | أمراض الصدر والعناية المركزة | Pulmonology & Critical Care
+Dr. Arjunsa H. Satapute | Sakra World Hospital, Bangalore | أمراض الصدر واضطرابات النوم | Pulmonology & Sleep Medicine
+Dr. Anisha S. Tandon | Sakra World Hospital, Bangalore | أشعة | Radiology
+Dr. B. Premsai Reddy | Sakra World Hospital, Bangalore | أشعة وتصوير تشخيصي | Radiology & Imaging
+Dr. Sonali Sethi | Sakra World Hospital, Bangalore | أشعة وتصوير تشخيصي | Radiology & Imaging
+Dr. Suresh V | Sakra World Hospital, Bangalore | أشعة وتصوير تشخيصي | Radiology & Imaging
+Dr. Y. Trishul Shetty | Sakra World Hospital, Bangalore | أشعة وتصوير تشخيصي | Radiology & Imaging
+Dr. Banarji | Sakra World Hospital, Bangalore | جراحة الكتف | Shoulder Surgery
+Dr. A Mohan Kumar | Sankara Eye Hospital, Bengaluru | تخدير | Anaesthesiology
+Dr. Alluri Suneetha | Sankara Eye Hospital, Bengaluru | تخدير | Anaesthesiology
+Dr. Kambhampati Chakrapani | Sankara Eye Hospital, Bengaluru | تخدير | Anaesthesiology
+Dr. Narmadha | Sankara Eye Hospital, Bengaluru | تخدير | Anaesthesiology
+Dr. Ajitha S | Sankara Eye Hospital, Bengaluru | كتاراكت وجلوكوما | Cataract & Glaucoma
+Dr. Meena G Menon | Sankara Eye Hospital, Bengaluru | كتاراكت وجلوكوما | Cataract & Glaucoma
+Dr. S. Ajitha | Sankara Eye Hospital, Bengaluru | كتاراكت وجلوكوما | Cataract & Glaucoma
+Dr. Srilakshmi Sikhakoli | Sankara Eye Hospital, Bengaluru | كتاراكت وجلوكوما | Cataract & Glaucoma
+Dr. Jayamadhury Gudimetla | Sankara Eye Hospital, Bengaluru | كتاراكت وشبكية طبية | Cataract & Medical Retina
+Dr. Y. Umesh | Sankara Eye Hospital, Bengaluru | كتاراكت وتصحيح البصر | Cataract & Refractive Services
+Dr. Anand Balasubramaniam | Sankara Eye Hospital, Bengaluru | كتاراكت وقرنية وتصحيح البصر | Cataract, Cornea & Refractive Service
+Dr. Haritha Veluri | Sankara Eye Hospital, Bengaluru | كتاراكت وقرنية وتصحيح البصر | Cataract, Cornea & Refractive Services
+Dr. Jagadeesh Kumar Reddy K | Sankara Eye Hospital, Bengaluru | كتاراكت وقرنية وتصحيح البصر | Cataract, Cornea & Refractive Services
+Dr. Madhuri V | Sankara Eye Hospital, Bengaluru | كتاراكت وقرنية وتصحيح البصر | Cataract, Cornea & Refractive Services
+Dr. Shashidhar Banigallapati | Sankara Eye Hospital, Bengaluru | كتاراكت وقرنية وتصحيح البصر | Cataract, Cornea & Refractive Services
+Dr. Nisha Ahuja | Sankara Eye Hospital, Bengaluru | كتاراكت وقرنية وتصحيح البصر | Cataract, Cornea & Refractive Surgery
+Dr. Minija C K | Sankara Eye Hospital, Bengaluru | كتاراكت وشبكية طبية وقزحية | Cataract, Medical Retina & UVEA Services
+Dr. Sudhakar Potti | Sankara Eye Hospital, Bengaluru | قرنية وتصحيح البصر | Cornea & Refractive Services
+Dr. Vandhana Sundaram | Sankara Eye Hospital, Bengaluru | قرنية | Cornea (Registrar – Cornea)
+Dr. Prabhu Vijayaraghavan | Sankara Eye Hospital, Bengaluru | خدمات القرنية | Cornea Services
+Dr. Pallavi Joshi | Sankara Eye Hospital, Bengaluru | قرنية وسطح العين وتصحيح البصر | Cornea, Ocular Surface & Refractive Services
+Dr. Anandhi R | Sankara Eye Hospital, Bengaluru | عيادة عامة | General OPD (ENT)
+Dr. Renukadevi N K | Sankara Eye Hospital, Bengaluru | عيادات عامة | General OPD (ENT)
+Dr. Anees Fatima Mohammed | Sankara Eye Hospital, Bengaluru | طب العيون العام | General Ophthalmology
+Dr. Anuradha Kakumanu | Sankara Eye Hospital, Bengaluru | طب العيون العام | General Ophthalmology
+Dr. Hitendrasinh Parmar | Sankara Eye Hospital, Bengaluru | طب العيون العام | General Ophthalmology
+Dr. Kanakamedala Bhargavi Lakshmi | Sankara Eye Hospital, Bengaluru | طب العيون العام | General Ophthalmology
+Dr. Kesana Udaya Sankar | Sankara Eye Hospital, Bengaluru | طب العيون العام | General Ophthalmology
+Dr. Shalini G | Sankara Eye Hospital, Bengaluru | طب العيون العام | General Ophthalmology
+Dr. Vijayabhaskar Gajjala | Sankara Eye Hospital, Bengaluru | طب العيون العام | General Ophthalmology
+Dr. Nidhi Dubey | Sankara Eye Hospital, Bengaluru | عيون عامة وشبكية طبية وقزحية | General Ophthalmology, Medical Retina & UVEA
+Dr. Lalitha K J | Sankara Eye Hospital, Bengaluru | جلوكوما | Glaucoma
+Dr. Malleswari Medikonda | Sankara Eye Hospital, Bengaluru | جلوكوما | Glaucoma
+Dr. Nishitha M.S | Sankara Eye Hospital, Bengaluru | جلوكوما | Glaucoma
+Dr. Geetha G | Sankara Eye Hospital, Bengaluru | شبكية طبية | Medical Retina
+Dr. Swathi Padma Kanchana | Sankara Eye Hospital, Bengaluru | شبكية طبية | Medical Retina
+Dr. Shruthi Tara | Sankara Eye Hospital, Bengaluru | محجر العين | Orbit & Oculoplasty
+Dr. Sowjanya Yerra | Sankara Eye Hospital, Bengaluru | محجر العين | Orbit & Oculoplasty
+Dr. Shashidhar V S | Sankara Eye Hospital, Bengaluru | أورام وجراحة محجر العين | Orbit, Oculoplasty & Ocular Oncology
+Dr. Kaushik Murali | Sankara Eye Hospital, Bengaluru | عيون أطفال | Paediatric Ophthalmology
+Dr. Madhulika Ladha | Sankara Eye Hospital, Bengaluru | عيون أطفال | Paediatric Ophthalmology
+Dr. Nambula Srinivasa Rao | Sankara Eye Hospital, Bengaluru | عيون أطفال | Paediatric Ophthalmology
+Dr. Rajesh Prabu | Sankara Eye Hospital, Bengaluru | عيون أطفال | Paediatric Ophthalmology
+Dr. Vankireddi Mahathi | Sankara Eye Hospital, Bengaluru | عيون أطفال | Paediatric Ophthalmology
+Dr. Vidhya C | Sankara Eye Hospital, Bengaluru | عيون أطفال | Paediatric Ophthalmology
+Dr. Sowmya R | Sankara Eye Hospital, Bengaluru | عيون أطفال وحول | Paediatric Ophthalmology & Strabismus
+Dr. Mugundan M.S | Sankara Eye Hospital, Bengaluru | شبكية | Retinal Services
+Dr. Divyansh K Mishra | Sankara Eye Hospital, Bengaluru | أورام عينية وشبكية | VR Ocular Oncology & Vitreoretinal Services
+Dr. Mahesh Shanmugham P | Sankara Eye Hospital, Bengaluru | أورام عينية وشبكية | VR Ocular Oncology & Vitreoretinal Services
+Dr. Rajesh R. | Sankara Eye Hospital, Bengaluru | أورام عينية وشبكية | VR Ocular Oncology & Vitreoretinal Services
+Dr. Birva Dave | Sankara Eye Hospital, Bengaluru | شبكية | Vitreoretina
+Dr. Payal Naresh Shah | Sankara Eye Hospital, Bengaluru | أورام عينية وشبكية | Vitreoretina & Ocular Oncology
+Dr. Ashok Kanakamedala | Sankara Eye Hospital, Bengaluru | شبكية | Vitreoretinal Services
+Dr. M. Prabhu Shankar | Sankara Eye Hospital, Bengaluru | شبكية | Vitreoretinal Services
+Dr. Madhu Kumar R | Sankara Eye Hospital, Bengaluru | شبكية | Vitreoretinal Services
+Dr. V. Devi Priya | Sankara Eye Hospital, Bengaluru | شبكية | Vitreoretinal Services
+Dr. Rajalakshmi | Trilife Hospital, Bangalore | تخدير | Anaesthesia
+Dr. Tameem Ahmed | Trilife Hospital, Bangalore | جراحة القلب | Cardiac Surgery
+Dr. Aishwarya | Trilife Hospital, Bangalore | أنف وأذن وحنجرة | ENT
+Dr. Sharath G | Trilife Hospital, Bangalore | أنف وأذن وحنجرة | ENT
+Dr. Atif Ahmed | Trilife Hospital, Bangalore | أمراض الجهاز الهضمي | Gastroenterology
+Dr. Bhushan | Trilife Hospital, Bangalore | جراحة عامة | General Surgery
+Dr. Shamna Mahmood Abdulla | Trilife Hospital, Bangalore | جراحة عامة | General Surgery
+Dr. Aditya S Chowti | Trilife Hospital, Bangalore | الطب الباطني | Internal Medicine
+Dr. Raghavendra N | Trilife Hospital, Bangalore | أمراض الكلى | Nephrology
+Dr. H Santosh | Trilife Hospital, Bangalore | طب الأعصاب | Neurology
+Dr. Usha M R | Trilife Hospital, Bangalore | نساء وولادة | OBG (Gynaecology & Obstetrics)
+Dr. Prashanth R | Trilife Hospital, Bangalore | جراحة العظام | Orthopaedics
+Dr. Adarsh G | Trilife Hospital, Bangalore | طب باطني | Physician / Internal Medicine
+Dr. Raghavendra H | Trilife Hospital, Bangalore | أمراض الروماتيزم | Rheumatology
+Dr. Siddaling Ladde | Trilife Hospital, Bangalore | جراحة المسالك البولية | Urology
+Dr. Hari Menon | St. John's Medical College Hospital, Bangalore | أورام دموية وطبية | Haematology and Medical Oncology
+Dr. Annie Kanchan Baa | St. John's Medical College Hospital, Bangalore | أورام طبية | Medical Oncology
+Dr. Ganesha | St. John's Medical College Hospital, Bangalore | أورام طبية | Medical Oncology
+Dr. Vandana Bharadwaj | St. John's Medical College Hospital, Bangalore | أورام دموية أطفال وزراعة نخاع العظم | Pediatric Hemat Oncology & Bone Marrow Transplant
+Dr. Anand Prakash | St. John's Medical College Hospital, Bangalore | أورام دموية أطفال وزراعة نخاع العظم | Pediatric Hemat Oncology & Bone Marrow Transplant
+Dr. Shubha A.M | St. John's Medical College Hospital, Bangalore | جراحة أطفال | Paediatric Surgery
+Dr. Nandini Vallath | St. John's Medical College Hospital, Bangalore | الطب التلطيفي | Palliative Medicine
+Dr. Avinash H. U | St. John's Medical College Hospital, Bangalore | أورام إشعاعية | Radiation Oncology
+Dr. Govindaraj Sridhar | St. John's Medical College Hospital, Bangalore | جراحة عامة | General Surgery
+Dr. Premlatha T.S | St. John's Medical College Hospital, Bangalore | أورام نسائية | Gynaecological Oncology
+Dr. Vijayalakshmi V. V | St. John's Medical College Hospital, Bangalore | جراحة الأورام | Surgical Oncology
+Dr. Medha Sugara | St. John's Medical College Hospital, Bangalore | جراحة الأورام | Surgical Oncology

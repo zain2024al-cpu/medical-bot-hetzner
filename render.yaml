@@ -1,0 +1,30 @@
+# Render.yaml for Medical Reports Bot
+# البوت الطبي - خدمة واحدة فقط
+
+services:
+  # 🟢 خدمة البوت الرئيسي
+  - type: web
+    name: medical-reports-bot
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    plan: free
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: ADMIN_IDS
+        sync: false
+      - key: TIMEZONE
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        sync: false
+      - key: WEBHOOK_URL
+        sync: false
+      - key: PORT
+        sync: false
+      - key: DATABASE_URL
+        sync: false

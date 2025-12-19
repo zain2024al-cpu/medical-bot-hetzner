@@ -1,0 +1,6312 @@
+[
+  {
+    "name": "Dr. R Prasada Reddy",
+    "hospital": "AIG Hospitals, Gachibowli Hyderabad",
+    "department_ar": "أمراض القلب",
+    "department_en": "Cardiology"
+  },
+  {
+    "name": "Dr. C Narasimhan",
+    "hospital": "AIG Hospitals, Gachibowli Hyderabad",
+    "department_ar": "فيزيولوجيا كهربائية القلب",
+    "department_en": "Electrophysiology & Cardiology"
+  },
+  {
+    "name": "Dr. Sundeep Lakhtakia",
+    "hospital": "AIG Hospitals, Gachibowli Hyderabad",
+    "department_ar": "مناظير متقدمة",
+    "department_en": "Endoscopy & EUS"
+  },
+  {
+    "name": "Dr. D Nageshwar Reddy",
+    "hospital": "AIG Hospitals, Gachibowli Hyderabad",
+    "department_ar": "الجهاز الهضمي",
+    "department_en": "Gastroenterology"
+  },
+  {
+    "name": "Dr. Rupa Banerjee",
+    "hospital": "AIG Hospitals, Gachibowli Hyderabad",
+    "department_ar": "أمراض الأمعاء ومناظير",
+    "department_en": "IBD & Endoscopy"
+  },
+  {
+    "name": "Dr. Naveen Reddy Podduturi",
+    "hospital": "AIG Hospitals, Gachibowli Hyderabad",
+    "department_ar": "طب باطني",
+    "department_en": "Internal Medicine"
+  },
+  {
+    "name": "Dr. Mohan Ramchandani",
+    "hospital": "AIG Hospitals, Gachibowli Hyderabad",
+    "department_ar": "مناظير الجهاز الهضمي",
+    "department_en": "Interventional Endoscopy"
+  },
+  {
+    "name": "Dr. P Nagaraja Rao",
+    "hospital": "AIG Hospitals, Gachibowli Hyderabad",
+    "department_ar": "أمراض وزراعة الكبد",
+    "department_en": "Liver Sciences & Transplant Hepatology"
+  },
+  {
+    "name": "Dr. P. Balachandran Menon",
+    "hospital": "AIG Hospitals, Gachibowli Hyderabad",
+    "department_ar": "زراعة الكبد والجراحة الكبدية",
+    "department_en": "Liver Transplant & Hepatobiliary Surgery"
+  },
+  {
+    "name": "Dr. G. V. Rao",
+    "hospital": "AIG Hospitals, Gachibowli Hyderabad",
+    "department_ar": "الجراحة طفيفة التوغل والجهاز الهضمي",
+    "department_en": "Surgical Gastroenterology & Minimally Invasive Surgery"
+  },
+  {
+    "name": "Dr. Jayanthi Thumsi",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "أورام الثدي",
+    "department_en": "Breast Oncology"
+  },
+  {
+    "name": "Dr. Linu Jacob",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "أورام الثدي",
+    "department_en": "Breast Oncology"
+  },
+  {
+    "name": "Dr. Satyaki Nambyala",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "جراحة القلب والصدر والأوعية",
+    "department_en": "CTVS"
+  },
+  {
+    "name": "Dr. Sathyaki P Nambala",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "جراحة القلب",
+    "department_en": "Cardiac Surgery"
+  },
+  {
+    "name": "Dr. Abhijit Vilas Kulkarni",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "أمراض القلب",
+    "department_en": "Cardiology"
+  },
+  {
+    "name": "Dr. B. Ramesh",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "أمراض القلب",
+    "department_en": "Cardiology"
+  },
+  {
+    "name": "Dr. Girish B Navasundhi",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "أمراض القلب",
+    "department_en": "Cardiology"
+  },
+  {
+    "name": "Dr. K.B. Prasad",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "أمراض القلب",
+    "department_en": "Cardiology"
+  },
+  {
+    "name": "Dr. Lakshimikant",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "أمراض القلب",
+    "department_en": "Cardiology"
+  },
+  {
+    "name": "Dr. Vittal Bhagi",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "أمراض القلب",
+    "department_en": "Cardiology"
+  },
+  {
+    "name": "Dr. Sugami Ramesh",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "علم النفس",
+    "department_en": "Clinical Psychology"
+  },
+  {
+    "name": "Dr. Narasimhaiah Srinivasaiah",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "سرطان القولون والمستقيم",
+    "department_en": "Colon & Rectal Cancer"
+  },
+  {
+    "name": "Dr. Ashwini Shetty",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "جلدية",
+    "department_en": "Dermatology"
+  },
+  {
+    "name": "Dr. Girish Panth",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "جلدية",
+    "department_en": "Dermatology"
+  },
+  {
+    "name": "Dr. Surendra V H",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "جلدية",
+    "department_en": "Dermatology"
+  },
+  {
+    "name": "Dr. Vanita Mathew",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "جلدية",
+    "department_en": "Dermatology"
+  },
+  {
+    "name": "Dr. Aanchal A Mittal",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "أنف وأذن وحنجرة",
+    "department_en": "ENT"
+  },
+  {
+    "name": "Dr. Nagamani",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "أنف وأذن وحنجرة",
+    "department_en": "ENT"
+  },
+  {
+    "name": "Dr. Pradeep Hosamani",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "أنف وأذن وحنجرة",
+    "department_en": "ENT"
+  },
+  {
+    "name": "Dr. Sumit Kumar Gaur",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "أنف وأذن وحنجرة",
+    "department_en": "ENT"
+  },
+  {
+    "name": "Dr. Sunil Narayan Dutt",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "أنف وأذن وحنجرة",
+    "department_en": "ENT"
+  },
+  {
+    "name": "Dr. Dwarkanath",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "الغدد الصماء",
+    "department_en": "Endocrinology"
+  },
+  {
+    "name": "Dr. Suyadevara Varun",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "الغدد الصماء",
+    "department_en": "Endocrinology"
+  },
+  {
+    "name": "Dr. Dinesh Kini",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "جهاز هضمي",
+    "department_en": "Gastroenterology"
+  },
+  {
+    "name": "Dr. Prasanna K.S",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "جهاز هضمي",
+    "department_en": "Gastroenterology"
+  },
+  {
+    "name": "Dr. Vijay Kumar",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "جهاز هضمي",
+    "department_en": "Gastroenterology"
+  },
+  {
+    "name": "Dr. Dinesh Kumar",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "جراحة عامة",
+    "department_en": "General Surgery"
+  },
+  {
+    "name": "Dr. Gautham",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "جراحة عامة",
+    "department_en": "General Surgery"
+  },
+  {
+    "name": "Dr. Kiran KJ",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "جراحة عامة",
+    "department_en": "General Surgery"
+  },
+  {
+    "name": "Dr. Prashanth C",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "جراحة عامة",
+    "department_en": "General Surgery"
+  },
+  {
+    "name": "Dr. Ravishankar Bhat",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "جراحة عامة",
+    "department_en": "General Surgery"
+  },
+  {
+    "name": "Dr. Satyajit Godhi",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "جراحة عامة",
+    "department_en": "General Surgery"
+  },
+  {
+    "name": "Dr. Saurabh Mishra",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "جراحة عامة",
+    "department_en": "General Surgery"
+  },
+  {
+    "name": "Dr. Aarathi Kannan",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "طب باطني",
+    "department_en": "Geriatric Internal Medicine"
+  },
+  {
+    "name": "Dr. Steve Paul Manjaly",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "طب باطني",
+    "department_en": "Geriatric Internal Medicine"
+  },
+  {
+    "name": "Dr. Rani A Bhat",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "أورام نسائية",
+    "department_en": "Gynaecological Cancer"
+  },
+  {
+    "name": "Dr. Chitra Ramamurthy",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "أمراض النساء",
+    "department_en": "Gynaecology"
+  },
+  {
+    "name": "Dr. Harshitha Ramamurthy",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "أمراض النساء",
+    "department_en": "Gynaecology"
+  },
+  {
+    "name": "Dr. Preethi Prabhakar Shetty",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "أمراض النساء",
+    "department_en": "Gynaecology"
+  },
+  {
+    "name": "Dr. Sunitha Shreedhar",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "أمراض النساء",
+    "department_en": "Gynaecology"
+  },
+  {
+    "name": "Dr. Neema Bhat",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "أمراض الدم وأورام الأطفال",
+    "department_en": "Haematology & Paediatric Oncology"
+  },
+  {
+    "name": "Dr. Krishnamurthy",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "جراحة الرأس والرقبة",
+    "department_en": "Head & Neck Cancer"
+  },
+  {
+    "name": "Dr. Satish Nair",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "جراحة الرأس والرقبة",
+    "department_en": "Head & Neck Cancer"
+  },
+  {
+    "name": "Dr. P Subramanya Rao",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "جراحة الرأس والرقبة",
+    "department_en": "Head & Neck Oncology"
+  },
+  {
+    "name": "Dr. Sandeep Satsangi",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "أمراض الكبد",
+    "department_en": "Hepatology"
+  },
+  {
+    "name": "Dr. Vinay D",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "أمراض معدية",
+    "department_en": "Infectious Disease"
+  },
+  {
+    "name": "Dr. Hina Mehara",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "طب باطني",
+    "department_en": "Internal Medicine"
+  },
+  {
+    "name": "Dr. Jyotsna Krishnappa",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "طب باطني",
+    "department_en": "Internal Medicine"
+  },
+  {
+    "name": "Dr. Kalpana Janardhan",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "طب باطني",
+    "department_en": "Internal Medicine"
+  },
+  {
+    "name": "Dr. Malla Reddy",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "طب باطني",
+    "department_en": "Internal Medicine"
+  },
+  {
+    "name": "Dr. Rajeeva Mogar",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "طب باطني",
+    "department_en": "Internal Medicine"
+  },
+  {
+    "name": "Dr. Ramesh B.S",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "طب باطني",
+    "department_en": "Internal Medicine"
+  },
+  {
+    "name": "Dr. Raza Shah",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "طب باطني",
+    "department_en": "Internal Medicine"
+  },
+  {
+    "name": "Dr. Swarna Das",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "طب باطني",
+    "department_en": "Internal Medicine"
+  },
+  {
+    "name": "Dr. Jayath Reddy",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "زراعة الكبد",
+    "department_en": "Liver Transplant"
+  },
+  {
+    "name": "Dr. Sanjay Govil",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "زراعة الكبد",
+    "department_en": "Liver Transplant"
+  },
+  {
+    "name": "Dr. Suresh Ragavaiah",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "زراعة الكبد",
+    "department_en": "Liver Transplant"
+  },
+  {
+    "name": "Dr. Kiran Kumar Sajjan Shetty",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "أورام طبية",
+    "department_en": "Medical Oncology"
+  },
+  {
+    "name": "Dr. Poonam Maurya",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "أورام طبية",
+    "department_en": "Medical Oncology"
+  },
+  {
+    "name": "Dr. Vijay Agarwal",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "أورام طبية",
+    "department_en": "Medical Oncology"
+  },
+  {
+    "name": "Dr. Vishwanath S",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "أورام طبية",
+    "department_en": "Medical Oncology"
+  },
+  {
+    "name": "Dr. Arpana Bansal",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "حديثي الولادة",
+    "department_en": "Neonatology"
+  },
+  {
+    "name": "Dr. Prashanth Urs",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "حديثي الولادة",
+    "department_en": "Neonatology"
+  },
+  {
+    "name": "Dr. Gokulnath",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "أمراض الكلى",
+    "department_en": "Nephrology"
+  },
+  {
+    "name": "Dr. Vinod Kumar",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "أمراض الكلى",
+    "department_en": "Nephrology"
+  },
+  {
+    "name": "Dr. Gurucharan Adhoor",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "طب الأعصاب",
+    "department_en": "Neurology"
+  },
+  {
+    "name": "Dr. Suryanarayana Sharma P M",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "طب الأعصاب",
+    "department_en": "Neurology"
+  },
+  {
+    "name": "Dr. Vikram Kamath",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "طب الأعصاب",
+    "department_en": "Neurology"
+  },
+  {
+    "name": "Dr. Kumbhar Kartik Revanappa",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "جراحة المخ والأعصاب",
+    "department_en": "Neurosurgery"
+  },
+  {
+    "name": "Dr. Sachin G",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "جراحة المخ والأعصاب",
+    "department_en": "Neurosurgery"
+  },
+  {
+    "name": "Dr. Satish Satyanarayan",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "جراحة المخ والأعصاب",
+    "department_en": "Neurosurgery"
+  },
+  {
+    "name": "Dr. Govindarajan M J",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "تصوير الأورام",
+    "department_en": "Onco Imaging"
+  },
+  {
+    "name": "Dr. Murthy S",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "تصوير الأورام",
+    "department_en": "Onco Imaging"
+  },
+  {
+    "name": "Dr. Savith Kumar",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "تصوير الأورام",
+    "department_en": "Onco Imaging"
+  },
+  {
+    "name": "Dr. Swarna Shivakumar",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "تصوير الأورام",
+    "department_en": "Onco Imaging"
+  },
+  {
+    "name": "Dr. Shalini Shetty",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "طب العيون",
+    "department_en": "Ophthalmology"
+  },
+  {
+    "name": "Dr. Adarsh",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "جراحة العظام",
+    "department_en": "Orthopaedic"
+  },
+  {
+    "name": "Dr. Ajith Prabhu",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "جراحة العظام",
+    "department_en": "Orthopaedic"
+  },
+  {
+    "name": "Dr. Manish Samson",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "جراحة العظام",
+    "department_en": "Orthopaedic"
+  },
+  {
+    "name": "Dr. Pradeep Kochheppan",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "جراحة العظام",
+    "department_en": "Orthopaedic"
+  },
+  {
+    "name": "Dr. Rajshekar K T",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "جراحة العظام",
+    "department_en": "Orthopaedic"
+  },
+  {
+    "name": "Dr. Raviraj A",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "جراحة العظام",
+    "department_en": "Orthopaedic"
+  },
+  {
+    "name": "Dr. Shashikumar H.K",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "جراحة العظام",
+    "department_en": "Orthopaedic"
+  },
+  {
+    "name": "Dr. Vidya Sagar",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "جراحة العظام",
+    "department_en": "Orthopaedic"
+  },
+  {
+    "name": "Dr. Vivek Kumar",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "جراحة العظام",
+    "department_en": "Orthopaedic"
+  },
+  {
+    "name": "Dr. Srimanth B S",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "أورام عظام",
+    "department_en": "Orthopaedic Oncology"
+  },
+  {
+    "name": "Dr. Anjana Hulse",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "الغدد الصماء للأطفال",
+    "department_en": "Paediatric Endocrinology"
+  },
+  {
+    "name": "Dr. Manohar Babu",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "عظام الأطفال",
+    "department_en": "Paediatric Ortho"
+  },
+  {
+    "name": "Dr. Anand Alladi",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "جراحة الأطفال",
+    "department_en": "Paediatric Surgeon"
+  },
+  {
+    "name": "Dr. Chitra Ramu",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "جراحة الأطفال",
+    "department_en": "Paediatric Surgery"
+  },
+  {
+    "name": "Dr. Poonam Shetty",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "طب أطفال",
+    "department_en": "Paediatrics"
+  },
+  {
+    "name": "Dr. Radhakrisha Hegde",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "طب أطفال",
+    "department_en": "Paediatrics"
+  },
+  {
+    "name": "Dr. Raghavan P.S",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "طب أطفال",
+    "department_en": "Paediatrics"
+  },
+  {
+    "name": "Dr. Shwetha S Rao",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "طب أطفال",
+    "department_en": "Paediatrics"
+  },
+  {
+    "name": "Dr. Sowmya C.C",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "طب أطفال",
+    "department_en": "Paediatrics"
+  },
+  {
+    "name": "Dr. Roshan Jain",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "طب نفسي",
+    "department_en": "Psychiatry"
+  },
+  {
+    "name": "Dr. Shobha Krishna",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "طب نفسي",
+    "department_en": "Psychiatry"
+  },
+  {
+    "name": "Dr. Srinivas Reddy",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "طب نفسي",
+    "department_en": "Psychiatry"
+  },
+  {
+    "name": "Dr. Hariprasad",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "أمراض الرئة",
+    "department_en": "Pulmonology"
+  },
+  {
+    "name": "Dr. Ravindra Mehta",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "أمراض الرئة",
+    "department_en": "Pulmonology"
+  },
+  {
+    "name": "Dr. Sumanth Mantri",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "أمراض الرئة",
+    "department_en": "Pulmonology"
+  },
+  {
+    "name": "Dr. B K M Reddy",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "علاج الأورام بالإشعاع",
+    "department_en": "Radiation Oncology"
+  },
+  {
+    "name": "Dr. Kumara Swamy",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "علاج الأورام بالإشعاع",
+    "department_en": "Radiation Oncology"
+  },
+  {
+    "name": "Dr. Natarajan V",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "علاج الأورام بالإشعاع",
+    "department_en": "Radiation Oncology"
+  },
+  {
+    "name": "Dr. Sridhar P S",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "علاج الأورام بالإشعاع",
+    "department_en": "Radiation Oncology"
+  },
+  {
+    "name": "Dr. Vijay Bhaskar L",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "علاج الأورام بالإشعاع",
+    "department_en": "Radiation Oncology"
+  },
+  {
+    "name": "Dr. Vikram Maiya M",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "علاج الأورام بالإشعاع",
+    "department_en": "Radiation Oncology"
+  },
+  {
+    "name": "Dr. Vinay Ural",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "علاج الأورام بالإشعاع",
+    "department_en": "Radiation Oncology"
+  },
+  {
+    "name": "Dr. Roopa Tekkatte",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "أمراض الروماتيزم",
+    "department_en": "Rheumatology"
+  },
+  {
+    "name": "Dr. Anil Kamat",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "جراحة الأورام",
+    "department_en": "Surgical Oncology"
+  },
+  {
+    "name": "Dr. Sunil Navalgund",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "جراحة الأورام",
+    "department_en": "Surgical Oncology"
+  },
+  {
+    "name": "Dr. Manohar T",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "أورام المسالك البولية",
+    "department_en": "Uro Oncology"
+  },
+  {
+    "name": "Dr. Ravi Chandran K",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "أورام المسالك البولية",
+    "department_en": "Uro Oncology"
+  },
+  {
+    "name": "Dr. Sundar Narasimhan",
+    "hospital": "Apollo Hospital, Bannerghatta Bangalore",
+    "department_ar": "جراحة الأوعية الدموية",
+    "department_en": "Vascular Surgery"
+  },
+  {
+    "name": "Dr. Amit Jassal",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "تخدير",
+    "department_en": "Anaesthesia"
+  },
+  {
+    "name": "Dr. Amit Kalsotra",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "تخدير",
+    "department_en": "Anaesthesia"
+  },
+  {
+    "name": "Dr. G. Arya Prakash",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "تخدير",
+    "department_en": "Anaesthesia"
+  },
+  {
+    "name": "Dr. Narender Kumar",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "تخدير",
+    "department_en": "Anaesthesia"
+  },
+  {
+    "name": "Dr. Rajesh Misra",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "تخدير",
+    "department_en": "Anaesthesia"
+  },
+  {
+    "name": "Dr. Shelly Mittal",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "تخدير",
+    "department_en": "Anaesthesia"
+  },
+  {
+    "name": "Dr. Swati Aggarwal",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "تخدير",
+    "department_en": "Anaesthesia"
+  },
+  {
+    "name": "Dr. Vijay Mohan Hanjoora",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "تخدير",
+    "department_en": "Anaesthesia"
+  },
+  {
+    "name": "Dr. Y Naveen",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "تخدير",
+    "department_en": "Anaesthesia"
+  },
+  {
+    "name": "Dr. (Brig.) Anil Khetarpal",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "طب نقل الدم",
+    "department_en": "Blood Centre & Transfusion Medicine"
+  },
+  {
+    "name": "Dr. Deepak Jha",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "جراحة الثدي",
+    "department_en": "Breast Surgery / Oncology"
+  },
+  {
+    "name": "Dr. (Col) Balbir Kalra",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "أمراض القلب",
+    "department_en": "Cardiology"
+  },
+  {
+    "name": "Dr. D.K. Jhamb",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "أمراض القلب",
+    "department_en": "Cardiology"
+  },
+  {
+    "name": "Dr. Rahul Mehrotra",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "أمراض القلب",
+    "department_en": "Cardiology"
+  },
+  {
+    "name": "Dr. Surendra Nath Khanna",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "جراحة أوعية وقلب",
+    "department_en": "Cardiothoracic & Vascular Surgery"
+  },
+  {
+    "name": "Dr. Ankur Bhatia",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "جراحة تجميل",
+    "department_en": "Cosmetic & Plastic Surgery"
+  },
+  {
+    "name": "Dr. Pradeep Kumar Singh",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "جراحة تجميل",
+    "department_en": "Cosmetic & Plastic Surgery"
+  },
+  {
+    "name": "Dr. Anjana Satyajit",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "طب الأسنان",
+    "department_en": "Dentistry"
+  },
+  {
+    "name": "Dr. Monica Bambroo",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "جلدية وتجميل",
+    "department_en": "Dermatology & Cosmetology"
+  },
+  {
+    "name": "Dr. Noor Sharma",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "جلدية وتجميل",
+    "department_en": "Dermatology & Cosmetology"
+  },
+  {
+    "name": "Dr. Shifa Yadav",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "جلدية وتجميل",
+    "department_en": "Dermatology & Cosmetology"
+  },
+  {
+    "name": "Dr. Trisha Srivastava",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "أنف وأذن وحنجرة",
+    "department_en": "ENT"
+  },
+  {
+    "name": "Dr. Dilpreet Bajwa",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "أنف وأذن وحنجرة",
+    "department_en": "ENT Surgery"
+  },
+  {
+    "name": "Dr. Poonam Gautam",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "أنف وأذن وحنجرة",
+    "department_en": "ENT Surgery"
+  },
+  {
+    "name": "Dr. Shashidhar TB",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "أنف وأذن وحنجرة",
+    "department_en": "ENT Surgery"
+  },
+  {
+    "name": "Dr. Sameer Mehrotra",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "كهروفسيولوجيا القلب",
+    "department_en": "Electrophysiology & Interventional Cardiology"
+  },
+  {
+    "name": "Dr. Rajesh Kumar Singh",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "الطوارئ",
+    "department_en": "Emergency & Trauma"
+  },
+  {
+    "name": "Dr. (Col) Suvasish Chakraberty",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "الطوارئ",
+    "department_en": "Emergency & Trauma Services"
+  },
+  {
+    "name": "Dr. Anjana Kharbanda",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "الطوارئ",
+    "department_en": "Emergency & Trauma Services"
+  },
+  {
+    "name": "Dr. Ellora Nanda",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "الطوارئ",
+    "department_en": "Emergency & Trauma Services"
+  },
+  {
+    "name": "Dr. Yatin Kukreja",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "الطوارئ",
+    "department_en": "Emergency & Trauma Services"
+  },
+  {
+    "name": "Dr. Dheeraj Kapoor",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "سكري وغدد",
+    "department_en": "Endocrinology"
+  },
+  {
+    "name": "Dr. Ashutosh Gupta",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "طب الأجنة والوراثة",
+    "department_en": "Fetal Medicine & Genetics"
+  },
+  {
+    "name": "Dr. Bimal Kumar Sahu",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "الجهاز الهضمي",
+    "department_en": "Gastroenterology / GI Surgery"
+  },
+  {
+    "name": "Dr. M.A Mir",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "الجهاز الهضمي",
+    "department_en": "Gastroenterology / GI Surgery"
+  },
+  {
+    "name": "Dr. Hitender Singh Chauhan",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "جراحة عامة ومناظير",
+    "department_en": "General & Minimally Invasive Surgery"
+  },
+  {
+    "name": "Dr. Kanika Singh",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "الوراثة",
+    "department_en": "Genetics"
+  },
+  {
+    "name": "Dr. Meenal Thakral",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "طب الشيخوخة",
+    "department_en": "Geriatric Medicine"
+  },
+  {
+    "name": "Dr. Prasun Chatterjee",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "طب الشيخوخة",
+    "department_en": "Geriatric Medicine"
+  },
+  {
+    "name": "Dr. Nutan Agarwal",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "غدد نسائية",
+    "department_en": "Gynaecological Endocrinology"
+  },
+  {
+    "name": "Dr. Amita Naithani",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "أورام النساء",
+    "department_en": "Gynaecological Oncology"
+  },
+  {
+    "name": "Dr. Rupinder Sekhon",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "أورام نسائية",
+    "department_en": "Gynaecological Oncology"
+  },
+  {
+    "name": "Dr. Biswarup Purkayastha",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "زراعة القلب والرئة",
+    "department_en": "Heart & Lung Transplant"
+  },
+  {
+    "name": "Dr. Gaurav Dixit",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "أمراض الدم وزراعة نخاع",
+    "department_en": "Hematology & BMT"
+  },
+  {
+    "name": "Dr. Lalit Kumar",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "أمراض الدم و BMT",
+    "department_en": "Hematology & BMT"
+  },
+  {
+    "name": "Dr. Rahul Naithani",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "أمراض الدم وBMT",
+    "department_en": "Hematology & BMT"
+  },
+  {
+    "name": "Dr. Gajanand Yadav",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "استبدال مفاصل",
+    "department_en": "Hip & Knee Arthroplasty"
+  },
+  {
+    "name": "Dr. Jeetendra Sharma",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "العناية المركزة",
+    "department_en": "ICU / Critical Care"
+  },
+  {
+    "name": "Dr. Kuldeep Singh",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "العناية المركزة",
+    "department_en": "ICU / Critical Care"
+  },
+  {
+    "name": "Dr. Mukesh Kumar Gupta",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "العناية المركزة",
+    "department_en": "ICU / Critical Care"
+  },
+  {
+    "name": "Dr. Rati Bansal Goel",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "عناية مركزة",
+    "department_en": "ICU / Critical Care"
+  },
+  {
+    "name": "Dr. Reshma Tewari",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "عناية مركزة",
+    "department_en": "ICU / Critical Care"
+  },
+  {
+    "name": "Dr. Kiran Arora",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "أطفال الأنابيب",
+    "department_en": "IVF & Reproductive Medicine"
+  },
+  {
+    "name": "Dr. Parul Prakash",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "أطفال الأنابيب",
+    "department_en": "IVF & Reproductive Medicine"
+  },
+  {
+    "name": "Dr. Sarabpreet Singh",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "أطفال الأنابيب",
+    "department_en": "IVF & Reproductive Medicine"
+  },
+  {
+    "name": "Dr. Arpit Jain",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "طب باطني",
+    "department_en": "Internal Medicine"
+  },
+  {
+    "name": "Dr. P Venkata Krishnan",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "طب باطني",
+    "department_en": "Internal Medicine"
+  },
+  {
+    "name": "Dr. Seema Dhir",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "طب باطني",
+    "department_en": "Internal Medicine"
+  },
+  {
+    "name": "Dr. Kuldeep Arora",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "أمراض القلب التداخلية",
+    "department_en": "Interventional Cardiology"
+  },
+  {
+    "name": "Dr. Sushant Mishra",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "قلب تداخلي",
+    "department_en": "Interventional Cardiology"
+  },
+  {
+    "name": "Dr. Amit Kumar Chaurasia",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "أمراض القلب التداخلية",
+    "department_en": "Interventional Cardiology & Structural Heart"
+  },
+  {
+    "name": "Dr. Gaurav Singhal",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "زراعة الكلى",
+    "department_en": "Kidney Transplant & Nephrology"
+  },
+  {
+    "name": "Dr. Lakshmi Kant Tripathi",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "زراعة الكلى",
+    "department_en": "Kidney Transplant & Nephrology"
+  },
+  {
+    "name": "Dr. Manju Aggarwal",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "زراعة الكلى",
+    "department_en": "Kidney Transplant & Nephrology"
+  },
+  {
+    "name": "Dr. Kunal Vinayak",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "زراعة الكلى والمسالك",
+    "department_en": "Kidney Transplant & Urology"
+  },
+  {
+    "name": "Dr. Varun Mittal",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "زراعة الكلى والمسالك",
+    "department_en": "Kidney Transplant & Urology"
+  },
+  {
+    "name": "Dr. Deepa Goel",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "طب المختبرات",
+    "department_en": "Laboratory Medicine"
+  },
+  {
+    "name": "Dr. Namita Jaggi",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "طب المختبرات",
+    "department_en": "Laboratory Medicine"
+  },
+  {
+    "name": "Dr. Nandini Vasdev",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "طب المختبرات",
+    "department_en": "Laboratory Medicine"
+  },
+  {
+    "name": "Dr. Ritika Singla",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "طب المختبرات",
+    "department_en": "Laboratory Medicine"
+  },
+  {
+    "name": "Dr. Vineeta Raina",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "طب المختبرات",
+    "department_en": "Laboratory Services"
+  },
+  {
+    "name": "Dr. Giriraj Bora",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "زراعة الكبد",
+    "department_en": "Liver Transplant"
+  },
+  {
+    "name": "Dr. Shyam Sunder Mahansaria",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "زراعة الكبد",
+    "department_en": "Liver Transplant"
+  },
+  {
+    "name": "Dr. Puneet Dwevedi",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "الصحة النفسية",
+    "department_en": "Mental Health"
+  },
+  {
+    "name": "Dr. Rahul Chandhok",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "الصحة النفسية",
+    "department_en": "Mental Health"
+  },
+  {
+    "name": "Dr. Chandrima Misra Mukherjee",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "الصحة النفسية",
+    "department_en": "Mental Health & Behavioural Sciences"
+  },
+  {
+    "name": "Dr. Manjul Bawa",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "جراحة عامة ومناظير وروبوت",
+    "department_en": "Minimally Invasive & Robotic Surgery"
+  },
+  {
+    "name": "Dr. Paritosh S Gupta",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "جراحة عامة ومناظير",
+    "department_en": "Minimally Invasive Surgery"
+  },
+  {
+    "name": "Dr. Rakesh Durkhure",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "جراحة مناظير",
+    "department_en": "Minimally Invasive Surgery"
+  },
+  {
+    "name": "Dr. Suresh Kumar Chhabra",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "جراحة مناظير",
+    "department_en": "Minimally Invasive Surgery"
+  },
+  {
+    "name": "Dr. Dinesh Bansal",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "أمراض الكلى",
+    "department_en": "Nephrology"
+  },
+  {
+    "name": "Dr. Deepak Solanki",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "العناية المركزة العصبية",
+    "department_en": "Neuro Critical Care"
+  },
+  {
+    "name": "Dr. Raman Deep Kaur",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "عناية مركزة عصبية",
+    "department_en": "Neuro Critical Care"
+  },
+  {
+    "name": "Dr. Saurabh Anand",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "عناية مركزة عصبية",
+    "department_en": "Neuro Critical Care"
+  },
+  {
+    "name": "Dr. Seema Lachala",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "عناية مركزة عصبية",
+    "department_en": "Neuro Critical Care"
+  },
+  {
+    "name": "Dr. Sweetha Susanne Mohan",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "عناية مركزة عصبية",
+    "department_en": "Neuro Critical Care"
+  },
+  {
+    "name": "Dr. Ashish Chakravarty",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "العناية المركزة العصبية",
+    "department_en": "Neuroanaesthesia & Neuro Critical Care"
+  },
+  {
+    "name": "Dr. Mukesh Kumar",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "جراحة الأعصاب التداخلية",
+    "department_en": "Neurointerventional Surgery"
+  },
+  {
+    "name": "Dr. Tariq Matin",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "جراحة عصبية تداخلية",
+    "department_en": "Neurointerventional Surgery"
+  },
+  {
+    "name": "Dr. Mohit Anand",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "طب الأعصاب",
+    "department_en": "Neurology"
+  },
+  {
+    "name": "Dr. Sameer Arora",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "طب الأعصاب",
+    "department_en": "Neurology"
+  },
+  {
+    "name": "Dr. Sumit Singh",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "طب الأعصاب",
+    "department_en": "Neurology"
+  },
+  {
+    "name": "Dr. Vivek Barun",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "طب الأعصاب",
+    "department_en": "Neurology"
+  },
+  {
+    "name": "Dr. Aditya Gupta",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "جراحة المخ والأعصاب",
+    "department_en": "Neurosurgery"
+  },
+  {
+    "name": "Dr. Anuvrat Sinha",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "جراحة المخ والأعصاب",
+    "department_en": "Neurosurgery"
+  },
+  {
+    "name": "Dr. Pawan Goyal",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "جراحة المخ والأعصاب",
+    "department_en": "Neurosurgery"
+  },
+  {
+    "name": "Dr. Sanjeev Srivastava",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "جراحة المخ والأعصاب",
+    "department_en": "Neurosurgery"
+  },
+  {
+    "name": "Dr. Noaline Sinha",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "طب نووي",
+    "department_en": "Nuclear Medicine"
+  },
+  {
+    "name": "Dr. Tajamul Syed Malik",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "طب نووي",
+    "department_en": "Nuclear Medicine"
+  },
+  {
+    "name": "Dr. Shabana Parveen",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "تغذية علاجية",
+    "department_en": "Nutrition & Dietetics"
+  },
+  {
+    "name": "Dr. Deepa Maheshwari",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "نساء وولادة",
+    "department_en": "Obstetrics & Gynaecology"
+  },
+  {
+    "name": "Dr. Nidhi Jain",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "نساء وولادة",
+    "department_en": "Obstetrics & Gynaecology"
+  },
+  {
+    "name": "Dr. Nidhi Rajotia",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "نساء وولادة",
+    "department_en": "Obstetrics & Gynaecology"
+  },
+  {
+    "name": "Dr. Renu Raina Sehgal",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "نساء وولادة",
+    "department_en": "Obstetrics & Gynaecology"
+  },
+  {
+    "name": "Dr. Seerat Sandhu",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "نساء وولادة",
+    "department_en": "Obstetrics & Gynaecology"
+  },
+  {
+    "name": "Dr. Biswajyoti Hazarika",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "الأورام",
+    "department_en": "Oncology"
+  },
+  {
+    "name": "Dr. Kamal Verma",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "الأورام",
+    "department_en": "Oncology"
+  },
+  {
+    "name": "Dr. Preeti Vijayakumaran",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "أورام",
+    "department_en": "Oncology"
+  },
+  {
+    "name": "Dr. Priya Tiwari",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "أورام",
+    "department_en": "Oncology"
+  },
+  {
+    "name": "Dr. Priyanka Raina",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "أورام",
+    "department_en": "Oncology"
+  },
+  {
+    "name": "Dr. S Jayalakshmi",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "أورام",
+    "department_en": "Oncology"
+  },
+  {
+    "name": "Dr. Sandeep Goel",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "أورام",
+    "department_en": "Oncology"
+  },
+  {
+    "name": "Dr. Subodh Chandra Pande",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "أورام",
+    "department_en": "Oncology"
+  },
+  {
+    "name": "Dr. Parveen Yadav",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "جراحة أورام",
+    "department_en": "Oncology Surgery"
+  },
+  {
+    "name": "Dr. Vishal Arora",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "طب العيون",
+    "department_en": "Ophthalmology"
+  },
+  {
+    "name": "Dr. Abhinandan Mukhopadhyay",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "زراعة الأعضاء والمسالك",
+    "department_en": "Organ Transplant & Urology"
+  },
+  {
+    "name": "Dr. (Prof.) Ravi Sauhta",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "جراحة العظام",
+    "department_en": "Orthopaedics"
+  },
+  {
+    "name": "Dr. Devendra Singh Solanki",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "جراحة العظام",
+    "department_en": "Orthopaedics"
+  },
+  {
+    "name": "Dr. Devendra Yadav",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "جراحة العظام",
+    "department_en": "Orthopaedics"
+  },
+  {
+    "name": "Dr. Mohd Irfan Banday",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "جراحة العظام",
+    "department_en": "Orthopaedics"
+  },
+  {
+    "name": "Dr. Sandeep Chauhan",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "جراحة عظام",
+    "department_en": "Orthopaedics"
+  },
+  {
+    "name": "Dr. Vipin Maheshwari",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "جراحة العظام",
+    "department_en": "Orthopaedics"
+  },
+  {
+    "name": "Dr. Vivek Vaibhav",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "جراحة العظام",
+    "department_en": "Orthopaedics"
+  },
+  {
+    "name": "Dr. Aseem R. Srivastava",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "قلب أطفال وجراحة قلب",
+    "department_en": "Paediatric Cardiac Surgery & Cardiology"
+  },
+  {
+    "name": "Dr. Nidhi Rawal",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "قلب أطفال",
+    "department_en": "Paediatric Cardiology"
+  },
+  {
+    "name": "Dr. Shubhra Shri Gupta",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "قلب أطفال",
+    "department_en": "Paediatric Cardiology"
+  },
+  {
+    "name": "Dr. Sumeet Arora",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "غدد أطفال ومراهقين",
+    "department_en": "Paediatric Endocrinology"
+  },
+  {
+    "name": "Dr. Sakshi Karkra",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "جهاز هضمي أطفال",
+    "department_en": "Paediatric Gastroenterology & Hepatology"
+  },
+  {
+    "name": "Dr. Sukriti Gupta",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "أمراض الدم وزراعة نخاع للأطفال",
+    "department_en": "Paediatric Haemato-Oncology & BMT"
+  },
+  {
+    "name": "Dr. Anju Singh",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "أمراض الدم وروماتيزم الأطفال",
+    "department_en": "Paediatric Haemato-Oncology & Rheumatology"
+  },
+  {
+    "name": "Dr. Ajit Singh Baghela",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "طب أعصاب الأطفال",
+    "department_en": "Paediatric Neurology"
+  },
+  {
+    "name": "Dr. Sanjay Sarup",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "جراحة أطفال وعمود فقري",
+    "department_en": "Paediatric Orthopaedics & Spine Surgery"
+  },
+  {
+    "name": "Dr. Nitin Goel",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "جراحة الأطفال",
+    "department_en": "Paediatric Surgery"
+  },
+  {
+    "name": "Dr. Hemant K. Gogia",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "طب أطفال",
+    "department_en": "Paediatrics"
+  },
+  {
+    "name": "Dr. Padam Yadav",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "طب أطفال",
+    "department_en": "Paediatrics"
+  },
+  {
+    "name": "Dr. Prabhat Maheshwari",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "طب أطفال",
+    "department_en": "Paediatrics"
+  },
+  {
+    "name": "Dr. Rajiv Chhabra",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "طب أطفال",
+    "department_en": "Paediatrics"
+  },
+  {
+    "name": "Dr. Ashu Kumar Jain",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "طب الألم",
+    "department_en": "Pain Medicine & Palliative Care"
+  },
+  {
+    "name": "Dr. Sachin Sethi",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "علاج طبيعي",
+    "department_en": "Physiotherapy & Rehab"
+  },
+  {
+    "name": "Dr. Anjali Vaish",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "العلاج الطبيعي وإعادة التأهيل",
+    "department_en": "Physiotherapy & Rehabilitation"
+  },
+  {
+    "name": "Dr. Arun Chowdary Kotaru",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "أمراض الصدر",
+    "department_en": "Pulmonology"
+  },
+  {
+    "name": "Dr. Shweta Bansal",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "أمراض الصدر",
+    "department_en": "Pulmonology"
+  },
+  {
+    "name": "Dr. Aditi Dixit",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "أشعة",
+    "department_en": "Radiology"
+  },
+  {
+    "name": "Dr. Gurpreet Makkar",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "أشعة",
+    "department_en": "Radiology"
+  },
+  {
+    "name": "Dr. Rajiv Sharma",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "أشعة",
+    "department_en": "Radiology"
+  },
+  {
+    "name": "Dr. Sanjay Mehta",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "أشعة",
+    "department_en": "Radiology"
+  },
+  {
+    "name": "Dr. Syed Tauqueer Fazal",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "أشعة",
+    "department_en": "Radiology"
+  },
+  {
+    "name": "Dr. Sumeet Agrawal",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "روماتيزم ومناعة",
+    "department_en": "Rheumatology & Clinical Immunology"
+  },
+  {
+    "name": "Dr. Tapan Singh Chauhan",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "أورام روبوتية",
+    "department_en": "Robotic Oncology Surgery"
+  },
+  {
+    "name": "Dr. I P S Oberoi",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "جراحة روبوتية للعظام",
+    "department_en": "Robotic Orthopaedic Surgery"
+  },
+  {
+    "name": "Dr. Ramkinkar Jha",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "جراحة روبوتية للعظام",
+    "department_en": "Robotic Orthopaedic Surgery"
+  },
+  {
+    "name": "Dr. Ankit Goel",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "الجراحة الروبوتية والمسالك",
+    "department_en": "Robotic Surgery & Urology"
+  },
+  {
+    "name": "Dr. Rajiv Yadav",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "جراحة روبوتية ومسالك",
+    "department_en": "Robotic Urology"
+  },
+  {
+    "name": "Dr. SK Rajan",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "جراحة العمود الفقري",
+    "department_en": "Spine Neurosurgery"
+  },
+  {
+    "name": "Dr. Sumit Kumar",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "جراحة العمود الفقري",
+    "department_en": "Spine Surgery"
+  },
+  {
+    "name": "Dr. Varun Khanna",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "جراحة العمود الفقري",
+    "department_en": "Spine Surgery"
+  },
+  {
+    "name": "Dr. Dheeraj Batheja",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "جراحة العمود الفقري",
+    "department_en": "Spine Surgery / Orthopaedics"
+  },
+  {
+    "name": "Dr. Hitesh Garg",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "جراحة العمود الفقري",
+    "department_en": "Spine Surgery / Scoliosis"
+  },
+  {
+    "name": "Dr. (Col) S. V. Kotwal",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "جراحة المسالك البولية",
+    "department_en": "Urology"
+  },
+  {
+    "name": "Dr. Piyush Gupta",
+    "hospital": "Artemis Hospital, Delhi",
+    "department_ar": "جراحة المسالك البولية",
+    "department_en": "Urology"
+  },
+  {
+    "name": "Dr. Arul Dominic Furtado",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "جراحة القلب",
+    "department_en": "Cardiac Surgery"
+  },
+  {
+    "name": "Dr. Ganeshakrishnan Iyer",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "جراحة القلب",
+    "department_en": "Cardiac Surgery"
+  },
+  {
+    "name": "Dr. Prashanth Y M",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "جراحة القلب",
+    "department_en": "Cardiac Surgery"
+  },
+  {
+    "name": "Dr. Madhusudan Raikar",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "أمراض القلب",
+    "department_en": "Cardiology"
+  },
+  {
+    "name": "Dr. Nagamalesh U M",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "أمراض القلب",
+    "department_en": "Cardiology"
+  },
+  {
+    "name": "Dr. Sanjay Bhat",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "أمراض القلب",
+    "department_en": "Cardiology"
+  },
+  {
+    "name": "Dr. Sudhir Kumar Kale",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "الأشعة التداخلية",
+    "department_en": "Clinical Imaging & Interventional Radiology"
+  },
+  {
+    "name": "Dr. Shireen Furtado",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "الأمراض الجلدية",
+    "department_en": "Dermatology"
+  },
+  {
+    "name": "Dr. Prakrutha S",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "أطفال الأنابيب وأمراض النساء",
+    "department_en": "Fertility, IVF & Obstetrics"
+  },
+  {
+    "name": "Dr. Puneeth Thalasta",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "الجراحة العامة وجراحة الجهاز الهضمي",
+    "department_en": "General & Surgical Gastroenterology"
+  },
+  {
+    "name": "Dr. Santosh MP",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "جراحة عامة",
+    "department_en": "General Surgery & Allied Specialities"
+  },
+  {
+    "name": "Dr. Anoop P",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "أمراض الدم والأورام وزراعة نخاع العظم",
+    "department_en": "Haematology, Haemato Oncology & BMT"
+  },
+  {
+    "name": "Dr. Girish S. Shetkar",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "أورام الرأس والرقبة",
+    "department_en": "Head & Neck Oncology"
+  },
+  {
+    "name": "Dr. Sonal Asthana",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "زراعة الكبد",
+    "department_en": "Integrated Liver Care, Liver Transplant"
+  },
+  {
+    "name": "Dr. Veerabhadra Guptha K",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "أمراض الكلى",
+    "department_en": "Nephrology"
+  },
+  {
+    "name": "Dr. Akshay Hari",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "جراحة المخ والأعصاب والعمود الفقري",
+    "department_en": "Neuro & Spine Surgery"
+  },
+  {
+    "name": "Dr. Deepak B S",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "جراحة المخ والأعصاب والعمود الفقري",
+    "department_en": "Neuro & Spine Surgery"
+  },
+  {
+    "name": "Dr. Nirmala S",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "جراحة المخ والأعصاب",
+    "department_en": "Neuro Surgery"
+  },
+  {
+    "name": "Dr. Ravi Gopal Varma",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "جراحة المخ والأعصاب",
+    "department_en": "Neuro Surgery"
+  },
+  {
+    "name": "Dr. Santhosh N U",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "جراحة المخ والأعصاب",
+    "department_en": "Neuro Surgery"
+  },
+  {
+    "name": "Dr. Anuradha H K",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "طب الأعصاب",
+    "department_en": "Neurology"
+  },
+  {
+    "name": "Dr. Lokesh B",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "طب الأعصاب",
+    "department_en": "Neurology"
+  },
+  {
+    "name": "Dr. Nikhil C. Hiremath",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "طب الأعصاب",
+    "department_en": "Neurology"
+  },
+  {
+    "name": "Dr. Keni Ravish Rajiv",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "طب الأعصاب والصرع",
+    "department_en": "Neurology & Epilepsy Centre"
+  },
+  {
+    "name": "Dr. Mythri Shankar",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "الطب النووي",
+    "department_en": "Nuclear Medicine"
+  },
+  {
+    "name": "Dr. Bhavani Stalin",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "أمراض النساء والولادة",
+    "department_en": "Obstetrics & Gynaecology"
+  },
+  {
+    "name": "Dr. Chetana V",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "أمراض النساء والولادة",
+    "department_en": "Obstetrics & Gynaecology"
+  },
+  {
+    "name": "Dr. Soumya Lakshmi T V",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "أمراض النساء والولادة",
+    "department_en": "Obstetrics & Gynaecology"
+  },
+  {
+    "name": "Dr. Varsha Desai Kale",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "أمراض النساء والولادة",
+    "department_en": "Obstetrics & Gynaecology"
+  },
+  {
+    "name": "Dr. Sagar Bhattad",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "روماتيزم الأطفال والمناعة",
+    "department_en": "Paediatric Rheumatology & Immunology"
+  },
+  {
+    "name": "Dr. Chetan Ginigeri",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "طب الأطفال وحديثي الولادة",
+    "department_en": "Paediatrics & Neonatology"
+  },
+  {
+    "name": "Dr. Parimala V Thirumalesh",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "أطفال وحديثي الولادة",
+    "department_en": "Paediatrics & Neonatology"
+  },
+  {
+    "name": "Dr. Raghuram CP",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "أطفال وحديثي الولادة",
+    "department_en": "Paediatrics & Neonatology"
+  },
+  {
+    "name": "Dr. Stalin Ramprakash",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "أطفال وحديثي الولادة",
+    "department_en": "Paediatrics & Neonatology"
+  },
+  {
+    "name": "Dr. Ravi Kumar C P",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "أطفال وحديثي الولادة وأمراض الأعصاب للأطفال",
+    "department_en": "Paediatrics, Neonatology & NeuKIDS"
+  },
+  {
+    "name": "Dr. Rohit Kumar C",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "جراحة الأورام ورأس الرقبة",
+    "department_en": "Surgical & Head & Neck Oncology"
+  },
+  {
+    "name": "Dr. Ashwin K R",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "جراحة الأورام",
+    "department_en": "Surgical Oncology"
+  },
+  {
+    "name": "Dr. Somashekhar S P",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "جراحة الأورام",
+    "department_en": "Surgical Oncology"
+  },
+  {
+    "name": "Dr. Vijay K Ahuja",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "جراحة الأورام",
+    "department_en": "Surgical Oncology"
+  },
+  {
+    "name": "Dr. Avinash T S",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "جراحة المسالك البولية",
+    "department_en": "Urology"
+  },
+  {
+    "name": "Dr. Giriraja Velayutham",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "جراحة المسالك البولية",
+    "department_en": "Urology"
+  },
+  {
+    "name": "Dr. Shashank M S",
+    "hospital": "Aster CMI Hospital, Bangalore",
+    "department_ar": "جراحة المسالك البولية",
+    "department_en": "Urology"
+  },
+  {
+    "name": "Dr. Divakar Bhat",
+    "hospital": "Aster RV Hospital, Bangalore",
+    "department_ar": "جراحة القلب",
+    "department_en": "Cardiac Surgery"
+  },
+  {
+    "name": "Dr. Ganesh Krishnan Iyer",
+    "hospital": "Aster RV Hospital, Bangalore",
+    "department_ar": "جراحة القلب",
+    "department_en": "Cardiac Surgery"
+  },
+  {
+    "name": "Dr. Shyam Sunder K R",
+    "hospital": "Aster RV Hospital, Bangalore",
+    "department_ar": "أمراض القلب",
+    "department_en": "Cardiology"
+  },
+  {
+    "name": "Prof. Dr. Nagamalesh U M",
+    "hospital": "Aster RV Hospital, Bangalore",
+    "department_ar": "أمراض القلب",
+    "department_en": "Cardiology"
+  },
+  {
+    "name": "Dr. Amogh V N",
+    "hospital": "Aster RV Hospital, Bangalore",
+    "department_ar": "الأشعة التداخلية",
+    "department_en": "Clinical Imaging & Interventional Radiology"
+  },
+  {
+    "name": "Dr. Ravindra B Kamble",
+    "hospital": "Aster RV Hospital, Bangalore",
+    "department_ar": "الأشعة التداخلية",
+    "department_en": "Clinical Imaging & Interventional Radiology"
+  },
+  {
+    "name": "Dr. Sudhakar Banakar",
+    "hospital": "Aster RV Hospital, Bangalore",
+    "department_ar": "الأشعة التداخلية",
+    "department_en": "Clinical Imaging & Interventional Radiology"
+  },
+  {
+    "name": "Dr. Vijaya Bhaskar S M",
+    "hospital": "Aster RV Hospital, Bangalore",
+    "department_ar": "الأنف والأذن والحنجرة وزراعة السماعات",
+    "department_en": "ENT & Hearing Implantology"
+  },
+  {
+    "name": "Dr. S Satish Kumar",
+    "hospital": "Aster RV Hospital, Bangalore",
+    "department_ar": "الغدد الصماء والسكري",
+    "department_en": "Endocrinology & Diabetology"
+  },
+  {
+    "name": "Dr. Girish P. Veeranna",
+    "hospital": "Aster RV Hospital, Bangalore",
+    "department_ar": "طب الجهاز الهضمي",
+    "department_en": "Gastro Science"
+  },
+  {
+    "name": "Dr. Madhu M P",
+    "hospital": "Aster RV Hospital, Bangalore",
+    "department_ar": "طب الجهاز الهضمي",
+    "department_en": "Gastro Science"
+  },
+  {
+    "name": "Dr. Ajay Kumar A V",
+    "hospital": "Aster RV Hospital, Bangalore",
+    "department_ar": "جراحة عامة وجراحة الجهاز الهضمي",
+    "department_en": "General & GI Surgery"
+  },
+  {
+    "name": "Dr. Satyajit Godhi",
+    "hospital": "Aster RV Hospital, Bangalore",
+    "department_ar": "جراحة عامة وجراحة الجهاز الهضمي",
+    "department_en": "General & GI Surgery"
+  },
+  {
+    "name": "Dr. Anoop P",
+    "hospital": "Aster RV Hospital, Bangalore",
+    "department_ar": "أمراض الدم والأورام وزراعة نخاع العظم",
+    "department_en": "Haematology, Haemato Oncology & BMT"
+  },
+  {
+    "name": "Dr. Sonal Asthana",
+    "hospital": "Aster RV Hospital, Bangalore",
+    "department_ar": "رعاية الكبد وزراعة الكبد",
+    "department_en": "Integrated Liver Care"
+  },
+  {
+    "name": "Dr. Harsha Kumar H N",
+    "hospital": "Aster RV Hospital, Bangalore",
+    "department_ar": "أمراض الكلى",
+    "department_en": "Nephrology"
+  },
+  {
+    "name": "Dr. Veerabhadra Guptha K",
+    "hospital": "Aster RV Hospital, Bangalore",
+    "department_ar": "أمراض الكلى",
+    "department_en": "Nephrology"
+  },
+  {
+    "name": "Dr. Dhananjaya I Bhat",
+    "hospital": "Aster RV Hospital, Bangalore",
+    "department_ar": "جراحة المخ والأعصاب",
+    "department_en": "Neuro Surgery"
+  },
+  {
+    "name": "Dr. Ravi Gopal Varma",
+    "hospital": "Aster RV Hospital, Bangalore",
+    "department_ar": "جراحة المخ والأعصاب",
+    "department_en": "Neuro Surgery"
+  },
+  {
+    "name": "Dr. B K Madhusudhan",
+    "hospital": "Aster RV Hospital, Bangalore",
+    "department_ar": "طب الأعصاب",
+    "department_en": "Neurology"
+  },
+  {
+    "name": "Dr. Shakthi K J S",
+    "hospital": "Aster RV Hospital, Bangalore",
+    "department_ar": "طب الأعصاب",
+    "department_en": "Neurology"
+  },
+  {
+    "name": "Dr. Jayashree K Bhat",
+    "hospital": "Aster RV Hospital, Bangalore",
+    "department_ar": "طب العيون",
+    "department_en": "Ophthalmology"
+  },
+  {
+    "name": "Dr. J V Srinivas",
+    "hospital": "Aster RV Hospital, Bangalore",
+    "department_ar": "جراحة العظام",
+    "department_en": "Orthopaedics"
+  },
+  {
+    "name": "Dr. Sagar Bhattad",
+    "hospital": "Aster RV Hospital, Bangalore",
+    "department_ar": "روماتيزم الأطفال والمناعة",
+    "department_en": "Paediatric Rheumatology & Immunology"
+  },
+  {
+    "name": "Dr. Chetan Ginigeri",
+    "hospital": "Aster RV Hospital, Bangalore",
+    "department_ar": "طب الأطفال وحديثي الولادة",
+    "department_en": "Paediatrics & Neonatology"
+  },
+  {
+    "name": "Dr. Raghuram CP",
+    "hospital": "Aster RV Hospital, Bangalore",
+    "department_ar": "طب الأطفال وحديثي الولادة",
+    "department_en": "Paediatrics & Neonatology"
+  },
+  {
+    "name": "Dr. Stalin Ramprakash",
+    "hospital": "Aster RV Hospital, Bangalore",
+    "department_ar": "طب الأطفال وحديثي الولادة",
+    "department_en": "Paediatrics & Neonatology"
+  },
+  {
+    "name": "Dr. Loganathan Venkatachalam",
+    "hospital": "Aster RV Hospital, Bangalore",
+    "department_ar": "الطب الفيزيائي وإعادة التأهيل",
+    "department_en": "Physical Medicine & Rehabilitation"
+  },
+  {
+    "name": "Dr. Murali Krishna",
+    "hospital": "Aster RV Hospital, Bangalore",
+    "department_ar": "الطب النفسي",
+    "department_en": "Psychiatry & Counselling Services"
+  },
+  {
+    "name": "Dr. Sandeep Attawar",
+    "hospital": "Aster RV Hospital, Bangalore",
+    "department_ar": "أمراض الصدر",
+    "department_en": "Pulmonology"
+  },
+  {
+    "name": "Dr. Somashekhar S P",
+    "hospital": "Aster RV Hospital, Bangalore",
+    "department_ar": "جراحة الأورام",
+    "department_en": "Surgical Oncology"
+  },
+  {
+    "name": "Dr. Rohit Kumar C",
+    "hospital": "Aster RV Hospital, Bangalore",
+    "department_ar": "جراحة الأورام ورأس الرقبة",
+    "department_en": "Surgical Oncology, Head & Neck Oncology"
+  },
+  {
+    "name": "Dr. Caranj S Venugopal",
+    "hospital": "Aster RV Hospital, Bangalore",
+    "department_ar": "جراحة المسالك البولية",
+    "department_en": "Urology"
+  },
+  {
+    "name": "Dr. Santhosh Bethur",
+    "hospital": "Aster RV Hospital, Bangalore",
+    "department_ar": "جراحة المسالك البولية",
+    "department_en": "Urology"
+  },
+  {
+    "name": "Dr. Yogesh K",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "مناظير المفاصل",
+    "department_en": "Arthroscopy & Sports Injury"
+  },
+  {
+    "name": "Dr. Nashi Semitha",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "جراحة أورام الثدي",
+    "department_en": "Breast Surgery"
+  },
+  {
+    "name": "Dr. Prashanth Y M",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "جراحة القلب والصدر",
+    "department_en": "CTVS"
+  },
+  {
+    "name": "Dr. Chirag D",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "أمراض القلب",
+    "department_en": "Cardiology"
+  },
+  {
+    "name": "Dr. Ajith Kumar A K",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "العناية المركزة",
+    "department_en": "Critical Care"
+  },
+  {
+    "name": "Dr. Nikhil Narayanaswamy",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "العناية المركزة",
+    "department_en": "Critical Care"
+  },
+  {
+    "name": "Dr. Pooja Murthy",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "العناية المركزة",
+    "department_en": "Critical Care"
+  },
+  {
+    "name": "Dr. Venkatesha Gupta K V",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "العناية المركزة",
+    "department_en": "Critical Care"
+  },
+  {
+    "name": "Dr. Khushboo Lath",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "طب الأسنان",
+    "department_en": "Dentistry"
+  },
+  {
+    "name": "Dr. Kushi C S",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "طب الأسنان",
+    "department_en": "Dentistry"
+  },
+  {
+    "name": "Dr. Sindhu U Muktamath",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "طب الأسنان",
+    "department_en": "Dentistry"
+  },
+  {
+    "name": "Dr. Priyanka Kuri",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "جلدية",
+    "department_en": "Dermatology"
+  },
+  {
+    "name": "Dr. Suma K R",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "جلدية",
+    "department_en": "Dermatology"
+  },
+  {
+    "name": "Dr. Bhuvaneshwari Parthiban",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "أنف وأذن وحنجرة",
+    "department_en": "ENT"
+  },
+  {
+    "name": "Dr. Jyotirmay S Hegde",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "أنف وأذن وحنجرة",
+    "department_en": "ENT & Skull Base Surgery"
+  },
+  {
+    "name": "Dr. Ashray V",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "طب الطوارئ",
+    "department_en": "Emergency Medicine"
+  },
+  {
+    "name": "Dr. Kushal Pandya",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "طب الطوارئ",
+    "department_en": "Emergency Medicine"
+  },
+  {
+    "name": "Dr. Narendra B S",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "الغدد الصماء",
+    "department_en": "Endocrinology"
+  },
+  {
+    "name": "Dr. Amulya R",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "طب الأجنة",
+    "department_en": "Fetal Medicine"
+  },
+  {
+    "name": "Dr. Shreshta Bhat",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "طب الأجنة",
+    "department_en": "Fetal Medicine"
+  },
+  {
+    "name": "Dr. Smitha D S",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "طب الأجنة",
+    "department_en": "Fetal Medicine"
+  },
+  {
+    "name": "Dr. Prabhakar B",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "جراحة عامة ومناظير وروبوت",
+    "department_en": "General & Laparoscopic Surgery"
+  },
+  {
+    "name": "Dr. Karthik A S",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "جراحة عامة",
+    "department_en": "General Surgery"
+  },
+  {
+    "name": "Dr. Esha R Shanbhag",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "أورام النساء",
+    "department_en": "Gynecologic Oncology"
+  },
+  {
+    "name": "Dr. Mythili Kundur",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "أورام النساء",
+    "department_en": "Gynecologic Oncology"
+  },
+  {
+    "name": "Dr. Vijay K Ahuja",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "أورام النساء",
+    "department_en": "Gynecologic Oncology"
+  },
+  {
+    "name": "Dr. H R S Girn",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "زراعة الكبد",
+    "department_en": "HPB & Transplant"
+  },
+  {
+    "name": "Dr. Anoop P",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "أمراض الدم وزراعة نخاع",
+    "department_en": "Haematology, Paediatric Haemato-Oncology & BMT"
+  },
+  {
+    "name": "Dr. Girish S. Shetkar",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "أورام الرأس والرقبة",
+    "department_en": "Head & Neck Oncology"
+  },
+  {
+    "name": "Dr. Narayana Subramaniam",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "جراحة الرأس والرقبة",
+    "department_en": "Head & Neck Surgery & Oncology"
+  },
+  {
+    "name": "Dr. Revanth Boddu",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "أمراض الدم وزراعة نخاع",
+    "department_en": "Hematology & BMT"
+  },
+  {
+    "name": "Dr. Akhil Deshmukh",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "كبد",
+    "department_en": "Hepatology"
+  },
+  {
+    "name": "Dr. Naveen Ganjoo",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "كبد",
+    "department_en": "Hepatology"
+  },
+  {
+    "name": "Dr. Mallikarjun Sakpal",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "كبد",
+    "department_en": "Hepatology & Transplant Physician"
+  },
+  {
+    "name": "Dr. Nayana D H",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "أطفال الأنابيب",
+    "department_en": "IVF & Reproductive Medicine"
+  },
+  {
+    "name": "Dr. Aishwarya R",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "الأمراض المعدية",
+    "department_en": "Infectious Diseases"
+  },
+  {
+    "name": "Dr. Abinaya Rathinasami",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "الطب الباطني",
+    "department_en": "Internal Medicine"
+  },
+  {
+    "name": "Dr. Basavaraj S Kumbar",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "الطب الباطني",
+    "department_en": "Internal Medicine"
+  },
+  {
+    "name": "Dr. Suchismitha Rajamanya",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "الطب الباطني",
+    "department_en": "Internal Medicine"
+  },
+  {
+    "name": "Dr. Naveen Chandra G S",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "أمراض القلب التداخلية",
+    "department_en": "Interventional Cardiology"
+  },
+  {
+    "name": "Dr. Dheeraj Shyam V N",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "الأشعة التداخلية",
+    "department_en": "Interventional Radiology"
+  },
+  {
+    "name": "Dr. Nischal Kundaragi",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "الأشعة التداخلية",
+    "department_en": "Interventional Radiology"
+  },
+  {
+    "name": "Dr. Rajaraman V",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "الأشعة التداخلية",
+    "department_en": "Interventional Radiology"
+  },
+  {
+    "name": "Dr. Vachan S Hukkeri",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "زراعة الكبد",
+    "department_en": "Liver Transplant"
+  },
+  {
+    "name": "Dr. Sonal Asthana",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "زراعة الكبد",
+    "department_en": "Liver Transplant & HPB Surgery"
+  },
+  {
+    "name": "Dr. Sreekanth P Kunjumon",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "طب الأسنان",
+    "department_en": "Maxillofacial Radiology"
+  },
+  {
+    "name": "Dr. C N Patil",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "أورام طبية ودم",
+    "department_en": "Medical & Haemato Oncology"
+  },
+  {
+    "name": "Dr. Abhijith B R",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "أمراض الجهاز الهضمي",
+    "department_en": "Medical Gastroenterology"
+  },
+  {
+    "name": "Dr. Ajay B R",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "أمراض الجهاز الهضمي",
+    "department_en": "Medical Gastroenterology"
+  },
+  {
+    "name": "Dr. Mallikarjun R Patil",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "الوراثة الطبية",
+    "department_en": "Medical Genetics"
+  },
+  {
+    "name": "Dr. Sai Vivek V",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "أورام طبية",
+    "department_en": "Medical Oncology"
+  },
+  {
+    "name": "Dr. Sneha Kommineni",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "أورام طبية",
+    "department_en": "Medical Oncology"
+  },
+  {
+    "name": "Dr. Vaishnavi Joshi",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "أورام طبية",
+    "department_en": "Medical Oncology"
+  },
+  {
+    "name": "Dr. Dheeraj Masapu",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "تخدير الأعصاب",
+    "department_en": "Neuro Anaesthesia"
+  },
+  {
+    "name": "Dr. Aravind P R",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "طب التأهيل العصبي",
+    "department_en": "Neuro Rehabilitation"
+  },
+  {
+    "name": "Dr. Balaji B S",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "طب الأعصاب",
+    "department_en": "Neurology & Epileptology"
+  },
+  {
+    "name": "Dr. Keni Ravish Rajiv",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "طب الأعصاب",
+    "department_en": "Neurology, Epilepsy"
+  },
+  {
+    "name": "Prof. Dr. Satish Rudrappa",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "جراحة الأعصاب والعمود الفقري",
+    "department_en": "Neurosurgery"
+  },
+  {
+    "name": "Prof. Dr. Swaroop Gopal",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "جراحة الأعصاب",
+    "department_en": "Neurosurgery"
+  },
+  {
+    "name": "Dr. Avinash Tupalli",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "الطب النووي",
+    "department_en": "Nuclear Medicine"
+  },
+  {
+    "name": "Dr. Mythri Shankar",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "الطب النووي",
+    "department_en": "Nuclear Medicine"
+  },
+  {
+    "name": "Dr. Prathap H J",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "الطب النووي",
+    "department_en": "Nuclear Medicine, Theranostics"
+  },
+  {
+    "name": "Dr. Deepthi Ashwin",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "نساء وولادة",
+    "department_en": "Obstetrics & Gynaecology"
+  },
+  {
+    "name": "Dr. Kavitha Kovi",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "نساء وولادة",
+    "department_en": "Obstetrics & Gynaecology"
+  },
+  {
+    "name": "Dr. Sandhya Rani",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "نساء وولادة",
+    "department_en": "Obstetrics & Gynaecology"
+  },
+  {
+    "name": "Dr. Vishnu Priya",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "نساء وولادة",
+    "department_en": "Obstetrics & Gynaecology"
+  },
+  {
+    "name": "Dr. Harsha G N",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "جراحة العظام",
+    "department_en": "Orthopedics, Joint Replacement"
+  },
+  {
+    "name": "Dr. C P Raghuram",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "أمراض الدم للأطفال وBMT",
+    "department_en": "Paediatric Haemato-Oncology & BMT"
+  },
+  {
+    "name": "Dr. Stalin Ramprakash",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "أمراض الدم للأطفال وBMT",
+    "department_en": "Paediatric Haemato-Oncology & BMT"
+  },
+  {
+    "name": "Dr. Sumithra S",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "عناية الأطفال",
+    "department_en": "Paediatric Intensive Care"
+  },
+  {
+    "name": "Dr. Manjiri Somashekhar",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "جراحة الأطفال",
+    "department_en": "Paediatric Surgery"
+  },
+  {
+    "name": "Dr. Palak Singhai",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "جراحة الأطفال",
+    "department_en": "Paediatric Surgery"
+  },
+  {
+    "name": "Dr. Lathiesh Kumar Kambham",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "أطفال وحديثي الولادة",
+    "department_en": "Paediatrics & Neonatology"
+  },
+  {
+    "name": "Dr. Srinivasa Murthy C L",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "أطفال وحديثي الولادة",
+    "department_en": "Paediatrics & Neonatology"
+  },
+  {
+    "name": "Dr. Amelia Sahana Michael",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "الرعاية التلطيفية",
+    "department_en": "Palliative Medicine"
+  },
+  {
+    "name": "Dr. Madhavi Thuyamani",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "الرعاية التلطيفية",
+    "department_en": "Palliative Medicine"
+  },
+  {
+    "name": "Dr. Raghavendra Ramanjulu",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "الرعاية التلطيفية",
+    "department_en": "Palliative Medicine & Rehab"
+  },
+  {
+    "name": "Dr. Abhijit Prakash Chougule",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "علم الأمراض",
+    "department_en": "Pathology"
+  },
+  {
+    "name": "Dr. Anand M S",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "علم الأمراض",
+    "department_en": "Pathology"
+  },
+  {
+    "name": "Dr. Susmita Rakshith",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "علم الأمراض",
+    "department_en": "Pathology & Histopathology"
+  },
+  {
+    "name": "Dr. Bharath A P",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "قلب أطفال",
+    "department_en": "Pediatric Cardiology"
+  },
+  {
+    "name": "Dr. Sujatha Thyagarajan",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "طوارئ الأطفال",
+    "department_en": "Pediatric Emergency & PICU"
+  },
+  {
+    "name": "Dr. Jahnavi M",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "الغدد الصماء أطفال",
+    "department_en": "Pediatric Endocrinology"
+  },
+  {
+    "name": "Dr. N. Kavitha Bhat",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "الغدد الصماء أطفال",
+    "department_en": "Pediatric Endocrinology"
+  },
+  {
+    "name": "Dr. Ashritha A",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "أمراض الكبد للأطفال",
+    "department_en": "Pediatric Hepatology"
+  },
+  {
+    "name": "Dr. Srikanta J T",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "صدر أطفال",
+    "department_en": "Pediatric Pulmonology"
+  },
+  {
+    "name": "Dr. Tejaswi Chandra",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "صدر أطفال",
+    "department_en": "Pediatric Pulmonology"
+  },
+  {
+    "name": "Dr. Jyothi Raghuram",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "روماتيزم أطفال",
+    "department_en": "Pediatric Rheumatology"
+  },
+  {
+    "name": "Dr. N Sudarshan Reddy",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "جراحة التجميل",
+    "department_en": "Plastic & Reconstructive Surgery"
+  },
+  {
+    "name": "Dr. Ashok B C",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "جراحة التجميل",
+    "department_en": "Plastic, Reconstructive & Aesthetic Surgery"
+  },
+  {
+    "name": "Dr. Pretty Duggar Gupta",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "الطب النفسي",
+    "department_en": "Psychiatry"
+  },
+  {
+    "name": "Ms. Neha K",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "علم النفس",
+    "department_en": "Psychology"
+  },
+  {
+    "name": "Dr. Rohit Shirgaonkar",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "أمراض الصدر",
+    "department_en": "Pulmonology"
+  },
+  {
+    "name": "Dr. Srivatsa Lokeshwaran",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "أمراض الصدر",
+    "department_en": "Pulmonology & Lung Transplant"
+  },
+  {
+    "name": "Dr. Jayant J B",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "علاج الأورام بالإشعاع",
+    "department_en": "Radiation Oncology"
+  },
+  {
+    "name": "Dr. M S Belliappa",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "علاج الأورام بالإشعاع",
+    "department_en": "Radiation Oncology"
+  },
+  {
+    "name": "Dr. Prathima Sivaguru",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "علاج الأورام بالإشعاع",
+    "department_en": "Radiation Oncology"
+  },
+  {
+    "name": "Dr. Pushpa Naga C H",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "علاج الأورام بالإشعاع",
+    "department_en": "Radiation Oncology"
+  },
+  {
+    "name": "Dr. Ram Charith Alva",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "علاج الأورام بالإشعاع",
+    "department_en": "Radiation Oncology"
+  },
+  {
+    "name": "Dr. Suneetha N",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "علاج الأورام بالإشعاع",
+    "department_en": "Radiation Oncology"
+  },
+  {
+    "name": "Dr. Namita Verma",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "الأشعة",
+    "department_en": "Radiology"
+  },
+  {
+    "name": "Dr. Sudhirkumar Kale",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "الأشعة",
+    "department_en": "Radiology"
+  },
+  {
+    "name": "Dr. Kiran K",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "علم الأمراض",
+    "department_en": "Renal & Transplant Pathology"
+  },
+  {
+    "name": "Dr. Yathish G C",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "أمراض الروماتيزم",
+    "department_en": "Rheumatology"
+  },
+  {
+    "name": "Dr. Ramachandran G",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "جراحة العمود الفقري",
+    "department_en": "Spine Surgery"
+  },
+  {
+    "name": "Prof. Dr. Somashekhar S P",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "جراحة الأورام النسائية والروبوت",
+    "department_en": "Surgical & Gynaecological Oncology / Robotic Surgery, HIPEC, PIPAC"
+  },
+  {
+    "name": "Dr. Vinodha Reddy K",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "جراحة الجهاز الهضمي والمناظير",
+    "department_en": "Surgical Gastroenterology & Bariatric"
+  },
+  {
+    "name": "Dr. Darshan Patil",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "جراحة الأورام",
+    "department_en": "Surgical Oncology"
+  },
+  {
+    "name": "Dr. Elvis Peter Joseph",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "جراحة الأورام",
+    "department_en": "Surgical Oncology"
+  },
+  {
+    "name": "Dr. Kushal Agrawal",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "جراحة الأورام",
+    "department_en": "Surgical Oncology"
+  },
+  {
+    "name": "Dr. Deo Ravindra Padmakar",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "جراحة الأورام والرأس والرقبة",
+    "department_en": "Surgical Oncology & Head & Neck Oncology"
+  },
+  {
+    "name": "Dr. Jagannath Dixit",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "جراحة الأورام والمناظير والروبوت",
+    "department_en": "Surgical Oncology & Robotic"
+  },
+  {
+    "name": "Dr. Ashwin K R",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "جراحة الأورام والروبوت",
+    "department_en": "Surgical Oncology & Robotic Surgery"
+  },
+  {
+    "name": "Dr. Rohit Kumar C",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "جراحة الأورام",
+    "department_en": "Surgical Oncology & Robotic Surgery"
+  },
+  {
+    "name": "Dr. Sachin Arakere Nataraj",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "أورام المسالك والروبوت",
+    "department_en": "Uro-oncology & Robotic Surgery"
+  },
+  {
+    "name": "Dr. Gokulakrishnan P J",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "جراحة المسالك",
+    "department_en": "Urology"
+  },
+  {
+    "name": "Dr. Anoop T",
+    "hospital": "Aster Whitefield Hospital, Bangalore",
+    "department_ar": "جراحة الأوعية الدموية",
+    "department_en": "Vascular Surgery"
+  },
+  {
+    "name": "Dr. Murali Manohhar",
+    "hospital": "Fortis Hospital, BG Road Bangalore",
+    "department_ar": "جراحة القلب",
+    "department_en": "Cardiac Surgery"
+  },
+  {
+    "name": "Dr. Vivek Jawali",
+    "hospital": "Fortis Hospital, BG Road Bangalore",
+    "department_ar": "جراحة القلب",
+    "department_en": "Cardiac Surgery"
+  },
+  {
+    "name": "Dr. Rajpal Singh R L",
+    "hospital": "Fortis Hospital, BG Road Bangalore",
+    "department_ar": "أمراض القلب",
+    "department_en": "Cardiology"
+  },
+  {
+    "name": "Dr. Shashidhara",
+    "hospital": "Fortis Hospital, BG Road Bangalore",
+    "department_ar": "أمراض القلب",
+    "department_en": "Cardiology"
+  },
+  {
+    "name": "Dr. Srinivas Prasad",
+    "hospital": "Fortis Hospital, BG Road Bangalore",
+    "department_ar": "أمراض القلب",
+    "department_en": "Cardiology"
+  },
+  {
+    "name": "Dr. Susheen Dutt",
+    "hospital": "Fortis Hospital, BG Road Bangalore",
+    "department_ar": "أنف وأذن وحنجرة",
+    "department_en": "ENT"
+  },
+  {
+    "name": "Dr. Srinivas Munigoti / Srinivasa Phanidhar Munigoti",
+    "hospital": "Fortis Hospital, BG Road Bangalore",
+    "department_ar": "الغدد الصماء أو طب عام",
+    "department_en": "Endocrinology / General Medicine"
+  },
+  {
+    "name": "Dr. Sreedhara V.",
+    "hospital": "Fortis Hospital, BG Road Bangalore",
+    "department_ar": "جراحة السمنة والمناظير",
+    "department_en": "GI, Minimal Access & Bariatric Surgery"
+  },
+  {
+    "name": "Dr. Ravindra B.S",
+    "hospital": "Fortis Hospital, BG Road Bangalore",
+    "department_ar": "الجهاز الهضمي",
+    "department_en": "Gastroenterology"
+  },
+  {
+    "name": "Dr. Sunil Kasturi",
+    "hospital": "Fortis Hospital, BG Road Bangalore",
+    "department_ar": "الجهاز الهضمي أو طب عام",
+    "department_en": "Gastroenterology / General"
+  },
+  {
+    "name": "Dr. Girikumar Venati",
+    "hospital": "Fortis Hospital, BG Road Bangalore",
+    "department_ar": "طبيب عام وسكري",
+    "department_en": "General Physician & Diabetologist"
+  },
+  {
+    "name": "Dr. Manish Joshi",
+    "hospital": "Fortis Hospital, BG Road Bangalore",
+    "department_ar": "جراحة عامة",
+    "department_en": "General Surgery"
+  },
+  {
+    "name": "Dr. Shashikiran",
+    "hospital": "Fortis Hospital, BG Road Bangalore",
+    "department_ar": "جراحة عامة",
+    "department_en": "General Surgery"
+  },
+  {
+    "name": "Dr. Kishore U.S.B",
+    "hospital": "Fortis Hospital, BG Road Bangalore",
+    "department_ar": "زراعة الكبد",
+    "department_en": "HBP & Liver Transplant"
+  },
+  {
+    "name": "Dr. Sheela Murali Chakravarthy",
+    "hospital": "Fortis Hospital, BG Road Bangalore",
+    "department_ar": "الطب الباطني",
+    "department_en": "Internal Medicine"
+  },
+  {
+    "name": "Dr. Sudha Vinod Menon",
+    "hospital": "Fortis Hospital, BG Road Bangalore",
+    "department_ar": "الطب الباطني",
+    "department_en": "Internal Medicine"
+  },
+  {
+    "name": "Dr. Prajwith Rai",
+    "hospital": "Fortis Hospital, BG Road Bangalore",
+    "department_ar": "أشعة تداخلية",
+    "department_en": "Interventional Radiology"
+  },
+  {
+    "name": "Dr. Niti Raizada",
+    "hospital": "Fortis Hospital, BG Road Bangalore",
+    "department_ar": "أورام طبية",
+    "department_en": "Medical Oncology"
+  },
+  {
+    "name": "Dr. Ashish Parek / Aashish Parekh",
+    "hospital": "Fortis Hospital, BG Road Bangalore",
+    "department_ar": "أمراض الكلى",
+    "department_en": "Nephrology"
+  },
+  {
+    "name": "Dr. Rajanna Sreedhara",
+    "hospital": "Fortis Hospital, BG Road Bangalore",
+    "department_ar": "أمراض الكلى",
+    "department_en": "Nephrology"
+  },
+  {
+    "name": "Dr. Rajakumar D.V",
+    "hospital": "Fortis Hospital, BG Road Bangalore",
+    "department_ar": "جراحة العمود الفقري والمخ والاعصاب",
+    "department_en": "Neuro & Spine Surgery"
+  },
+  {
+    "name": "Dr. Grober",
+    "hospital": "Fortis Hospital, BG Road Bangalore",
+    "department_ar": "طب الأعصاب",
+    "department_en": "Neurology"
+  },
+  {
+    "name": "Dr. Sreekanta Swamy",
+    "hospital": "Fortis Hospital, BG Road Bangalore",
+    "department_ar": "طب الأعصاب",
+    "department_en": "Neurology"
+  },
+  {
+    "name": "Dr. Deshpande Vasudevarao Rajakumar",
+    "hospital": "Fortis Hospital, BG Road Bangalore",
+    "department_ar": "جراحة المخ والأعصاب",
+    "department_en": "Neurosurgery"
+  },
+  {
+    "name": "Dr. Murali Krishna",
+    "hospital": "Fortis Hospital, BG Road Bangalore",
+    "department_ar": "جراحة الأعصاب",
+    "department_en": "Neurosurgery"
+  },
+  {
+    "name": "Dr. Gayana",
+    "hospital": "Fortis Hospital, BG Road Bangalore",
+    "department_ar": "الطب النووي",
+    "department_en": "Nuclear Medicine"
+  },
+  {
+    "name": "Dr. Mohan Karisankappa Puttaswamy",
+    "hospital": "Fortis Hospital, BG Road Bangalore",
+    "department_ar": "جراحة العظام",
+    "department_en": "Orthopaedics"
+  },
+  {
+    "name": "Dr. Narayan Hulse",
+    "hospital": "Fortis Hospital, BG Road Bangalore",
+    "department_ar": "جراحة العظام",
+    "department_en": "Orthopaedics"
+  },
+  {
+    "name": "Dr. Naveen D",
+    "hospital": "Fortis Hospital, BG Road Bangalore",
+    "department_ar": "جراحة العظام",
+    "department_en": "Orthopaedics"
+  },
+  {
+    "name": "Dr. Mohan Puttaswamy",
+    "hospital": "Fortis Hospital, BG Road Bangalore",
+    "department_ar": "جراحة العظام",
+    "department_en": "Orthopedics"
+  },
+  {
+    "name": "Dr. Venu Gopal",
+    "hospital": "Fortis Hospital, BG Road Bangalore",
+    "department_ar": "جراحة العظام",
+    "department_en": "Orthopedics"
+  },
+  {
+    "name": "Dr. Vivek Anand Padegal",
+    "hospital": "Fortis Hospital, BG Road Bangalore",
+    "department_ar": "أمراض الصدر",
+    "department_en": "Pulmonology"
+  },
+  {
+    "name": "Dr. Srinivasa C",
+    "hospital": "Fortis Hospital, BG Road Bangalore",
+    "department_ar": "أمراض الروماتيزم أو طب عام",
+    "department_en": "Rheumatology / General Medicine"
+  },
+  {
+    "name": "Dr. Sudarshan",
+    "hospital": "Fortis Hospital, BG Road Bangalore",
+    "department_ar": "جراحة القلب الروبوتية",
+    "department_en": "Robotic Cardiac Surgery"
+  },
+  {
+    "name": "Dr. Karibasavaraja",
+    "hospital": "Fortis Hospital, BG Road Bangalore",
+    "department_ar": "جراحة المسالك البولية",
+    "department_en": "Urology"
+  },
+  {
+    "name": "Dr. Mohan Keshavamurthy",
+    "hospital": "Fortis Hospital, BG Road Bangalore",
+    "department_ar": "جراحة المسالك البولية",
+    "department_en": "Urology"
+  },
+  {
+    "name": "Dr. Nlgar",
+    "hospital": "Fortis Hospital, BG Road Bangalore",
+    "department_ar": "جراحة المسالك البولية",
+    "department_en": "Urology"
+  },
+  {
+    "name": "Dr. Hosahalli Rajanna Sunilkumar",
+    "hospital": "HCG Hospital, K R Road Bangalore",
+    "department_ar": "تخدير",
+    "department_en": "Anesthesia"
+  },
+  {
+    "name": "Dr. Anand Subraya Bhat",
+    "hospital": "HCG Hospital, K R Road Bangalore",
+    "department_ar": "جراحة القلب والصدر والأوعية",
+    "department_en": "Cardiothoracic & Vascular Surgery"
+  },
+  {
+    "name": "Dr. Brindha Sitaram",
+    "hospital": "HCG Hospital, K R Road Bangalore",
+    "department_ar": "علم النفس الإكلينيكي",
+    "department_en": "Clinical Psychology"
+  },
+  {
+    "name": "Dr. Gaurav Shankar Medikeri",
+    "hospital": "HCG Hospital, K R Road Bangalore",
+    "department_ar": "أنف وأذن وحنجرة",
+    "department_en": "ENT"
+  },
+  {
+    "name": "Dr. Jeevan H R",
+    "hospital": "HCG Hospital, K R Road Bangalore",
+    "department_ar": "الجهاز الهضمي",
+    "department_en": "Gastroenterology"
+  },
+  {
+    "name": "Dr. Bharat Gadhavi",
+    "hospital": "HCG Hospital, K R Road Bangalore",
+    "department_ar": "جراحة عامة",
+    "department_en": "General Surgery"
+  },
+  {
+    "name": "Dr. Gaurav Medikeri",
+    "hospital": "HCG Hospital, K R Road Bangalore",
+    "department_ar": "جراحة عامة",
+    "department_en": "General Surgery"
+  },
+  {
+    "name": "Dr. Abhilasha Narayan",
+    "hospital": "HCG Hospital, K R Road Bangalore",
+    "department_ar": "أورام نسائية",
+    "department_en": "Gynecologic Oncology"
+  },
+  {
+    "name": "Dr. Ganesh Datta Borewad",
+    "hospital": "HCG Hospital, K R Road Bangalore",
+    "department_ar": "أورام الرأس والعنق",
+    "department_en": "Head & Neck Oncology"
+  },
+  {
+    "name": "Dr. K Bhavya",
+    "hospital": "HCG Hospital, K R Road Bangalore",
+    "department_ar": "أورام الرأس والعنق",
+    "department_en": "Head & Neck Oncology"
+  },
+  {
+    "name": "Dr. Aishwarya N",
+    "hospital": "HCG Hospital, K R Road Bangalore",
+    "department_ar": "عناية مشددة",
+    "department_en": "Intensive Care"
+  },
+  {
+    "name": "Dr. Divya Gangoli",
+    "hospital": "HCG Hospital, K R Road Bangalore",
+    "department_ar": "عناية مشددة",
+    "department_en": "Intensive Care"
+  },
+  {
+    "name": "Dr. Abhideep Chaudhary",
+    "hospital": "HCG Hospital, K R Road Bangalore",
+    "department_ar": "زراعة الكبد",
+    "department_en": "Liver Transplant"
+  },
+  {
+    "name": "Dr. Basant Mahadevappa",
+    "hospital": "HCG Hospital, K R Road Bangalore",
+    "department_ar": "زراعة الكبد",
+    "department_en": "Liver Transplant"
+  },
+  {
+    "name": "Dr. Bhushan Chittawadagi",
+    "hospital": "HCG Hospital, K R Road Bangalore",
+    "department_ar": "زراعة الكبد",
+    "department_en": "Liver Transplant"
+  },
+  {
+    "name": "Dr. B J Srinivasa",
+    "hospital": "HCG Hospital, K R Road Bangalore",
+    "department_ar": "أورام طبية",
+    "department_en": "Medical Oncology"
+  },
+  {
+    "name": "Dr. Intezar Mehdi",
+    "hospital": "HCG Hospital, K R Road Bangalore",
+    "department_ar": "أورام طبية",
+    "department_en": "Medical Oncology"
+  },
+  {
+    "name": "Dr. Amresh Bhaganagare",
+    "hospital": "HCG Hospital, K R Road Bangalore",
+    "department_ar": "جراحة المخ والأعصاب",
+    "department_en": "Neurosurgery"
+  },
+  {
+    "name": "Dr. Kumarswamy Gangadharayya Kallur",
+    "hospital": "HCG Hospital, K R Road Bangalore",
+    "department_ar": "الطب النووي",
+    "department_en": "Nuclear Medicine"
+  },
+  {
+    "name": "Dr. Jayashree K Bhat",
+    "hospital": "HCG Hospital, K R Road Bangalore",
+    "department_ar": "طب العيون",
+    "department_en": "Ophthalmology"
+  },
+  {
+    "name": "Dr. Apoorva Narasimha Iyengar",
+    "hospital": "HCG Hospital, K R Road Bangalore",
+    "department_ar": "جراحة الفم والوجه والفكين",
+    "department_en": "Oral & Maxillofacial Surgery"
+  },
+  {
+    "name": "Dr. Arun Krishna A R",
+    "hospital": "HCG Hospital, K R Road Bangalore",
+    "department_ar": "جراحة الفم والوجه والفكين",
+    "department_en": "Oral & Maxillofacial Surgery"
+  },
+  {
+    "name": "Dr. Govinda Kishor Auradkar",
+    "hospital": "HCG Hospital, K R Road Bangalore",
+    "department_ar": "أمراض قلب الأطفال",
+    "department_en": "Paediatric Cardiology"
+  },
+  {
+    "name": "Dr. Amit Galgali",
+    "hospital": "HCG Hospital, K R Road Bangalore",
+    "department_ar": "طب أطفال أورام",
+    "department_en": "Paediatric Oncology"
+  },
+  {
+    "name": "Dr. Mahendra Kumar Kulkarni",
+    "hospital": "HCG Hospital, K R Road Bangalore",
+    "department_ar": "جراحة التجميل",
+    "department_en": "Plastic Surgery"
+  },
+  {
+    "name": "Dr. Kedar Ravi Hibare",
+    "hospital": "HCG Hospital, K R Road Bangalore",
+    "department_ar": "أمراض الصدر",
+    "department_en": "Pulmonology"
+  },
+  {
+    "name": "Dr. Ajay G V",
+    "hospital": "HCG Hospital, K R Road Bangalore",
+    "department_ar": "علاج الأورام بالإشعاع",
+    "department_en": "Radiation Oncology"
+  },
+  {
+    "name": "Dr. Anirudh V S",
+    "hospital": "HCG Hospital, K R Road Bangalore",
+    "department_ar": "علاج الأورام بالإشعاع",
+    "department_en": "Radiation Oncology"
+  },
+  {
+    "name": "Dr. Hasib Abdul Gaffor",
+    "hospital": "HCG Hospital, K R Road Bangalore",
+    "department_ar": "علاج الأورام بالإشعاع",
+    "department_en": "Radiation Oncology"
+  },
+  {
+    "name": "Dr. Kirthi Koushik A.S",
+    "hospital": "HCG Hospital, K R Road Bangalore",
+    "department_ar": "علاج الأورام بالإشعاع",
+    "department_en": "Radiation Oncology"
+  },
+  {
+    "name": "Dr. Krithikaa S",
+    "hospital": "HCG Hospital, K R Road Bangalore",
+    "department_ar": "علاج الأورام بالإشعاع",
+    "department_en": "Radiation Oncology"
+  },
+  {
+    "name": "Dr. Lohith G",
+    "hospital": "HCG Hospital, K R Road Bangalore",
+    "department_ar": "علاج الأورام بالإشعاع",
+    "department_en": "Radiation Oncology"
+  },
+  {
+    "name": "Dr. Anand S",
+    "hospital": "HCG Hospital, K R Road Bangalore",
+    "department_ar": "جراحة الأورام",
+    "department_en": "Surgical Oncology"
+  },
+  {
+    "name": "Dr. Dinesh M G",
+    "hospital": "HCG Hospital, K R Road Bangalore",
+    "department_ar": "جراحة الأورام",
+    "department_en": "Surgical Oncology"
+  },
+  {
+    "name": "Dr. Krithika Murugan",
+    "hospital": "HCG Hospital, K R Road Bangalore",
+    "department_ar": "جراحة الأورام",
+    "department_en": "Surgical Oncology"
+  },
+  {
+    "name": "Dr. Deepak Krishnappa",
+    "hospital": "HCG Hospital, K R Road Bangalore",
+    "department_ar": "جراحة المسالك البولية",
+    "department_en": "Urology"
+  },
+  {
+    "name": "Dr. Lingesh Sairam Chelliah",
+    "hospital": "HCG Hospital, K R Road Bangalore",
+    "department_ar": "جراحة المسالك البولية",
+    "department_en": "Urology"
+  },
+  {
+    "name": "Dr. Mudit Tyagi",
+    "hospital": "L V Prasad Eye Institute, Hyderabad",
+    "department_ar": "الساد والعدسات",
+    "department_en": "Cataract & IOL"
+  },
+  {
+    "name": "Dr. Jagat Ram",
+    "hospital": "L V Prasad Eye Institute, Hyderabad",
+    "department_ar": "الساد والعدسات",
+    "department_en": "Cataract & IOL Services"
+  },
+  {
+    "name": "Dr. Swapna Kakade",
+    "hospital": "L V Prasad Eye Institute, Hyderabad",
+    "department_ar": "عيون شاملة",
+    "department_en": "Comprehensive Ophthalmology"
+  },
+  {
+    "name": "Dr. Debananda Padhy",
+    "hospital": "L V Prasad Eye Institute, Hyderabad",
+    "department_ar": "القرنية",
+    "department_en": "Cornea"
+  },
+  {
+    "name": "Dr. Murugesan Vanathi",
+    "hospital": "L V Prasad Eye Institute, Hyderabad",
+    "department_ar": "القرنية",
+    "department_en": "Cornea"
+  },
+  {
+    "name": "Dr. Radhika Tandon",
+    "hospital": "L V Prasad Eye Institute, Hyderabad",
+    "department_ar": "القرنية",
+    "department_en": "Cornea"
+  },
+  {
+    "name": "Dr. Prashant Garg",
+    "hospital": "L V Prasad Eye Institute, Hyderabad",
+    "department_ar": "القرنية",
+    "department_en": "Cornea & External Diseases"
+  },
+  {
+    "name": "Dr. Sayan Basu",
+    "hospital": "L V Prasad Eye Institute, Hyderabad",
+    "department_ar": "القرنية والسطح العيني",
+    "department_en": "Cornea & Ocular Surface"
+  },
+  {
+    "name": "Dr. Srinivas K. Rao",
+    "hospital": "L V Prasad Eye Institute, Hyderabad",
+    "department_ar": "القرنية وتصحيح النظر",
+    "department_en": "Cornea & Refractive Surgery"
+  },
+  {
+    "name": "Dr. Virender S. Sangwan",
+    "hospital": "L V Prasad Eye Institute, Hyderabad",
+    "department_ar": "القرنية والخلايا الجذعية",
+    "department_en": "Cornea & Stem Cell"
+  },
+  {
+    "name": "Dr. Somasheila I. Murthy",
+    "hospital": "L V Prasad Eye Institute, Hyderabad",
+    "department_ar": "القرنية",
+    "department_en": "Cornea Services"
+  },
+  {
+    "name": "Dr. Bhagabat Nayak",
+    "hospital": "L V Prasad Eye Institute, Hyderabad",
+    "department_ar": "المياه الزرقاء",
+    "department_en": "Glaucoma"
+  },
+  {
+    "name": "Dr. Sirisha Senthil",
+    "hospital": "L V Prasad Eye Institute, Hyderabad",
+    "department_ar": "المياه الزرقاء",
+    "department_en": "Glaucoma"
+  },
+  {
+    "name": "Dr. Rohit Khanna",
+    "hospital": "L V Prasad Eye Institute, Hyderabad",
+    "department_ar": "المياه الزرقاء",
+    "department_en": "Glaucoma Services"
+  },
+  {
+    "name": "Dr. Sudheer Kumar Shantha Kumari",
+    "hospital": "L V Prasad Eye Institute, Hyderabad",
+    "department_ar": "أعصاب العين",
+    "department_en": "Neuro Ophthalmology"
+  },
+  {
+    "name": "Dr. Sumita Agarkar",
+    "hospital": "L V Prasad Eye Institute, Hyderabad",
+    "department_ar": "أعصاب العين",
+    "department_en": "Neuro Ophthalmology"
+  },
+  {
+    "name": "Dr. Aparna Ramasubramanian",
+    "hospital": "L V Prasad Eye Institute, Hyderabad",
+    "department_ar": "أورام العين",
+    "department_en": "Ocular Oncology"
+  },
+  {
+    "name": "Dr. Madan Deshpande",
+    "hospital": "L V Prasad Eye Institute, Hyderabad",
+    "department_ar": "تجميل الجفون",
+    "department_en": "Oculoplasty"
+  },
+  {
+    "name": "Dr. Mohammad Javed Ali",
+    "hospital": "L V Prasad Eye Institute, Hyderabad",
+    "department_ar": "تجميل الجفون والقناة الدمعية",
+    "department_en": "Oculoplasty & Lacrimal"
+  },
+  {
+    "name": "Dr. Santosh G. Honavar",
+    "hospital": "L V Prasad Eye Institute, Hyderabad",
+    "department_ar": "تجميل الجفون وأورام العين",
+    "department_en": "Oculoplasty & Oncology"
+  },
+  {
+    "name": "Dr. Joveeta Joseph",
+    "hospital": "L V Prasad Eye Institute, Hyderabad",
+    "department_ar": "عيون الأطفال",
+    "department_en": "Paediatric Ophthalmology"
+  },
+  {
+    "name": "Dr. Ramesh Kekunnaya",
+    "hospital": "L V Prasad Eye Institute, Hyderabad",
+    "department_ar": "عيون الأطفال",
+    "department_en": "Paediatric Ophthalmology"
+  },
+  {
+    "name": "Dr. Taraprasad Das",
+    "hospital": "L V Prasad Eye Institute, Hyderabad",
+    "department_ar": "الشبكية والزجاجية",
+    "department_en": "Retina & Vitreous"
+  },
+  {
+    "name": "Dr. Subhadra Jalali",
+    "hospital": "L V Prasad Eye Institute, Hyderabad",
+    "department_ar": "اعتلال الشبكية لدى الأطفال الخدّج",
+    "department_en": "Retinopathy of Prematurity"
+  },
+  {
+    "name": "Dr. Muralidhar Ramappa",
+    "hospital": "L V Prasad Eye Institute, Hyderabad",
+    "department_ar": "التهاب العنبية",
+    "department_en": "Uveitis Services"
+  },
+  {
+    "name": "Dr. Anthony Vipin Das",
+    "hospital": "L V Prasad Eye Institute, Hyderabad",
+    "department_ar": "الشبكية",
+    "department_en": "Vitreoretinal Services"
+  },
+  {
+    "name": "Dr. Gowri Shankar Gopi",
+    "hospital": "L V Prasad Eye Institute, Hyderabad",
+    "department_ar": "الشبكية",
+    "department_en": "Vitreoretinal Services"
+  },
+  {
+    "name": "Dr. Rajeev Reddy Pappuru",
+    "hospital": "L V Prasad Eye Institute, Hyderabad",
+    "department_ar": "جراحة الشبكية",
+    "department_en": "Vitreoretinal Surgery"
+  },
+  {
+    "name": "Dr. Vivek P. Dave",
+    "hospital": "L V Prasad Eye Institute, Hyderabad",
+    "department_ar": "جراحة الشبكية",
+    "department_en": "Vitreoretinal Surgery"
+  },
+  {
+    "name": "Dr. Aruna C Ramesh",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "طب الطوارئ",
+    "department_en": "Accident & Emergency (Emergency Medicine)"
+  },
+  {
+    "name": "Dr. Hariprasad K V",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "طب الطوارئ",
+    "department_en": "Accident & Emergency (Emergency Medicine)"
+  },
+  {
+    "name": "Dr. Jerry Jacob",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "طب الطوارئ",
+    "department_en": "Accident & Emergency (Emergency Medicine)"
+  },
+  {
+    "name": "Dr. Keshava Murthy M R",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "طب الطوارئ",
+    "department_en": "Accident & Emergency (Emergency Medicine)"
+  },
+  {
+    "name": "Dr. Shruthi Deshpande",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "طب الطوارئ",
+    "department_en": "Accident & Emergency (Emergency Medicine)"
+  },
+  {
+    "name": "Dr. Treepti",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "طب الطوارئ",
+    "department_en": "Accident & Emergency (Emergency Medicine)"
+  },
+  {
+    "name": "Dr. Archana S",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "تخدير",
+    "department_en": "Anesthesiology"
+  },
+  {
+    "name": "Dr. Ashwini Turai",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "تخدير",
+    "department_en": "Anesthesiology"
+  },
+  {
+    "name": "Dr. Balakrishna Shenoy",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "تخدير",
+    "department_en": "Anesthesiology"
+  },
+  {
+    "name": "Dr. Chandana Balram",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "تخدير",
+    "department_en": "Anesthesiology"
+  },
+  {
+    "name": "Dr. Geetha C R",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "تخدير",
+    "department_en": "Anesthesiology"
+  },
+  {
+    "name": "Dr. Guru Police Patel",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "تخدير",
+    "department_en": "Anesthesiology"
+  },
+  {
+    "name": "Dr. Leena H P",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "تخدير",
+    "department_en": "Anesthesiology"
+  },
+  {
+    "name": "Dr. Nanditha Shreedhar",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "تخدير",
+    "department_en": "Anesthesiology"
+  },
+  {
+    "name": "Dr. Navdeep",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "تخدير",
+    "department_en": "Anesthesiology"
+  },
+  {
+    "name": "Dr. Prapti Rath",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "تخدير",
+    "department_en": "Anesthesiology"
+  },
+  {
+    "name": "Dr. Prathima P T",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "تخدير",
+    "department_en": "Anesthesiology"
+  },
+  {
+    "name": "Dr. Sandya Rani",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "تخدير",
+    "department_en": "Anesthesiology"
+  },
+  {
+    "name": "Dr. Sharmila",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "تخدير",
+    "department_en": "Anesthesiology"
+  },
+  {
+    "name": "Dr. Shruthi N S",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "تخدير",
+    "department_en": "Anesthesiology"
+  },
+  {
+    "name": "Dr. Tejesh C A",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "تخدير",
+    "department_en": "Anesthesiology"
+  },
+  {
+    "name": "Dr. Yatish B",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "تخدير",
+    "department_en": "Anesthesiology"
+  },
+  {
+    "name": "Dr. Manjunath A C",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "تخدير وإدارة الألم",
+    "department_en": "Anesthesiology & Pain Management"
+  },
+  {
+    "name": "Dr. D. Deepa",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "بنك الدم",
+    "department_en": "Blood Bank / Transfusion Medicine"
+  },
+  {
+    "name": "Dr. Nanda Kishore V",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "بنك الدم",
+    "department_en": "Blood Bank / Transfusion Medicine"
+  },
+  {
+    "name": "Dr. Nandakishore Alva N",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "بنك الدم",
+    "department_en": "Blood Bank / Transfusion Medicine"
+  },
+  {
+    "name": "Dr. Anandathirtha H. S",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "جراحة القلب والصدر",
+    "department_en": "Cardio Thoracic Surgery"
+  },
+  {
+    "name": "Dr. Anupama V Hegde",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "أمراض القلب",
+    "department_en": "Cardiology"
+  },
+  {
+    "name": "Dr. Prakash V S",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "أمراض القلب",
+    "department_en": "Cardiology"
+  },
+  {
+    "name": "Dr. Ramkumar S",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "أمراض القلب",
+    "department_en": "Cardiology"
+  },
+  {
+    "name": "Dr. Ravi Narayan",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "أمراض القلب",
+    "department_en": "Cardiology"
+  },
+  {
+    "name": "Dr. Varsha Rakshitha P",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "أمراض القلب",
+    "department_en": "Cardiology"
+  },
+  {
+    "name": "Dr. Mukundan Seshadri",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "جراحة القلب والصدر والأوعية",
+    "department_en": "Cardiovascular & Thoracic Surgery (CTVS)"
+  },
+  {
+    "name": "Dr. Bhagyalakshmi. M",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "عناية مركزة",
+    "department_en": "Critical Care Medicine"
+  },
+  {
+    "name": "Dr. Deepak. T. S",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "عناية مركزة",
+    "department_en": "Critical Care Medicine"
+  },
+  {
+    "name": "Dr. Faizya Taskeen",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "عناية مركزة",
+    "department_en": "Critical Care Medicine"
+  },
+  {
+    "name": "Dr. Radha. M. G",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "عناية مركزة",
+    "department_en": "Critical Care Medicine"
+  },
+  {
+    "name": "Dr. Ramya. D. M",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "عناية مركزة",
+    "department_en": "Critical Care Medicine"
+  },
+  {
+    "name": "Dr. Rooparani. K",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "عناية مركزة",
+    "department_en": "Critical Care Medicine"
+  },
+  {
+    "name": "Dr. Thejeswini",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "عناية مركزة",
+    "department_en": "Critical Care Medicine"
+  },
+  {
+    "name": "Dr. Vikas. K. N",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "عناية مركزة",
+    "department_en": "Critical Care Medicine"
+  },
+  {
+    "name": "Dr. Vinay. R",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "عناية مركزة",
+    "department_en": "Critical Care Medicine"
+  },
+  {
+    "name": "Dr. A. S. Madhura",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "طب الأسنان",
+    "department_en": "Dental Surgery"
+  },
+  {
+    "name": "Dr. Amulya V. Rai",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "طب الأسنان",
+    "department_en": "Dental Surgery"
+  },
+  {
+    "name": "Dr. Madhubala",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "طب الأسنان",
+    "department_en": "Dental Surgery"
+  },
+  {
+    "name": "Dr. O. P. Kharbanda",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "طب الأسنان",
+    "department_en": "Dental Surgery"
+  },
+  {
+    "name": "Dr. Priyanka Rawat",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "طب الأسنان",
+    "department_en": "Dental Surgery"
+  },
+  {
+    "name": "Dr. Renu Kharbanda",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "طب الأسنان",
+    "department_en": "Dental Surgery"
+  },
+  {
+    "name": "Dr. Sayanthi Hazra",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "طب الأسنان",
+    "department_en": "Dental Surgery"
+  },
+  {
+    "name": "Dr. Deena Patil",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "جلدية وتجميل",
+    "department_en": "Dermatology & Cosmetology"
+  },
+  {
+    "name": "Dr. K. N. Shivaswamy",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "جلدية وتجميل",
+    "department_en": "Dermatology & Cosmetology"
+  },
+  {
+    "name": "Dr. Praveen Kumar S",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "جلدية وتجميل",
+    "department_en": "Dermatology & Cosmetology"
+  },
+  {
+    "name": "Dr. Sudha Banti",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "جلدية وتجميل",
+    "department_en": "Dermatology & Cosmetology"
+  },
+  {
+    "name": "Dr. Suparna. M. Y",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "جلدية وتجميل",
+    "department_en": "Dermatology & Cosmetology"
+  },
+  {
+    "name": "Dr. T. K. Sumathy",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "جلدية وتجميل",
+    "department_en": "Dermatology & Cosmetology"
+  },
+  {
+    "name": "Dr. Chandrakiran C.",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "أنف وأذن وحنجرة",
+    "department_en": "ENT"
+  },
+  {
+    "name": "Dr. Harshavardhan N. Reddy",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "أنف وأذن وحنجرة",
+    "department_en": "ENT"
+  },
+  {
+    "name": "Dr. Sanjay B Patil",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "أنف وأذن وحنجرة",
+    "department_en": "ENT"
+  },
+  {
+    "name": "Dr. Soujanya Balaraj",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "أنف وأذن وحنجرة",
+    "department_en": "ENT"
+  },
+  {
+    "name": "Dr. Sumanth K. R.",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "أنف وأذن وحنجرة",
+    "department_en": "ENT"
+  },
+  {
+    "name": "Dr. Surya Prakash D. R.",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "أنف وأذن وحنجرة",
+    "department_en": "ENT"
+  },
+  {
+    "name": "Dr. Chitra. S",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "الغدد الصماء",
+    "department_en": "Endocrinology"
+  },
+  {
+    "name": "Dr. Ganavi. Y. P",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "الغدد الصماء",
+    "department_en": "Endocrinology"
+  },
+  {
+    "name": "Dr. K. M. Suryanarayana",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "الغدد الصماء",
+    "department_en": "Endocrinology"
+  },
+  {
+    "name": "Dr. Manjunath P R",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "الغدد الصماء",
+    "department_en": "Endocrinology"
+  },
+  {
+    "name": "Dr. Pramila Kalra",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "الغدد الصماء",
+    "department_en": "Endocrinology"
+  },
+  {
+    "name": "Dr. Akshay Rao",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "طب عام",
+    "department_en": "General Medicine"
+  },
+  {
+    "name": "Dr. Anil Kumar T",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "طب عام",
+    "department_en": "General Medicine"
+  },
+  {
+    "name": "Dr. Ashwin Kulkarni",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "طب عام",
+    "department_en": "General Medicine"
+  },
+  {
+    "name": "Dr. Divya Prabhu",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "طب عام",
+    "department_en": "General Medicine"
+  },
+  {
+    "name": "Dr. Megha Reddy",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "طب عام",
+    "department_en": "General Medicine"
+  },
+  {
+    "name": "Dr. Mohammed Suhail K",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "طب عام",
+    "department_en": "General Medicine"
+  },
+  {
+    "name": "Dr. Nagesh Kumar",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "طب عام",
+    "department_en": "General Medicine"
+  },
+  {
+    "name": "Dr. Shaikh Mohammed Aslam S",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "طب عام",
+    "department_en": "General Medicine"
+  },
+  {
+    "name": "Dr. Srikanth",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "طب عام",
+    "department_en": "General Medicine"
+  },
+  {
+    "name": "Dr. Tharanath Shankar",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "طب عام",
+    "department_en": "General Medicine"
+  },
+  {
+    "name": "Dr. Vijayashree Thyagaraj",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "طب عام",
+    "department_en": "General Medicine"
+  },
+  {
+    "name": "Dr Nandakumar B M",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "جراحة عامة",
+    "department_en": "General Surgery"
+  },
+  {
+    "name": "Dr. Bharati V Hiremath",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "جراحة عامة",
+    "department_en": "General Surgery"
+  },
+  {
+    "name": "Dr. Kalaivani V",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "جراحة عامة",
+    "department_en": "General Surgery"
+  },
+  {
+    "name": "Dr. Madan K",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "جراحة عامة",
+    "department_en": "General Surgery"
+  },
+  {
+    "name": "Dr. Narayana Swamy Chetty",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "جراحة عامة",
+    "department_en": "General Surgery"
+  },
+  {
+    "name": "Dr. Navyashree C",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "جراحة عامة",
+    "department_en": "General Surgery"
+  },
+  {
+    "name": "Dr. Sagar Z",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "جراحة عامة",
+    "department_en": "General Surgery"
+  },
+  {
+    "name": "Dr. Shaik Mohammad Safiuddin",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "جراحة عامة",
+    "department_en": "General Surgery"
+  },
+  {
+    "name": "Dr. Shashank G",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "جراحة عامة",
+    "department_en": "General Surgery"
+  },
+  {
+    "name": "Dr. Sreekar Pai A",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "جراحة عامة",
+    "department_en": "General Surgery"
+  },
+  {
+    "name": "Dr. Sreevathsa M R",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "جراحة عامة",
+    "department_en": "General Surgery"
+  },
+  {
+    "name": "Dr. Srikantaiah H C",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "جراحة عامة",
+    "department_en": "General Surgery"
+  },
+  {
+    "name": "Dr. Sudharshan S. Murthy",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "جراحة عامة",
+    "department_en": "General Surgery"
+  },
+  {
+    "name": "Dr. Suhas Devanathan",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "جراحة عامة",
+    "department_en": "General Surgery"
+  },
+  {
+    "name": "Dr. Syed Faizan",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "جراحة عامة",
+    "department_en": "General Surgery"
+  },
+  {
+    "name": "Dr. Avinash B",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "أمراض الجهاز الهضمي",
+    "department_en": "Medical Gastroenterology"
+  },
+  {
+    "name": "Dr. Harshavardhan Rao B",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "أمراض الجهاز الهضمي",
+    "department_en": "Medical Gastroenterology"
+  },
+  {
+    "name": "Dr. Nishil Gowda",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "أورام طبية",
+    "department_en": "Medical Oncology"
+  },
+  {
+    "name": "Dr. Rasmi Palassery",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "أورام طبية",
+    "department_en": "Medical Oncology"
+  },
+  {
+    "name": "Dr. Santhosh Devadas",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "أورام طبية",
+    "department_en": "Medical Oncology"
+  },
+  {
+    "name": "Dr. Vinayak Maka",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "أورام طبية",
+    "department_en": "Medical Oncology"
+  },
+  {
+    "name": "Dr. Krithika",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "حديثي الولادة",
+    "department_en": "Neonatology"
+  },
+  {
+    "name": "Dr. Pradeep G C M",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "حديثي الولادة",
+    "department_en": "Neonatology"
+  },
+  {
+    "name": "Dr. Sharanabasavesh. M",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "حديثي الولادة",
+    "department_en": "Neonatology"
+  },
+  {
+    "name": "Dr. Gireesh M. S.",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "أمراض الكلى",
+    "department_en": "Nephrology"
+  },
+  {
+    "name": "Dr. Mahesh E",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "أمراض الكلى",
+    "department_en": "Nephrology"
+  },
+  {
+    "name": "Dr. Mohammad Yousuff",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "أمراض الكلى",
+    "department_en": "Nephrology"
+  },
+  {
+    "name": "Dr. Pooja Prakash Prabhu",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "أمراض الكلى",
+    "department_en": "Nephrology"
+  },
+  {
+    "name": "Dr.Rajashekar MD, DM",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "أمراض الكلى",
+    "department_en": "Nephrology"
+  },
+  {
+    "name": "Dr. Geetha. L",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "تخدير أعصاب وعناية عصبية",
+    "department_en": "Neuroanesthesia & Neurocritical Care"
+  },
+  {
+    "name": "Dr. Madhusudhana Rao",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "تخدير أعصاب وعناية عصبية",
+    "department_en": "Neuroanesthesia & Neurocritical Care"
+  },
+  {
+    "name": "Dr. Seham Syeda",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "تخدير أعصاب وعناية عصبية",
+    "department_en": "Neuroanesthesia & Neurocritical Care"
+  },
+  {
+    "name": "Dr. Anish Mehta",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "طب الأعصاب",
+    "department_en": "Neurology"
+  },
+  {
+    "name": "Dr. Divya Nagabushana",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "طب الأعصاب",
+    "department_en": "Neurology"
+  },
+  {
+    "name": "Dr. Kumara Swamy",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "طب الأعصاب",
+    "department_en": "Neurology"
+  },
+  {
+    "name": "Dr. Mahendra. J. V",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "طب الأعصاب",
+    "department_en": "Neurology"
+  },
+  {
+    "name": "Dr. P. T. Acharya",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "طب الأعصاب",
+    "department_en": "Neurology"
+  },
+  {
+    "name": "Dr. Pradeep R",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "طب الأعصاب",
+    "department_en": "Neurology"
+  },
+  {
+    "name": "Dr. Nishchit Hegde",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "جراحة المخ والأعصاب",
+    "department_en": "Neurosurgery"
+  },
+  {
+    "name": "Dr. Parichay J Perikal",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "جراحة المخ والأعصاب",
+    "department_en": "Neurosurgery"
+  },
+  {
+    "name": "Dr. Rakshith Srinivasa",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "جراحة المخ والأعصاب",
+    "department_en": "Neurosurgery"
+  },
+  {
+    "name": "Dr. Shabari Girishan K. V.",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "جراحة المخ والأعصاب",
+    "department_en": "Neurosurgery"
+  },
+  {
+    "name": "Dr. Sunil Valentine Furtado",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "جراحة المخ والأعصاب",
+    "department_en": "Neurosurgery"
+  },
+  {
+    "name": "Dr.(Prof) A. S. Hegde",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "جراحة المخ والأعصاب",
+    "department_en": "Neurosurgery"
+  },
+  {
+    "name": "Dr. Asha Swaroop",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "نساء وولادة",
+    "department_en": "Obstetrics & Gynecology"
+  },
+  {
+    "name": "Dr. Gayatri Devi",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "نساء وولادة",
+    "department_en": "Obstetrics & Gynecology"
+  },
+  {
+    "name": "Dr. Jyothi G. S",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "نساء وولادة",
+    "department_en": "Obstetrics & Gynecology"
+  },
+  {
+    "name": "Dr. K. Padma",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "نساء وولادة",
+    "department_en": "Obstetrics & Gynecology"
+  },
+  {
+    "name": "Dr. Mamatha",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "نساء وولادة",
+    "department_en": "Obstetrics & Gynecology"
+  },
+  {
+    "name": "Dr. Manjula. N. V.",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "نساء وولادة",
+    "department_en": "Obstetrics & Gynecology"
+  },
+  {
+    "name": "Dr. Nandini. G.",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "نساء وولادة",
+    "department_en": "Obstetrics & Gynecology"
+  },
+  {
+    "name": "Dr. Nivedita Reshme",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "نساء وولادة",
+    "department_en": "Obstetrics & Gynecology"
+  },
+  {
+    "name": "Dr. Seema Mehrotra",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "نساء وولادة",
+    "department_en": "Obstetrics & Gynecology"
+  },
+  {
+    "name": "Dr. Sujani. B. K",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "نساء وولادة",
+    "department_en": "Obstetrics & Gynecology"
+  },
+  {
+    "name": "Dr. Sundari N",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "نساء وولادة",
+    "department_en": "Obstetrics & Gynecology"
+  },
+  {
+    "name": "Dr. Umadevi. K",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "نساء وولادة",
+    "department_en": "Obstetrics & Gynecology"
+  },
+  {
+    "name": "Dr. Urvashi",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "نساء وولادة",
+    "department_en": "Obstetrics & Gynecology"
+  },
+  {
+    "name": "Dr. Ananth Bhandary S.",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "طب العيون",
+    "department_en": "Ophthalmology"
+  },
+  {
+    "name": "Dr. Divya D Sundaresh",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "طب العيون",
+    "department_en": "Ophthalmology"
+  },
+  {
+    "name": "Dr. Ksheeraja. Y",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "طب العيون",
+    "department_en": "Ophthalmology"
+  },
+  {
+    "name": "Dr. Soumya Ramani",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "طب العيون",
+    "department_en": "Ophthalmology"
+  },
+  {
+    "name": "Dr. Thanuja G P",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "طب العيون",
+    "department_en": "Ophthalmology"
+  },
+  {
+    "name": "Dr Ponnanna K M",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "جراحة العظام",
+    "department_en": "Orthopaedics"
+  },
+  {
+    "name": "Dr. Ajoy S M",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "جراحة العظام",
+    "department_en": "Orthopaedics"
+  },
+  {
+    "name": "Dr. Ashok Kumar P",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "جراحة العظام",
+    "department_en": "Orthopaedics"
+  },
+  {
+    "name": "Dr. Harshad. M. Shah",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "جراحة العظام",
+    "department_en": "Orthopaedics"
+  },
+  {
+    "name": "Dr. Karthik Badarayan V",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "جراحة العظام",
+    "department_en": "Orthopaedics"
+  },
+  {
+    "name": "Dr. Rahul P",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "جراحة العظام",
+    "department_en": "Orthopaedics"
+  },
+  {
+    "name": "Dr. Ravikumar T V",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "جراحة العظام",
+    "department_en": "Orthopaedics"
+  },
+  {
+    "name": "Dr. Sandeep Reddy R",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "جراحة العظام",
+    "department_en": "Orthopaedics"
+  },
+  {
+    "name": "Dr. Sathish Shervegar",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "جراحة العظام",
+    "department_en": "Orthopaedics"
+  },
+  {
+    "name": "Dr. Yashwanth Kumar. C",
+    "hospital": "M S Ramaiah Memorial Hospital, Bangalore",
+    "department_ar": "جراحة العظام",
+    "department_en": "Orthopaedics"
+  },
+  {
+    "name": "Dr. Bopanna K",
+    "hospital": "Manipal Hospital, Old Airport Road",
+    "department_ar": "جراحة المخ والأعصاب",
+    "department_en": "Adult Neurosurgery"
+  },
+  {
+    "name": "Dr. G. Moinoddin",
+    "hospital": "Manipal Hospital, Old Airport Road",
+    "department_ar": "جراحة السمنة والأيض",
+    "department_en": "Bariatric & Metabolic Surgery"
+  },
+  {
+    "name": "Dr. Devananda N",
+    "hospital": "Manipal Hospital, Old Airport Road",
+    "department_ar": "جراحة القلب والصدر والأوعية",
+    "department_en": "Cardiothoracic & Vascular Surgery"
+  },
+  {
+    "name": "Dr. Devananda N S",
+    "hospital": "Manipal Hospital, Old Airport Road",
+    "department_ar": "جراحة القلب والصدر والأوعية وزراعة القلب والرئة",
+    "department_en": "Cardiothoracic Vascular & Heart-Lung Transplant Surgery"
+  },
+  {
+    "name": "Dr. (Prof) Sampath Chandra Prasad Rao",
+    "hospital": "Manipal Hospital, Old Airport Road",
+    "department_ar": "جراحة الرأس والعنق وقاعدة الجمجمة",
+    "department_en": "ENT, Head & Neck Surgery, Skull Base Surgery, Cochlear Implantology"
+  },
+  {
+    "name": "Dr. Darshan Kirshnappa",
+    "hospital": "Manipal Hospital, Old Airport Road",
+    "department_ar": "كهرباء القلب",
+    "department_en": "Electrophysiology"
+  },
+  {
+    "name": "Dr. Hemanth Kumar",
+    "hospital": "Manipal Hospital, Old Airport Road",
+    "department_ar": "جراحة عامة و سمنة",
+    "department_en": "General & Bariatric Surgery"
+  },
+  {
+    "name": "Dr. Mohit Shetti",
+    "hospital": "Manipal Hospital, Old Airport Road",
+    "department_ar": "طب عام",
+    "department_en": "General Medicine"
+  },
+  {
+    "name": "Dr. Sampath Kumar",
+    "hospital": "Manipal Hospital, Old Airport Road",
+    "department_ar": "طب عام",
+    "department_en": "General Medicine"
+  },
+  {
+    "name": "Dr. Sumit Talwar",
+    "hospital": "Manipal Hospital, Old Airport Road",
+    "department_ar": "طب عام",
+    "department_en": "General Medicine"
+  },
+  {
+    "name": "Dr. Bharath Kadadi",
+    "hospital": "Manipal Hospital, Old Airport Road",
+    "department_ar": "جراحة اليد",
+    "department_en": "Hand Surgery"
+  },
+  {
+    "name": "Dr. Satish Nair",
+    "hospital": "Manipal Hospital, Old Airport Road",
+    "department_ar": "جراحة أورام الرأس والعنق",
+    "department_en": "Head & Neck Oncology Surgery"
+  },
+  {
+    "name": "Dr. Amit",
+    "hospital": "Manipal Hospital, Old Airport Road",
+    "department_ar": "أورام دموية",
+    "department_en": "Hematologic Oncology"
+  },
+  {
+    "name": "Dr. Ashish",
+    "hospital": "Manipal Hospital, Old Airport Road",
+    "department_ar": "زرع نخاع العظم",
+    "department_en": "Hematology & Bone Marrow Transplantation"
+  },
+  {
+    "name": "Dr. Mallikarjun",
+    "hospital": "Manipal Hospital, Old Airport Road",
+    "department_ar": "زرع نخاع العظم",
+    "department_en": "Hematology & Bone Marrow Transplantation"
+  },
+  {
+    "name": "Dr. Raj Vigna",
+    "hospital": "Manipal Hospital, Old Airport Road",
+    "department_ar": "أمراض الكبد والجهاز الهضمي",
+    "department_en": "Hepato-Gastroenterology"
+  },
+  {
+    "name": "Dr. Sridhar G",
+    "hospital": "Manipal Hospital, Old Airport Road",
+    "department_ar": "أمراض القلب التداخلية",
+    "department_en": "Interventional Cardiology"
+  },
+  {
+    "name": "Dr. Amit Rauthan",
+    "hospital": "Manipal Hospital, Old Airport Road",
+    "department_ar": "أورام طبية",
+    "department_en": "Medical Oncology, Immunotherapy & Precision Medicine"
+  },
+  {
+    "name": "Dr. Bhavana M V",
+    "hospital": "Manipal Hospital, Old Airport Road",
+    "department_ar": "علم الميكروبات",
+    "department_en": "Microbiology & Laboratory Medicine"
+  },
+  {
+    "name": "Dr. Ajit Kumar",
+    "hospital": "Manipal Hospital, Old Airport Road",
+    "department_ar": "طب الأعصاب",
+    "department_en": "Neurology"
+  },
+  {
+    "name": "Dr. Pramod Krishnan",
+    "hospital": "Manipal Hospital, Old Airport Road",
+    "department_ar": "طب الأعصاب والصرع",
+    "department_en": "Neurology & Epilepsy"
+  },
+  {
+    "name": "Dr. Bopanna K M",
+    "hospital": "Manipal Hospital, Old Airport Road",
+    "department_ar": "جراحة المخ والأعصاب",
+    "department_en": "Neurosurgery"
+  },
+  {
+    "name": "Dr. Praveen M",
+    "hospital": "Manipal Hospital, Old Airport Road",
+    "department_ar": "جراحة المخ والأعصاب",
+    "department_en": "Neurosurgery"
+  },
+  {
+    "name": "Dr. Sunil G",
+    "hospital": "Manipal Hospital, Old Airport Road",
+    "department_ar": "جراحة العظام والمفاصل",
+    "department_en": "Orthopedic & Joint Surgery"
+  },
+  {
+    "name": "Dr. Srimanth B",
+    "hospital": "Manipal Hospital, Old Airport Road",
+    "department_ar": "جراحة عظام أورام",
+    "department_en": "Orthopedic Oncology"
+  },
+  {
+    "name": "Dr. Kavya Mallikarjun",
+    "hospital": "Manipal Hospital, Old Airport Road",
+    "department_ar": "أمراض قلب الأطفال",
+    "department_en": "Pediatric Cardiology"
+  },
+  {
+    "name": "Dr. A Sivagnanam",
+    "hospital": "Manipal Hospital, Old Airport Road",
+    "department_ar": "طب الأطفال",
+    "department_en": "Pediatric Emergency"
+  },
+  {
+    "name": "Dr. Dheeraj A",
+    "hospital": "Manipal Hospital, Old Airport Road",
+    "department_ar": "الطب الفيزيائي وإعادة التأهيل",
+    "department_en": "Physical Medicine & Rehabilitation"
+  },
+  {
+    "name": "Dr. Vadhiraja",
+    "hospital": "Manipal Hospital, Old Airport Road",
+    "department_ar": "علاج الأورام بالإشعاع",
+    "department_en": "Radiation Oncology"
+  },
+  {
+    "name": "Dr. Abhishek Patil",
+    "hospital": "Manipal Hospital, Old Airport Road",
+    "department_ar": "أمراض المناعة السريرية والروماتيزم",
+    "department_en": "Rheumatology & Clinical Immunology"
+  },
+  {
+    "name": "Dr. Shabber Zaveri",
+    "hospital": "Manipal Hospital, Old Airport Road",
+    "department_ar": "جراحة الأورام",
+    "department_en": "Surgical Oncology"
+  },
+  {
+    "name": "Dr. Deepak Dubey",
+    "hospital": "Manipal Hospital, Old Airport Road",
+    "department_ar": "زراعة الكلى والمسالك",
+    "department_en": "Uro-Oncology, Robotic Surgery & Renal Transplantation"
+  },
+  {
+    "name": "Deepak",
+    "hospital": "Manipal Hospital, Old Airport Road",
+    "department_ar": "جراحة المسالك البولية",
+    "department_en": "Urology"
+  },
+  {
+    "name": "Dr. Azeez Pasha",
+    "hospital": "Manipal Hospital, Old Airport Road",
+    "department_ar": "جراحة الأوعية الدموية",
+    "department_en": "Vascular Surgery"
+  },
+  {
+    "name": "Dr. Venkatesh Reddy",
+    "hospital": "Manipal Hospital, Old Airport Road",
+    "department_ar": "جراحة الأوعية الدموية",
+    "department_en": "Vascular Surgery"
+  },
+  {
+    "name": "Dr. Pramod Krishnappa",
+    "hospital": "NU Hospitals, Rajajinagar Bangalore",
+    "department_ar": "جراحة المسالك وأمراض الذكورة",
+    "department_en": "Andrology & Urology"
+  },
+  {
+    "name": "Dr. Jyoti Sridhar",
+    "hospital": "NU Hospitals, Rajajinagar Bangalore",
+    "department_ar": "العناية المركزة والتخدير",
+    "department_en": "Critical Care & Anaesthesia"
+  },
+  {
+    "name": "Dr. Sridhar Pandit",
+    "hospital": "NU Hospitals, Rajajinagar Bangalore",
+    "department_ar": "جراحة عامة ومناظير",
+    "department_en": "General & Laparoscopic Surgery"
+  },
+  {
+    "name": "Dr. Shakuntala V Modi",
+    "hospital": "NU Hospitals, Rajajinagar Bangalore",
+    "department_ar": "أمراض الكلى",
+    "department_en": "Nephrology"
+  },
+  {
+    "name": "Dr. Aashish S",
+    "hospital": "NU Hospitals, Rajajinagar Bangalore",
+    "department_ar": "زراعة الكلى وزراعة الأعضاء",
+    "department_en": "Nephrology & Transplant Physician"
+  },
+  {
+    "name": "Dr. Padmanabhan S",
+    "hospital": "NU Hospitals, Rajajinagar Bangalore",
+    "department_ar": "أمراض الكلى",
+    "department_en": "Nephrology & Transplant Physician"
+  },
+  {
+    "name": "Dr. Ashvini Koti",
+    "hospital": "NU Hospitals, Rajajinagar Bangalore",
+    "department_ar": "علم الأمراض",
+    "department_en": "Pathology (Sr. Pathologist & Lab Director)"
+  },
+  {
+    "name": "Dr. Nitin Nayak",
+    "hospital": "NU Hospitals, Rajajinagar Bangalore",
+    "department_ar": "أمراض كلى الأطفال",
+    "department_en": "Pediatric Nephrology"
+  },
+  {
+    "name": "Dr. Prasanna Venkatesh M K",
+    "hospital": "NU Hospitals, Rajajinagar Bangalore",
+    "department_ar": "زراعة الكلى",
+    "department_en": "Pediatric Urology, Robotic & Renal Transplant Surgery"
+  },
+  {
+    "name": "Dr. Keval P Jain",
+    "hospital": "NU Hospitals, Rajajinagar Bangalore",
+    "department_ar": "الأشعة التشخيصية",
+    "department_en": "Radiodiagnosis"
+  },
+  {
+    "name": "Dr. Swathi Matippa",
+    "hospital": "NU Hospitals, Rajajinagar Bangalore",
+    "department_ar": "الأشعة التشخيصية",
+    "department_en": "Radiodiagnosis"
+  },
+  {
+    "name": "Dr. Krishna Prasad T",
+    "hospital": "NU Hospitals, Rajajinagar Bangalore",
+    "department_ar": "زراعة الكلى",
+    "department_en": "Uro-Oncology, Robotic & Renal Transplant Surgery"
+  },
+  {
+    "name": "Dr. Nagarjuna Reddy Danduri",
+    "hospital": "NU Hospitals, Rajajinagar Bangalore",
+    "department_ar": "جراحة المسالك البولية",
+    "department_en": "Urology"
+  },
+  {
+    "name": "Dr. Srinivas M.",
+    "hospital": "Narayana Hospital, Bommasandra Bangalore",
+    "department_ar": "التخدير",
+    "department_en": "Anaesthesia"
+  },
+  {
+    "name": "Dr. Devi Shetty",
+    "hospital": "Narayana Hospital, Bommasandra Bangalore",
+    "department_ar": "جراحة القلب",
+    "department_en": "Cardiac Surgery"
+  },
+  {
+    "name": "Dr. Sandeep Attawar",
+    "hospital": "Narayana Hospital, Bommasandra Bangalore",
+    "department_ar": "جراحة القلب",
+    "department_en": "Cardiac Transplant Surgery"
+  },
+  {
+    "name": "Dr. Manjunath C. N.",
+    "hospital": "Narayana Hospital, Bommasandra Bangalore",
+    "department_ar": "أمراض القلب",
+    "department_en": "Cardiology"
+  },
+  {
+    "name": "Dr. Anil Bhan",
+    "hospital": "Narayana Hospital, Bommasandra Bangalore",
+    "department_ar": "جراحة القلب",
+    "department_en": "Cardiothoracic Surgery"
+  },
+  {
+    "name": "Dr. Sathyaki Nambala",
+    "hospital": "Narayana Hospital, Bommasandra Bangalore",
+    "department_ar": "جراحة القلب",
+    "department_en": "Cardiothoracic Surgery"
+  },
+  {
+    "name": "Dr. Pratap Reddy",
+    "hospital": "Narayana Hospital, Bommasandra Bangalore",
+    "department_ar": "العناية المركزة",
+    "department_en": "Critical Care"
+  },
+  {
+    "name": "Dr. Smitha Shetty",
+    "hospital": "Narayana Hospital, Bommasandra Bangalore",
+    "department_ar": "الأمراض الجلدية",
+    "department_en": "Dermatology"
+  },
+  {
+    "name": "Dr. Ashok Pillai",
+    "hospital": "Narayana Hospital, Bommasandra Bangalore",
+    "department_ar": "الأنف والأذن والحنجرة",
+    "department_en": "ENT"
+  },
+  {
+    "name": "Dr. H. S. Sreevathsa",
+    "hospital": "Narayana Hospital, Bommasandra Bangalore",
+    "department_ar": "الغدد الصماء",
+    "department_en": "Endocrinology"
+  },
+  {
+    "name": "Dr. Malini Saba",
+    "hospital": "Narayana Hospital, Bommasandra Bangalore",
+    "department_ar": "طب الأسرة",
+    "department_en": "Family Medicine"
+  },
+  {
+    "name": "Dr. Suresh Ramaswamy",
+    "hospital": "Narayana Hospital, Bommasandra Bangalore",
+    "department_ar": "الجهاز الهضمي",
+    "department_en": "Gastroenterology"
+  },
+  {
+    "name": "Dr. Dilip Raja",
+    "hospital": "Narayana Hospital, Bommasandra Bangalore",
+    "department_ar": "جراحة عامة",
+    "department_en": "General Surgery"
+  },
+  {
+    "name": "Dr. Shobha Badiger",
+    "hospital": "Narayana Hospital, Bommasandra Bangalore",
+    "department_ar": "أمراض النساء",
+    "department_en": "Gynaecology"
+  },
+  {
+    "name": "Dr. Harish Nanjappa",
+    "hospital": "Narayana Hospital, Bommasandra Bangalore",
+    "department_ar": "أمراض الدم",
+    "department_en": "Haematology"
+  },
+  {
+    "name": "Dr. Pradeep Mahajan",
+    "hospital": "Narayana Hospital, Bommasandra Bangalore",
+    "department_ar": "الطب الباطني",
+    "department_en": "Internal Medicine"
+  },
+  {
+    "name": "Dr. Ravi Kishore",
+    "hospital": "Narayana Hospital, Bommasandra Bangalore",
+    "department_ar": "أمراض القلب التداخلية",
+    "department_en": "Interventional Cardiology"
+  },
+  {
+    "name": "Dr. Ravi Prasad",
+    "hospital": "Narayana Hospital, Bommasandra Bangalore",
+    "department_ar": "الأورام الطبية",
+    "department_en": "Medical Oncology"
+  },
+  {
+    "name": "Dr. Roopa K.",
+    "hospital": "Narayana Hospital, Bommasandra Bangalore",
+    "department_ar": "حديثي الولادة",
+    "department_en": "Neonatology"
+  },
+  {
+    "name": "Dr. Santosh Benjamin",
+    "hospital": "Narayana Hospital, Bommasandra Bangalore",
+    "department_ar": "أمراض الكلى",
+    "department_en": "Nephrology"
+  },
+  {
+    "name": "Dr. Sanjay Desai",
+    "hospital": "Narayana Hospital, Bommasandra Bangalore",
+    "department_ar": "طب الأعصاب",
+    "department_en": "Neurology"
+  },
+  {
+    "name": "Dr. Ashwin Borkar",
+    "hospital": "Narayana Hospital, Bommasandra Bangalore",
+    "department_ar": "جراحة الأعصاب",
+    "department_en": "Neurosurgery"
+  },
+  {
+    "name": "Dr. Anand Rao",
+    "hospital": "Narayana Hospital, Bommasandra Bangalore",
+    "department_ar": "طب العيون",
+    "department_en": "Ophthalmology"
+  },
+  {
+    "name": "Dr. Suresh H. Rao",
+    "hospital": "Narayana Hospital, Bommasandra Bangalore",
+    "department_ar": "جراحة العظام",
+    "department_en": "Orthopaedic Surgery"
+  },
+  {
+    "name": "Dr. Gaurav Ganguly",
+    "hospital": "Narayana Hospital, Bommasandra Bangalore",
+    "department_ar": "جراحة العظام",
+    "department_en": "Orthopaedics"
+  },
+  {
+    "name": "Dr. Viveka Kumar",
+    "hospital": "Narayana Hospital, Bommasandra Bangalore",
+    "department_ar": "أمراض قلب الأطفال",
+    "department_en": "Paediatric Cardiology"
+  },
+  {
+    "name": "Dr. Prabha Adhikari",
+    "hospital": "Narayana Hospital, Bommasandra Bangalore",
+    "department_ar": "طب الأطفال",
+    "department_en": "Paediatrics"
+  },
+  {
+    "name": "Dr. R. R. Kasliwal",
+    "hospital": "Narayana Hospital, Bommasandra Bangalore",
+    "department_ar": "أمراض القلب الوقائية",
+    "department_en": "Preventive Cardiology"
+  },
+  {
+    "name": "Dr. Rajesh Kumar",
+    "hospital": "Narayana Hospital, Bommasandra Bangalore",
+    "department_ar": "الطب النفسي",
+    "department_en": "Psychiatry"
+  },
+  {
+    "name": "Dr. K. R. Suresh",
+    "hospital": "Narayana Hospital, Bommasandra Bangalore",
+    "department_ar": "أمراض الصدر",
+    "department_en": "Pulmonology"
+  },
+  {
+    "name": "Dr. Girish Rao",
+    "hospital": "Narayana Hospital, Bommasandra Bangalore",
+    "department_ar": "الأشعة",
+    "department_en": "Radiology"
+  },
+  {
+    "name": "Dr. Sanjay Mehrotra",
+    "hospital": "Narayana Hospital, Bommasandra Bangalore",
+    "department_ar": "زراعة الكلى",
+    "department_en": "Renal Transplant"
+  },
+  {
+    "name": "Dr. Venkatesh K.",
+    "hospital": "Narayana Hospital, Bommasandra Bangalore",
+    "department_ar": "جراحة الأورام",
+    "department_en": "Surgical Oncology"
+  },
+  {
+    "name": "Dr. Rajeev Jayadevan",
+    "hospital": "Narayana Hospital, Bommasandra Bangalore",
+    "department_ar": "جراحة المسالك البولية",
+    "department_en": "Urology"
+  },
+  {
+    "name": "Dr. B. C. Srinivasa",
+    "hospital": "Narayana Hospital, Bommasandra Bangalore",
+    "department_ar": "جراحة الأوعية الدموية",
+    "department_en": "Vascular Surgery"
+  },
+  {
+    "name": "Dr. Praveena Shenoi",
+    "hospital": "Rainbow Children's Hospital, Marathahalli",
+    "department_ar": "نساء وولادة",
+    "department_en": "Clinical Director Obstetrics & Gynecology"
+  },
+  {
+    "name": "Dr. Arvind Shenoi",
+    "hospital": "Rainbow Children's Hospital, Marathahalli",
+    "department_ar": "طب الأطفال",
+    "department_en": "Clinical Director Pediatrics"
+  },
+  {
+    "name": "Dr. Chandrashekar Changappa",
+    "hospital": "Rainbow Children's Hospital, Marathahalli",
+    "department_ar": "طب الأطفال",
+    "department_en": "Consultant Pediatrician"
+  },
+  {
+    "name": "Dr. Rachana Shilpakar",
+    "hospital": "Rainbow Children's Hospital, Marathahalli",
+    "department_ar": "جلدية",
+    "department_en": "Dermatology"
+  },
+  {
+    "name": "Dr. Rajaram G",
+    "hospital": "Rainbow Children's Hospital, Marathahalli",
+    "department_ar": "أطفال",
+    "department_en": "General Pediatrics"
+  },
+  {
+    "name": "Dr. Srikanth Kulkarni",
+    "hospital": "Rainbow Children's Hospital, Marathahalli",
+    "department_ar": "أطفال",
+    "department_en": "General Pediatrics"
+  },
+  {
+    "name": "Dr. Vinu N",
+    "hospital": "Rainbow Children's Hospital, Marathahalli",
+    "department_ar": "أطفال",
+    "department_en": "General Pediatrics"
+  },
+  {
+    "name": "Dr. Plabani Sarkar",
+    "hospital": "Rainbow Children's Hospital, Marathahalli",
+    "department_ar": "طب الإنجاب",
+    "department_en": "IVF"
+  },
+  {
+    "name": "Dr. Sandeep R",
+    "hospital": "Rainbow Children's Hospital, Marathahalli",
+    "department_ar": "عناية مركزة حديثي الولادة",
+    "department_en": "Neonatal Intensive Care"
+  },
+  {
+    "name": "Dr. Aruna Thangapandy",
+    "hospital": "Rainbow Children's Hospital, Marathahalli",
+    "department_ar": "نساء وولادة",
+    "department_en": "Obstetrics & Gynecology"
+  },
+  {
+    "name": "Dr. Meghana Jetty",
+    "hospital": "Rainbow Children's Hospital, Marathahalli",
+    "department_ar": "نساء وولادة",
+    "department_en": "Obstetrics, Gynecology & Laparoscopic Surgery"
+  },
+  {
+    "name": "Dr. Supriya Shetty",
+    "hospital": "Rainbow Children's Hospital, Marathahalli",
+    "department_ar": "طب العيون",
+    "department_en": "Ophthalmology"
+  },
+  {
+    "name": "Dr. Nandana Bala",
+    "hospital": "Rainbow Children's Hospital, Marathahalli",
+    "department_ar": "أمراض الجهاز التنفسي للأطفال",
+    "department_en": "Pediatric Allergy & Respiratory Medicine"
+  },
+  {
+    "name": "Dr. Prabhavathi H B",
+    "hospital": "Rainbow Children's Hospital, Marathahalli",
+    "department_ar": "أسنان أطفال",
+    "department_en": "Pediatric Dentistry"
+  },
+  {
+    "name": "Dr. Shilpa H",
+    "hospital": "Rainbow Children's Hospital, Marathahalli",
+    "department_ar": "أنف وأذن وحنجرة أطفال",
+    "department_en": "Pediatric ENT"
+  },
+  {
+    "name": "Dr. Rachana G",
+    "hospital": "Rainbow Children's Hospital, Marathahalli",
+    "department_ar": "أنف وأذن وحنجرة أطفال / اضطرابات التطور",
+    "department_en": "Pediatric ENT / Development"
+  },
+  {
+    "name": "Dr. Tejasvi Sheshadri",
+    "hospital": "Rainbow Children's Hospital, Marathahalli",
+    "department_ar": "غدد أطفال",
+    "department_en": "Pediatric Endocrinology"
+  },
+  {
+    "name": "Dr. Lavenya R P",
+    "hospital": "Rainbow Children's Hospital, Marathahalli",
+    "department_ar": "أمراض الجهاز الهضمي والكبد للأطفال",
+    "department_en": "Pediatric Gastroenterology & Hepatology"
+  },
+  {
+    "name": "Dr. V R Nagendra Kumar",
+    "hospital": "Rainbow Children's Hospital, Marathahalli",
+    "department_ar": "أمراض الكبد والجهاز الهضمي للأطفال",
+    "department_en": "Pediatric Gastroenterology & Hepatology"
+  },
+  {
+    "name": "Dr. Manojit Chakraborty",
+    "hospital": "Rainbow Children's Hospital, Marathahalli",
+    "department_ar": "أورام وزرع نخاع للأطفال",
+    "department_en": "Pediatric Hemato Oncology & Bone Marrow Transplant"
+  },
+  {
+    "name": "Dr. Vasudha N R",
+    "hospital": "Rainbow Children's Hospital, Marathahalli",
+    "department_ar": "أورام وزرع نخاع للأطفال",
+    "department_en": "Pediatric Hemato Oncology & Bone Marrow Transplant"
+  },
+  {
+    "name": "Dr. Manu Chaudhary",
+    "hospital": "Rainbow Children's Hospital, Marathahalli",
+    "department_ar": "أمراض معدية للأطفال",
+    "department_en": "Pediatric Infectious Diseases"
+  },
+  {
+    "name": "Dr. Deepak R",
+    "hospital": "Rainbow Children's Hospital, Marathahalli",
+    "department_ar": "عناية مركزة للأطفال / طب أطفال",
+    "department_en": "Pediatric Intensive Care / General Pediatrics"
+  },
+  {
+    "name": "Dr. Rakshay Shetty",
+    "hospital": "Rainbow Children's Hospital, Marathahalli",
+    "department_ar": "عناية مركزة وأطفال عام",
+    "department_en": "Pediatric Intensivist & General Pediatrician"
+  },
+  {
+    "name": "Dr. Saumil Gaur",
+    "hospital": "Rainbow Children's Hospital, Marathahalli",
+    "department_ar": "أمراض الكلى للأطفال",
+    "department_en": "Pediatric Nephrology"
+  },
+  {
+    "name": "Dr. N Balamurugan",
+    "hospital": "Rainbow Children's Hospital, Marathahalli",
+    "department_ar": "جراحة أعصاب الأطفال",
+    "department_en": "Pediatric Neurology & Neuro Surgery"
+  },
+  {
+    "name": "Dr. Aniruddha Tekkatte Jagannatha",
+    "hospital": "Rainbow Children's Hospital, Marathahalli",
+    "department_ar": "جراحة أعصاب الأطفال",
+    "department_en": "Pediatric Neurology & Neurosurgery"
+  },
+  {
+    "name": "Dr. Jayanth Sundar Sampath",
+    "hospital": "Rainbow Children's Hospital, Marathahalli",
+    "department_ar": "جراحة عظام الأطفال",
+    "department_en": "Pediatric Orthopedics"
+  },
+  {
+    "name": "Dr. Ruchi Gupta",
+    "hospital": "Rainbow Children's Hospital, Marathahalli",
+    "department_ar": "طب نفسي أطفال",
+    "department_en": "Pediatric Psychiatry"
+  },
+  {
+    "name": "Dr. Anupama Menon",
+    "hospital": "Rainbow Children's Hospital, Marathahalli",
+    "department_ar": "أمراض الصدر للأطفال",
+    "department_en": "Pediatric Pulmonologist"
+  },
+  {
+    "name": "Dr. Chandrika S Bhat",
+    "hospital": "Rainbow Children's Hospital, Marathahalli",
+    "department_ar": "أمراض الروماتيزم للأطفال",
+    "department_en": "Pediatric Rheumatology"
+  },
+  {
+    "name": "Dr. Antony Robert",
+    "hospital": "Rainbow Children's Hospital, Marathahalli",
+    "department_ar": "جراحة الأطفال والمسالك",
+    "department_en": "Pediatric Surgery & Pediatric Urology / Laparoscopy"
+  },
+  {
+    "name": "Dr. Shounak Choudhury",
+    "hospital": "Rainbow Children's Hospital, Marathahalli",
+    "department_ar": "جراحة الأطفال والمسالك",
+    "department_en": "Pediatric Surgery & Urology"
+  },
+  {
+    "name": "Dr. Priyadarshan K",
+    "hospital": "Rainbow Children's Hospital, Marathahalli",
+    "department_ar": "جراحة تجميلية وترميمية",
+    "department_en": "Plastic & Reconstructive Surgery"
+  },
+  {
+    "name": "Dr. Jyoti Singh",
+    "hospital": "Rainbow Children's Hospital, Marathahalli",
+    "department_ar": "الأشعة",
+    "department_en": "Radiology"
+  },
+  {
+    "name": "Dr. Krishna Kumar",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "التخدير",
+    "department_en": "Anaesthesia"
+  },
+  {
+    "name": "Dr. C. Narasimhan",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "كهرباء القلب",
+    "department_en": "Cardiac Electrophysiology"
+  },
+  {
+    "name": "Dr. Murali Mohan B. V.",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "جراحة القلب",
+    "department_en": "Cardiac Surgery"
+  },
+  {
+    "name": "Dr. Ravi Mohanka",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "جراحة القلب",
+    "department_en": "Cardiac Surgery"
+  },
+  {
+    "name": "Dr. R. Prasada Reddy",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "أمراض القلب",
+    "department_en": "Cardiology"
+  },
+  {
+    "name": "Dr. Ramesh Babu",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "أمراض القلب",
+    "department_en": "Cardiology"
+  },
+  {
+    "name": "Dr. Sandhya Sundaram",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "أمراض القلب",
+    "department_en": "Cardiology"
+  },
+  {
+    "name": "Dr. Vijay Shankar",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "جراحة القلب",
+    "department_en": "Cardiothoracic Surgery"
+  },
+  {
+    "name": "Dr. Lakshmi Venkataraman",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "التغذية الإكلينيكية",
+    "department_en": "Clinical Nutrition"
+  },
+  {
+    "name": "Dr. Rohit Vadala",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "العناية المركزة",
+    "department_en": "Critical Care"
+  },
+  {
+    "name": "Dr. Sandhya Rajagopal",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "الأمراض الجلدية",
+    "department_en": "Dermatology"
+  },
+  {
+    "name": "Dr. Raghavan Varadarajan",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "الأنف والأذن والحنجرة",
+    "department_en": "ENT"
+  },
+  {
+    "name": "Dr. Kavitha Rajagopalan",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "طب الطوارئ",
+    "department_en": "Emergency Medicine"
+  },
+  {
+    "name": "Dr. Sundeep Lakhtakia",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "المناظير",
+    "department_en": "Endoscopy & EUS"
+  },
+  {
+    "name": "Dr. Suresh Kumar",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "طب الأسرة",
+    "department_en": "Family Medicine"
+  },
+  {
+    "name": "Dr. D. Nageshwar Reddy",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "الجهاز الهضمي",
+    "department_en": "Gastroenterology"
+  },
+  {
+    "name": "Dr. Seema Rao",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "أمراض النساء",
+    "department_en": "Gynaecology"
+  },
+  {
+    "name": "Dr. Ashwin Rammohan",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "جراحة الكبد",
+    "department_en": "HPB Surgery"
+  },
+  {
+    "name": "Dr. Niranjan Rao",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "أمراض الدم",
+    "department_en": "Haematology"
+  },
+  {
+    "name": "Dr. Anil Arora",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "أمراض الكبد",
+    "department_en": "Hepatology"
+  },
+  {
+    "name": "Dr. Dinesh Jothimani",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "أمراض الكبد",
+    "department_en": "Hepatology"
+  },
+  {
+    "name": "Dr. P. Nagaraja Rao",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "أمراض الكبد",
+    "department_en": "Hepatology"
+  },
+  {
+    "name": "Dr. Sanjay Kumar Yadav",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "أمراض الكبد",
+    "department_en": "Hepatology"
+  },
+  {
+    "name": "Dr. Rupa Banerjee",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "أمراض الأمعاء الالتهابية",
+    "department_en": "IBD Specialist"
+  },
+  {
+    "name": "Dr. Harish Kumar",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "الطب الباطني",
+    "department_en": "Internal Medicine"
+  },
+  {
+    "name": "Dr. Naveen Reddy Podduturi",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "الطب الباطني",
+    "department_en": "Internal Medicine"
+  },
+  {
+    "name": "Dr. Mohan Ramchandani",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "المناظير",
+    "department_en": "Interventional Endoscopy"
+  },
+  {
+    "name": "Dr. Rohan Arora",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "الأشعة التداخلية",
+    "department_en": "Interventional Radiology"
+  },
+  {
+    "name": "Dr. Mettu Srinivas Reddy",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "تخدير زراعة الأعضاء",
+    "department_en": "Liver Transplant Anaesthesia"
+  },
+  {
+    "name": "Dr. Ilankumaran Kaliamurthy",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "جراحة الكبد",
+    "department_en": "Liver Transplant Surgery"
+  },
+  {
+    "name": "Dr. P. Balachandran Menon",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "زراعة الكبد",
+    "department_en": "Liver Transplant Surgery"
+  },
+  {
+    "name": "Dr. Mohamed Rela",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "زراعة الكبد",
+    "department_en": "Liver Transplantation"
+  },
+  {
+    "name": "Dr. Prashant Bhangui",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "زراعة الكبد",
+    "department_en": "Liver Transplantation"
+  },
+  {
+    "name": "Dr. G. V. Rao",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "الجراحة طفيفة التوغل",
+    "department_en": "Minimally Invasive Surgery"
+  },
+  {
+    "name": "Dr. Bindu Garg",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "حديثي الولادة",
+    "department_en": "Neonatology"
+  },
+  {
+    "name": "Dr. Vikram Venkateswaran",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "أمراض الكلى",
+    "department_en": "Nephrology"
+  },
+  {
+    "name": "Dr. Sankar Narayanan",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "طب الأعصاب",
+    "department_en": "Neurology"
+  },
+  {
+    "name": "Dr. Jayaraman Kumaravelu",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "جراحة الأعصاب",
+    "department_en": "Neurosurgery"
+  },
+  {
+    "name": "Dr. Padmini Ramesh",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "طب العيون",
+    "department_en": "Ophthalmology"
+  },
+  {
+    "name": "Dr. R. Ravi",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "جراحة العظام",
+    "department_en": "Orthopaedics"
+  },
+  {
+    "name": "Dr. Gomathy Narasimhan",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "أمراض الكبد للأطفال",
+    "department_en": "Paediatric Hepatology"
+  },
+  {
+    "name": "Dr. Joy Varghese",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "جراحة الأطفال",
+    "department_en": "Paediatric Surgery"
+  },
+  {
+    "name": "Dr. Anand Kumar",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "طب الأطفال",
+    "department_en": "Paediatrics"
+  },
+  {
+    "name": "Dr. Mohan Rajesh",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "جراحة التجميل",
+    "department_en": "Plastic Surgery"
+  },
+  {
+    "name": "Dr. Sujatha Siddappa",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "الطب النفسي",
+    "department_en": "Psychiatry"
+  },
+  {
+    "name": "Dr. Pradeep Rangappa",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "أمراض الصدر",
+    "department_en": "Pulmonology"
+  },
+  {
+    "name": "Dr. Vijayalakshmi Balasubramanian",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "الأشعة",
+    "department_en": "Radiology"
+  },
+  {
+    "name": "Dr. Somashekhar S. P.",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "جراحة الأورام",
+    "department_en": "Surgical Oncology"
+  },
+  {
+    "name": "Dr. Arvind Kumar",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "جراحة الصدر",
+    "department_en": "Thoracic Surgery"
+  },
+  {
+    "name": "Dr. Anand Alur",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "جراحة المسالك البولية",
+    "department_en": "Urology"
+  },
+  {
+    "name": "Dr. Subramaniam Venkatesh",
+    "hospital": "Rela Hospital, Chennai",
+    "department_ar": "جراحة الأوعية الدموية",
+    "department_en": "Vascular Surgery"
+  },
+  {
+    "name": "Dr. Chaithannya N S",
+    "hospital": "SPARSH Hospital, Hennur Road",
+    "department_ar": "تخدير",
+    "department_en": "Anaesthesiology"
+  },
+  {
+    "name": "Dr. Deepa Chandran",
+    "hospital": "SPARSH Hospital, Hennur Road",
+    "department_ar": "تخدير",
+    "department_en": "Anaesthesiology"
+  },
+  {
+    "name": "Dr. Anand Kumar K",
+    "hospital": "SPARSH Hospital, Hennur Road",
+    "department_ar": "زرع نخاع العظم",
+    "department_en": "Bone Marrow Transplant"
+  },
+  {
+    "name": "Dr. Anand K",
+    "hospital": "SPARSH Hospital, Hennur Road",
+    "department_ar": "جراحة تجميلية وعلاج تجميلي",
+    "department_en": "Cosmetology & Cosmetic Surgery"
+  },
+  {
+    "name": "Dr. Chetan Dev K",
+    "hospital": "SPARSH Hospital, Hennur Road",
+    "department_ar": "الغدد الصماء والسكري",
+    "department_en": "Endocrinology & Diabetology"
+  },
+  {
+    "name": "Dr. Deepanju D Changkakoti",
+    "hospital": "SPARSH Hospital, Hennur Road",
+    "department_ar": "طب الأسرة",
+    "department_en": "Family Medicine"
+  },
+  {
+    "name": "Dr. Anto Gnana Delasalle M",
+    "hospital": "SPARSH Hospital, Hennur Road",
+    "department_ar": "أمراض الجهاز الهضمي",
+    "department_en": "Gastroenterology"
+  },
+  {
+    "name": "Dr. Praveen Mathew",
+    "hospital": "SPARSH Hospital, Hennur Road",
+    "department_ar": "أمراض الجهاز الهضمي",
+    "department_en": "Gastroenterology"
+  },
+  {
+    "name": "Dr. Deepmala Karmakar",
+    "hospital": "SPARSH Hospital, Hennur Road",
+    "department_ar": "أشعة تداخلية",
+    "department_en": "Interventional Radiology"
+  },
+  {
+    "name": "Dr. Ann Agnes Mathew",
+    "hospital": "SPARSH Hospital, Hennur Road",
+    "department_ar": "طب الأعصاب",
+    "department_en": "Neuroscience / Neurology"
+  },
+  {
+    "name": "Dr. Avinash Lakha",
+    "hospital": "SPARSH Hospital, Hennur Road",
+    "department_ar": "طب الأعصاب",
+    "department_en": "Neuroscience / Neurology"
+  },
+  {
+    "name": "Dr. Arpi Sagar Lodha",
+    "hospital": "SPARSH Hospital, Hennur Road",
+    "department_ar": "نساء وولادة",
+    "department_en": "Obstetrics & Gynaecology"
+  },
+  {
+    "name": "Dr. Linu Abraham Jacob",
+    "hospital": "SPARSH Hospital, Hennur Road",
+    "department_ar": "طب الأورام",
+    "department_en": "Oncology"
+  },
+  {
+    "name": "Dr. Abhijit Chavan",
+    "hospital": "SPARSH Hospital, Hennur Road",
+    "department_ar": "جراحة العظام",
+    "department_en": "Orthopaedics"
+  },
+  {
+    "name": "Dr. Chaynika Agarwal",
+    "hospital": "SPARSH Hospital, Hennur Road",
+    "department_ar": "أشعة",
+    "department_en": "Radiology"
+  },
+  {
+    "name": "Dr. Abhilash V",
+    "hospital": "SPARSH Hospital, Hennur Road",
+    "department_ar": "جراحة الأوعية الدموية",
+    "department_en": "Vascular & Endovascular Surgery"
+  },
+  {
+    "name": "Dr. Ranjan Shetty",
+    "hospital": "SPARSH Hospital, Infantry Road",
+    "department_ar": "أمراض القلب",
+    "department_en": "Cardiac Sciences"
+  },
+  {
+    "name": "Dr. Anand K",
+    "hospital": "SPARSH Hospital, Infantry Road",
+    "department_ar": "جراحة تجميلية وعلاج تجميلي",
+    "department_en": "Cosmetology & Cosmetic Surgery"
+  },
+  {
+    "name": "Dr. Kishan Nag",
+    "hospital": "SPARSH Hospital, Infantry Road",
+    "department_ar": "جراحة الأسنان",
+    "department_en": "Dental Surgery"
+  },
+  {
+    "name": "Dr. Aditi Ravindra",
+    "hospital": "SPARSH Hospital, Infantry Road",
+    "department_ar": "أنف وأذن وحنجرة",
+    "department_en": "ENT"
+  },
+  {
+    "name": "Dr. Sanjana Rai",
+    "hospital": "SPARSH Hospital, Infantry Road",
+    "department_ar": "طب عام وباطنة",
+    "department_en": "General Medicine"
+  },
+  {
+    "name": "Dr. Abhinay Indrakumar Reddy",
+    "hospital": "SPARSH Hospital, Infantry Road",
+    "department_ar": "جراحة الرأس والرقبة",
+    "department_en": "Head & Neck Surgery"
+  },
+  {
+    "name": "Dr. Deepmala Karmakar",
+    "hospital": "SPARSH Hospital, Infantry Road",
+    "department_ar": "أشعة تداخلية",
+    "department_en": "Interventional Radiology"
+  },
+  {
+    "name": "Dr. Arun",
+    "hospital": "SPARSH Hospital, Infantry Road",
+    "department_ar": "زراعة الكبد وجراحة الكبد والبنكرياس",
+    "department_en": "Liver Transplant & HPB Surgery"
+  },
+  {
+    "name": "Dr. Dinesh Kumar",
+    "hospital": "SPARSH Hospital, Infantry Road",
+    "department_ar": "أمراض الكلى والمسالك",
+    "department_en": "Nephrology & Urology"
+  },
+  {
+    "name": "Dr. Divyashree Bhat",
+    "hospital": "SPARSH Hospital, Infantry Road",
+    "department_ar": "أمراض الكلى والمسالك",
+    "department_en": "Nephrology & Urology"
+  },
+  {
+    "name": "Dr. Arvind Bhateja",
+    "hospital": "SPARSH Hospital, Infantry Road",
+    "department_ar": "طب الأعصاب",
+    "department_en": "Neuroscience / Neurology"
+  },
+  {
+    "name": "Dr. Chirag Jain",
+    "hospital": "SPARSH Hospital, Infantry Road",
+    "department_ar": "طب الأعصاب",
+    "department_en": "Neuroscience / Neurology"
+  },
+  {
+    "name": "Dr. Deepthi Bawa",
+    "hospital": "SPARSH Hospital, Infantry Road",
+    "department_ar": "نساء وولادة",
+    "department_en": "Obstetrics & Gynaecology"
+  },
+  {
+    "name": "Dr. Geeth Monnappa",
+    "hospital": "SPARSH Hospital, Infantry Road",
+    "department_ar": "نساء وولادة",
+    "department_en": "Obstetrics & Gynaecology"
+  },
+  {
+    "name": "Dr. Linu Abraham Jacob",
+    "hospital": "SPARSH Hospital, Infantry Road",
+    "department_ar": "طب الأورام",
+    "department_en": "Oncology"
+  },
+  {
+    "name": "Dr. Sharan Shivaraj Patil",
+    "hospital": "SPARSH Hospital, Infantry Road",
+    "department_ar": "جراحة العظام",
+    "department_en": "Orthopaedics"
+  },
+  {
+    "name": "Dr. Abram Harsha Vardhan",
+    "hospital": "SPARSH Hospital, Infantry Road",
+    "department_ar": "طب الأطفال",
+    "department_en": "Paediatrics"
+  },
+  {
+    "name": "Dr. Gaurang Sudhir Deshpande",
+    "hospital": "SPARSH Hospital, Infantry Road",
+    "department_ar": "أمراض الروماتيزم",
+    "department_en": "Rheumatology"
+  },
+  {
+    "name": "Dr. Dhananjay D. N.",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "تخدير",
+    "department_en": "Anaesthesiology"
+  },
+  {
+    "name": "Dr. Shishir Chandrashekhar",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "تخدير",
+    "department_en": "Anaesthesiology"
+  },
+  {
+    "name": "Dr. Nanda Rajaneesh",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "جراحة سمنة وثدي وجهاز هضمي",
+    "department_en": "Bariatric, Breast & Surgical Gastroenterology"
+  },
+  {
+    "name": "Dr. Sunil Kumar N. K.",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "تخدير قلبي",
+    "department_en": "Cardiac Anaesthesiology"
+  },
+  {
+    "name": "Dr. Bharat Raj",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "الفيزيولوجيا الكهربائية للقلب",
+    "department_en": "Cardiac Electrophysiology"
+  },
+  {
+    "name": "Dr. Adil Sadiq",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "جراحة القلب والصدر والأوعية",
+    "department_en": "Cardio Thoracic & Vascular Surgery (CTVS)"
+  },
+  {
+    "name": "Dr. Srikanth",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "أمراض القلب",
+    "department_en": "Cardiology"
+  },
+  {
+    "name": "Dr. Anand Bandachar Mamdapur",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "العناية المركزة",
+    "department_en": "Critical Care Medicine"
+  },
+  {
+    "name": "Dr. Divya Hirolli",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "العناية المركزة",
+    "department_en": "Critical Care Medicine"
+  },
+  {
+    "name": "Dr. Sandeep Anehosur",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "العناية المركزة",
+    "department_en": "Critical Care Medicine"
+  },
+  {
+    "name": "Dr. Shashidhar B. G",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "العناية المركزة",
+    "department_en": "Critical Care Medicine"
+  },
+  {
+    "name": "Dr. A. Chris Deepak",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "طب الأسنان",
+    "department_en": "Dental Surgery"
+  },
+  {
+    "name": "Dr. Akshay Shetty",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "طب الأسنان",
+    "department_en": "Dental Surgery"
+  },
+  {
+    "name": "Dr. Deepak Pathak",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "طب الأسنان",
+    "department_en": "Dental Surgery"
+  },
+  {
+    "name": "Dr. Swati Vishwakarma",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "طب الأسنان",
+    "department_en": "Dental Surgery"
+  },
+  {
+    "name": "Dr. Priyanka Dutta",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "طب الأسنان",
+    "department_en": "Dentistry"
+  },
+  {
+    "name": "Dr. Dali Chandran",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "أنف وأذن وحنجرة",
+    "department_en": "ENT"
+  },
+  {
+    "name": "Dr. Shantanu Tandon",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "أنف وأذن وحنجرة",
+    "department_en": "ENT"
+  },
+  {
+    "name": "Dr. Sadiq Saleem Sikora",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "جراحة الجهاز الهضمي وزراعة الكبد",
+    "department_en": "GI Surgery & Liver Transplant"
+  },
+  {
+    "name": "Dr. Lawrence Peter",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "أمراض الجهاز الهضمي",
+    "department_en": "Gastroenterology"
+  },
+  {
+    "name": "Dr. Akshay Deshpande",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "جهاز هضمي وكبد",
+    "department_en": "Gastroenterology & Hepatology"
+  },
+  {
+    "name": "Dr. Amruthesh T. M.",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "جهاز هضمي وكبد",
+    "department_en": "Gastroenterology & Hepatology"
+  },
+  {
+    "name": "Dr. Honey Ashok",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "جراحة أورام الرأس والرقبة",
+    "department_en": "Head & Neck Onco-Surgery"
+  },
+  {
+    "name": "Dr. Sreekanth B. Shetty",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "أمراض القلب التداخلي",
+    "department_en": "Interventional Cardiology"
+  },
+  {
+    "name": "Dr. Vineet Gupta",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "أورام باطنية وأمراض دم",
+    "department_en": "Medical Oncology & Haematology"
+  },
+  {
+    "name": "Dr. Sushma Rani",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "أمراض الكلى",
+    "department_en": "Nephrology"
+  },
+  {
+    "name": "Dr. Amit Kulkarni",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "طب الأعصاب والسكتات",
+    "department_en": "Neurology & Stroke"
+  },
+  {
+    "name": "Dr. Alok Mohan Uppar",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "جراحة المخ والأعصاب",
+    "department_en": "Neurosurgery"
+  },
+  {
+    "name": "Dr. Arjun Srivatsa",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "جراحة المخ والأعصاب",
+    "department_en": "Neurosurgery"
+  },
+  {
+    "name": "Dr. Lakshmi Mahesh",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "تجميل عيون/قناة دمعية",
+    "department_en": "Oculoplastic & Lacrimal Surgery"
+  },
+  {
+    "name": "Dr. Chandrashekar",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "جراحة العظام والمفاصل",
+    "department_en": "Orthopedic & Joint Surgery"
+  },
+  {
+    "name": "Dr. Adarsh Babu K",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "جراحة العظام",
+    "department_en": "Orthopedics"
+  },
+  {
+    "name": "Dr. Anil Kumar Pura Lingegowda",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "جراحة الأطفال",
+    "department_en": "Paediatric Surgery"
+  },
+  {
+    "name": "Dr. Apoorva Gudadhe",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "أسنان أطفال",
+    "department_en": "Pediatric Dentistry"
+  },
+  {
+    "name": "Dr. Anil Kumar",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "جراحة الأطفال",
+    "department_en": "Pediatric Surgery"
+  },
+  {
+    "name": "Dr. Rajendra S. Gujjalanavar",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "جراحة تجميلية وترميمية",
+    "department_en": "Plastic & Reconstructive Surgery"
+  },
+  {
+    "name": "Dr. Sachin Kumar",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "أمراض الصدر",
+    "department_en": "Pulmonology"
+  },
+  {
+    "name": "Dr. Ajay Handa",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "أمراض الصدر والعناية المركزة",
+    "department_en": "Pulmonology & Critical Care"
+  },
+  {
+    "name": "Dr. Arjunsa H. Satapute",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "أمراض الصدر واضطرابات النوم",
+    "department_en": "Pulmonology & Sleep Medicine"
+  },
+  {
+    "name": "Dr. Anisha S. Tandon",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "أشعة",
+    "department_en": "Radiology"
+  },
+  {
+    "name": "Dr. B. Premsai Reddy",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "أشعة وتصوير تشخيصي",
+    "department_en": "Radiology & Imaging"
+  },
+  {
+    "name": "Dr. Sonali Sethi",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "أشعة وتصوير تشخيصي",
+    "department_en": "Radiology & Imaging"
+  },
+  {
+    "name": "Dr. Suresh V",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "أشعة وتصوير تشخيصي",
+    "department_en": "Radiology & Imaging"
+  },
+  {
+    "name": "Dr. Y. Trishul Shetty",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "أشعة وتصوير تشخيصي",
+    "department_en": "Radiology & Imaging"
+  },
+  {
+    "name": "Dr. Banarji",
+    "hospital": "Sakra World Hospital, Bangalore",
+    "department_ar": "جراحة الكتف",
+    "department_en": "Shoulder Surgery"
+  },
+  {
+    "name": "Dr. A Mohan Kumar",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "تخدير",
+    "department_en": "Anaesthesiology"
+  },
+  {
+    "name": "Dr. Alluri Suneetha",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "تخدير",
+    "department_en": "Anaesthesiology"
+  },
+  {
+    "name": "Dr. Kambhampati Chakrapani",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "تخدير",
+    "department_en": "Anaesthesiology"
+  },
+  {
+    "name": "Dr. Narmadha",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "تخدير",
+    "department_en": "Anaesthesiology"
+  },
+  {
+    "name": "Dr. Ajitha S",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "كتاراكت وجلوكوما",
+    "department_en": "Cataract & Glaucoma"
+  },
+  {
+    "name": "Dr. Meena G Menon",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "كتاراكت وجلوكوما",
+    "department_en": "Cataract & Glaucoma"
+  },
+  {
+    "name": "Dr. S. Ajitha",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "كتاراكت وجلوكوما",
+    "department_en": "Cataract & Glaucoma"
+  },
+  {
+    "name": "Dr. Srilakshmi Sikhakoli",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "كتاراكت وجلوكوما",
+    "department_en": "Cataract & Glaucoma"
+  },
+  {
+    "name": "Dr. Jayamadhury Gudimetla",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "كتاراكت وشبكية طبية",
+    "department_en": "Cataract & Medical Retina"
+  },
+  {
+    "name": "Dr. Y. Umesh",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "كتاراكت وتصحيح البصر",
+    "department_en": "Cataract & Refractive Services"
+  },
+  {
+    "name": "Dr. Anand Balasubramaniam",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "كتاراكت وقرنية وتصحيح البصر",
+    "department_en": "Cataract, Cornea & Refractive Service"
+  },
+  {
+    "name": "Dr. Haritha Veluri",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "كتاراكت وقرنية وتصحيح البصر",
+    "department_en": "Cataract, Cornea & Refractive Services"
+  },
+  {
+    "name": "Dr. Jagadeesh Kumar Reddy K",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "كتاراكت وقرنية وتصحيح البصر",
+    "department_en": "Cataract, Cornea & Refractive Services"
+  },
+  {
+    "name": "Dr. Madhuri V",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "كتاراكت وقرنية وتصحيح البصر",
+    "department_en": "Cataract, Cornea & Refractive Services"
+  },
+  {
+    "name": "Dr. Shashidhar Banigallapati",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "كتاراكت وقرنية وتصحيح البصر",
+    "department_en": "Cataract, Cornea & Refractive Services"
+  },
+  {
+    "name": "Dr. Nisha Ahuja",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "كتاراكت وقرنية وتصحيح البصر",
+    "department_en": "Cataract, Cornea & Refractive Surgery"
+  },
+  {
+    "name": "Dr. Minija C K",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "كتاراكت وشبكية طبية وقزحية",
+    "department_en": "Cataract, Medical Retina & UVEA Services"
+  },
+  {
+    "name": "Dr. Sudhakar Potti",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "قرنية وتصحيح البصر",
+    "department_en": "Cornea & Refractive Services"
+  },
+  {
+    "name": "Dr. Vandhana Sundaram",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "قرنية",
+    "department_en": "Cornea (Registrar – Cornea)"
+  },
+  {
+    "name": "Dr. Prabhu Vijayaraghavan",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "خدمات القرنية",
+    "department_en": "Cornea Services"
+  },
+  {
+    "name": "Dr. Pallavi Joshi",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "قرنية وسطح العين وتصحيح البصر",
+    "department_en": "Cornea, Ocular Surface & Refractive Services"
+  },
+  {
+    "name": "Dr. Anandhi R",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "عيادة عامة",
+    "department_en": "General OPD (ENT)"
+  },
+  {
+    "name": "Dr. Renukadevi N K",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "عيادات عامة",
+    "department_en": "General OPD (ENT)"
+  },
+  {
+    "name": "Dr. Anees Fatima Mohammed",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "طب العيون العام",
+    "department_en": "General Ophthalmology"
+  },
+  {
+    "name": "Dr. Anuradha Kakumanu",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "طب العيون العام",
+    "department_en": "General Ophthalmology"
+  },
+  {
+    "name": "Dr. Hitendrasinh Parmar",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "طب العيون العام",
+    "department_en": "General Ophthalmology"
+  },
+  {
+    "name": "Dr. Kanakamedala Bhargavi Lakshmi",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "طب العيون العام",
+    "department_en": "General Ophthalmology"
+  },
+  {
+    "name": "Dr. Kesana Udaya Sankar",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "طب العيون العام",
+    "department_en": "General Ophthalmology"
+  },
+  {
+    "name": "Dr. Shalini G",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "طب العيون العام",
+    "department_en": "General Ophthalmology"
+  },
+  {
+    "name": "Dr. Vijayabhaskar Gajjala",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "طب العيون العام",
+    "department_en": "General Ophthalmology"
+  },
+  {
+    "name": "Dr. Nidhi Dubey",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "عيون عامة وشبكية طبية وقزحية",
+    "department_en": "General Ophthalmology, Medical Retina & UVEA"
+  },
+  {
+    "name": "Dr. Lalitha K J",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "جلوكوما",
+    "department_en": "Glaucoma"
+  },
+  {
+    "name": "Dr. Malleswari Medikonda",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "جلوكوما",
+    "department_en": "Glaucoma"
+  },
+  {
+    "name": "Dr. Nishitha M.S",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "جلوكوما",
+    "department_en": "Glaucoma"
+  },
+  {
+    "name": "Dr. Geetha G",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "شبكية طبية",
+    "department_en": "Medical Retina"
+  },
+  {
+    "name": "Dr. Swathi Padma Kanchana",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "شبكية طبية",
+    "department_en": "Medical Retina"
+  },
+  {
+    "name": "Dr. Shruthi Tara",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "محجر العين",
+    "department_en": "Orbit & Oculoplasty"
+  },
+  {
+    "name": "Dr. Sowjanya Yerra",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "محجر العين",
+    "department_en": "Orbit & Oculoplasty"
+  },
+  {
+    "name": "Dr. Shashidhar V S",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "أورام وجراحة محجر العين",
+    "department_en": "Orbit, Oculoplasty & Ocular Oncology"
+  },
+  {
+    "name": "Dr. Kaushik Murali",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "عيون أطفال",
+    "department_en": "Paediatric Ophthalmology"
+  },
+  {
+    "name": "Dr. Madhulika Ladha",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "عيون أطفال",
+    "department_en": "Paediatric Ophthalmology"
+  },
+  {
+    "name": "Dr. Nambula Srinivasa Rao",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "عيون أطفال",
+    "department_en": "Paediatric Ophthalmology"
+  },
+  {
+    "name": "Dr. Rajesh Prabu",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "عيون أطفال",
+    "department_en": "Paediatric Ophthalmology"
+  },
+  {
+    "name": "Dr. Vankireddi Mahathi",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "عيون أطفال",
+    "department_en": "Paediatric Ophthalmology"
+  },
+  {
+    "name": "Dr. Vidhya C",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "عيون أطفال",
+    "department_en": "Paediatric Ophthalmology"
+  },
+  {
+    "name": "Dr. Sowmya R",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "عيون أطفال وحول",
+    "department_en": "Paediatric Ophthalmology & Strabismus"
+  },
+  {
+    "name": "Dr. Mugundan M.S",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "شبكية",
+    "department_en": "Retinal Services"
+  },
+  {
+    "name": "Dr. Divyansh K Mishra",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "أورام عينية وشبكية",
+    "department_en": "VR Ocular Oncology & Vitreoretinal Services"
+  },
+  {
+    "name": "Dr. Mahesh Shanmugham P",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "أورام عينية وشبكية",
+    "department_en": "VR Ocular Oncology & Vitreoretinal Services"
+  },
+  {
+    "name": "Dr. Rajesh R.",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "أورام عينية وشبكية",
+    "department_en": "VR Ocular Oncology & Vitreoretinal Services"
+  },
+  {
+    "name": "Dr. Birva Dave",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "شبكية",
+    "department_en": "Vitreoretina"
+  },
+  {
+    "name": "Dr. Payal Naresh Shah",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "أورام عينية وشبكية",
+    "department_en": "Vitreoretina & Ocular Oncology"
+  },
+  {
+    "name": "Dr. Ashok Kanakamedala",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "شبكية",
+    "department_en": "Vitreoretinal Services"
+  },
+  {
+    "name": "Dr. M. Prabhu Shankar",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "شبكية",
+    "department_en": "Vitreoretinal Services"
+  },
+  {
+    "name": "Dr. Madhu Kumar R",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "شبكية",
+    "department_en": "Vitreoretinal Services"
+  },
+  {
+    "name": "Dr. V. Devi Priya",
+    "hospital": "Sankara Eye Hospital, Bengaluru",
+    "department_ar": "شبكية",
+    "department_en": "Vitreoretinal Services"
+  },
+  {
+    "name": "Dr. Rajalakshmi",
+    "hospital": "Trilife Hospital, Bangalore",
+    "department_ar": "تخدير",
+    "department_en": "Anaesthesia"
+  },
+  {
+    "name": "Dr. Tameem Ahmed",
+    "hospital": "Trilife Hospital, Bangalore",
+    "department_ar": "جراحة القلب",
+    "department_en": "Cardiac Surgery"
+  },
+  {
+    "name": "Dr. Aishwarya",
+    "hospital": "Trilife Hospital, Bangalore",
+    "department_ar": "أنف وأذن وحنجرة",
+    "department_en": "ENT"
+  },
+  {
+    "name": "Dr. Sharath G",
+    "hospital": "Trilife Hospital, Bangalore",
+    "department_ar": "أنف وأذن وحنجرة",
+    "department_en": "ENT"
+  },
+  {
+    "name": "Dr. Atif Ahmed",
+    "hospital": "Trilife Hospital, Bangalore",
+    "department_ar": "أمراض الجهاز الهضمي",
+    "department_en": "Gastroenterology"
+  },
+  {
+    "name": "Dr. Bhushan",
+    "hospital": "Trilife Hospital, Bangalore",
+    "department_ar": "جراحة عامة",
+    "department_en": "General Surgery"
+  },
+  {
+    "name": "Dr. Shamna Mahmood Abdulla",
+    "hospital": "Trilife Hospital, Bangalore",
+    "department_ar": "جراحة عامة",
+    "department_en": "General Surgery"
+  },
+  {
+    "name": "Dr. Aditya S Chowti",
+    "hospital": "Trilife Hospital, Bangalore",
+    "department_ar": "الطب الباطني",
+    "department_en": "Internal Medicine"
+  },
+  {
+    "name": "Dr. Raghavendra N",
+    "hospital": "Trilife Hospital, Bangalore",
+    "department_ar": "أمراض الكلى",
+    "department_en": "Nephrology"
+  },
+  {
+    "name": "Dr. H Santosh",
+    "hospital": "Trilife Hospital, Bangalore",
+    "department_ar": "طب الأعصاب",
+    "department_en": "Neurology"
+  },
+  {
+    "name": "Dr. Usha M R",
+    "hospital": "Trilife Hospital, Bangalore",
+    "department_ar": "نساء وولادة",
+    "department_en": "OBG (Gynaecology & Obstetrics)"
+  },
+  {
+    "name": "Dr. Prashanth R",
+    "hospital": "Trilife Hospital, Bangalore",
+    "department_ar": "جراحة العظام",
+    "department_en": "Orthopaedics"
+  },
+  {
+    "name": "Dr. Adarsh G",
+    "hospital": "Trilife Hospital, Bangalore",
+    "department_ar": "طب باطني",
+    "department_en": "Physician / Internal Medicine"
+  },
+  {
+    "name": "Dr. Raghavendra H",
+    "hospital": "Trilife Hospital, Bangalore",
+    "department_ar": "أمراض الروماتيزم",
+    "department_en": "Rheumatology"
+  },
+  {
+    "name": "Dr. Siddaling Ladde",
+    "hospital": "Trilife Hospital, Bangalore",
+    "department_ar": "جراحة المسالك البولية",
+    "department_en": "Urology"
+  },
+  {
+    "name": "اشوك",
+    "hospital": "Bhagwan Mahaveer Jain Hospital - Millers Road",
+    "department": "الأمراض الجلدية | Dermatology",
+    "subspecialty": "",
+    "added_by": "user",
+    "added_at": "2025-11-13 10:33:35"
+  },
+  {
+    "name": "Ashok",
+    "hospital": "Manipal Hospital - Yeshwanthpur",
+    "department": "علاج وإدارة الألم | Pain Management",
+    "subspecialty": "",
+    "added_by": "user",
+    "added_at": "2025-11-21 12:29:49"
+  }
+]
+
+
+
+
+
+

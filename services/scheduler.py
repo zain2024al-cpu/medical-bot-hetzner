@@ -1,0 +1,236 @@
+# services/scheduler.py
+"""
+Scheduler service (compatible with python-telegram-bot 20+).
+Uses APScheduler AsyncIOScheduler to schedule async tasks.
+"""
+
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.interval import IntervalTrigger
+import asyncio
+
+# مثال دالة مهمة مجدولة (غير مرتبطة بالـ bot مباشرة)
+async def _example_job():
+    # هنا تضع ما تريد تنفيذه مجدولاً (إرسال رسالة، تنظيف بيانات، ...)
+        print("Example scheduled job running...")
+
+# دالة تتبع الجدول اليومي
+async def _schedule_tracking_job():
+    """مهمة تتبع الجدول اليومي"""
+    try:
+        from services.schedule_tracker import schedule_tracker
+        
+        # تحديث عدد التقارير
+        await schedule_tracker.update_daily_reports_count()
+        
+        # فحص وإرسال التذكيرات
+        await schedule_tracker.check_and_send_reminders()
+        
+        # إرسال الملخص اليومي
+        await schedule_tracker.send_daily_summary_to_admin()
+        
+        print("Schedule tracking job completed.")
+        
+    except Exception as e:
+        print(f"Error in schedule tracking job: {e}")
+
+# دالة التقييم الشهري التلقائي
+async def _monthly_evaluation_job():
+    """مهمة التقييم الشهري التلقائي"""
+    try:
+        from services.evaluation_service import evaluation_service
+        from db.session import SessionLocal
+        from db.models import DailyReportTracking
+        from datetime import date
+        
+        # تشغيل في أول يوم من كل شهر
+        current_date = date.today()
+        if current_date.day == 1:
+            print("Starting monthly evaluation...")
+            
+            # جلب جميع المترجمين
+            with SessionLocal() as s:
+                translators = s.query(DailyReportTracking).distinct(DailyReportTracking.translator_name).all()
+                
+                for translator_record in translators:
+                    translator_name = translator_record.translator_name
+                    
+                    # توليد التقييم الشهري
+                    monthly_eval = evaluation_service.generate_monthly_evaluation(
+                        translator_name, 
+                        current_date.year, 
+                        current_date.month - 1  # الشهر السابق
+                    )
+                    
+                    if monthly_eval:
+                        print(f"Generated monthly evaluation for {translator_name}")
+            
+            print("Monthly evaluation completed.")
+        
+    except Exception as e:
+        print(f"Error in monthly evaluation job: {e}")
+
+# دالة فحص مواعيد العودة
+async def _followup_reminder_job(app):
+    """مهمة تنبيهات مواعيد العودة"""
+    try:
+        from services.followup_reminder import check_and_send_followup_reminders
+        
+        if app and hasattr(app, 'bot'):
+            await check_and_send_followup_reminders(app.bot)
+            print("Followup reminders sent successfully.")
+        
+    except Exception as e:
+        print(f"Error in followup reminder job: {e}")
+
+async def _translator_reminder_job(app):
+    """مهمة تنبيهات المترجمين"""
+    try:
+        from services.translator_reminders import check_and_send_reminders
+        if app and hasattr(app, 'bot'):
+            await check_and_send_reminders(app.bot)
+    except Exception as e:
+        print(f"Error in translator reminder: {e}")
+
+async def _daily_followups_job(app):
+    """مهمة استخراج ورفع المواعيد من تقارير اليوم"""
+    try:
+        from services.followup_appointments import extract_and_create_followups_from_today_reports
+        from config.settings import ADMIN_IDS
+        if app and hasattr(app, 'bot'):
+            await extract_and_create_followups_from_today_reports(app.bot, ADMIN_IDS)
+    except Exception as e:
+        print(f"Error in daily followups: {e}")
+
+async def _sqlite_quick_backup_job():
+    """مهمة النسخ الاحتياطي السريع كل 10 دقائق"""
+    try:
+        # محاولة النسخ الاحتياطي إلى Google Cloud Storage (إذا كان متاحاً)
+        try:
+            from services.sqlite_backup import get_backup_service
+            backup_service = get_backup_service()
+            backup_service.quick_backup()
+            print("SQLite quick backup to GCS completed.")
+        except Exception as gcs_error:
+            # Fallback: النسخ الاحتياطي المحلي (لـ Render)
+            print(f"GCS backup not available, using local backup: {gcs_error}")
+            from services.render_backup import create_local_backup
+            backup_path = create_local_backup()
+            if backup_path:
+                print(f"Local backup completed: {backup_path}")
+            else:
+                print("Local backup failed")
+    except Exception as e:
+        print(f"Error in quick backup: {e}")
+
+async def _sqlite_daily_backup_job():
+    """مهمة النسخ الاحتياطي اليومي"""
+    try:
+        # محاولة النسخ الاحتياطي إلى Google Cloud Storage (إذا كان متاحاً)
+        try:
+            from services.sqlite_backup import get_backup_service
+            backup_service = get_backup_service()
+            backup_service.backup_database(backup_type="daily")
+            print("SQLite daily backup to GCS completed.")
+        except Exception as gcs_error:
+            # Fallback: النسخ الاحتياطي المحلي (لـ Render)
+            print(f"GCS backup not available, using local backup: {gcs_error}")
+            from services.render_backup import create_local_backup
+            backup_path = create_local_backup()
+            if backup_path:
+                print(f"Local daily backup completed: {backup_path}")
+            else:
+                print("Local daily backup failed")
+    except Exception as e:
+        print(f"Error in daily backup: {e}")
+
+
+def start_scheduler(app=None):
+    """
+    ابدأ المجدول مع الميزات الجديدة
+    """
+    try:
+        scheduler = AsyncIOScheduler(timezone='UTC')
+        
+        from apscheduler.triggers.cron import CronTrigger
+        
+        if app:
+            # 1. تنبيهات مواعيد العودة (6:00 مساءً)
+            scheduler.add_job(
+                _followup_reminder_job,
+                trigger=CronTrigger(hour=18, minute=0, timezone='UTC'),
+                args=[app],
+                id='followup_reminder'
+            )
+            try:
+                print("✅ Followup reminder: 6:00 PM daily")
+            except UnicodeEncodeError:
+                print("[OK] Followup reminder: 6:00 PM daily")
+            
+            # 2. تنبيهات المترجمين (3 مرات يومياً)
+            scheduler.add_job(
+                _translator_reminder_job,
+                trigger=CronTrigger(hour=14, minute=0, timezone='UTC'),  # 2:00 PM
+                args=[app],
+                id='translator_reminder_1'
+            )
+            scheduler.add_job(
+                _translator_reminder_job,
+                trigger=CronTrigger(hour=16, minute=0, timezone='UTC'),  # 4:00 PM
+                args=[app],
+                id='translator_reminder_2'
+            )
+            scheduler.add_job(
+                _translator_reminder_job,
+                trigger=CronTrigger(hour=18, minute=0, timezone='UTC'),  # 6:00 PM
+                args=[app],
+                id='translator_reminder_3'
+            )
+            try:
+                print("✅ Translator reminders: 2 PM, 4 PM, 6 PM daily")
+            except UnicodeEncodeError:
+                print("[OK] Translator reminders: 2 PM, 4 PM, 6 PM daily")
+            
+            # 3. رفع مواعيد المرضى من تقارير اليوم (9:00 مساءً)
+            scheduler.add_job(
+                _daily_followups_job,
+                trigger=CronTrigger(hour=21, minute=0, timezone='UTC'),  # 9:00 PM
+                args=[app],
+                id='daily_followups'
+            )
+            try:
+                print("✅ Daily followups extraction: 9:00 PM daily")
+            except UnicodeEncodeError:
+                print("[OK] Daily followups extraction: 9:00 PM daily")
+        
+        # 4. النسخ الاحتياطي السريع كل 10 دقائق
+        scheduler.add_job(
+            _sqlite_quick_backup_job,
+            trigger=IntervalTrigger(minutes=10),
+            id='sqlite_quick_backup'
+        )
+        try:
+            print("✅ SQLite quick backup: Every 10 minutes")
+        except UnicodeEncodeError:
+            print("[OK] SQLite quick backup: Every 10 minutes")
+        
+        # 5. النسخ الاحتياطي اليومي عند الساعة 3 صباحاً
+        scheduler.add_job(
+            _sqlite_daily_backup_job,
+            trigger=CronTrigger(hour=3, minute=0, timezone='UTC'),  # 3:00 AM
+            id='sqlite_daily_backup'
+        )
+        try:
+            print("✅ SQLite daily backup: Daily at 3:00 AM")
+        except UnicodeEncodeError:
+            print("[OK] SQLite daily backup: Daily at 3:00 AM")
+        
+        # تعطيل المجدول الأخرى مؤقتاً
+        # scheduler.add_job(_example_job, trigger=IntervalTrigger(minutes=5))
+        # scheduler.add_job(_schedule_tracking_job, trigger=IntervalTrigger(minutes=1))
+        # scheduler.add_job(_monthly_evaluation_job, trigger=IntervalTrigger(days=1))
+        
+        scheduler.start()
+        print("Scheduler started successfully.")
+        
+    except Exception as e:
+        print("Failed to start scheduler:", e)

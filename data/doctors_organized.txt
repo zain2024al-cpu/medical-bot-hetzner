@@ -1,0 +1,3586 @@
+# ملف الاطباء المنظم
+# التنسيق: مستشفى > قسم > اطباء
+# تم الإنشاء: 2025-11-28 21:17:24
+
+================================================================================
+
+المستشفى 1. AIG Hospitals, Gachibowli Hyderabad
+--------------------------------------------------------------------------------
+
+  القسم 1. أمراض الأمعاء ومناظير | IBD & Endoscopy
+     (1 طبيب)
+     1. Dr. Rupa Banerjee
+
+
+  القسم 2. أمراض القلب | Cardiology
+     (1 طبيب)
+     1. Dr. R Prasada Reddy
+
+
+  القسم 3. أمراض وزراعة الكبد | Liver Sciences & Transplant Hepatology
+     (1 طبيب)
+     1. Dr. P Nagaraja Rao
+
+
+  القسم 4. الجراحة طفيفة التوغل والجهاز الهضمي | Surgical Gastroenterology & Minimally Invasive Surgery
+     (1 طبيب)
+     1. Dr. G. V. Rao
+
+
+  القسم 5. الجهاز الهضمي | Gastroenterology
+     (1 طبيب)
+     1. Dr. D Nageshwar Reddy
+
+
+  القسم 6. زراعة الكبد والجراحة الكبدية | Liver Transplant & Hepatobiliary Surgery
+     (1 طبيب)
+     1. Dr. P. Balachandran Menon
+
+
+  القسم 7. طب باطني | Internal Medicine
+     (1 طبيب)
+     1. Dr. Naveen Reddy Podduturi
+
+
+  القسم 8. فيزيولوجيا كهربائية القلب | Electrophysiology & Cardiology
+     (1 طبيب)
+     1. Dr. C Narasimhan
+
+
+  القسم 9. مناظير الجهاز الهضمي | Interventional Endoscopy
+     (1 طبيب)
+     1. Dr. Mohan Ramchandani
+
+
+  القسم 10. مناظير متقدمة | Endoscopy & EUS
+     (1 طبيب)
+     1. Dr. Sundeep Lakhtakia
+
+
+================================================================================
+
+المستشفى 2. Apollo Hospital, Bannerghatta Bangalore
+--------------------------------------------------------------------------------
+
+  القسم 1. أمراض الدم وأورام الأطفال | Haematology & Paediatric Oncology
+     (1 طبيب)
+     1. Dr. Neema Bhat
+
+
+  القسم 2. أمراض الرئة | Pulmonology
+     (3 طبيب)
+     1. Dr. Hariprasad
+     2. Dr. Ravindra Mehta
+     3. Dr. Sumanth Mantri
+
+
+  القسم 3. أمراض الروماتيزم | Rheumatology
+     (1 طبيب)
+     1. Dr. Roopa Tekkatte
+
+
+  القسم 4. أمراض القلب | Cardiology
+     (6 طبيب)
+     1. Dr. Abhijit Vilas Kulkarni
+     2. Dr. B. Ramesh
+     3. Dr. Girish B Navasundhi
+     4. Dr. K.B. Prasad
+     5. Dr. Lakshimikant
+     6. Dr. Vittal Bhagi
+
+
+  القسم 5. أمراض الكبد | Hepatology
+     (1 طبيب)
+     1. Dr. Sandeep Satsangi
+
+
+  القسم 6. أمراض الكلى | Nephrology
+     (2 طبيب)
+     1. Dr. Gokulnath
+     2. Dr. Vinod Kumar
+
+
+  القسم 7. أمراض النساء | Gynaecology
+     (4 طبيب)
+     1. Dr. Chitra Ramamurthy
+     2. Dr. Harshitha Ramamurthy
+     3. Dr. Preethi Prabhakar Shetty
+     4. Dr. Sunitha Shreedhar
+
+
+  القسم 8. أمراض معدية | Infectious Disease
+     (1 طبيب)
+     1. Dr. Vinay D
+
+
+  القسم 9. أنف وأذن وحنجرة | ENT
+     (5 طبيب)
+     1. Dr. Aanchal A Mittal
+     2. Dr. Nagamani
+     3. Dr. Pradeep Hosamani
+     4. Dr. Sumit Kumar Gaur
+     5. Dr. Sunil Narayan Dutt
+
+
+  القسم 10. أورام الثدي | Breast Oncology
+     (2 طبيب)
+     1. Dr. Jayanthi Thumsi
+     2. Dr. Linu Jacob
+
+
+  القسم 11. أورام المسالك البولية | Uro Oncology
+     (2 طبيب)
+     1. Dr. Manohar T
+     2. Dr. Ravi Chandran K
+
+
+  القسم 12. أورام طبية | Medical Oncology
+     (4 طبيب)
+     1. Dr. Kiran Kumar Sajjan Shetty
+     2. Dr. Poonam Maurya
+     3. Dr. Vijay Agarwal
+     4. Dr. Vishwanath S
+
+
+  القسم 13. أورام عظام | Orthopaedic Oncology
+     (1 طبيب)
+     1. Dr. Srimanth B S
+
+
+  القسم 14. أورام نسائية | Gynaecological Cancer
+     (1 طبيب)
+     1. Dr. Rani A Bhat
+
+
+  القسم 15. الغدد الصماء | Endocrinology
+     (2 طبيب)
+     1. Dr. Dwarkanath
+     2. Dr. Suyadevara Varun
+
+
+  القسم 16. الغدد الصماء للأطفال | Paediatric Endocrinology
+     (1 طبيب)
+     1. Dr. Anjana Hulse
+
+
+  القسم 17. تصوير الأورام | Onco Imaging
+     (4 طبيب)
+     1. Dr. Govindarajan M J
+     2. Dr. Murthy S
+     3. Dr. Savith Kumar
+     4. Dr. Swarna Shivakumar
+
+
+  القسم 18. جراحة الأطفال | Paediatric Surgeon
+     (1 طبيب)
+     1. Dr. Anand Alladi
+
+
+  القسم 19. جراحة الأطفال | Paediatric Surgery
+     (1 طبيب)
+     1. Dr. Chitra Ramu
+
+
+  القسم 20. جراحة الأورام | Surgical Oncology
+     (2 طبيب)
+     1. Dr. Anil Kamat
+     2. Dr. Sunil Navalgund
+
+
+  القسم 21. جراحة الأوعية الدموية | Vascular Surgery
+     (1 طبيب)
+     1. Dr. Sundar Narasimhan
+
+
+  القسم 22. جراحة الرأس والرقبة | Head & Neck Cancer
+     (2 طبيب)
+     1. Dr. Krishnamurthy
+     2. Dr. Satish Nair
+
+
+  القسم 23. جراحة الرأس والرقبة | Head & Neck Oncology
+     (1 طبيب)
+     1. Dr. P Subramanya Rao
+
+
+  القسم 24. جراحة العظام | Orthopaedic
+     (9 طبيب)
+     1. Dr. Adarsh
+     2. Dr. Ajith Prabhu
+     3. Dr. Manish Samson
+     4. Dr. Pradeep Kochheppan
+     5. Dr. Rajshekar K T
+     6. Dr. Raviraj A
+     7. Dr. Shashikumar H.K
+     8. Dr. Vidya Sagar
+     9. Dr. Vivek Kumar
+
+
+  القسم 25. جراحة القلب | Cardiac Surgery
+     (1 طبيب)
+     1. Dr. Sathyaki P Nambala
+
+
+  القسم 26. جراحة القلب والصدر والأوعية | CTVS
+     (1 طبيب)
+     1. Dr. Satyaki Nambyala
+
+
+  القسم 27. جراحة المخ والأعصاب | Neurosurgery
+     (3 طبيب)
+     1. Dr. Kumbhar Kartik Revanappa
+     2. Dr. Sachin G
+     3. Dr. Satish Satyanarayan
+
+
+  القسم 28. جراحة عامة | General Surgery
+     (7 طبيب)
+     1. Dr. Dinesh Kumar
+     2. Dr. Gautham
+     3. Dr. Kiran KJ
+     4. Dr. Prashanth C
+     5. Dr. Ravishankar Bhat
+     6. Dr. Satyajit Godhi
+     7. Dr. Saurabh Mishra
+
+
+  القسم 29. جلدية | Dermatology
+     (4 طبيب)
+     1. Dr. Ashwini Shetty
+     2. Dr. Girish Panth
+     3. Dr. Surendra V H
+     4. Dr. Vanita Mathew
+
+
+  القسم 30. جهاز هضمي | Gastroenterology
+     (3 طبيب)
+     1. Dr. Dinesh Kini
+     2. Dr. Prasanna K.S
+     3. Dr. Vijay Kumar
+
+
+  القسم 31. حديثي الولادة | Neonatology
+     (2 طبيب)
+     1. Dr. Arpana Bansal
+     2. Dr. Prashanth Urs
+
+
+  القسم 32. زراعة الكبد | Liver Transplant
+     (3 طبيب)
+     1. Dr. Jayath Reddy
+     2. Dr. Sanjay Govil
+     3. Dr. Suresh Ragavaiah
+
+
+  القسم 33. سرطان القولون والمستقيم | Colon & Rectal Cancer
+     (1 طبيب)
+     1. Dr. Narasimhaiah Srinivasaiah
+
+
+  القسم 34. طب أطفال | Paediatrics
+     (5 طبيب)
+     1. Dr. Poonam Shetty
+     2. Dr. Radhakrisha Hegde
+     3. Dr. Raghavan P.S
+     4. Dr. Shwetha S Rao
+     5. Dr. Sowmya C.C
+
+
+  القسم 35. طب الأعصاب | Neurology
+     (3 طبيب)
+     1. Dr. Gurucharan Adhoor
+     2. Dr. Suryanarayana Sharma P M
+     3. Dr. Vikram Kamath
+
+
+  القسم 36. طب العيون | Ophthalmology
+     (1 طبيب)
+     1. Dr. Shalini Shetty
+
+
+  القسم 37. طب باطني | Geriatric Internal Medicine
+     (2 طبيب)
+     1. Dr. Aarathi Kannan
+     2. Dr. Steve Paul Manjaly
+
+
+  القسم 38. طب باطني | Internal Medicine
+     (8 طبيب)
+     1. Dr. Hina Mehara
+     2. Dr. Jyotsna Krishnappa
+     3. Dr. Kalpana Janardhan
+     4. Dr. Malla Reddy
+     5. Dr. Rajeeva Mogar
+     6. Dr. Ramesh B.S
+     7. Dr. Raza Shah
+     8. Dr. Swarna Das
+
+
+  القسم 39. طب نفسي | Psychiatry
+     (3 طبيب)
+     1. Dr. Roshan Jain
+     2. Dr. Shobha Krishna
+     3. Dr. Srinivas Reddy
+
+
+  القسم 40. عظام الأطفال | Paediatric Ortho
+     (1 طبيب)
+     1. Dr. Manohar Babu
+
+
+  القسم 41. علاج الأورام بالإشعاع | Radiation Oncology
+     (7 طبيب)
+     1. Dr. B K M Reddy
+     2. Dr. Kumara Swamy
+     3. Dr. Natarajan V
+     4. Dr. Sridhar P S
+     5. Dr. Vijay Bhaskar L
+     6. Dr. Vikram Maiya M
+     7. Dr. Vinay Ural
+
+
+  القسم 42. علم النفس | Clinical Psychology
+     (1 طبيب)
+     1. Dr. Sugami Ramesh
+
+
+================================================================================
+
+المستشفى 3. Artemis Hospital, Delhi
+--------------------------------------------------------------------------------
+
+  القسم 1. أشعة | Radiology
+     (5 طبيب)
+     1. Dr. Aditi Dixit
+     2. Dr. Gurpreet Makkar
+     3. Dr. Rajiv Sharma
+     4. Dr. Sanjay Mehta
+     5. Dr. Syed Tauqueer Fazal
+
+
+  القسم 2. أطفال الأنابيب | IVF & Reproductive Medicine
+     (3 طبيب)
+     1. Dr. Kiran Arora
+     2. Dr. Parul Prakash
+     3. Dr. Sarabpreet Singh
+
+
+  القسم 3. أمراض الدم و BMT | Hematology & BMT
+     (1 طبيب)
+     1. Dr. Lalit Kumar
+
+
+  القسم 4. أمراض الدم وBMT | Hematology & BMT
+     (1 طبيب)
+     1. Dr. Rahul Naithani
+
+
+  القسم 5. أمراض الدم وروماتيزم الأطفال | Paediatric Haemato-Oncology & Rheumatology
+     (1 طبيب)
+     1. Dr. Anju Singh
+
+
+  القسم 6. أمراض الدم وزراعة نخاع | Hematology & BMT
+     (1 طبيب)
+     1. Dr. Gaurav Dixit
+
+
+  القسم 7. أمراض الدم وزراعة نخاع للأطفال | Paediatric Haemato-Oncology & BMT
+     (1 طبيب)
+     1. Dr. Sukriti Gupta
+
+
+  القسم 8. أمراض الصدر | Pulmonology
+     (2 طبيب)
+     1. Dr. Arun Chowdary Kotaru
+     2. Dr. Shweta Bansal
+
+
+  القسم 9. أمراض القلب | Cardiology
+     (3 طبيب)
+     1. Dr. (Col) Balbir Kalra
+     2. Dr. D.K. Jhamb
+     3. Dr. Rahul Mehrotra
+
+
+  القسم 10. أمراض القلب التداخلية | Interventional Cardiology
+     (1 طبيب)
+     1. Dr. Kuldeep Arora
+
+
+  القسم 11. أمراض القلب التداخلية | Interventional Cardiology & Structural Heart
+     (1 طبيب)
+     1. Dr. Amit Kumar Chaurasia
+
+
+  القسم 12. أمراض الكلى | Nephrology
+     (1 طبيب)
+     1. Dr. Dinesh Bansal
+
+
+  القسم 13. أنف وأذن وحنجرة | ENT
+     (1 طبيب)
+     1. Dr. Trisha Srivastava
+
+
+  القسم 14. أنف وأذن وحنجرة | ENT Surgery
+     (3 طبيب)
+     1. Dr. Dilpreet Bajwa
+     2. Dr. Poonam Gautam
+     3. Dr. Shashidhar TB
+
+
+  القسم 15. أورام | Oncology
+     (6 طبيب)
+     1. Dr. Preeti Vijayakumaran
+     2. Dr. Priya Tiwari
+     3. Dr. Priyanka Raina
+     4. Dr. S Jayalakshmi
+     5. Dr. Sandeep Goel
+     6. Dr. Subodh Chandra Pande
+
+
+  القسم 16. أورام النساء | Gynaecological Oncology
+     (1 طبيب)
+     1. Dr. Amita Naithani
+
+
+  القسم 17. أورام روبوتية | Robotic Oncology Surgery
+     (1 طبيب)
+     1. Dr. Tapan Singh Chauhan
+
+
+  القسم 18. أورام نسائية | Gynaecological Oncology
+     (1 طبيب)
+     1. Dr. Rupinder Sekhon
+
+
+  القسم 19. استبدال مفاصل | Hip & Knee Arthroplasty
+     (1 طبيب)
+     1. Dr. Gajanand Yadav
+
+
+  القسم 20. الأورام | Oncology
+     (2 طبيب)
+     1. Dr. Biswajyoti Hazarika
+     2. Dr. Kamal Verma
+
+
+  القسم 21. الجراحة الروبوتية والمسالك | Robotic Surgery & Urology
+     (1 طبيب)
+     1. Dr. Ankit Goel
+
+
+  القسم 22. الجهاز الهضمي | Gastroenterology / GI Surgery
+     (2 طبيب)
+     1. Dr. Bimal Kumar Sahu
+     2. Dr. M.A Mir
+
+
+  القسم 23. الصحة النفسية | Mental Health
+     (2 طبيب)
+     1. Dr. Puneet Dwevedi
+     2. Dr. Rahul Chandhok
+
+
+  القسم 24. الصحة النفسية | Mental Health & Behavioural Sciences
+     (1 طبيب)
+     1. Dr. Chandrima Misra Mukherjee
+
+
+  القسم 25. الطوارئ | Emergency & Trauma
+     (1 طبيب)
+     1. Dr. Rajesh Kumar Singh
+
+
+  القسم 26. الطوارئ | Emergency & Trauma Services
+     (4 طبيب)
+     1. Dr. (Col) Suvasish Chakraberty
+     2. Dr. Anjana Kharbanda
+     3. Dr. Ellora Nanda
+     4. Dr. Yatin Kukreja
+
+
+  القسم 27. العلاج الطبيعي وإعادة التأهيل | Physiotherapy & Rehabilitation
+     (1 طبيب)
+     1. Dr. Anjali Vaish
+
+
+  القسم 28. العناية المركزة | ICU / Critical Care
+     (3 طبيب)
+     1. Dr. Jeetendra Sharma
+     2. Dr. Kuldeep Singh
+     3. Dr. Mukesh Kumar Gupta
+
+
+  القسم 29. العناية المركزة العصبية | Neuro Critical Care
+     (1 طبيب)
+     1. Dr. Deepak Solanki
+
+
+  القسم 30. العناية المركزة العصبية | Neuroanaesthesia & Neuro Critical Care
+     (1 طبيب)
+     1. Dr. Ashish Chakravarty
+
+
+  القسم 31. الوراثة | Genetics
+     (1 طبيب)
+     1. Dr. Kanika Singh
+
+
+  القسم 32. تخدير | Anaesthesia
+     (9 طبيب)
+     1. Dr. Amit Jassal
+     2. Dr. Amit Kalsotra
+     3. Dr. G. Arya Prakash
+     4. Dr. Narender Kumar
+     5. Dr. Rajesh Misra
+     6. Dr. Shelly Mittal
+     7. Dr. Swati Aggarwal
+     8. Dr. Vijay Mohan Hanjoora
+     9. Dr. Y Naveen
+
+
+  القسم 33. تغذية علاجية | Nutrition & Dietetics
+     (1 طبيب)
+     1. Dr. Shabana Parveen
+
+
+  القسم 34. جراحة أطفال وعمود فقري | Paediatric Orthopaedics & Spine Surgery
+     (1 طبيب)
+     1. Dr. Sanjay Sarup
+
+
+  القسم 35. جراحة أورام | Oncology Surgery
+     (1 طبيب)
+     1. Dr. Parveen Yadav
+
+
+  القسم 36. جراحة أوعية وقلب | Cardiothoracic & Vascular Surgery
+     (1 طبيب)
+     1. Dr. Surendra Nath Khanna
+
+
+  القسم 37. جراحة الأطفال | Paediatric Surgery
+     (1 طبيب)
+     1. Dr. Nitin Goel
+
+
+  القسم 38. جراحة الأعصاب التداخلية | Neurointerventional Surgery
+     (1 طبيب)
+     1. Dr. Mukesh Kumar
+
+
+  القسم 39. جراحة الثدي | Breast Surgery / Oncology
+     (1 طبيب)
+     1. Dr. Deepak Jha
+
+
+  القسم 40. جراحة العظام | Orthopaedics
+     (6 طبيب)
+     1. Dr. (Prof.) Ravi Sauhta
+     2. Dr. Devendra Singh Solanki
+     3. Dr. Devendra Yadav
+     4. Dr. Mohd Irfan Banday
+     5. Dr. Vipin Maheshwari
+     6. Dr. Vivek Vaibhav
+
+
+  القسم 41. جراحة العمود الفقري | Spine Neurosurgery
+     (1 طبيب)
+     1. Dr. SK Rajan
+
+
+  القسم 42. جراحة العمود الفقري | Spine Surgery
+     (2 طبيب)
+     1. Dr. Sumit Kumar
+     2. Dr. Varun Khanna
+
+
+  القسم 43. جراحة العمود الفقري | Spine Surgery / Orthopaedics
+     (1 طبيب)
+     1. Dr. Dheeraj Batheja
+
+
+  القسم 44. جراحة العمود الفقري | Spine Surgery / Scoliosis
+     (1 طبيب)
+     1. Dr. Hitesh Garg
+
+
+  القسم 45. جراحة المخ والأعصاب | Neurosurgery
+     (4 طبيب)
+     1. Dr. Aditya Gupta
+     2. Dr. Anuvrat Sinha
+     3. Dr. Pawan Goyal
+     4. Dr. Sanjeev Srivastava
+
+
+  القسم 46. جراحة المسالك البولية | Urology
+     (2 طبيب)
+     1. Dr. (Col) S. V. Kotwal
+     2. Dr. Piyush Gupta
+
+
+  القسم 47. جراحة تجميل | Cosmetic & Plastic Surgery
+     (2 طبيب)
+     1. Dr. Ankur Bhatia
+     2. Dr. Pradeep Kumar Singh
+
+
+  القسم 48. جراحة روبوتية للعظام | Robotic Orthopaedic Surgery
+     (2 طبيب)
+     1. Dr. I P S Oberoi
+     2. Dr. Ramkinkar Jha
+
+
+  القسم 49. جراحة روبوتية ومسالك | Robotic Urology
+     (1 طبيب)
+     1. Dr. Rajiv Yadav
+
+
+  القسم 50. جراحة عامة ومناظير | General & Minimally Invasive Surgery
+     (1 طبيب)
+     1. Dr. Hitender Singh Chauhan
+
+
+  القسم 51. جراحة عامة ومناظير | Minimally Invasive Surgery
+     (1 طبيب)
+     1. Dr. Paritosh S Gupta
+
+
+  القسم 52. جراحة عامة ومناظير وروبوت | Minimally Invasive & Robotic Surgery
+     (1 طبيب)
+     1. Dr. Manjul Bawa
+
+
+  القسم 53. جراحة عصبية تداخلية | Neurointerventional Surgery
+     (1 طبيب)
+     1. Dr. Tariq Matin
+
+
+  القسم 54. جراحة عظام | Orthopaedics
+     (1 طبيب)
+     1. Dr. Sandeep Chauhan
+
+
+  القسم 55. جراحة مناظير | Minimally Invasive Surgery
+     (2 طبيب)
+     1. Dr. Rakesh Durkhure
+     2. Dr. Suresh Kumar Chhabra
+
+
+  القسم 56. جلدية وتجميل | Dermatology & Cosmetology
+     (3 طبيب)
+     1. Dr. Monica Bambroo
+     2. Dr. Noor Sharma
+     3. Dr. Shifa Yadav
+
+
+  القسم 57. جهاز هضمي أطفال | Paediatric Gastroenterology & Hepatology
+     (1 طبيب)
+     1. Dr. Sakshi Karkra
+
+
+  القسم 58. روماتيزم ومناعة | Rheumatology & Clinical Immunology
+     (1 طبيب)
+     1. Dr. Sumeet Agrawal
+
+
+  القسم 59. زراعة الأعضاء والمسالك | Organ Transplant & Urology
+     (1 طبيب)
+     1. Dr. Abhinandan Mukhopadhyay
+
+
+  القسم 60. زراعة القلب والرئة | Heart & Lung Transplant
+     (1 طبيب)
+     1. Dr. Biswarup Purkayastha
+
+
+  القسم 61. زراعة الكبد | Liver Transplant
+     (2 طبيب)
+     1. Dr. Giriraj Bora
+     2. Dr. Shyam Sunder Mahansaria
+
+
+  القسم 62. زراعة الكلى | Kidney Transplant & Nephrology
+     (3 طبيب)
+     1. Dr. Gaurav Singhal
+     2. Dr. Lakshmi Kant Tripathi
+     3. Dr. Manju Aggarwal
+
+
+  القسم 63. زراعة الكلى والمسالك | Kidney Transplant & Urology
+     (2 طبيب)
+     1. Dr. Kunal Vinayak
+     2. Dr. Varun Mittal
+
+
+  القسم 64. سكري وغدد | Endocrinology
+     (1 طبيب)
+     1. Dr. Dheeraj Kapoor
+
+
+  القسم 65. طب أطفال | Paediatrics
+     (4 طبيب)
+     1. Dr. Hemant K. Gogia
+     2. Dr. Padam Yadav
+     3. Dr. Prabhat Maheshwari
+     4. Dr. Rajiv Chhabra
+
+
+  القسم 66. طب أعصاب الأطفال | Paediatric Neurology
+     (1 طبيب)
+     1. Dr. Ajit Singh Baghela
+
+
+  القسم 67. طب الأجنة والوراثة | Fetal Medicine & Genetics
+     (1 طبيب)
+     1. Dr. Ashutosh Gupta
+
+
+  القسم 68. طب الأسنان | Dentistry
+     (1 طبيب)
+     1. Dr. Anjana Satyajit
+
+
+  القسم 69. طب الأعصاب | Neurology
+     (4 طبيب)
+     1. Dr. Mohit Anand
+     2. Dr. Sameer Arora
+     3. Dr. Sumit Singh
+     4. Dr. Vivek Barun
+
+
+  القسم 70. طب الألم | Pain Medicine & Palliative Care
+     (1 طبيب)
+     1. Dr. Ashu Kumar Jain
+
+
+  القسم 71. طب الشيخوخة | Geriatric Medicine
+     (2 طبيب)
+     1. Dr. Meenal Thakral
+     2. Dr. Prasun Chatterjee
+
+
+  القسم 72. طب العيون | Ophthalmology
+     (1 طبيب)
+     1. Dr. Vishal Arora
+
+
+  القسم 73. طب المختبرات | Laboratory Medicine
+     (4 طبيب)
+     1. Dr. Deepa Goel
+     2. Dr. Namita Jaggi
+     3. Dr. Nandini Vasdev
+     4. Dr. Ritika Singla
+
+
+  القسم 74. طب المختبرات | Laboratory Services
+     (1 طبيب)
+     1. Dr. Vineeta Raina
+
+
+  القسم 75. طب باطني | Internal Medicine
+     (3 طبيب)
+     1. Dr. Arpit Jain
+     2. Dr. P Venkata Krishnan
+     3. Dr. Seema Dhir
+
+
+  القسم 76. طب نقل الدم | Blood Centre & Transfusion Medicine
+     (1 طبيب)
+     1. Dr. (Brig.) Anil Khetarpal
+
+
+  القسم 77. طب نووي | Nuclear Medicine
+     (2 طبيب)
+     1. Dr. Noaline Sinha
+     2. Dr. Tajamul Syed Malik
+
+
+  القسم 78. علاج طبيعي | Physiotherapy & Rehab
+     (1 طبيب)
+     1. Dr. Sachin Sethi
+
+
+  القسم 79. عناية مركزة | ICU / Critical Care
+     (2 طبيب)
+     1. Dr. Rati Bansal Goel
+     2. Dr. Reshma Tewari
+
+
+  القسم 80. عناية مركزة عصبية | Neuro Critical Care
+     (4 طبيب)
+     1. Dr. Raman Deep Kaur
+     2. Dr. Saurabh Anand
+     3. Dr. Seema Lachala
+     4. Dr. Sweetha Susanne Mohan
+
+
+  القسم 81. غدد أطفال ومراهقين | Paediatric Endocrinology
+     (1 طبيب)
+     1. Dr. Sumeet Arora
+
+
+  القسم 82. غدد نسائية | Gynaecological Endocrinology
+     (1 طبيب)
+     1. Dr. Nutan Agarwal
+
+
+  القسم 83. قلب أطفال | Paediatric Cardiology
+     (2 طبيب)
+     1. Dr. Nidhi Rawal
+     2. Dr. Shubhra Shri Gupta
+
+
+  القسم 84. قلب أطفال وجراحة قلب | Paediatric Cardiac Surgery & Cardiology
+     (1 طبيب)
+     1. Dr. Aseem R. Srivastava
+
+
+  القسم 85. قلب تداخلي | Interventional Cardiology
+     (1 طبيب)
+     1. Dr. Sushant Mishra
+
+
+  القسم 86. كهروفسيولوجيا القلب | Electrophysiology & Interventional Cardiology
+     (1 طبيب)
+     1. Dr. Sameer Mehrotra
+
+
+  القسم 87. نساء وولادة | Obstetrics & Gynaecology
+     (5 طبيب)
+     1. Dr. Deepa Maheshwari
+     2. Dr. Nidhi Jain
+     3. Dr. Nidhi Rajotia
+     4. Dr. Renu Raina Sehgal
+     5. Dr. Seerat Sandhu
+
+
+================================================================================
+
+المستشفى 4. Aster CMI Hospital, Bangalore
+--------------------------------------------------------------------------------
+
+  القسم 1. أطفال الأنابيب وأمراض النساء | Fertility, IVF & Obstetrics
+     (1 طبيب)
+     1. Dr. Prakrutha S
+
+
+  القسم 2. أطفال وحديثي الولادة | Paediatrics & Neonatology
+     (3 طبيب)
+     1. Dr. Parimala V Thirumalesh
+     2. Dr. Raghuram CP
+     3. Dr. Stalin Ramprakash
+
+
+  القسم 3. أطفال وحديثي الولادة وأمراض الأعصاب للأطفال | Paediatrics, Neonatology & NeuKIDS
+     (1 طبيب)
+     1. Dr. Ravi Kumar C P
+
+
+  القسم 4. أمراض الدم والأورام وزراعة نخاع العظم | Haematology, Haemato Oncology & BMT
+     (1 طبيب)
+     1. Dr. Anoop P
+
+
+  القسم 5. أمراض القلب | Cardiology
+     (3 طبيب)
+     1. Dr. Madhusudan Raikar
+     2. Dr. Nagamalesh U M
+     3. Dr. Sanjay Bhat
+
+
+  القسم 6. أمراض الكلى | Nephrology
+     (1 طبيب)
+     1. Dr. Veerabhadra Guptha K
+
+
+  القسم 7. أمراض النساء والولادة | Obstetrics & Gynaecology
+     (4 طبيب)
+     1. Dr. Bhavani Stalin
+     2. Dr. Chetana V
+     3. Dr. Soumya Lakshmi T V
+     4. Dr. Varsha Desai Kale
+
+
+  القسم 8. أورام الرأس والرقبة | Head & Neck Oncology
+     (1 طبيب)
+     1. Dr. Girish S. Shetkar
+
+
+  القسم 9. الأشعة التداخلية | Clinical Imaging & Interventional Radiology
+     (1 طبيب)
+     1. Dr. Sudhir Kumar Kale
+
+
+  القسم 10. الأمراض الجلدية | Dermatology
+     (1 طبيب)
+     1. Dr. Shireen Furtado
+
+
+  القسم 11. الجراحة العامة وجراحة الجهاز الهضمي | General & Surgical Gastroenterology
+     (1 طبيب)
+     1. Dr. Puneeth Thalasta
+
+
+  القسم 12. الطب النووي | Nuclear Medicine
+     (1 طبيب)
+     1. Dr. Mythri Shankar
+
+
+  القسم 13. جراحة الأورام | Surgical Oncology
+     (3 طبيب)
+     1. Dr. Ashwin K R
+     2. Dr. Somashekhar S P
+     3. Dr. Vijay K Ahuja
+
+
+  القسم 14. جراحة الأورام ورأس الرقبة | Surgical & Head & Neck Oncology
+     (1 طبيب)
+     1. Dr. Rohit Kumar C
+
+
+  القسم 15. جراحة القلب | Cardiac Surgery
+     (3 طبيب)
+     1. Dr. Arul Dominic Furtado
+     2. Dr. Ganeshakrishnan Iyer
+     3. Dr. Prashanth Y M
+
+
+  القسم 16. جراحة المخ والأعصاب | Neuro Surgery
+     (3 طبيب)
+     1. Dr. Nirmala S
+     2. Dr. Ravi Gopal Varma
+     3. Dr. Santhosh N U
+
+
+  القسم 17. جراحة المخ والأعصاب والعمود الفقري | Neuro & Spine Surgery
+     (2 طبيب)
+     1. Dr. Akshay Hari
+     2. Dr. Deepak B S
+
+
+  القسم 18. جراحة المسالك البولية | Urology
+     (3 طبيب)
+     1. Dr. Avinash T S
+     2. Dr. Giriraja Velayutham
+     3. Dr. Shashank M S
+
+
+  القسم 19. جراحة عامة | General Surgery & Allied Specialities
+     (1 طبيب)
+     1. Dr. Santosh MP
+
+
+  القسم 20. روماتيزم الأطفال والمناعة | Paediatric Rheumatology & Immunology
+     (1 طبيب)
+     1. Dr. Sagar Bhattad
+
+
+  القسم 21. زراعة الكبد | Integrated Liver Care, Liver Transplant
+     (1 طبيب)
+     1. Dr. Sonal Asthana
+
+
+  القسم 22. طب الأطفال وحديثي الولادة | Paediatrics & Neonatology
+     (1 طبيب)
+     1. Dr. Chetan Ginigeri
+
+
+  القسم 23. طب الأعصاب | Neurology
+     (3 طبيب)
+     1. Dr. Anuradha H K
+     2. Dr. Lokesh B
+     3. Dr. Nikhil C. Hiremath
+
+
+  القسم 24. طب الأعصاب والصرع | Neurology & Epilepsy Centre
+     (1 طبيب)
+     1. Dr. Keni Ravish Rajiv
+
+
+================================================================================
+
+المستشفى 5. Aster RV Hospital, Bangalore
+--------------------------------------------------------------------------------
+
+  القسم 1. أمراض الدم والأورام وزراعة نخاع العظم | Haematology, Haemato Oncology & BMT
+     (1 طبيب)
+     1. Dr. Anoop P
+
+
+  القسم 2. أمراض الصدر | Pulmonology
+     (1 طبيب)
+     1. Dr. Sandeep Attawar
+
+
+  القسم 3. أمراض القلب | Cardiology
+     (2 طبيب)
+     1. Dr. Shyam Sunder K R
+     2. Prof. Dr. Nagamalesh U M
+
+
+  القسم 4. أمراض الكلى | Nephrology
+     (2 طبيب)
+     1. Dr. Harsha Kumar H N
+     2. Dr. Veerabhadra Guptha K
+
+
+  القسم 5. الأشعة التداخلية | Clinical Imaging & Interventional Radiology
+     (3 طبيب)
+     1. Dr. Amogh V N
+     2. Dr. Ravindra B Kamble
+     3. Dr. Sudhakar Banakar
+
+
+  القسم 6. الأنف والأذن والحنجرة وزراعة السماعات | ENT & Hearing Implantology
+     (1 طبيب)
+     1. Dr. Vijaya Bhaskar S M
+
+
+  القسم 7. الطب الفيزيائي وإعادة التأهيل | Physical Medicine & Rehabilitation
+     (1 طبيب)
+     1. Dr. Loganathan Venkatachalam
+
+
+  القسم 8. الطب النفسي | Psychiatry & Counselling Services
+     (1 طبيب)
+     1. Dr. Murali Krishna
+
+
+  القسم 9. الغدد الصماء والسكري | Endocrinology & Diabetology
+     (1 طبيب)
+     1. Dr. S Satish Kumar
+
+
+  القسم 10. جراحة الأورام | Surgical Oncology
+     (1 طبيب)
+     1. Dr. Somashekhar S P
+
+
+  القسم 11. جراحة الأورام ورأس الرقبة | Surgical Oncology, Head & Neck Oncology
+     (1 طبيب)
+     1. Dr. Rohit Kumar C
+
+
+  القسم 12. جراحة العظام | Orthopaedics
+     (1 طبيب)
+     1. Dr. J V Srinivas
+
+
+  القسم 13. جراحة القلب | Cardiac Surgery
+     (2 طبيب)
+     1. Dr. Divakar Bhat
+     2. Dr. Ganesh Krishnan Iyer
+
+
+  القسم 14. جراحة المخ والأعصاب | Neuro Surgery
+     (2 طبيب)
+     1. Dr. Dhananjaya I Bhat
+     2. Dr. Ravi Gopal Varma
+
+
+  القسم 15. جراحة المسالك البولية | Urology
+     (2 طبيب)
+     1. Dr. Caranj S Venugopal
+     2. Dr. Santhosh Bethur
+
+
+  القسم 16. جراحة عامة وجراحة الجهاز الهضمي | General & GI Surgery
+     (2 طبيب)
+     1. Dr. Ajay Kumar A V
+     2. Dr. Satyajit Godhi
+
+
+  القسم 17. رعاية الكبد وزراعة الكبد | Integrated Liver Care
+     (1 طبيب)
+     1. Dr. Sonal Asthana
+
+
+  القسم 18. روماتيزم الأطفال والمناعة | Paediatric Rheumatology & Immunology
+     (1 طبيب)
+     1. Dr. Sagar Bhattad
+
+
+  القسم 19. طب الأطفال وحديثي الولادة | Paediatrics & Neonatology
+     (3 طبيب)
+     1. Dr. Chetan Ginigeri
+     2. Dr. Raghuram CP
+     3. Dr. Stalin Ramprakash
+
+
+  القسم 20. طب الأعصاب | Neurology
+     (2 طبيب)
+     1. Dr. B K Madhusudhan
+     2. Dr. Shakthi K J S
+
+
+  القسم 21. طب الجهاز الهضمي | Gastro Science
+     (2 طبيب)
+     1. Dr. Girish P. Veeranna
+     2. Dr. Madhu M P
+
+
+  القسم 22. طب العيون | Ophthalmology
+     (1 طبيب)
+     1. Dr. Jayashree K Bhat
+
+
+================================================================================
+
+المستشفى 6. Aster Whitefield Hospital, Bangalore
+--------------------------------------------------------------------------------
+
+  القسم 1. أطفال الأنابيب | IVF & Reproductive Medicine
+     (1 طبيب)
+     1. Dr. Nayana D H
+
+
+  القسم 2. أطفال وحديثي الولادة | Paediatrics & Neonatology
+     (2 طبيب)
+     1. Dr. Lathiesh Kumar Kambham
+     2. Dr. Srinivasa Murthy C L
+
+
+  القسم 3. أمراض الجهاز الهضمي | Medical Gastroenterology
+     (2 طبيب)
+     1. Dr. Abhijith B R
+     2. Dr. Ajay B R
+
+
+  القسم 4. أمراض الدم للأطفال وBMT | Paediatric Haemato-Oncology & BMT
+     (2 طبيب)
+     1. Dr. C P Raghuram
+     2. Dr. Stalin Ramprakash
+
+
+  القسم 5. أمراض الدم وزراعة نخاع | Haematology, Paediatric Haemato-Oncology & BMT
+     (1 طبيب)
+     1. Dr. Anoop P
+
+
+  القسم 6. أمراض الدم وزراعة نخاع | Hematology & BMT
+     (1 طبيب)
+     1. Dr. Revanth Boddu
+
+
+  القسم 7. أمراض الروماتيزم | Rheumatology
+     (1 طبيب)
+     1. Dr. Yathish G C
+
+
+  القسم 8. أمراض الصدر | Pulmonology
+     (1 طبيب)
+     1. Dr. Rohit Shirgaonkar
+
+
+  القسم 9. أمراض الصدر | Pulmonology & Lung Transplant
+     (1 طبيب)
+     1. Dr. Srivatsa Lokeshwaran
+
+
+  القسم 10. أمراض القلب | Cardiology
+     (1 طبيب)
+     1. Dr. Chirag D
+
+
+  القسم 11. أمراض القلب التداخلية | Interventional Cardiology
+     (1 طبيب)
+     1. Dr. Naveen Chandra G S
+
+
+  القسم 12. أمراض الكبد للأطفال | Pediatric Hepatology
+     (1 طبيب)
+     1. Dr. Ashritha A
+
+
+  القسم 13. أنف وأذن وحنجرة | ENT
+     (1 طبيب)
+     1. Dr. Bhuvaneshwari Parthiban
+
+
+  القسم 14. أنف وأذن وحنجرة | ENT & Skull Base Surgery
+     (1 طبيب)
+     1. Dr. Jyotirmay S Hegde
+
+
+  القسم 15. أورام الرأس والرقبة | Head & Neck Oncology
+     (1 طبيب)
+     1. Dr. Girish S. Shetkar
+
+
+  القسم 16. أورام المسالك والروبوت | Uro-oncology & Robotic Surgery
+     (1 طبيب)
+     1. Dr. Sachin Arakere Nataraj
+
+
+  القسم 17. أورام النساء | Gynecologic Oncology
+     (3 طبيب)
+     1. Dr. Esha R Shanbhag
+     2. Dr. Mythili Kundur
+     3. Dr. Vijay K Ahuja
+
+
+  القسم 18. أورام طبية | Medical Oncology
+     (3 طبيب)
+     1. Dr. Sai Vivek V
+     2. Dr. Sneha Kommineni
+     3. Dr. Vaishnavi Joshi
+
+
+  القسم 19. أورام طبية ودم | Medical & Haemato Oncology
+     (1 طبيب)
+     1. Dr. C N Patil
+
+
+  القسم 20. الأشعة | Radiology
+     (2 طبيب)
+     1. Dr. Namita Verma
+     2. Dr. Sudhirkumar Kale
+
+
+  القسم 21. الأشعة التداخلية | Interventional Radiology
+     (3 طبيب)
+     1. Dr. Dheeraj Shyam V N
+     2. Dr. Nischal Kundaragi
+     3. Dr. Rajaraman V
+
+
+  القسم 22. الأمراض المعدية | Infectious Diseases
+     (1 طبيب)
+     1. Dr. Aishwarya R
+
+
+  القسم 23. الرعاية التلطيفية | Palliative Medicine
+     (2 طبيب)
+     1. Dr. Amelia Sahana Michael
+     2. Dr. Madhavi Thuyamani
+
+
+  القسم 24. الرعاية التلطيفية | Palliative Medicine & Rehab
+     (1 طبيب)
+     1. Dr. Raghavendra Ramanjulu
+
+
+  القسم 25. الطب الباطني | Internal Medicine
+     (3 طبيب)
+     1. Dr. Abinaya Rathinasami
+     2. Dr. Basavaraj S Kumbar
+     3. Dr. Suchismitha Rajamanya
+
+
+  القسم 26. الطب النفسي | Psychiatry
+     (1 طبيب)
+     1. Dr. Pretty Duggar Gupta
+
+
+  القسم 27. الطب النووي | Nuclear Medicine
+     (2 طبيب)
+     1. Dr. Avinash Tupalli
+     2. Dr. Mythri Shankar
+
+
+  القسم 28. الطب النووي | Nuclear Medicine, Theranostics
+     (1 طبيب)
+     1. Dr. Prathap H J
+
+
+  القسم 29. العناية المركزة | Critical Care
+     (4 طبيب)
+     1. Dr. Ajith Kumar A K
+     2. Dr. Nikhil Narayanaswamy
+     3. Dr. Pooja Murthy
+     4. Dr. Venkatesha Gupta K V
+
+
+  القسم 30. الغدد الصماء | Endocrinology
+     (1 طبيب)
+     1. Dr. Narendra B S
+
+
+  القسم 31. الغدد الصماء أطفال | Pediatric Endocrinology
+     (2 طبيب)
+     1. Dr. Jahnavi M
+     2. Dr. N. Kavitha Bhat
+
+
+  القسم 32. الوراثة الطبية | Medical Genetics
+     (1 طبيب)
+     1. Dr. Mallikarjun R Patil
+
+
+  القسم 33. تخدير الأعصاب | Neuro Anaesthesia
+     (1 طبيب)
+     1. Dr. Dheeraj Masapu
+
+
+  القسم 34. جراحة أورام الثدي | Breast Surgery
+     (1 طبيب)
+     1. Dr. Nashi Semitha
+
+
+  القسم 35. جراحة الأطفال | Paediatric Surgery
+     (2 طبيب)
+     1. Dr. Manjiri Somashekhar
+     2. Dr. Palak Singhai
+
+
+  القسم 36. جراحة الأعصاب | Neurosurgery
+     (1 طبيب)
+     1. Prof. Dr. Swaroop Gopal
+
+
+  القسم 37. جراحة الأعصاب والعمود الفقري | Neurosurgery
+     (1 طبيب)
+     1. Prof. Dr. Satish Rudrappa
+
+
+  القسم 38. جراحة الأورام | Surgical Oncology
+     (3 طبيب)
+     1. Dr. Darshan Patil
+     2. Dr. Elvis Peter Joseph
+     3. Dr. Kushal Agrawal
+
+
+  القسم 39. جراحة الأورام | Surgical Oncology & Robotic Surgery
+     (1 طبيب)
+     1. Dr. Rohit Kumar C
+
+
+  القسم 40. جراحة الأورام النسائية والروبوت | Surgical & Gynaecological Oncology / Robotic Surgery, HIPEC, PIPAC
+     (1 طبيب)
+     1. Prof. Dr. Somashekhar S P
+
+
+  القسم 41. جراحة الأورام والرأس والرقبة | Surgical Oncology & Head & Neck Oncology
+     (1 طبيب)
+     1. Dr. Deo Ravindra Padmakar
+
+
+  القسم 42. جراحة الأورام والروبوت | Surgical Oncology & Robotic Surgery
+     (1 طبيب)
+     1. Dr. Ashwin K R
+
+
+  القسم 43. جراحة الأورام والمناظير والروبوت | Surgical Oncology & Robotic
+     (1 طبيب)
+     1. Dr. Jagannath Dixit
+
+
+  القسم 44. جراحة الأوعية الدموية | Vascular Surgery
+     (1 طبيب)
+     1. Dr. Anoop T
+
+
+  القسم 45. جراحة التجميل | Plastic & Reconstructive Surgery
+     (1 طبيب)
+     1. Dr. N Sudarshan Reddy
+
+
+  القسم 46. جراحة التجميل | Plastic, Reconstructive & Aesthetic Surgery
+     (1 طبيب)
+     1. Dr. Ashok B C
+
+
+  القسم 47. جراحة الجهاز الهضمي والمناظير | Surgical Gastroenterology & Bariatric
+     (1 طبيب)
+     1. Dr. Vinodha Reddy K
+
+
+  القسم 48. جراحة الرأس والرقبة | Head & Neck Surgery & Oncology
+     (1 طبيب)
+     1. Dr. Narayana Subramaniam
+
+
+  القسم 49. جراحة العظام | Orthopedics, Joint Replacement
+     (1 طبيب)
+     1. Dr. Harsha G N
+
+
+  القسم 50. جراحة العمود الفقري | Spine Surgery
+     (1 طبيب)
+     1. Dr. Ramachandran G
+
+
+  القسم 51. جراحة القلب والصدر | CTVS
+     (1 طبيب)
+     1. Dr. Prashanth Y M
+
+
+  القسم 52. جراحة المسالك | Urology
+     (1 طبيب)
+     1. Dr. Gokulakrishnan P J
+
+
+  القسم 53. جراحة عامة | General Surgery
+     (1 طبيب)
+     1. Dr. Karthik A S
+
+
+  القسم 54. جراحة عامة ومناظير وروبوت | General & Laparoscopic Surgery
+     (1 طبيب)
+     1. Dr. Prabhakar B
+
+
+  القسم 55. جلدية | Dermatology
+     (2 طبيب)
+     1. Dr. Priyanka Kuri
+     2. Dr. Suma K R
+
+
+  القسم 56. روماتيزم أطفال | Pediatric Rheumatology
+     (1 طبيب)
+     1. Dr. Jyothi Raghuram
+
+
+  القسم 57. زراعة الكبد | HPB & Transplant
+     (1 طبيب)
+     1. Dr. H R S Girn
+
+
+  القسم 58. زراعة الكبد | Liver Transplant
+     (1 طبيب)
+     1. Dr. Vachan S Hukkeri
+
+
+  القسم 59. زراعة الكبد | Liver Transplant & HPB Surgery
+     (1 طبيب)
+     1. Dr. Sonal Asthana
+
+
+  القسم 60. صدر أطفال | Pediatric Pulmonology
+     (2 طبيب)
+     1. Dr. Srikanta J T
+     2. Dr. Tejaswi Chandra
+
+
+  القسم 61. طب الأجنة | Fetal Medicine
+     (3 طبيب)
+     1. Dr. Amulya R
+     2. Dr. Shreshta Bhat
+     3. Dr. Smitha D S
+
+
+  القسم 62. طب الأسنان | Dentistry
+     (3 طبيب)
+     1. Dr. Khushboo Lath
+     2. Dr. Kushi C S
+     3. Dr. Sindhu U Muktamath
+
+
+  القسم 63. طب الأسنان | Maxillofacial Radiology
+     (1 طبيب)
+     1. Dr. Sreekanth P Kunjumon
+
+
+  القسم 64. طب الأعصاب | Neurology & Epileptology
+     (1 طبيب)
+     1. Dr. Balaji B S
+
+
+  القسم 65. طب الأعصاب | Neurology, Epilepsy
+     (1 طبيب)
+     1. Dr. Keni Ravish Rajiv
+
+
+  القسم 66. طب التأهيل العصبي | Neuro Rehabilitation
+     (1 طبيب)
+     1. Dr. Aravind P R
+
+
+  القسم 67. طب الطوارئ | Emergency Medicine
+     (2 طبيب)
+     1. Dr. Ashray V
+     2. Dr. Kushal Pandya
+
+
+  القسم 68. طوارئ الأطفال | Pediatric Emergency & PICU
+     (1 طبيب)
+     1. Dr. Sujatha Thyagarajan
+
+
+  القسم 69. علاج الأورام بالإشعاع | Radiation Oncology
+     (6 طبيب)
+     1. Dr. Jayant J B
+     2. Dr. M S Belliappa
+     3. Dr. Prathima Sivaguru
+     4. Dr. Pushpa Naga C H
+     5. Dr. Ram Charith Alva
+     6. Dr. Suneetha N
+
+
+  القسم 70. علم الأمراض | Pathology
+     (2 طبيب)
+     1. Dr. Abhijit Prakash Chougule
+     2. Dr. Anand M S
+
+
+  القسم 71. علم الأمراض | Pathology & Histopathology
+     (1 طبيب)
+     1. Dr. Susmita Rakshith
+
+
+  القسم 72. علم الأمراض | Renal & Transplant Pathology
+     (1 طبيب)
+     1. Dr. Kiran K
+
+
+  القسم 73. علم النفس | Psychology
+     (1 طبيب)
+     1. Ms. Neha K
+
+
+  القسم 74. عناية الأطفال | Paediatric Intensive Care
+     (1 طبيب)
+     1. Dr. Sumithra S
+
+
+  القسم 75. قلب أطفال | Pediatric Cardiology
+     (1 طبيب)
+     1. Dr. Bharath A P
+
+
+  القسم 76. كبد | Hepatology
+     (2 طبيب)
+     1. Dr. Akhil Deshmukh
+     2. Dr. Naveen Ganjoo
+
+
+  القسم 77. كبد | Hepatology & Transplant Physician
+     (1 طبيب)
+     1. Dr. Mallikarjun Sakpal
+
+
+  القسم 78. مناظير المفاصل | Arthroscopy & Sports Injury
+     (1 طبيب)
+     1. Dr. Yogesh K
+
+
+  القسم 79. نساء وولادة | Obstetrics & Gynaecology
+     (4 طبيب)
+     1. Dr. Deepthi Ashwin
+     2. Dr. Kavitha Kovi
+     3. Dr. Sandhya Rani
+     4. Dr. Vishnu Priya
+
+
+================================================================================
+
+المستشفى 7. Fortis Hospital, BG Road Bangalore
+--------------------------------------------------------------------------------
+
+  القسم 1. أشعة تداخلية | Interventional Radiology
+     (1 طبيب)
+     1. Dr. Prajwith Rai
+
+
+  القسم 2. أمراض الروماتيزم أو طب عام | Rheumatology / General Medicine
+     (1 طبيب)
+     1. Dr. Srinivasa C
+
+
+  القسم 3. أمراض الصدر | Pulmonology
+     (1 طبيب)
+     1. Dr. Vivek Anand Padegal
+
+
+  القسم 4. أمراض القلب | Cardiology
+     (3 طبيب)
+     1. Dr. Rajpal Singh R L
+     2. Dr. Shashidhara
+     3. Dr. Srinivas Prasad
+
+
+  القسم 5. أمراض الكلى | Nephrology
+     (2 طبيب)
+     1. Dr. Ashish Parek / Aashish Parekh
+     2. Dr. Rajanna Sreedhara
+
+
+  القسم 6. أنف وأذن وحنجرة | ENT
+     (1 طبيب)
+     1. Dr. Susheen Dutt
+
+
+  القسم 7. أورام طبية | Medical Oncology
+     (1 طبيب)
+     1. Dr. Niti Raizada
+
+
+  القسم 8. الجهاز الهضمي | Gastroenterology
+     (1 طبيب)
+     1. Dr. Ravindra B.S
+
+
+  القسم 9. الجهاز الهضمي أو طب عام | Gastroenterology / General
+     (1 طبيب)
+     1. Dr. Sunil Kasturi
+
+
+  القسم 10. الطب الباطني | Internal Medicine
+     (2 طبيب)
+     1. Dr. Sheela Murali Chakravarthy
+     2. Dr. Sudha Vinod Menon
+
+
+  القسم 11. الطب النووي | Nuclear Medicine
+     (1 طبيب)
+     1. Dr. Gayana
+
+
+  القسم 12. الغدد الصماء أو طب عام | Endocrinology / General Medicine
+     (1 طبيب)
+     1. Dr. Srinivas Munigoti / Srinivasa Phanidhar Munigoti
+
+
+  القسم 13. جراحة الأعصاب | Neurosurgery
+     (1 طبيب)
+     1. Dr. Murali Krishna
+
+
+  القسم 14. جراحة السمنة والمناظير | GI, Minimal Access & Bariatric Surgery
+     (1 طبيب)
+     1. Dr. Sreedhara V.
+
+
+  القسم 15. جراحة العظام | Orthopaedics
+     (3 طبيب)
+     1. Dr. Mohan Karisankappa Puttaswamy
+     2. Dr. Narayan Hulse
+     3. Dr. Naveen D
+
+
+  القسم 16. جراحة العظام | Orthopedics
+     (2 طبيب)
+     1. Dr. Mohan Puttaswamy
+     2. Dr. Venu Gopal
+
+
+  القسم 17. جراحة العمود الفقري والمخ والاعصاب | Neuro & Spine Surgery
+     (1 طبيب)
+     1. Dr. Rajakumar D.V
+
+
+  القسم 18. جراحة القلب | Cardiac Surgery
+     (2 طبيب)
+     1. Dr. Murali Manohhar
+     2. Dr. Vivek Jawali
+
+
+  القسم 19. جراحة القلب الروبوتية | Robotic Cardiac Surgery
+     (1 طبيب)
+     1. Dr. Sudarshan
+
+
+  القسم 20. جراحة المخ والأعصاب | Neurosurgery
+     (1 طبيب)
+     1. Dr. Deshpande Vasudevarao Rajakumar
+
+
+  القسم 21. جراحة المسالك البولية | Urology
+     (3 طبيب)
+     1. Dr. Karibasavaraja
+     2. Dr. Mohan Keshavamurthy
+     3. Dr. Nlgar
+
+
+  القسم 22. جراحة عامة | General Surgery
+     (2 طبيب)
+     1. Dr. Manish Joshi
+     2. Dr. Shashikiran
+
+
+  القسم 23. زراعة الكبد | HBP & Liver Transplant
+     (1 طبيب)
+     1. Dr. Kishore U.S.B
+
+
+  القسم 24. طب الأعصاب | Neurology
+     (2 طبيب)
+     1. Dr. Grober
+     2. Dr. Sreekanta Swamy
+
+
+  القسم 25. طبيب عام وسكري | General Physician & Diabetologist
+     (1 طبيب)
+     1. Dr. Girikumar Venati
+
+
+================================================================================
+
+المستشفى 8. HCG Hospital, K R Road Bangalore
+--------------------------------------------------------------------------------
+
+  القسم 1. أمراض الصدر | Pulmonology
+     (1 طبيب)
+     1. Dr. Kedar Ravi Hibare
+
+
+  القسم 2. أمراض قلب الأطفال | Paediatric Cardiology
+     (1 طبيب)
+     1. Dr. Govinda Kishor Auradkar
+
+
+  القسم 3. أنف وأذن وحنجرة | ENT
+     (1 طبيب)
+     1. Dr. Gaurav Shankar Medikeri
+
+
+  القسم 4. أورام الرأس والعنق | Head & Neck Oncology
+     (2 طبيب)
+     1. Dr. Ganesh Datta Borewad
+     2. Dr. K Bhavya
+
+
+  القسم 5. أورام طبية | Medical Oncology
+     (2 طبيب)
+     1. Dr. B J Srinivasa
+     2. Dr. Intezar Mehdi
+
+
+  القسم 6. أورام نسائية | Gynecologic Oncology
+     (1 طبيب)
+     1. Dr. Abhilasha Narayan
+
+
+  القسم 7. الجهاز الهضمي | Gastroenterology
+     (1 طبيب)
+     1. Dr. Jeevan H R
+
+
+  القسم 8. الطب النووي | Nuclear Medicine
+     (1 طبيب)
+     1. Dr. Kumarswamy Gangadharayya Kallur
+
+
+  القسم 9. تخدير | Anesthesia
+     (1 طبيب)
+     1. Dr. Hosahalli Rajanna Sunilkumar
+
+
+  القسم 10. جراحة الأورام | Surgical Oncology
+     (3 طبيب)
+     1. Dr. Anand S
+     2. Dr. Dinesh M G
+     3. Dr. Krithika Murugan
+
+
+  القسم 11. جراحة التجميل | Plastic Surgery
+     (1 طبيب)
+     1. Dr. Mahendra Kumar Kulkarni
+
+
+  القسم 12. جراحة الفم والوجه والفكين | Oral & Maxillofacial Surgery
+     (2 طبيب)
+     1. Dr. Apoorva Narasimha Iyengar
+     2. Dr. Arun Krishna A R
+
+
+  القسم 13. جراحة القلب والصدر والأوعية | Cardiothoracic & Vascular Surgery
+     (1 طبيب)
+     1. Dr. Anand Subraya Bhat
+
+
+  القسم 14. جراحة المخ والأعصاب | Neurosurgery
+     (1 طبيب)
+     1. Dr. Amresh Bhaganagare
+
+
+  القسم 15. جراحة المسالك البولية | Urology
+     (2 طبيب)
+     1. Dr. Deepak Krishnappa
+     2. Dr. Lingesh Sairam Chelliah
+
+
+  القسم 16. جراحة عامة | General Surgery
+     (2 طبيب)
+     1. Dr. Bharat Gadhavi
+     2. Dr. Gaurav Medikeri
+
+
+  القسم 17. زراعة الكبد | Liver Transplant
+     (3 طبيب)
+     1. Dr. Abhideep Chaudhary
+     2. Dr. Basant Mahadevappa
+     3. Dr. Bhushan Chittawadagi
+
+
+  القسم 18. طب أطفال أورام | Paediatric Oncology
+     (1 طبيب)
+     1. Dr. Amit Galgali
+
+
+  القسم 19. طب العيون | Ophthalmology
+     (1 طبيب)
+     1. Dr. Jayashree K Bhat
+
+
+  القسم 20. علاج الأورام بالإشعاع | Radiation Oncology
+     (6 طبيب)
+     1. Dr. Ajay G V
+     2. Dr. Anirudh V S
+     3. Dr. Hasib Abdul Gaffor
+     4. Dr. Kirthi Koushik A.S
+     5. Dr. Krithikaa S
+     6. Dr. Lohith G
+
+
+  القسم 21. علم النفس الإكلينيكي | Clinical Psychology
+     (1 طبيب)
+     1. Dr. Brindha Sitaram
+
+
+  القسم 22. عناية مشددة | Intensive Care
+     (2 طبيب)
+     1. Dr. Aishwarya N
+     2. Dr. Divya Gangoli
+
+
+================================================================================
+
+المستشفى 9. L V Prasad Eye Institute, Hyderabad
+--------------------------------------------------------------------------------
+
+  القسم 1. أعصاب العين | Neuro Ophthalmology
+     (2 طبيب)
+     1. Dr. Sudheer Kumar Shantha Kumari
+     2. Dr. Sumita Agarkar
+
+
+  القسم 2. أورام العين | Ocular Oncology
+     (1 طبيب)
+     1. Dr. Aparna Ramasubramanian
+
+
+  القسم 3. اعتلال الشبكية لدى الأطفال الخدّج | Retinopathy of Prematurity
+     (1 طبيب)
+     1. Dr. Subhadra Jalali
+
+
+  القسم 4. التهاب العنبية | Uveitis Services
+     (1 طبيب)
+     1. Dr. Muralidhar Ramappa
+
+
+  القسم 5. الساد والعدسات | Cataract & IOL
+     (1 طبيب)
+     1. Dr. Mudit Tyagi
+
+
+  القسم 6. الساد والعدسات | Cataract & IOL Services
+     (1 طبيب)
+     1. Dr. Jagat Ram
+
+
+  القسم 7. الشبكية | Vitreoretinal Services
+     (2 طبيب)
+     1. Dr. Anthony Vipin Das
+     2. Dr. Gowri Shankar Gopi
+
+
+  القسم 8. الشبكية والزجاجية | Retina & Vitreous
+     (1 طبيب)
+     1. Dr. Taraprasad Das
+
+
+  القسم 9. القرنية | Cornea
+     (3 طبيب)
+     1. Dr. Debananda Padhy
+     2. Dr. Murugesan Vanathi
+     3. Dr. Radhika Tandon
+
+
+  القسم 10. القرنية | Cornea & External Diseases
+     (1 طبيب)
+     1. Dr. Prashant Garg
+
+
+  القسم 11. القرنية | Cornea Services
+     (1 طبيب)
+     1. Dr. Somasheila I. Murthy
+
+
+  القسم 12. القرنية والخلايا الجذعية | Cornea & Stem Cell
+     (1 طبيب)
+     1. Dr. Virender S. Sangwan
+
+
+  القسم 13. القرنية والسطح العيني | Cornea & Ocular Surface
+     (1 طبيب)
+     1. Dr. Sayan Basu
+
+
+  القسم 14. القرنية وتصحيح النظر | Cornea & Refractive Surgery
+     (1 طبيب)
+     1. Dr. Srinivas K. Rao
+
+
+  القسم 15. المياه الزرقاء | Glaucoma
+     (2 طبيب)
+     1. Dr. Bhagabat Nayak
+     2. Dr. Sirisha Senthil
+
+
+  القسم 16. المياه الزرقاء | Glaucoma Services
+     (1 طبيب)
+     1. Dr. Rohit Khanna
+
+
+  القسم 17. تجميل الجفون | Oculoplasty
+     (1 طبيب)
+     1. Dr. Madan Deshpande
+
+
+  القسم 18. تجميل الجفون وأورام العين | Oculoplasty & Oncology
+     (1 طبيب)
+     1. Dr. Santosh G. Honavar
+
+
+  القسم 19. تجميل الجفون والقناة الدمعية | Oculoplasty & Lacrimal
+     (1 طبيب)
+     1. Dr. Mohammad Javed Ali
+
+
+  القسم 20. جراحة الشبكية | Vitreoretinal Surgery
+     (2 طبيب)
+     1. Dr. Rajeev Reddy Pappuru
+     2. Dr. Vivek P. Dave
+
+
+  القسم 21. عيون الأطفال | Paediatric Ophthalmology
+     (2 طبيب)
+     1. Dr. Joveeta Joseph
+     2. Dr. Ramesh Kekunnaya
+
+
+  القسم 22. عيون شاملة | Comprehensive Ophthalmology
+     (1 طبيب)
+     1. Dr. Swapna Kakade
+
+
+================================================================================
+
+المستشفى 10. M S Ramaiah Memorial Hospital, Bangalore
+--------------------------------------------------------------------------------
+
+  القسم 1. أمراض الجهاز الهضمي | Medical Gastroenterology
+     (2 طبيب)
+     1. Dr. Avinash B
+     2. Dr. Harshavardhan Rao B
+
+
+  القسم 2. أمراض القلب | Cardiology
+     (5 طبيب)
+     1. Dr. Anupama V Hegde
+     2. Dr. Prakash V S
+     3. Dr. Ramkumar S
+     4. Dr. Ravi Narayan
+     5. Dr. Varsha Rakshitha P
+
+
+  القسم 3. أمراض الكلى | Nephrology
+     (5 طبيب)
+     1. Dr. Gireesh M. S.
+     2. Dr. Mahesh E
+     3. Dr. Mohammad Yousuff
+     4. Dr. Pooja Prakash Prabhu
+     5. Dr.Rajashekar MD, DM
+
+
+  القسم 4. أنف وأذن وحنجرة | ENT
+     (6 طبيب)
+     1. Dr. Chandrakiran C.
+     2. Dr. Harshavardhan N. Reddy
+     3. Dr. Sanjay B Patil
+     4. Dr. Soujanya Balaraj
+     5. Dr. Sumanth K. R.
+     6. Dr. Surya Prakash D. R.
+
+
+  القسم 5. أورام طبية | Medical Oncology
+     (4 طبيب)
+     1. Dr. Nishil Gowda
+     2. Dr. Rasmi Palassery
+     3. Dr. Santhosh Devadas
+     4. Dr. Vinayak Maka
+
+
+  القسم 6. الغدد الصماء | Endocrinology
+     (5 طبيب)
+     1. Dr. Chitra. S
+     2. Dr. Ganavi. Y. P
+     3. Dr. K. M. Suryanarayana
+     4. Dr. Manjunath P R
+     5. Dr. Pramila Kalra
+
+
+  القسم 7. بنك الدم | Blood Bank / Transfusion Medicine
+     (3 طبيب)
+     1. Dr. D. Deepa
+     2. Dr. Nanda Kishore V
+     3. Dr. Nandakishore Alva N
+
+
+  القسم 8. تخدير | Anesthesiology
+     (16 طبيب)
+     1. Dr. Archana S
+     2. Dr. Ashwini Turai
+     3. Dr. Balakrishna Shenoy
+     4. Dr. Chandana Balram
+     5. Dr. Geetha C R
+     6. Dr. Guru Police Patel
+     7. Dr. Leena H P
+     8. Dr. Nanditha Shreedhar
+     9. Dr. Navdeep
+     10. Dr. Prapti Rath
+     11. Dr. Prathima P T
+     12. Dr. Sandya Rani
+     13. Dr. Sharmila
+     14. Dr. Shruthi N S
+     15. Dr. Tejesh C A
+     16. Dr. Yatish B
+
+
+  القسم 9. تخدير أعصاب وعناية عصبية | Neuroanesthesia & Neurocritical Care
+     (3 طبيب)
+     1. Dr. Geetha. L
+     2. Dr. Madhusudhana Rao
+     3. Dr. Seham Syeda
+
+
+  القسم 10. تخدير وإدارة الألم | Anesthesiology & Pain Management
+     (1 طبيب)
+     1. Dr. Manjunath A C
+
+
+  القسم 11. جراحة العظام | Orthopaedics
+     (10 طبيب)
+     1. Dr Ponnanna K M
+     2. Dr. Ajoy S M
+     3. Dr. Ashok Kumar P
+     4. Dr. Harshad. M. Shah
+     5. Dr. Karthik Badarayan V
+     6. Dr. Rahul P
+     7. Dr. Ravikumar T V
+     8. Dr. Sandeep Reddy R
+     9. Dr. Sathish Shervegar
+     10. Dr. Yashwanth Kumar. C
+
+
+  القسم 12. جراحة القلب والصدر | Cardio Thoracic Surgery
+     (1 طبيب)
+     1. Dr. Anandathirtha H. S
+
+
+  القسم 13. جراحة القلب والصدر والأوعية | Cardiovascular & Thoracic Surgery (CTVS)
+     (1 طبيب)
+     1. Dr. Mukundan Seshadri
+
+
+  القسم 14. جراحة المخ والأعصاب | Neurosurgery
+     (6 طبيب)
+     1. Dr. Nishchit Hegde
+     2. Dr. Parichay J Perikal
+     3. Dr. Rakshith Srinivasa
+     4. Dr. Shabari Girishan K. V.
+     5. Dr. Sunil Valentine Furtado
+     6. Dr.(Prof) A. S. Hegde
+
+
+  القسم 15. جراحة عامة | General Surgery
+     (15 طبيب)
+     1. Dr Nandakumar B M
+     2. Dr. Bharati V Hiremath
+     3. Dr. Kalaivani V
+     4. Dr. Madan K
+     5. Dr. Narayana Swamy Chetty
+     6. Dr. Navyashree C
+     7. Dr. Sagar Z
+     8. Dr. Shaik Mohammad Safiuddin
+     9. Dr. Shashank G
+     10. Dr. Sreekar Pai A
+     11. Dr. Sreevathsa M R
+     12. Dr. Srikantaiah H C
+     13. Dr. Sudharshan S. Murthy
+     14. Dr. Suhas Devanathan
+     15. Dr. Syed Faizan
+
+
+  القسم 16. جلدية وتجميل | Dermatology & Cosmetology
+     (6 طبيب)
+     1. Dr. Deena Patil
+     2. Dr. K. N. Shivaswamy
+     3. Dr. Praveen Kumar S
+     4. Dr. Sudha Banti
+     5. Dr. Suparna. M. Y
+     6. Dr. T. K. Sumathy
+
+
+  القسم 17. حديثي الولادة | Neonatology
+     (3 طبيب)
+     1. Dr. Krithika
+     2. Dr. Pradeep G C M
+     3. Dr. Sharanabasavesh. M
+
+
+  القسم 18. طب الأسنان | Dental Surgery
+     (7 طبيب)
+     1. Dr. A. S. Madhura
+     2. Dr. Amulya V. Rai
+     3. Dr. Madhubala
+     4. Dr. O. P. Kharbanda
+     5. Dr. Priyanka Rawat
+     6. Dr. Renu Kharbanda
+     7. Dr. Sayanthi Hazra
+
+
+  القسم 19. طب الأعصاب | Neurology
+     (6 طبيب)
+     1. Dr. Anish Mehta
+     2. Dr. Divya Nagabushana
+     3. Dr. Kumara Swamy
+     4. Dr. Mahendra. J. V
+     5. Dr. P. T. Acharya
+     6. Dr. Pradeep R
+
+
+  القسم 20. طب الطوارئ | Accident & Emergency (Emergency Medicine)
+     (6 طبيب)
+     1. Dr. Aruna C Ramesh
+     2. Dr. Hariprasad K V
+     3. Dr. Jerry Jacob
+     4. Dr. Keshava Murthy M R
+     5. Dr. Shruthi Deshpande
+     6. Dr. Treepti
+
+
+  القسم 21. طب العيون | Ophthalmology
+     (5 طبيب)
+     1. Dr. Ananth Bhandary S.
+     2. Dr. Divya D Sundaresh
+     3. Dr. Ksheeraja. Y
+     4. Dr. Soumya Ramani
+     5. Dr. Thanuja G P
+
+
+  القسم 22. طب عام | General Medicine
+     (11 طبيب)
+     1. Dr. Akshay Rao
+     2. Dr. Anil Kumar T
+     3. Dr. Ashwin Kulkarni
+     4. Dr. Divya Prabhu
+     5. Dr. Megha Reddy
+     6. Dr. Mohammed Suhail K
+     7. Dr. Nagesh Kumar
+     8. Dr. Shaikh Mohammed Aslam S
+     9. Dr. Srikanth
+     10. Dr. Tharanath Shankar
+     11. Dr. Vijayashree Thyagaraj
+
+
+  القسم 23. عناية مركزة | Critical Care Medicine
+     (9 طبيب)
+     1. Dr. Bhagyalakshmi. M
+     2. Dr. Deepak. T. S
+     3. Dr. Faizya Taskeen
+     4. Dr. Radha. M. G
+     5. Dr. Ramya. D. M
+     6. Dr. Rooparani. K
+     7. Dr. Thejeswini
+     8. Dr. Vikas. K. N
+     9. Dr. Vinay. R
+
+
+  القسم 24. نساء وولادة | Obstetrics & Gynecology
+     (13 طبيب)
+     1. Dr. Asha Swaroop
+     2. Dr. Gayatri Devi
+     3. Dr. Jyothi G. S
+     4. Dr. K. Padma
+     5. Dr. Mamatha
+     6. Dr. Manjula. N. V.
+     7. Dr. Nandini. G.
+     8. Dr. Nivedita Reshme
+     9. Dr. Seema Mehrotra
+     10. Dr. Sujani. B. K
+     11. Dr. Sundari N
+     12. Dr. Umadevi. K
+     13. Dr. Urvashi
+
+
+================================================================================
+
+المستشفى 11. Manipal Hospital, Old Airport Road
+--------------------------------------------------------------------------------
+
+  القسم 1. أمراض القلب التداخلية | Interventional Cardiology
+     (1 طبيب)
+     1. Dr. Sridhar G
+
+
+  القسم 2. أمراض الكبد والجهاز الهضمي | Hepato-Gastroenterology
+     (1 طبيب)
+     1. Dr. Raj Vigna
+
+
+  القسم 3. أمراض المناعة السريرية والروماتيزم | Rheumatology & Clinical Immunology
+     (1 طبيب)
+     1. Dr. Abhishek Patil
+
+
+  القسم 4. أمراض قلب الأطفال | Pediatric Cardiology
+     (1 طبيب)
+     1. Dr. Kavya Mallikarjun
+
+
+  القسم 5. أورام دموية | Hematologic Oncology
+     (1 طبيب)
+     1. Dr. Amit
+
+
+  القسم 6. أورام طبية | Medical Oncology, Immunotherapy & Precision Medicine
+     (1 طبيب)
+     1. Dr. Amit Rauthan
+
+
+  القسم 7. الطب الفيزيائي وإعادة التأهيل | Physical Medicine & Rehabilitation
+     (1 طبيب)
+     1. Dr. Dheeraj A
+
+
+  القسم 8. جراحة أورام الرأس والعنق | Head & Neck Oncology Surgery
+     (1 طبيب)
+     1. Dr. Satish Nair
+
+
+  القسم 9. جراحة الأورام | Surgical Oncology
+     (1 طبيب)
+     1. Dr. Shabber Zaveri
+
+
+  القسم 10. جراحة الأوعية الدموية | Vascular Surgery
+     (2 طبيب)
+     1. Dr. Azeez Pasha
+     2. Dr. Venkatesh Reddy
+
+
+  القسم 11. جراحة الرأس والعنق وقاعدة الجمجمة | ENT, Head & Neck Surgery, Skull Base Surgery, Cochlear Implantology
+     (1 طبيب)
+     1. Dr. (Prof) Sampath Chandra Prasad Rao
+
+
+  القسم 12. جراحة السمنة والأيض | Bariatric & Metabolic Surgery
+     (1 طبيب)
+     1. Dr. G. Moinoddin
+
+
+  القسم 13. جراحة العظام والمفاصل | Orthopedic & Joint Surgery
+     (1 طبيب)
+     1. Dr. Sunil G
+
+
+  القسم 14. جراحة القلب والصدر والأوعية | Cardiothoracic & Vascular Surgery
+     (1 طبيب)
+     1. Dr. Devananda N
+
+
+  القسم 15. جراحة القلب والصدر والأوعية وزراعة القلب والرئة | Cardiothoracic Vascular & Heart-Lung Transplant Surgery
+     (1 طبيب)
+     1. Dr. Devananda N S
+
+
+  القسم 16. جراحة المخ والأعصاب | Adult Neurosurgery
+     (1 طبيب)
+     1. Dr. Bopanna K
+
+
+  القسم 17. جراحة المخ والأعصاب | Neurosurgery
+     (2 طبيب)
+     1. Dr. Bopanna K M
+     2. Dr. Praveen M
+
+
+  القسم 18. جراحة المسالك البولية | Urology
+     (1 طبيب)
+     1. Deepak
+
+
+  القسم 19. جراحة اليد | Hand Surgery
+     (1 طبيب)
+     1. Dr. Bharath Kadadi
+
+
+  القسم 20. جراحة عامة و سمنة | General & Bariatric Surgery
+     (1 طبيب)
+     1. Dr. Hemanth Kumar
+
+
+  القسم 21. جراحة عظام أورام | Orthopedic Oncology
+     (1 طبيب)
+     1. Dr. Srimanth B
+
+
+  القسم 22. زراعة الكلى والمسالك | Uro-Oncology, Robotic Surgery & Renal Transplantation
+     (1 طبيب)
+     1. Dr. Deepak Dubey
+
+
+  القسم 23. زرع نخاع العظم | Hematology & Bone Marrow Transplantation
+     (2 طبيب)
+     1. Dr. Ashish
+     2. Dr. Mallikarjun
+
+
+  القسم 24. طب الأطفال | Pediatric Emergency
+     (1 طبيب)
+     1. Dr. A Sivagnanam
+
+
+  القسم 25. طب الأعصاب | Neurology
+     (1 طبيب)
+     1. Dr. Ajit Kumar
+
+
+  القسم 26. طب الأعصاب والصرع | Neurology & Epilepsy
+     (1 طبيب)
+     1. Dr. Pramod Krishnan
+
+
+  القسم 27. طب عام | General Medicine
+     (3 طبيب)
+     1. Dr. Mohit Shetti
+     2. Dr. Sampath Kumar
+     3. Dr. Sumit Talwar
+
+
+  القسم 28. علاج الأورام بالإشعاع | Radiation Oncology
+     (1 طبيب)
+     1. Dr. Vadhiraja
+
+
+  القسم 29. علم الميكروبات | Microbiology & Laboratory Medicine
+     (1 طبيب)
+     1. Dr. Bhavana M V
+
+
+  القسم 30. كهرباء القلب | Electrophysiology
+     (1 طبيب)
+     1. Dr. Darshan Kirshnappa
+
+
+================================================================================
+
+المستشفى 12. NU Hospitals, Rajajinagar Bangalore
+--------------------------------------------------------------------------------
+
+  القسم 1. أمراض الكلى | Nephrology
+     (1 طبيب)
+     1. Dr. Shakuntala V Modi
+
+
+  القسم 2. أمراض الكلى | Nephrology & Transplant Physician
+     (1 طبيب)
+     1. Dr. Padmanabhan S
+
+
+  القسم 3. أمراض كلى الأطفال | Pediatric Nephrology
+     (1 طبيب)
+     1. Dr. Nitin Nayak
+
+
+  القسم 4. الأشعة التشخيصية | Radiodiagnosis
+     (2 طبيب)
+     1. Dr. Keval P Jain
+     2. Dr. Swathi Matippa
+
+
+  القسم 5. العناية المركزة والتخدير | Critical Care & Anaesthesia
+     (1 طبيب)
+     1. Dr. Jyoti Sridhar
+
+
+  القسم 6. جراحة المسالك البولية | Urology
+     (1 طبيب)
+     1. Dr. Nagarjuna Reddy Danduri
+
+
+  القسم 7. جراحة المسالك وأمراض الذكورة | Andrology & Urology
+     (1 طبيب)
+     1. Dr. Pramod Krishnappa
+
+
+  القسم 8. جراحة عامة ومناظير | General & Laparoscopic Surgery
+     (1 طبيب)
+     1. Dr. Sridhar Pandit
+
+
+  القسم 9. زراعة الكلى | Pediatric Urology, Robotic & Renal Transplant Surgery
+     (1 طبيب)
+     1. Dr. Prasanna Venkatesh M K
+
+
+  القسم 10. زراعة الكلى | Uro-Oncology, Robotic & Renal Transplant Surgery
+     (1 طبيب)
+     1. Dr. Krishna Prasad T
+
+
+  القسم 11. زراعة الكلى وزراعة الأعضاء | Nephrology & Transplant Physician
+     (1 طبيب)
+     1. Dr. Aashish S
+
+
+  القسم 12. علم الأمراض | Pathology (Sr. Pathologist & Lab Director)
+     (1 طبيب)
+     1. Dr. Ashvini Koti
+
+
+================================================================================
+
+المستشفى 13. Narayana Hospital, Bommasandra Bangalore
+--------------------------------------------------------------------------------
+
+  القسم 1. أمراض الدم | Haematology
+     (1 طبيب)
+     1. Dr. Harish Nanjappa
+
+
+  القسم 2. أمراض الصدر | Pulmonology
+     (1 طبيب)
+     1. Dr. K. R. Suresh
+
+
+  القسم 3. أمراض القلب | Cardiology
+     (1 طبيب)
+     1. Dr. Manjunath C. N.
+
+
+  القسم 4. أمراض القلب التداخلية | Interventional Cardiology
+     (1 طبيب)
+     1. Dr. Ravi Kishore
+
+
+  القسم 5. أمراض القلب الوقائية | Preventive Cardiology
+     (1 طبيب)
+     1. Dr. R. R. Kasliwal
+
+
+  القسم 6. أمراض الكلى | Nephrology
+     (1 طبيب)
+     1. Dr. Santosh Benjamin
+
+
+  القسم 7. أمراض النساء | Gynaecology
+     (1 طبيب)
+     1. Dr. Shobha Badiger
+
+
+  القسم 8. أمراض قلب الأطفال | Paediatric Cardiology
+     (1 طبيب)
+     1. Dr. Viveka Kumar
+
+
+  القسم 9. الأشعة | Radiology
+     (1 طبيب)
+     1. Dr. Girish Rao
+
+
+  القسم 10. الأمراض الجلدية | Dermatology
+     (1 طبيب)
+     1. Dr. Smitha Shetty
+
+
+  القسم 11. الأنف والأذن والحنجرة | ENT
+     (1 طبيب)
+     1. Dr. Ashok Pillai
+
+
+  القسم 12. الأورام الطبية | Medical Oncology
+     (1 طبيب)
+     1. Dr. Ravi Prasad
+
+
+  القسم 13. التخدير | Anaesthesia
+     (1 طبيب)
+     1. Dr. Srinivas M.
+
+
+  القسم 14. الجهاز الهضمي | Gastroenterology
+     (1 طبيب)
+     1. Dr. Suresh Ramaswamy
+
+
+  القسم 15. الطب الباطني | Internal Medicine
+     (1 طبيب)
+     1. Dr. Pradeep Mahajan
+
+
+  القسم 16. الطب النفسي | Psychiatry
+     (1 طبيب)
+     1. Dr. Rajesh Kumar
+
+
+  القسم 17. العناية المركزة | Critical Care
+     (1 طبيب)
+     1. Dr. Pratap Reddy
+
+
+  القسم 18. الغدد الصماء | Endocrinology
+     (1 طبيب)
+     1. Dr. H. S. Sreevathsa
+
+
+  القسم 19. جراحة الأعصاب | Neurosurgery
+     (1 طبيب)
+     1. Dr. Ashwin Borkar
+
+
+  القسم 20. جراحة الأورام | Surgical Oncology
+     (1 طبيب)
+     1. Dr. Venkatesh K.
+
+
+  القسم 21. جراحة الأوعية الدموية | Vascular Surgery
+     (1 طبيب)
+     1. Dr. B. C. Srinivasa
+
+
+  القسم 22. جراحة العظام | Orthopaedic Surgery
+     (1 طبيب)
+     1. Dr. Suresh H. Rao
+
+
+  القسم 23. جراحة العظام | Orthopaedics
+     (1 طبيب)
+     1. Dr. Gaurav Ganguly
+
+
+  القسم 24. جراحة القلب | Cardiac Surgery
+     (1 طبيب)
+     1. Dr. Devi Shetty
+
+
+  القسم 25. جراحة القلب | Cardiac Transplant Surgery
+     (1 طبيب)
+     1. Dr. Sandeep Attawar
+
+
+  القسم 26. جراحة القلب | Cardiothoracic Surgery
+     (2 طبيب)
+     1. Dr. Anil Bhan
+     2. Dr. Sathyaki Nambala
+
+
+  القسم 27. جراحة المسالك البولية | Urology
+     (1 طبيب)
+     1. Dr. Rajeev Jayadevan
+
+
+  القسم 28. جراحة عامة | General Surgery
+     (1 طبيب)
+     1. Dr. Dilip Raja
+
+
+  القسم 29. حديثي الولادة | Neonatology
+     (1 طبيب)
+     1. Dr. Roopa K.
+
+
+  القسم 30. زراعة الكلى | Renal Transplant
+     (1 طبيب)
+     1. Dr. Sanjay Mehrotra
+
+
+  القسم 31. طب الأسرة | Family Medicine
+     (1 طبيب)
+     1. Dr. Malini Saba
+
+
+  القسم 32. طب الأطفال | Paediatrics
+     (1 طبيب)
+     1. Dr. Prabha Adhikari
+
+
+  القسم 33. طب الأعصاب | Neurology
+     (1 طبيب)
+     1. Dr. Sanjay Desai
+
+
+  القسم 34. طب العيون | Ophthalmology
+     (1 طبيب)
+     1. Dr. Anand Rao
+
+
+================================================================================
+
+المستشفى 14. Rainbow Children's Hospital, Marathahalli
+--------------------------------------------------------------------------------
+
+  القسم 1. أسنان أطفال | Pediatric Dentistry
+     (1 طبيب)
+     1. Dr. Prabhavathi H B
+
+
+  القسم 2. أطفال | General Pediatrics
+     (3 طبيب)
+     1. Dr. Rajaram G
+     2. Dr. Srikanth Kulkarni
+     3. Dr. Vinu N
+
+
+  القسم 3. أمراض الجهاز التنفسي للأطفال | Pediatric Allergy & Respiratory Medicine
+     (1 طبيب)
+     1. Dr. Nandana Bala
+
+
+  القسم 4. أمراض الجهاز الهضمي والكبد للأطفال | Pediatric Gastroenterology & Hepatology
+     (1 طبيب)
+     1. Dr. Lavenya R P
+
+
+  القسم 5. أمراض الروماتيزم للأطفال | Pediatric Rheumatology
+     (1 طبيب)
+     1. Dr. Chandrika S Bhat
+
+
+  القسم 6. أمراض الصدر للأطفال | Pediatric Pulmonologist
+     (1 طبيب)
+     1. Dr. Anupama Menon
+
+
+  القسم 7. أمراض الكبد والجهاز الهضمي للأطفال | Pediatric Gastroenterology & Hepatology
+     (1 طبيب)
+     1. Dr. V R Nagendra Kumar
+
+
+  القسم 8. أمراض الكلى للأطفال | Pediatric Nephrology
+     (1 طبيب)
+     1. Dr. Saumil Gaur
+
+
+  القسم 9. أمراض معدية للأطفال | Pediatric Infectious Diseases
+     (1 طبيب)
+     1. Dr. Manu Chaudhary
+
+
+  القسم 10. أنف وأذن وحنجرة أطفال / اضطرابات التطور | Pediatric ENT / Development
+     (1 طبيب)
+     1. Dr. Rachana G
+
+
+  القسم 11. أنف وأذن وحنجرة أطفال | Pediatric ENT
+     (1 طبيب)
+     1. Dr. Shilpa H
+
+
+  القسم 12. أورام وزرع نخاع للأطفال | Pediatric Hemato Oncology & Bone Marrow Transplant
+     (2 طبيب)
+     1. Dr. Manojit Chakraborty
+     2. Dr. Vasudha N R
+
+
+  القسم 13. الأشعة | Radiology
+     (1 طبيب)
+     1. Dr. Jyoti Singh
+
+
+  القسم 14. جراحة أعصاب الأطفال | Pediatric Neurology & Neuro Surgery
+     (1 طبيب)
+     1. Dr. N Balamurugan
+
+
+  القسم 15. جراحة أعصاب الأطفال | Pediatric Neurology & Neurosurgery
+     (1 طبيب)
+     1. Dr. Aniruddha Tekkatte Jagannatha
+
+
+  القسم 16. جراحة الأطفال والمسالك | Pediatric Surgery & Pediatric Urology / Laparoscopy
+     (1 طبيب)
+     1. Dr. Antony Robert
+
+
+  القسم 17. جراحة الأطفال والمسالك | Pediatric Surgery & Urology
+     (1 طبيب)
+     1. Dr. Shounak Choudhury
+
+
+  القسم 18. جراحة تجميلية وترميمية | Plastic & Reconstructive Surgery
+     (1 طبيب)
+     1. Dr. Priyadarshan K
+
+
+  القسم 19. جراحة عظام الأطفال | Pediatric Orthopedics
+     (1 طبيب)
+     1. Dr. Jayanth Sundar Sampath
+
+
+  القسم 20. جلدية | Dermatology
+     (1 طبيب)
+     1. Dr. Rachana Shilpakar
+
+
+  القسم 21. طب الأطفال | Clinical Director Pediatrics
+     (1 طبيب)
+     1. Dr. Arvind Shenoi
+
+
+  القسم 22. طب الأطفال | Consultant Pediatrician
+     (1 طبيب)
+     1. Dr. Chandrashekar Changappa
+
+
+  القسم 23. طب الإنجاب | IVF
+     (1 طبيب)
+     1. Dr. Plabani Sarkar
+
+
+  القسم 24. طب العيون | Ophthalmology
+     (1 طبيب)
+     1. Dr. Supriya Shetty
+
+
+  القسم 25. طب نفسي أطفال | Pediatric Psychiatry
+     (1 طبيب)
+     1. Dr. Ruchi Gupta
+
+
+  القسم 26. عناية مركزة حديثي الولادة | Neonatal Intensive Care
+     (1 طبيب)
+     1. Dr. Sandeep R
+
+
+  القسم 27. عناية مركزة للأطفال / طب أطفال | Pediatric Intensive Care / General Pediatrics
+     (1 طبيب)
+     1. Dr. Deepak R
+
+
+  القسم 28. عناية مركزة وأطفال عام | Pediatric Intensivist & General Pediatrician
+     (1 طبيب)
+     1. Dr. Rakshay Shetty
+
+
+  القسم 29. غدد أطفال | Pediatric Endocrinology
+     (1 طبيب)
+     1. Dr. Tejasvi Sheshadri
+
+
+  القسم 30. نساء وولادة | Clinical Director Obstetrics & Gynecology
+     (1 طبيب)
+     1. Dr. Praveena Shenoi
+
+
+  القسم 31. نساء وولادة | Obstetrics & Gynecology
+     (1 طبيب)
+     1. Dr. Aruna Thangapandy
+
+
+  القسم 32. نساء وولادة | Obstetrics, Gynecology & Laparoscopic Surgery
+     (1 طبيب)
+     1. Dr. Meghana Jetty
+
+
+================================================================================
+
+المستشفى 15. Rela Hospital, Chennai
+--------------------------------------------------------------------------------
+
+  القسم 1. أمراض الأمعاء الالتهابية | IBD Specialist
+     (1 طبيب)
+     1. Dr. Rupa Banerjee
+
+
+  القسم 2. أمراض الدم | Haematology
+     (1 طبيب)
+     1. Dr. Niranjan Rao
+
+
+  القسم 3. أمراض الصدر | Pulmonology
+     (1 طبيب)
+     1. Dr. Pradeep Rangappa
+
+
+  القسم 4. أمراض القلب | Cardiology
+     (3 طبيب)
+     1. Dr. R. Prasada Reddy
+     2. Dr. Ramesh Babu
+     3. Dr. Sandhya Sundaram
+
+
+  القسم 5. أمراض الكبد | Hepatology
+     (4 طبيب)
+     1. Dr. Anil Arora
+     2. Dr. Dinesh Jothimani
+     3. Dr. P. Nagaraja Rao
+     4. Dr. Sanjay Kumar Yadav
+
+
+  القسم 6. أمراض الكبد للأطفال | Paediatric Hepatology
+     (1 طبيب)
+     1. Dr. Gomathy Narasimhan
+
+
+  القسم 7. أمراض الكلى | Nephrology
+     (1 طبيب)
+     1. Dr. Vikram Venkateswaran
+
+
+  القسم 8. أمراض النساء | Gynaecology
+     (1 طبيب)
+     1. Dr. Seema Rao
+
+
+  القسم 9. الأشعة | Radiology
+     (1 طبيب)
+     1. Dr. Vijayalakshmi Balasubramanian
+
+
+  القسم 10. الأشعة التداخلية | Interventional Radiology
+     (1 طبيب)
+     1. Dr. Rohan Arora
+
+
+  القسم 11. الأمراض الجلدية | Dermatology
+     (1 طبيب)
+     1. Dr. Sandhya Rajagopal
+
+
+  القسم 12. الأنف والأذن والحنجرة | ENT
+     (1 طبيب)
+     1. Dr. Raghavan Varadarajan
+
+
+  القسم 13. التخدير | Anaesthesia
+     (1 طبيب)
+     1. Dr. Krishna Kumar
+
+
+  القسم 14. التغذية الإكلينيكية | Clinical Nutrition
+     (1 طبيب)
+     1. Dr. Lakshmi Venkataraman
+
+
+  القسم 15. الجراحة طفيفة التوغل | Minimally Invasive Surgery
+     (1 طبيب)
+     1. Dr. G. V. Rao
+
+
+  القسم 16. الجهاز الهضمي | Gastroenterology
+     (1 طبيب)
+     1. Dr. D. Nageshwar Reddy
+
+
+  القسم 17. الطب الباطني | Internal Medicine
+     (2 طبيب)
+     1. Dr. Harish Kumar
+     2. Dr. Naveen Reddy Podduturi
+
+
+  القسم 18. الطب النفسي | Psychiatry
+     (1 طبيب)
+     1. Dr. Sujatha Siddappa
+
+
+  القسم 19. العناية المركزة | Critical Care
+     (1 طبيب)
+     1. Dr. Rohit Vadala
+
+
+  القسم 20. المناظير | Endoscopy & EUS
+     (1 طبيب)
+     1. Dr. Sundeep Lakhtakia
+
+
+  القسم 21. المناظير | Interventional Endoscopy
+     (1 طبيب)
+     1. Dr. Mohan Ramchandani
+
+
+  القسم 22. تخدير زراعة الأعضاء | Liver Transplant Anaesthesia
+     (1 طبيب)
+     1. Dr. Mettu Srinivas Reddy
+
+
+  القسم 23. جراحة الأطفال | Paediatric Surgery
+     (1 طبيب)
+     1. Dr. Joy Varghese
+
+
+  القسم 24. جراحة الأعصاب | Neurosurgery
+     (1 طبيب)
+     1. Dr. Jayaraman Kumaravelu
+
+
+  القسم 25. جراحة الأورام | Surgical Oncology
+     (1 طبيب)
+     1. Dr. Somashekhar S. P.
+
+
+  القسم 26. جراحة الأوعية الدموية | Vascular Surgery
+     (1 طبيب)
+     1. Dr. Subramaniam Venkatesh
+
+
+  القسم 27. جراحة التجميل | Plastic Surgery
+     (1 طبيب)
+     1. Dr. Mohan Rajesh
+
+
+  القسم 28. جراحة الصدر | Thoracic Surgery
+     (1 طبيب)
+     1. Dr. Arvind Kumar
+
+
+  القسم 29. جراحة العظام | Orthopaedics
+     (1 طبيب)
+     1. Dr. R. Ravi
+
+
+  القسم 30. جراحة القلب | Cardiac Surgery
+     (2 طبيب)
+     1. Dr. Murali Mohan B. V.
+     2. Dr. Ravi Mohanka
+
+
+  القسم 31. جراحة القلب | Cardiothoracic Surgery
+     (1 طبيب)
+     1. Dr. Vijay Shankar
+
+
+  القسم 32. جراحة الكبد | HPB Surgery
+     (1 طبيب)
+     1. Dr. Ashwin Rammohan
+
+
+  القسم 33. جراحة الكبد | Liver Transplant Surgery
+     (1 طبيب)
+     1. Dr. Ilankumaran Kaliamurthy
+
+
+  القسم 34. جراحة المسالك البولية | Urology
+     (1 طبيب)
+     1. Dr. Anand Alur
+
+
+  القسم 35. حديثي الولادة | Neonatology
+     (1 طبيب)
+     1. Dr. Bindu Garg
+
+
+  القسم 36. زراعة الكبد | Liver Transplant Surgery
+     (1 طبيب)
+     1. Dr. P. Balachandran Menon
+
+
+  القسم 37. زراعة الكبد | Liver Transplantation
+     (2 طبيب)
+     1. Dr. Mohamed Rela
+     2. Dr. Prashant Bhangui
+
+
+  القسم 38. طب الأسرة | Family Medicine
+     (1 طبيب)
+     1. Dr. Suresh Kumar
+
+
+  القسم 39. طب الأطفال | Paediatrics
+     (1 طبيب)
+     1. Dr. Anand Kumar
+
+
+  القسم 40. طب الأعصاب | Neurology
+     (1 طبيب)
+     1. Dr. Sankar Narayanan
+
+
+  القسم 41. طب الطوارئ | Emergency Medicine
+     (1 طبيب)
+     1. Dr. Kavitha Rajagopalan
+
+
+  القسم 42. طب العيون | Ophthalmology
+     (1 طبيب)
+     1. Dr. Padmini Ramesh
+
+
+  القسم 43. كهرباء القلب | Cardiac Electrophysiology
+     (1 طبيب)
+     1. Dr. C. Narasimhan
+
+
+================================================================================
+
+المستشفى 16. SPARSH Hospital, Hennur Road
+--------------------------------------------------------------------------------
+
+  القسم 1. أشعة | Radiology
+     (1 طبيب)
+     1. Dr. Chaynika Agarwal
+
+
+  القسم 2. أشعة تداخلية | Interventional Radiology
+     (1 طبيب)
+     1. Dr. Deepmala Karmakar
+
+
+  القسم 3. أمراض الجهاز الهضمي | Gastroenterology
+     (2 طبيب)
+     1. Dr. Anto Gnana Delasalle M
+     2. Dr. Praveen Mathew
+
+
+  القسم 4. الغدد الصماء والسكري | Endocrinology & Diabetology
+     (1 طبيب)
+     1. Dr. Chetan Dev K
+
+
+  القسم 5. تخدير | Anaesthesiology
+     (2 طبيب)
+     1. Dr. Chaithannya N S
+     2. Dr. Deepa Chandran
+
+
+  القسم 6. جراحة الأوعية الدموية | Vascular & Endovascular Surgery
+     (1 طبيب)
+     1. Dr. Abhilash V
+
+
+  القسم 7. جراحة العظام | Orthopaedics
+     (1 طبيب)
+     1. Dr. Abhijit Chavan
+
+
+  القسم 8. جراحة تجميلية وعلاج تجميلي | Cosmetology & Cosmetic Surgery
+     (1 طبيب)
+     1. Dr. Anand K
+
+
+  القسم 9. زرع نخاع العظم | Bone Marrow Transplant
+     (1 طبيب)
+     1. Dr. Anand Kumar K
+
+
+  القسم 10. طب الأسرة | Family Medicine
+     (1 طبيب)
+     1. Dr. Deepanju D Changkakoti
+
+
+  القسم 11. طب الأعصاب | Neuroscience / Neurology
+     (2 طبيب)
+     1. Dr. Ann Agnes Mathew
+     2. Dr. Avinash Lakha
+
+
+  القسم 12. طب الأورام | Oncology
+     (1 طبيب)
+     1. Dr. Linu Abraham Jacob
+
+
+  القسم 13. نساء وولادة | Obstetrics & Gynaecology
+     (1 طبيب)
+     1. Dr. Arpi Sagar Lodha
+
+
+================================================================================
+
+المستشفى 17. SPARSH Hospital, Infantry Road
+--------------------------------------------------------------------------------
+
+  القسم 1. أشعة تداخلية | Interventional Radiology
+     (1 طبيب)
+     1. Dr. Deepmala Karmakar
+
+
+  القسم 2. أمراض الروماتيزم | Rheumatology
+     (1 طبيب)
+     1. Dr. Gaurang Sudhir Deshpande
+
+
+  القسم 3. أمراض القلب | Cardiac Sciences
+     (1 طبيب)
+     1. Dr. Ranjan Shetty
+
+
+  القسم 4. أمراض الكلى والمسالك | Nephrology & Urology
+     (2 طبيب)
+     1. Dr. Dinesh Kumar
+     2. Dr. Divyashree Bhat
+
+
+  القسم 5. أنف وأذن وحنجرة | ENT
+     (1 طبيب)
+     1. Dr. Aditi Ravindra
+
+
+  القسم 6. جراحة الأسنان | Dental Surgery
+     (1 طبيب)
+     1. Dr. Kishan Nag
+
+
+  القسم 7. جراحة الرأس والرقبة | Head & Neck Surgery
+     (1 طبيب)
+     1. Dr. Abhinay Indrakumar Reddy
+
+
+  القسم 8. جراحة العظام | Orthopaedics
+     (1 طبيب)
+     1. Dr. Sharan Shivaraj Patil
+
+
+  القسم 9. جراحة تجميلية وعلاج تجميلي | Cosmetology & Cosmetic Surgery
+     (1 طبيب)
+     1. Dr. Anand K
+
+
+  القسم 10. زراعة الكبد وجراحة الكبد والبنكرياس | Liver Transplant & HPB Surgery
+     (1 طبيب)
+     1. Dr. Arun
+
+
+  القسم 11. طب الأطفال | Paediatrics
+     (1 طبيب)
+     1. Dr. Abram Harsha Vardhan
+
+
+  القسم 12. طب الأعصاب | Neuroscience / Neurology
+     (2 طبيب)
+     1. Dr. Arvind Bhateja
+     2. Dr. Chirag Jain
+
+
+  القسم 13. طب الأورام | Oncology
+     (1 طبيب)
+     1. Dr. Linu Abraham Jacob
+
+
+  القسم 14. طب عام وباطنة | General Medicine
+     (1 طبيب)
+     1. Dr. Sanjana Rai
+
+
+  القسم 15. نساء وولادة | Obstetrics & Gynaecology
+     (2 طبيب)
+     1. Dr. Deepthi Bawa
+     2. Dr. Geeth Monnappa
+
+
+================================================================================
+
+المستشفى 18. Sakra World Hospital, Bangalore
+--------------------------------------------------------------------------------
+
+  القسم 1. أسنان أطفال | Pediatric Dentistry
+     (1 طبيب)
+     1. Dr. Apoorva Gudadhe
+
+
+  القسم 2. أشعة | Radiology
+     (1 طبيب)
+     1. Dr. Anisha S. Tandon
+
+
+  القسم 3. أشعة وتصوير تشخيصي | Radiology & Imaging
+     (4 طبيب)
+     1. Dr. B. Premsai Reddy
+     2. Dr. Sonali Sethi
+     3. Dr. Suresh V
+     4. Dr. Y. Trishul Shetty
+
+
+  القسم 4. أمراض الجهاز الهضمي | Gastroenterology
+     (1 طبيب)
+     1. Dr. Lawrence Peter
+
+
+  القسم 5. أمراض الصدر | Pulmonology
+     (1 طبيب)
+     1. Dr. Sachin Kumar
+
+
+  القسم 6. أمراض الصدر واضطرابات النوم | Pulmonology & Sleep Medicine
+     (1 طبيب)
+     1. Dr. Arjunsa H. Satapute
+
+
+  القسم 7. أمراض الصدر والعناية المركزة | Pulmonology & Critical Care
+     (1 طبيب)
+     1. Dr. Ajay Handa
+
+
+  القسم 8. أمراض القلب | Cardiology
+     (1 طبيب)
+     1. Dr. Srikanth
+
+
+  القسم 9. أمراض القلب التداخلي | Interventional Cardiology
+     (1 طبيب)
+     1. Dr. Sreekanth B. Shetty
+
+
+  القسم 10. أمراض الكلى | Nephrology
+     (1 طبيب)
+     1. Dr. Sushma Rani
+
+
+  القسم 11. أنف وأذن وحنجرة | ENT
+     (2 طبيب)
+     1. Dr. Dali Chandran
+     2. Dr. Shantanu Tandon
+
+
+  القسم 12. أورام باطنية وأمراض دم | Medical Oncology & Haematology
+     (1 طبيب)
+     1. Dr. Vineet Gupta
+
+
+  القسم 13. العناية المركزة | Critical Care Medicine
+     (4 طبيب)
+     1. Dr. Anand Bandachar Mamdapur
+     2. Dr. Divya Hirolli
+     3. Dr. Sandeep Anehosur
+     4. Dr. Shashidhar B. G
+
+
+  القسم 14. الفيزيولوجيا الكهربائية للقلب | Cardiac Electrophysiology
+     (1 طبيب)
+     1. Dr. Bharat Raj
+
+
+  القسم 15. تجميل عيون/قناة دمعية | Oculoplastic & Lacrimal Surgery
+     (1 طبيب)
+     1. Dr. Lakshmi Mahesh
+
+
+  القسم 16. تخدير | Anaesthesiology
+     (2 طبيب)
+     1. Dr. Dhananjay D. N.
+     2. Dr. Shishir Chandrashekhar
+
+
+  القسم 17. تخدير قلبي | Cardiac Anaesthesiology
+     (1 طبيب)
+     1. Dr. Sunil Kumar N. K.
+
+
+  القسم 18. جراحة أورام الرأس والرقبة | Head & Neck Onco-Surgery
+     (1 طبيب)
+     1. Dr. Honey Ashok
+
+
+  القسم 19. جراحة الأطفال | Paediatric Surgery
+     (1 طبيب)
+     1. Dr. Anil Kumar Pura Lingegowda
+
+
+  القسم 20. جراحة الأطفال | Pediatric Surgery
+     (1 طبيب)
+     1. Dr. Anil Kumar
+
+
+  القسم 21. جراحة الجهاز الهضمي وزراعة الكبد | GI Surgery & Liver Transplant
+     (1 طبيب)
+     1. Dr. Sadiq Saleem Sikora
+
+
+  القسم 22. جراحة العظام | Orthopedics
+     (1 طبيب)
+     1. Dr. Adarsh Babu K
+
+
+  القسم 23. جراحة العظام والمفاصل | Orthopedic & Joint Surgery
+     (1 طبيب)
+     1. Dr. Chandrashekar
+
+
+  القسم 24. جراحة القلب والصدر والأوعية | Cardio Thoracic & Vascular Surgery (CTVS)
+     (1 طبيب)
+     1. Dr. Adil Sadiq
+
+
+  القسم 25. جراحة الكتف | Shoulder Surgery
+     (1 طبيب)
+     1. Dr. Banarji
+
+
+  القسم 26. جراحة المخ والأعصاب | Neurosurgery
+     (2 طبيب)
+     1. Dr. Alok Mohan Uppar
+     2. Dr. Arjun Srivatsa
+
+
+  القسم 27. جراحة تجميلية وترميمية | Plastic & Reconstructive Surgery
+     (1 طبيب)
+     1. Dr. Rajendra S. Gujjalanavar
+
+
+  القسم 28. جراحة سمنة وثدي وجهاز هضمي | Bariatric, Breast & Surgical Gastroenterology
+     (1 طبيب)
+     1. Dr. Nanda Rajaneesh
+
+
+  القسم 29. جهاز هضمي وكبد | Gastroenterology & Hepatology
+     (2 طبيب)
+     1. Dr. Akshay Deshpande
+     2. Dr. Amruthesh T. M.
+
+
+  القسم 30. طب الأسنان | Dental Surgery
+     (4 طبيب)
+     1. Dr. A. Chris Deepak
+     2. Dr. Akshay Shetty
+     3. Dr. Deepak Pathak
+     4. Dr. Swati Vishwakarma
+
+
+  القسم 31. طب الأسنان | Dentistry
+     (1 طبيب)
+     1. Dr. Priyanka Dutta
+
+
+  القسم 32. طب الأعصاب والسكتات | Neurology & Stroke
+     (1 طبيب)
+     1. Dr. Amit Kulkarni
+
+
+================================================================================
+
+المستشفى 19. Sankara Eye Hospital, Bengaluru
+--------------------------------------------------------------------------------
+
+  القسم 1. أورام عينية وشبكية | VR Ocular Oncology & Vitreoretinal Services
+     (3 طبيب)
+     1. Dr. Divyansh K Mishra
+     2. Dr. Mahesh Shanmugham P
+     3. Dr. Rajesh R.
+
+
+  القسم 2. أورام عينية وشبكية | Vitreoretina & Ocular Oncology
+     (1 طبيب)
+     1. Dr. Payal Naresh Shah
+
+
+  القسم 3. أورام وجراحة محجر العين | Orbit, Oculoplasty & Ocular Oncology
+     (1 طبيب)
+     1. Dr. Shashidhar V S
+
+
+  القسم 4. تخدير | Anaesthesiology
+     (4 طبيب)
+     1. Dr. A Mohan Kumar
+     2. Dr. Alluri Suneetha
+     3. Dr. Kambhampati Chakrapani
+     4. Dr. Narmadha
+
+
+  القسم 5. جلوكوما | Glaucoma
+     (3 طبيب)
+     1. Dr. Lalitha K J
+     2. Dr. Malleswari Medikonda
+     3. Dr. Nishitha M.S
+
+
+  القسم 6. خدمات القرنية | Cornea Services
+     (1 طبيب)
+     1. Dr. Prabhu Vijayaraghavan
+
+
+  القسم 7. شبكية | Retinal Services
+     (1 طبيب)
+     1. Dr. Mugundan M.S
+
+
+  القسم 8. شبكية | Vitreoretina
+     (1 طبيب)
+     1. Dr. Birva Dave
+
+
+  القسم 9. شبكية | Vitreoretinal Services
+     (4 طبيب)
+     1. Dr. Ashok Kanakamedala
+     2. Dr. M. Prabhu Shankar
+     3. Dr. Madhu Kumar R
+     4. Dr. V. Devi Priya
+
+
+  القسم 10. شبكية طبية | Medical Retina
+     (2 طبيب)
+     1. Dr. Geetha G
+     2. Dr. Swathi Padma Kanchana
+
+
+  القسم 11. طب العيون العام | General Ophthalmology
+     (7 طبيب)
+     1. Dr. Anees Fatima Mohammed
+     2. Dr. Anuradha Kakumanu
+     3. Dr. Hitendrasinh Parmar
+     4. Dr. Kanakamedala Bhargavi Lakshmi
+     5. Dr. Kesana Udaya Sankar
+     6. Dr. Shalini G
+     7. Dr. Vijayabhaskar Gajjala
+
+
+  القسم 12. عيادات عامة | General OPD (ENT)
+     (1 طبيب)
+     1. Dr. Renukadevi N K
+
+
+  القسم 13. عيادة عامة | General OPD (ENT)
+     (1 طبيب)
+     1. Dr. Anandhi R
+
+
+  القسم 14. عيون أطفال | Paediatric Ophthalmology
+     (6 طبيب)
+     1. Dr. Kaushik Murali
+     2. Dr. Madhulika Ladha
+     3. Dr. Nambula Srinivasa Rao
+     4. Dr. Rajesh Prabu
+     5. Dr. Vankireddi Mahathi
+     6. Dr. Vidhya C
+
+
+  القسم 15. عيون أطفال وحول | Paediatric Ophthalmology & Strabismus
+     (1 طبيب)
+     1. Dr. Sowmya R
+
+
+  القسم 16. عيون عامة وشبكية طبية وقزحية | General Ophthalmology, Medical Retina & UVEA
+     (1 طبيب)
+     1. Dr. Nidhi Dubey
+
+
+  القسم 17. قرنية | Cornea (Registrar – Cornea)
+     (1 طبيب)
+     1. Dr. Vandhana Sundaram
+
+
+  القسم 18. قرنية وتصحيح البصر | Cornea & Refractive Services
+     (1 طبيب)
+     1. Dr. Sudhakar Potti
+
+
+  القسم 19. قرنية وسطح العين وتصحيح البصر | Cornea, Ocular Surface & Refractive Services
+     (1 طبيب)
+     1. Dr. Pallavi Joshi
+
+
+  القسم 20. كتاراكت وتصحيح البصر | Cataract & Refractive Services
+     (1 طبيب)
+     1. Dr. Y. Umesh
+
+
+  القسم 21. كتاراكت وجلوكوما | Cataract & Glaucoma
+     (4 طبيب)
+     1. Dr. Ajitha S
+     2. Dr. Meena G Menon
+     3. Dr. S. Ajitha
+     4. Dr. Srilakshmi Sikhakoli
+
+
+  القسم 22. كتاراكت وشبكية طبية | Cataract & Medical Retina
+     (1 طبيب)
+     1. Dr. Jayamadhury Gudimetla
+
+
+  القسم 23. كتاراكت وشبكية طبية وقزحية | Cataract, Medical Retina & UVEA Services
+     (1 طبيب)
+     1. Dr. Minija C K
+
+
+  القسم 24. كتاراكت وقرنية وتصحيح البصر | Cataract, Cornea & Refractive Service
+     (1 طبيب)
+     1. Dr. Anand Balasubramaniam
+
+
+  القسم 25. كتاراكت وقرنية وتصحيح البصر | Cataract, Cornea & Refractive Services
+     (4 طبيب)
+     1. Dr. Haritha Veluri
+     2. Dr. Jagadeesh Kumar Reddy K
+     3. Dr. Madhuri V
+     4. Dr. Shashidhar Banigallapati
+
+
+  القسم 26. كتاراكت وقرنية وتصحيح البصر | Cataract, Cornea & Refractive Surgery
+     (1 طبيب)
+     1. Dr. Nisha Ahuja
+
+
+  القسم 27. محجر العين | Orbit & Oculoplasty
+     (2 طبيب)
+     1. Dr. Shruthi Tara
+     2. Dr. Sowjanya Yerra
+
+
+================================================================================
+
+المستشفى 20. Trilife Hospital, Bangalore
+--------------------------------------------------------------------------------
+
+  القسم 1. أمراض الجهاز الهضمي | Gastroenterology
+     (1 طبيب)
+     1. Dr. Atif Ahmed
+
+
+  القسم 2. أمراض الروماتيزم | Rheumatology
+     (1 طبيب)
+     1. Dr. Raghavendra H
+
+
+  القسم 3. أمراض الكلى | Nephrology
+     (1 طبيب)
+     1. Dr. Raghavendra N
+
+
+  القسم 4. أنف وأذن وحنجرة | ENT
+     (2 طبيب)
+     1. Dr. Aishwarya
+     2. Dr. Sharath G
+
+
+  القسم 5. الطب الباطني | Internal Medicine
+     (1 طبيب)
+     1. Dr. Aditya S Chowti
+
+
+  القسم 6. تخدير | Anaesthesia
+     (1 طبيب)
+     1. Dr. Rajalakshmi
+
+
+  القسم 7. جراحة العظام | Orthopaedics
+     (1 طبيب)
+     1. Dr. Prashanth R
+
+
+  القسم 8. جراحة القلب | Cardiac Surgery
+     (1 طبيب)
+     1. Dr. Tameem Ahmed
+
+
+  القسم 9. جراحة المسالك البولية | Urology
+     (1 طبيب)
+     1. Dr. Siddaling Ladde
+
+
+  القسم 10. جراحة عامة | General Surgery
+     (2 طبيب)
+     1. Dr. Bhushan
+     2. Dr. Shamna Mahmood Abdulla
+
+
+  القسم 11. طب الأعصاب | Neurology
+     (1 طبيب)
+     1. Dr. H Santosh
+
+
+  القسم 12. طب باطني | Physician / Internal Medicine
+     (1 طبيب)
+     1. Dr. Adarsh G
+
+
+  القسم 13. نساء وولادة | OBG (Gynaecology & Obstetrics)
+     (1 طبيب)
+     1. Dr. Usha M R
+
+
+================================================================================
+

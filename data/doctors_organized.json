@@ -1,0 +1,4814 @@
+{
+  "metadata": {
+    "created_at": "2025-11-28T21:17:24.271675",
+    "total_hospitals": 21,
+    "total_doctors": 1060,
+    "updated_at": "2025-11-28T23:05:27.083736"
+  },
+  "hospitals": {
+    "AIG Hospitals, Gachibowli Hyderabad": {
+      "أمراض القلب | Cardiology": {
+        "department_ar": "أمراض القلب",
+        "department_en": "Cardiology",
+        "doctors": [
+          "Dr. R Prasada Reddy"
+        ]
+      },
+      "فيزيولوجيا كهربائية القلب | Electrophysiology & Cardiology": {
+        "department_ar": "فيزيولوجيا كهربائية القلب",
+        "department_en": "Electrophysiology & Cardiology",
+        "doctors": [
+          "Dr. C Narasimhan"
+        ]
+      },
+      "مناظير متقدمة | Endoscopy & EUS": {
+        "department_ar": "مناظير متقدمة",
+        "department_en": "Endoscopy & EUS",
+        "doctors": [
+          "Dr. Sundeep Lakhtakia"
+        ]
+      },
+      "الجهاز الهضمي | Gastroenterology": {
+        "department_ar": "الجهاز الهضمي",
+        "department_en": "Gastroenterology",
+        "doctors": [
+          "Dr. D Nageshwar Reddy"
+        ]
+      },
+      "أمراض الأمعاء ومناظير | IBD & Endoscopy": {
+        "department_ar": "أمراض الأمعاء ومناظير",
+        "department_en": "IBD & Endoscopy",
+        "doctors": [
+          "Dr. Rupa Banerjee"
+        ]
+      },
+      "طب باطني | Internal Medicine": {
+        "department_ar": "طب باطني",
+        "department_en": "Internal Medicine",
+        "doctors": [
+          "Dr. Naveen Reddy Podduturi"
+        ]
+      },
+      "مناظير الجهاز الهضمي | Interventional Endoscopy": {
+        "department_ar": "مناظير الجهاز الهضمي",
+        "department_en": "Interventional Endoscopy",
+        "doctors": [
+          "Dr. Mohan Ramchandani"
+        ]
+      },
+      "أمراض وزراعة الكبد | Liver Sciences & Transplant Hepatology": {
+        "department_ar": "أمراض وزراعة الكبد",
+        "department_en": "Liver Sciences & Transplant Hepatology",
+        "doctors": [
+          "Dr. P Nagaraja Rao"
+        ]
+      },
+      "زراعة الكبد والجراحة الكبدية | Liver Transplant & Hepatobiliary Surgery": {
+        "department_ar": "زراعة الكبد والجراحة الكبدية",
+        "department_en": "Liver Transplant & Hepatobiliary Surgery",
+        "doctors": [
+          "Dr. P. Balachandran Menon"
+        ]
+      },
+      "الجراحة طفيفة التوغل والجهاز الهضمي | Surgical Gastroenterology & Minimally Invasive Surgery": {
+        "department_ar": "الجراحة طفيفة التوغل والجهاز الهضمي",
+        "department_en": "Surgical Gastroenterology & Minimally Invasive Surgery",
+        "doctors": [
+          "Dr. G. V. Rao"
+        ]
+      }
+    },
+    "Apollo Hospital, Bannerghatta Bangalore": {
+      "أورام الثدي | Breast Oncology": {
+        "department_ar": "أورام الثدي",
+        "department_en": "Breast Oncology",
+        "doctors": [
+          "Dr. Jayanthi Thumsi",
+          "Dr. Linu Jacob"
+        ]
+      },
+      "جراحة القلب والصدر والأوعية | CTVS": {
+        "department_ar": "جراحة القلب والصدر والأوعية",
+        "department_en": "CTVS",
+        "doctors": [
+          "Dr. Satyaki Nambyala"
+        ]
+      },
+      "جراحة القلب | Cardiac Surgery": {
+        "department_ar": "جراحة القلب",
+        "department_en": "Cardiac Surgery",
+        "doctors": [
+          "Dr. Sathyaki P Nambala"
+        ]
+      },
+      "أمراض القلب | Cardiology": {
+        "department_ar": "أمراض القلب",
+        "department_en": "Cardiology",
+        "doctors": [
+          "Dr. Abhijit Vilas Kulkarni",
+          "Dr. B. Ramesh",
+          "Dr. Girish B Navasundhi",
+          "Dr. K.B. Prasad",
+          "Dr. Lakshimikant",
+          "Dr. Vittal Bhagi"
+        ]
+      },
+      "علم النفس | Clinical Psychology": {
+        "department_ar": "علم النفس",
+        "department_en": "Clinical Psychology",
+        "doctors": [
+          "Dr. Sugami Ramesh"
+        ]
+      },
+      "سرطان القولون والمستقيم | Colon & Rectal Cancer": {
+        "department_ar": "سرطان القولون والمستقيم",
+        "department_en": "Colon & Rectal Cancer",
+        "doctors": [
+          "Dr. Narasimhaiah Srinivasaiah"
+        ]
+      },
+      "جلدية | Dermatology": {
+        "department_ar": "جلدية",
+        "department_en": "Dermatology",
+        "doctors": [
+          "Dr. Ashwini Shetty",
+          "Dr. Girish Panth",
+          "Dr. Surendra V H",
+          "Dr. Vanita Mathew"
+        ]
+      },
+      "أنف وأذن وحنجرة | ENT": {
+        "department_ar": "أنف وأذن وحنجرة",
+        "department_en": "ENT",
+        "doctors": [
+          "Dr. Aanchal A Mittal",
+          "Dr. Nagamani",
+          "Dr. Pradeep Hosamani",
+          "Dr. Sumit Kumar Gaur",
+          "Dr. Sunil Narayan Dutt"
+        ]
+      },
+      "الغدد الصماء | Endocrinology": {
+        "department_ar": "الغدد الصماء",
+        "department_en": "Endocrinology",
+        "doctors": [
+          "Dr. Dwarkanath",
+          "Dr. Suyadevara Varun"
+        ]
+      },
+      "جهاز هضمي | Gastroenterology": {
+        "department_ar": "جهاز هضمي",
+        "department_en": "Gastroenterology",
+        "doctors": [
+          "Dr. Dinesh Kini",
+          "Dr. Prasanna K.S",
+          "Dr. Vijay Kumar"
+        ]
+      },
+      "جراحة عامة | General Surgery": {
+        "department_ar": "جراحة عامة",
+        "department_en": "General Surgery",
+        "doctors": [
+          "Dr. Dinesh Kumar",
+          "Dr. Gautham",
+          "Dr. Kiran KJ",
+          "Dr. Prashanth C",
+          "Dr. Ravishankar Bhat",
+          "Dr. Satyajit Godhi",
+          "Dr. Saurabh Mishra"
+        ]
+      },
+      "طب باطني | Geriatric Internal Medicine": {
+        "department_ar": "طب باطني",
+        "department_en": "Geriatric Internal Medicine",
+        "doctors": [
+          "Dr. Aarathi Kannan",
+          "Dr. Steve Paul Manjaly"
+        ]
+      },
+      "أورام نسائية | Gynaecological Cancer": {
+        "department_ar": "أورام نسائية",
+        "department_en": "Gynaecological Cancer",
+        "doctors": [
+          "Dr. Rani A Bhat"
+        ]
+      },
+      "أمراض النساء | Gynaecology": {
+        "department_ar": "أمراض النساء",
+        "department_en": "Gynaecology",
+        "doctors": [
+          "Dr. Chitra Ramamurthy",
+          "Dr. Harshitha Ramamurthy",
+          "Dr. Preethi Prabhakar Shetty",
+          "Dr. Sunitha Shreedhar"
+        ]
+      },
+      "أمراض الدم وأورام الأطفال | Haematology & Paediatric Oncology": {
+        "department_ar": "أمراض الدم وأورام الأطفال",
+        "department_en": "Haematology & Paediatric Oncology",
+        "doctors": [
+          "Dr. Neema Bhat"
+        ]
+      },
+      "جراحة الرأس والرقبة | Head & Neck Cancer": {
+        "department_ar": "جراحة الرأس والرقبة",
+        "department_en": "Head & Neck Cancer",
+        "doctors": [
+          "Dr. Krishnamurthy",
+          "Dr. Satish Nair"
+        ]
+      },
+      "جراحة الرأس والرقبة | Head & Neck Oncology": {
+        "department_ar": "جراحة الرأس والرقبة",
+        "department_en": "Head & Neck Oncology",
+        "doctors": [
+          "Dr. P Subramanya Rao"
+        ]
+      },
+      "أمراض الكبد | Hepatology": {
+        "department_ar": "أمراض الكبد",
+        "department_en": "Hepatology",
+        "doctors": [
+          "Dr. Sandeep Satsangi"
+        ]
+      },
+      "أمراض معدية | Infectious Disease": {
+        "department_ar": "أمراض معدية",
+        "department_en": "Infectious Disease",
+        "doctors": [
+          "Dr. Vinay D"
+        ]
+      },
+      "طب باطني | Internal Medicine": {
+        "department_ar": "طب باطني",
+        "department_en": "Internal Medicine",
+        "doctors": [
+          "Dr. Hina Mehara",
+          "Dr. Jyotsna Krishnappa",
+          "Dr. Kalpana Janardhan",
+          "Dr. Malla Reddy",
+          "Dr. Rajeeva Mogar",
+          "Dr. Ramesh B.S",
+          "Dr. Raza Shah",
+          "Dr. Swarna Das"
+        ]
+      },
+      "زراعة الكبد | Liver Transplant": {
+        "department_ar": "زراعة الكبد",
+        "department_en": "Liver Transplant",
+        "doctors": [
+          "Dr. Jayath Reddy",
+          "Dr. Sanjay Govil",
+          "Dr. Suresh Ragavaiah"
+        ]
+      },
+      "أورام طبية | Medical Oncology": {
+        "department_ar": "أورام طبية",
+        "department_en": "Medical Oncology",
+        "doctors": [
+          "Dr. Kiran Kumar Sajjan Shetty",
+          "Dr. Poonam Maurya",
+          "Dr. Vijay Agarwal",
+          "Dr. Vishwanath S"
+        ]
+      },
+      "حديثي الولادة | Neonatology": {
+        "department_ar": "حديثي الولادة",
+        "department_en": "Neonatology",
+        "doctors": [
+          "Dr. Arpana Bansal",
+          "Dr. Prashanth Urs"
+        ]
+      },
+      "أمراض الكلى | Nephrology": {
+        "department_ar": "أمراض الكلى",
+        "department_en": "Nephrology",
+        "doctors": [
+          "Dr. Gokulnath",
+          "Dr. Vinod Kumar"
+        ]
+      },
+      "طب الأعصاب | Neurology": {
+        "department_ar": "طب الأعصاب",
+        "department_en": "Neurology",
+        "doctors": [
+          "Dr. Gurucharan Adhoor",
+          "Dr. Suryanarayana Sharma P M",
+          "Dr. Vikram Kamath"
+        ]
+      },
+      "جراحة المخ والأعصاب | Neurosurgery": {
+        "department_ar": "جراحة المخ والأعصاب",
+        "department_en": "Neurosurgery",
+        "doctors": [
+          "Dr. Kumbhar Kartik Revanappa",
+          "Dr. Sachin G",
+          "Dr. Satish Satyanarayan"
+        ]
+      },
+      "تصوير الأورام | Onco Imaging": {
+        "department_ar": "تصوير الأورام",
+        "department_en": "Onco Imaging",
+        "doctors": [
+          "Dr. Govindarajan M J",
+          "Dr. Murthy S",
+          "Dr. Savith Kumar",
+          "Dr. Swarna Shivakumar"
+        ]
+      },
+      "طب العيون | Ophthalmology": {
+        "department_ar": "طب العيون",
+        "department_en": "Ophthalmology",
+        "doctors": [
+          "Dr. Shalini Shetty"
+        ]
+      },
+      "جراحة العظام | Orthopaedic": {
+        "department_ar": "جراحة العظام",
+        "department_en": "Orthopaedic",
+        "doctors": [
+          "Dr. Adarsh",
+          "Dr. Ajith Prabhu",
+          "Dr. Manish Samson",
+          "Dr. Pradeep Kochheppan",
+          "Dr. Rajshekar K T",
+          "Dr. Raviraj A",
+          "Dr. Shashikumar H.K",
+          "Dr. Vidya Sagar",
+          "Dr. Vivek Kumar"
+        ]
+      },
+      "أورام عظام | Orthopaedic Oncology": {
+        "department_ar": "أورام عظام",
+        "department_en": "Orthopaedic Oncology",
+        "doctors": [
+          "Dr. Srimanth B S"
+        ]
+      },
+      "الغدد الصماء للأطفال | Paediatric Endocrinology": {
+        "department_ar": "الغدد الصماء للأطفال",
+        "department_en": "Paediatric Endocrinology",
+        "doctors": [
+          "Dr. Anjana Hulse"
+        ]
+      },
+      "عظام الأطفال | Paediatric Ortho": {
+        "department_ar": "عظام الأطفال",
+        "department_en": "Paediatric Ortho",
+        "doctors": [
+          "Dr. Manohar Babu"
+        ]
+      },
+      "جراحة الأطفال | Paediatric Surgeon": {
+        "department_ar": "جراحة الأطفال",
+        "department_en": "Paediatric Surgeon",
+        "doctors": [
+          "Dr. Anand Alladi"
+        ]
+      },
+      "جراحة الأطفال | Paediatric Surgery": {
+        "department_ar": "جراحة الأطفال",
+        "department_en": "Paediatric Surgery",
+        "doctors": [
+          "Dr. Chitra Ramu"
+        ]
+      },
+      "طب أطفال | Paediatrics": {
+        "department_ar": "طب أطفال",
+        "department_en": "Paediatrics",
+        "doctors": [
+          "Dr. Poonam Shetty",
+          "Dr. Radhakrisha Hegde",
+          "Dr. Raghavan P.S",
+          "Dr. Shwetha S Rao",
+          "Dr. Sowmya C.C"
+        ]
+      },
+      "طب نفسي | Psychiatry": {
+        "department_ar": "طب نفسي",
+        "department_en": "Psychiatry",
+        "doctors": [
+          "Dr. Roshan Jain",
+          "Dr. Shobha Krishna",
+          "Dr. Srinivas Reddy"
+        ]
+      },
+      "أمراض الرئة | Pulmonology": {
+        "department_ar": "أمراض الرئة",
+        "department_en": "Pulmonology",
+        "doctors": [
+          "Dr. Hariprasad",
+          "Dr. Ravindra Mehta",
+          "Dr. Sumanth Mantri"
+        ]
+      },
+      "علاج الأورام بالإشعاع | Radiation Oncology": {
+        "department_ar": "علاج الأورام بالإشعاع",
+        "department_en": "Radiation Oncology",
+        "doctors": [
+          "Dr. B K M Reddy",
+          "Dr. Kumara Swamy",
+          "Dr. Natarajan V",
+          "Dr. Sridhar P S",
+          "Dr. Vijay Bhaskar L",
+          "Dr. Vikram Maiya M",
+          "Dr. Vinay Ural"
+        ]
+      },
+      "أمراض الروماتيزم | Rheumatology": {
+        "department_ar": "أمراض الروماتيزم",
+        "department_en": "Rheumatology",
+        "doctors": [
+          "Dr. Roopa Tekkatte"
+        ]
+      },
+      "جراحة الأورام | Surgical Oncology": {
+        "department_ar": "جراحة الأورام",
+        "department_en": "Surgical Oncology",
+        "doctors": [
+          "Dr. Anil Kamat",
+          "Dr. Sunil Navalgund"
+        ]
+      },
+      "أورام المسالك البولية | Uro Oncology": {
+        "department_ar": "أورام المسالك البولية",
+        "department_en": "Uro Oncology",
+        "doctors": [
+          "Dr. Manohar T",
+          "Dr. Ravi Chandran K"
+        ]
+      },
+      "جراحة الأوعية الدموية | Vascular Surgery": {
+        "department_ar": "جراحة الأوعية الدموية",
+        "department_en": "Vascular Surgery",
+        "doctors": [
+          "Dr. Sundar Narasimhan"
+        ]
+      }
+    },
+    "Artemis Hospital, Delhi": {
+      "تخدير | Anaesthesia": {
+        "department_ar": "تخدير",
+        "department_en": "Anaesthesia",
+        "doctors": [
+          "Dr. Amit Jassal",
+          "Dr. Amit Kalsotra",
+          "Dr. G. Arya Prakash",
+          "Dr. Narender Kumar",
+          "Dr. Rajesh Misra",
+          "Dr. Shelly Mittal",
+          "Dr. Swati Aggarwal",
+          "Dr. Vijay Mohan Hanjoora",
+          "Dr. Y Naveen"
+        ]
+      },
+      "طب نقل الدم | Blood Centre & Transfusion Medicine": {
+        "department_ar": "طب نقل الدم",
+        "department_en": "Blood Centre & Transfusion Medicine",
+        "doctors": [
+          "Dr. (Brig.) Anil Khetarpal"
+        ]
+      },
+      "جراحة الثدي | Breast Surgery / Oncology": {
+        "department_ar": "جراحة الثدي",
+        "department_en": "Breast Surgery / Oncology",
+        "doctors": [
+          "Dr. Deepak Jha"
+        ]
+      },
+      "أمراض القلب | Cardiology": {
+        "department_ar": "أمراض القلب",
+        "department_en": "Cardiology",
+        "doctors": [
+          "Dr. (Col) Balbir Kalra",
+          "Dr. D.K. Jhamb",
+          "Dr. Rahul Mehrotra"
+        ]
+      },
+      "جراحة أوعية وقلب | Cardiothoracic & Vascular Surgery": {
+        "department_ar": "جراحة أوعية وقلب",
+        "department_en": "Cardiothoracic & Vascular Surgery",
+        "doctors": [
+          "Dr. Surendra Nath Khanna"
+        ]
+      },
+      "جراحة تجميل | Cosmetic & Plastic Surgery": {
+        "department_ar": "جراحة تجميل",
+        "department_en": "Cosmetic & Plastic Surgery",
+        "doctors": [
+          "Dr. Ankur Bhatia",
+          "Dr. Pradeep Kumar Singh"
+        ]
+      },
+      "طب الأسنان | Dentistry": {
+        "department_ar": "طب الأسنان",
+        "department_en": "Dentistry",
+        "doctors": [
+          "Dr. Anjana Satyajit"
+        ]
+      },
+      "جلدية وتجميل | Dermatology & Cosmetology": {
+        "department_ar": "جلدية وتجميل",
+        "department_en": "Dermatology & Cosmetology",
+        "doctors": [
+          "Dr. Monica Bambroo",
+          "Dr. Noor Sharma",
+          "Dr. Shifa Yadav"
+        ]
+      },
+      "أنف وأذن وحنجرة | ENT": {
+        "department_ar": "أنف وأذن وحنجرة",
+        "department_en": "ENT",
+        "doctors": [
+          "Dr. Trisha Srivastava"
+        ]
+      },
+      "أنف وأذن وحنجرة | ENT Surgery": {
+        "department_ar": "أنف وأذن وحنجرة",
+        "department_en": "ENT Surgery",
+        "doctors": [
+          "Dr. Dilpreet Bajwa",
+          "Dr. Poonam Gautam",
+          "Dr. Shashidhar TB"
+        ]
+      },
+      "كهروفسيولوجيا القلب | Electrophysiology & Interventional Cardiology": {
+        "department_ar": "كهروفسيولوجيا القلب",
+        "department_en": "Electrophysiology & Interventional Cardiology",
+        "doctors": [
+          "Dr. Sameer Mehrotra"
+        ]
+      },
+      "الطوارئ | Emergency & Trauma": {
+        "department_ar": "الطوارئ",
+        "department_en": "Emergency & Trauma",
+        "doctors": [
+          "Dr. Rajesh Kumar Singh"
+        ]
+      },
+      "الطوارئ | Emergency & Trauma Services": {
+        "department_ar": "الطوارئ",
+        "department_en": "Emergency & Trauma Services",
+        "doctors": [
+          "Dr. (Col) Suvasish Chakraberty",
+          "Dr. Anjana Kharbanda",
+          "Dr. Ellora Nanda",
+          "Dr. Yatin Kukreja"
+        ]
+      },
+      "سكري وغدد | Endocrinology": {
+        "department_ar": "سكري وغدد",
+        "department_en": "Endocrinology",
+        "doctors": [
+          "Dr. Dheeraj Kapoor"
+        ]
+      },
+      "طب الأجنة والوراثة | Fetal Medicine & Genetics": {
+        "department_ar": "طب الأجنة والوراثة",
+        "department_en": "Fetal Medicine & Genetics",
+        "doctors": [
+          "Dr. Ashutosh Gupta"
+        ]
+      },
+      "الجهاز الهضمي | Gastroenterology / GI Surgery": {
+        "department_ar": "الجهاز الهضمي",
+        "department_en": "Gastroenterology / GI Surgery",
+        "doctors": [
+          "Dr. Bimal Kumar Sahu",
+          "Dr. M.A Mir"
+        ]
+      },
+      "جراحة عامة ومناظير | General & Minimally Invasive Surgery": {
+        "department_ar": "جراحة عامة ومناظير",
+        "department_en": "General & Minimally Invasive Surgery",
+        "doctors": [
+          "Dr. Hitender Singh Chauhan"
+        ]
+      },
+      "الوراثة | Genetics": {
+        "department_ar": "الوراثة",
+        "department_en": "Genetics",
+        "doctors": [
+          "Dr. Kanika Singh"
+        ]
+      },
+      "طب الشيخوخة | Geriatric Medicine": {
+        "department_ar": "طب الشيخوخة",
+        "department_en": "Geriatric Medicine",
+        "doctors": [
+          "Dr. Meenal Thakral",
+          "Dr. Prasun Chatterjee"
+        ]
+      },
+      "غدد نسائية | Gynaecological Endocrinology": {
+        "department_ar": "غدد نسائية",
+        "department_en": "Gynaecological Endocrinology",
+        "doctors": [
+          "Dr. Nutan Agarwal"
+        ]
+      },
+      "أورام النساء | Gynaecological Oncology": {
+        "department_ar": "أورام النساء",
+        "department_en": "Gynaecological Oncology",
+        "doctors": [
+          "Dr. Amita Naithani"
+        ]
+      },
+      "أورام نسائية | Gynaecological Oncology": {
+        "department_ar": "أورام نسائية",
+        "department_en": "Gynaecological Oncology",
+        "doctors": [
+          "Dr. Rupinder Sekhon"
+        ]
+      },
+      "زراعة القلب والرئة | Heart & Lung Transplant": {
+        "department_ar": "زراعة القلب والرئة",
+        "department_en": "Heart & Lung Transplant",
+        "doctors": [
+          "Dr. Biswarup Purkayastha"
+        ]
+      },
+      "أمراض الدم وزراعة نخاع | Hematology & BMT": {
+        "department_ar": "أمراض الدم وزراعة نخاع",
+        "department_en": "Hematology & BMT",
+        "doctors": [
+          "Dr. Gaurav Dixit"
+        ]
+      },
+      "أمراض الدم و BMT | Hematology & BMT": {
+        "department_ar": "أمراض الدم و BMT",
+        "department_en": "Hematology & BMT",
+        "doctors": [
+          "Dr. Lalit Kumar"
+        ]
+      },
+      "أمراض الدم وBMT | Hematology & BMT": {
+        "department_ar": "أمراض الدم وBMT",
+        "department_en": "Hematology & BMT",
+        "doctors": [
+          "Dr. Rahul Naithani"
+        ]
+      },
+      "استبدال مفاصل | Hip & Knee Arthroplasty": {
+        "department_ar": "استبدال مفاصل",
+        "department_en": "Hip & Knee Arthroplasty",
+        "doctors": [
+          "Dr. Gajanand Yadav"
+        ]
+      },
+      "العناية المركزة | ICU / Critical Care": {
+        "department_ar": "العناية المركزة",
+        "department_en": "ICU / Critical Care",
+        "doctors": [
+          "Dr. Jeetendra Sharma",
+          "Dr. Kuldeep Singh",
+          "Dr. Mukesh Kumar Gupta"
+        ]
+      },
+      "عناية مركزة | ICU / Critical Care": {
+        "department_ar": "عناية مركزة",
+        "department_en": "ICU / Critical Care",
+        "doctors": [
+          "Dr. Rati Bansal Goel",
+          "Dr. Reshma Tewari"
+        ]
+      },
+      "أطفال الأنابيب | IVF & Reproductive Medicine": {
+        "department_ar": "أطفال الأنابيب",
+        "department_en": "IVF & Reproductive Medicine",
+        "doctors": [
+          "Dr. Kiran Arora",
+          "Dr. Parul Prakash",
+          "Dr. Sarabpreet Singh"
+        ]
+      },
+      "طب باطني | Internal Medicine": {
+        "department_ar": "طب باطني",
+        "department_en": "Internal Medicine",
+        "doctors": [
+          "Dr. Arpit Jain",
+          "Dr. P Venkata Krishnan",
+          "Dr. Seema Dhir"
+        ]
+      },
+      "أمراض القلب التداخلية | Interventional Cardiology": {
+        "department_ar": "أمراض القلب التداخلية",
+        "department_en": "Interventional Cardiology",
+        "doctors": [
+          "Dr. Kuldeep Arora"
+        ]
+      },
+      "قلب تداخلي | Interventional Cardiology": {
+        "department_ar": "قلب تداخلي",
+        "department_en": "Interventional Cardiology",
+        "doctors": [
+          "Dr. Sushant Mishra"
+        ]
+      },
+      "أمراض القلب التداخلية | Interventional Cardiology & Structural Heart": {
+        "department_ar": "أمراض القلب التداخلية",
+        "department_en": "Interventional Cardiology & Structural Heart",
+        "doctors": [
+          "Dr. Amit Kumar Chaurasia"
+        ]
+      },
+      "زراعة الكلى | Kidney Transplant & Nephrology": {
+        "department_ar": "زراعة الكلى",
+        "department_en": "Kidney Transplant & Nephrology",
+        "doctors": [
+          "Dr. Gaurav Singhal",
+          "Dr. Lakshmi Kant Tripathi",
+          "Dr. Manju Aggarwal"
+        ]
+      },
+      "زراعة الكلى والمسالك | Kidney Transplant & Urology": {
+        "department_ar": "زراعة الكلى والمسالك",
+        "department_en": "Kidney Transplant & Urology",
+        "doctors": [
+          "Dr. Kunal Vinayak",
+          "Dr. Varun Mittal"
+        ]
+      },
+      "طب المختبرات | Laboratory Medicine": {
+        "department_ar": "طب المختبرات",
+        "department_en": "Laboratory Medicine",
+        "doctors": [
+          "Dr. Deepa Goel",
+          "Dr. Namita Jaggi",
+          "Dr. Nandini Vasdev",
+          "Dr. Ritika Singla"
+        ]
+      },
+      "طب المختبرات | Laboratory Services": {
+        "department_ar": "طب المختبرات",
+        "department_en": "Laboratory Services",
+        "doctors": [
+          "Dr. Vineeta Raina"
+        ]
+      },
+      "زراعة الكبد | Liver Transplant": {
+        "department_ar": "زراعة الكبد",
+        "department_en": "Liver Transplant",
+        "doctors": [
+          "Dr. Giriraj Bora",
+          "Dr. Shyam Sunder Mahansaria"
+        ]
+      },
+      "الصحة النفسية | Mental Health": {
+        "department_ar": "الصحة النفسية",
+        "department_en": "Mental Health",
+        "doctors": [
+          "Dr. Puneet Dwevedi",
+          "Dr. Rahul Chandhok"
+        ]
+      },
+      "الصحة النفسية | Mental Health & Behavioural Sciences": {
+        "department_ar": "الصحة النفسية",
+        "department_en": "Mental Health & Behavioural Sciences",
+        "doctors": [
+          "Dr. Chandrima Misra Mukherjee"
+        ]
+      },
+      "جراحة عامة ومناظير وروبوت | Minimally Invasive & Robotic Surgery": {
+        "department_ar": "جراحة عامة ومناظير وروبوت",
+        "department_en": "Minimally Invasive & Robotic Surgery",
+        "doctors": [
+          "Dr. Manjul Bawa"
+        ]
+      },
+      "جراحة عامة ومناظير | Minimally Invasive Surgery": {
+        "department_ar": "جراحة عامة ومناظير",
+        "department_en": "Minimally Invasive Surgery",
+        "doctors": [
+          "Dr. Paritosh S Gupta"
+        ]
+      },
+      "جراحة مناظير | Minimally Invasive Surgery": {
+        "department_ar": "جراحة مناظير",
+        "department_en": "Minimally Invasive Surgery",
+        "doctors": [
+          "Dr. Rakesh Durkhure",
+          "Dr. Suresh Kumar Chhabra"
+        ]
+      },
+      "أمراض الكلى | Nephrology": {
+        "department_ar": "أمراض الكلى",
+        "department_en": "Nephrology",
+        "doctors": [
+          "Dr. Dinesh Bansal"
+        ]
+      },
+      "العناية المركزة العصبية | Neuro Critical Care": {
+        "department_ar": "العناية المركزة العصبية",
+        "department_en": "Neuro Critical Care",
+        "doctors": [
+          "Dr. Deepak Solanki"
+        ]
+      },
+      "عناية مركزة عصبية | Neuro Critical Care": {
+        "department_ar": "عناية مركزة عصبية",
+        "department_en": "Neuro Critical Care",
+        "doctors": [
+          "Dr. Raman Deep Kaur",
+          "Dr. Saurabh Anand",
+          "Dr. Seema Lachala",
+          "Dr. Sweetha Susanne Mohan"
+        ]
+      },
+      "العناية المركزة العصبية | Neuroanaesthesia & Neuro Critical Care": {
+        "department_ar": "العناية المركزة العصبية",
+        "department_en": "Neuroanaesthesia & Neuro Critical Care",
+        "doctors": [
+          "Dr. Ashish Chakravarty"
+        ]
+      },
+      "جراحة الأعصاب التداخلية | Neurointerventional Surgery": {
+        "department_ar": "جراحة الأعصاب التداخلية",
+        "department_en": "Neurointerventional Surgery",
+        "doctors": [
+          "Dr. Mukesh Kumar"
+        ]
+      },
+      "جراحة عصبية تداخلية | Neurointerventional Surgery": {
+        "department_ar": "جراحة عصبية تداخلية",
+        "department_en": "Neurointerventional Surgery",
+        "doctors": [
+          "Dr. Tariq Matin"
+        ]
+      },
+      "طب الأعصاب | Neurology": {
+        "department_ar": "طب الأعصاب",
+        "department_en": "Neurology",
+        "doctors": [
+          "Dr. Mohit Anand",
+          "Dr. Sameer Arora",
+          "Dr. Sumit Singh",
+          "Dr. Vivek Barun"
+        ]
+      },
+      "جراحة المخ والأعصاب | Neurosurgery": {
+        "department_ar": "جراحة المخ والأعصاب",
+        "department_en": "Neurosurgery",
+        "doctors": [
+          "Dr. Aditya Gupta",
+          "Dr. Anuvrat Sinha",
+          "Dr. Pawan Goyal",
+          "Dr. Sanjeev Srivastava"
+        ]
+      },
+      "طب نووي | Nuclear Medicine": {
+        "department_ar": "طب نووي",
+        "department_en": "Nuclear Medicine",
+        "doctors": [
+          "Dr. Noaline Sinha",
+          "Dr. Tajamul Syed Malik"
+        ]
+      },
+      "تغذية علاجية | Nutrition & Dietetics": {
+        "department_ar": "تغذية علاجية",
+        "department_en": "Nutrition & Dietetics",
+        "doctors": [
+          "Dr. Shabana Parveen"
+        ]
+      },
+      "نساء وولادة | Obstetrics & Gynaecology": {
+        "department_ar": "نساء وولادة",
+        "department_en": "Obstetrics & Gynaecology",
+        "doctors": [
+          "Dr. Deepa Maheshwari",
+          "Dr. Nidhi Jain",
+          "Dr. Nidhi Rajotia",
+          "Dr. Renu Raina Sehgal",
+          "Dr. Seerat Sandhu"
+        ]
+      },
+      "الأورام | Oncology": {
+        "department_ar": "الأورام",
+        "department_en": "Oncology",
+        "doctors": [
+          "Dr. Biswajyoti Hazarika",
+          "Dr. Kamal Verma"
+        ]
+      },
+      "أورام | Oncology": {
+        "department_ar": "أورام",
+        "department_en": "Oncology",
+        "doctors": [
+          "Dr. Preeti Vijayakumaran",
+          "Dr. Priya Tiwari",
+          "Dr. Priyanka Raina",
+          "Dr. S Jayalakshmi",
+          "Dr. Sandeep Goel",
+          "Dr. Subodh Chandra Pande"
+        ]
+      },
+      "جراحة أورام | Oncology Surgery": {
+        "department_ar": "جراحة أورام",
+        "department_en": "Oncology Surgery",
+        "doctors": [
+          "Dr. Parveen Yadav"
+        ]
+      },
+      "طب العيون | Ophthalmology": {
+        "department_ar": "طب العيون",
+        "department_en": "Ophthalmology",
+        "doctors": [
+          "Dr. Vishal Arora"
+        ]
+      },
+      "زراعة الأعضاء والمسالك | Organ Transplant & Urology": {
+        "department_ar": "زراعة الأعضاء والمسالك",
+        "department_en": "Organ Transplant & Urology",
+        "doctors": [
+          "Dr. Abhinandan Mukhopadhyay"
+        ]
+      },
+      "جراحة العظام | Orthopaedics": {
+        "department_ar": "جراحة العظام",
+        "department_en": "Orthopaedics",
+        "doctors": [
+          "Dr. (Prof.) Ravi Sauhta",
+          "Dr. Devendra Singh Solanki",
+          "Dr. Devendra Yadav",
+          "Dr. Mohd Irfan Banday",
+          "Dr. Vipin Maheshwari",
+          "Dr. Vivek Vaibhav"
+        ]
+      },
+      "جراحة عظام | Orthopaedics": {
+        "department_ar": "جراحة عظام",
+        "department_en": "Orthopaedics",
+        "doctors": [
+          "Dr. Sandeep Chauhan"
+        ]
+      },
+      "قلب أطفال وجراحة قلب | Paediatric Cardiac Surgery & Cardiology": {
+        "department_ar": "قلب أطفال وجراحة قلب",
+        "department_en": "Paediatric Cardiac Surgery & Cardiology",
+        "doctors": [
+          "Dr. Aseem R. Srivastava"
+        ]
+      },
+      "قلب أطفال | Paediatric Cardiology": {
+        "department_ar": "قلب أطفال",
+        "department_en": "Paediatric Cardiology",
+        "doctors": [
+          "Dr. Nidhi Rawal",
+          "Dr. Shubhra Shri Gupta"
+        ]
+      },
+      "غدد أطفال ومراهقين | Paediatric Endocrinology": {
+        "department_ar": "غدد أطفال ومراهقين",
+        "department_en": "Paediatric Endocrinology",
+        "doctors": [
+          "Dr. Sumeet Arora"
+        ]
+      },
+      "جهاز هضمي أطفال | Paediatric Gastroenterology & Hepatology": {
+        "department_ar": "جهاز هضمي أطفال",
+        "department_en": "Paediatric Gastroenterology & Hepatology",
+        "doctors": [
+          "Dr. Sakshi Karkra"
+        ]
+      },
+      "أمراض الدم وزراعة نخاع للأطفال | Paediatric Haemato-Oncology & BMT": {
+        "department_ar": "أمراض الدم وزراعة نخاع للأطفال",
+        "department_en": "Paediatric Haemato-Oncology & BMT",
+        "doctors": [
+          "Dr. Sukriti Gupta"
+        ]
+      },
+      "أمراض الدم وروماتيزم الأطفال | Paediatric Haemato-Oncology & Rheumatology": {
+        "department_ar": "أمراض الدم وروماتيزم الأطفال",
+        "department_en": "Paediatric Haemato-Oncology & Rheumatology",
+        "doctors": [
+          "Dr. Anju Singh"
+        ]
+      },
+      "طب أعصاب الأطفال | Paediatric Neurology": {
+        "department_ar": "طب أعصاب الأطفال",
+        "department_en": "Paediatric Neurology",
+        "doctors": [
+          "Dr. Ajit Singh Baghela"
+        ]
+      },
+      "جراحة أطفال وعمود فقري | Paediatric Orthopaedics & Spine Surgery": {
+        "department_ar": "جراحة أطفال وعمود فقري",
+        "department_en": "Paediatric Orthopaedics & Spine Surgery",
+        "doctors": [
+          "Dr. Sanjay Sarup"
+        ]
+      },
+      "جراحة الأطفال | Paediatric Surgery": {
+        "department_ar": "جراحة الأطفال",
+        "department_en": "Paediatric Surgery",
+        "doctors": [
+          "Dr. Nitin Goel"
+        ]
+      },
+      "طب أطفال | Paediatrics": {
+        "department_ar": "طب أطفال",
+        "department_en": "Paediatrics",
+        "doctors": [
+          "Dr. Hemant K. Gogia",
+          "Dr. Padam Yadav",
+          "Dr. Prabhat Maheshwari",
+          "Dr. Rajiv Chhabra"
+        ]
+      },
+      "طب الألم | Pain Medicine & Palliative Care": {
+        "department_ar": "طب الألم",
+        "department_en": "Pain Medicine & Palliative Care",
+        "doctors": [
+          "Dr. Ashu Kumar Jain"
+        ]
+      },
+      "علاج طبيعي | Physiotherapy & Rehab": {
+        "department_ar": "علاج طبيعي",
+        "department_en": "Physiotherapy & Rehab",
+        "doctors": [
+          "Dr. Sachin Sethi"
+        ]
+      },
+      "العلاج الطبيعي وإعادة التأهيل | Physiotherapy & Rehabilitation": {
+        "department_ar": "العلاج الطبيعي وإعادة التأهيل",
+        "department_en": "Physiotherapy & Rehabilitation",
+        "doctors": [
+          "Dr. Anjali Vaish"
+        ]
+      },
+      "أمراض الصدر | Pulmonology": {
+        "department_ar": "أمراض الصدر",
+        "department_en": "Pulmonology",
+        "doctors": [
+          "Dr. Arun Chowdary Kotaru",
+          "Dr. Shweta Bansal"
+        ]
+      },
+      "أشعة | Radiology": {
+        "department_ar": "أشعة",
+        "department_en": "Radiology",
+        "doctors": [
+          "Dr. Aditi Dixit",
+          "Dr. Gurpreet Makkar",
+          "Dr. Rajiv Sharma",
+          "Dr. Sanjay Mehta",
+          "Dr. Syed Tauqueer Fazal"
+        ]
+      },
+      "روماتيزم ومناعة | Rheumatology & Clinical Immunology": {
+        "department_ar": "روماتيزم ومناعة",
+        "department_en": "Rheumatology & Clinical Immunology",
+        "doctors": [
+          "Dr. Sumeet Agrawal"
+        ]
+      },
+      "أورام روبوتية | Robotic Oncology Surgery": {
+        "department_ar": "أورام روبوتية",
+        "department_en": "Robotic Oncology Surgery",
+        "doctors": [
+          "Dr. Tapan Singh Chauhan"
+        ]
+      },
+      "جراحة روبوتية للعظام | Robotic Orthopaedic Surgery": {
+        "department_ar": "جراحة روبوتية للعظام",
+        "department_en": "Robotic Orthopaedic Surgery",
+        "doctors": [
+          "Dr. I P S Oberoi",
+          "Dr. Ramkinkar Jha"
+        ]
+      },
+      "الجراحة الروبوتية والمسالك | Robotic Surgery & Urology": {
+        "department_ar": "الجراحة الروبوتية والمسالك",
+        "department_en": "Robotic Surgery & Urology",
+        "doctors": [
+          "Dr. Ankit Goel"
+        ]
+      },
+      "جراحة روبوتية ومسالك | Robotic Urology": {
+        "department_ar": "جراحة روبوتية ومسالك",
+        "department_en": "Robotic Urology",
+        "doctors": [
+          "Dr. Rajiv Yadav"
+        ]
+      },
+      "جراحة العمود الفقري | Spine Neurosurgery": {
+        "department_ar": "جراحة العمود الفقري",
+        "department_en": "Spine Neurosurgery",
+        "doctors": [
+          "Dr. SK Rajan"
+        ]
+      },
+      "جراحة العمود الفقري | Spine Surgery": {
+        "department_ar": "جراحة العمود الفقري",
+        "department_en": "Spine Surgery",
+        "doctors": [
+          "Dr. Sumit Kumar",
+          "Dr. Varun Khanna"
+        ]
+      },
+      "جراحة العمود الفقري | Spine Surgery / Orthopaedics": {
+        "department_ar": "جراحة العمود الفقري",
+        "department_en": "Spine Surgery / Orthopaedics",
+        "doctors": [
+          "Dr. Dheeraj Batheja"
+        ]
+      },
+      "جراحة العمود الفقري | Spine Surgery / Scoliosis": {
+        "department_ar": "جراحة العمود الفقري",
+        "department_en": "Spine Surgery / Scoliosis",
+        "doctors": [
+          "Dr. Hitesh Garg"
+        ]
+      },
+      "جراحة المسالك البولية | Urology": {
+        "department_ar": "جراحة المسالك البولية",
+        "department_en": "Urology",
+        "doctors": [
+          "Dr. (Col) S. V. Kotwal",
+          "Dr. Piyush Gupta"
+        ]
+      }
+    },
+    "Aster CMI Hospital, Bangalore": {
+      "جراحة القلب | Cardiac Surgery": {
+        "department_ar": "جراحة القلب",
+        "department_en": "Cardiac Surgery",
+        "doctors": [
+          "Dr. Arul Dominic Furtado",
+          "Dr. Ganeshakrishnan Iyer",
+          "Dr. Prashanth Y M"
+        ]
+      },
+      "أمراض القلب | Cardiology": {
+        "department_ar": "أمراض القلب",
+        "department_en": "Cardiology",
+        "doctors": [
+          "Dr. Madhusudan Raikar",
+          "Dr. Nagamalesh U M",
+          "Dr. Sanjay Bhat"
+        ]
+      },
+      "الأشعة التداخلية | Clinical Imaging & Interventional Radiology": {
+        "department_ar": "الأشعة التداخلية",
+        "department_en": "Clinical Imaging & Interventional Radiology",
+        "doctors": [
+          "Dr. Sudhir Kumar Kale"
+        ]
+      },
+      "الأمراض الجلدية | Dermatology": {
+        "department_ar": "الأمراض الجلدية",
+        "department_en": "Dermatology",
+        "doctors": [
+          "Dr. Shireen Furtado"
+        ]
+      },
+      "أطفال الأنابيب وأمراض النساء | Fertility, IVF & Obstetrics": {
+        "department_ar": "أطفال الأنابيب وأمراض النساء",
+        "department_en": "Fertility, IVF & Obstetrics",
+        "doctors": [
+          "Dr. Prakrutha S"
+        ]
+      },
+      "الجراحة العامة وجراحة الجهاز الهضمي | General & Surgical Gastroenterology": {
+        "department_ar": "الجراحة العامة وجراحة الجهاز الهضمي",
+        "department_en": "General & Surgical Gastroenterology",
+        "doctors": [
+          "Dr. Puneeth Thalasta"
+        ]
+      },
+      "جراحة عامة | General Surgery & Allied Specialities": {
+        "department_ar": "جراحة عامة",
+        "department_en": "General Surgery & Allied Specialities",
+        "doctors": [
+          "Dr. Santosh MP"
+        ]
+      },
+      "أمراض الدم والأورام وزراعة نخاع العظم | Haematology, Haemato Oncology & BMT": {
+        "department_ar": "أمراض الدم والأورام وزراعة نخاع العظم",
+        "department_en": "Haematology, Haemato Oncology & BMT",
+        "doctors": [
+          "Dr. Anoop P"
+        ]
+      },
+      "أورام الرأس والرقبة | Head & Neck Oncology": {
+        "department_ar": "أورام الرأس والرقبة",
+        "department_en": "Head & Neck Oncology",
+        "doctors": [
+          "Dr. Girish S. Shetkar"
+        ]
+      },
+      "زراعة الكبد | Integrated Liver Care, Liver Transplant": {
+        "department_ar": "زراعة الكبد",
+        "department_en": "Integrated Liver Care, Liver Transplant",
+        "doctors": [
+          "Dr. Sonal Asthana"
+        ]
+      },
+      "أمراض الكلى | Nephrology": {
+        "department_ar": "أمراض الكلى",
+        "department_en": "Nephrology",
+        "doctors": [
+          "Dr. Veerabhadra Guptha K"
+        ]
+      },
+      "جراحة المخ والأعصاب والعمود الفقري | Neuro & Spine Surgery": {
+        "department_ar": "جراحة المخ والأعصاب والعمود الفقري",
+        "department_en": "Neuro & Spine Surgery",
+        "doctors": [
+          "Dr. Akshay Hari",
+          "Dr. Deepak B S"
+        ]
+      },
+      "جراحة المخ والأعصاب | Neuro Surgery": {
+        "department_ar": "جراحة المخ والأعصاب",
+        "department_en": "Neuro Surgery",
+        "doctors": [
+          "Dr. Nirmala S",
+          "Dr. Ravi Gopal Varma",
+          "Dr. Santhosh N U"
+        ]
+      },
+      "طب الأعصاب | Neurology": {
+        "department_ar": "طب الأعصاب",
+        "department_en": "Neurology",
+        "doctors": [
+          "Dr. Anuradha H K",
+          "Dr. Lokesh B",
+          "Dr. Nikhil C. Hiremath"
+        ]
+      },
+      "طب الأعصاب والصرع | Neurology & Epilepsy Centre": {
+        "department_ar": "طب الأعصاب والصرع",
+        "department_en": "Neurology & Epilepsy Centre",
+        "doctors": [
+          "Dr. Keni Ravish Rajiv"
+        ]
+      },
+      "الطب النووي | Nuclear Medicine": {
+        "department_ar": "الطب النووي",
+        "department_en": "Nuclear Medicine",
+        "doctors": [
+          "Dr. Mythri Shankar"
+        ]
+      },
+      "أمراض النساء والولادة | Obstetrics & Gynaecology": {
+        "department_ar": "أمراض النساء والولادة",
+        "department_en": "Obstetrics & Gynaecology",
+        "doctors": [
+          "Dr. Bhavani Stalin",
+          "Dr. Chetana V",
+          "Dr. Soumya Lakshmi T V",
+          "Dr. Varsha Desai Kale"
+        ]
+      },
+      "روماتيزم الأطفال والمناعة | Paediatric Rheumatology & Immunology": {
+        "department_ar": "روماتيزم الأطفال والمناعة",
+        "department_en": "Paediatric Rheumatology & Immunology",
+        "doctors": [
+          "Dr. Sagar Bhattad"
+        ]
+      },
+      "طب الأطفال وحديثي الولادة | Paediatrics & Neonatology": {
+        "department_ar": "طب الأطفال وحديثي الولادة",
+        "department_en": "Paediatrics & Neonatology",
+        "doctors": [
+          "Dr. Chetan Ginigeri"
+        ]
+      },
+      "أطفال وحديثي الولادة | Paediatrics & Neonatology": {
+        "department_ar": "أطفال وحديثي الولادة",
+        "department_en": "Paediatrics & Neonatology",
+        "doctors": [
+          "Dr. Parimala V Thirumalesh",
+          "Dr. Raghuram CP",
+          "Dr. Stalin Ramprakash"
+        ]
+      },
+      "أطفال وحديثي الولادة وأمراض الأعصاب للأطفال | Paediatrics, Neonatology & NeuKIDS": {
+        "department_ar": "أطفال وحديثي الولادة وأمراض الأعصاب للأطفال",
+        "department_en": "Paediatrics, Neonatology & NeuKIDS",
+        "doctors": [
+          "Dr. Ravi Kumar C P"
+        ]
+      },
+      "جراحة الأورام ورأس الرقبة | Surgical & Head & Neck Oncology": {
+        "department_ar": "جراحة الأورام ورأس الرقبة",
+        "department_en": "Surgical & Head & Neck Oncology",
+        "doctors": [
+          "Dr. Rohit Kumar C"
+        ]
+      },
+      "جراحة الأورام | Surgical Oncology": {
+        "department_ar": "جراحة الأورام",
+        "department_en": "Surgical Oncology",
+        "doctors": [
+          "Dr. Ashwin K R",
+          "Dr. Somashekhar S P",
+          "Dr. Vijay K Ahuja"
+        ]
+      },
+      "جراحة المسالك البولية | Urology": {
+        "department_ar": "جراحة المسالك البولية",
+        "department_en": "Urology",
+        "doctors": [
+          "Dr. Avinash T S",
+          "Dr. Giriraja Velayutham",
+          "Dr. Shashank M S"
+        ]
+      }
+    },
+    "Aster RV Hospital, Bangalore": {
+      "جراحة القلب | Cardiac Surgery": {
+        "department_ar": "جراحة القلب",
+        "department_en": "Cardiac Surgery",
+        "doctors": [
+          "Dr. Divakar Bhat",
+          "Dr. Ganesh Krishnan Iyer"
+        ]
+      },
+      "أمراض القلب | Cardiology": {
+        "department_ar": "أمراض القلب",
+        "department_en": "Cardiology",
+        "doctors": [
+          "Dr. Shyam Sunder K R",
+          "Prof. Dr. Nagamalesh U M"
+        ]
+      },
+      "الأشعة التداخلية | Clinical Imaging & Interventional Radiology": {
+        "department_ar": "الأشعة التداخلية",
+        "department_en": "Clinical Imaging & Interventional Radiology",
+        "doctors": [
+          "Dr. Amogh V N",
+          "Dr. Ravindra B Kamble",
+          "Dr. Sudhakar Banakar"
+        ]
+      },
+      "الأنف والأذن والحنجرة وزراعة السماعات | ENT & Hearing Implantology": {
+        "department_ar": "الأنف والأذن والحنجرة وزراعة السماعات",
+        "department_en": "ENT & Hearing Implantology",
+        "doctors": [
+          "Dr. Vijaya Bhaskar S M"
+        ]
+      },
+      "الغدد الصماء والسكري | Endocrinology & Diabetology": {
+        "department_ar": "الغدد الصماء والسكري",
+        "department_en": "Endocrinology & Diabetology",
+        "doctors": [
+          "Dr. S Satish Kumar"
+        ]
+      },
+      "طب الجهاز الهضمي | Gastro Science": {
+        "department_ar": "طب الجهاز الهضمي",
+        "department_en": "Gastro Science",
+        "doctors": [
+          "Dr. Girish P. Veeranna",
+          "Dr. Madhu M P"
+        ]
+      },
+      "جراحة عامة وجراحة الجهاز الهضمي | General & GI Surgery": {
+        "department_ar": "جراحة عامة وجراحة الجهاز الهضمي",
+        "department_en": "General & GI Surgery",
+        "doctors": [
+          "Dr. Ajay Kumar A V",
+          "Dr. Satyajit Godhi"
+        ]
+      },
+      "أمراض الدم والأورام وزراعة نخاع العظم | Haematology, Haemato Oncology & BMT": {
+        "department_ar": "أمراض الدم والأورام وزراعة نخاع العظم",
+        "department_en": "Haematology, Haemato Oncology & BMT",
+        "doctors": [
+          "Dr. Anoop P"
+        ]
+      },
+      "رعاية الكبد وزراعة الكبد | Integrated Liver Care": {
+        "department_ar": "رعاية الكبد وزراعة الكبد",
+        "department_en": "Integrated Liver Care",
+        "doctors": [
+          "Dr. Sonal Asthana"
+        ]
+      },
+      "أمراض الكلى | Nephrology": {
+        "department_ar": "أمراض الكلى",
+        "department_en": "Nephrology",
+        "doctors": [
+          "Dr. Harsha Kumar H N",
+          "Dr. Veerabhadra Guptha K"
+        ]
+      },
+      "جراحة المخ والأعصاب | Neuro Surgery": {
+        "department_ar": "جراحة المخ والأعصاب",
+        "department_en": "Neuro Surgery",
+        "doctors": [
+          "Dr. Dhananjaya I Bhat",
+          "Dr. Ravi Gopal Varma"
+        ]
+      },
+      "طب الأعصاب | Neurology": {
+        "department_ar": "طب الأعصاب",
+        "department_en": "Neurology",
+        "doctors": [
+          "Dr. B K Madhusudhan",
+          "Dr. Shakthi K J S"
+        ]
+      },
+      "طب العيون | Ophthalmology": {
+        "department_ar": "طب العيون",
+        "department_en": "Ophthalmology",
+        "doctors": [
+          "Dr. Jayashree K Bhat"
+        ]
+      },
+      "جراحة العظام | Orthopaedics": {
+        "department_ar": "جراحة العظام",
+        "department_en": "Orthopaedics",
+        "doctors": [
+          "Dr. J V Srinivas"
+        ]
+      },
+      "روماتيزم الأطفال والمناعة | Paediatric Rheumatology & Immunology": {
+        "department_ar": "روماتيزم الأطفال والمناعة",
+        "department_en": "Paediatric Rheumatology & Immunology",
+        "doctors": [
+          "Dr. Sagar Bhattad"
+        ]
+      },
+      "طب الأطفال وحديثي الولادة | Paediatrics & Neonatology": {
+        "department_ar": "طب الأطفال وحديثي الولادة",
+        "department_en": "Paediatrics & Neonatology",
+        "doctors": [
+          "Dr. Chetan Ginigeri",
+          "Dr. Raghuram CP",
+          "Dr. Stalin Ramprakash"
+        ]
+      },
+      "الطب الفيزيائي وإعادة التأهيل | Physical Medicine & Rehabilitation": {
+        "department_ar": "الطب الفيزيائي وإعادة التأهيل",
+        "department_en": "Physical Medicine & Rehabilitation",
+        "doctors": [
+          "Dr. Loganathan Venkatachalam"
+        ]
+      },
+      "الطب النفسي | Psychiatry & Counselling Services": {
+        "department_ar": "الطب النفسي",
+        "department_en": "Psychiatry & Counselling Services",
+        "doctors": [
+          "Dr. Murali Krishna"
+        ]
+      },
+      "أمراض الصدر | Pulmonology": {
+        "department_ar": "أمراض الصدر",
+        "department_en": "Pulmonology",
+        "doctors": [
+          "Dr. Sandeep Attawar"
+        ]
+      },
+      "جراحة الأورام | Surgical Oncology": {
+        "department_ar": "جراحة الأورام",
+        "department_en": "Surgical Oncology",
+        "doctors": [
+          "Dr. Somashekhar S P"
+        ]
+      },
+      "جراحة الأورام ورأس الرقبة | Surgical Oncology, Head & Neck Oncology": {
+        "department_ar": "جراحة الأورام ورأس الرقبة",
+        "department_en": "Surgical Oncology, Head & Neck Oncology",
+        "doctors": [
+          "Dr. Rohit Kumar C"
+        ]
+      },
+      "جراحة المسالك البولية | Urology": {
+        "department_ar": "جراحة المسالك البولية",
+        "department_en": "Urology",
+        "doctors": [
+          "Dr. Caranj S Venugopal",
+          "Dr. Santhosh Bethur"
+        ]
+      }
+    },
+    "Aster Whitefield Hospital, Bangalore": {
+      "مناظير المفاصل | Arthroscopy & Sports Injury": {
+        "department_ar": "مناظير المفاصل",
+        "department_en": "Arthroscopy & Sports Injury",
+        "doctors": [
+          "Dr. Yogesh K"
+        ]
+      },
+      "جراحة أورام الثدي | Breast Surgery": {
+        "department_ar": "جراحة أورام الثدي",
+        "department_en": "Breast Surgery",
+        "doctors": [
+          "Dr. Nashi Semitha"
+        ]
+      },
+      "جراحة القلب والصدر | CTVS": {
+        "department_ar": "جراحة القلب والصدر",
+        "department_en": "CTVS",
+        "doctors": [
+          "Dr. Prashanth Y M"
+        ]
+      },
+      "أمراض القلب | Cardiology": {
+        "department_ar": "أمراض القلب",
+        "department_en": "Cardiology",
+        "doctors": [
+          "Dr. Chirag D"
+        ]
+      },
+      "العناية المركزة | Critical Care": {
+        "department_ar": "العناية المركزة",
+        "department_en": "Critical Care",
+        "doctors": [
+          "Dr. Ajith Kumar A K",
+          "Dr. Nikhil Narayanaswamy",
+          "Dr. Pooja Murthy",
+          "Dr. Venkatesha Gupta K V"
+        ]
+      },
+      "طب الأسنان | Dentistry": {
+        "department_ar": "طب الأسنان",
+        "department_en": "Dentistry",
+        "doctors": [
+          "Dr. Khushboo Lath",
+          "Dr. Kushi C S",
+          "Dr. Sindhu U Muktamath"
+        ]
+      },
+      "جلدية | Dermatology": {
+        "department_ar": "جلدية",
+        "department_en": "Dermatology",
+        "doctors": [
+          "Dr. Priyanka Kuri",
+          "Dr. Suma K R"
+        ]
+      },
+      "أنف وأذن وحنجرة | ENT": {
+        "department_ar": "أنف وأذن وحنجرة",
+        "department_en": "ENT",
+        "doctors": [
+          "Dr. Bhuvaneshwari Parthiban"
+        ]
+      },
+      "أنف وأذن وحنجرة | ENT & Skull Base Surgery": {
+        "department_ar": "أنف وأذن وحنجرة",
+        "department_en": "ENT & Skull Base Surgery",
+        "doctors": [
+          "Dr. Jyotirmay S Hegde"
+        ]
+      },
+      "طب الطوارئ | Emergency Medicine": {
+        "department_ar": "طب الطوارئ",
+        "department_en": "Emergency Medicine",
+        "doctors": [
+          "Dr. Ashray V",
+          "Dr. Kushal Pandya"
+        ]
+      },
+      "الغدد الصماء | Endocrinology": {
+        "department_ar": "الغدد الصماء",
+        "department_en": "Endocrinology",
+        "doctors": [
+          "Dr. Narendra B S"
+        ]
+      },
+      "طب الأجنة | Fetal Medicine": {
+        "department_ar": "طب الأجنة",
+        "department_en": "Fetal Medicine",
+        "doctors": [
+          "Dr. Amulya R",
+          "Dr. Shreshta Bhat",
+          "Dr. Smitha D S"
+        ]
+      },
+      "جراحة عامة ومناظير وروبوت | General & Laparoscopic Surgery": {
+        "department_ar": "جراحة عامة ومناظير وروبوت",
+        "department_en": "General & Laparoscopic Surgery",
+        "doctors": [
+          "Dr. Prabhakar B"
+        ]
+      },
+      "جراحة عامة | General Surgery": {
+        "department_ar": "جراحة عامة",
+        "department_en": "General Surgery",
+        "doctors": [
+          "Dr. Karthik A S"
+        ]
+      },
+      "أورام النساء | Gynecologic Oncology": {
+        "department_ar": "أورام النساء",
+        "department_en": "Gynecologic Oncology",
+        "doctors": [
+          "Dr. Esha R Shanbhag",
+          "Dr. Mythili Kundur",
+          "Dr. Vijay K Ahuja"
+        ]
+      },
+      "زراعة الكبد | HPB & Transplant": {
+        "department_ar": "زراعة الكبد",
+        "department_en": "HPB & Transplant",
+        "doctors": [
+          "Dr. H R S Girn"
+        ]
+      },
+      "أمراض الدم وزراعة نخاع | Haematology, Paediatric Haemato-Oncology & BMT": {
+        "department_ar": "أمراض الدم وزراعة نخاع",
+        "department_en": "Haematology, Paediatric Haemato-Oncology & BMT",
+        "doctors": [
+          "Dr. Anoop P"
+        ]
+      },
+      "أورام الرأس والرقبة | Head & Neck Oncology": {
+        "department_ar": "أورام الرأس والرقبة",
+        "department_en": "Head & Neck Oncology",
+        "doctors": [
+          "Dr. Girish S. Shetkar"
+        ]
+      },
+      "جراحة الرأس والرقبة | Head & Neck Surgery & Oncology": {
+        "department_ar": "جراحة الرأس والرقبة",
+        "department_en": "Head & Neck Surgery & Oncology",
+        "doctors": [
+          "Dr. Narayana Subramaniam"
+        ]
+      },
+      "أمراض الدم وزراعة نخاع | Hematology & BMT": {
+        "department_ar": "أمراض الدم وزراعة نخاع",
+        "department_en": "Hematology & BMT",
+        "doctors": [
+          "Dr. Revanth Boddu"
+        ]
+      },
+      "كبد | Hepatology": {
+        "department_ar": "كبد",
+        "department_en": "Hepatology",
+        "doctors": [
+          "Dr. Akhil Deshmukh",
+          "Dr. Naveen Ganjoo"
+        ]
+      },
+      "كبد | Hepatology & Transplant Physician": {
+        "department_ar": "كبد",
+        "department_en": "Hepatology & Transplant Physician",
+        "doctors": [
+          "Dr. Mallikarjun Sakpal"
+        ]
+      },
+      "أطفال الأنابيب | IVF & Reproductive Medicine": {
+        "department_ar": "أطفال الأنابيب",
+        "department_en": "IVF & Reproductive Medicine",
+        "doctors": [
+          "Dr. Nayana D H"
+        ]
+      },
+      "الأمراض المعدية | Infectious Diseases": {
+        "department_ar": "الأمراض المعدية",
+        "department_en": "Infectious Diseases",
+        "doctors": [
+          "Dr. Aishwarya R"
+        ]
+      },
+      "الطب الباطني | Internal Medicine": {
+        "department_ar": "الطب الباطني",
+        "department_en": "Internal Medicine",
+        "doctors": [
+          "Dr. Abinaya Rathinasami",
+          "Dr. Basavaraj S Kumbar",
+          "Dr. Suchismitha Rajamanya"
+        ]
+      },
+      "أمراض القلب التداخلية | Interventional Cardiology": {
+        "department_ar": "أمراض القلب التداخلية",
+        "department_en": "Interventional Cardiology",
+        "doctors": [
+          "Dr. Naveen Chandra G S"
+        ]
+      },
+      "الأشعة التداخلية | Interventional Radiology": {
+        "department_ar": "الأشعة التداخلية",
+        "department_en": "Interventional Radiology",
+        "doctors": [
+          "Dr. Dheeraj Shyam V N",
+          "Dr. Nischal Kundaragi",
+          "Dr. Rajaraman V"
+        ]
+      },
+      "زراعة الكبد | Liver Transplant": {
+        "department_ar": "زراعة الكبد",
+        "department_en": "Liver Transplant",
+        "doctors": [
+          "Dr. Vachan S Hukkeri"
+        ]
+      },
+      "زراعة الكبد | Liver Transplant & HPB Surgery": {
+        "department_ar": "زراعة الكبد",
+        "department_en": "Liver Transplant & HPB Surgery",
+        "doctors": [
+          "Dr. Sonal Asthana"
+        ]
+      },
+      "طب الأسنان | Maxillofacial Radiology": {
+        "department_ar": "طب الأسنان",
+        "department_en": "Maxillofacial Radiology",
+        "doctors": [
+          "Dr. Sreekanth P Kunjumon"
+        ]
+      },
+      "أورام طبية ودم | Medical & Haemato Oncology": {
+        "department_ar": "أورام طبية ودم",
+        "department_en": "Medical & Haemato Oncology",
+        "doctors": [
+          "Dr. C N Patil"
+        ]
+      },
+      "أمراض الجهاز الهضمي | Medical Gastroenterology": {
+        "department_ar": "أمراض الجهاز الهضمي",
+        "department_en": "Medical Gastroenterology",
+        "doctors": [
+          "Dr. Abhijith B R",
+          "Dr. Ajay B R"
+        ]
+      },
+      "الوراثة الطبية | Medical Genetics": {
+        "department_ar": "الوراثة الطبية",
+        "department_en": "Medical Genetics",
+        "doctors": [
+          "Dr. Mallikarjun R Patil"
+        ]
+      },
+      "أورام طبية | Medical Oncology": {
+        "department_ar": "أورام طبية",
+        "department_en": "Medical Oncology",
+        "doctors": [
+          "Dr. Sai Vivek V",
+          "Dr. Sneha Kommineni",
+          "Dr. Vaishnavi Joshi"
+        ]
+      },
+      "تخدير الأعصاب | Neuro Anaesthesia": {
+        "department_ar": "تخدير الأعصاب",
+        "department_en": "Neuro Anaesthesia",
+        "doctors": [
+          "Dr. Dheeraj Masapu"
+        ]
+      },
+      "طب التأهيل العصبي | Neuro Rehabilitation": {
+        "department_ar": "طب التأهيل العصبي",
+        "department_en": "Neuro Rehabilitation",
+        "doctors": [
+          "Dr. Aravind P R"
+        ]
+      },
+      "طب الأعصاب | Neurology & Epileptology": {
+        "department_ar": "طب الأعصاب",
+        "department_en": "Neurology & Epileptology",
+        "doctors": [
+          "Dr. Balaji B S"
+        ]
+      },
+      "طب الأعصاب | Neurology, Epilepsy": {
+        "department_ar": "طب الأعصاب",
+        "department_en": "Neurology, Epilepsy",
+        "doctors": [
+          "Dr. Keni Ravish Rajiv"
+        ]
+      },
+      "جراحة الأعصاب والعمود الفقري | Neurosurgery": {
+        "department_ar": "جراحة الأعصاب والعمود الفقري",
+        "department_en": "Neurosurgery",
+        "doctors": [
+          "Prof. Dr. Satish Rudrappa"
+        ]
+      },
+      "جراحة الأعصاب | Neurosurgery": {
+        "department_ar": "جراحة الأعصاب",
+        "department_en": "Neurosurgery",
+        "doctors": [
+          "Prof. Dr. Swaroop Gopal"
+        ]
+      },
+      "الطب النووي | Nuclear Medicine": {
+        "department_ar": "الطب النووي",
+        "department_en": "Nuclear Medicine",
+        "doctors": [
+          "Dr. Avinash Tupalli",
+          "Dr. Mythri Shankar"
+        ]
+      },
+      "الطب النووي | Nuclear Medicine, Theranostics": {
+        "department_ar": "الطب النووي",
+        "department_en": "Nuclear Medicine, Theranostics",
+        "doctors": [
+          "Dr. Prathap H J"
+        ]
+      },
+      "نساء وولادة | Obstetrics & Gynaecology": {
+        "department_ar": "نساء وولادة",
+        "department_en": "Obstetrics & Gynaecology",
+        "doctors": [
+          "Dr. Deepthi Ashwin",
+          "Dr. Kavitha Kovi",
+          "Dr. Sandhya Rani",
+          "Dr. Vishnu Priya"
+        ]
+      },
+      "جراحة العظام | Orthopedics, Joint Replacement": {
+        "department_ar": "جراحة العظام",
+        "department_en": "Orthopedics, Joint Replacement",
+        "doctors": [
+          "Dr. Harsha G N"
+        ]
+      },
+      "أمراض الدم للأطفال وBMT | Paediatric Haemato-Oncology & BMT": {
+        "department_ar": "أمراض الدم للأطفال وBMT",
+        "department_en": "Paediatric Haemato-Oncology & BMT",
+        "doctors": [
+          "Dr. C P Raghuram",
+          "Dr. Stalin Ramprakash"
+        ]
+      },
+      "عناية الأطفال | Paediatric Intensive Care": {
+        "department_ar": "عناية الأطفال",
+        "department_en": "Paediatric Intensive Care",
+        "doctors": [
+          "Dr. Sumithra S"
+        ]
+      },
+      "جراحة الأطفال | Paediatric Surgery": {
+        "department_ar": "جراحة الأطفال",
+        "department_en": "Paediatric Surgery",
+        "doctors": [
+          "Dr. Manjiri Somashekhar",
+          "Dr. Palak Singhai"
+        ]
+      },
+      "أطفال وحديثي الولادة | Paediatrics & Neonatology": {
+        "department_ar": "أطفال وحديثي الولادة",
+        "department_en": "Paediatrics & Neonatology",
+        "doctors": [
+          "Dr. Lathiesh Kumar Kambham",
+          "Dr. Srinivasa Murthy C L"
+        ]
+      },
+      "الرعاية التلطيفية | Palliative Medicine": {
+        "department_ar": "الرعاية التلطيفية",
+        "department_en": "Palliative Medicine",
+        "doctors": [
+          "Dr. Amelia Sahana Michael",
+          "Dr. Madhavi Thuyamani"
+        ]
+      },
+      "الرعاية التلطيفية | Palliative Medicine & Rehab": {
+        "department_ar": "الرعاية التلطيفية",
+        "department_en": "Palliative Medicine & Rehab",
+        "doctors": [
+          "Dr. Raghavendra Ramanjulu"
+        ]
+      },
+      "علم الأمراض | Pathology": {
+        "department_ar": "علم الأمراض",
+        "department_en": "Pathology",
+        "doctors": [
+          "Dr. Abhijit Prakash Chougule",
+          "Dr. Anand M S"
+        ]
+      },
+      "علم الأمراض | Pathology & Histopathology": {
+        "department_ar": "علم الأمراض",
+        "department_en": "Pathology & Histopathology",
+        "doctors": [
+          "Dr. Susmita Rakshith"
+        ]
+      },
+      "قلب أطفال | Pediatric Cardiology": {
+        "department_ar": "قلب أطفال",
+        "department_en": "Pediatric Cardiology",
+        "doctors": [
+          "Dr. Bharath A P"
+        ]
+      },
+      "طوارئ الأطفال | Pediatric Emergency & PICU": {
+        "department_ar": "طوارئ الأطفال",
+        "department_en": "Pediatric Emergency & PICU",
+        "doctors": [
+          "Dr. Sujatha Thyagarajan"
+        ]
+      },
+      "الغدد الصماء أطفال | Pediatric Endocrinology": {
+        "department_ar": "الغدد الصماء أطفال",
+        "department_en": "Pediatric Endocrinology",
+        "doctors": [
+          "Dr. Jahnavi M",
+          "Dr. N. Kavitha Bhat"
+        ]
+      },
+      "أمراض الكبد للأطفال | Pediatric Hepatology": {
+        "department_ar": "أمراض الكبد للأطفال",
+        "department_en": "Pediatric Hepatology",
+        "doctors": [
+          "Dr. Ashritha A"
+        ]
+      },
+      "صدر أطفال | Pediatric Pulmonology": {
+        "department_ar": "صدر أطفال",
+        "department_en": "Pediatric Pulmonology",
+        "doctors": [
+          "Dr. Srikanta J T",
+          "Dr. Tejaswi Chandra"
+        ]
+      },
+      "روماتيزم أطفال | Pediatric Rheumatology": {
+        "department_ar": "روماتيزم أطفال",
+        "department_en": "Pediatric Rheumatology",
+        "doctors": [
+          "Dr. Jyothi Raghuram"
+        ]
+      },
+      "جراحة التجميل | Plastic & Reconstructive Surgery": {
+        "department_ar": "جراحة التجميل",
+        "department_en": "Plastic & Reconstructive Surgery",
+        "doctors": [
+          "Dr. N Sudarshan Reddy"
+        ]
+      },
+      "جراحة التجميل | Plastic, Reconstructive & Aesthetic Surgery": {
+        "department_ar": "جراحة التجميل",
+        "department_en": "Plastic, Reconstructive & Aesthetic Surgery",
+        "doctors": [
+          "Dr. Ashok B C"
+        ]
+      },
+      "الطب النفسي | Psychiatry": {
+        "department_ar": "الطب النفسي",
+        "department_en": "Psychiatry",
+        "doctors": [
+          "Dr. Pretty Duggar Gupta"
+        ]
+      },
+      "علم النفس | Psychology": {
+        "department_ar": "علم النفس",
+        "department_en": "Psychology",
+        "doctors": [
+          "Ms. Neha K"
+        ]
+      },
+      "أمراض الصدر | Pulmonology": {
+        "department_ar": "أمراض الصدر",
+        "department_en": "Pulmonology",
+        "doctors": [
+          "Dr. Rohit Shirgaonkar"
+        ]
+      },
+      "أمراض الصدر | Pulmonology & Lung Transplant": {
+        "department_ar": "أمراض الصدر",
+        "department_en": "Pulmonology & Lung Transplant",
+        "doctors": [
+          "Dr. Srivatsa Lokeshwaran"
+        ]
+      },
+      "علاج الأورام بالإشعاع | Radiation Oncology": {
+        "department_ar": "علاج الأورام بالإشعاع",
+        "department_en": "Radiation Oncology",
+        "doctors": [
+          "Dr. Jayant J B",
+          "Dr. M S Belliappa",
+          "Dr. Prathima Sivaguru",
+          "Dr. Pushpa Naga C H",
+          "Dr. Ram Charith Alva",
+          "Dr. Suneetha N"
+        ]
+      },
+      "الأشعة | Radiology": {
+        "department_ar": "الأشعة",
+        "department_en": "Radiology",
+        "doctors": [
+          "Dr. Namita Verma",
+          "Dr. Sudhirkumar Kale"
+        ]
+      },
+      "علم الأمراض | Renal & Transplant Pathology": {
+        "department_ar": "علم الأمراض",
+        "department_en": "Renal & Transplant Pathology",
+        "doctors": [
+          "Dr. Kiran K"
+        ]
+      },
+      "أمراض الروماتيزم | Rheumatology": {
+        "department_ar": "أمراض الروماتيزم",
+        "department_en": "Rheumatology",
+        "doctors": [
+          "Dr. Yathish G C"
+        ]
+      },
+      "جراحة العمود الفقري | Spine Surgery": {
+        "department_ar": "جراحة العمود الفقري",
+        "department_en": "Spine Surgery",
+        "doctors": [
+          "Dr. Ramachandran G"
+        ]
+      },
+      "جراحة الأورام النسائية والروبوت | Surgical & Gynaecological Oncology / Robotic Surgery, HIPEC, PIPAC": {
+        "department_ar": "جراحة الأورام النسائية والروبوت",
+        "department_en": "Surgical & Gynaecological Oncology / Robotic Surgery, HIPEC, PIPAC",
+        "doctors": [
+          "Prof. Dr. Somashekhar S P"
+        ]
+      },
+      "جراحة الجهاز الهضمي والمناظير | Surgical Gastroenterology & Bariatric": {
+        "department_ar": "جراحة الجهاز الهضمي والمناظير",
+        "department_en": "Surgical Gastroenterology & Bariatric",
+        "doctors": [
+          "Dr. Vinodha Reddy K"
+        ]
+      },
+      "جراحة الأورام | Surgical Oncology": {
+        "department_ar": "جراحة الأورام",
+        "department_en": "Surgical Oncology",
+        "doctors": [
+          "Dr. Darshan Patil",
+          "Dr. Elvis Peter Joseph",
+          "Dr. Kushal Agrawal"
+        ]
+      },
+      "جراحة الأورام والرأس والرقبة | Surgical Oncology & Head & Neck Oncology": {
+        "department_ar": "جراحة الأورام والرأس والرقبة",
+        "department_en": "Surgical Oncology & Head & Neck Oncology",
+        "doctors": [
+          "Dr. Deo Ravindra Padmakar"
+        ]
+      },
+      "جراحة الأورام والمناظير والروبوت | Surgical Oncology & Robotic": {
+        "department_ar": "جراحة الأورام والمناظير والروبوت",
+        "department_en": "Surgical Oncology & Robotic",
+        "doctors": [
+          "Dr. Jagannath Dixit"
+        ]
+      },
+      "جراحة الأورام والروبوت | Surgical Oncology & Robotic Surgery": {
+        "department_ar": "جراحة الأورام والروبوت",
+        "department_en": "Surgical Oncology & Robotic Surgery",
+        "doctors": [
+          "Dr. Ashwin K R"
+        ]
+      },
+      "جراحة الأورام | Surgical Oncology & Robotic Surgery": {
+        "department_ar": "جراحة الأورام",
+        "department_en": "Surgical Oncology & Robotic Surgery",
+        "doctors": [
+          "Dr. Rohit Kumar C"
+        ]
+      },
+      "أورام المسالك والروبوت | Uro-oncology & Robotic Surgery": {
+        "department_ar": "أورام المسالك والروبوت",
+        "department_en": "Uro-oncology & Robotic Surgery",
+        "doctors": [
+          "Dr. Sachin Arakere Nataraj"
+        ]
+      },
+      "جراحة المسالك | Urology": {
+        "department_ar": "جراحة المسالك",
+        "department_en": "Urology",
+        "doctors": [
+          "Dr. Gokulakrishnan P J"
+        ]
+      },
+      "جراحة الأوعية الدموية | Vascular Surgery": {
+        "department_ar": "جراحة الأوعية الدموية",
+        "department_en": "Vascular Surgery",
+        "doctors": [
+          "Dr. Anoop T"
+        ]
+      }
+    },
+    "Fortis Hospital, BG Road Bangalore": {
+      "جراحة القلب | Cardiac Surgery": {
+        "department_ar": "جراحة القلب",
+        "department_en": "Cardiac Surgery",
+        "doctors": [
+          "Dr. Murali Manohhar",
+          "Dr. Vivek Jawali"
+        ]
+      },
+      "أمراض القلب | Cardiology": {
+        "department_ar": "أمراض القلب",
+        "department_en": "Cardiology",
+        "doctors": [
+          "Dr. Rajpal Singh R L",
+          "Dr. Shashidhara",
+          "Dr. Srinivas Prasad"
+        ]
+      },
+      "أنف وأذن وحنجرة | ENT": {
+        "department_ar": "أنف وأذن وحنجرة",
+        "department_en": "ENT",
+        "doctors": [
+          "Dr. Susheen Dutt"
+        ]
+      },
+      "الغدد الصماء أو طب عام | Endocrinology / General Medicine": {
+        "department_ar": "الغدد الصماء أو طب عام",
+        "department_en": "Endocrinology / General Medicine",
+        "doctors": [
+          "Dr. Srinivas Munigoti / Srinivasa Phanidhar Munigoti"
+        ]
+      },
+      "جراحة السمنة والمناظير | GI, Minimal Access & Bariatric Surgery": {
+        "department_ar": "جراحة السمنة والمناظير",
+        "department_en": "GI, Minimal Access & Bariatric Surgery",
+        "doctors": [
+          "Dr. Sreedhara V."
+        ]
+      },
+      "الجهاز الهضمي | Gastroenterology": {
+        "department_ar": "الجهاز الهضمي",
+        "department_en": "Gastroenterology",
+        "doctors": [
+          "Dr. Ravindra B.S"
+        ]
+      },
+      "الجهاز الهضمي أو طب عام | Gastroenterology / General": {
+        "department_ar": "الجهاز الهضمي أو طب عام",
+        "department_en": "Gastroenterology / General",
+        "doctors": [
+          "Dr. Sunil Kasturi"
+        ]
+      },
+      "طبيب عام وسكري | General Physician & Diabetologist": {
+        "department_ar": "طبيب عام وسكري",
+        "department_en": "General Physician & Diabetologist",
+        "doctors": [
+          "Dr. Girikumar Venati"
+        ]
+      },
+      "جراحة عامة | General Surgery": {
+        "department_ar": "جراحة عامة",
+        "department_en": "General Surgery",
+        "doctors": [
+          "Dr. Manish Joshi",
+          "Dr. Shashikiran"
+        ]
+      },
+      "زراعة الكبد | HBP & Liver Transplant": {
+        "department_ar": "زراعة الكبد",
+        "department_en": "HBP & Liver Transplant",
+        "doctors": [
+          "Dr. Kishore U.S.B"
+        ]
+      },
+      "الطب الباطني | Internal Medicine": {
+        "department_ar": "الطب الباطني",
+        "department_en": "Internal Medicine",
+        "doctors": [
+          "Dr. Sheela Murali Chakravarthy",
+          "Dr. Sudha Vinod Menon"
+        ]
+      },
+      "أشعة تداخلية | Interventional Radiology": {
+        "department_ar": "أشعة تداخلية",
+        "department_en": "Interventional Radiology",
+        "doctors": [
+          "Dr. Prajwith Rai"
+        ]
+      },
+      "أورام طبية | Medical Oncology": {
+        "department_ar": "أورام طبية",
+        "department_en": "Medical Oncology",
+        "doctors": [
+          "Dr. Niti Raizada"
+        ]
+      },
+      "أمراض الكلى | Nephrology": {
+        "department_ar": "أمراض الكلى",
+        "department_en": "Nephrology",
+        "doctors": [
+          "Dr. Ashish Parek / Aashish Parekh",
+          "Dr. Rajanna Sreedhara"
+        ]
+      },
+      "جراحة العمود الفقري والمخ والاعصاب | Neuro & Spine Surgery": {
+        "department_ar": "جراحة العمود الفقري والمخ والاعصاب",
+        "department_en": "Neuro & Spine Surgery",
+        "doctors": [
+          "Dr. Rajakumar D.V"
+        ]
+      },
+      "طب الأعصاب | Neurology": {
+        "department_ar": "طب الأعصاب",
+        "department_en": "Neurology",
+        "doctors": [
+          "Dr. Grober",
+          "Dr. Sreekanta Swamy"
+        ]
+      },
+      "جراحة المخ والأعصاب | Neurosurgery": {
+        "department_ar": "جراحة المخ والأعصاب",
+        "department_en": "Neurosurgery",
+        "doctors": [
+          "Dr. Deshpande Vasudevarao Rajakumar"
+        ]
+      },
+      "جراحة الأعصاب | Neurosurgery": {
+        "department_ar": "جراحة الأعصاب",
+        "department_en": "Neurosurgery",
+        "doctors": [
+          "Dr. Murali Krishna"
+        ]
+      },
+      "الطب النووي | Nuclear Medicine": {
+        "department_ar": "الطب النووي",
+        "department_en": "Nuclear Medicine",
+        "doctors": [
+          "Dr. Gayana"
+        ]
+      },
+      "جراحة العظام | Orthopaedics": {
+        "department_ar": "جراحة العظام",
+        "department_en": "Orthopaedics",
+        "doctors": [
+          "Dr. Mohan Karisankappa Puttaswamy",
+          "Dr. Narayan Hulse",
+          "Dr. Naveen D"
+        ]
+      },
+      "جراحة العظام | Orthopedics": {
+        "department_ar": "جراحة العظام",
+        "department_en": "Orthopedics",
+        "doctors": [
+          "Dr. Mohan Puttaswamy",
+          "Dr. Venu Gopal"
+        ]
+      },
+      "أمراض الصدر | Pulmonology": {
+        "department_ar": "أمراض الصدر",
+        "department_en": "Pulmonology",
+        "doctors": [
+          "Dr. Vivek Anand Padegal"
+        ]
+      },
+      "أمراض الروماتيزم أو طب عام | Rheumatology / General Medicine": {
+        "department_ar": "أمراض الروماتيزم أو طب عام",
+        "department_en": "Rheumatology / General Medicine",
+        "doctors": [
+          "Dr. Srinivasa C"
+        ]
+      },
+      "جراحة القلب الروبوتية | Robotic Cardiac Surgery": {
+        "department_ar": "جراحة القلب الروبوتية",
+        "department_en": "Robotic Cardiac Surgery",
+        "doctors": [
+          "Dr. Sudarshan"
+        ]
+      },
+      "جراحة المسالك البولية | Urology": {
+        "department_ar": "جراحة المسالك البولية",
+        "department_en": "Urology",
+        "doctors": [
+          "Dr. Karibasavaraja",
+          "Dr. Mohan Keshavamurthy",
+          "Dr. Nlgar"
+        ]
+      }
+    },
+    "HCG Hospital, K R Road Bangalore": {
+      "تخدير | Anesthesia": {
+        "department_ar": "تخدير",
+        "department_en": "Anesthesia",
+        "doctors": [
+          "Dr. Hosahalli Rajanna Sunilkumar"
+        ]
+      },
+      "جراحة القلب والصدر والأوعية | Cardiothoracic & Vascular Surgery": {
+        "department_ar": "جراحة القلب والصدر والأوعية",
+        "department_en": "Cardiothoracic & Vascular Surgery",
+        "doctors": [
+          "Dr. Anand Subraya Bhat"
+        ]
+      },
+      "علم النفس الإكلينيكي | Clinical Psychology": {
+        "department_ar": "علم النفس الإكلينيكي",
+        "department_en": "Clinical Psychology",
+        "doctors": [
+          "Dr. Brindha Sitaram"
+        ]
+      },
+      "أنف وأذن وحنجرة | ENT": {
+        "department_ar": "أنف وأذن وحنجرة",
+        "department_en": "ENT",
+        "doctors": [
+          "Dr. Gaurav Shankar Medikeri"
+        ]
+      },
+      "الجهاز الهضمي | Gastroenterology": {
+        "department_ar": "الجهاز الهضمي",
+        "department_en": "Gastroenterology",
+        "doctors": [
+          "Dr. Jeevan H R"
+        ]
+      },
+      "جراحة عامة | General Surgery": {
+        "department_ar": "جراحة عامة",
+        "department_en": "General Surgery",
+        "doctors": [
+          "Dr. Bharat Gadhavi",
+          "Dr. Gaurav Medikeri"
+        ]
+      },
+      "أورام نسائية | Gynecologic Oncology": {
+        "department_ar": "أورام نسائية",
+        "department_en": "Gynecologic Oncology",
+        "doctors": [
+          "Dr. Abhilasha Narayan"
+        ]
+      },
+      "أورام الرأس والعنق | Head & Neck Oncology": {
+        "department_ar": "أورام الرأس والعنق",
+        "department_en": "Head & Neck Oncology",
+        "doctors": [
+          "Dr. Ganesh Datta Borewad",
+          "Dr. K Bhavya"
+        ]
+      },
+      "عناية مشددة | Intensive Care": {
+        "department_ar": "عناية مشددة",
+        "department_en": "Intensive Care",
+        "doctors": [
+          "Dr. Aishwarya N",
+          "Dr. Divya Gangoli"
+        ]
+      },
+      "زراعة الكبد | Liver Transplant": {
+        "department_ar": "زراعة الكبد",
+        "department_en": "Liver Transplant",
+        "doctors": [
+          "Dr. Abhideep Chaudhary",
+          "Dr. Basant Mahadevappa",
+          "Dr. Bhushan Chittawadagi"
+        ]
+      },
+      "أورام طبية | Medical Oncology": {
+        "department_ar": "أورام طبية",
+        "department_en": "Medical Oncology",
+        "doctors": [
+          "Dr. B J Srinivasa",
+          "Dr. Intezar Mehdi"
+        ]
+      },
+      "جراحة المخ والأعصاب | Neurosurgery": {
+        "department_ar": "جراحة المخ والأعصاب",
+        "department_en": "Neurosurgery",
+        "doctors": [
+          "Dr. Amresh Bhaganagare"
+        ]
+      },
+      "الطب النووي | Nuclear Medicine": {
+        "department_ar": "الطب النووي",
+        "department_en": "Nuclear Medicine",
+        "doctors": [
+          "Dr. Kumarswamy Gangadharayya Kallur"
+        ]
+      },
+      "طب العيون | Ophthalmology": {
+        "department_ar": "طب العيون",
+        "department_en": "Ophthalmology",
+        "doctors": [
+          "Dr. Jayashree K Bhat"
+        ]
+      },
+      "جراحة الفم والوجه والفكين | Oral & Maxillofacial Surgery": {
+        "department_ar": "جراحة الفم والوجه والفكين",
+        "department_en": "Oral & Maxillofacial Surgery",
+        "doctors": [
+          "Dr. Apoorva Narasimha Iyengar",
+          "Dr. Arun Krishna A R"
+        ]
+      },
+      "أمراض قلب الأطفال | Paediatric Cardiology": {
+        "department_ar": "أمراض قلب الأطفال",
+        "department_en": "Paediatric Cardiology",
+        "doctors": [
+          "Dr. Govinda Kishor Auradkar"
+        ]
+      },
+      "طب أطفال أورام | Paediatric Oncology": {
+        "department_ar": "طب أطفال أورام",
+        "department_en": "Paediatric Oncology",
+        "doctors": [
+          "Dr. Amit Galgali"
+        ]
+      },
+      "جراحة التجميل | Plastic Surgery": {
+        "department_ar": "جراحة التجميل",
+        "department_en": "Plastic Surgery",
+        "doctors": [
+          "Dr. Mahendra Kumar Kulkarni"
+        ]
+      },
+      "أمراض الصدر | Pulmonology": {
+        "department_ar": "أمراض الصدر",
+        "department_en": "Pulmonology",
+        "doctors": [
+          "Dr. Kedar Ravi Hibare"
+        ]
+      },
+      "علاج الأورام بالإشعاع | Radiation Oncology": {
+        "department_ar": "علاج الأورام بالإشعاع",
+        "department_en": "Radiation Oncology",
+        "doctors": [
+          "Dr. Ajay G V",
+          "Dr. Anirudh V S",
+          "Dr. Hasib Abdul Gaffor",
+          "Dr. Kirthi Koushik A.S",
+          "Dr. Krithikaa S",
+          "Dr. Lohith G"
+        ]
+      },
+      "جراحة الأورام | Surgical Oncology": {
+        "department_ar": "جراحة الأورام",
+        "department_en": "Surgical Oncology",
+        "doctors": [
+          "Dr. Anand S",
+          "Dr. Dinesh M G",
+          "Dr. Krithika Murugan"
+        ]
+      },
+      "جراحة المسالك البولية | Urology": {
+        "department_ar": "جراحة المسالك البولية",
+        "department_en": "Urology",
+        "doctors": [
+          "Dr. Deepak Krishnappa",
+          "Dr. Lingesh Sairam Chelliah"
+        ]
+      }
+    },
+    "L V Prasad Eye Institute, Hyderabad": {
+      "الساد والعدسات | Cataract & IOL": {
+        "department_ar": "الساد والعدسات",
+        "department_en": "Cataract & IOL",
+        "doctors": [
+          "Dr. Mudit Tyagi"
+        ]
+      },
+      "الساد والعدسات | Cataract & IOL Services": {
+        "department_ar": "الساد والعدسات",
+        "department_en": "Cataract & IOL Services",
+        "doctors": [
+          "Dr. Jagat Ram"
+        ]
+      },
+      "عيون شاملة | Comprehensive Ophthalmology": {
+        "department_ar": "عيون شاملة",
+        "department_en": "Comprehensive Ophthalmology",
+        "doctors": [
+          "Dr. Swapna Kakade"
+        ]
+      },
+      "القرنية | Cornea": {
+        "department_ar": "القرنية",
+        "department_en": "Cornea",
+        "doctors": [
+          "Dr. Debananda Padhy",
+          "Dr. Murugesan Vanathi",
+          "Dr. Radhika Tandon"
+        ]
+      },
+      "القرنية | Cornea & External Diseases": {
+        "department_ar": "القرنية",
+        "department_en": "Cornea & External Diseases",
+        "doctors": [
+          "Dr. Prashant Garg"
+        ]
+      },
+      "القرنية والسطح العيني | Cornea & Ocular Surface": {
+        "department_ar": "القرنية والسطح العيني",
+        "department_en": "Cornea & Ocular Surface",
+        "doctors": [
+          "Dr. Sayan Basu"
+        ]
+      },
+      "القرنية وتصحيح النظر | Cornea & Refractive Surgery": {
+        "department_ar": "القرنية وتصحيح النظر",
+        "department_en": "Cornea & Refractive Surgery",
+        "doctors": [
+          "Dr. Srinivas K. Rao"
+        ]
+      },
+      "القرنية والخلايا الجذعية | Cornea & Stem Cell": {
+        "department_ar": "القرنية والخلايا الجذعية",
+        "department_en": "Cornea & Stem Cell",
+        "doctors": [
+          "Dr. Virender S. Sangwan"
+        ]
+      },
+      "القرنية | Cornea Services": {
+        "department_ar": "القرنية",
+        "department_en": "Cornea Services",
+        "doctors": [
+          "Dr. Somasheila I. Murthy"
+        ]
+      },
+      "المياه الزرقاء | Glaucoma": {
+        "department_ar": "المياه الزرقاء",
+        "department_en": "Glaucoma",
+        "doctors": [
+          "Dr. Bhagabat Nayak",
+          "Dr. Sirisha Senthil"
+        ]
+      },
+      "المياه الزرقاء | Glaucoma Services": {
+        "department_ar": "المياه الزرقاء",
+        "department_en": "Glaucoma Services",
+        "doctors": [
+          "Dr. Rohit Khanna"
+        ]
+      },
+      "أعصاب العين | Neuro Ophthalmology": {
+        "department_ar": "أعصاب العين",
+        "department_en": "Neuro Ophthalmology",
+        "doctors": [
+          "Dr. Sudheer Kumar Shantha Kumari",
+          "Dr. Sumita Agarkar"
+        ]
+      },
+      "أورام العين | Ocular Oncology": {
+        "department_ar": "أورام العين",
+        "department_en": "Ocular Oncology",
+        "doctors": [
+          "Dr. Aparna Ramasubramanian"
+        ]
+      },
+      "تجميل الجفون | Oculoplasty": {
+        "department_ar": "تجميل الجفون",
+        "department_en": "Oculoplasty",
+        "doctors": [
+          "Dr. Madan Deshpande"
+        ]
+      },
+      "تجميل الجفون والقناة الدمعية | Oculoplasty & Lacrimal": {
+        "department_ar": "تجميل الجفون والقناة الدمعية",
+        "department_en": "Oculoplasty & Lacrimal",
+        "doctors": [
+          "Dr. Mohammad Javed Ali"
+        ]
+      },
+      "تجميل الجفون وأورام العين | Oculoplasty & Oncology": {
+        "department_ar": "تجميل الجفون وأورام العين",
+        "department_en": "Oculoplasty & Oncology",
+        "doctors": [
+          "Dr. Santosh G. Honavar"
+        ]
+      },
+      "عيون الأطفال | Paediatric Ophthalmology": {
+        "department_ar": "عيون الأطفال",
+        "department_en": "Paediatric Ophthalmology",
+        "doctors": [
+          "Dr. Joveeta Joseph",
+          "Dr. Ramesh Kekunnaya"
+        ]
+      },
+      "الشبكية والزجاجية | Retina & Vitreous": {
+        "department_ar": "الشبكية والزجاجية",
+        "department_en": "Retina & Vitreous",
+        "doctors": [
+          "Dr. Taraprasad Das"
+        ]
+      },
+      "اعتلال الشبكية لدى الأطفال الخدّج | Retinopathy of Prematurity": {
+        "department_ar": "اعتلال الشبكية لدى الأطفال الخدّج",
+        "department_en": "Retinopathy of Prematurity",
+        "doctors": [
+          "Dr. Subhadra Jalali"
+        ]
+      },
+      "التهاب العنبية | Uveitis Services": {
+        "department_ar": "التهاب العنبية",
+        "department_en": "Uveitis Services",
+        "doctors": [
+          "Dr. Muralidhar Ramappa"
+        ]
+      },
+      "الشبكية | Vitreoretinal Services": {
+        "department_ar": "الشبكية",
+        "department_en": "Vitreoretinal Services",
+        "doctors": [
+          "Dr. Anthony Vipin Das",
+          "Dr. Gowri Shankar Gopi"
+        ]
+      },
+      "جراحة الشبكية | Vitreoretinal Surgery": {
+        "department_ar": "جراحة الشبكية",
+        "department_en": "Vitreoretinal Surgery",
+        "doctors": [
+          "Dr. Rajeev Reddy Pappuru",
+          "Dr. Vivek P. Dave"
+        ]
+      }
+    },
+    "M S Ramaiah Memorial Hospital, Bangalore": {
+      "طب الطوارئ | Accident & Emergency (Emergency Medicine)": {
+        "department_ar": "طب الطوارئ",
+        "department_en": "Accident & Emergency (Emergency Medicine)",
+        "doctors": [
+          "Dr. Aruna C Ramesh",
+          "Dr. Hariprasad K V",
+          "Dr. Jerry Jacob",
+          "Dr. Keshava Murthy M R",
+          "Dr. Shruthi Deshpande",
+          "Dr. Treepti"
+        ]
+      },
+      "تخدير | Anesthesiology": {
+        "department_ar": "تخدير",
+        "department_en": "Anesthesiology",
+        "doctors": [
+          "Dr. Archana S",
+          "Dr. Ashwini Turai",
+          "Dr. Balakrishna Shenoy",
+          "Dr. Chandana Balram",
+          "Dr. Geetha C R",
+          "Dr. Guru Police Patel",
+          "Dr. Leena H P",
+          "Dr. Nanditha Shreedhar",
+          "Dr. Navdeep",
+          "Dr. Prapti Rath",
+          "Dr. Prathima P T",
+          "Dr. Sandya Rani",
+          "Dr. Sharmila",
+          "Dr. Shruthi N S",
+          "Dr. Tejesh C A",
+          "Dr. Yatish B"
+        ]
+      },
+      "تخدير وإدارة الألم | Anesthesiology & Pain Management": {
+        "department_ar": "تخدير وإدارة الألم",
+        "department_en": "Anesthesiology & Pain Management",
+        "doctors": [
+          "Dr. Manjunath A C"
+        ]
+      },
+      "بنك الدم | Blood Bank / Transfusion Medicine": {
+        "department_ar": "بنك الدم",
+        "department_en": "Blood Bank / Transfusion Medicine",
+        "doctors": [
+          "Dr. D. Deepa",
+          "Dr. Nanda Kishore V",
+          "Dr. Nandakishore Alva N"
+        ]
+      },
+      "جراحة القلب والصدر | Cardio Thoracic Surgery": {
+        "department_ar": "جراحة القلب والصدر",
+        "department_en": "Cardio Thoracic Surgery",
+        "doctors": [
+          "Dr. Anandathirtha H. S"
+        ]
+      },
+      "أمراض القلب | Cardiology": {
+        "department_ar": "أمراض القلب",
+        "department_en": "Cardiology",
+        "doctors": [
+          "Dr. Anupama V Hegde",
+          "Dr. Prakash V S",
+          "Dr. Ramkumar S",
+          "Dr. Ravi Narayan",
+          "Dr. Varsha Rakshitha P"
+        ]
+      },
+      "جراحة القلب والصدر والأوعية | Cardiovascular & Thoracic Surgery (CTVS)": {
+        "department_ar": "جراحة القلب والصدر والأوعية",
+        "department_en": "Cardiovascular & Thoracic Surgery (CTVS)",
+        "doctors": [
+          "Dr. Mukundan Seshadri"
+        ]
+      },
+      "عناية مركزة | Critical Care Medicine": {
+        "department_ar": "عناية مركزة",
+        "department_en": "Critical Care Medicine",
+        "doctors": [
+          "Dr. Bhagyalakshmi. M",
+          "Dr. Deepak. T. S",
+          "Dr. Faizya Taskeen",
+          "Dr. Radha. M. G",
+          "Dr. Ramya. D. M",
+          "Dr. Rooparani. K",
+          "Dr. Thejeswini",
+          "Dr. Vikas. K. N",
+          "Dr. Vinay. R"
+        ]
+      },
+      "طب الأسنان | Dental Surgery": {
+        "department_ar": "طب الأسنان",
+        "department_en": "Dental Surgery",
+        "doctors": [
+          "Dr. A. S. Madhura",
+          "Dr. Amulya V. Rai",
+          "Dr. Madhubala",
+          "Dr. O. P. Kharbanda",
+          "Dr. Priyanka Rawat",
+          "Dr. Renu Kharbanda",
+          "Dr. Sayanthi Hazra"
+        ]
+      },
+      "جلدية وتجميل | Dermatology & Cosmetology": {
+        "department_ar": "جلدية وتجميل",
+        "department_en": "Dermatology & Cosmetology",
+        "doctors": [
+          "Dr. Deena Patil",
+          "Dr. K. N. Shivaswamy",
+          "Dr. Praveen Kumar S",
+          "Dr. Sudha Banti",
+          "Dr. Suparna. M. Y",
+          "Dr. T. K. Sumathy"
+        ]
+      },
+      "أنف وأذن وحنجرة | ENT": {
+        "department_ar": "أنف وأذن وحنجرة",
+        "department_en": "ENT",
+        "doctors": [
+          "Dr. Chandrakiran C.",
+          "Dr. Harshavardhan N. Reddy",
+          "Dr. Sanjay B Patil",
+          "Dr. Soujanya Balaraj",
+          "Dr. Sumanth K. R.",
+          "Dr. Surya Prakash D. R."
+        ]
+      },
+      "الغدد الصماء | Endocrinology": {
+        "department_ar": "الغدد الصماء",
+        "department_en": "Endocrinology",
+        "doctors": [
+          "Dr. Chitra. S",
+          "Dr. Ganavi. Y. P",
+          "Dr. K. M. Suryanarayana",
+          "Dr. Manjunath P R",
+          "Dr. Pramila Kalra"
+        ]
+      },
+      "طب عام | General Medicine": {
+        "department_ar": "طب عام",
+        "department_en": "General Medicine",
+        "doctors": [
+          "Dr. Akshay Rao",
+          "Dr. Anil Kumar T",
+          "Dr. Ashwin Kulkarni",
+          "Dr. Divya Prabhu",
+          "Dr. Megha Reddy",
+          "Dr. Mohammed Suhail K",
+          "Dr. Nagesh Kumar",
+          "Dr. Shaikh Mohammed Aslam S",
+          "Dr. Srikanth",
+          "Dr. Tharanath Shankar",
+          "Dr. Vijayashree Thyagaraj"
+        ]
+      },
+      "جراحة عامة | General Surgery": {
+        "department_ar": "جراحة عامة",
+        "department_en": "General Surgery",
+        "doctors": [
+          "Dr Nandakumar B M",
+          "Dr. Bharati V Hiremath",
+          "Dr. Kalaivani V",
+          "Dr. Madan K",
+          "Dr. Narayana Swamy Chetty",
+          "Dr. Navyashree C",
+          "Dr. Sagar Z",
+          "Dr. Shaik Mohammad Safiuddin",
+          "Dr. Shashank G",
+          "Dr. Sreekar Pai A",
+          "Dr. Sreevathsa M R",
+          "Dr. Srikantaiah H C",
+          "Dr. Sudharshan S. Murthy",
+          "Dr. Suhas Devanathan",
+          "Dr. Syed Faizan"
+        ]
+      },
+      "أمراض الجهاز الهضمي | Medical Gastroenterology": {
+        "department_ar": "أمراض الجهاز الهضمي",
+        "department_en": "Medical Gastroenterology",
+        "doctors": [
+          "Dr. Avinash B",
+          "Dr. Harshavardhan Rao B"
+        ]
+      },
+      "أورام طبية | Medical Oncology": {
+        "department_ar": "أورام طبية",
+        "department_en": "Medical Oncology",
+        "doctors": [
+          "Dr. Nishil Gowda",
+          "Dr. Rasmi Palassery",
+          "Dr. Santhosh Devadas",
+          "Dr. Vinayak Maka"
+        ]
+      },
+      "حديثي الولادة | Neonatology": {
+        "department_ar": "حديثي الولادة",
+        "department_en": "Neonatology",
+        "doctors": [
+          "Dr. Krithika",
+          "Dr. Pradeep G C M",
+          "Dr. Sharanabasavesh. M"
+        ]
+      },
+      "أمراض الكلى | Nephrology": {
+        "department_ar": "أمراض الكلى",
+        "department_en": "Nephrology",
+        "doctors": [
+          "Dr. Gireesh M. S.",
+          "Dr. Mahesh E",
+          "Dr. Mohammad Yousuff",
+          "Dr. Pooja Prakash Prabhu",
+          "Dr.Rajashekar MD, DM"
+        ]
+      },
+      "تخدير أعصاب وعناية عصبية | Neuroanesthesia & Neurocritical Care": {
+        "department_ar": "تخدير أعصاب وعناية عصبية",
+        "department_en": "Neuroanesthesia & Neurocritical Care",
+        "doctors": [
+          "Dr. Geetha. L",
+          "Dr. Madhusudhana Rao",
+          "Dr. Seham Syeda"
+        ]
+      },
+      "طب الأعصاب | Neurology": {
+        "department_ar": "طب الأعصاب",
+        "department_en": "Neurology",
+        "doctors": [
+          "Dr. Anish Mehta",
+          "Dr. Divya Nagabushana",
+          "Dr. Kumara Swamy",
+          "Dr. Mahendra. J. V",
+          "Dr. P. T. Acharya",
+          "Dr. Pradeep R"
+        ]
+      },
+      "جراحة المخ والأعصاب | Neurosurgery": {
+        "department_ar": "جراحة المخ والأعصاب",
+        "department_en": "Neurosurgery",
+        "doctors": [
+          "Dr. Nishchit Hegde",
+          "Dr. Parichay J Perikal",
+          "Dr. Rakshith Srinivasa",
+          "Dr. Shabari Girishan K. V.",
+          "Dr. Sunil Valentine Furtado",
+          "Dr.(Prof) A. S. Hegde"
+        ]
+      },
+      "نساء وولادة | Obstetrics & Gynecology": {
+        "department_ar": "نساء وولادة",
+        "department_en": "Obstetrics & Gynecology",
+        "doctors": [
+          "Dr. Asha Swaroop",
+          "Dr. Gayatri Devi",
+          "Dr. Jyothi G. S",
+          "Dr. K. Padma",
+          "Dr. Mamatha",
+          "Dr. Manjula. N. V.",
+          "Dr. Nandini. G.",
+          "Dr. Nivedita Reshme",
+          "Dr. Seema Mehrotra",
+          "Dr. Sujani. B. K",
+          "Dr. Sundari N",
+          "Dr. Umadevi. K",
+          "Dr. Urvashi"
+        ]
+      },
+      "طب العيون | Ophthalmology": {
+        "department_ar": "طب العيون",
+        "department_en": "Ophthalmology",
+        "doctors": [
+          "Dr. Ananth Bhandary S.",
+          "Dr. Divya D Sundaresh",
+          "Dr. Ksheeraja. Y",
+          "Dr. Soumya Ramani",
+          "Dr. Thanuja G P"
+        ]
+      },
+      "جراحة العظام | Orthopaedics": {
+        "department_ar": "جراحة العظام",
+        "department_en": "Orthopaedics",
+        "doctors": [
+          "Dr Ponnanna K M",
+          "Dr. Ajoy S M",
+          "Dr. Ashok Kumar P",
+          "Dr. Harshad. M. Shah",
+          "Dr. Karthik Badarayan V",
+          "Dr. Rahul P",
+          "Dr. Ravikumar T V",
+          "Dr. Sandeep Reddy R",
+          "Dr. Sathish Shervegar",
+          "Dr. Yashwanth Kumar. C"
+        ]
+      }
+    },
+    "Manipal Hospital, Old Airport Road": {
+      "جراحة المخ والأعصاب | Adult Neurosurgery": {
+        "department_ar": "جراحة المخ والأعصاب",
+        "department_en": "Adult Neurosurgery",
+        "doctors": [
+          "Dr. Bopanna K"
+        ]
+      },
+      "جراحة السمنة والأيض | Bariatric & Metabolic Surgery": {
+        "department_ar": "جراحة السمنة والأيض",
+        "department_en": "Bariatric & Metabolic Surgery",
+        "doctors": [
+          "Dr. G. Moinoddin"
+        ]
+      },
+      "جراحة القلب والصدر والأوعية | Cardiothoracic & Vascular Surgery": {
+        "department_ar": "جراحة القلب والصدر والأوعية",
+        "department_en": "Cardiothoracic & Vascular Surgery",
+        "doctors": [
+          "Dr. Devananda N"
+        ]
+      },
+      "جراحة القلب والصدر والأوعية وزراعة القلب والرئة | Cardiothoracic Vascular & Heart-Lung Transplant Surgery": {
+        "department_ar": "جراحة القلب والصدر والأوعية وزراعة القلب والرئة",
+        "department_en": "Cardiothoracic Vascular & Heart-Lung Transplant Surgery",
+        "doctors": [
+          "Dr. Devananda N S"
+        ]
+      },
+      "جراحة الرأس والعنق وقاعدة الجمجمة | ENT, Head & Neck Surgery, Skull Base Surgery, Cochlear Implantology": {
+        "department_ar": "جراحة الرأس والعنق وقاعدة الجمجمة",
+        "department_en": "ENT, Head & Neck Surgery, Skull Base Surgery, Cochlear Implantology",
+        "doctors": [
+          "Dr. (Prof) Sampath Chandra Prasad Rao"
+        ]
+      },
+      "كهرباء القلب | Electrophysiology": {
+        "department_ar": "كهرباء القلب",
+        "department_en": "Electrophysiology",
+        "doctors": [
+          "Dr. Darshan Kirshnappa"
+        ]
+      },
+      "جراحة عامة و سمنة | General & Bariatric Surgery": {
+        "department_ar": "جراحة عامة و سمنة",
+        "department_en": "General & Bariatric Surgery",
+        "doctors": [
+          "Dr. Hemanth Kumar"
+        ]
+      },
+      "طب عام | General Medicine": {
+        "department_ar": "طب عام",
+        "department_en": "General Medicine",
+        "doctors": [
+          "Dr. Mohit Shetti",
+          "Dr. Sampath Kumar",
+          "Dr. Sumit Talwar"
+        ]
+      },
+      "جراحة اليد | Hand Surgery": {
+        "department_ar": "جراحة اليد",
+        "department_en": "Hand Surgery",
+        "doctors": [
+          "Dr. Bharath Kadadi"
+        ]
+      },
+      "جراحة أورام الرأس والعنق | Head & Neck Oncology Surgery": {
+        "department_ar": "جراحة أورام الرأس والعنق",
+        "department_en": "Head & Neck Oncology Surgery",
+        "doctors": [
+          "Dr. Satish Nair"
+        ]
+      },
+      "أورام دموية | Hematologic Oncology": {
+        "department_ar": "أورام دموية",
+        "department_en": "Hematologic Oncology",
+        "doctors": [
+          "Dr. Amit"
+        ]
+      },
+      "زرع نخاع العظم | Hematology & Bone Marrow Transplantation": {
+        "department_ar": "زرع نخاع العظم",
+        "department_en": "Hematology & Bone Marrow Transplantation",
+        "doctors": [
+          "Dr. Ashish",
+          "Dr. Mallikarjun"
+        ]
+      },
+      "أمراض الكبد والجهاز الهضمي | Hepato-Gastroenterology": {
+        "department_ar": "أمراض الكبد والجهاز الهضمي",
+        "department_en": "Hepato-Gastroenterology",
+        "doctors": [
+          "Dr. Raj Vigna"
+        ]
+      },
+      "أمراض القلب التداخلية | Interventional Cardiology": {
+        "department_ar": "أمراض القلب التداخلية",
+        "department_en": "Interventional Cardiology",
+        "doctors": [
+          "Dr. Sridhar G"
+        ]
+      },
+      "أورام طبية | Medical Oncology, Immunotherapy & Precision Medicine": {
+        "department_ar": "أورام طبية",
+        "department_en": "Medical Oncology, Immunotherapy & Precision Medicine",
+        "doctors": [
+          "Dr. Amit Rauthan"
+        ]
+      },
+      "علم الميكروبات | Microbiology & Laboratory Medicine": {
+        "department_ar": "علم الميكروبات",
+        "department_en": "Microbiology & Laboratory Medicine",
+        "doctors": [
+          "Dr. Bhavana M V"
+        ]
+      },
+      "طب الأعصاب | Neurology": {
+        "department_ar": "طب الأعصاب",
+        "department_en": "Neurology",
+        "doctors": [
+          "Dr. Ajit Kumar"
+        ]
+      },
+      "طب الأعصاب والصرع | Neurology & Epilepsy": {
+        "department_ar": "طب الأعصاب والصرع",
+        "department_en": "Neurology & Epilepsy",
+        "doctors": [
+          "Dr. Pramod Krishnan"
+        ]
+      },
+      "جراحة المخ والأعصاب | Neurosurgery": {
+        "department_ar": "جراحة المخ والأعصاب",
+        "department_en": "Neurosurgery",
+        "doctors": [
+          "Dr. Bopanna K M",
+          "Dr. Praveen M"
+        ]
+      },
+      "جراحة العظام والمفاصل | Orthopedic & Joint Surgery": {
+        "department_ar": "جراحة العظام والمفاصل",
+        "department_en": "Orthopedic & Joint Surgery",
+        "doctors": [
+          "Dr. Sunil G"
+        ]
+      },
+      "جراحة عظام أورام | Orthopedic Oncology": {
+        "department_ar": "جراحة عظام أورام",
+        "department_en": "Orthopedic Oncology",
+        "doctors": [
+          "Dr. Srimanth B"
+        ]
+      },
+      "أمراض قلب الأطفال | Pediatric Cardiology": {
+        "department_ar": "أمراض قلب الأطفال",
+        "department_en": "Pediatric Cardiology",
+        "doctors": [
+          "Dr. Kavya Mallikarjun"
+        ]
+      },
+      "طب الأطفال | Pediatric Emergency": {
+        "department_ar": "طب الأطفال",
+        "department_en": "Pediatric Emergency",
+        "doctors": [
+          "Dr. A Sivagnanam"
+        ]
+      },
+      "الطب الفيزيائي وإعادة التأهيل | Physical Medicine & Rehabilitation": {
+        "department_ar": "الطب الفيزيائي وإعادة التأهيل",
+        "department_en": "Physical Medicine & Rehabilitation",
+        "doctors": [
+          "Dr. Dheeraj A"
+        ]
+      },
+      "علاج الأورام بالإشعاع | Radiation Oncology": {
+        "department_ar": "علاج الأورام بالإشعاع",
+        "department_en": "Radiation Oncology",
+        "doctors": [
+          "Dr. Vadhiraja"
+        ]
+      },
+      "أمراض المناعة السريرية والروماتيزم | Rheumatology & Clinical Immunology": {
+        "department_ar": "أمراض المناعة السريرية والروماتيزم",
+        "department_en": "Rheumatology & Clinical Immunology",
+        "doctors": [
+          "Dr. Abhishek Patil"
+        ]
+      },
+      "جراحة الأورام | Surgical Oncology": {
+        "department_ar": "جراحة الأورام",
+        "department_en": "Surgical Oncology",
+        "doctors": [
+          "Dr. Shabber Zaveri"
+        ]
+      },
+      "زراعة الكلى والمسالك | Uro-Oncology, Robotic Surgery & Renal Transplantation": {
+        "department_ar": "زراعة الكلى والمسالك",
+        "department_en": "Uro-Oncology, Robotic Surgery & Renal Transplantation",
+        "doctors": [
+          "Dr. Deepak Dubey"
+        ]
+      },
+      "جراحة المسالك البولية | Urology": {
+        "department_ar": "جراحة المسالك البولية",
+        "department_en": "Urology",
+        "doctors": [
+          "Deepak"
+        ]
+      },
+      "جراحة الأوعية الدموية | Vascular Surgery": {
+        "department_ar": "جراحة الأوعية الدموية",
+        "department_en": "Vascular Surgery",
+        "doctors": [
+          "Dr. Azeez Pasha",
+          "Dr. Venkatesh Reddy"
+        ]
+      }
+    },
+    "NU Hospitals, Rajajinagar Bangalore": {
+      "جراحة المسالك وأمراض الذكورة | Andrology & Urology": {
+        "department_ar": "جراحة المسالك وأمراض الذكورة",
+        "department_en": "Andrology & Urology",
+        "doctors": [
+          "Dr. Pramod Krishnappa"
+        ]
+      },
+      "العناية المركزة والتخدير | Critical Care & Anaesthesia": {
+        "department_ar": "العناية المركزة والتخدير",
+        "department_en": "Critical Care & Anaesthesia",
+        "doctors": [
+          "Dr. Jyoti Sridhar"
+        ]
+      },
+      "جراحة عامة ومناظير | General & Laparoscopic Surgery": {
+        "department_ar": "جراحة عامة ومناظير",
+        "department_en": "General & Laparoscopic Surgery",
+        "doctors": [
+          "Dr. Sridhar Pandit"
+        ]
+      },
+      "أمراض الكلى | Nephrology": {
+        "department_ar": "أمراض الكلى",
+        "department_en": "Nephrology",
+        "doctors": [
+          "Dr. Shakuntala V Modi"
+        ]
+      },
+      "زراعة الكلى وزراعة الأعضاء | Nephrology & Transplant Physician": {
+        "department_ar": "زراعة الكلى وزراعة الأعضاء",
+        "department_en": "Nephrology & Transplant Physician",
+        "doctors": [
+          "Dr. Aashish S"
+        ]
+      },
+      "أمراض الكلى | Nephrology & Transplant Physician": {
+        "department_ar": "أمراض الكلى",
+        "department_en": "Nephrology & Transplant Physician",
+        "doctors": [
+          "Dr. Padmanabhan S"
+        ]
+      },
+      "علم الأمراض | Pathology (Sr. Pathologist & Lab Director)": {
+        "department_ar": "علم الأمراض",
+        "department_en": "Pathology (Sr. Pathologist & Lab Director)",
+        "doctors": [
+          "Dr. Ashvini Koti"
+        ]
+      },
+      "أمراض كلى الأطفال | Pediatric Nephrology": {
+        "department_ar": "أمراض كلى الأطفال",
+        "department_en": "Pediatric Nephrology",
+        "doctors": [
+          "Dr. Nitin Nayak"
+        ]
+      },
+      "زراعة الكلى | Pediatric Urology, Robotic & Renal Transplant Surgery": {
+        "department_ar": "زراعة الكلى",
+        "department_en": "Pediatric Urology, Robotic & Renal Transplant Surgery",
+        "doctors": [
+          "Dr. Prasanna Venkatesh M K"
+        ]
+      },
+      "الأشعة التشخيصية | Radiodiagnosis": {
+        "department_ar": "الأشعة التشخيصية",
+        "department_en": "Radiodiagnosis",
+        "doctors": [
+          "Dr. Keval P Jain",
+          "Dr. Swathi Matippa"
+        ]
+      },
+      "زراعة الكلى | Uro-Oncology, Robotic & Renal Transplant Surgery": {
+        "department_ar": "زراعة الكلى",
+        "department_en": "Uro-Oncology, Robotic & Renal Transplant Surgery",
+        "doctors": [
+          "Dr. Krishna Prasad T"
+        ]
+      },
+      "جراحة المسالك البولية | Urology": {
+        "department_ar": "جراحة المسالك البولية",
+        "department_en": "Urology",
+        "doctors": [
+          "Dr. Nagarjuna Reddy Danduri"
+        ]
+      }
+    },
+    "Narayana Hospital, Bommasandra Bangalore": {
+      "التخدير | Anaesthesia": {
+        "department_ar": "التخدير",
+        "department_en": "Anaesthesia",
+        "doctors": [
+          "Dr. Srinivas M."
+        ]
+      },
+      "جراحة القلب | Cardiac Surgery": {
+        "department_ar": "جراحة القلب",
+        "department_en": "Cardiac Surgery",
+        "doctors": [
+          "Dr. Devi Shetty"
+        ]
+      },
+      "جراحة القلب | Cardiac Transplant Surgery": {
+        "department_ar": "جراحة القلب",
+        "department_en": "Cardiac Transplant Surgery",
+        "doctors": [
+          "Dr. Sandeep Attawar"
+        ]
+      },
+      "أمراض القلب | Cardiology": {
+        "department_ar": "أمراض القلب",
+        "department_en": "Cardiology",
+        "doctors": [
+          "Dr. Manjunath C. N."
+        ]
+      },
+      "جراحة القلب | Cardiothoracic Surgery": {
+        "department_ar": "جراحة القلب",
+        "department_en": "Cardiothoracic Surgery",
+        "doctors": [
+          "Dr. Anil Bhan",
+          "Dr. Sathyaki Nambala"
+        ]
+      },
+      "العناية المركزة | Critical Care": {
+        "department_ar": "العناية المركزة",
+        "department_en": "Critical Care",
+        "doctors": [
+          "Dr. Pratap Reddy"
+        ]
+      },
+      "الأمراض الجلدية | Dermatology": {
+        "department_ar": "الأمراض الجلدية",
+        "department_en": "Dermatology",
+        "doctors": [
+          "Dr. Smitha Shetty"
+        ]
+      },
+      "الأنف والأذن والحنجرة | ENT": {
+        "department_ar": "الأنف والأذن والحنجرة",
+        "department_en": "ENT",
+        "doctors": [
+          "Dr. Ashok Pillai"
+        ]
+      },
+      "الغدد الصماء | Endocrinology": {
+        "department_ar": "الغدد الصماء",
+        "department_en": "Endocrinology",
+        "doctors": [
+          "Dr. H. S. Sreevathsa"
+        ]
+      },
+      "طب الأسرة | Family Medicine": {
+        "department_ar": "طب الأسرة",
+        "department_en": "Family Medicine",
+        "doctors": [
+          "Dr. Malini Saba"
+        ]
+      },
+      "الجهاز الهضمي | Gastroenterology": {
+        "department_ar": "الجهاز الهضمي",
+        "department_en": "Gastroenterology",
+        "doctors": [
+          "Dr. Suresh Ramaswamy"
+        ]
+      },
+      "جراحة عامة | General Surgery": {
+        "department_ar": "جراحة عامة",
+        "department_en": "General Surgery",
+        "doctors": [
+          "Dr. Dilip Raja"
+        ]
+      },
+      "أمراض النساء | Gynaecology": {
+        "department_ar": "أمراض النساء",
+        "department_en": "Gynaecology",
+        "doctors": [
+          "Dr. Shobha Badiger"
+        ]
+      },
+      "أمراض الدم | Haematology": {
+        "department_ar": "أمراض الدم",
+        "department_en": "Haematology",
+        "doctors": [
+          "Dr. Harish Nanjappa"
+        ]
+      },
+      "الطب الباطني | Internal Medicine": {
+        "department_ar": "الطب الباطني",
+        "department_en": "Internal Medicine",
+        "doctors": [
+          "Dr. Pradeep Mahajan"
+        ]
+      },
+      "أمراض القلب التداخلية | Interventional Cardiology": {
+        "department_ar": "أمراض القلب التداخلية",
+        "department_en": "Interventional Cardiology",
+        "doctors": [
+          "Dr. Ravi Kishore"
+        ]
+      },
+      "الأورام الطبية | Medical Oncology": {
+        "department_ar": "الأورام الطبية",
+        "department_en": "Medical Oncology",
+        "doctors": [
+          "Dr. Ravi Prasad"
+        ]
+      },
+      "حديثي الولادة | Neonatology": {
+        "department_ar": "حديثي الولادة",
+        "department_en": "Neonatology",
+        "doctors": [
+          "Dr. Roopa K."
+        ]
+      },
+      "أمراض الكلى | Nephrology": {
+        "department_ar": "أمراض الكلى",
+        "department_en": "Nephrology",
+        "doctors": [
+          "Dr. Santosh Benjamin"
+        ]
+      },
+      "طب الأعصاب | Neurology": {
+        "department_ar": "طب الأعصاب",
+        "department_en": "Neurology",
+        "doctors": [
+          "Dr. Sanjay Desai"
+        ]
+      },
+      "جراحة الأعصاب | Neurosurgery": {
+        "department_ar": "جراحة الأعصاب",
+        "department_en": "Neurosurgery",
+        "doctors": [
+          "Dr. Ashwin Borkar"
+        ]
+      },
+      "طب العيون | Ophthalmology": {
+        "department_ar": "طب العيون",
+        "department_en": "Ophthalmology",
+        "doctors": [
+          "Dr. Anand Rao"
+        ]
+      },
+      "جراحة العظام | Orthopaedic Surgery": {
+        "department_ar": "جراحة العظام",
+        "department_en": "Orthopaedic Surgery",
+        "doctors": [
+          "Dr. Suresh H. Rao"
+        ]
+      },
+      "جراحة العظام | Orthopaedics": {
+        "department_ar": "جراحة العظام",
+        "department_en": "Orthopaedics",
+        "doctors": [
+          "Dr. Gaurav Ganguly"
+        ]
+      },
+      "أمراض قلب الأطفال | Paediatric Cardiology": {
+        "department_ar": "أمراض قلب الأطفال",
+        "department_en": "Paediatric Cardiology",
+        "doctors": [
+          "Dr. Viveka Kumar"
+        ]
+      },
+      "طب الأطفال | Paediatrics": {
+        "department_ar": "طب الأطفال",
+        "department_en": "Paediatrics",
+        "doctors": [
+          "Dr. Prabha Adhikari"
+        ]
+      },
+      "أمراض القلب الوقائية | Preventive Cardiology": {
+        "department_ar": "أمراض القلب الوقائية",
+        "department_en": "Preventive Cardiology",
+        "doctors": [
+          "Dr. R. R. Kasliwal"
+        ]
+      },
+      "الطب النفسي | Psychiatry": {
+        "department_ar": "الطب النفسي",
+        "department_en": "Psychiatry",
+        "doctors": [
+          "Dr. Rajesh Kumar"
+        ]
+      },
+      "أمراض الصدر | Pulmonology": {
+        "department_ar": "أمراض الصدر",
+        "department_en": "Pulmonology",
+        "doctors": [
+          "Dr. K. R. Suresh"
+        ]
+      },
+      "الأشعة | Radiology": {
+        "department_ar": "الأشعة",
+        "department_en": "Radiology",
+        "doctors": [
+          "Dr. Girish Rao"
+        ]
+      },
+      "زراعة الكلى | Renal Transplant": {
+        "department_ar": "زراعة الكلى",
+        "department_en": "Renal Transplant",
+        "doctors": [
+          "Dr. Sanjay Mehrotra"
+        ]
+      },
+      "جراحة الأورام | Surgical Oncology": {
+        "department_ar": "جراحة الأورام",
+        "department_en": "Surgical Oncology",
+        "doctors": [
+          "Dr. Venkatesh K."
+        ]
+      },
+      "جراحة المسالك البولية | Urology": {
+        "department_ar": "جراحة المسالك البولية",
+        "department_en": "Urology",
+        "doctors": [
+          "Dr. Rajeev Jayadevan"
+        ]
+      },
+      "جراحة الأوعية الدموية | Vascular Surgery": {
+        "department_ar": "جراحة الأوعية الدموية",
+        "department_en": "Vascular Surgery",
+        "doctors": [
+          "Dr. B. C. Srinivasa"
+        ]
+      }
+    },
+    "Rainbow Children's Hospital, Marathahalli": {
+      "نساء وولادة | Clinical Director Obstetrics & Gynecology": {
+        "department_ar": "نساء وولادة",
+        "department_en": "Clinical Director Obstetrics & Gynecology",
+        "doctors": [
+          "Dr. Praveena Shenoi"
+        ]
+      },
+      "طب الأطفال | Clinical Director Pediatrics": {
+        "department_ar": "طب الأطفال",
+        "department_en": "Clinical Director Pediatrics",
+        "doctors": [
+          "Dr. Arvind Shenoi"
+        ]
+      },
+      "طب الأطفال | Consultant Pediatrician": {
+        "department_ar": "طب الأطفال",
+        "department_en": "Consultant Pediatrician",
+        "doctors": [
+          "Dr. Chandrashekar Changappa"
+        ]
+      },
+      "جلدية | Dermatology": {
+        "department_ar": "جلدية",
+        "department_en": "Dermatology",
+        "doctors": [
+          "Dr. Rachana Shilpakar"
+        ]
+      },
+      "أطفال | General Pediatrics": {
+        "department_ar": "أطفال",
+        "department_en": "General Pediatrics",
+        "doctors": [
+          "Dr. Rajaram G",
+          "Dr. Srikanth Kulkarni",
+          "Dr. Vinu N"
+        ]
+      },
+      "طب الإنجاب | IVF": {
+        "department_ar": "طب الإنجاب",
+        "department_en": "IVF",
+        "doctors": [
+          "Dr. Plabani Sarkar"
+        ]
+      },
+      "عناية مركزة حديثي الولادة | Neonatal Intensive Care": {
+        "department_ar": "عناية مركزة حديثي الولادة",
+        "department_en": "Neonatal Intensive Care",
+        "doctors": [
+          "Dr. Sandeep R"
+        ]
+      },
+      "نساء وولادة | Obstetrics & Gynecology": {
+        "department_ar": "نساء وولادة",
+        "department_en": "Obstetrics & Gynecology",
+        "doctors": [
+          "Dr. Aruna Thangapandy"
+        ]
+      },
+      "نساء وولادة | Obstetrics, Gynecology & Laparoscopic Surgery": {
+        "department_ar": "نساء وولادة",
+        "department_en": "Obstetrics, Gynecology & Laparoscopic Surgery",
+        "doctors": [
+          "Dr. Meghana Jetty"
+        ]
+      },
+      "طب العيون | Ophthalmology": {
+        "department_ar": "طب العيون",
+        "department_en": "Ophthalmology",
+        "doctors": [
+          "Dr. Supriya Shetty"
+        ]
+      },
+      "أمراض الجهاز التنفسي للأطفال | Pediatric Allergy & Respiratory Medicine": {
+        "department_ar": "أمراض الجهاز التنفسي للأطفال",
+        "department_en": "Pediatric Allergy & Respiratory Medicine",
+        "doctors": [
+          "Dr. Nandana Bala"
+        ]
+      },
+      "أسنان أطفال | Pediatric Dentistry": {
+        "department_ar": "أسنان أطفال",
+        "department_en": "Pediatric Dentistry",
+        "doctors": [
+          "Dr. Prabhavathi H B"
+        ]
+      },
+      "أنف وأذن وحنجرة أطفال | Pediatric ENT": {
+        "department_ar": "أنف وأذن وحنجرة أطفال",
+        "department_en": "Pediatric ENT",
+        "doctors": [
+          "Dr. Shilpa H"
+        ]
+      },
+      "أنف وأذن وحنجرة أطفال / اضطرابات التطور | Pediatric ENT / Development": {
+        "department_ar": "أنف وأذن وحنجرة أطفال / اضطرابات التطور",
+        "department_en": "Pediatric ENT / Development",
+        "doctors": [
+          "Dr. Rachana G"
+        ]
+      },
+      "غدد أطفال | Pediatric Endocrinology": {
+        "department_ar": "غدد أطفال",
+        "department_en": "Pediatric Endocrinology",
+        "doctors": [
+          "Dr. Tejasvi Sheshadri"
+        ]
+      },
+      "أمراض الجهاز الهضمي والكبد للأطفال | Pediatric Gastroenterology & Hepatology": {
+        "department_ar": "أمراض الجهاز الهضمي والكبد للأطفال",
+        "department_en": "Pediatric Gastroenterology & Hepatology",
+        "doctors": [
+          "Dr. Lavenya R P"
+        ]
+      },
+      "أمراض الكبد والجهاز الهضمي للأطفال | Pediatric Gastroenterology & Hepatology": {
+        "department_ar": "أمراض الكبد والجهاز الهضمي للأطفال",
+        "department_en": "Pediatric Gastroenterology & Hepatology",
+        "doctors": [
+          "Dr. V R Nagendra Kumar"
+        ]
+      },
+      "أورام وزرع نخاع للأطفال | Pediatric Hemato Oncology & Bone Marrow Transplant": {
+        "department_ar": "أورام وزرع نخاع للأطفال",
+        "department_en": "Pediatric Hemato Oncology & Bone Marrow Transplant",
+        "doctors": [
+          "Dr. Manojit Chakraborty",
+          "Dr. Vasudha N R"
+        ]
+      },
+      "أمراض معدية للأطفال | Pediatric Infectious Diseases": {
+        "department_ar": "أمراض معدية للأطفال",
+        "department_en": "Pediatric Infectious Diseases",
+        "doctors": [
+          "Dr. Manu Chaudhary"
+        ]
+      },
+      "عناية مركزة للأطفال / طب أطفال | Pediatric Intensive Care / General Pediatrics": {
+        "department_ar": "عناية مركزة للأطفال / طب أطفال",
+        "department_en": "Pediatric Intensive Care / General Pediatrics",
+        "doctors": [
+          "Dr. Deepak R"
+        ]
+      },
+      "عناية مركزة وأطفال عام | Pediatric Intensivist & General Pediatrician": {
+        "department_ar": "عناية مركزة وأطفال عام",
+        "department_en": "Pediatric Intensivist & General Pediatrician",
+        "doctors": [
+          "Dr. Rakshay Shetty"
+        ]
+      },
+      "أمراض الكلى للأطفال | Pediatric Nephrology": {
+        "department_ar": "أمراض الكلى للأطفال",
+        "department_en": "Pediatric Nephrology",
+        "doctors": [
+          "Dr. Saumil Gaur"
+        ]
+      },
+      "جراحة أعصاب الأطفال | Pediatric Neurology & Neuro Surgery": {
+        "department_ar": "جراحة أعصاب الأطفال",
+        "department_en": "Pediatric Neurology & Neuro Surgery",
+        "doctors": [
+          "Dr. N Balamurugan"
+        ]
+      },
+      "جراحة أعصاب الأطفال | Pediatric Neurology & Neurosurgery": {
+        "department_ar": "جراحة أعصاب الأطفال",
+        "department_en": "Pediatric Neurology & Neurosurgery",
+        "doctors": [
+          "Dr. Aniruddha Tekkatte Jagannatha"
+        ]
+      },
+      "جراحة عظام الأطفال | Pediatric Orthopedics": {
+        "department_ar": "جراحة عظام الأطفال",
+        "department_en": "Pediatric Orthopedics",
+        "doctors": [
+          "Dr. Jayanth Sundar Sampath"
+        ]
+      },
+      "طب نفسي أطفال | Pediatric Psychiatry": {
+        "department_ar": "طب نفسي أطفال",
+        "department_en": "Pediatric Psychiatry",
+        "doctors": [
+          "Dr. Ruchi Gupta"
+        ]
+      },
+      "أمراض الصدر للأطفال | Pediatric Pulmonologist": {
+        "department_ar": "أمراض الصدر للأطفال",
+        "department_en": "Pediatric Pulmonologist",
+        "doctors": [
+          "Dr. Anupama Menon"
+        ]
+      },
+      "أمراض الروماتيزم للأطفال | Pediatric Rheumatology": {
+        "department_ar": "أمراض الروماتيزم للأطفال",
+        "department_en": "Pediatric Rheumatology",
+        "doctors": [
+          "Dr. Chandrika S Bhat"
+        ]
+      },
+      "جراحة الأطفال والمسالك | Pediatric Surgery & Pediatric Urology / Laparoscopy": {
+        "department_ar": "جراحة الأطفال والمسالك",
+        "department_en": "Pediatric Surgery & Pediatric Urology / Laparoscopy",
+        "doctors": [
+          "Dr. Antony Robert"
+        ]
+      },
+      "جراحة الأطفال والمسالك | Pediatric Surgery & Urology": {
+        "department_ar": "جراحة الأطفال والمسالك",
+        "department_en": "Pediatric Surgery & Urology",
+        "doctors": [
+          "Dr. Shounak Choudhury"
+        ]
+      },
+      "جراحة تجميلية وترميمية | Plastic & Reconstructive Surgery": {
+        "department_ar": "جراحة تجميلية وترميمية",
+        "department_en": "Plastic & Reconstructive Surgery",
+        "doctors": [
+          "Dr. Priyadarshan K"
+        ]
+      },
+      "الأشعة | Radiology": {
+        "department_ar": "الأشعة",
+        "department_en": "Radiology",
+        "doctors": [
+          "Dr. Jyoti Singh"
+        ]
+      }
+    },
+    "Rela Hospital, Chennai": {
+      "التخدير | Anaesthesia": {
+        "department_ar": "التخدير",
+        "department_en": "Anaesthesia",
+        "doctors": [
+          "Dr. Krishna Kumar"
+        ]
+      },
+      "كهرباء القلب | Cardiac Electrophysiology": {
+        "department_ar": "كهرباء القلب",
+        "department_en": "Cardiac Electrophysiology",
+        "doctors": [
+          "Dr. C. Narasimhan"
+        ]
+      },
+      "جراحة القلب | Cardiac Surgery": {
+        "department_ar": "جراحة القلب",
+        "department_en": "Cardiac Surgery",
+        "doctors": [
+          "Dr. Murali Mohan B. V.",
+          "Dr. Ravi Mohanka"
+        ]
+      },
+      "أمراض القلب | Cardiology": {
+        "department_ar": "أمراض القلب",
+        "department_en": "Cardiology",
+        "doctors": [
+          "Dr. R. Prasada Reddy",
+          "Dr. Ramesh Babu",
+          "Dr. Sandhya Sundaram"
+        ]
+      },
+      "جراحة القلب | Cardiothoracic Surgery": {
+        "department_ar": "جراحة القلب",
+        "department_en": "Cardiothoracic Surgery",
+        "doctors": [
+          "Dr. Vijay Shankar"
+        ]
+      },
+      "التغذية الإكلينيكية | Clinical Nutrition": {
+        "department_ar": "التغذية الإكلينيكية",
+        "department_en": "Clinical Nutrition",
+        "doctors": [
+          "Dr. Lakshmi Venkataraman"
+        ]
+      },
+      "العناية المركزة | Critical Care": {
+        "department_ar": "العناية المركزة",
+        "department_en": "Critical Care",
+        "doctors": [
+          "Dr. Rohit Vadala"
+        ]
+      },
+      "الأمراض الجلدية | Dermatology": {
+        "department_ar": "الأمراض الجلدية",
+        "department_en": "Dermatology",
+        "doctors": [
+          "Dr. Sandhya Rajagopal"
+        ]
+      },
+      "الأنف والأذن والحنجرة | ENT": {
+        "department_ar": "الأنف والأذن والحنجرة",
+        "department_en": "ENT",
+        "doctors": [
+          "Dr. Raghavan Varadarajan"
+        ]
+      },
+      "طب الطوارئ | Emergency Medicine": {
+        "department_ar": "طب الطوارئ",
+        "department_en": "Emergency Medicine",
+        "doctors": [
+          "Dr. Kavitha Rajagopalan"
+        ]
+      },
+      "المناظير | Endoscopy & EUS": {
+        "department_ar": "المناظير",
+        "department_en": "Endoscopy & EUS",
+        "doctors": [
+          "Dr. Sundeep Lakhtakia"
+        ]
+      },
+      "طب الأسرة | Family Medicine": {
+        "department_ar": "طب الأسرة",
+        "department_en": "Family Medicine",
+        "doctors": [
+          "Dr. Suresh Kumar"
+        ]
+      },
+      "الجهاز الهضمي | Gastroenterology": {
+        "department_ar": "الجهاز الهضمي",
+        "department_en": "Gastroenterology",
+        "doctors": [
+          "Dr. D. Nageshwar Reddy"
+        ]
+      },
+      "أمراض النساء | Gynaecology": {
+        "department_ar": "أمراض النساء",
+        "department_en": "Gynaecology",
+        "doctors": [
+          "Dr. Seema Rao"
+        ]
+      },
+      "جراحة الكبد | HPB Surgery": {
+        "department_ar": "جراحة الكبد",
+        "department_en": "HPB Surgery",
+        "doctors": [
+          "Dr. Ashwin Rammohan"
+        ]
+      },
+      "أمراض الدم | Haematology": {
+        "department_ar": "أمراض الدم",
+        "department_en": "Haematology",
+        "doctors": [
+          "Dr. Niranjan Rao"
+        ]
+      },
+      "أمراض الكبد | Hepatology": {
+        "department_ar": "أمراض الكبد",
+        "department_en": "Hepatology",
+        "doctors": [
+          "Dr. Anil Arora",
+          "Dr. Dinesh Jothimani",
+          "Dr. P. Nagaraja Rao",
+          "Dr. Sanjay Kumar Yadav"
+        ]
+      },
+      "أمراض الأمعاء الالتهابية | IBD Specialist": {
+        "department_ar": "أمراض الأمعاء الالتهابية",
+        "department_en": "IBD Specialist",
+        "doctors": [
+          "Dr. Rupa Banerjee"
+        ]
+      },
+      "الطب الباطني | Internal Medicine": {
+        "department_ar": "الطب الباطني",
+        "department_en": "Internal Medicine",
+        "doctors": [
+          "Dr. Harish Kumar",
+          "Dr. Naveen Reddy Podduturi"
+        ]
+      },
+      "المناظير | Interventional Endoscopy": {
+        "department_ar": "المناظير",
+        "department_en": "Interventional Endoscopy",
+        "doctors": [
+          "Dr. Mohan Ramchandani"
+        ]
+      },
+      "الأشعة التداخلية | Interventional Radiology": {
+        "department_ar": "الأشعة التداخلية",
+        "department_en": "Interventional Radiology",
+        "doctors": [
+          "Dr. Rohan Arora"
+        ]
+      },
+      "تخدير زراعة الأعضاء | Liver Transplant Anaesthesia": {
+        "department_ar": "تخدير زراعة الأعضاء",
+        "department_en": "Liver Transplant Anaesthesia",
+        "doctors": [
+          "Dr. Mettu Srinivas Reddy"
+        ]
+      },
+      "جراحة الكبد | Liver Transplant Surgery": {
+        "department_ar": "جراحة الكبد",
+        "department_en": "Liver Transplant Surgery",
+        "doctors": [
+          "Dr. Ilankumaran Kaliamurthy"
+        ]
+      },
+      "زراعة الكبد | Liver Transplant Surgery": {
+        "department_ar": "زراعة الكبد",
+        "department_en": "Liver Transplant Surgery",
+        "doctors": [
+          "Dr. P. Balachandran Menon"
+        ]
+      },
+      "زراعة الكبد | Liver Transplantation": {
+        "department_ar": "زراعة الكبد",
+        "department_en": "Liver Transplantation",
+        "doctors": [
+          "Dr. Mohamed Rela",
+          "Dr. Prashant Bhangui"
+        ]
+      },
+      "الجراحة طفيفة التوغل | Minimally Invasive Surgery": {
+        "department_ar": "الجراحة طفيفة التوغل",
+        "department_en": "Minimally Invasive Surgery",
+        "doctors": [
+          "Dr. G. V. Rao"
+        ]
+      },
+      "حديثي الولادة | Neonatology": {
+        "department_ar": "حديثي الولادة",
+        "department_en": "Neonatology",
+        "doctors": [
+          "Dr. Bindu Garg"
+        ]
+      },
+      "أمراض الكلى | Nephrology": {
+        "department_ar": "أمراض الكلى",
+        "department_en": "Nephrology",
+        "doctors": [
+          "Dr. Vikram Venkateswaran"
+        ]
+      },
+      "طب الأعصاب | Neurology": {
+        "department_ar": "طب الأعصاب",
+        "department_en": "Neurology",
+        "doctors": [
+          "Dr. Sankar Narayanan"
+        ]
+      },
+      "جراحة الأعصاب | Neurosurgery": {
+        "department_ar": "جراحة الأعصاب",
+        "department_en": "Neurosurgery",
+        "doctors": [
+          "Dr. Jayaraman Kumaravelu"
+        ]
+      },
+      "طب العيون | Ophthalmology": {
+        "department_ar": "طب العيون",
+        "department_en": "Ophthalmology",
+        "doctors": [
+          "Dr. Padmini Ramesh"
+        ]
+      },
+      "جراحة العظام | Orthopaedics": {
+        "department_ar": "جراحة العظام",
+        "department_en": "Orthopaedics",
+        "doctors": [
+          "Dr. R. Ravi"
+        ]
+      },
+      "أمراض الكبد للأطفال | Paediatric Hepatology": {
+        "department_ar": "أمراض الكبد للأطفال",
+        "department_en": "Paediatric Hepatology",
+        "doctors": [
+          "Dr. Gomathy Narasimhan"
+        ]
+      },
+      "جراحة الأطفال | Paediatric Surgery": {
+        "department_ar": "جراحة الأطفال",
+        "department_en": "Paediatric Surgery",
+        "doctors": [
+          "Dr. Joy Varghese"
+        ]
+      },
+      "طب الأطفال | Paediatrics": {
+        "department_ar": "طب الأطفال",
+        "department_en": "Paediatrics",
+        "doctors": [
+          "Dr. Anand Kumar"
+        ]
+      },
+      "جراحة التجميل | Plastic Surgery": {
+        "department_ar": "جراحة التجميل",
+        "department_en": "Plastic Surgery",
+        "doctors": [
+          "Dr. Mohan Rajesh"
+        ]
+      },
+      "الطب النفسي | Psychiatry": {
+        "department_ar": "الطب النفسي",
+        "department_en": "Psychiatry",
+        "doctors": [
+          "Dr. Sujatha Siddappa"
+        ]
+      },
+      "أمراض الصدر | Pulmonology": {
+        "department_ar": "أمراض الصدر",
+        "department_en": "Pulmonology",
+        "doctors": [
+          "Dr. Pradeep Rangappa"
+        ]
+      },
+      "الأشعة | Radiology": {
+        "department_ar": "الأشعة",
+        "department_en": "Radiology",
+        "doctors": [
+          "Dr. Vijayalakshmi Balasubramanian"
+        ]
+      },
+      "جراحة الأورام | Surgical Oncology": {
+        "department_ar": "جراحة الأورام",
+        "department_en": "Surgical Oncology",
+        "doctors": [
+          "Dr. Somashekhar S. P."
+        ]
+      },
+      "جراحة الصدر | Thoracic Surgery": {
+        "department_ar": "جراحة الصدر",
+        "department_en": "Thoracic Surgery",
+        "doctors": [
+          "Dr. Arvind Kumar"
+        ]
+      },
+      "جراحة المسالك البولية | Urology": {
+        "department_ar": "جراحة المسالك البولية",
+        "department_en": "Urology",
+        "doctors": [
+          "Dr. Anand Alur"
+        ]
+      },
+      "جراحة الأوعية الدموية | Vascular Surgery": {
+        "department_ar": "جراحة الأوعية الدموية",
+        "department_en": "Vascular Surgery",
+        "doctors": [
+          "Dr. Subramaniam Venkatesh"
+        ]
+      }
+    },
+    "SPARSH Hospital, Hennur Road": {
+      "تخدير | Anaesthesiology": {
+        "department_ar": "تخدير",
+        "department_en": "Anaesthesiology",
+        "doctors": [
+          "Dr. Chaithannya N S",
+          "Dr. Deepa Chandran"
+        ]
+      },
+      "زرع نخاع العظم | Bone Marrow Transplant": {
+        "department_ar": "زرع نخاع العظم",
+        "department_en": "Bone Marrow Transplant",
+        "doctors": [
+          "Dr. Anand Kumar K"
+        ]
+      },
+      "جراحة تجميلية وعلاج تجميلي | Cosmetology & Cosmetic Surgery": {
+        "department_ar": "جراحة تجميلية وعلاج تجميلي",
+        "department_en": "Cosmetology & Cosmetic Surgery",
+        "doctors": [
+          "Dr. Anand K"
+        ]
+      },
+      "الغدد الصماء والسكري | Endocrinology & Diabetology": {
+        "department_ar": "الغدد الصماء والسكري",
+        "department_en": "Endocrinology & Diabetology",
+        "doctors": [
+          "Dr. Chetan Dev K"
+        ]
+      },
+      "طب الأسرة | Family Medicine": {
+        "department_ar": "طب الأسرة",
+        "department_en": "Family Medicine",
+        "doctors": [
+          "Dr. Deepanju D Changkakoti"
+        ]
+      },
+      "أمراض الجهاز الهضمي | Gastroenterology": {
+        "department_ar": "أمراض الجهاز الهضمي",
+        "department_en": "Gastroenterology",
+        "doctors": [
+          "Dr. Anto Gnana Delasalle M",
+          "Dr. Praveen Mathew"
+        ]
+      },
+      "أشعة تداخلية | Interventional Radiology": {
+        "department_ar": "أشعة تداخلية",
+        "department_en": "Interventional Radiology",
+        "doctors": [
+          "Dr. Deepmala Karmakar"
+        ]
+      },
+      "طب الأعصاب | Neuroscience / Neurology": {
+        "department_ar": "طب الأعصاب",
+        "department_en": "Neuroscience / Neurology",
+        "doctors": [
+          "Dr. Ann Agnes Mathew",
+          "Dr. Avinash Lakha"
+        ]
+      },
+      "نساء وولادة | Obstetrics & Gynaecology": {
+        "department_ar": "نساء وولادة",
+        "department_en": "Obstetrics & Gynaecology",
+        "doctors": [
+          "Dr. Arpi Sagar Lodha"
+        ]
+      },
+      "طب الأورام | Oncology": {
+        "department_ar": "طب الأورام",
+        "department_en": "Oncology",
+        "doctors": [
+          "Dr. Linu Abraham Jacob"
+        ]
+      },
+      "جراحة العظام | Orthopaedics": {
+        "department_ar": "جراحة العظام",
+        "department_en": "Orthopaedics",
+        "doctors": [
+          "Dr. Abhijit Chavan"
+        ]
+      },
+      "أشعة | Radiology": {
+        "department_ar": "أشعة",
+        "department_en": "Radiology",
+        "doctors": [
+          "Dr. Chaynika Agarwal"
+        ]
+      },
+      "جراحة الأوعية الدموية | Vascular & Endovascular Surgery": {
+        "department_ar": "جراحة الأوعية الدموية",
+        "department_en": "Vascular & Endovascular Surgery",
+        "doctors": [
+          "Dr. Abhilash V"
+        ]
+      }
+    },
+    "SPARSH Hospital, Infantry Road": {
+      "أمراض القلب | Cardiac Sciences": {
+        "department_ar": "أمراض القلب",
+        "department_en": "Cardiac Sciences",
+        "doctors": [
+          "Dr. Ranjan Shetty"
+        ]
+      },
+      "جراحة تجميلية وعلاج تجميلي | Cosmetology & Cosmetic Surgery": {
+        "department_ar": "جراحة تجميلية وعلاج تجميلي",
+        "department_en": "Cosmetology & Cosmetic Surgery",
+        "doctors": [
+          "Dr. Anand K"
+        ]
+      },
+      "جراحة الأسنان | Dental Surgery": {
+        "department_ar": "جراحة الأسنان",
+        "department_en": "Dental Surgery",
+        "doctors": [
+          "Dr. Kishan Nag"
+        ]
+      },
+      "أنف وأذن وحنجرة | ENT": {
+        "department_ar": "أنف وأذن وحنجرة",
+        "department_en": "ENT",
+        "doctors": [
+          "Dr. Aditi Ravindra"
+        ]
+      },
+      "طب عام وباطنة | General Medicine": {
+        "department_ar": "طب عام وباطنة",
+        "department_en": "General Medicine",
+        "doctors": [
+          "Dr. Sanjana Rai"
+        ]
+      },
+      "جراحة الرأس والرقبة | Head & Neck Surgery": {
+        "department_ar": "جراحة الرأس والرقبة",
+        "department_en": "Head & Neck Surgery",
+        "doctors": [
+          "Dr. Abhinay Indrakumar Reddy"
+        ]
+      },
+      "أشعة تداخلية | Interventional Radiology": {
+        "department_ar": "أشعة تداخلية",
+        "department_en": "Interventional Radiology",
+        "doctors": [
+          "Dr. Deepmala Karmakar"
+        ]
+      },
+      "زراعة الكبد وجراحة الكبد والبنكرياس | Liver Transplant & HPB Surgery": {
+        "department_ar": "زراعة الكبد وجراحة الكبد والبنكرياس",
+        "department_en": "Liver Transplant & HPB Surgery",
+        "doctors": [
+          "Dr. Arun"
+        ]
+      },
+      "أمراض الكلى والمسالك | Nephrology & Urology": {
+        "department_ar": "أمراض الكلى والمسالك",
+        "department_en": "Nephrology & Urology",
+        "doctors": [
+          "Dr. Dinesh Kumar",
+          "Dr. Divyashree Bhat"
+        ]
+      },
+      "طب الأعصاب | Neuroscience / Neurology": {
+        "department_ar": "طب الأعصاب",
+        "department_en": "Neuroscience / Neurology",
+        "doctors": [
+          "Dr. Arvind Bhateja",
+          "Dr. Chirag Jain"
+        ]
+      },
+      "نساء وولادة | Obstetrics & Gynaecology": {
+        "department_ar": "نساء وولادة",
+        "department_en": "Obstetrics & Gynaecology",
+        "doctors": [
+          "Dr. Deepthi Bawa",
+          "Dr. Geeth Monnappa"
+        ]
+      },
+      "طب الأورام | Oncology": {
+        "department_ar": "طب الأورام",
+        "department_en": "Oncology",
+        "doctors": [
+          "Dr. Linu Abraham Jacob"
+        ]
+      },
+      "جراحة العظام | Orthopaedics": {
+        "department_ar": "جراحة العظام",
+        "department_en": "Orthopaedics",
+        "doctors": [
+          "Dr. Sharan Shivaraj Patil"
+        ]
+      },
+      "طب الأطفال | Paediatrics": {
+        "department_ar": "طب الأطفال",
+        "department_en": "Paediatrics",
+        "doctors": [
+          "Dr. Abram Harsha Vardhan"
+        ]
+      },
+      "أمراض الروماتيزم | Rheumatology": {
+        "department_ar": "أمراض الروماتيزم",
+        "department_en": "Rheumatology",
+        "doctors": [
+          "Dr. Gaurang Sudhir Deshpande"
+        ]
+      }
+    },
+    "Sakra World Hospital, Bangalore": {
+      "تخدير | Anaesthesiology": {
+        "department_ar": "تخدير",
+        "department_en": "Anaesthesiology",
+        "doctors": [
+          "Dr. Dhananjay D. N.",
+          "Dr. Shishir Chandrashekhar"
+        ]
+      },
+      "جراحة سمنة وثدي وجهاز هضمي | Bariatric, Breast & Surgical Gastroenterology": {
+        "department_ar": "جراحة سمنة وثدي وجهاز هضمي",
+        "department_en": "Bariatric, Breast & Surgical Gastroenterology",
+        "doctors": [
+          "Dr. Nanda Rajaneesh"
+        ]
+      },
+      "تخدير قلبي | Cardiac Anaesthesiology": {
+        "department_ar": "تخدير قلبي",
+        "department_en": "Cardiac Anaesthesiology",
+        "doctors": [
+          "Dr. Sunil Kumar N. K."
+        ]
+      },
+      "الفيزيولوجيا الكهربائية للقلب | Cardiac Electrophysiology": {
+        "department_ar": "الفيزيولوجيا الكهربائية للقلب",
+        "department_en": "Cardiac Electrophysiology",
+        "doctors": [
+          "Dr. Bharat Raj"
+        ]
+      },
+      "جراحة القلب والصدر والأوعية | Cardio Thoracic & Vascular Surgery (CTVS)": {
+        "department_ar": "جراحة القلب والصدر والأوعية",
+        "department_en": "Cardio Thoracic & Vascular Surgery (CTVS)",
+        "doctors": [
+          "Dr. Adil Sadiq"
+        ]
+      },
+      "أمراض القلب | Cardiology": {
+        "department_ar": "أمراض القلب",
+        "department_en": "Cardiology",
+        "doctors": [
+          "Dr. Srikanth"
+        ]
+      },
+      "العناية المركزة | Critical Care Medicine": {
+        "department_ar": "العناية المركزة",
+        "department_en": "Critical Care Medicine",
+        "doctors": [
+          "Dr. Anand Bandachar Mamdapur",
+          "Dr. Divya Hirolli",
+          "Dr. Sandeep Anehosur",
+          "Dr. Shashidhar B. G"
+        ]
+      },
+      "طب الأسنان | Dental Surgery": {
+        "department_ar": "طب الأسنان",
+        "department_en": "Dental Surgery",
+        "doctors": [
+          "Dr. A. Chris Deepak",
+          "Dr. Akshay Shetty",
+          "Dr. Deepak Pathak",
+          "Dr. Swati Vishwakarma"
+        ]
+      },
+      "طب الأسنان | Dentistry": {
+        "department_ar": "طب الأسنان",
+        "department_en": "Dentistry",
+        "doctors": [
+          "Dr. Priyanka Dutta"
+        ]
+      },
+      "أنف وأذن وحنجرة | ENT": {
+        "department_ar": "أنف وأذن وحنجرة",
+        "department_en": "ENT",
+        "doctors": [
+          "Dr. Dali Chandran",
+          "Dr. Shantanu Tandon"
+        ]
+      },
+      "جراحة الجهاز الهضمي وزراعة الكبد | GI Surgery & Liver Transplant": {
+        "department_ar": "جراحة الجهاز الهضمي وزراعة الكبد",
+        "department_en": "GI Surgery & Liver Transplant",
+        "doctors": [
+          "Dr. Sadiq Saleem Sikora"
+        ]
+      },
+      "أمراض الجهاز الهضمي | Gastroenterology": {
+        "department_ar": "أمراض الجهاز الهضمي",
+        "department_en": "Gastroenterology",
+        "doctors": [
+          "Dr. Lawrence Peter"
+        ]
+      },
+      "جهاز هضمي وكبد | Gastroenterology & Hepatology": {
+        "department_ar": "جهاز هضمي وكبد",
+        "department_en": "Gastroenterology & Hepatology",
+        "doctors": [
+          "Dr. Akshay Deshpande",
+          "Dr. Amruthesh T. M."
+        ]
+      },
+      "جراحة أورام الرأس والرقبة | Head & Neck Onco-Surgery": {
+        "department_ar": "جراحة أورام الرأس والرقبة",
+        "department_en": "Head & Neck Onco-Surgery",
+        "doctors": [
+          "Dr. Honey Ashok"
+        ]
+      },
+      "أمراض القلب التداخلي | Interventional Cardiology": {
+        "department_ar": "أمراض القلب التداخلي",
+        "department_en": "Interventional Cardiology",
+        "doctors": [
+          "Dr. Sreekanth B. Shetty"
+        ]
+      },
+      "أورام باطنية وأمراض دم | Medical Oncology & Haematology": {
+        "department_ar": "أورام باطنية وأمراض دم",
+        "department_en": "Medical Oncology & Haematology",
+        "doctors": [
+          "Dr. Vineet Gupta"
+        ]
+      },
+      "أمراض الكلى | Nephrology": {
+        "department_ar": "أمراض الكلى",
+        "department_en": "Nephrology",
+        "doctors": [
+          "Dr. Sushma Rani"
+        ]
+      },
+      "طب الأعصاب والسكتات | Neurology & Stroke": {
+        "department_ar": "طب الأعصاب والسكتات",
+        "department_en": "Neurology & Stroke",
+        "doctors": [
+          "Dr. Amit Kulkarni"
+        ]
+      },
+      "جراحة المخ والأعصاب | Neurosurgery": {
+        "department_ar": "جراحة المخ والأعصاب",
+        "department_en": "Neurosurgery",
+        "doctors": [
+          "Dr. Alok Mohan Uppar",
+          "Dr. Arjun Srivatsa"
+        ]
+      },
+      "تجميل عيون/قناة دمعية | Oculoplastic & Lacrimal Surgery": {
+        "department_ar": "تجميل عيون/قناة دمعية",
+        "department_en": "Oculoplastic & Lacrimal Surgery",
+        "doctors": [
+          "Dr. Lakshmi Mahesh"
+        ]
+      },
+      "جراحة العظام والمفاصل | Orthopedic & Joint Surgery": {
+        "department_ar": "جراحة العظام والمفاصل",
+        "department_en": "Orthopedic & Joint Surgery",
+        "doctors": [
+          "Dr. Chandrashekar"
+        ]
+      },
+      "جراحة العظام | Orthopedics": {
+        "department_ar": "جراحة العظام",
+        "department_en": "Orthopedics",
+        "doctors": [
+          "Dr. Adarsh Babu K"
+        ]
+      },
+      "جراحة الأطفال | Paediatric Surgery": {
+        "department_ar": "جراحة الأطفال",
+        "department_en": "Paediatric Surgery",
+        "doctors": [
+          "Dr. Anil Kumar Pura Lingegowda"
+        ]
+      },
+      "أسنان أطفال | Pediatric Dentistry": {
+        "department_ar": "أسنان أطفال",
+        "department_en": "Pediatric Dentistry",
+        "doctors": [
+          "Dr. Apoorva Gudadhe"
+        ]
+      },
+      "جراحة الأطفال | Pediatric Surgery": {
+        "department_ar": "جراحة الأطفال",
+        "department_en": "Pediatric Surgery",
+        "doctors": [
+          "Dr. Anil Kumar"
+        ]
+      },
+      "جراحة تجميلية وترميمية | Plastic & Reconstructive Surgery": {
+        "department_ar": "جراحة تجميلية وترميمية",
+        "department_en": "Plastic & Reconstructive Surgery",
+        "doctors": [
+          "Dr. Rajendra S. Gujjalanavar"
+        ]
+      },
+      "أمراض الصدر | Pulmonology": {
+        "department_ar": "أمراض الصدر",
+        "department_en": "Pulmonology",
+        "doctors": [
+          "Dr. Sachin Kumar"
+        ]
+      },
+      "أمراض الصدر والعناية المركزة | Pulmonology & Critical Care": {
+        "department_ar": "أمراض الصدر والعناية المركزة",
+        "department_en": "Pulmonology & Critical Care",
+        "doctors": [
+          "Dr. Ajay Handa"
+        ]
+      },
+      "أمراض الصدر واضطرابات النوم | Pulmonology & Sleep Medicine": {
+        "department_ar": "أمراض الصدر واضطرابات النوم",
+        "department_en": "Pulmonology & Sleep Medicine",
+        "doctors": [
+          "Dr. Arjunsa H. Satapute"
+        ]
+      },
+      "أشعة | Radiology": {
+        "department_ar": "أشعة",
+        "department_en": "Radiology",
+        "doctors": [
+          "Dr. Anisha S. Tandon"
+        ]
+      },
+      "أشعة وتصوير تشخيصي | Radiology & Imaging": {
+        "department_ar": "أشعة وتصوير تشخيصي",
+        "department_en": "Radiology & Imaging",
+        "doctors": [
+          "Dr. B. Premsai Reddy",
+          "Dr. Sonali Sethi",
+          "Dr. Suresh V",
+          "Dr. Y. Trishul Shetty"
+        ]
+      },
+      "جراحة الكتف | Shoulder Surgery": {
+        "department_ar": "جراحة الكتف",
+        "department_en": "Shoulder Surgery",
+        "doctors": [
+          "Dr. Banarji"
+        ]
+      }
+    },
+    "Sankara Eye Hospital, Bengaluru": {
+      "تخدير | Anaesthesiology": {
+        "department_ar": "تخدير",
+        "department_en": "Anaesthesiology",
+        "doctors": [
+          "Dr. A Mohan Kumar",
+          "Dr. Alluri Suneetha",
+          "Dr. Kambhampati Chakrapani",
+          "Dr. Narmadha"
+        ]
+      },
+      "كتاراكت وجلوكوما | Cataract & Glaucoma": {
+        "department_ar": "كتاراكت وجلوكوما",
+        "department_en": "Cataract & Glaucoma",
+        "doctors": [
+          "Dr. Ajitha S",
+          "Dr. Meena G Menon",
+          "Dr. S. Ajitha",
+          "Dr. Srilakshmi Sikhakoli"
+        ]
+      },
+      "كتاراكت وشبكية طبية | Cataract & Medical Retina": {
+        "department_ar": "كتاراكت وشبكية طبية",
+        "department_en": "Cataract & Medical Retina",
+        "doctors": [
+          "Dr. Jayamadhury Gudimetla"
+        ]
+      },
+      "كتاراكت وتصحيح البصر | Cataract & Refractive Services": {
+        "department_ar": "كتاراكت وتصحيح البصر",
+        "department_en": "Cataract & Refractive Services",
+        "doctors": [
+          "Dr. Y. Umesh"
+        ]
+      },
+      "كتاراكت وقرنية وتصحيح البصر | Cataract, Cornea & Refractive Service": {
+        "department_ar": "كتاراكت وقرنية وتصحيح البصر",
+        "department_en": "Cataract, Cornea & Refractive Service",
+        "doctors": [
+          "Dr. Anand Balasubramaniam"
+        ]
+      },
+      "كتاراكت وقرنية وتصحيح البصر | Cataract, Cornea & Refractive Services": {
+        "department_ar": "كتاراكت وقرنية وتصحيح البصر",
+        "department_en": "Cataract, Cornea & Refractive Services",
+        "doctors": [
+          "Dr. Haritha Veluri",
+          "Dr. Jagadeesh Kumar Reddy K",
+          "Dr. Madhuri V",
+          "Dr. Shashidhar Banigallapati"
+        ]
+      },
+      "كتاراكت وقرنية وتصحيح البصر | Cataract, Cornea & Refractive Surgery": {
+        "department_ar": "كتاراكت وقرنية وتصحيح البصر",
+        "department_en": "Cataract, Cornea & Refractive Surgery",
+        "doctors": [
+          "Dr. Nisha Ahuja"
+        ]
+      },
+      "كتاراكت وشبكية طبية وقزحية | Cataract, Medical Retina & UVEA Services": {
+        "department_ar": "كتاراكت وشبكية طبية وقزحية",
+        "department_en": "Cataract, Medical Retina & UVEA Services",
+        "doctors": [
+          "Dr. Minija C K"
+        ]
+      },
+      "قرنية وتصحيح البصر | Cornea & Refractive Services": {
+        "department_ar": "قرنية وتصحيح البصر",
+        "department_en": "Cornea & Refractive Services",
+        "doctors": [
+          "Dr. Sudhakar Potti"
+        ]
+      },
+      "قرنية | Cornea (Registrar – Cornea)": {
+        "department_ar": "قرنية",
+        "department_en": "Cornea (Registrar – Cornea)",
+        "doctors": [
+          "Dr. Vandhana Sundaram"
+        ]
+      },
+      "خدمات القرنية | Cornea Services": {
+        "department_ar": "خدمات القرنية",
+        "department_en": "Cornea Services",
+        "doctors": [
+          "Dr. Prabhu Vijayaraghavan"
+        ]
+      },
+      "قرنية وسطح العين وتصحيح البصر | Cornea, Ocular Surface & Refractive Services": {
+        "department_ar": "قرنية وسطح العين وتصحيح البصر",
+        "department_en": "Cornea, Ocular Surface & Refractive Services",
+        "doctors": [
+          "Dr. Pallavi Joshi"
+        ]
+      },
+      "عيادة عامة | General OPD (ENT)": {
+        "department_ar": "عيادة عامة",
+        "department_en": "General OPD (ENT)",
+        "doctors": [
+          "Dr. Anandhi R"
+        ]
+      },
+      "عيادات عامة | General OPD (ENT)": {
+        "department_ar": "عيادات عامة",
+        "department_en": "General OPD (ENT)",
+        "doctors": [
+          "Dr. Renukadevi N K"
+        ]
+      },
+      "طب العيون العام | General Ophthalmology": {
+        "department_ar": "طب العيون العام",
+        "department_en": "General Ophthalmology",
+        "doctors": [
+          "Dr. Anees Fatima Mohammed",
+          "Dr. Anuradha Kakumanu",
+          "Dr. Hitendrasinh Parmar",
+          "Dr. Kanakamedala Bhargavi Lakshmi",
+          "Dr. Kesana Udaya Sankar",
+          "Dr. Shalini G",
+          "Dr. Vijayabhaskar Gajjala"
+        ]
+      },
+      "عيون عامة وشبكية طبية وقزحية | General Ophthalmology, Medical Retina & UVEA": {
+        "department_ar": "عيون عامة وشبكية طبية وقزحية",
+        "department_en": "General Ophthalmology, Medical Retina & UVEA",
+        "doctors": [
+          "Dr. Nidhi Dubey"
+        ]
+      },
+      "جلوكوما | Glaucoma": {
+        "department_ar": "جلوكوما",
+        "department_en": "Glaucoma",
+        "doctors": [
+          "Dr. Lalitha K J",
+          "Dr. Malleswari Medikonda",
+          "Dr. Nishitha M.S"
+        ]
+      },
+      "شبكية طبية | Medical Retina": {
+        "department_ar": "شبكية طبية",
+        "department_en": "Medical Retina",
+        "doctors": [
+          "Dr. Geetha G",
+          "Dr. Swathi Padma Kanchana"
+        ]
+      },
+      "محجر العين | Orbit & Oculoplasty": {
+        "department_ar": "محجر العين",
+        "department_en": "Orbit & Oculoplasty",
+        "doctors": [
+          "Dr. Shruthi Tara",
+          "Dr. Sowjanya Yerra"
+        ]
+      },
+      "أورام وجراحة محجر العين | Orbit, Oculoplasty & Ocular Oncology": {
+        "department_ar": "أورام وجراحة محجر العين",
+        "department_en": "Orbit, Oculoplasty & Ocular Oncology",
+        "doctors": [
+          "Dr. Shashidhar V S"
+        ]
+      },
+      "عيون أطفال | Paediatric Ophthalmology": {
+        "department_ar": "عيون أطفال",
+        "department_en": "Paediatric Ophthalmology",
+        "doctors": [
+          "Dr. Kaushik Murali",
+          "Dr. Madhulika Ladha",
+          "Dr. Nambula Srinivasa Rao",
+          "Dr. Rajesh Prabu",
+          "Dr. Vankireddi Mahathi",
+          "Dr. Vidhya C"
+        ]
+      },
+      "عيون أطفال وحول | Paediatric Ophthalmology & Strabismus": {
+        "department_ar": "عيون أطفال وحول",
+        "department_en": "Paediatric Ophthalmology & Strabismus",
+        "doctors": [
+          "Dr. Sowmya R"
+        ]
+      },
+      "شبكية | Retinal Services": {
+        "department_ar": "شبكية",
+        "department_en": "Retinal Services",
+        "doctors": [
+          "Dr. Mugundan M.S"
+        ]
+      },
+      "أورام عينية وشبكية | VR Ocular Oncology & Vitreoretinal Services": {
+        "department_ar": "أورام عينية وشبكية",
+        "department_en": "VR Ocular Oncology & Vitreoretinal Services",
+        "doctors": [
+          "Dr. Divyansh K Mishra",
+          "Dr. Mahesh Shanmugham P",
+          "Dr. Rajesh R."
+        ]
+      },
+      "شبكية | Vitreoretina": {
+        "department_ar": "شبكية",
+        "department_en": "Vitreoretina",
+        "doctors": [
+          "Dr. Birva Dave"
+        ]
+      },
+      "أورام عينية وشبكية | Vitreoretina & Ocular Oncology": {
+        "department_ar": "أورام عينية وشبكية",
+        "department_en": "Vitreoretina & Ocular Oncology",
+        "doctors": [
+          "Dr. Payal Naresh Shah"
+        ]
+      },
+      "شبكية | Vitreoretinal Services": {
+        "department_ar": "شبكية",
+        "department_en": "Vitreoretinal Services",
+        "doctors": [
+          "Dr. Ashok Kanakamedala",
+          "Dr. M. Prabhu Shankar",
+          "Dr. Madhu Kumar R",
+          "Dr. V. Devi Priya"
+        ]
+      }
+    },
+    "Trilife Hospital, Bangalore": {
+      "تخدير | Anaesthesia": {
+        "department_ar": "تخدير",
+        "department_en": "Anaesthesia",
+        "doctors": [
+          "Dr. Rajalakshmi"
+        ]
+      },
+      "جراحة القلب | Cardiac Surgery": {
+        "department_ar": "جراحة القلب",
+        "department_en": "Cardiac Surgery",
+        "doctors": [
+          "Dr. Tameem Ahmed"
+        ]
+      },
+      "أنف وأذن وحنجرة | ENT": {
+        "department_ar": "أنف وأذن وحنجرة",
+        "department_en": "ENT",
+        "doctors": [
+          "Dr. Aishwarya",
+          "Dr. Sharath G"
+        ]
+      },
+      "أمراض الجهاز الهضمي | Gastroenterology": {
+        "department_ar": "أمراض الجهاز الهضمي",
+        "department_en": "Gastroenterology",
+        "doctors": [
+          "Dr. Atif Ahmed"
+        ]
+      },
+      "جراحة عامة | General Surgery": {
+        "department_ar": "جراحة عامة",
+        "department_en": "General Surgery",
+        "doctors": [
+          "Dr. Bhushan",
+          "Dr. Shamna Mahmood Abdulla"
+        ]
+      },
+      "الطب الباطني | Internal Medicine": {
+        "department_ar": "الطب الباطني",
+        "department_en": "Internal Medicine",
+        "doctors": [
+          "Dr. Aditya S Chowti"
+        ]
+      },
+      "أمراض الكلى | Nephrology": {
+        "department_ar": "أمراض الكلى",
+        "department_en": "Nephrology",
+        "doctors": [
+          "Dr. Raghavendra N"
+        ]
+      },
+      "طب الأعصاب | Neurology": {
+        "department_ar": "طب الأعصاب",
+        "department_en": "Neurology",
+        "doctors": [
+          "Dr. H Santosh"
+        ]
+      },
+      "نساء وولادة | OBG (Gynaecology & Obstetrics)": {
+        "department_ar": "نساء وولادة",
+        "department_en": "OBG (Gynaecology & Obstetrics)",
+        "doctors": [
+          "Dr. Usha M R"
+        ]
+      },
+      "جراحة العظام | Orthopaedics": {
+        "department_ar": "جراحة العظام",
+        "department_en": "Orthopaedics",
+        "doctors": [
+          "Dr. Prashanth R"
+        ]
+      },
+      "طب باطني | Physician / Internal Medicine": {
+        "department_ar": "طب باطني",
+        "department_en": "Physician / Internal Medicine",
+        "doctors": [
+          "Dr. Adarsh G"
+        ]
+      },
+      "أمراض الروماتيزم | Rheumatology": {
+        "department_ar": "أمراض الروماتيزم",
+        "department_en": "Rheumatology",
+        "doctors": [
+          "Dr. Raghavendra H"
+        ]
+      },
+      "جراحة المسالك البولية | Urology": {
+        "department_ar": "جراحة المسالك البولية",
+        "department_en": "Urology",
+        "doctors": [
+          "Dr. Siddaling Ladde"
+        ]
+      }
+    },
+    "St. John's Medical College Hospital, Bangalore": {
+      "أورام دموية وطبية | Haematology and Medical Oncology": {
+        "department_ar": "أورام دموية وطبية",
+        "department_en": "Haematology and Medical Oncology",
+        "doctors": [
+          "Dr. Hari Menon"
+        ]
+      },
+      "أورام طبية | Medical Oncology": {
+        "department_ar": "أورام طبية",
+        "department_en": "Medical Oncology",
+        "doctors": [
+          "Dr. Annie Kanchan Baa",
+          "Dr. Ganesha"
+        ]
+      },
+      "أورام دموية أطفال وزراعة نخاع العظم | Pediatric Hemat Oncology & Bone Marrow Transplant": {
+        "department_ar": "أورام دموية أطفال وزراعة نخاع العظم",
+        "department_en": "Pediatric Hemat Oncology & Bone Marrow Transplant",
+        "doctors": [
+          "Dr. Vandana Bharadwaj",
+          "Dr. Anand Prakash"
+        ]
+      },
+      "جراحة أطفال | Paediatric Surgery": {
+        "department_ar": "جراحة أطفال",
+        "department_en": "Paediatric Surgery",
+        "doctors": [
+          "Dr. Shubha A.M"
+        ]
+      },
+      "الطب التلطيفي | Palliative Medicine": {
+        "department_ar": "الطب التلطيفي",
+        "department_en": "Palliative Medicine",
+        "doctors": [
+          "Dr. Nandini Vallath"
+        ]
+      },
+      "أورام إشعاعية | Radiation Oncology": {
+        "department_ar": "أورام إشعاعية",
+        "department_en": "Radiation Oncology",
+        "doctors": [
+          "Dr. Avinash H. U"
+        ]
+      },
+      "جراحة عامة | General Surgery": {
+        "department_ar": "جراحة عامة",
+        "department_en": "General Surgery",
+        "doctors": [
+          "Dr. Govindaraj Sridhar"
+        ]
+      },
+      "أورام نسائية | Gynaecological Oncology": {
+        "department_ar": "أورام نسائية",
+        "department_en": "Gynaecological Oncology",
+        "doctors": [
+          "Dr. Premlatha T.S"
+        ]
+      },
+      "جراحة الأورام | Surgical Oncology": {
+        "department_ar": "جراحة الأورام",
+        "department_en": "Surgical Oncology",
+        "doctors": [
+          "Dr. Vijayalakshmi V. V",
+          "Dr. Medha Sugara"
+        ]
+      }
+    }
+  }
+}

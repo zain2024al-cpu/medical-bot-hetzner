@@ -1,0 +1,149 @@
+# ================================================
+# .gitignore للبوت الطبي
+# ================================================
+
+# 🐍 Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 🐍 Virtual Environments
+venv/
+env/
+ENV/
+.venv/
+.env
+env.bak/
+venv.bak/
+
+# 📊 IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 📝 Logs
+logs/
+*.log
+all_events.log
+bot.log
+errors.log
+
+# 💾 Databases (Local only - keep backups safe)
+db/medical_reports.db
+db/medical_reports.db-*
+db/medical_reports.db-shm
+db/medical_reports.db-wal
+*.db
+*.sqlite
+*.sqlite3
+
+# 🔐 Secrets & Configs
+config.env
+.env
+.env.local
+.env.production
+.env.staging
+secrets.json
+
+# 📁 Temporary files
+tmp/
+temp/
+.tmp/
+*.tmp
+
+# 📊 Exports & Reports
+exports/
+*.pdf
+*.html
+
+# 🖼️ Uploads (if any)
+uploads/
+*.jpg
+*.jpeg
+*.png
+*.gif
+
+# 💾 Backups (Local only)
+backups/
+*.tar.gz
+backup_*.tar.gz
+
+# 🐳 Docker
+.dockerignore
+
+# 📚 Documentation builds
+docs/_build/
+
+# 🔧 OS specific
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# 🚀 Deployment
+.deploy/
+*.deploy
+
+# 📊 Monitoring
+monitor_*.log
+
+# 🔒 Security
+secrets/
+keys/
+*.key
+*.pem
+service-account-key.json
+google-service-account.json
+
+# 🚀 Deployment Scripts (Local only)
+upload_to_hetzner.bat
+setup_bot_on_server.sh
+check_git.bat
+push_to_github.bat
+create_new_github_repo.bat
+run_import.bat
+verify_import.py
+run_verify.bat
+
+# 🖥️ Local Development
+config.env
+.env.local
+.env.development
+
+# 📊 Cache files
+.cache/
+.pytest_cache/
+.mypy_cache/
+
+# 📝 Jupyter Notebooks (if any)
+.ipynb_checkpoints
+
+# 🌐 Web assets (if any)
+static/
+media/
+
+# 🔧 Tools
+.vscode/settings.json
+.vscode/launch.json

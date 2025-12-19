@@ -1,0 +1,43 @@
+{
+  "build": {
+    "builder": "NIXPACKS"
+  },
+  "deploy": {
+    "startCommand": "python app.py",
+    "healthcheckPath": "/",
+    "healthcheckTimeout": 300,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10
+  },
+  "environments": [
+    {
+      "name": "production",
+      "envVars": [
+        {
+          "name": "BOT_TOKEN",
+          "value": "${{ RAILWAY_STATIC_URL }}"
+        },
+        {
+          "name": "ADMIN_IDS",
+          "value": "${{ ADMIN_IDS }}"
+        },
+        {
+          "name": "TIMEZONE",
+          "value": "Asia/Riyadh"
+        },
+        {
+          "name": "AI_ENABLED",
+          "value": "true"
+        },
+        {
+          "name": "OPENAI_API_KEY",
+          "value": "${{ OPENAI_API_KEY }}"
+        },
+        {
+          "name": "DATABASE_URL",
+          "value": "${{ DATABASE_URL }}"
+        }
+      ]
+    }
+  ]
+}
