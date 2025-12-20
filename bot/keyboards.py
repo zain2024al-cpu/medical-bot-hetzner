@@ -171,3 +171,45 @@ def settings_submenu():
         [InlineKeyboardButton("🔙 رجوع للقائمة الرئيسية", callback_data="user_action:back_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
+
+
+# ✅ قائمة إدارة مجموعة التقارير
+def reports_group_management_kb():
+    """قائمة إدارة مجموعة التقارير"""
+    keyboard = [
+        [InlineKeyboardButton("📋 إعداد المجموعة", callback_data="group:setup")],
+        [InlineKeyboardButton("🔗 إرسال دعوات", callback_data="group:invite")],
+        [InlineKeyboardButton("📊 حالة المجموعة", callback_data="group:status")],
+        [InlineKeyboardButton("⚙️ إعدادات البث", callback_data="group:settings")],
+        [InlineKeyboardButton("🔙 رجوع", callback_data="admin:back")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+# ✅ لوحة إدارة مجموعة محسنة
+def admin_main_inline_kb_with_group():
+    """
+    لوحة أدمن محسنة تشمل إدارة المجموعة
+    """
+    keyboard = [
+        # الصف الأول: الحالات والتقارير
+        [
+            InlineKeyboardButton("➕ إضافة حالة أولية", callback_data="admin:add_initial_case"),
+            InlineKeyboardButton("🖨️ طباعة التقارير", callback_data="admin:print_reports")
+        ],
+        # الصف الثاني: إدارة المستخدمين والمجموعة
+        [
+            InlineKeyboardButton("👥 إدارة المستخدمين", callback_data="admin:manage_users"),
+            InlineKeyboardButton("🏥 إدارة المجموعة", callback_data="admin:manage_group")
+        ],
+        # الصف الثالث: التحليلات والأدمنين
+        [
+            InlineKeyboardButton("👑 إدارة الأدمنين", callback_data="admin:manage_admins"),
+            InlineKeyboardButton("📊 تحليل البيانات", callback_data="admin:analytics")
+        ],
+        # الصف الرابع: التحديث
+        [
+            InlineKeyboardButton("🔄 تحديث الصفحة", callback_data="admin:refresh")
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)

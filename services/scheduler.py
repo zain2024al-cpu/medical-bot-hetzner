@@ -189,7 +189,19 @@ def start_scheduler(app=None):
                 print("✅ Translator reminders: 2 PM, 4 PM, 6 PM daily")
             except UnicodeEncodeError:
                 print("[OK] Translator reminders: 2 PM, 4 PM, 6 PM daily")
-            
+
+            # 2.5. التنبيهات اليومية للمتابعة (4:00 عصرًا)
+            scheduler.add_job(
+                _daily_reminder_job,
+                trigger=CronTrigger(hour=16, minute=0, timezone='UTC'),  # 4:00 PM (16:00 UTC)
+                args=[app],
+                id='daily_reminder'
+            )
+            try:
+                print("✅ Daily reminder system: 4:00 PM daily")
+            except UnicodeEncodeError:
+                print("[OK] Daily reminder system: 4:00 PM daily")
+
             # 3. رفع مواعيد المرضى من تقارير اليوم (9:00 مساءً)
             scheduler.add_job(
                 _daily_followups_job,

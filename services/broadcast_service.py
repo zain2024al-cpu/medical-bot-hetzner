@@ -1,6 +1,6 @@
 # =============================
 # services/broadcast_service.py
-# 📢 نظام البث للتقارير والحالات الجديدة
+# 📢 نظام البث المحسّن للتقارير - إرسال للمجموعة
 # =============================
 
 from db.session import SessionLocal
@@ -9,29 +9,61 @@ from config.settings import ADMIN_IDS
 from telegram import Bot
 from telegram.constants import ParseMode
 import logging
+import os
 
 logger = logging.getLogger(__name__)
+
+# إعدادات المجموعة
+REPORTS_GROUP_ID = os.getenv("REPORTS_GROUP_ID", "")  # معرف المجموعة الخاصة بالتقارير
+USE_GROUP_BROADCAST = os.getenv("USE_GROUP_BROADCAST", "true").lower() == "true"  # تفعيل الإرسال للمجموعة
 
 
 async def broadcast_new_report(bot: Bot, report_data: dict):
     """
-    بث تقرير جديد لجميع المستخدمين المعتمدين والأدمن
-    
+    بث تقرير جديد - محسّن للأداء العالي
+
+    إذا كانت المجموعة مفعّلة: يرسل للمجموعة فقط
+    إلا: يرسل للمستخدمين الفرديين (الطريقة القديمة)
+
     Args:
         bot: كائن البوت
         report_data: بيانات التقرير كـ dictionary
     """
     # تنسيق الرسالة
     message = format_report_message(report_data)
-    
+
+    # 🚀 الطريقة الجديدة: إرسال للمجموعة المنفصلة
+    if USE_GROUP_BROADCAST and REPORTS_GROUP_ID:
+        try:
+            await bot.send_message(
+                chat_id=REPORTS_GROUP_ID,
+                text=message,
+                parse_mode=ParseMode.MARKDOWN
+            )
+            logger.info(f"✅ تم إرسال التقرير للمجموعة: {REPORTS_GROUP_ID}")
+
+            # إرسال تنبيه للمستخدم عن التقرير الجديد
+            await send_user_notification(bot, report_data)
+            return
+
+        except Exception as e:
+            logger.error(f"❌ فشل إرسال التقرير للمجموعة: {e}")
+            # في حالة فشل الإرسال للمجموعة، نعود للطريقة القديمة
+
+    # 🏠 الطريقة القديمة: إرسال فردي (احتياطي أو عند عدم تفعيل المجموعة)
+    logger.info("📤 استخدام الإرسال الفردي (الطريقة القديمة)")
+
     # الحصول على جميع المستخدمين المعتمدين
     with SessionLocal() as s:
         approved_users = s.query(Translator).filter_by(
-            is_approved=True, 
+            is_approved=True,
             is_suspended=False
         ).all()
-        
-        # إرسال للمستخدمين
+
+        # إرسال للمستخدمين (مع تحسينات الأداء)
+        successful_sends = 0
+        failed_sends = 0
+
         for user in approved_users:
             try:
                 await bot.send_message(
@@ -39,11 +71,15 @@ async def broadcast_new_report(bot: Bot, report_data: dict):
                     text=message,
                     parse_mode=ParseMode.MARKDOWN
                 )
-                logger.info(f"تم ارسال التقرير الى {user.full_name}")
+                successful_sends += 1
+                logger.debug(f"✅ تم إرسال التقرير إلى {user.full_name}")
             except Exception as e:
-                logger.error(f"فشل ارسال الى {user.full_name}: {e}")
-    
-    # إرسال للأدمن
+                failed_sends += 1
+                logger.error(f"❌ فشل إرسال إلى {user.full_name}: {e}")
+
+        logger.info(f"📊 إرسال فردي مكتمل: {successful_sends} نجح، {failed_sends} فشل")
+
+    # إرسال للأدمن دائماً
     for admin_id in ADMIN_IDS:
         try:
             await bot.send_message(
@@ -349,9 +385,9 @@ async def broadcast_schedule(bot: Bot, photo_source: str, schedule_data: dict, u
                             caption=message,
                             parse_mode=ParseMode.MARKDOWN
                         )
-                print(f"✅ تم إرسال الجدول إلى {user.full_name}")
+                logger.info(f"✅ تم إرسال الجدول إلى {user.full_name}")
             except Exception as e:
-                print(f"❌ فشل إرسال الجدول إلى {user.full_name}: {e}")
+                logger.error(f"❌ فشل إرسال الجدول إلى {user.full_name}: {e}")
     
     # إرسال للأدمن
     for admin_id in ADMIN_IDS:
@@ -371,9 +407,137 @@ async def broadcast_schedule(bot: Bot, photo_source: str, schedule_data: dict, u
                         caption=message + "\n\n👑 **نسخة الأدمن**",
                         parse_mode=ParseMode.MARKDOWN
                     )
-            print(f"✅ تم إرسال الجدول إلى الأدمن {admin_id}")
         except Exception as e:
-            print(f"❌ فشل إرسال الجدول إلى الأدمن {admin_id}: {e}")
+            logger.error(f"❌ فشل إرسال الجدول للأدمن {admin_id}: {e}")
+
+
+async def send_user_notification(bot: Bot, report_data: dict):
+    """
+    إرسال تنبيه للمستخدم عند إنشاء تقرير جديد
+
+    Args:
+        bot: كائن البوت
+        report_data: بيانات التقرير
+    """
+    try:
+        translator_id = report_data.get('translator_id')
+        patient_name = report_data.get('patient_name', 'غير محدد')
+
+        if translator_id:
+            # إرسال تنبيه سريع للمستخدم
+            notification_message = f"""
+🔔 **تقرير جديد تم إنشاؤه**
+
+👤 **المريض:** {patient_name}
+📅 **التاريخ:** {report_data.get('report_date', 'غير محدد')}
+
+✅ تم إرسال التقرير للمجموعة المخصصة
+🔗 يمكنك مراجعة جميع التقارير في المجموعة
+
+💡 **نصيحة:** لتجنب الضغط، تتم مراجعة التقارير في المجموعة بدلاً من الإرسال الفردي
+"""
+
+            await bot.send_message(
+                chat_id=translator_id,
+                text=notification_message,
+                parse_mode=ParseMode.MARKDOWN
+            )
+
+            logger.info(f"✅ تم إرسال تنبيه للمستخدم: {translator_id}")
+
+    except Exception as e:
+        logger.error(f"❌ فشل إرسال التنبيه للمستخدم: {e}")
+
+
+async def setup_reports_group(bot: Bot, group_invite_link: str = None):
+    """
+    إعداد مجموعة التقارير وإرسال الدعوة للمستخدمين
+
+    Args:
+        bot: كائن البوت
+        group_invite_link: رابط دعوة المجموعة (اختياري)
+    """
+    if not REPORTS_GROUP_ID:
+        logger.warning("⚠️ REPORTS_GROUP_ID غير محدد في متغيرات البيئة")
+        return
+
+    try:
+        # إرسال رسالة تعريفية للمجموعة
+        welcome_message = """
+🏥 **مجموعة تقارير المستشفى**
+
+📋 **كيفية عمل النظام:**
+• جميع التقارير الجديدة تُرسل هنا تلقائياً
+• يمكنك مراجعة التقارير في أي وقت
+• النظام يوفر الضغط على البوت الفردي
+• إشعارات سريعة تُرسل لك عند إنشاء تقرير جديد
+
+📱 **للانضمام:** إذا لم تكن عضواً، ستتلقى دعوة تلقائية
+
+⚠️ **ملاحظة:** هذا النظام يحسن الأداء عند وجود عدد كبير من المستخدمين
+"""
+
+        await bot.send_message(
+            chat_id=REPORTS_GROUP_ID,
+            text=welcome_message,
+            parse_mode=ParseMode.MARKDOWN
+        )
+
+        logger.info("✅ تم إعداد مجموعة التقارير")
+
+        # إرسال دعوات للمستخدمين إذا كان هناك رابط دعوة
+        if group_invite_link:
+            await send_group_invitations(bot, group_invite_link)
+
+    except Exception as e:
+        logger.error(f"❌ فشل إعداد مجموعة التقارير: {e}")
+
+
+async def send_group_invitations(bot: Bot, invite_link: str):
+    """
+    إرسال دعوات الانضمام للمجموعة لجميع المستخدمين
+
+    Args:
+        bot: كائن البوت
+        invite_link: رابط دعوة المجموعة
+    """
+    try:
+        with SessionLocal() as s:
+            approved_users = s.query(Translator).filter_by(
+                is_approved=True,
+                is_suspended=False
+            ).all()
+
+            invitation_message = f"""
+🎉 **دعوة خاصة: مجموعة تقارير المستشفى**
+
+📋 **لماذا هذه المجموعة مهمة:**
+• جميع التقارير الجديدة تُرسل هنا
+• أداء أفضل تحت الضغط العالي
+• تنظيم أفضل للتقارير
+• إشعارات فورية للتقارير الجديدة
+
+🔗 **رابط الانضمام:** {invite_link}
+
+⚡ **نصيحة:** انضم للمجموعة لمتابعة جميع التقارير بسهولة
+"""
+
+            sent_count = 0
+            for user in approved_users:
+                try:
+                    await bot.send_message(
+                        chat_id=user.tg_user_id,
+                        text=invitation_message,
+                        parse_mode=ParseMode.MARKDOWN
+                    )
+                    sent_count += 1
+                except Exception as e:
+                    logger.error(f"فشل إرسال الدعوة لـ {user.full_name}: {e}")
+
+            logger.info(f"✅ تم إرسال {sent_count} دعوة انضمام للمجموعة")
+
+    except Exception as e:
+        logger.error(f"❌ فشل إرسال دعوات المجموعة: {e}")
 
 
 def format_schedule_message(data: dict) -> str:

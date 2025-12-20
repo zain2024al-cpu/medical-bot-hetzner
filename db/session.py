@@ -23,19 +23,21 @@ DATABASE_PATH = os.getenv("DATABASE_PATH", "db/medical_reports.db")
 # Create SQLite URL
 DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
 
-# Create engine with SQLite-specific settings
+# 🚀 Create engine with high-performance settings for heavy load
 engine = create_engine(
     DATABASE_URL,
     echo=False,  # Set to True for SQL debugging
     connect_args={
         "check_same_thread": False,  # Allow multi-threading
-        "timeout": 30,  # 30 second timeout for locked database
+        "timeout": 300,  # زيادة timeout إلى 5 دقائق للعمليات الطويلة
         "isolation_level": None  # Enable autocommit for WAL mode
     },
     pool_pre_ping=True,  # Verify connections before using
-    pool_recycle=3600,  # Recycle connections after 1 hour
-    pool_size=20,  # Connection pool size
-    max_overflow=10  # Max additional connections
+    pool_recycle=1800,  # Recycle connections after 30 minutes (أسرع من 1 ساعة)
+    pool_size=100,  # زيادة pool size إلى 100 للمستخدمين الكثيرين
+    max_overflow=50,  # زيادة max overflow إلى 50 للذروة
+    # إعدادات إضافية للأداء العالي
+    pool_timeout=120,  # زيادة timeout للحصول على connection إلى 2 دقائق
 )
 
 # Create session factory

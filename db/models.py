@@ -446,7 +446,6 @@ __all__ = [
     'Note',
     'InitialCase',
     'Evaluation',
-    'DailySchedule',
     'DailyPatient',
     'DailyReportTracking',
     'AdminNote',

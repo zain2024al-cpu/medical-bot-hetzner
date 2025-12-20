@@ -76,6 +76,7 @@ except ImportError:
 from datetime import datetime, timedelta
 import calendar
 import hashlib
+import os
 from .user_reports_add_helpers import (
     PREDEFINED_HOSPITALS, PREDEFINED_DEPARTMENTS, DIRECT_DEPARTMENTS,
     PREDEFINED_ACTIONS, validate_text_input, validate_english_only, save_report_to_db,
@@ -103,6 +104,123 @@ from zoneinfo import ZoneInfo  # Python 3.9+ (متوفر في Python 3.12)
     STATE_SELECT_DOCTOR,         # اختيار اسم الطبيب
     STATE_SELECT_ACTION_TYPE,    # اختيار نوع الإجراء
 ) = range(8)
+
+# =============================
+# إصلاح مشكلة conversation handler - callback fallback
+# =============================
+
+
+async def handle_hospital_selection(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """معالج اختيار المستشفى"""
+    query = update.callback_query
+    await query.answer()
+
+    # استخراج اسم المستشفى
+    hospital_name = query.data.replace("select_hospital:", "")
+
+    # حفظ اسم المستشفى
+    context.user_data['selected_hospital'] = hospital_name
+
+    # الانتقال للخطوة التالية (اختيار القسم)
+    await query.edit_message_text(
+        f"✅ تم اختيار المستشفى: {hospital_name}\n\n"
+        "الآن يرجى اختيار القسم الطبي:",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🏥 الطوارئ", callback_data="dept:emergency")],
+            [InlineKeyboardButton("🫀 القلب", callback_data="dept:cardiology")],
+            [InlineKeyboardButton("🧠 الأعصاب", callback_data="dept:neurology")],
+            [InlineKeyboardButton("🫁 الجهاز التنفسي", callback_data="dept:pulmonary")],
+            [InlineKeyboardButton("⬅️ رجوع للمستشفيات", callback_data="hosp_search")]
+        ])
+    )
+
+    return STATE_SELECT_DEPARTMENT
+
+# =============================
+# معالجات إضافية للبحث عن المستشفيات
+# =============================
+
+async def handle_hospital_page(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """معالج صفحات المستشفيات"""
+    query = update.callback_query
+
+    try:
+        await query.answer()
+
+        # استخراج رقم الصفحة
+        callback_data = query.data
+        if ':' in callback_data:
+            page_num = int(callback_data.split(':')[1])
+        else:
+            page_num = 0
+
+        # إعادة عرض قائمة المستشفيات مع الصفحة المطلوبة
+        return await show_hospital_search_results(update, context, page_num)
+
+    except Exception as e:
+        logger.error(f"خطأ في handle_hospital_page: {e}")
+        await query.answer("❌ حدث خطأ")
+        return STATE_SELECT_HOSPITAL
+
+async def show_hospital_search_results(update: Update, context: ContextTypes.DEFAULT_TYPE, page: int = 0) -> int:
+    """عرض نتائج البحث عن المستشفيات"""
+    query = update.callback_query
+
+    # قائمة المستشفيات (يمكن استبدالها بقاعدة البيانات)
+    hospitals = [
+        "مستشفى الملك فيصل", "مستشفى الملك خالد", "مستشفى الملك عبدالعزيز",
+        "مستشفى الثورة", "مستشفى السبعين", "مستشفى الجراحي",
+        "مستشفى الأطفال", "مستشفى النساء والولادة", "مستشفى الصدر",
+        "مستشفى العيون", "مستشفى الأسنان", "مستشفى الطوارئ"
+    ]
+
+    # تقسيم لصفحات (5 مستشفيات لكل صفحة)
+    items_per_page = 5
+    start_idx = page * items_per_page
+    end_idx = start_idx + items_per_page
+
+    current_hospitals = hospitals[start_idx:end_idx]
+
+    # إنشاء الأزرار
+    keyboard = []
+    for hospital in current_hospitals:
+        keyboard.append([InlineKeyboardButton(
+            f"🏥 {hospital}",
+            callback_data=f"select_hospital:{hospital}"
+        )])
+
+    # أزرار التنقل
+    nav_buttons = []
+    if page > 0:
+        nav_buttons.append(InlineKeyboardButton("⬅️ السابق", callback_data=f"hosp_page:{page-1}"))
+
+    if end_idx < len(hospitals):
+        nav_buttons.append(InlineKeyboardButton("التالي ➡️", callback_data=f"hosp_page:{page+1}"))
+
+    if nav_buttons:
+        keyboard.append(nav_buttons)
+
+    # زر الإلغاء
+    keyboard.append([InlineKeyboardButton("❌ إلغاء", callback_data="cancel")])
+
+    markup = InlineKeyboardMarkup(keyboard)
+
+    try:
+        await query.edit_message_text(
+            f"🏥 اختر المستشفى (الصفحة {page + 1}):\n\n" +
+            f"📊 المجموع: {len(hospitals)} مستشفى",
+            reply_markup=markup
+        )
+    except Exception as e:
+        logger.error(f"خطأ في تحديث الرسالة: {e}")
+        # إذا فشل التحديث، أرسل رسالة جديدة
+        await query.message.reply_text(
+            f"🏥 اختر المستشفى (الصفحة {page + 1}):\n\n" +
+            f"📊 المجموع: {len(hospitals)} مستشفى",
+            reply_markup=markup
+        )
+
+    return STATE_SELECT_HOSPITAL
 
 # تعيين الأسماء القديمة للتوافق المؤقت (سيتم إزالتها تدريجياً)
 R_DATE = STATE_SELECT_DATE
@@ -475,125 +593,1058 @@ def _build_minute_keyboard(hour: str):
 # =============================
 
 
-async def handle_cancel_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """معالجة إلغاء العملية"""
+class SmartCancelManager:
+    """
+    مدير إلغاء ذكي يفهم السياق ويتعامل مع كل حالة بشكل مناسب
+    """
+
+    @staticmethod
+    def get_cancel_context(context):
+        """
+        تحديد سياق الإلغاء بناءً على البيانات الحالية
+        """
+        user_data = context.user_data
+
+        # إذا كان في وضع تعديل مؤقت
+        if user_data.get('editing_draft'):
+            return 'draft_edit'
+
+        # إذا كان في وضع تعديل تقرير موجود
+        if 'current_report_data' in user_data and user_data['current_report_data']:
+            return 'report_edit'
+
+        # إذا كان هناك بيانات تقرير مؤقتة (إنشاء تقرير جديد)
+        if 'report_tmp' in user_data and user_data['report_tmp']:
+            return 'report_creation'
+
+        # إذا كان في وضع بحث
+        search_context = smart_nav_manager.get_search_context()
+        if search_context and search_context.get('current_search_type'):
+            return 'search'
+
+        # إلغاء عام
+        return 'general'
+
+    @staticmethod
+    async def handle_contextual_cancel(update, context, cancel_context):
+        """
+        التعامل مع الإلغاء حسب السياق
+        """
+        if cancel_context == 'draft_edit':
+            # إلغاء التعديل المؤقت - العودة للملخص
+            await cancel_draft_edit(update, context)
+
+        elif cancel_context == 'report_edit':
+            # إلغاء تعديل تقرير موجود - العودة لقائمة التقارير
+            await cancel_report_edit(update, context)
+
+        elif cancel_context == 'report_creation':
+            # إلغاء إنشاء تقرير جديد - تنظيف البيانات والعودة للبداية
+            await cancel_report_creation(update, context)
+
+        elif cancel_context == 'search':
+            # إلغاء البحث - العودة للخطوة السابقة
+            await cancel_search(update, context)
+
+        else:
+            # إلغاء عام - تنظيف كل شيء
+            await cancel_general(update, context)
+
+async def handle_smart_cancel_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    معالجة إلغاء ذكية تفهم السياق وتتصرف بطريقة مناسبة
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    logger.info("=" * 80)
+    logger.info("❌ SMART CANCEL NAVIGATION TRIGGERED")
+    logger.info("=" * 80)
+
+    try:
+        # تحديد سياق الإلغاء
+        cancel_context = SmartCancelManager.get_cancel_context(context)
+
+        logger.info(f"❌ Cancel context determined: {cancel_context}")
+
+        # التعامل مع الإلغاء حسب السياق
+        await SmartCancelManager.handle_contextual_cancel(update, context, cancel_context)
+
+        logger.info(f"❌ Successfully handled cancel for context: {cancel_context}")
+
+    except Exception as e:
+        logger.error(f"❌ Error in handle_smart_cancel_navigation: {e}", exc_info=True)
+        # في حالة الخطأ، إلغاء عام
+        await SmartCancelManager.cancel_general(update, context)
+
+# دوال الإلغاء المخصصة لكل سياق
+
+async def cancel_draft_edit(update, context):
+    """
+    إلغاء التعديل المؤقت - العودة للملخص دون حفظ التغييرات
+    """
     query = update.callback_query
     if query:
-        await query.answer("تم إلغاء العملية")
+        await query.answer("تم إلغاء التعديل")
+
         try:
-            await query.edit_message_text("❌ تم إلغاء العملية.")
+            await query.edit_message_text(
+                "❌ تم إلغاء التعديل المؤقت\n\n"
+                "لم يتم حفظ أي تغييرات\n"
+                "يمكنك إعادة التعديل أو الحفظ الآن",
+                reply_markup=None
+            )
+        except:
+            pass
+
+    # مسح بيانات التعديل المؤقت
+    context.user_data.pop('editing_draft', None)
+    context.user_data.pop('draft_flow_type', None)
+    context.user_data.pop('draft_medical_action', None)
+    context.user_data.pop('editing_field', None)
+
+    # العودة للملخص النهائي
+    flow_type = context.user_data.get('report_tmp', {}).get('current_flow', 'new_consult')
+    await show_final_summary(query.message if query else update.message, context, flow_type)
+
+    confirm_state = get_confirm_state(flow_type)
+    context.user_data['_conversation_state'] = confirm_state
+    return confirm_state
+
+async def cancel_report_edit(update, context):
+    """
+    إلغاء تعديل تقرير موجود - العودة لقائمة التقارير
+    """
+    query = update.callback_query
+    if query:
+        await query.answer("تم إلغاء تعديل التقرير")
+
+        try:
+            await query.edit_message_text(
+                "❌ تم إلغاء تعديل التقرير\n\n"
+                "لم يتم حفظ أي تغييرات على التقرير الأصلي\n"
+                "العودة لقائمة التقارير...",
+                reply_markup=None
+            )
+        except:
+            pass
+
+    # مسح بيانات التعديل
+    context.user_data.pop('current_report_data', None)
+    context.user_data.pop('editing_field', None)
+
+    # العودة لقائمة التقارير
+    await start_edit_reports(update, context)
+    return SELECT_REPORT
+
+async def cancel_report_creation(update, context):
+    """
+    إلغاء إنشاء تقرير جديد - تنظيف البيانات والعودة للبداية
+    """
+    query = update.callback_query
+    if query:
+        await query.answer("تم إلغاء إنشاء التقرير")
+
+        try:
+            await query.edit_message_text(
+                "❌ تم إلغاء إنشاء التقرير\n\n"
+                "⚠️ **تحذير:** سيتم حذف جميع البيانات التي أدخلتها\n"
+                "تأكد من حفظ أي معلومات مهمة قبل المتابعة\n\n"
+                "يمكنك البدء بإنشاء تقرير جديد في أي وقت",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🏥 إضافة تقرير جديد", callback_data="start_report")],
+                    [InlineKeyboardButton("📋 تعديل تقارير موجودة", callback_data="edit_reports")]
+                ]),
+                parse_mode="Markdown"
+            )
         except:
             pass
     elif update.message:
-        await update.message.reply_text("❌ تم إلغاء العملية.")
-    
-    # تنظيف البيانات
+        await update.message.reply_text(
+            "❌ تم إلغاء إنشاء التقرير\n\n"
+            "⚠️ **تحذير:** سيتم حذف جميع البيانات التي أدخلتها\n"
+            "تأكد من حفظ أي معلومات مهمة قبل المتابعة\n\n"
+            "يمكنك البدء بإنشاء تقرير جديد في أي وقت",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🏥 إضافة تقرير جديد", callback_data="start_report")],
+                [InlineKeyboardButton("📋 تعديل تقارير موجودة", callback_data="edit_reports")]
+            ]),
+            parse_mode="Markdown"
+        )
+
+    # تنظيف جميع البيانات المتعلقة بالتقرير
     context.user_data.pop("report_tmp", None)
+    context.user_data.pop('_conversation_state', None)
+
+    # إعادة تعيين سياق البحث
+    smart_nav_manager.clear_search_context()
+
     return ConversationHandler.END
 
+async def cancel_search(update, context):
+    """
+    إلغاء البحث - العودة للخطوة السابقة
+    """
+    query = update.callback_query
+    if query:
+        await query.answer("تم إلغاء البحث")
 
-# الدوال القديمة تم استبدالها بـ StateHistoryManager و Data Managers المنفصلة
+        try:
+            await query.edit_message_text(
+                "❌ تم إلغاء البحث\n\n"
+                "العودة للخطوة السابقة...",
+                reply_markup=None
+            )
+        except:
+            pass
 
-async def handle_back_navigation(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE):
-    """معالجة الرجوع للخطوة السابقة - يعيد الـ state السابق فقط"""
+    # مسح سياق البحث
+    smart_nav_manager.clear_search_context()
+
+    # العودة للخطوة السابقة
+    current_state = context.user_data.get('_conversation_state')
+    flow_type = context.user_data.get('report_tmp', {}).get('current_flow', 'new_consult')
+
+    previous_step = smart_nav_manager.get_previous_step(flow_type, current_state)
+
+    if previous_step:
+        await execute_smart_state_action(previous_step, flow_type, update, context)
+        return previous_step
+    else:
+        # إذا لم يكن هناك خطوة سابقة، إلغاء عام
+        await SmartCancelManager.cancel_general(update, context)
+
+async def cancel_general(update, context):
+    """
+    إلغاء عام - تنظيف كل شيء والعودة للبداية
+    """
+    query = update.callback_query
+    if query:
+        await query.answer("تم إلغاء العملية")
+
+        try:
+            await query.edit_message_text(
+                "❌ تم إلغاء العملية بالكامل\n\n"
+                "⚠️ **تحذير:** سيتم حذف جميع البيانات والإعدادات الحالية\n\n"
+                "🔄 يمكنك البدء من جديد في أي وقت من خلال القوائم الرئيسية",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🏥 إضافة تقرير جديد", callback_data="start_report")],
+                    [InlineKeyboardButton("📋 تعديل تقارير", callback_data="edit_reports")],
+                    [InlineKeyboardButton("👤 إدارة المستخدمين", callback_data="admin:manage_users")]
+                ]),
+                parse_mode="Markdown"
+            )
+        except:
+            pass
+    elif update.message:
+        await update.message.reply_text(
+            "❌ تم إلغاء العملية بالكامل\n\n"
+            "⚠️ **تحذير:** سيتم حذف جميع البيانات والإعدادات الحالية\n\n"
+            "🔄 يمكنك البدء من جديد في أي وقت من خلال القوائم الرئيسية",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🏥 إضافة تقرير جديد", callback_data="start_report")],
+                [InlineKeyboardButton("📋 تعديل تقارير", callback_data="edit_reports")],
+                [InlineKeyboardButton("👤 إدارة المستخدمين", callback_data="admin:manage_users")]
+            ]),
+            parse_mode="Markdown"
+        )
+
+    # تنظيف جميع البيانات
+    context.user_data.clear()
+
+    # إعادة تعيين سياق البحث
+    smart_nav_manager.clear_search_context()
+
+    return ConversationHandler.END
+
+async def handle_smart_back_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    معالجة الرجوع الذكي بخطوة واحدة مع ضمان إعادة العرض الصحيح للأسماء دائماً
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    logger.info("=" * 80)
+    logger.info("🔙 SMART BACK NAVIGATION TRIGGERED WITH DATA REFRESH")
+    logger.info("=" * 80)
+
+    try:
+        query = update.callback_query
+        await query.answer()
+
+        # التحقق من تناسق البيانات قبل الرجوع
+        await SmartStateRenderer.validate_data_consistency(context)
+
+        # الحصول على نوع التدفق الحالي
+        flow_type = context.user_data.get('report_tmp', {}).get('current_flow', 'new_consult')
+
+        # الحصول على الخطوة الحالية
+        current_state = context.user_data.get('_conversation_state')
+
+        logger.info(f"🔙 Current state: {current_state}, Flow: {flow_type}")
+
+        # الحصول على الخطوة السابقة
+        previous_step = smart_nav_manager.get_previous_step(flow_type, current_state)
+
+        if previous_step:
+            logger.info(f"🔙 Previous step determined: {previous_step}")
+
+            # إزالة الخطوة الحالية من التاريخ
+            state_manager = StateHistoryManager.get_state_manager(context)
+            state_manager.pop_state()
+
+            # إجبار تحديث البيانات حسب نوع الخطوة السابقة
+            if previous_step == STATE_SELECT_PATIENT:
+                await SmartStateRenderer.force_data_refresh(context, 'patient')
+                logger.info("🔄 Forced patient data refresh on back navigation")
+            elif previous_step == STATE_SELECT_DOCTOR:
+                await SmartStateRenderer.force_data_refresh(context, 'doctor')
+                logger.info("🔄 Forced doctor data refresh on back navigation")
+            elif 'TRANSLATOR' in str(previous_step):
+                await SmartStateRenderer.force_data_refresh(context, 'translator')
+                logger.info("🔄 Forced translator data refresh on back navigation")
+
+            # تنفيذ الإجراء للخطوة السابقة مع ضمان إعادة العرض الصحيح
+            await execute_smart_state_action(previous_step, flow_type, update, context)
+
+            logger.info(f"✅ Successfully navigated back to: {previous_step} with FRESH data")
+        else:
+            logger.warning(f"⚠️ No previous step found for state: {current_state}")
+            await query.edit_message_text(
+                "⚠️ لا يمكن الرجوع أكثر من ذلك",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("🏠 العودة للقائمة الرئيسية", callback_data="main_menu"),
+                    InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
+                ]])
+            )
+
+    except Exception as e:
+        logger.error(f"❌ Error in handle_smart_back_navigation: {e}", exc_info=True)
+        try:
+            await update.callback_query.edit_message_text(
+                "❌ حدث خطأ في الرجوع\n\nيرجى المحاولة مرة أخرى",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("🔄 إعادة المحاولة", callback_data="nav:back"),
+                    InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
+                ]])
+            )
+        except:
+            pass
+
+# استبدال الدالة القديمة بالجديدة
+handle_cancel_navigation = handle_smart_cancel_navigation
+
+def test_smart_cancel_system():
+    """
+    دالة اختبار لنظام الإلغاء الذكي
+    """
+    print("🧪 اختبار نظام الإلغاء الذكي")
+    print("=" * 50)
+
+    # اختبار تحديد السياق
+    test_contexts = [
+        ({'editing_draft': True}, 'draft_edit'),
+        ({'current_report_data': {}}, 'report_edit'),
+        ({'report_tmp': {}}, 'report_creation'),
+        ({}, 'general')
+    ]
+
+    print("📋 اختبار تحديد السياق:")
+    for user_data, expected in test_contexts:
+        # محاكاة context
+        class MockContext:
+            def __init__(self, user_data):
+                self.user_data = user_data
+
+        context = MockContext(user_data)
+        result = SmartCancelManager.get_cancel_context(context)
+
+        status = '✅' if result == expected else '❌'
+        print(f"   {status} {user_data} → {result} (متوقع: {expected})")
+
+    print("\n🎯 أنواع الإلغاء المتاحة:")
+    cancel_types = [
+        'draft_edit: إلغاء التعديل المؤقت',
+        'report_edit: إلغاء تعديل تقرير موجود',
+        'report_creation: إلغاء إنشاء تقرير جديد',
+        'search: إلغاء البحث',
+        'general: إلغاء عام'
+    ]
+
+    for cancel_type in cancel_types:
+        print(f"   • {cancel_type}")
+
+    print("\n✅ النظام الذكي جاهز للاستخدام!")
+    return True
+
+
+# =============================
+# نظام التنقل الذكي الجديد - Smart Navigation System
+# =============================
+
+class SmartNavigationManager:
+    """
+    مدير تنقل ذكي يتتبع الخطوات بدقة ويعرف كيفية الرجوع خطوة واحدة فقط
+    يحل مشكلة الخلطة في أزرار البحث ويضمن الرجوع الدقيق
+    """
+
+    def __init__(self):
+        # خريطة الخطوات لكل نوع تدفق مع الخطوة السابقة بدقة
+        self.step_flows = {
+            # تدفق استشارة جديدة
+            'new_consult': {
+                STATE_SELECT_DATE: None,  # البداية
+                STATE_SELECT_PATIENT: STATE_SELECT_DATE,
+                STATE_SELECT_HOSPITAL: STATE_SELECT_PATIENT,
+                STATE_SELECT_DEPARTMENT: STATE_SELECT_HOSPITAL,
+                STATE_SELECT_SUBDEPARTMENT: STATE_SELECT_DEPARTMENT,
+                STATE_SELECT_DOCTOR: STATE_SELECT_SUBDEPARTMENT,
+                STATE_SELECT_ACTION_TYPE: STATE_SELECT_DOCTOR,
+                'NEW_CONSULT_COMPLAINT': STATE_SELECT_ACTION_TYPE,
+                'NEW_CONSULT_DIAGNOSIS': 'NEW_CONSULT_COMPLAINT',
+                'NEW_CONSULT_DECISION': 'NEW_CONSULT_DIAGNOSIS',
+                'NEW_CONSULT_TESTS': 'NEW_CONSULT_DECISION',
+                'NEW_CONSULT_FOLLOWUP_DATE': 'NEW_CONSULT_TESTS',
+                'NEW_CONSULT_FOLLOWUP_REASON': 'NEW_CONSULT_FOLLOWUP_DATE',
+                'NEW_CONSULT_TRANSLATOR': 'NEW_CONSULT_FOLLOWUP_REASON',
+                'NEW_CONSULT_CONFIRM': 'NEW_CONSULT_TRANSLATOR',
+            },
+
+            # تدفق استشارة مع قرار عملية
+            'surgery_consult': {
+                STATE_SELECT_DATE: None,
+                STATE_SELECT_PATIENT: STATE_SELECT_DATE,
+                STATE_SELECT_HOSPITAL: STATE_SELECT_PATIENT,
+                STATE_SELECT_DEPARTMENT: STATE_SELECT_HOSPITAL,
+                STATE_SELECT_SUBDEPARTMENT: STATE_SELECT_DEPARTMENT,
+                STATE_SELECT_DOCTOR: STATE_SELECT_SUBDEPARTMENT,
+                STATE_SELECT_ACTION_TYPE: STATE_SELECT_DOCTOR,
+                'SURGERY_CONSULT_DIAGNOSIS': STATE_SELECT_ACTION_TYPE,
+                'SURGERY_CONSULT_DECISION': 'SURGERY_CONSULT_DIAGNOSIS',
+                'SURGERY_CONSULT_OPERATION_NAME': 'SURGERY_CONSULT_DECISION',
+                'SURGERY_CONSULT_SUCCESS_RATE': 'SURGERY_CONSULT_OPERATION_NAME',
+                'SURGERY_CONSULT_TESTS': 'SURGERY_CONSULT_SUCCESS_RATE',
+                'SURGERY_CONSULT_FOLLOWUP_DATE': 'SURGERY_CONSULT_TESTS',
+                'SURGERY_CONSULT_FOLLOWUP_REASON': 'SURGERY_CONSULT_FOLLOWUP_DATE',
+                'SURGERY_CONSULT_TRANSLATOR': 'SURGERY_CONSULT_FOLLOWUP_REASON',
+                'SURGERY_CONSULT_CONFIRM': 'SURGERY_CONSULT_TRANSLATOR',
+            },
+
+            # تدفق استشارة أخيرة
+            'final_consult': {
+                STATE_SELECT_DATE: None,
+                STATE_SELECT_PATIENT: STATE_SELECT_DATE,
+                STATE_SELECT_HOSPITAL: STATE_SELECT_PATIENT,
+                STATE_SELECT_DEPARTMENT: STATE_SELECT_HOSPITAL,
+                STATE_SELECT_SUBDEPARTMENT: STATE_SELECT_DEPARTMENT,
+                STATE_SELECT_DOCTOR: STATE_SELECT_SUBDEPARTMENT,
+                STATE_SELECT_ACTION_TYPE: STATE_SELECT_DOCTOR,
+                'FINAL_CONSULT_DIAGNOSIS': STATE_SELECT_ACTION_TYPE,
+                'FINAL_CONSULT_DECISION': 'FINAL_CONSULT_DIAGNOSIS',
+                'FINAL_CONSULT_TREATMENT': 'FINAL_CONSULT_DECISION',
+                'FINAL_CONSULT_TRANSLATOR': 'FINAL_CONSULT_TREATMENT',
+                'FINAL_CONSULT_CONFIRM': 'FINAL_CONSULT_TRANSLATOR',
+            },
+
+            # تدفق طوارئ
+            'emergency': {
+                STATE_SELECT_DATE: None,
+                STATE_SELECT_PATIENT: STATE_SELECT_DATE,
+                STATE_SELECT_HOSPITAL: STATE_SELECT_PATIENT,
+                STATE_SELECT_DEPARTMENT: STATE_SELECT_HOSPITAL,
+                STATE_SELECT_SUBDEPARTMENT: STATE_SELECT_DEPARTMENT,
+                STATE_SELECT_DOCTOR: STATE_SELECT_SUBDEPARTMENT,
+                STATE_SELECT_ACTION_TYPE: STATE_SELECT_DOCTOR,
+                'EMERGENCY_COMPLAINT': STATE_SELECT_ACTION_TYPE,
+                'EMERGENCY_DIAGNOSIS': 'EMERGENCY_COMPLAINT',
+                'EMERGENCY_DECISION': 'EMERGENCY_DIAGNOSIS',
+                'EMERGENCY_STATUS': 'EMERGENCY_DECISION',
+                'EMERGENCY_FOLLOWUP_DATE': 'EMERGENCY_STATUS',
+                'EMERGENCY_FOLLOWUP_REASON': 'EMERGENCY_FOLLOWUP_DATE',
+                'EMERGENCY_TRANSLATOR': 'EMERGENCY_FOLLOWUP_REASON',
+                'EMERGENCY_CONFIRM': 'EMERGENCY_TRANSLATOR',
+            },
+
+            # تدفق متابعة في الرقود
+            'followup': {
+                STATE_SELECT_DATE: None,
+                STATE_SELECT_PATIENT: STATE_SELECT_DATE,
+                STATE_SELECT_HOSPITAL: STATE_SELECT_PATIENT,
+                STATE_SELECT_DEPARTMENT: STATE_SELECT_HOSPITAL,
+                STATE_SELECT_SUBDEPARTMENT: STATE_SELECT_DEPARTMENT,
+                STATE_SELECT_DOCTOR: STATE_SELECT_SUBDEPARTMENT,
+                STATE_SELECT_ACTION_TYPE: STATE_SELECT_DOCTOR,
+                'FOLLOWUP_COMPLAINT': STATE_SELECT_ACTION_TYPE,
+                'FOLLOWUP_DIAGNOSIS': 'FOLLOWUP_COMPLAINT',
+                'FOLLOWUP_DECISION': 'FOLLOWUP_DIAGNOSIS',
+                'FOLLOWUP_FOLLOWUP_DATE': 'FOLLOWUP_DECISION',
+                'FOLLOWUP_FOLLOWUP_REASON': 'FOLLOWUP_FOLLOWUP_DATE',
+                'FOLLOWUP_TRANSLATOR': 'FOLLOWUP_FOLLOWUP_REASON',
+                'FOLLOWUP_CONFIRM': 'FOLLOWUP_TRANSLATOR',
+            },
+
+            # تدفق عملية
+            'operation': {
+                STATE_SELECT_DATE: None,
+                STATE_SELECT_PATIENT: STATE_SELECT_DATE,
+                STATE_SELECT_HOSPITAL: STATE_SELECT_PATIENT,
+                STATE_SELECT_DEPARTMENT: STATE_SELECT_HOSPITAL,
+                STATE_SELECT_SUBDEPARTMENT: STATE_SELECT_DEPARTMENT,
+                STATE_SELECT_DOCTOR: STATE_SELECT_SUBDEPARTMENT,
+                STATE_SELECT_ACTION_TYPE: STATE_SELECT_DOCTOR,
+                'OPERATION_DETAILS_AR': STATE_SELECT_ACTION_TYPE,
+                'OPERATION_NAME_EN': 'OPERATION_DETAILS_AR',
+                'OPERATION_NOTES': 'OPERATION_NAME_EN',
+                'OPERATION_FOLLOWUP_DATE': 'OPERATION_NOTES',
+                'OPERATION_FOLLOWUP_REASON': 'OPERATION_FOLLOWUP_DATE',
+                'OPERATION_TRANSLATOR': 'OPERATION_FOLLOWUP_REASON',
+                'OPERATION_CONFIRM': 'OPERATION_TRANSLATOR',
+            },
+
+            # تدفق علاج طبيعي
+            'rehab': {
+                STATE_SELECT_DATE: None,
+                STATE_SELECT_PATIENT: STATE_SELECT_DATE,
+                STATE_SELECT_HOSPITAL: STATE_SELECT_PATIENT,
+                STATE_SELECT_DEPARTMENT: STATE_SELECT_HOSPITAL,
+                STATE_SELECT_SUBDEPARTMENT: STATE_SELECT_DEPARTMENT,
+                STATE_SELECT_DOCTOR: STATE_SELECT_SUBDEPARTMENT,
+                STATE_SELECT_ACTION_TYPE: STATE_SELECT_DOCTOR,
+                'REHAB_TYPE': STATE_SELECT_ACTION_TYPE,
+                'PHYSICAL_THERAPY_DETAILS': 'REHAB_TYPE',
+                'PHYSICAL_THERAPY_DEVICES': 'PHYSICAL_THERAPY_DETAILS',
+                'PHYSICAL_THERAPY_NOTES': 'PHYSICAL_THERAPY_DEVICES',
+                'PHYSICAL_THERAPY_FOLLOWUP_DATE': 'PHYSICAL_THERAPY_NOTES',
+                'PHYSICAL_THERAPY_FOLLOWUP_REASON': 'PHYSICAL_THERAPY_FOLLOWUP_DATE',
+                'PHYSICAL_THERAPY_TRANSLATOR': 'PHYSICAL_THERAPY_FOLLOWUP_REASON',
+                'PHYSICAL_THERAPY_CONFIRM': 'PHYSICAL_THERAPY_TRANSLATOR',
+
+                'DEVICE_NAME_DETAILS': 'REHAB_TYPE',
+                'DEVICE_NOTES': 'DEVICE_NAME_DETAILS',
+                'DEVICE_FOLLOWUP_DATE': 'DEVICE_NOTES',
+                'DEVICE_FOLLOWUP_REASON': 'DEVICE_FOLLOWUP_DATE',
+                'DEVICE_TRANSLATOR': 'DEVICE_FOLLOWUP_REASON',
+                'DEVICE_CONFIRM': 'DEVICE_TRANSLATOR',
+            },
+
+            # تدفق أشعة وفحوصات
+            'radiology': {
+                STATE_SELECT_DATE: None,
+                STATE_SELECT_PATIENT: STATE_SELECT_DATE,
+                STATE_SELECT_HOSPITAL: STATE_SELECT_PATIENT,
+                STATE_SELECT_DEPARTMENT: STATE_SELECT_HOSPITAL,
+                STATE_SELECT_SUBDEPARTMENT: STATE_SELECT_DEPARTMENT,
+                STATE_SELECT_DOCTOR: STATE_SELECT_SUBDEPARTMENT,
+                STATE_SELECT_ACTION_TYPE: STATE_SELECT_DOCTOR,
+                'RADIOLOGY_TYPE': STATE_SELECT_ACTION_TYPE,
+                'RADIOLOGY_DELIVERY_DATE': 'RADIOLOGY_TYPE',
+                'RADIOLOGY_TRANSLATOR': 'RADIOLOGY_DELIVERY_DATE',
+                'RADIOLOGY_CONFIRM': 'RADIOLOGY_TRANSLATOR',
+            },
+
+            # تدفق ترقيد
+            'admission': {
+                STATE_SELECT_DATE: None,
+                STATE_SELECT_PATIENT: STATE_SELECT_DATE,
+                STATE_SELECT_HOSPITAL: STATE_SELECT_PATIENT,
+                STATE_SELECT_DEPARTMENT: STATE_SELECT_HOSPITAL,
+                STATE_SELECT_SUBDEPARTMENT: STATE_SELECT_DEPARTMENT,
+                STATE_SELECT_DOCTOR: STATE_SELECT_SUBDEPARTMENT,
+                STATE_SELECT_ACTION_TYPE: STATE_SELECT_DOCTOR,
+                'ADMISSION_REASON': STATE_SELECT_ACTION_TYPE,
+                'ADMISSION_ROOM': 'ADMISSION_REASON',
+                'ADMISSION_NOTES': 'ADMISSION_ROOM',
+                'ADMISSION_FOLLOWUP_DATE': 'ADMISSION_NOTES',
+                'ADMISSION_FOLLOWUP_REASON': 'ADMISSION_FOLLOWUP_DATE',
+                'ADMISSION_TRANSLATOR': 'ADMISSION_FOLLOWUP_REASON',
+                'ADMISSION_CONFIRM': 'ADMISSION_TRANSLATOR',
+            },
+
+            # تدفق خروج من المستشفى
+            'discharge': {
+                STATE_SELECT_DATE: None,
+                STATE_SELECT_PATIENT: STATE_SELECT_DATE,
+                STATE_SELECT_HOSPITAL: STATE_SELECT_PATIENT,
+                STATE_SELECT_DEPARTMENT: STATE_SELECT_HOSPITAL,
+                STATE_SELECT_SUBDEPARTMENT: STATE_SELECT_DEPARTMENT,
+                STATE_SELECT_DOCTOR: STATE_SELECT_SUBDEPARTMENT,
+                STATE_SELECT_ACTION_TYPE: STATE_SELECT_DOCTOR,
+                'DISCHARGE_TYPE': STATE_SELECT_ACTION_TYPE,
+                'DISCHARGE_ADMISSION_SUMMARY': 'DISCHARGE_TYPE',
+                'DISCHARGE_OPERATION_DETAILS': 'DISCHARGE_ADMISSION_SUMMARY',
+                'DISCHARGE_OPERATION_NAME_EN': 'DISCHARGE_OPERATION_DETAILS',
+                'DISCHARGE_FOLLOWUP_DATE': 'DISCHARGE_OPERATION_NAME_EN',
+                'DISCHARGE_FOLLOWUP_REASON': 'DISCHARGE_FOLLOWUP_DATE',
+                'DISCHARGE_TRANSLATOR': 'DISCHARGE_FOLLOWUP_REASON',
+                'DISCHARGE_CONFIRM': 'DISCHARGE_TRANSLATOR',
+            },
+        }
+
+        # تتبع نوع البحث الحالي لمنع الخلطة
+        self.search_context = {
+            'current_search_type': None,  # 'patient', 'doctor', 'translator', 'hospital', 'department', 'subdepartment'
+            'search_query': None,
+            'last_results': None
+        }
+
+    def get_previous_step(self, flow_type, current_step):
+        """
+        الحصول على الخطوة السابقة بدقة لنوع التدفق المحدد
+        """
+        if flow_type not in self.step_flows:
+            return STATE_SELECT_DATE  # الرجوع للبداية إذا لم يكن معروف
+
+        flow_map = self.step_flows[flow_type]
+
+        # إذا كان current_step هو string، ابحث عنه مباشرة
+        if isinstance(current_step, str):
+            return flow_map.get(current_step, STATE_SELECT_DATE)
+
+        # إذا كان current_step هو int، ابحث عن الـ state المقابل
+        for step_name, prev_step in flow_map.items():
+            if step_name == current_step or (isinstance(step_name, int) and step_name == current_step):
+                return prev_step
+
+        return STATE_SELECT_DATE  # الافتراضي
+
+    def get_next_step(self, flow_type, current_step):
+        """
+        الحصول على الخطوة التالية (للتنقل للأمام إذا لزم)
+        """
+        if flow_type not in self.step_flows:
+            return None
+
+        flow_map = self.step_flows[flow_type]
+
+        # العثور على الخطوة التالية
+        for step_name, prev_step in flow_map.items():
+            if prev_step == current_step:
+                return step_name
+
+        return None
+
+    def set_search_context(self, search_type, query=None):
+        """
+        تعيين سياق البحث الحالي لمنع الخلطة
+        """
+        self.search_context = {
+            'current_search_type': search_type,
+            'search_query': query,
+            'last_results': None
+        }
+
+    def get_search_context(self):
+        """
+        الحصول على سياق البحث الحالي
+        """
+        return self.search_context
+
+    def clear_search_context(self):
+        """
+        مسح سياق البحث
+        """
+        self.search_context = {
+            'current_search_type': None,
+            'search_query': None,
+            'last_results': None
+        }
+
+# إنشاء instance واحد من SmartNavigationManager
+smart_nav_manager = SmartNavigationManager()
+
+def get_translator_state(flow_type):
+    """
+    الحصول على حالة المترجم المناسبة حسب نوع التدفق
+    """
+    translator_states = {
+        'new_consult': 'FOLLOWUP_TRANSLATOR',
+        'followup': 'FOLLOWUP_TRANSLATOR',
+        'emergency': 'EMERGENCY_TRANSLATOR',
+        'operation': 'OPERATION_TRANSLATOR',
+        'diagnosis': 'DIAGNOSIS_TRANSLATOR',
+        'discharge': 'DISCHARGE_TRANSLATOR',
+        'radiology': 'RADIOLOGY_TRANSLATOR',
+        'physical_therapy': 'PHYSICAL_THERAPY_TRANSLATOR',
+        'device': 'DEVICE_TRANSLATOR'
+    }
+
+    return translator_states.get(flow_type, 'FOLLOWUP_TRANSLATOR')
+
+class SmartStateRenderer:
+    """
+    مدير ذكي لإعادة عرض الشاشات بعد الرجوع أو التعديل
+    يضمن أن جميع البيانات والأسماء تظهر بشكل صحيح دائماً
+    """
+
+    @staticmethod
+    async def render_patient_selection(message, context, search_query=""):
+        """
+        إعادة عرض شاشة اختيار المريض مع ضمان ظهور الأسماء دائماً
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+
+        logger.info("🎯 Rendering patient selection with FRESH data")
+
+        # تنظيف أي بيانات قديمة للمريض لضمان البداية من جديد
+        PatientDataManager.clear_patient_data(context)
+
+        # إعداد سياق البحث من جديد
+        smart_nav_manager.set_search_context('patient')
+        context.user_data['_current_search_type'] = 'patient'
+
+        # تحديث الحالة بدقة
+        context.user_data['_conversation_state'] = STATE_SELECT_PATIENT
+
+        # التأكد من وجود report_tmp
+        if 'report_tmp' not in context.user_data:
+            context.user_data['report_tmp'] = {}
+
+        # إضافة علامة للتحقق من أن البيانات محدثة
+        context.user_data['report_tmp']['_patient_data_fresh'] = True
+
+        logger.info("✅ Patient selection fully refreshed and ready")
+        # عرض شاشة المريض مع البحث
+        await show_patient_selection(message, context, search_query)
+
+    @staticmethod
+    async def render_doctor_selection(message, context, search_query=""):
+        """
+        إعادة عرض شاشة اختيار الطبيب مع ضمان ظهور الأسماء دائماً
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+
+        logger.info("🎯 Rendering doctor selection with FRESH data")
+
+        # تنظيف أي بيانات قديمة للطبيب لضمان البداية من جديد
+        DoctorDataManager.clear_doctor_data(context)
+
+        # إعداد سياق البحث من جديد
+        smart_nav_manager.set_search_context('doctor')
+        context.user_data['_current_search_type'] = 'doctor'
+
+        # تحديث الحالة بدقة
+        context.user_data['_conversation_state'] = STATE_SELECT_DOCTOR
+
+        # التأكد من وجود report_tmp
+        if 'report_tmp' not in context.user_data:
+            context.user_data['report_tmp'] = {}
+
+        # إضافة علامة للتحقق من أن البيانات محدثة
+        context.user_data['report_tmp']['_doctor_data_fresh'] = True
+
+        logger.info("✅ Doctor selection fully refreshed and ready")
+        # عرض شاشة الطبيب مع البحث
+        await show_doctor_input(message, context)
+
+    @staticmethod
+    async def render_translator_selection(message, context, flow_type):
+        """
+        إعادة عرض شاشة اختيار المترجم مع ضمان ظهور الأسماء دائماً
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+
+        logger.info("🎯 Rendering translator selection with FRESH data")
+
+        # تنظيف أي بيانات قديمة للمترجم لضمان البداية من جديد
+        if 'report_tmp' in context.user_data:
+            context.user_data['report_tmp'].pop('translator_name', None)
+            context.user_data['report_tmp'].pop('translator_id', None)
+
+        # تحديث الحالة بدقة
+        translator_state = get_translator_state(flow_type)
+        context.user_data['_conversation_state'] = translator_state
+
+        # التأكد من وجود report_tmp
+        if 'report_tmp' not in context.user_data:
+            context.user_data['report_tmp'] = {}
+
+        # إضافة علامة للتحقق من أن البيانات محدثة
+        context.user_data['report_tmp']['_translator_data_fresh'] = True
+
+        logger.info("✅ Translator selection fully refreshed and ready")
+        # عرض شاشة المترجم
+        await show_translator_selection(message, context, flow_type)
+
+    @staticmethod
+    async def ensure_search_context(context, search_type):
+        """
+        التأكد من أن سياق البحث صحيح ومحدث دائماً
+        """
+        current_type = context.user_data.get('_current_search_type')
+        if current_type != search_type:
+            # إعادة تهيئة سياق البحث بالكامل
+            smart_nav_manager.clear_search_context()
+            smart_nav_manager.set_search_context(search_type)
+            context.user_data['_current_search_type'] = search_type
+
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"🔄 FORCE reset search context from {current_type} to {search_type}")
+
+    @staticmethod
+    async def validate_data_consistency(context):
+        """
+        التحقق من تناسق البيانات وإصلاح أي مشاكل
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+
+        report_tmp = context.user_data.get('report_tmp', {})
+        current_state = context.user_data.get('_conversation_state')
+
+        # فحص تناسق بيانات المريض
+        if current_state == STATE_SELECT_PATIENT:
+            if not report_tmp.get('_patient_data_fresh'):
+                logger.warning("⚠️ Patient data not fresh, forcing refresh")
+                await SmartStateRenderer.ensure_search_context(context, 'patient')
+                report_tmp['_patient_data_fresh'] = True
+
+        # فحص تناسق بيانات الطبيب
+        elif current_state == STATE_SELECT_DOCTOR:
+            if not report_tmp.get('_doctor_data_fresh'):
+                logger.warning("⚠️ Doctor data not fresh, forcing refresh")
+                await SmartStateRenderer.ensure_search_context(context, 'doctor')
+                report_tmp['_doctor_data_fresh'] = True
+
+        # فحص تناسق بيانات المترجم
+        elif 'TRANSLATOR' in str(current_state):
+            if not report_tmp.get('_translator_data_fresh'):
+                logger.warning("⚠️ Translator data not fresh, forcing refresh")
+                flow_type = report_tmp.get('current_flow', 'new_consult')
+                translator_state = get_translator_state(flow_type)
+                context.user_data['_conversation_state'] = translator_state
+                report_tmp['_translator_data_fresh'] = True
+
+        logger.info("✅ Data consistency validated")
+
+    @staticmethod
+    async def force_data_refresh(context, data_type):
+        """
+        إجبار تحديث البيانات بالكامل
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+
+        if data_type == 'all':
+            # تحديث جميع البيانات
+            PatientDataManager.clear_patient_data(context)
+            DoctorDataManager.clear_doctor_data(context)
+            smart_nav_manager.clear_search_context()
+
+            if 'report_tmp' in context.user_data:
+                context.user_data['report_tmp'].pop('translator_name', None)
+                context.user_data['report_tmp'].pop('translator_id', None)
+
+            logger.info("🔄 All data forcefully refreshed")
+
+        elif data_type == 'patient':
+            PatientDataManager.clear_patient_data(context)
+            await SmartStateRenderer.ensure_search_context(context, 'patient')
+            logger.info("🔄 Patient data forcefully refreshed")
+
+        elif data_type == 'doctor':
+            DoctorDataManager.clear_doctor_data(context)
+            await SmartStateRenderer.ensure_search_context(context, 'doctor')
+            logger.info("🔄 Doctor data forcefully refreshed")
+
+        elif data_type == 'translator':
+            if 'report_tmp' in context.user_data:
+                context.user_data['report_tmp'].pop('translator_name', None)
+                context.user_data['report_tmp'].pop('translator_id', None)
+            logger.info("🔄 Translator data forcefully refreshed")
+
+async def execute_smart_state_action(target_step, flow_type, update, context):
+    """
+    تنفيذ الإجراء المناسب للخطوة المستهدفة مع ضمان إعادة العرض الصحيح
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    logger.info(f"🎯 Executing SMART action for step: {target_step}, flow: {flow_type}")
+
+    try:
+        # تنفيذ الإجراء حسب الخطوة مع ضمان إعادة العرض الصحيح
+        if target_step == STATE_SELECT_DATE:
+            # إعادة عرض شاشة تحديد التاريخ
+            from services.calendar_service import create_date_selection_keyboard
+            keyboard = create_date_selection_keyboard()
+            await update.callback_query.edit_message_text(
+                "📅 اختر تاريخ التقرير:",
+                reply_markup=keyboard
+            )
+
+        elif target_step == STATE_SELECT_PATIENT:
+            # إعادة عرض شاشة اختيار المريض مع ضمان ظهور الأسماء
+            await SmartStateRenderer.ensure_search_context(context, 'patient')
+            await SmartStateRenderer.render_patient_selection(update.callback_query.message, context)
+
+        elif target_step == STATE_SELECT_HOSPITAL:
+            # إعادة عرض شاشة اختيار المستشفى
+            await SmartStateRenderer.ensure_search_context(context, 'hospital')
+            # استخدام الدالة المحلية للمستشفيات
+            await show_hospitals_menu(update.callback_query.message, context)
+
+        elif target_step == STATE_SELECT_DEPARTMENT:
+            # إعادة عرض شاشة اختيار القسم الرئيسي
+            await SmartStateRenderer.ensure_search_context(context, 'department')
+            await show_departments_menu(update.callback_query.message, context)
+
+        elif target_step == STATE_SELECT_SUBDEPARTMENT:
+            # إعادة عرض شاشة اختيار القسم الفرعي
+            await SmartStateRenderer.ensure_search_context(context, 'subdepartment')
+            # الحصول على اسم القسم الرئيسي من البيانات المحفوظة
+            main_dept = context.user_data.get('report_tmp', {}).get('main_department', 'الجراحة')
+            await show_subdepartment_options(update.callback_query.message, context, main_dept)
+
+        elif target_step == STATE_SELECT_DOCTOR:
+            # إعادة عرض شاشة اختيار الطبيب مع ضمان ظهور الأسماء
+            await SmartStateRenderer.ensure_search_context(context, 'doctor')
+            await SmartStateRenderer.render_doctor_selection(update.callback_query.message, context)
+
+        elif target_step in ['FOLLOWUP_TRANSLATOR', 'EMERGENCY_TRANSLATOR', 'OPERATION_TRANSLATOR',
+                           'DIAGNOSIS_TRANSLATOR', 'DISCHARGE_TRANSLATOR', 'RADIOLOGY_TRANSLATOR',
+                           'PHYSICAL_THERAPY_TRANSLATOR', 'DEVICE_TRANSLATOR']:
+            # إعادة عرض شاشة اختيار المترجم مع ضمان ظهور الأسماء
+            await SmartStateRenderer.render_translator_selection(update.callback_query.message, context, flow_type)
+
+        else:
+            logger.warning(f"⚠️ Unknown target step: {target_step}")
+            # محاولة التعامل مع الحالة غير المعروفة
+            await update.callback_query.edit_message_text(
+                f"⚠️ خطأ في التنقل - الخطوة: {target_step}\n\nيرجى المحاولة مرة أخرى",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
+                    InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
+                ]])
+            )
+
+    except Exception as e:
+        logger.error(f"❌ Error in execute_smart_state_action: {e}", exc_info=True)
+        try:
+            await update.callback_query.edit_message_text(
+                "❌ حدث خطأ في إعادة العرض\n\nيرجى المحاولة مرة أخرى",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
+                    InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
+                ]])
+            )
+        except:
+            pass
+
+    if target_step == STATE_SELECT_ACTION_TYPE:
+        # إعادة عرض شاشة اختيار نوع الإجراء
+        await show_action_type_menu(update.callback_query.message, context)
+
+    else:
+        # للخطوات الأخرى، إعادة توجيه حسب نوع التدفق
+        await redirect_to_flow_step(target_step, flow_type, update, context)
+
+async def redirect_to_flow_step(step_name, flow_type, update, context):
+    """
+    إعادة توجيه لخطوة محددة في التدفق
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    try:
+        # تنظيف البيانات حسب الخطوة
+        data = context.user_data.get('report_tmp', {})
+
+        # إعادة توجيه حسب اسم الخطوة
+        if 'COMPLAINT' in step_name:
+            await update.callback_query.edit_message_text(
+                "💬 أدخل شكوى المريض:",
+                reply_markup=_nav_buttons()
+            )
+        elif 'DIAGNOSIS' in step_name:
+            await update.callback_query.edit_message_text(
+                "🔬 أدخل التشخيص الطبي:",
+                reply_markup=_nav_buttons()
+            )
+        elif 'DECISION' in step_name:
+            await update.callback_query.edit_message_text(
+                "📝 أدخل قرار الطبيب:",
+                reply_markup=_nav_buttons()
+            )
+        elif 'CONFIRM' in step_name:
+            # إعادة عرض الملخص النهائي
+            await show_final_summary(update.callback_query.message, context, flow_type)
+        else:
+            # خطوة غير معروفة، إعادة التوجيه للبداية
+            logger.warning(f"Unknown step: {step_name}, redirecting to start")
+            await start_report(update, context)
+
+    except Exception as e:
+        logger.error(f"Error in redirect_to_flow_step: {e}")
+        await start_report(update, context)
+
+async def handle_smart_back_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    معالج زر الرجوع الذكي - يرجع خطوة واحدة فقط بدقة
+    يحل مشكلة الخلطة في أزرار البحث ويضمن الرجوع الصحيح
+    """
     import logging
     logger = logging.getLogger(__name__)
 
     query = update.callback_query
+    if not query:
+        logger.error("❌ handle_smart_back_navigation: No query found")
+        return ConversationHandler.END
+
     await query.answer()
 
+    logger.info("=" * 80)
+    logger.info("🔙 SMART BACK NAVIGATION TRIGGERED")
+    logger.info("=" * 80)
+
     try:
-        # الحصول على State History Manager
-        state_manager = StateHistoryManager.get_state_manager(context)
-        current_history = state_manager.get_history()
-
-        logger.info(f"🔙 handle_back_navigation: current_history={current_history}")
-
-        # إذا لم تكن هناك history
-        if not current_history:
-            logger.warning("🔙 handle_back_navigation: No history available")
-            return ConversationHandler.END
-
-        # الحصول على الـ state السابق
-        previous_step = state_manager.get_previous_state()
+        # الحصول على البيانات الحالية
         current_state = context.user_data.get('_conversation_state')
+        flow_type = context.user_data.get('report_tmp', {}).get('current_flow', 'new_consult')
 
-        logger.info(f"🔙 handle_back_navigation: current_state={current_state}, previous_step={previous_step}, history_length={len(current_history)}")
-        logger.info(f"🔙 handle_back_navigation: FULL history={current_history}")
-        logger.info(f"🔙 handle_back_navigation: Current context _conversation_state: {context.user_data.get('_conversation_state')}")
-        logger.info(f"🔙 handle_back_navigation: Current context states: {context.user_data.get('report_tmp', {}).get('state_manager', {}).get_history() if 'report_tmp' in context.user_data else 'No report_tmp'}")
+        logger.info(f"🔙 Current state: {current_state}")
+        logger.info(f"🔙 Flow type: {flow_type}")
 
-        # طباعة تفصيلية عن الـ states
-        if 'report_tmp' in context.user_data and 'state_manager' in context.user_data['report_tmp']:
-            manager = context.user_data['report_tmp']['state_manager']
-            logger.info(f"🔙 StateManager history: {manager.get_history()}")
-            logger.info(f"🔙 StateManager peek_state: {manager.peek_state()}")
-            logger.info(f"🔙 StateManager get_previous_state: {manager.get_previous_state()}")
+        # الحصول على الخطوة السابقة باستخدام SmartNavigationManager
+        previous_step = smart_nav_manager.get_previous_step(flow_type, current_state)
+
+        logger.info(f"🔙 Previous step determined: {previous_step}")
 
         if previous_step is None:
-            # إذا كانت هناك خطوة واحدة فقط، نرجع للبداية
-            previous_step = STATE_SELECT_DATE
-            state_manager.clear_history()
-            logger.info("🔙 handle_back_navigation: Going to start (STATE_SELECT_DATE)")
-        else:
-            # إزالة الـ state الحالي من التاريخ
-            popped = state_manager.pop_state()
-            logger.info(f"🔙 handle_back_navigation: popped={popped}, Going back to {previous_step}, new_history={state_manager.get_history()}")
-
-        # تحديث الـ conversation state للخطوة السابقة
-        context.user_data['_conversation_state'] = previous_step
-
-        # عرض رسالة تأكيد الرجوع
-        step_names = {
-            STATE_SELECT_DATE: "اختيار التاريخ",
-            STATE_SELECT_PATIENT: "اختيار المريض",
-            STATE_SELECT_HOSPITAL: "اختيار المستشفى",
-            STATE_SELECT_DEPARTMENT: "اختيار القسم",
-            STATE_SELECT_DOCTOR: "اختيار الطبيب"
-        }
-        step_name = step_names.get(previous_step, "الخطوة السابقة")
-
-        # إرسال رسالة تأكيد الرجوع
-        await query.answer(f"🔙 تم الرجوع لـ: {step_name}", show_alert=False)
-
-        # Rendering Logic: عرض الشاشة المناسبة حسب الـ state السابق
-        logger.info(f"🔙 Rendering step: {previous_step}")
-
-        if previous_step == STATE_SELECT_DATE:
-            await query.message.delete()
-            await render_date_selection(query.message, context)
+            # الرجوع للبداية
+            logger.info("🔙 No previous step, going to start")
+            await start_report(update, context)
             return STATE_SELECT_DATE
 
-        elif previous_step == STATE_SELECT_PATIENT:
-            PatientDataManager.clear_patient_data(context)
-            await query.message.delete()
-            await render_patient_selection(query.message, context)
-            return STATE_SELECT_PATIENT
+        # تحديث الـ conversation state
+        context.user_data['_conversation_state'] = previous_step
 
-        elif previous_step == STATE_SELECT_HOSPITAL:
-            await query.message.delete()
-            await render_hospital_selection(query.message, context)
-            return STATE_SELECT_HOSPITAL
+        # تنفيذ الإجراء المناسب للخطوة السابقة
+        await execute_smart_state_action(previous_step, flow_type, update, context)
 
-        elif previous_step == STATE_SELECT_DEPARTMENT:
-            DepartmentDataManager.clear_department_data(context, full_clear=False)
-            await query.message.delete()
-            await render_department_selection(query.message, context)
-            return STATE_SELECT_DEPARTMENT
-
-        elif previous_step == STATE_SELECT_DOCTOR:
-            await query.message.delete()
-            await render_doctor_selection(query.message, context)
-            return STATE_SELECT_DOCTOR
-
-        # إذا لم نجد معالجة للـ state، نعيد الـ state كما هو
+        logger.info(f"🔙 Successfully went back to {previous_step}")
         return previous_step
 
     except Exception as e:
-        logger.error(f"❌ Error in handle_back_navigation: {e}", exc_info=True)
-        return ConversationHandler.END
+        logger.error(f"❌ Error in handle_smart_back_navigation: {e}", exc_info=True)
+        # في حالة الخطأ، الرجوع للبداية بأمان
+        await start_report(update, context)
+        return STATE_SELECT_DATE
+
+# الدوال القديمة تم استبدالها بـ Smart Navigation System
+
+async def handle_back_navigation(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE):
+    """
+    معالج زر الرجوع الذكي - يستخدم SmartNavigationManager
+    يرجع خطوة واحدة فقط بدقة ويحل مشكلة الخلطة في أزرار البحث
+    """
+    # استدعاء النظام الذكي الجديد
+    return await handle_smart_back_navigation(update, context)
 
 
 async def render_date_selection(message, context):
@@ -1288,9 +2339,6 @@ def _build_hospitals_keyboard(page=0, search_query="", context=None):
         if nav_buttons:
             keyboard.append(nav_buttons)
 
-    # زر البحث
-    keyboard.append([InlineKeyboardButton(
-        "🔍 بحث", callback_data="hosp_search")])
     # أزرار التنقل
     keyboard.append([InlineKeyboardButton(
         "❌ إلغاء", callback_data="nav:cancel")])
@@ -1509,7 +2557,6 @@ def _build_departments_keyboard(page=0, search_query="", context=None):
 
     # أزرار التحكم
     control_buttons = []
-    control_buttons.append(InlineKeyboardButton("🔍 بحث", callback_data="dept_search"))
     control_buttons.append(InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel"))
     keyboard.append(control_buttons)
 
@@ -3536,7 +4583,7 @@ async def handle_new_consult_followup_reason(update: Update, context: ContextTyp
     context.user_data["report_tmp"]["followup_reason"] = text
 
     await update.message.reply_text("✅ تم الحفظ")
-    await ask_translator_name(update.message, context, "new_consult")
+    await show_translator_selection(update.message, context, "new_consult")
 
     return NEW_CONSULT_TRANSLATOR
 
@@ -3745,7 +4792,7 @@ async def handle_followup_reason(update: Update, context: ContextTypes.DEFAULT_T
     context.user_data["report_tmp"]["followup_reason"] = text
 
     await update.message.reply_text("✅ تم الحفظ")
-    await ask_translator_name(update.message, context, "followup")
+    await show_translator_selection(update.message, context, "followup")
 
     return FOLLOWUP_TRANSLATOR
 
@@ -4065,7 +5112,7 @@ async def handle_emergency_reason(update: Update, context: ContextTypes.DEFAULT_
     context.user_data["report_tmp"]["followup_reason"] = text
 
     await update.message.reply_text("✅ تم الحفظ")
-    await ask_translator_name(update.message, context, "emergency")
+    await show_translator_selection(update.message, context, "emergency")
 
     return EMERGENCY_TRANSLATOR
 
@@ -4196,7 +5243,7 @@ async def handle_admission_followup_reason(update: Update, context: ContextTypes
     context.user_data["report_tmp"]["followup_reason"] = text
 
     await update.message.reply_text("✅ تم الحفظ")
-    await ask_translator_name(update.message, context, "admission")
+    await show_translator_selection(update.message, context, "admission")
 
     return ADMISSION_TRANSLATOR
 
@@ -4456,7 +5503,7 @@ async def handle_surgery_consult_followup_reason(update: Update, context: Contex
     context.user_data["report_tmp"]["followup_reason"] = text
 
     await update.message.reply_text("✅ تم الحفظ")
-    await ask_translator_name(update.message, context, "surgery_consult")
+    await show_translator_selection(update.message, context, "surgery_consult")
 
     return SURGERY_CONSULT_TRANSLATOR
 
@@ -4615,7 +5662,7 @@ async def handle_operation_followup_reason(update: Update, context: ContextTypes
     context.user_data["report_tmp"]["followup_reason"] = text
 
     await update.message.reply_text("✅ تم الحفظ")
-    await ask_translator_name(update.message, context, "operation")
+    await show_translator_selection(update.message, context, "operation")
 
     return OPERATION_TRANSLATOR
 
@@ -4735,7 +5782,7 @@ async def handle_final_consult_recommendations(update: Update, context: ContextT
     context.user_data["report_tmp"]["followup_reason"] = "استشارة أخيرة - لا يوجد عودة"
 
     await update.message.reply_text("✅ تم الحفظ")
-    await ask_translator_name(update.message, context, "final_consult")
+    await show_translator_selection(update.message, context, "final_consult")
 
     return FINAL_CONSULT_TRANSLATOR
 
@@ -4910,7 +5957,7 @@ async def handle_discharge_followup_reason(update: Update, context: ContextTypes
     context.user_data["report_tmp"]["followup_reason"] = text
 
     await update.message.reply_text("✅ تم الحفظ")
-    await ask_translator_name(update.message, context, "discharge")
+    await show_translator_selection(update.message, context, "discharge")
 
     return DISCHARGE_TRANSLATOR
 
@@ -5029,7 +6076,7 @@ async def handle_physical_therapy_followup_date_choice(update: Update, context: 
         context.user_data["report_tmp"]["followup_reason"] = "لا يوجد"
 
         await query.edit_message_text("✅ لا يوجد تاريخ عودة")
-        await ask_translator_name(query.message, context, "rehab_physical")
+        await show_translator_selection(query.message, context, "rehab_physical")
         return PHYSICAL_THERAPY_TRANSLATOR
 
     elif query.data == "physical_date:yes":
@@ -5082,7 +6129,7 @@ async def handle_physical_therapy_followup_reason(update: Update, context: Conte
     context.user_data["report_tmp"]["followup_reason"] = text
 
     await update.message.reply_text("✅ تم الحفظ")
-    await ask_translator_name(update.message, context, "rehab_physical")
+    await show_translator_selection(update.message, context, "rehab_physical")
 
     return PHYSICAL_THERAPY_TRANSLATOR
 
@@ -5154,7 +6201,7 @@ async def handle_device_followup_reason(update: Update, context: ContextTypes.DE
     context.user_data["report_tmp"]["followup_reason"] = text
 
     await update.message.reply_text("✅ تم الحفظ")
-    await ask_translator_name(update.message, context, "rehab_device")
+    await show_translator_selection(update.message, context, "rehab_device")
 
     return DEVICE_TRANSLATOR
 
@@ -5481,7 +6528,7 @@ async def handle_radiology_calendar_day(update: Update, context: ContextTypes.DE
             f"📅 **تاريخ التسليم:**\n"
             f"{date_display}"
         )
-        await ask_translator_name(query.message, context, "radiology")
+        await show_translator_selection(query.message, context, "radiology")
         
         # حفظ الحالة يدوياً في user_data للمساعدة في التتبع
         context.user_data['_conversation_state'] = RADIOLOGY_TRANSLATOR
@@ -6282,7 +7329,10 @@ async def show_final_summary(message, context, flow_type):
     summary += f"\n👤 **المترجم:** {data.get('translator_name', 'غير محدد')}"
 
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("💾 حفظ التقرير", callback_data=f"save:{flow_type}")],
+        [
+            InlineKeyboardButton("💾 حفظ التقرير", callback_data=f"save:{flow_type}"),
+            InlineKeyboardButton("✏️ تعديل التقرير", callback_data=f"edit_draft:{flow_type}")
+        ],
         [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back")],
         [InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]
     ])
@@ -6296,6 +7346,303 @@ async def show_final_summary(message, context, flow_type):
 # =============================
 # معالجة التأكيد والحفظ
 # =============================
+
+async def handle_edit_draft_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    معالجة تعديل التقرير المؤقت قبل الحفظ
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    query = update.callback_query
+    await query.answer()
+
+    try:
+        # استخراج نوع التدفق
+        callback_data = query.data
+        if ":" not in callback_data:
+            await query.edit_message_text("❌ خطأ في البيانات")
+            return
+
+        flow_type = callback_data.split(":", 1)[1]
+
+        # الحصول على البيانات المؤقتة
+        data = context.user_data.get("report_tmp", {})
+        medical_action = data.get("medical_action", "")
+
+        if not medical_action:
+            await query.edit_message_text("❌ خطأ: نوع الإجراء غير محدد")
+            return
+
+        # استيراد دالة get_editable_fields_by_action_type من ملف التعديل
+        try:
+            from bot.handlers.user.user_reports_edit import get_editable_fields_by_action_type
+        except ImportError:
+            await query.edit_message_text("❌ خطأ في تحميل نظام التعديل")
+            return
+
+        # الحصول على الحقول القابلة للتعديل
+        editable_fields = get_editable_fields_by_action_type(medical_action)
+
+        if not editable_fields:
+            await query.edit_message_text("❌ لا توجد حقول قابلة للتعديل لهذا النوع من الإجراءات")
+            return
+
+        # حفظ معلومات التعديل في context
+        context.user_data['editing_draft'] = True
+        context.user_data['draft_flow_type'] = flow_type
+        context.user_data['draft_medical_action'] = medical_action
+        context.user_data['current_edit_field_index'] = 0
+
+        # عرض قائمة الحقول للاختيار
+        await show_draft_edit_fields(query.message, context, editable_fields, flow_type)
+
+        # إرجاع state خاص للتعديل
+        return f"{flow_type.upper()}_EDIT_DRAFT"
+
+    except Exception as e:
+        logger.error(f"خطأ في handle_edit_draft_report: {e}")
+        await query.edit_message_text("❌ حدث خطأ في بدء عملية التعديل")
+        return
+
+async def show_draft_edit_fields(message, context, editable_fields, flow_type):
+    """
+    عرض قائمة الحقول القابلة للتعديل في التقرير المؤقت
+    """
+    text = "✏️ **تعديل التقرير المؤقت**\n\n"
+    text += "اختر الحقل الذي تريد تعديله:\n\n"
+
+    keyboard_buttons = []
+    for field_key, field_name in editable_fields:
+        # الحصول على القيمة الحالية للحقل
+        current_value = context.user_data.get("report_tmp", {}).get(field_key, "غير محدد")
+        if len(str(current_value)) > 20:
+            current_value = str(current_value)[:17] + "..."
+
+        button_text = f"{field_name} ({current_value})"
+        keyboard_buttons.append([InlineKeyboardButton(button_text, callback_data=f"edit_field_draft:{field_key}")])
+
+    # أزرار إضافية
+    keyboard_buttons.extend([
+        [InlineKeyboardButton("✅ انتهيت من التعديل", callback_data=f"finish_edit_draft:{flow_type}")],
+        [InlineKeyboardButton("🔙 رجوع للملخص", callback_data=f"back_to_summary:{flow_type}")],
+        [InlineKeyboardButton("❌ إلغاء التعديل", callback_data="nav:cancel")]
+    ])
+
+    keyboard = InlineKeyboardMarkup(keyboard_buttons)
+
+    await message.reply_text(
+        text,
+        reply_markup=keyboard,
+        parse_mode="Markdown"
+    )
+
+async def handle_edit_draft_field(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    معالجة تعديل حقل محدد في التقرير المؤقت
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    query = update.callback_query
+    await query.answer()
+
+    try:
+        callback_data = query.data
+        if ":" not in callback_data:
+            await query.edit_message_text("❌ خطأ في البيانات")
+            return
+
+        field_key = callback_data.split(":", 1)[1]
+
+        # حفظ اسم الحقل المراد تعديله
+        context.user_data['editing_field'] = field_key
+
+        # الحصول على معلومات الحقل
+        field_names = {
+            'complaint_text': 'الشكوى',
+            'diagnosis': 'التشخيص',
+            'doctor_decision': 'قرار الطبيب',
+            'notes': 'الملاحظات',
+            'treatment_plan': 'خطة العلاج',
+            'medications': 'الأدوية',
+            'followup_date': 'تاريخ العودة',
+            'followup_reason': 'سبب العودة',
+            'case_status': 'حالة الطوارئ'
+        }
+
+        field_display_name = field_names.get(field_key, field_key)
+
+        # عرض رسالة طلب إدخال القيمة الجديدة
+        current_value = context.user_data.get("report_tmp", {}).get(field_key, "")
+        text = f"✏️ **تعديل: {field_display_name}**\n\n"
+        text += f"القيمة الحالية: {current_value or 'غير محدد'}\n\n"
+        text += "أدخل القيمة الجديدة:"
+
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 رجوع", callback_data="back_to_edit_fields")],
+            [InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]
+        ])
+
+        await query.edit_message_text(
+            text,
+            reply_markup=keyboard,
+            parse_mode="Markdown"
+        )
+
+        # إرجاع state انتظار الإدخال
+        flow_type = context.user_data.get('draft_flow_type', 'unknown')
+        return f"{flow_type.upper()}_EDIT_DRAFT_FIELD"
+
+    except Exception as e:
+        logger.error(f"خطأ في handle_edit_draft_field: {e}")
+        await query.edit_message_text("❌ حدث خطأ في بدء تعديل الحقل")
+        return
+
+async def handle_draft_field_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    معالجة إدخال القيمة الجديدة للحقل
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    try:
+        field_key = context.user_data.get('editing_field')
+        if not field_key:
+            await update.message.reply_text("❌ خطأ: لم يتم تحديد الحقل المراد تعديله")
+            return
+
+        new_value = update.message.text.strip()
+
+        # حفظ القيمة الجديدة
+        context.user_data.setdefault("report_tmp", {})[field_key] = new_value
+
+        # رسالة تأكيد
+        field_names = {
+            'complaint_text': 'الشكوى',
+            'diagnosis': 'التشخيص',
+            'doctor_decision': 'قرار الطبيب',
+            'notes': 'الملاحظات',
+            'treatment_plan': 'خطة العلاج',
+            'medications': 'الأدوية',
+            'followup_date': 'تاريخ العودة',
+            'followup_reason': 'سبب العودة',
+            'case_status': 'حالة الطوارئ'
+        }
+
+        field_display_name = field_names.get(field_key, field_key)
+
+        await update.message.reply_text(
+            f"✅ تم تحديث **{field_display_name}** بنجاح!\n\n"
+            f"القيمة الجديدة: {new_value}",
+            parse_mode="Markdown"
+        )
+
+        # العودة لقائمة الحقول
+        flow_type = context.user_data.get('draft_flow_type', 'unknown')
+        medical_action = context.user_data.get('draft_medical_action', '')
+
+        try:
+            from bot.handlers.user.user_reports_edit import get_editable_fields_by_action_type
+            editable_fields = get_editable_fields_by_action_type(medical_action)
+            await show_draft_edit_fields(update.message, context, editable_fields, flow_type)
+            return f"{flow_type.upper()}_EDIT_DRAFT"
+        except Exception as e:
+            logger.error(f"خطأ في العودة لقائمة الحقول: {e}")
+            await update.message.reply_text("❌ حدث خطأ في العودة لقائمة التعديل")
+            return
+
+    except Exception as e:
+        logger.error(f"خطأ في handle_draft_field_input: {e}")
+        await update.message.reply_text("❌ حدث خطأ في حفظ القيمة الجديدة")
+        return
+
+async def handle_finish_edit_draft(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    معالجة انتهاء التعديل والعودة للملخص
+    """
+    query = update.callback_query
+    await query.answer()
+
+    try:
+        callback_data = query.data
+        flow_type = callback_data.split(":", 1)[1] if ":" in callback_data else "unknown"
+
+        # مسح بيانات التعديل المؤقت
+        context.user_data.pop('editing_draft', None)
+        context.user_data.pop('draft_flow_type', None)
+        context.user_data.pop('draft_medical_action', None)
+        context.user_data.pop('editing_field', None)
+
+        # العودة للملخص النهائي
+        await query.edit_message_text("✅ تم الانتهاء من التعديل. جاري إعادة عرض الملخص...")
+
+        await show_final_summary(query.message, context, flow_type)
+
+        # إرجاع state التأكيد
+        confirm_state = get_confirm_state(flow_type)
+        context.user_data['_conversation_state'] = confirm_state
+        return confirm_state
+
+    except Exception as e:
+        await query.edit_message_text("❌ حدث خطأ في إنهاء التعديل")
+        return
+
+async def handle_back_to_edit_fields(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    معالجة الرجوع لقائمة الحقول المعدلة
+    """
+    query = update.callback_query
+    await query.answer()
+
+    try:
+        # العودة لقائمة الحقول
+        flow_type = context.user_data.get('draft_flow_type', 'unknown')
+        medical_action = context.user_data.get('draft_medical_action', '')
+
+        try:
+            from bot.handlers.user.user_reports_edit import get_editable_fields_by_action_type
+            editable_fields = get_editable_fields_by_action_type(medical_action)
+            await show_draft_edit_fields(query.message, context, editable_fields, flow_type)
+            return f"{flow_type.upper()}_EDIT_DRAFT"
+        except Exception as e:
+            await query.edit_message_text("❌ حدث خطأ في العودة لقائمة الحقول")
+            return
+
+    except Exception as e:
+        await query.edit_message_text("❌ حدث خطأ في الرجوع")
+        return
+
+async def handle_back_to_summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    معالجة الرجوع للملخص دون حفظ التعديلات
+    """
+    query = update.callback_query
+    await query.answer()
+
+    try:
+        callback_data = query.data
+        flow_type = callback_data.split(":", 1)[1] if ":" in callback_data else "unknown"
+
+        # مسح بيانات التعديل المؤقت
+        context.user_data.pop('editing_draft', None)
+        context.user_data.pop('draft_flow_type', None)
+        context.user_data.pop('draft_medical_action', None)
+        context.user_data.pop('editing_field', None)
+
+        # العودة للملخص النهائي
+        await query.edit_message_text("🔄 جاري العودة للملخص...")
+
+        await show_final_summary(query.message, context, flow_type)
+
+        # إرجاع state التأكيد
+        confirm_state = get_confirm_state(flow_type)
+        context.user_data['_conversation_state'] = confirm_state
+        return confirm_state
+
+    except Exception as e:
+        await query.edit_message_text("❌ حدث خطأ في الرجوع للملخص")
+        return
 
 async def handle_final_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة التأكيد النهائي"""
@@ -6797,7 +8144,7 @@ async def debug_unhandled_message(update: Update, context: ContextTypes.DEFAULT_
             print("DEBUG: No translator_name found, routing to NEW_CONSULT_TRANSLATOR")
             sys.stdout.flush()
             try:
-                await ask_translator_name(update.message, context, "new_consult")
+                await show_translator_selection(update.message, context, "new_consult")
                 return NEW_CONSULT_TRANSLATOR
             except Exception as e:
                 print(f"ERROR: Failed to handle NEW_CONSULT_TRANSLATOR: {e}")
@@ -7358,12 +8705,21 @@ def register(app):
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_new_consult_followup_reason),
             ],
             NEW_CONSULT_TRANSLATOR: [
-                CallbackQueryHandler(handle_translator_choice, pattern="^translator:"),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_translator_text),
+                CallbackQueryHandler(handle_simple_translator_choice, pattern="^simple_translator:"),
             ],
             NEW_CONSULT_CONFIRM: [
                 CallbackQueryHandler(handle_final_confirm, pattern="^save:"),
                 CallbackQueryHandler(handle_save_callback, pattern="^save:"),
+                CallbackQueryHandler(handle_edit_draft_report, pattern="^edit_draft:"),
+                CallbackQueryHandler(handle_finish_edit_draft, pattern="^finish_edit_draft:"),
+                CallbackQueryHandler(handle_back_to_summary, pattern="^back_to_summary:"),
+                CallbackQueryHandler(handle_edit_draft_field, pattern="^edit_field_draft:"),
+                CallbackQueryHandler(handle_back_to_edit_fields, pattern="^back_to_edit_fields"),
+                CallbackQueryHandler(handle_edit_draft_report, pattern="^edit_draft:"),
+                CallbackQueryHandler(handle_finish_edit_draft, pattern="^finish_edit_draft:"),
+                CallbackQueryHandler(handle_back_to_summary, pattern="^back_to_summary:"),
+                CallbackQueryHandler(handle_edit_draft_field, pattern="^edit_field_draft:"),
+                CallbackQueryHandler(handle_back_to_edit_fields, pattern="^back_to_edit_fields"),
             ],
             # مسار استشارة مع قرار عملية
             SURGERY_CONSULT_DIAGNOSIS: [
@@ -7396,12 +8752,16 @@ def register(app):
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_surgery_consult_followup_reason),
             ],
             SURGERY_CONSULT_TRANSLATOR: [
-                CallbackQueryHandler(handle_translator_choice, pattern="^translator:"),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_translator_text),
+                CallbackQueryHandler(handle_simple_translator_choice, pattern="^simple_translator:"),
             ],
             SURGERY_CONSULT_CONFIRM: [
                 CallbackQueryHandler(handle_final_confirm, pattern="^save:"),
                 CallbackQueryHandler(handle_save_callback, pattern="^save:"),
+                CallbackQueryHandler(handle_edit_draft_report, pattern="^edit_draft:"),
+                CallbackQueryHandler(handle_finish_edit_draft, pattern="^finish_edit_draft:"),
+                CallbackQueryHandler(handle_back_to_summary, pattern="^back_to_summary:"),
+                CallbackQueryHandler(handle_edit_draft_field, pattern="^edit_field_draft:"),
+                CallbackQueryHandler(handle_back_to_edit_fields, pattern="^back_to_edit_fields"),
             ],
             # مسار استشارة أخيرة
             FINAL_CONSULT_DIAGNOSIS: [
@@ -7414,12 +8774,16 @@ def register(app):
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_final_consult_recommendations),
             ],
             FINAL_CONSULT_TRANSLATOR: [
-                CallbackQueryHandler(handle_translator_choice, pattern="^translator:"),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_translator_text),
+                CallbackQueryHandler(handle_simple_translator_choice, pattern="^simple_translator:"),
             ],
             FINAL_CONSULT_CONFIRM: [
                 CallbackQueryHandler(handle_final_confirm, pattern="^save:"),
                 CallbackQueryHandler(handle_save_callback, pattern="^save:"),
+                CallbackQueryHandler(handle_edit_draft_report, pattern="^edit_draft:"),
+                CallbackQueryHandler(handle_finish_edit_draft, pattern="^finish_edit_draft:"),
+                CallbackQueryHandler(handle_back_to_summary, pattern="^back_to_summary:"),
+                CallbackQueryHandler(handle_edit_draft_field, pattern="^edit_field_draft:"),
+                CallbackQueryHandler(handle_back_to_edit_fields, pattern="^back_to_edit_fields"),
             ],
             # مسار متابعة في الرقود
             FOLLOWUP_COMPLAINT: [
@@ -7445,12 +8809,16 @@ def register(app):
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_followup_reason),
             ],
             FOLLOWUP_TRANSLATOR: [
-                CallbackQueryHandler(handle_translator_choice, pattern="^translator:"),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_translator_text),
+                CallbackQueryHandler(handle_simple_translator_choice, pattern="^simple_translator:"),
             ],
             FOLLOWUP_CONFIRM: [
                 CallbackQueryHandler(handle_final_confirm, pattern="^save:"),
                 CallbackQueryHandler(handle_save_callback, pattern="^save:"),
+                CallbackQueryHandler(handle_edit_draft_report, pattern="^edit_draft:"),
+                CallbackQueryHandler(handle_finish_edit_draft, pattern="^finish_edit_draft:"),
+                CallbackQueryHandler(handle_back_to_summary, pattern="^back_to_summary:"),
+                CallbackQueryHandler(handle_edit_draft_field, pattern="^edit_field_draft:"),
+                CallbackQueryHandler(handle_back_to_edit_fields, pattern="^back_to_edit_fields"),
             ],
             # مسار طوارئ
             EMERGENCY_COMPLAINT: [
@@ -7484,12 +8852,16 @@ def register(app):
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_emergency_reason),
             ],
             EMERGENCY_TRANSLATOR: [
-                CallbackQueryHandler(handle_translator_choice, pattern="^translator:"),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_translator_text),
+                CallbackQueryHandler(handle_simple_translator_choice, pattern="^simple_translator:"),
             ],
             EMERGENCY_CONFIRM: [
                 CallbackQueryHandler(handle_final_confirm, pattern="^save:"),
                 CallbackQueryHandler(handle_save_callback, pattern="^save:"),
+                CallbackQueryHandler(handle_edit_draft_report, pattern="^edit_draft:"),
+                CallbackQueryHandler(handle_finish_edit_draft, pattern="^finish_edit_draft:"),
+                CallbackQueryHandler(handle_back_to_summary, pattern="^back_to_summary:"),
+                CallbackQueryHandler(handle_edit_draft_field, pattern="^edit_field_draft:"),
+                CallbackQueryHandler(handle_back_to_edit_fields, pattern="^back_to_edit_fields"),
             ],
             # مسار عملية
             OPERATION_DETAILS_AR: [
@@ -7513,12 +8885,16 @@ def register(app):
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_operation_followup_reason),
             ],
             OPERATION_TRANSLATOR: [
-                CallbackQueryHandler(handle_translator_choice, pattern="^translator:"),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_translator_text),
+                CallbackQueryHandler(handle_simple_translator_choice, pattern="^simple_translator:"),
             ],
             OPERATION_CONFIRM: [
                 CallbackQueryHandler(handle_final_confirm, pattern="^save:"),
                 CallbackQueryHandler(handle_save_callback, pattern="^save:"),
+                CallbackQueryHandler(handle_edit_draft_report, pattern="^edit_draft:"),
+                CallbackQueryHandler(handle_finish_edit_draft, pattern="^finish_edit_draft:"),
+                CallbackQueryHandler(handle_back_to_summary, pattern="^back_to_summary:"),
+                CallbackQueryHandler(handle_edit_draft_field, pattern="^edit_field_draft:"),
+                CallbackQueryHandler(handle_back_to_edit_fields, pattern="^back_to_edit_fields"),
             ],
             # مسار علاج طبيعي / أجهزة تعويضية
             REHAB_TYPE: [
@@ -7539,12 +8915,16 @@ def register(app):
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_physical_therapy_followup_reason),
             ],
             PHYSICAL_THERAPY_TRANSLATOR: [
-                CallbackQueryHandler(handle_translator_choice, pattern="^translator:"),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_translator_text),
+                CallbackQueryHandler(handle_simple_translator_choice, pattern="^simple_translator:"),
             ],
             PHYSICAL_THERAPY_CONFIRM: [
                 CallbackQueryHandler(handle_final_confirm, pattern="^save:"),
                 CallbackQueryHandler(handle_save_callback, pattern="^save:"),
+                CallbackQueryHandler(handle_edit_draft_report, pattern="^edit_draft:"),
+                CallbackQueryHandler(handle_finish_edit_draft, pattern="^finish_edit_draft:"),
+                CallbackQueryHandler(handle_back_to_summary, pattern="^back_to_summary:"),
+                CallbackQueryHandler(handle_edit_draft_field, pattern="^edit_field_draft:"),
+                CallbackQueryHandler(handle_back_to_edit_fields, pattern="^back_to_edit_fields"),
             ],
             DEVICE_NAME_DETAILS: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_device_name_details),
@@ -7561,12 +8941,16 @@ def register(app):
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_device_followup_reason),
             ],
             DEVICE_TRANSLATOR: [
-                CallbackQueryHandler(handle_translator_choice, pattern="^translator:"),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_translator_text),
+                CallbackQueryHandler(handle_simple_translator_choice, pattern="^simple_translator:"),
             ],
             DEVICE_CONFIRM: [
                 CallbackQueryHandler(handle_final_confirm, pattern="^save:"),
                 CallbackQueryHandler(handle_save_callback, pattern="^save:"),
+                CallbackQueryHandler(handle_edit_draft_report, pattern="^edit_draft:"),
+                CallbackQueryHandler(handle_finish_edit_draft, pattern="^finish_edit_draft:"),
+                CallbackQueryHandler(handle_back_to_summary, pattern="^back_to_summary:"),
+                CallbackQueryHandler(handle_edit_draft_field, pattern="^edit_field_draft:"),
+                CallbackQueryHandler(handle_back_to_edit_fields, pattern="^back_to_edit_fields"),
             ],
             # مسار أشعة وفحوصات
             RADIOLOGY_TYPE: [
@@ -7577,12 +8961,16 @@ def register(app):
                 CallbackQueryHandler(handle_radiology_calendar_day, pattern="^radiology_cal_day:"),
             ],
             RADIOLOGY_TRANSLATOR: [
-                CallbackQueryHandler(handle_translator_choice, pattern="^translator:"),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_translator_text),
+                CallbackQueryHandler(handle_simple_translator_choice, pattern="^simple_translator:"),
             ],
             RADIOLOGY_CONFIRM: [
                 CallbackQueryHandler(handle_final_confirm, pattern="^save:"),
                 CallbackQueryHandler(handle_save_callback, pattern="^save:"),
+                CallbackQueryHandler(handle_edit_draft_report, pattern="^edit_draft:"),
+                CallbackQueryHandler(handle_finish_edit_draft, pattern="^finish_edit_draft:"),
+                CallbackQueryHandler(handle_back_to_summary, pattern="^back_to_summary:"),
+                CallbackQueryHandler(handle_edit_draft_field, pattern="^edit_field_draft:"),
+                CallbackQueryHandler(handle_back_to_edit_fields, pattern="^back_to_edit_fields"),
             ],
             # مسار ترقيد
             ADMISSION_REASON: [
@@ -7607,12 +8995,16 @@ def register(app):
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_admission_followup_reason),
             ],
             ADMISSION_TRANSLATOR: [
-                CallbackQueryHandler(handle_translator_choice, pattern="^translator:"),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_translator_text),
+                CallbackQueryHandler(handle_simple_translator_choice, pattern="^simple_translator:"),
             ],
             ADMISSION_CONFIRM: [
                 CallbackQueryHandler(handle_final_confirm, pattern="^save:"),
                 CallbackQueryHandler(handle_save_callback, pattern="^save:"),
+                CallbackQueryHandler(handle_edit_draft_report, pattern="^edit_draft:"),
+                CallbackQueryHandler(handle_finish_edit_draft, pattern="^finish_edit_draft:"),
+                CallbackQueryHandler(handle_back_to_summary, pattern="^back_to_summary:"),
+                CallbackQueryHandler(handle_edit_draft_field, pattern="^edit_field_draft:"),
+                CallbackQueryHandler(handle_back_to_edit_fields, pattern="^back_to_edit_fields"),
             ],
             # مسار خروج من المستشفى
             DISCHARGE_TYPE: [
@@ -7640,12 +9032,16 @@ def register(app):
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_discharge_followup_reason),
             ],
             DISCHARGE_TRANSLATOR: [
-                CallbackQueryHandler(handle_translator_choice, pattern="^translator:"),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_translator_text),
+                CallbackQueryHandler(handle_simple_translator_choice, pattern="^simple_translator:"),
             ],
             DISCHARGE_CONFIRM: [
                 CallbackQueryHandler(handle_final_confirm, pattern="^save:"),
                 CallbackQueryHandler(handle_save_callback, pattern="^save:"),
+                CallbackQueryHandler(handle_edit_draft_report, pattern="^edit_draft:"),
+                CallbackQueryHandler(handle_finish_edit_draft, pattern="^finish_edit_draft:"),
+                CallbackQueryHandler(handle_back_to_summary, pattern="^back_to_summary:"),
+                CallbackQueryHandler(handle_edit_draft_field, pattern="^edit_field_draft:"),
+                CallbackQueryHandler(handle_back_to_edit_fields, pattern="^back_to_edit_fields"),
             ],
             # State عام لمعالجة التعديل
             "EDIT_FIELD": [
@@ -7654,12 +9050,16 @@ def register(app):
             # أضف هنا باقي المسارات بنفس الطريقة (FOLLOWUP_COMPLAINT، ADMISSION_COMPLAINT، ...)
         },
         fallbacks=[
+            # معالجات للمستشفيات
+            CallbackQueryHandler(handle_hospital_page, pattern="^hosp_page:"),
+            CallbackQueryHandler(handle_hospital_selection, pattern="^select_hospital:"),
+
             CallbackQueryHandler(handle_cancel_navigation, pattern="^nav:cancel"),
             CommandHandler("cancel", handle_cancel_navigation),
             # معالج للرسائل التي تحتوي على "إضافة تقرير جديد" (للتعامل مع الأزرار)
             MessageHandler(filters.TEXT & filters.Regex(r".*إضافة.*تقرير.*جديد.*"), start_report),
             # معالج زر الرجوع - يعمل في جميع الـ states
-            CallbackQueryHandler(handle_back_navigation, pattern="^nav:back$"),
+            CallbackQueryHandler(handle_smart_back_navigation, pattern="^nav:back$"),
             # معالج زر الإلغاء - يعمل في جميع الـ states
             CallbackQueryHandler(handle_cancel_navigation, pattern="^nav:cancel$"),
             # DEBUG: إضافة fallback لالتقاط جميع callbacks غير متطابقة في حالة R_ACTION_TYPE
@@ -7703,8 +9103,276 @@ def register(app):
             print("🎯 Unknown search type, defaulting to patient search")
             await patient_inline_query_handler(update, context)
 
+    # دوال البحث المفقودة
+    async def patient_inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """معالج البحث عن المرضى"""
+        query = update.inline_query.query.strip()
+        from db.session import SessionLocal
+        from db.models import Patient
+
+        with SessionLocal() as s:
+            if query:
+                patients = s.query(Patient).filter(
+                    Patient.full_name.ilike(f'%{query}%')
+                ).limit(50).all()
+            else:
+                patients = s.query(Patient).limit(20).all()
+
+        results = []
+        for patient in patients:
+            results.append(
+                InlineQueryResultArticle(
+                    id=str(patient.id),
+                    title=patient.full_name,
+                    input_message_content=InputTextMessageContent(
+                        message_text=f"__PATIENT_SELECTED__:{patient.id}:{patient.full_name}"
+                    )
+                )
+            )
+
+        await update.inline_query.answer(results, cache_time=1)
+
+    async def doctor_inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """معالج البحث عن الأطباء"""
+        query = update.inline_query.query.strip()
+        from db.session import SessionLocal
+        from db.models import Doctor
+
+        with SessionLocal() as s:
+            if query:
+                doctors = s.query(Doctor).filter(
+                    Doctor.full_name.ilike(f'%{query}%')
+                ).limit(50).all()
+            else:
+                doctors = s.query(Doctor).limit(20).all()
+
+        results = []
+        for doctor in doctors:
+            results.append(
+                InlineQueryResultArticle(
+                    id=str(doctor.id),
+                    title=doctor.full_name,
+                    input_message_content=InputTextMessageContent(
+                        message_text=f"__DOCTOR_SELECTED__:{doctor.id}:{doctor.full_name}"
+                    )
+                )
+            )
+
+        await update.inline_query.answer(results, cache_time=1)
+
+    # دوال البحث المفقودة
+    async def patient_inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """معالج البحث عن المرضى"""
+        query = update.inline_query.query.strip()
+
+        with SessionLocal() as s:
+            if query:
+                patients = s.query(Patient).filter(
+                    Patient.full_name.ilike(f'%{query}%')
+                ).limit(50).all()
+            else:
+                patients = s.query(Patient).limit(20).all()
+
+        results = []
+        for patient in patients:
+            results.append(
+                InlineQueryResultArticle(
+                    id=str(patient.id),
+                    title=patient.full_name,
+                    input_message_content=InputTextMessageContent(
+                        message_text=f"__PATIENT_SELECTED__:{patient.id}:{patient.full_name}"
+                    )
+                )
+            )
+
+        await update.inline_query.answer(results, cache_time=1)
+
+    async def doctor_inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """معالج البحث عن الأطباء"""
+        query = update.inline_query.query.strip()
+
+        with SessionLocal() as s:
+            if query:
+                doctors = s.query(Doctor).filter(
+                    Doctor.full_name.ilike(f'%{query}%')
+                ).limit(50).all()
+            else:
+                doctors = s.query(Doctor).limit(20).all()
+
+        results = []
+        for doctor in doctors:
+            results.append(
+                InlineQueryResultArticle(
+                    id=str(doctor.id),
+                    title=doctor.full_name,
+                    input_message_content=InputTextMessageContent(
+                        message_text=f"__DOCTOR_SELECTED__:{doctor.id}:{doctor.full_name}"
+                    )
+                )
+            )
+
+        await update.inline_query.answer(results, cache_time=1)
+
     # تسجيل InlineQueryHandler أولاً لضمان أنه يلتقط inline queries قبل ConversationHandler
     app.add_handler(InlineQueryHandler(unified_inline_query_handler))
 
     # ثم تسجيل ConversationHandler
     app.add_handler(conv_handler)
+
+
+# ================================================
+# 🆕 نظام المترجمين الجديد - مبسط وسريع
+# ================================================
+
+def load_translator_names():
+    """
+    قراءة أسماء المترجمين من الملف
+    """
+    try:
+        # البحث عن الملف في عدة مسارات محتملة
+        possible_paths = [
+            os.path.join(os.path.dirname(__file__), '..', '..', '..', 'data', 'translator_names.txt'),
+            os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', 'data', 'translator_names.txt'),
+            'data/translator_names.txt',
+            '../data/translator_names.txt',
+            '../../data/translator_names.txt'
+        ]
+
+        translator_file = None
+        for path in possible_paths:
+            if os.path.exists(path):
+                translator_file = path
+                break
+
+        if not translator_file:
+            raise FileNotFoundError(f"لم يتم العثور على ملف translator_names.txt في أي من المسارات: {possible_paths}")
+
+        print(f"📁 تم العثور على ملف المترجمين: {translator_file}")
+
+        # محاولة قراءة الملف بطرق مختلفة
+        try:
+            # محاولة أولى: utf-8 مع BOM
+            with open(translator_file, 'r', encoding='utf-8-sig') as f:
+                content = f.read()
+                lines = content.split('\n')
+                names = [line.strip() for line in lines[1:] if line.strip()]
+                if names and any('م' in name for name in names):
+                    print(f"✅ تم قراءة {len(names)} مترجم باستخدام utf-8-sig")
+                    return names
+        except Exception:
+            pass
+
+        # محاولة ثانية: قراءة كـ bytes ثم decode
+        try:
+            with open(translator_file, 'rb') as f:
+                content = f.read()
+                # محاولة decode بترميز مختلف
+                for encoding in ['utf-8', 'cp1256', 'windows-1256']:
+                    try:
+                        text = content.decode(encoding)
+                        lines = text.split('\n')
+                        names = [line.strip() for line in lines[1:] if line.strip()]
+                        if names and any('م' in name for name in names):
+                            print(f"✅ تم قراءة {len(names)} مترجم باستخدام {encoding} (binary)")
+                            return names
+                    except UnicodeDecodeError:
+                        continue
+        except Exception:
+            pass
+
+        # إذا فشل جميع encodings
+        raise Exception("فشل في قراءة الملف بجميع encodings المحاولة")
+
+    except Exception as e:
+        print(f"خطأ في قراءة ملف المترجمين: {e}")
+        # قائمة احتياطية في حالة فشل قراءة الملف
+        return ["مصطفى", "واصل", "نجم الدين", "محمد علي", "سعيد", "مهدي", "صبري", "عزي", "معتز", "ادريس", "هاشم", "ادم", "زيد", "عصام", "عزالدين", "حسن", "زين العابدين", "عبدالسلام", "ياسر", "يحيى"]
+
+async def show_translator_selection(message, context, flow_type):
+    """
+    عرض قائمة المترجمين للاختيار
+    """
+    translator_names = load_translator_names()
+
+    if not translator_names:
+        await message.reply_text("❌ خطأ: لا توجد أسماء مترجمين متاحة")
+        # المتابعة بدون مترجم
+        await show_final_summary(message, context, flow_type)
+        confirm_state = get_confirm_state(flow_type)
+        context.user_data['_conversation_state'] = confirm_state
+        return confirm_state
+
+    # تقسيم الأسماء إلى صفوف (3 أسماء لكل صف)
+    keyboard_buttons = []
+    row = []
+
+    for i, name in enumerate(translator_names):
+        row.append(InlineKeyboardButton(name, callback_data=f"simple_translator:{flow_type}:{i}"))
+        if len(row) == 3 or i == len(translator_names) - 1:
+            keyboard_buttons.append(row)
+            row = []
+
+    # إضافة زر تخطي (اختياري)
+    keyboard_buttons.append([
+        InlineKeyboardButton("⏭️ تخطي (بدون مترجم)", callback_data=f"simple_translator:{flow_type}:skip"),
+        InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
+    ])
+
+    keyboard = InlineKeyboardMarkup(keyboard_buttons)
+
+    await message.reply_text(
+        f"👤 **اختر اسم المترجم**\n\n"
+        f"المترجم مسؤول عن ترجمة التقرير إلى اللغة المطلوبة.\n"
+        f"اختر من القائمة أدناه:",
+        reply_markup=keyboard,
+        parse_mode="Markdown"
+    )
+
+async def handle_simple_translator_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    معالجة اختيار المترجم البسيط
+    """
+    query = update.callback_query
+    await query.answer()
+
+    try:
+        parts = query.data.split(":")
+        if len(parts) < 3:
+            await query.edit_message_text("❌ خطأ في البيانات")
+            return
+
+        flow_type = parts[1]
+        choice = parts[2]
+
+        if choice == "skip":
+            # تخطي المترجم
+            translator_name = "غير محدد"
+            translator_id = None
+        else:
+            # اختيار مترجم من القائمة
+            translator_names = load_translator_names()
+            try:
+                index = int(choice)
+                translator_name = translator_names[index]
+                translator_id = None  # لا نحتاج id للمترجمين الثابتين
+            except (IndexError, ValueError):
+                await query.edit_message_text("❌ اختيار غير صحيح")
+                return
+
+        # حفظ اسم المترجم
+        context.user_data.setdefault("report_tmp", {})
+        context.user_data["report_tmp"]["translator_name"] = translator_name
+        context.user_data["report_tmp"]["translator_id"] = translator_id
+
+        # المتابعة للتأكيد النهائي
+        await query.edit_message_text(f"✅ تم اختيار المترجم: **{translator_name}**")
+        await show_final_summary(query.message, context, flow_type)
+
+        confirm_state = get_confirm_state(flow_type)
+        context.user_data['_conversation_state'] = confirm_state
+        return confirm_state
+
+    except Exception as e:
+        print(f"خطأ في معالجة اختيار المترجم: {e}")
+        await query.edit_message_text("❌ حدث خطأ في معالجة الاختيار")
+        return

@@ -6,10 +6,14 @@
 import asyncio
 import nest_asyncio
 import logging
+import httpx  # للتحكم في HTTP connections
 from telegram import Update
 from telegram.ext import Application
+import json
 from config.settings import BOT_TOKEN
 from services.scheduler import start_scheduler
+from services.caching import start_cache_system, stop_cache_system
+from services.performance_utils import start_performance_monitoring, stop_performance_monitoring, get_performance_stats
 
 # 🔧 استيراد نظام تسجيل الهاندلرز الجديد
 from bot.handlers_registry import register_all_handlers
@@ -85,10 +89,48 @@ async def main():
     # 🤖 Telegram App + Persistence
     from telegram.ext import DictPersistence
     persistence = DictPersistence()
-    app = Application.builder().token(BOT_TOKEN).persistence(persistence).build()
+
+    # 🚀 إعداد request محسّن للأداء العالي مع timeout طويل و retry logic لتجنب الفشل
+    from telegram.request import HTTPXRequest
+    request = HTTPXRequest(
+        connection_pool_size=150,  # زيادة للتعامل مع المزيد من المستخدمين
+        read_timeout=300.0,  # زيادة timeout إلى 5 دقائق للعمليات الطويلة
+        write_timeout=300.0,
+        connect_timeout=60.0,  # زيادة timeout الاتصال
+        pool_timeout=180.0,  # زيادة pool timeout
+        max_keepalive_connections=75,  # زيادة الاتصالات المحفوظة
+        max_connections=300,  # زيادة الحد الأقصى للاتصالات
+        # إعدادات إضافية للأداء العالي مع timeout طويل
+        limits=httpx.Limits(
+            max_keepalive_connections=75,
+            max_connections=300,
+            keepalive_expiry=600.0  # 10 دقائق
+        ),
+        # إضافة retry logic لإعادة المحاولة عند الفشل
+        retry_on_timeout=True,
+        retry_after=5.0,  # انتظار 5 ثوان قبل إعادة المحاولة
+        max_retries=3,  # حد أقصى 3 محاولات
+    )
+
+    app = (
+        Application.builder()
+        .token(BOT_TOKEN)
+        .persistence(persistence)
+        .request(request)
+        # 🚀 تحسينات الأداء للضغط العالي
+        .concurrent_updates(True)  # تفعيل المعالجة المتزامنة للتحديثات
+        .rate_limiter(None)  # إزالة rate limiter للأداء الأمثل (استخدم Telegram's built-in limits)
+        .build()
+    )
 
     # 🕐 Scheduler
     start_scheduler(app)
+
+    # 🚀 Cache System - للأداء العالي تحت الضغط
+    await start_cache_system()
+
+    # 📊 Performance Monitoring - لمراقبة الأداء تحت الضغط العالي
+    await start_performance_monitoring()
 
     # 📌 Handlers
     register_all_handlers(app)
@@ -144,6 +186,8 @@ async def main():
                 await asyncio.sleep(3600)  # Sleep for 1 hour
         except (KeyboardInterrupt, SystemExit):
             logger.info("🛑 Shutting down...")
+            await stop_cache_system()  # إيقاف نظام الـ cache
+            await stop_performance_monitoring()  # إيقاف مراقبة الأداء
             await app.stop()
             await app.shutdown()
 
@@ -151,7 +195,22 @@ async def main():
     else:
         logger.info("💻 Running in POLLING mode")
         logger.info("="*60)
-        await app.run_polling(allowed_updates=Update.ALL_TYPES)
+        await app.run_polling(
+            allowed_updates=Update.ALL_TYPES,
+            drop_pending_updates=True,  # تجاهل التحديثات المعلقة عند بدء التشغيل
+            close_loop=False,  # عدم إغلاق event loop
+            stop_signals=None,  # عدم الاستجابة لإشارات النظام
+            # 🚀 إعدادات محسّنة للأداء العالي مع timeout طويل ومعالجة أخطاء
+            poll_interval=0.5,  # interval معتدل لتجنب الضغط مع timeout طويل
+            timeout=300,  # زيادة timeout إلى 5 دقائق للانتظار الطويل جداً
+            bootstrap_retries=15,  # زيادة محاولات إعادة التشغيل
+            read_timeout=600,  # زيادة read timeout إلى 10 دقائق
+            write_timeout=600,  # زيادة write timeout إلى 10 دقائق
+            connect_timeout=120,  # زيادة connect timeout إلى 2 دقيقة
+            pool_timeout=300,  # زيادة pool timeout إلى 5 دقائق
+            # معالجة أخطاء الشبكة والtimeout بطريقة أفضل
+            error_handler=None,  # استخدام error handler مخصص
+        )
 
 
 # ================================================

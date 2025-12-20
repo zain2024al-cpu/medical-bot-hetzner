@@ -1,32 +1,0 @@
-# ================================================
-# ملف متغيرات البيئة للبوت الطبي
-# انسخ هذا الملف إلى .env وأدخل البيانات الصحيحة
-# ================================================
-
-# 🔐 Telegram Bot Token (من BotFather)
-BOT_TOKEN=your_bot_token_here
-
-# 👥 قائمة المشرفين (معرفات Telegram مفصولة بفاصلة)
-ADMIN_IDS=123456789,987654321
-
-# 🕒 المنطقة الزمنية
-TIMEZONE=Asia/Riyadh
-
-# 🤖 OpenAI API (اختياري - للذكاء الاصطناعي)
-OPENAI_API_KEY=your_openai_api_key_here
-OPENAI_MODEL=gpt-4
-
-# 🗃️ قاعدة البيانات
-DATABASE_URL=sqlite:///db/medical_reports.db
-
-# 🌐 Webhook (اختياري - إذا كنت تستخدم webhook بدلاً من polling)
-WEBHOOK_URL=https://your-domain.com
-PORT=8080
-
-# 📊 إعدادات المراقبة (اختياري)
-TELEGRAM_BOT_TOKEN=your_monitoring_bot_token
-TELEGRAM_ADMIN_ID=your_telegram_id
-
-# 🔧 إعدادات إضافية
-LOG_LEVEL=INFO
-MAX_WORKERS=4
