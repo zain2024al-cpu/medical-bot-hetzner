@@ -247,10 +247,18 @@ class InitialCase(Base):
     __tablename__ = "initial_cases"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
+    patient_id = Column(Integer, nullable=True, index=True)
     translator_id = Column(Integer, nullable=True)
     translator_name = Column(String(255), nullable=True)
     patient_name = Column(String(255), nullable=True)
-    case_details = Column(Text, nullable=True)
+    patient_age = Column(Integer, nullable=True)
+    main_complaint = Column(Text, nullable=True)
+    current_history = Column(Text, nullable=True)
+    previous_procedures = Column(Text, nullable=True)
+    test_details = Column(Text, nullable=True)
+    notes = Column(Text, nullable=True)
+    case_details = Column(Text, nullable=True)  # للحفاظ على التوافق
+    created_by = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=True)
     status = Column(String(50), default="pending", nullable=True)
 
@@ -397,8 +405,17 @@ class MonthlyEvaluation(Base):
     month = Column(Integer, nullable=True)
     year = Column(Integer, nullable=True)
     total_reports = Column(Integer, default=0, nullable=True)
+    on_time_reports = Column(Integer, default=0, nullable=True)
+    late_reports = Column(Integer, default=0, nullable=True)
+    timing_points = Column(Float, default=0.0, nullable=True)
+    quality_points = Column(Float, default=0.0, nullable=True)
+    regularity_points = Column(Float, default=0.0, nullable=True)
+    total_points = Column(Float, default=0.0, nullable=True)
+    final_rating = Column(Integer, default=0, nullable=True)
+    performance_level = Column(String(50), nullable=True)
     average_quality = Column(Float, default=0.0, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
 
 
 class FollowupTracking(Base):

@@ -343,8 +343,49 @@ async def track_daily_reports(update: Update, context: ContextTypes.DEFAULT_TYPE
     today = date.today()
     
     with SessionLocal() as s:
+        # محاولة إضافة العمود translator_id إذا لم يكن موجوداً
+        try:
+            from sqlalchemy import inspect, text
+            inspector = inspect(s.bind)
+            columns = [col['name'] for col in inspector.get_columns('daily_report_tracking')]
+            
+            if 'translator_id' not in columns:
+                logger.info("🔧 Adding translator_id column to daily_report_tracking table...")
+                try:
+                    s.execute(text("ALTER TABLE daily_report_tracking ADD COLUMN translator_id INTEGER"))
+                    s.commit()
+                    logger.info("✅ Successfully added translator_id column")
+                except Exception as alter_error:
+                    logger.warning(f"⚠️ Could not add column (may already exist): {alter_error}")
+                    s.rollback()
+        except Exception as inspect_error:
+            logger.warning(f"⚠️ Could not inspect table: {inspect_error}")
+        
         # جلب سجلات التتبع
-        tracking_records = s.query(DailyReportTracking).filter_by(date=today).all()
+        try:
+            tracking_records = s.query(DailyReportTracking).filter_by(date=today).all()
+        except Exception as e:
+            logger.error(f"❌ Error querying DailyReportTracking: {e}", exc_info=True)
+            # إذا فشل، جرب query محدود بدون translator_id
+            try:
+                tracking_records = s.query(
+                    DailyReportTracking.id,
+                    DailyReportTracking.translator_name,
+                    DailyReportTracking.date,
+                    DailyReportTracking.expected_reports,
+                    DailyReportTracking.actual_reports,
+                    DailyReportTracking.is_completed,
+                    DailyReportTracking.reminder_sent,
+                    DailyReportTracking.created_at
+                ).filter_by(date=today).all()
+            except Exception as e2:
+                logger.error(f"❌ Error in fallback query: {e2}", exc_info=True)
+                await query.edit_message_text(
+                    "❌ **خطأ في قاعدة البيانات**\n\n"
+                    "يرجى التحقق من قاعدة البيانات أو التواصل مع المطور.",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+                return
         
         if not tracking_records:
             await query.edit_message_text("⚠️ لا توجد سجلات تتبع لهذا اليوم.")
@@ -362,7 +403,9 @@ async def track_daily_reports(update: Update, context: ContextTypes.DEFAULT_TYPE
         # تفاصيل كل مترجم
         for record in tracking_records:
             status = "✅" if record.is_completed else "⏳"
-            stats_text += f"{status} **{record.translator_name}**\n"
+            # استخدام translator_name إذا كان متوفراً، وإلا استخدام "غير محدد"
+            translator_name = getattr(record, 'translator_name', None) or 'غير محدد'
+            stats_text += f"{status} **{translator_name}**\n"
             stats_text += f"   📝 التقارير: {record.actual_reports}/{record.expected_reports}\n"
             if record.reminder_sent:
                 stats_text += f"   🔔 تم إرسال تذكير\n"
@@ -939,7 +982,7 @@ def register(app):
         name="admin_schedule_management_conv",
         per_chat=True,
         per_user=True,
-        per_message=False,
+        per_message=True,  # ✅ تفعيل per_message لتجنب التحذيرات
     )
     
     # دالة wrapper لإضافة اسم (لحل مشكلة async)
@@ -965,7 +1008,7 @@ def register(app):
         ],
         per_chat=True,
         per_user=True,
-        per_message=False,
+        per_message=True,  # ✅ تفعيل per_message لتجنب التحذيرات
         name="patient_names_conv"
     )
     

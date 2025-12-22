@@ -43,9 +43,19 @@ OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
 
 # 🌐 إعدادات الاستضافة السحابية
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "")
-PORT = int(os.getenv("PORT", "8080"))
+PORT = int(os.getenv("PORT", "0"))  # 0 يعني لا يوجد port (وضع محلي)
 DATABASE_URL = os.getenv("DATABASE_URL", "")
+
+# 🔍 تحديد البيئة (محلي أو Hetzner)
+HETZNER_DEPLOYMENT = os.getenv("HETZNER_DEPLOYMENT", "false").lower() == "true"
+IS_LOCAL = not HETZNER_DEPLOYMENT and PORT == 0
 
 # 📊 إعدادات إضافية
 WEB_CONCURRENCY = int(os.getenv("WEB_CONCURRENCY", "1"))
 PYTHONUNBUFFERED = os.getenv("PYTHONUNBUFFERED", "1")
+
+# 👥 إعدادات المجموعات
+# معرف المجموعة (سيتم الحصول عليه تلقائياً عند إضافة البوت للمجموعة)
+GROUP_CHAT_ID = os.getenv("GROUP_CHAT_ID", "")
+# رابط المجموعة
+GROUP_INVITE_LINK = os.getenv("GROUP_INVITE_LINK", "https://t.me/+Ok0L5LL3TX83MjA1")

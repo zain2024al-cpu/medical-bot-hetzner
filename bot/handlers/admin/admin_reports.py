@@ -2482,8 +2482,12 @@ def export_to_excel(reports_data, filename="reports"):
     from datetime import datetime
     from openpyxl import load_workbook
     from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    import os
     
     try:
+        # إنشاء مجلد exports إذا لم يكن موجوداً
+        os.makedirs("exports", exist_ok=True)
+        
         # تحضير البيانات
         excel_data = []
         for r in reports_data:
@@ -2500,6 +2504,11 @@ def export_to_excel(reports_data, filename="reports"):
                 'موعد المراجعة': r.get('followup_date', ''),
                 'سبب المراجعة': r.get('followup_reason', '')
             })
+        
+        # التحقق من وجود بيانات
+        if not excel_data:
+            logger.warning("⚠️ No data to export to Excel")
+            return None
         
         # إنشاء DataFrame
         df = pd.DataFrame(excel_data)
@@ -2785,7 +2794,7 @@ def register(app):
         name="admin_reports_conv",
         per_chat=True,
         per_user=True,
-        per_message=False,
+        per_message=True,  # ✅ تفعيل per_message لتجنب التحذيرات
     )
     app.add_handler(conv)
     

@@ -9,6 +9,9 @@ User=botuser
 WorkingDirectory=/home/botuser/medical-bot
 Environment=PATH=/home/botuser/medical-bot/venv/bin
 Environment=PYTHONPATH=/home/botuser/medical-bot
+Environment=HETZNER_DEPLOYMENT=true
+Environment=PORT=8080
+Environment=DATABASE_PATH=/home/botuser/medical-bot/db/medical_reports.db
 ExecStart=/home/botuser/medical-bot/venv/bin/python app.py
 Restart=always
 RestartSec=10

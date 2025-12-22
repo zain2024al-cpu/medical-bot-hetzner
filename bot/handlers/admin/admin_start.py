@@ -5,6 +5,7 @@
 
 from telegram import Update
 from telegram.ext import ContextTypes, CommandHandler, MessageHandler, CallbackQueryHandler, filters
+from telegram.constants import ChatType
 from bot.shared_auth import is_admin
 from bot.keyboards import admin_main_kb
 from db.session import SessionLocal
@@ -17,6 +18,19 @@ async def admin_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if not is_admin(user.id):
         return
+    
+    # ✅ منع إرسال الأزرار في المجموعات - السماح فقط في الدردشة الخاصة
+    chat = update.effective_chat
+    if chat and chat.type not in [ChatType.PRIVATE]:
+        # في المجموعة، نرسل رسالة بدون أزرار
+        await update.message.reply_text(
+            f"👑 أهلاً {user.first_name}!\n\n"
+            f"💡 يمكنك استخدام لوحة التحكم في الدردشة الخاصة مع البوت.\n\n"
+            f"📋 للبدء، اضغط على /admin في الدردشة الخاصة معي.",
+            disable_web_page_preview=True
+        )
+        return
+    
     await update.message.reply_text(
         f"👑 أهلاً {user.first_name}! لوحة التحكم جاهزة.",
         reply_markup=admin_main_kb()

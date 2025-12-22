@@ -690,7 +690,7 @@ def register(app):
         allow_reentry=True,
         per_chat=True,
         per_user=True,
-        per_message=False,
+        per_message=True,  # ✅ تفعيل per_message لتجنب التحذيرات
     )
     
     app.add_handler(conv_handler)

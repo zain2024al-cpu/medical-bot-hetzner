@@ -5,6 +5,7 @@
 import asyncio
 
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.constants import ParseMode
 from telegram.ext import (
     ContextTypes,
     ConversationHandler,
@@ -1753,47 +1754,123 @@ async def handle_export_excel(update: Update, context: ContextTypes.DEFAULT_TYPE
             # تحويل إلى صيغة مناسبة
             reports_data = []
             for r in reports:
+                # جلب بيانات المريض
+                patient_name = 'غير محدد'
+                if r.patient_id:
+                    patient = db.query(Patient).filter_by(id=r.patient_id).first()
+                    if patient:
+                        patient_name = patient.full_name or 'غير محدد'
+                
+                # جلب بيانات المستشفى
+                hospital_name = 'غير محدد'
+                if r.hospital_id:
+                    hospital = db.query(Hospital).filter_by(id=r.hospital_id).first()
+                    if hospital:
+                        hospital_name = hospital.name or 'غير محدد'
+                
+                # جلب بيانات القسم
+                department_name = 'غير محدد'
+                if r.department_id:
+                    department = db.query(Department).filter_by(id=r.department_id).first()
+                    if department:
+                        department_name = department.name or 'غير محدد'
+                
+                # جلب بيانات الطبيب
+                doctor_name = 'غير محدد'
+                if r.doctor_id:
+                    doctor = db.query(Doctor).filter_by(id=r.doctor_id).first()
+                    if doctor:
+                        doctor_name = doctor.full_name or doctor.name or 'غير محدد'
+                
                 reports_data.append({
                     'report_id': r.id,
                     'report_date': r.report_date.strftime("%Y-%m-%d %H:%M") if r.report_date else '',
-                    'patient_name': r.patient.full_name if r.patient else 'غير محدد',
-                    'hospital_name': r.hospital.name if r.hospital else 'غير محدد',
-                    'department_name': r.department.name if r.department else 'غير محدد',
-                    'doctor_name': r.doctor.full_name if r.doctor else 'غير محدد',
+                    'patient_name': patient_name,
+                    'hospital_name': hospital_name,
+                    'department_name': department_name,
+                    'doctor_name': doctor_name,
                     'medical_action': r.medical_action or 'غير محدد',
-                    'complaint_text': r.chief_complaint or '',
+                    'complaint_text': r.complaint_text or '',
                     'doctor_decision': r.doctor_decision or '',
                 })
             
+            # التحقق من وجود بيانات
+            if not reports_data:
+                await query.edit_message_text(
+                    "⚠️ **لا توجد بيانات للتصدير**\n\n"
+                    "لم يتم العثور على تقارير مطابقة للفلتر المحدد.",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+                return
+            
             # إنشاء Excel
-            excel_file = export_to_excel(reports_data, f"analysis_{analysis_type}")
+            try:
+                excel_file = export_to_excel(reports_data, f"analysis_{analysis_type}")
+            except Exception as excel_error:
+                logger.error(f"❌ Error in export_to_excel: {excel_error}", exc_info=True)
+                await query.edit_message_text(
+                    f"❌ **خطأ في إنشاء ملف Excel**\n\n"
+                    f"الخطأ: {str(excel_error)[:100]}\n\n"
+                    f"يرجى المحاولة مرة أخرى.",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+                return
             
             # إرسال الملف
             if excel_file and os.path.exists(excel_file):
-                with open(excel_file, 'rb') as f:
-                    await context.bot.send_document(
-                        chat_id=query.message.chat_id,
-                        document=f,
-                        filename=os.path.basename(excel_file),
-                        caption=f"✅ ملف Excel - تحليل: {analysis_type}\n📊 عدد السجلات: {len(reports_data)}"
-                    )
-                
-                # حذف الملف المؤقت
                 try:
-                    os.remove(excel_file)
-                except:
-                    pass
-                
-                await query.edit_message_text("✅ تم إنشاء ملف Excel بنجاح!")
+                    with open(excel_file, 'rb') as f:
+                        await context.bot.send_document(
+                            chat_id=query.message.chat_id,
+                            document=f,
+                            filename=os.path.basename(excel_file),
+                            caption=f"✅ ملف Excel - تحليل: {analysis_type}\n📊 عدد السجلات: {len(reports_data)}"
+                        )
+                    
+                    # حذف الملف المؤقت
+                    try:
+                        os.remove(excel_file)
+                    except Exception as remove_error:
+                        logger.warning(f"⚠️ Could not remove temp file: {remove_error}")
+                    
+                    await query.edit_message_text(
+                        f"✅ **تم إنشاء ملف Excel بنجاح!**\n\n"
+                        f"📊 عدد السجلات: {len(reports_data)}",
+                        parse_mode=ParseMode.MARKDOWN
+                    )
+                except Exception as send_error:
+                    logger.error(f"❌ Error sending Excel file: {send_error}", exc_info=True)
+                    await query.edit_message_text(
+                        f"❌ **خطأ في إرسال الملف**\n\n"
+                        f"تم إنشاء الملف لكن فشل الإرسال.\n"
+                        f"الخطأ: {str(send_error)[:100]}",
+                        parse_mode=ParseMode.MARKDOWN
+                    )
             else:
-                await query.edit_message_text("❌ فشل إنشاء ملف Excel")
+                logger.error(f"❌ Excel file not created or not found: {excel_file}")
+                await query.edit_message_text(
+                    "❌ **فشل إنشاء ملف Excel**\n\n"
+                    "يرجى المحاولة مرة أخرى أو التواصل مع المطور.",
+                    parse_mode=ParseMode.MARKDOWN
+                )
                 
         finally:
             db.close()
             
     except Exception as e:
-        logger.error(f"Excel export error: {e}")
-        await query.edit_message_text(f"❌ خطأ في إنشاء Excel: {str(e)}")
+        logger.error(f"Excel export error: {e}", exc_info=True)
+        error_msg = str(e)
+        if len(error_msg) > 200:
+            error_msg = error_msg[:200] + "..."
+        try:
+            await query.edit_message_text(
+                f"❌ **خطأ في إنشاء Excel**\n\n"
+                f"الخطأ: {error_msg}\n\n"
+                f"يرجى المحاولة مرة أخرى أو التواصل مع المطور.",
+                parse_mode=ParseMode.MARKDOWN
+            )
+        except:
+            pass
 
 def register(app):
     """تسجيل معالج تحليل البيانات"""
@@ -1821,7 +1898,7 @@ def register(app):
         fallbacks=[
             CallbackQueryHandler(cancel, pattern="^abort$"),
         ],
-        per_message=False,
+        per_message=True,  # ✅ تفعيل per_message لتجنب التحذيرات
         allow_reentry=True,
     )
     

@@ -17,8 +17,12 @@ logger = logging.getLogger(__name__)
 # Database Configuration
 # ================================================
 
-# SQLite database path (inside Cloud Run container)
-DATABASE_PATH = os.getenv("DATABASE_PATH", "db/medical_reports.db")
+# SQLite database path - يعمل محلياً وأونلاين
+# على Hetzner: /home/botuser/medical-bot/db/medical_reports.db
+# محلياً: db/medical_reports.db
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DEFAULT_DB_PATH = os.path.join(BASE_DIR, "db", "medical_reports.db")
+DATABASE_PATH = os.getenv("DATABASE_PATH", DEFAULT_DB_PATH)
 
 # Create SQLite URL
 DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
@@ -29,13 +33,13 @@ engine = create_engine(
     echo=False,  # Set to True for SQL debugging
     connect_args={
         "check_same_thread": False,  # Allow multi-threading
-        "timeout": 30,  # 30 second timeout for locked database
+        "timeout": 120,  # 120 second timeout - زيادة كبيرة لدعم الضغط العالي و20+ مستخدم
         "isolation_level": None  # Enable autocommit for WAL mode
     },
     pool_pre_ping=True,  # Verify connections before using
     pool_recycle=3600,  # Recycle connections after 1 hour
-    pool_size=20,  # Connection pool size
-    max_overflow=10  # Max additional connections
+    pool_size=30,  # Connection pool size - زيادة لدعم 20+ مستخدم
+    max_overflow=20  # Max additional connections - زيادة للضغط العالي
 )
 
 # Create session factory
@@ -204,27 +208,31 @@ def close_connection():
 # Persistent Storage Integration
 # ================================================
 
-# Download database from Cloud Storage on startup (DISABLED FOR FRESH START)
-# This will be re-enabled after first successful deployment
-# try:
-#     from db.persistent_storage import restore_database_on_startup
-#     if restore_database_on_startup():
-#         logger.info("DB restored from GCS")
-# except Exception as e:
-#     pass  # Continue silently
-logger.info("Database restore DISABLED - starting fresh")
+# Download database from Cloud Storage on startup
+# محاولة استعادة قاعدة البيانات من GCS عند البدء
+try:
+    from db.persistent_storage import restore_database_on_startup
+    if restore_database_on_startup():
+        logger.info("✅ Database restored from GCS successfully")
+    else:
+        logger.info("ℹ️ No GCS backup found or local database exists - continuing with local database")
+except Exception as e:
+    logger.warning(f"⚠️ GCS restore attempt failed: {e}")
+    logger.info("   Continuing with local database initialization")
 
 # Create database directory if it doesn't exist
 try:
-    import os
     import shutil
-    os.makedirs(os.path.dirname(DATABASE_PATH), exist_ok=True)
+    db_dir = os.path.dirname(DATABASE_PATH)
+    if db_dir:  # تأكد من وجود مجلد
+        os.makedirs(db_dir, exist_ok=True)
     
     # Check if database exists and is not empty
     db_exists = os.path.exists(DATABASE_PATH) and os.path.getsize(DATABASE_PATH) > 0
     
     if not db_exists:
-        # Try to load from initial database file (for first deployment)
+        # قاعدة البيانات غير موجودة - تمت محاولة الاستعادة من GCS أعلاه
+        # إذا لم تنجح الاستعادة من GCS، جرب الملف الأولي المحلي
         initial_db_path = os.path.join(os.path.dirname(DATABASE_PATH), "medical_reports_initial.db")
         
         if os.path.exists(initial_db_path) and os.path.getsize(initial_db_path) > 0:
@@ -243,6 +251,7 @@ try:
             Base.metadata.create_all(bind=engine)
             logger.info("✅ Database tables created")
     else:
+        # قاعدة البيانات موجودة (إما محلية أو تمت استعادتها من GCS)
         db_size = os.path.getsize(DATABASE_PATH) / 1024
         logger.info(f"✅ Database loaded: {db_size:.2f} KB")
         # Ensure all tables exist (for migrations)

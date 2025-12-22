@@ -380,8 +380,6 @@ def _build_hospitals_keyboard(page=0, search_query=""):
         if nav_buttons:
             keyboard.append(nav_buttons)
     
-    # زر البحث
-    keyboard.append([InlineKeyboardButton("🔍 بحث", callback_data="hosp_search")])
     keyboard.append([InlineKeyboardButton("❌ إلغاء", callback_data="abort")])
     
     text = f"""🏥 **اختيار المستشفى**
@@ -524,8 +522,6 @@ def _build_departments_keyboard(page=0, search_query=""):
         if nav_buttons:
             keyboard.append(nav_buttons)
     
-    # زر البحث
-    keyboard.append([InlineKeyboardButton("🔍 بحث", callback_data="dept_search")])
     keyboard.append([InlineKeyboardButton("❌ إلغاء", callback_data="abort")])
     
     text = (

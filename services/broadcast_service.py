@@ -1,6 +1,6 @@
 # =============================
 # services/broadcast_service.py
-# 📢 نظام البث للتقارير والحالات الجديدة
+# 📢 نظام البث المحسّن للتقارير - إرسال للمجموعة
 # =============================
 
 from db.session import SessionLocal
@@ -9,41 +9,60 @@ from config.settings import ADMIN_IDS
 from telegram import Bot
 from telegram.constants import ParseMode
 import logging
+import os
 
 logger = logging.getLogger(__name__)
+
+# إعدادات المجموعة - استخدام GROUP_CHAT_ID من settings
+try:
+    from config.settings import GROUP_CHAT_ID
+    REPORTS_GROUP_ID = GROUP_CHAT_ID if GROUP_CHAT_ID else os.getenv("REPORTS_GROUP_ID", "")
+except ImportError:
+    REPORTS_GROUP_ID = os.getenv("REPORTS_GROUP_ID", "")
+
+# تفعيل الإرسال للمجموعة فقط (افتراضياً مفعّل)
+USE_GROUP_BROADCAST = os.getenv("USE_GROUP_BROADCAST", "true").lower() == "true"
 
 
 async def broadcast_new_report(bot: Bot, report_data: dict):
     """
-    بث تقرير جديد لجميع المستخدمين المعتمدين والأدمن
+    بث تقرير جديد - إرسال للمجموعة فقط (محسّن للأداء)
     
+    ⚡ يرسل التقرير للمجموعة فقط - لا يرسل للمستخدمين الفرديين
+    هذا يحسن الأداء ويقلل الضغط على البوت
+
     Args:
         bot: كائن البوت
         report_data: بيانات التقرير كـ dictionary
     """
     # تنسيق الرسالة
     message = format_report_message(report_data)
+
+    # 🚀 إرسال للمجموعة فقط (الطريقة المفضلة)
+    if REPORTS_GROUP_ID:
+        try:
+            # تحويل GROUP_CHAT_ID إلى int إذا كان string
+            group_id = int(REPORTS_GROUP_ID) if isinstance(REPORTS_GROUP_ID, str) and REPORTS_GROUP_ID.lstrip('-').isdigit() else REPORTS_GROUP_ID
+            
+            await bot.send_message(
+                chat_id=group_id,
+                text=message,
+                parse_mode=ParseMode.MARKDOWN,
+                disable_web_page_preview=True
+            )
+            logger.info(f"✅ تم إرسال التقرير للمجموعة: {group_id}")
+            
+            # إرسال تنبيه بسيط للمستخدم (اختياري - يمكن تعطيله)
+            # await send_user_notification(bot, report_data)
+            return
+
+        except Exception as e:
+            logger.error(f"❌ فشل إرسال التقرير للمجموعة: {e}", exc_info=True)
+            # في حالة فشل الإرسال للمجموعة، نرسل للأدمن فقط كاحتياطي
+            logger.warning("⚠️ محاولة إرسال للأدمن كاحتياطي")
     
-    # الحصول على جميع المستخدمين المعتمدين
-    with SessionLocal() as s:
-        approved_users = s.query(Translator).filter_by(
-            is_approved=True, 
-            is_suspended=False
-        ).all()
-        
-        # إرسال للمستخدمين
-        for user in approved_users:
-            try:
-                await bot.send_message(
-                    chat_id=user.tg_user_id,
-                    text=message,
-                    parse_mode=ParseMode.MARKDOWN
-                )
-                logger.info(f"تم ارسال التقرير الى {user.full_name}")
-            except Exception as e:
-                logger.error(f"فشل ارسال الى {user.full_name}: {e}")
-    
-    # إرسال للأدمن
+    # 🏠 احتياطي: إرسال للأدمن فقط (في حالة عدم وجود معرف المجموعة أو فشل الإرسال)
+    logger.info("📤 إرسال للأدمن فقط (احتياطي)")
     for admin_id in ADMIN_IDS:
         try:
             await bot.send_message(
@@ -51,9 +70,51 @@ async def broadcast_new_report(bot: Bot, report_data: dict):
                 text=message,
                 parse_mode=ParseMode.MARKDOWN
             )
-            logger.info(f"تم ارسال التقرير الى الادمن {admin_id}")
+            logger.info(f"✅ تم إرسال التقرير إلى الأدمن {admin_id}")
         except Exception as e:
-            logger.error(f"فشل ارسال الى الادمن {admin_id}: {e}")
+            logger.error(f"❌ فشل إرسال إلى الأدمن {admin_id}: {e}")
+
+
+async def send_user_notification(bot: Bot, report_data: dict):
+    """
+    إرسال تنبيه للمستخدم الذي أنشأ التقرير (اختياري)
+    
+    Args:
+        bot: كائن البوت
+        report_data: بيانات التقرير
+    """
+    try:
+        # محاولة استخدام translator_id أولاً (أسرع)
+        translator_id = report_data.get('translator_id')
+        if translator_id:
+            try:
+                await bot.send_message(
+                    chat_id=translator_id,
+                    text="✅ **تم إرسال التقرير بنجاح إلى المجموعة**",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+                logger.debug(f"✅ تم إرسال تنبيه للمترجم (ID: {translator_id})")
+                return
+            except Exception as e:
+                logger.debug(f"⚠️ لم يتم إرسال تنبيه للمترجم (ID: {translator_id}): {e}")
+        
+        # Fallback: استخدام translator_name
+        translator_name = report_data.get('translator_name', '')
+        if translator_name and translator_name != 'غير محدد':
+            with SessionLocal() as s:
+                translator = s.query(Translator).filter_by(full_name=translator_name).first()
+                if translator:
+                    try:
+                        await bot.send_message(
+                            chat_id=translator.tg_user_id,
+                            text="✅ **تم إرسال التقرير بنجاح إلى المجموعة**",
+                            parse_mode=ParseMode.MARKDOWN
+                        )
+                        logger.debug(f"✅ تم إرسال تنبيه للمترجم {translator_name}")
+                    except Exception as e:
+                        logger.debug(f"⚠️ لم يتم إرسال تنبيه للمترجم {translator_name}: {e}")
+    except Exception as e:
+        logger.debug(f"⚠️ خطأ في إرسال التنبيه: {e}")
 
 
 async def broadcast_initial_case(bot: Bot, case_data: dict):

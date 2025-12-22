@@ -11,8 +11,10 @@ def register_all_handlers(app):
     # 🔄 تسجيل handlers المشتركة (للجميع) - يجب أن تكون أولاً
     from bot.handlers.shared.shared_refresh import register as register_shared_refresh
     from bot.handlers.shared.shared_schedule import register as register_shared_schedule
+    from bot.handlers.shared.group_handler import register as register_group_handler
     register_shared_refresh(app)
     register_shared_schedule(app)
+    register_group_handler(app)  # ✅ معالجة الرسائل في المجموعات
     
     # 🔸 تسجيل واجهة الأدمن
     from bot.handlers.admin.admin_start import register as register_admin_start
@@ -67,6 +69,10 @@ def register_all_handlers(app):
     # 🆕 النظام الجديد - المرحلة 1 (استشارة جديدة، مراجعة، طوارئ، ترقيد)
     from bot.handlers.user import user_reports_add_new_system
     user_reports_add_new_system.register(app)
+    
+    # 📋 التقرير الأولي للمرضى
+    from bot.handlers.user.user_initial_case import register as register_initial_case
+    register_initial_case(app)
     
     # 🎨 النظام الجديد - Inline Menu + Command Shortcuts (معطّل - المستخدم يفضل الأزرار الثابتة)
     # from bot.handlers.user.user_inline_menu import register as register_inline_menu

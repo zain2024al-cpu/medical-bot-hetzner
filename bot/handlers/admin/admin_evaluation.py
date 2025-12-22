@@ -15,6 +15,9 @@ from db.models import (
 )
 from bot.shared_auth import is_admin
 from bot.keyboards import admin_main_kb
+import logging
+
+logger = logging.getLogger(__name__)
 
 # حالات المحادثة
 SELECT_EVALUATION_TYPE, SELECT_TRANSLATOR, SELECT_MONTH, CONFIRM_EVALUATION, MANUAL_EVALUATION = range(5)
@@ -185,14 +188,67 @@ async def generate_monthly_report(update: Update, context: ContextTypes.DEFAULT_
     
     with SessionLocal() as s:
         # جلب جميع المترجمين من الجدول
-        translators = s.query(DailyReportTracking).filter(
+        from sqlalchemy import func
+        translator_names = s.query(DailyReportTracking.translator_name).filter(
             DailyReportTracking.date >= date(year, month, 1),
             DailyReportTracking.date < date(year, month + 1, 1) if month < 12 else date(year + 1, 1, 1)
-        ).distinct(DailyReportTracking.translator_name).all()
+        ).distinct().all()
         
-        if not translators:
+        # تحويل إلى قائمة أسماء
+        translator_names_list = [name[0] for name in translator_names if name[0]]
+        
+        if not translator_names_list:
             await query.edit_message_text("⚠️ لا توجد بيانات للمترجمين في هذا الشهر.")
             return
+        
+        # محاولة إضافة translator_id إذا لم يكن موجوداً
+        try:
+            from sqlalchemy import inspect, text
+            inspector = inspect(s.bind)
+            drt_columns = [col['name'] for col in inspector.get_columns('daily_report_tracking')]
+            if 'translator_id' not in drt_columns:
+                try:
+                    s.execute(text("ALTER TABLE daily_report_tracking ADD COLUMN translator_id INTEGER"))
+                    s.commit()
+                    logger.info("✅ Added translator_id column to daily_report_tracking")
+                except Exception as alter_error:
+                    logger.warning(f"⚠️ Could not add translator_id: {alter_error}")
+                    s.rollback()
+        except Exception as inspect_error:
+            logger.warning(f"⚠️ Could not inspect daily_report_tracking: {inspect_error}")
+        
+        # جلب سجلات لكل مترجم - استخدام query محدود
+        translators = []
+        for name in translator_names_list:
+            try:
+                # استخدام query محدود بدون translator_id
+                record = s.query(
+                    DailyReportTracking.id,
+                    DailyReportTracking.translator_name,
+                    DailyReportTracking.date,
+                    DailyReportTracking.expected_reports,
+                    DailyReportTracking.actual_reports,
+                    DailyReportTracking.is_completed,
+                    DailyReportTracking.reminder_sent,
+                    DailyReportTracking.created_at
+                ).filter(
+                    DailyReportTracking.translator_name == name,
+                    DailyReportTracking.date >= date(year, month, 1),
+                    DailyReportTracking.date < date(year, month + 1, 1) if month < 12 else date(year + 1, 1, 1)
+                ).first()
+                if record:
+                    # إنشاء كائن بسيط
+                    class SimpleRecord:
+                        def __init__(self, translator_name):
+                            self.translator_name = translator_name
+                    translators.append(SimpleRecord(name))
+            except Exception as query_error:
+                logger.warning(f"⚠️ Error querying translator {name}: {query_error}")
+                # استخدام كائن بسيط
+                class SimpleRecord:
+                    def __init__(self, translator_name):
+                        self.translator_name = translator_name
+                translators.append(SimpleRecord(name))
         
         evaluation_results = []
         
@@ -207,6 +263,7 @@ async def generate_monthly_report(update: Update, context: ContextTypes.DEFAULT_
             ).all()
             
             # جلب التقارير الفعلية للمترجم
+            # Translator هو alias لـ User
             translator = s.query(Translator).filter_by(full_name=translator_name).first()
             if translator:
                 reports = s.query(Report).filter(
@@ -215,6 +272,7 @@ async def generate_monthly_report(update: Update, context: ContextTypes.DEFAULT_
                     Report.report_date < datetime(year, month + 1, 1) if month < 12 else datetime(year + 1, 1, 1)
                 ).all()
             else:
+                # محاولة البحث باستخدام translator_name مباشرة من DailyReportTracking
                 reports = []
             
             # حساب النقاط
@@ -321,6 +379,12 @@ async def generate_monthly_report(update: Update, context: ContextTypes.DEFAULT_
         
         s.commit()
         
+        # حفظ النتائج في context للتصدير لاحقاً
+        context.user_data['last_evaluation_results'] = evaluation_results
+        context.user_data['last_evaluation_year'] = year
+        context.user_data['last_evaluation_month'] = month
+        context.user_data['last_evaluation_type'] = 'monthly'
+        
         # عرض النتائج
         await display_evaluation_results(update, context, evaluation_results, year, month)
 
@@ -340,7 +404,7 @@ async def generate_yearly_report(update: Update, context: ContextTypes.DEFAULT_T
         translator_stats = {}
         
         for eval in monthly_evaluations:
-            translator_name = eval.translator_name
+            translator_name = eval.translator_name or 'غير محدد'
             
             if translator_name not in translator_stats:
                 translator_stats[translator_name] = {
@@ -355,11 +419,14 @@ async def generate_yearly_report(update: Update, context: ContextTypes.DEFAULT_T
             
             stats = translator_stats[translator_name]
             stats['months'] += 1
-            stats['total_points'] += eval.total_points
-            stats['total_reports'] += eval.total_reports
-            stats['on_time_reports'] += eval.on_time_reports
-            stats['late_reports'] += eval.late_reports
-            stats['ratings'].append(eval.final_rating)
+            # استخدام getattr للتحقق من وجود الحقول
+            stats['total_points'] += getattr(eval, 'total_points', 0) or 0
+            stats['total_reports'] += getattr(eval, 'total_reports', 0) or 0
+            stats['on_time_reports'] += getattr(eval, 'on_time_reports', 0) or 0
+            stats['late_reports'] += getattr(eval, 'late_reports', 0) or 0
+            final_rating = getattr(eval, 'final_rating', 0) or 0
+            if final_rating:
+                stats['ratings'].append(final_rating)
         
         # حساب المتوسطات
         evaluation_results = []
@@ -389,6 +456,11 @@ async def generate_yearly_report(update: Update, context: ContextTypes.DEFAULT_T
                 'on_time_reports': stats['on_time_reports'],
                 'late_reports': stats['late_reports']
             })
+        
+        # حفظ النتائج في context للتصدير لاحقاً
+        context.user_data['last_evaluation_results'] = evaluation_results
+        context.user_data['last_evaluation_year'] = year
+        context.user_data['last_evaluation_type'] = 'yearly'
         
         # عرض النتائج السنوية
         await display_yearly_results(update, context, evaluation_results, year)
@@ -479,11 +551,63 @@ async def start_manual_evaluation(update: Update, context: ContextTypes.DEFAULT_
     await query.answer()
     
     with SessionLocal() as s:
-        # جلب المترجمين من الجدول
-        translators = s.query(DailyReportTracking).distinct(DailyReportTracking.translator_name).all()
+        # محاولة إضافة translator_id إذا لم يكن موجوداً
+        try:
+            from sqlalchemy import inspect, text
+            inspector = inspect(s.bind)
+            columns = [col['name'] for col in inspector.get_columns('daily_report_tracking')]
+            
+            if 'translator_id' not in columns:
+                try:
+                    s.execute(text("ALTER TABLE daily_report_tracking ADD COLUMN translator_id INTEGER"))
+                    s.commit()
+                    logger.info("✅ Added translator_id column to daily_report_tracking")
+                except Exception as alter_error:
+                    logger.warning(f"⚠️ Could not add translator_id column: {alter_error}")
+                    s.rollback()
+        except Exception as inspect_error:
+            logger.warning(f"⚠️ Could not inspect table: {inspect_error}")
         
-        if not translators:
-            await query.edit_message_text("⚠️ لا توجد بيانات للمترجمين.")
+        # جلب المترجمين من الجدول
+        try:
+            from sqlalchemy import func
+            translator_names = s.query(DailyReportTracking.translator_name).distinct().all()
+            translator_names_list = [name[0] for name in translator_names if name[0]]
+            
+            if not translator_names_list:
+                await query.edit_message_text("⚠️ لا توجد بيانات للمترجمين.")
+                return
+            
+            # جلب سجل واحد لكل مترجم للعرض - استخدام query محدود بدون translator_id
+            translators = []
+            for name in translator_names_list[:10]:  # أول 10 مترجمين
+                try:
+                    record = s.query(
+                        DailyReportTracking.id,
+                        DailyReportTracking.translator_name,
+                        DailyReportTracking.date,
+                        DailyReportTracking.expected_reports,
+                        DailyReportTracking.actual_reports,
+                        DailyReportTracking.is_completed,
+                        DailyReportTracking.reminder_sent,
+                        DailyReportTracking.created_at
+                    ).filter_by(translator_name=name).first()
+                    if record:
+                        # إنشاء كائن وهمي يحتوي على translator_name فقط
+                        class SimpleRecord:
+                            def __init__(self, translator_name):
+                                self.translator_name = translator_name
+                        translators.append(SimpleRecord(name))
+                except Exception as query_error:
+                    logger.warning(f"⚠️ Error querying translator {name}: {query_error}")
+                    # استخدام كائن بسيط
+                    class SimpleRecord:
+                        def __init__(self, translator_name):
+                            self.translator_name = translator_name
+                    translators.append(SimpleRecord(name))
+        except Exception as e:
+            logger.error(f"❌ Error in start_manual_evaluation: {e}", exc_info=True)
+            await query.edit_message_text("❌ خطأ في قاعدة البيانات. يرجى المحاولة مرة أخرى.")
             return
         
         keyboard = []
@@ -508,12 +632,72 @@ async def view_evaluations(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     
     with SessionLocal() as s:
+        # محاولة إضافة الأعمدة المفقودة أولاً
+        try:
+            from sqlalchemy import inspect, text
+            inspector = inspect(s.bind)
+            columns = [col['name'] for col in inspector.get_columns('monthly_evaluations')]
+            
+            # إضافة translator_id إذا لم يكن موجوداً
+            if 'translator_id' not in columns:
+                try:
+                    s.execute(text("ALTER TABLE monthly_evaluations ADD COLUMN translator_id INTEGER"))
+                    s.commit()
+                    logger.info("✅ Added translator_id column to monthly_evaluations")
+                except Exception as alter_error:
+                    logger.warning(f"⚠️ Could not add translator_id column: {alter_error}")
+                    s.rollback()
+            
+            # إضافة الحقول الأخرى إذا لم تكن موجودة
+            missing_fields = {
+                'on_time_reports': 'INTEGER',
+                'late_reports': 'INTEGER',
+                'timing_points': 'REAL',
+                'quality_points': 'REAL',
+                'regularity_points': 'REAL',
+                'total_points': 'REAL',
+                'final_rating': 'INTEGER',
+                'performance_level': 'TEXT',
+                'updated_at': 'DATETIME'
+            }
+            
+            for field_name, field_type in missing_fields.items():
+                if field_name not in columns:
+                    try:
+                        s.execute(text(f"ALTER TABLE monthly_evaluations ADD COLUMN {field_name} {field_type}"))
+                        s.commit()
+                        logger.info(f"✅ Added {field_name} column to monthly_evaluations")
+                    except Exception as alter_error:
+                        logger.warning(f"⚠️ Could not add {field_name} column: {alter_error}")
+                        s.rollback()
+        except Exception as inspect_error:
+            logger.warning(f"⚠️ Could not inspect table: {inspect_error}")
+        
         # جلب آخر التقييمات الشهرية
-        evaluations = s.query(MonthlyEvaluation).order_by(
-            MonthlyEvaluation.year.desc(),
-            MonthlyEvaluation.month.desc(),
-            MonthlyEvaluation.total_points.desc()
-        ).limit(10).all()
+        try:
+            evaluations = s.query(MonthlyEvaluation).order_by(
+                MonthlyEvaluation.year.desc(),
+                MonthlyEvaluation.month.desc()
+            )
+            # محاولة إضافة ترتيب حسب total_points إذا كان موجوداً
+            if hasattr(MonthlyEvaluation, 'total_points'):
+                try:
+                    evaluations = evaluations.order_by(MonthlyEvaluation.total_points.desc())
+                except:
+                    pass
+            evaluations = evaluations.limit(10).all()
+        except Exception as e:
+            logger.error(f"❌ Error querying evaluations: {e}", exc_info=True)
+            # استخدام query بسيط بدون total_points
+            try:
+                evaluations = s.query(MonthlyEvaluation).order_by(
+                    MonthlyEvaluation.year.desc(),
+                    MonthlyEvaluation.month.desc()
+                ).limit(10).all()
+            except Exception as e2:
+                logger.error(f"❌ Error in fallback query: {e2}", exc_info=True)
+                await query.edit_message_text("❌ خطأ في قاعدة البيانات. يرجى المحاولة مرة أخرى.")
+                return
         
         if not evaluations:
             await query.edit_message_text("⚠️ لا توجد تقييمات متاحة.")
@@ -522,10 +706,15 @@ async def view_evaluations(update: Update, context: ContextTypes.DEFAULT_TYPE):
         report_text = "📊 **آخر التقييمات الشهرية**\n\n"
         
         for eval in evaluations:
-            stars = "⭐" * eval.final_rating
-            report_text += f"**{eval.translator_name}**\n"
-            report_text += f"📅 {eval.year}/{eval.month} | {stars} ({eval.performance_level})\n"
-            report_text += f"📊 {eval.total_points}/30 نقطة\n\n"
+            # استخدام getattr للتحقق من وجود الحقول
+            final_rating = getattr(eval, 'final_rating', 0) or 0
+            performance_level = getattr(eval, 'performance_level', 'غير محدد') or 'غير محدد'
+            total_points = getattr(eval, 'total_points', 0) or 0
+            
+            stars = "⭐" * int(final_rating) if final_rating else "⭐"
+            report_text += f"**{eval.translator_name or 'غير محدد'}**\n"
+            report_text += f"📅 {eval.year}/{eval.month} | {stars} ({performance_level})\n"
+            report_text += f"📊 {total_points}/30 نقطة\n\n"
         
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("🔙 العودة", callback_data="back_to_eval")]
@@ -546,13 +735,24 @@ async def show_ranking(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # جلب متوسط النقاط لكل مترجم
         from sqlalchemy import func
         
-        rankings = s.query(
-            MonthlyEvaluation.translator_name,
-            func.avg(MonthlyEvaluation.total_points).label('avg_points'),
-            func.count(MonthlyEvaluation.id).label('months_count')
-        ).group_by(MonthlyEvaluation.translator_name).order_by(
-            func.avg(MonthlyEvaluation.total_points).desc()
-        ).limit(10).all()
+        # استخدام getattr للتحقق من وجود الحقل total_points
+        if hasattr(MonthlyEvaluation, 'total_points'):
+            rankings = s.query(
+                MonthlyEvaluation.translator_name,
+                func.avg(MonthlyEvaluation.total_points).label('avg_points'),
+                func.count(MonthlyEvaluation.id).label('months_count')
+            ).group_by(MonthlyEvaluation.translator_name).order_by(
+                func.avg(MonthlyEvaluation.total_points).desc()
+            ).limit(10).all()
+        else:
+            # استخدام total_reports كبديل
+            rankings = s.query(
+                MonthlyEvaluation.translator_name,
+                func.avg(MonthlyEvaluation.total_reports).label('avg_points'),
+                func.count(MonthlyEvaluation.id).label('months_count')
+            ).group_by(MonthlyEvaluation.translator_name).order_by(
+                func.avg(MonthlyEvaluation.total_reports).desc()
+            ).limit(10).all()
         
         if not rankings:
             await query.edit_message_text("⚠️ لا توجد بيانات كافية للترتيب.")
@@ -638,11 +838,32 @@ def register(app):
             elif query.data.startswith("manual_eval:"):
                 await start_manual_evaluation(update, context)
             elif query.data == "export_report":
-                await display_evaluation_results(update, context)
+                # استرجاع البيانات المحفوظة
+                results = context.user_data.get('last_evaluation_results')
+                year = context.user_data.get('last_evaluation_year')
+                month = context.user_data.get('last_evaluation_month')
+                if results and year and month:
+                    await display_evaluation_results(update, context, results, year, month)
+                else:
+                    await query.edit_message_text("⚠️ لا توجد بيانات للتصدير.")
             elif query.data == "export_yearly_report":
-                await display_yearly_results(update, context)
+                # استرجاع البيانات المحفوظة
+                results = context.user_data.get('last_evaluation_results')
+                year = context.user_data.get('last_evaluation_year')
+                if results and year:
+                    await display_yearly_results(update, context, results, year)
+                else:
+                    await query.edit_message_text("⚠️ لا توجد بيانات للتصدير.")
         except Exception as e:
-            print(f"Error in handle_all_evaluation_callbacks: {e}")
-            await query.edit_message_text("حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.")
+            logger.error(f"❌ Error in handle_all_evaluation_callbacks: {e}", exc_info=True)
+            try:
+                await query.edit_message_text(
+                    f"❌ **حدث خطأ غير متوقع**\n\n"
+                    f"الخطأ: {str(e)[:100]}\n\n"
+                    f"يرجى المحاولة مرة أخرى أو التواصل مع المطور.",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+            except:
+                pass
     
     app.add_handler(CallbackQueryHandler(handle_all_evaluation_callbacks, pattern="^(eval:|year:|month:|back_to_eval$|manual_eval:|export_report$|export_yearly_report$)"))

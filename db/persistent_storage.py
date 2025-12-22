@@ -1,140 +1,144 @@
 # ================================================
 # db/persistent_storage.py
-# 🔹 Persistent Storage Manager - Cloud Storage Integration
+# 🔹 استعادة قاعدة البيانات من Google Cloud Storage عند البدء
 # ================================================
 
 import os
 import logging
 from pathlib import Path
-from google.cloud import storage
 
 logger = logging.getLogger(__name__)
 
-# Configuration
-PROJECT_ID = "lunar-standard-477302-a6"
-BUCKET_NAME = f"{PROJECT_ID}-sqlite-backups"
+# ================================================
+# Database Path
+# ================================================
+
 DATABASE_PATH = os.getenv("DATABASE_PATH", "db/medical_reports.db")
-PERSISTENT_DB_PATH = "persistent/medical_reports.db"  # Path in GCS
 
-class PersistentStorageManager:
+# ================================================
+# Restore Database from GCS
+# ================================================
+
+def restore_database_on_startup() -> bool:
     """
-    Manages database persistence across Cloud Run deployments
+    استعادة قاعدة البيانات من Google Cloud Storage عند بدء البوت
     
-    Features:
-    - Download database from GCS on startup
-    - Upload database to GCS on shutdown
-    - Automatic sync
+    Returns:
+        True إذا تمت الاستعادة بنجاح، False إذا لم تكن هناك نسخة احتياطية
     """
-    
-    def __init__(self):
-        self.bucket_name = BUCKET_NAME
-        self.local_path = DATABASE_PATH
-        self.cloud_path = PERSISTENT_DB_PATH
-        self.client = None
-        self.bucket = None
-        self._init_storage()
-    
-    def _init_storage(self):
-        """Initialize Google Cloud Storage client"""
-        try:
-            self.client = storage.Client(project=PROJECT_ID)
-            self.bucket = self.client.bucket(BUCKET_NAME)
-            
-            if not self.bucket.exists():
-                logger.info(f"Creating bucket: {BUCKET_NAME}")
-                self.bucket = self.client.create_bucket(BUCKET_NAME, location="asia-south1")
-            
-            logger.info(f"✅ Cloud Storage initialized: {BUCKET_NAME}")
-        except Exception as e:
-            logger.error(f"❌ Failed to init Cloud Storage: {e}")
-    
-    def download_database(self) -> bool:
-        """
-        Download database from Cloud Storage on startup
+    try:
+        # التحقق من وجود قاعدة بيانات محلية
+        db_exists = os.path.exists(DATABASE_PATH) and os.path.getsize(DATABASE_PATH) > 0
         
-        Returns:
-            True if downloaded successfully, False if no backup exists
-        """
-        try:
-            if not self.bucket:
-                return False
-            
-            blob = self.bucket.blob(self.cloud_path)
-            
-            if not blob.exists():
-                return False
-            
-            # Create directory if needed
-            os.makedirs(os.path.dirname(self.local_path), exist_ok=True)
-            
-            # Download database (fast, no logging during download)
-            blob.download_to_filename(self.local_path)
-            
-            return True
-            
-        except Exception as e:
-            logger.error(f"Failed to download database: {e}")
+        # إذا كانت قاعدة البيانات موجودة وليست فارغة، لا نحتاج للاستعادة
+        if db_exists:
+            db_size = os.path.getsize(DATABASE_PATH) / 1024
+            logger.info(f"✅ Database already exists locally: {db_size:.2f} KB")
+            logger.info("   Skipping GCS restore (local database found)")
             return False
-    
-    def upload_database(self) -> bool:
-        """
-        Upload database to Cloud Storage
         
-        Returns:
-            True if uploaded successfully
-        """
+        # محاولة الاستعادة من GCS
+        logger.info("🔄 Attempting to restore database from GCS...")
+        
         try:
-            if not self.bucket:
-                logger.warning("⚠️ Bucket not available")
+            from services.sqlite_backup import get_backup_service
+            
+            backup_service = get_backup_service()
+            
+            # التحقق من وجود bucket
+            if not backup_service.bucket:
+                logger.warning("⚠️ GCS bucket not available - skipping restore")
                 return False
             
-            if not os.path.exists(self.local_path):
-                logger.warning(f"⚠️ Database file not found: {self.local_path}")
+            # محاولة استعادة النسخة الدائمة
+            persistent_blob_name = "persistent/medical_reports.db"
+            blob = backup_service.bucket.blob(persistent_blob_name)
+            
+            if blob.exists():
+                logger.info(f"📥 Found persistent database in GCS: {persistent_blob_name}")
+                
+                # إنشاء مجلد قاعدة البيانات إذا لم يكن موجوداً
+                db_dir = os.path.dirname(DATABASE_PATH)
+                if db_dir:
+                    os.makedirs(db_dir, exist_ok=True)
+                
+                # تحميل قاعدة البيانات
+                blob.download_to_filename(DATABASE_PATH)
+                
+                if os.path.exists(DATABASE_PATH):
+                    db_size = os.path.getsize(DATABASE_PATH) / 1024
+                    logger.info(f"✅ Database restored from GCS: {db_size:.2f} KB")
+                    logger.info(f"   📁 Source: gs://{backup_service.bucket.name}/{persistent_blob_name}")
+                    return True
+                else:
+                    logger.error("❌ Database file not created after download")
+                    return False
+            else:
+                logger.info("ℹ️ No persistent database found in GCS - starting fresh")
                 return False
-            
-            blob = self.bucket.blob(self.cloud_path)
-            blob.upload_from_filename(self.local_path)
-            
-            size_kb = os.path.getsize(self.local_path) / 1024
-            logger.info(f"✅ Database uploaded to Cloud Storage")
-            logger.info(f"   Size: {size_kb:.2f} KB")
-            
-            return True
-            
-        except Exception as e:
-            logger.error(f"❌ Failed to upload database: {e}")
+                
+        except ImportError as import_error:
+            logger.warning(f"⚠️ Could not import backup service: {import_error}")
+            logger.info("   Starting with fresh database")
             return False
+        except Exception as gcs_error:
+            logger.warning(f"⚠️ GCS restore failed: {gcs_error}")
+            logger.info("   Starting with fresh database")
+            return False
+            
+    except Exception as e:
+        logger.error(f"❌ Error in restore_database_on_startup: {e}")
+        logger.info("   Starting with fresh database")
+        return False
+
+
+def restore_from_latest_backup() -> bool:
+    """
+    استعادة قاعدة البيانات من آخر نسخة احتياطية في GCS
     
-    def sync_to_cloud(self) -> bool:
-        """Quick sync to cloud (called periodically)"""
-        return self.upload_database()
-
-
-# Global instance
-_storage_manager = None
-
-def get_storage_manager() -> PersistentStorageManager:
-    """Get the global storage manager instance"""
-    global _storage_manager
-    if _storage_manager is None:
-        _storage_manager = PersistentStorageManager()
-    return _storage_manager
-
-
-def restore_database_on_startup():
+    Returns:
+        True إذا تمت الاستعادة بنجاح
     """
-    Restore database from Cloud Storage on startup
-    Call this before initializing the database
-    """
-    manager = get_storage_manager()
-    return manager.download_database()
+    try:
+        logger.info("🔄 Attempting to restore from latest backup in GCS...")
+        
+        from services.sqlite_backup import get_backup_service
+        
+        backup_service = get_backup_service()
+        
+        if not backup_service.bucket:
+            logger.error("❌ GCS bucket not available")
+            return False
+        
+        # محاولة استعادة النسخة الدائمة أولاً
+        persistent_blob_name = "persistent/medical_reports.db"
+        blob = backup_service.bucket.blob(persistent_blob_name)
+        
+        if blob.exists():
+            # إنشاء نسخة احتياطية من قاعدة البيانات الحالية
+            if os.path.exists(DATABASE_PATH):
+                backup_current = f"{DATABASE_PATH}.before_restore"
+                import shutil
+                shutil.copy2(DATABASE_PATH, backup_current)
+                logger.info(f"   💾 Current database backed up to: {backup_current}")
+            
+            # تحميل قاعدة البيانات
+            db_dir = os.path.dirname(DATABASE_PATH)
+            if db_dir:
+                os.makedirs(db_dir, exist_ok=True)
+            
+            blob.download_to_filename(DATABASE_PATH)
+            
+            if os.path.exists(DATABASE_PATH):
+                db_size = os.path.getsize(DATABASE_PATH) / 1024
+                logger.info(f"✅ Database restored from latest backup: {db_size:.2f} KB")
+                return True
+        
+        logger.warning("⚠️ No backup found in GCS")
+        return False
+        
+    except Exception as e:
+        logger.error(f"❌ Error restoring from latest backup: {e}")
+        return False
 
-
-def save_database_to_cloud():
-    """
-    Save database to Cloud Storage
-    Call this periodically or on shutdown
-    """
-    manager = get_storage_manager()
-    return manager.upload_database()
 

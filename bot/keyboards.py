@@ -30,8 +30,8 @@ def user_main_kb():
         ["📝 إضافة تقرير جديد"],
         # الصف الثاني: الجدول وابدأ
         ["📅 جدول اليوم", "🚀 ابدأ"],
-        # الصف الثالث: التعديل
-        ["✏️ تعديل التقارير"]
+        # الصف الثالث: التعديل والتقرير الأولي
+        ["✏️ تعديل التقارير", "📋 التقرير الأولي للمرضى"]
     ]
     return ReplyKeyboardMarkup(
         keyboard, 
@@ -101,6 +101,10 @@ def user_main_inline_kb():
         [
             InlineKeyboardButton("📜 السجل", callback_data="user_action:history"),
             InlineKeyboardButton("ℹ️ مساعدة", callback_data="user_action:help")
+        ],
+        # الصف الخامس: التقرير الأولي للمرضى
+        [
+            InlineKeyboardButton("📋 التقرير الأولي للمرضى", callback_data="user_action:initial_case")
         ],
         # الصف الخامس: التحديث
         [

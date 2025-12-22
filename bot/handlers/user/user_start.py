@@ -5,6 +5,7 @@
 
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes, CommandHandler, MessageHandler, CallbackQueryHandler, filters
+from telegram.constants import ChatType
 from datetime import datetime
 import hashlib
 
@@ -102,6 +103,19 @@ async def user_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         user = update.effective_user
         tg_id = user.id
+        
+        # ✅ منع إرسال الأزرار في المجموعات - السماح فقط في الدردشة الخاصة
+        chat = update.effective_chat
+        if chat and chat.type not in [ChatType.PRIVATE]:
+            # في المجموعة، نرسل رسالة بدون أزرار
+            await update.message.reply_text(
+                f"👋 مرحباً في المجموعة!\n\n"
+                f"🤖 أنا بوت التقارير الطبية الذكي.\n\n"
+                f"💡 يمكنك استخدامي في الدردشة الخاصة لإضافة التقارير الطبية.\n\n"
+                f"📋 للبدء، اضغط على /start في الدردشة الخاصة معي.",
+                disable_web_page_preview=True
+            )
+            return
 
         # ✅ التحقق من أن المستخدم أدمن أولاً
         from bot.shared_auth import is_admin

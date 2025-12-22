@@ -23,8 +23,10 @@ def _escape_markdown_v2(text: str) -> str:
     Helper function to escape special characters in MarkdownV2.
     From python-telegram-bot examples.
     """
+    if not text:
+        return ""
     escape_chars = r'_*[]()~`>#+-=|{}.!'
-    return re.sub(r'([{}])'.format(re.escape(escape_chars)), r'\', text)
+    return re.sub(r'([{}])'.format(re.escape(escape_chars)), r'\\\1', text)
 
 async def start_user_management(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """بدء إدارة المستخدمين"""
@@ -93,9 +95,20 @@ def _user_actions_kb():
 async def handle_user_management_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة جميع استدعاءات إدارة المستخدمين"""
     query = update.callback_query
-    await query.answer()
+    if not query:
+        logger.error("❌ handle_user_management_callback: No query found")
+        return ConversationHandler.END
+    
+    try:
+        await query.answer()
+    except Exception as e:
+        logger.error(f"❌ Error answering query: {e}")
     
     # إزالة البادئة "um:" للحصول على البيانات الفعلية
+    if not query.data:
+        logger.error("❌ handle_user_management_callback: No query.data")
+        return ConversationHandler.END
+    
     if query.data.startswith("um:"):
         data = query.data[3:]  # إزالة "um:" من البداية
     else:
@@ -115,8 +128,13 @@ async def handle_user_management_callback(update: Update, context: ContextTypes.
         elif data == "search":
             return await _start_search(query, context)
         elif data.startswith("user:"):
-            user_id = int(data.split(":")[1])
-            return await _show_user_details(query, context, user_id)
+            try:
+                user_id = int(data.split(":")[1])
+                return await _show_user_details(query, context, user_id)
+            except (ValueError, IndexError) as e:
+                logger.error(f"❌ Error parsing user_id: {e}")
+                await query.edit_message_text("❌ خطأ في رقم المستخدم.")
+                return UM_START
         elif data in ["approve", "reject", "suspend", "unsuspend", "delete"]:
             return await _handle_user_action(query, context, data)
         elif data == "back":
@@ -124,9 +142,16 @@ async def handle_user_management_callback(update: Update, context: ContextTypes.
         elif data == "cancel":
             await query.edit_message_text("❌ تم إلغاء إدارة المستخدمين.")
             return ConversationHandler.END
+        else:
+            logger.warning(f"⚠️ Unknown callback data: {data}")
+            await query.edit_message_text("❌ أمر غير معروف.")
+            return UM_START
     except Exception as e:
-        logger.error(f"Error in user management: {e}", exc_info=True)
-        await query.edit_message_text("❌ حدث خطأ. يرجى المحاولة مرة أخرى.")
+        logger.error(f"❌ Error in user management callback: {e}", exc_info=True)
+        try:
+            await query.edit_message_text("❌ حدث خطأ. يرجى المحاولة مرة أخرى.")
+        except:
+            pass
         return UM_START
 
 async def _show_all_users(query, context):
@@ -220,19 +245,26 @@ async def _show_user_details(query, context, user_id):
         try:
             reports_count = s.query(func.count(Report.id)).filter_by(translator_id=user.id).scalar() or 0
         except Exception as e:
-            logger.error(f"خطأ في حساب عدد التقارير: {e}")
+            logger.error(f"خطأ في حساب عدد التقارير: {e}", exc_info=True)
             reports_count = 0
         
         # آخر تقرير (باستخدام فقط الأعمدة الأساسية)
         try:
             last_report = s.query(Report.id, Report.created_at).filter_by(translator_id=user.id).order_by(Report.created_at.desc()).first()
-            last_activity = last_report.created_at.strftime('%Y-%m-%d %H:%M') if last_report and last_report.created_at else "لا يوجد"
+            if last_report and hasattr(last_report, 'created_at') and last_report.created_at:
+                last_activity = last_report.created_at.strftime('%Y-%m-%d %H:%M')
+            else:
+                last_activity = "لا يوجد"
         except Exception as e:
-            logger.error(f"خطأ في جلب آخر تقرير: {e}")
+            logger.error(f"خطأ في جلب آخر تقرير: {e}", exc_info=True)
             last_activity = "لا يوجد"
         
-        status = "✅ نشط" if user.is_approved else "⏳ معلق"
-        suspended = "🔒 مجمد" if getattr(user, 'is_suspended', False) else "🔓 نشط"
+        # التحقق من الحقول قبل استخدامها
+        is_approved = getattr(user, 'is_approved', False)
+        is_suspended = getattr(user, 'is_suspended', False)
+        
+        status = "✅ نشط" if is_approved else "⏳ معلق"
+        suspended = "🔒 مجمد" if is_suspended else "🔓 نشط"
         
         text = f"👤 **تفاصيل المستخدم**\n"
         text += f"━━━━━━━━━━━━━━━━\n\n"
@@ -246,10 +278,16 @@ async def _show_user_details(query, context, user_id):
         text += f"🔐 **حالة الوصول:** {suspended}\n"
         text += f"📝 **عدد التقارير:** {reports_count}\n"
         
-        if getattr(user, 'is_suspended', False) and getattr(user, 'suspended_at', None):
-            text += f"\n⚠️ **تاريخ التجميد:** {user.suspended_at.strftime('%Y-%m-%d %H:%M')}\n"
-            if getattr(user, 'suspension_reason', None):
-                text += f"📋 **سبب التجميد:** {user.suspension_reason}\n"
+        if is_suspended:
+            suspended_at = getattr(user, 'suspended_at', None)
+            if suspended_at:
+                try:
+                    text += f"\n⚠️ **تاريخ التجميد:** {suspended_at.strftime('%Y-%m-%d %H:%M')}\n"
+                except:
+                    text += f"\n⚠️ **تاريخ التجميد:** غير محدد\n"
+            suspension_reason = getattr(user, 'suspension_reason', None)
+            if suspension_reason:
+                text += f"📋 **سبب التجميد:** {suspension_reason}\n"
         
         text += f"\n━━━━━━━━━━━━━━━━"
         
@@ -334,8 +372,10 @@ async def _handle_user_action(query, context, action):
                 
         elif action == "unsuspend":
             user.is_suspended = False
-            user.suspended_at = None
-            user.suspension_reason = None
+            if hasattr(user, 'suspended_at'):
+                user.suspended_at = None
+            if hasattr(user, 'suspension_reason'):
+                user.suspension_reason = None
             s.commit()
             message = f"🔓 **تم إلغاء تجميد المستخدم بنجاح**\n\n"
             message += f"👤 **الاسم:** {user_name}\n"
@@ -524,9 +564,11 @@ async def handle_delete_confirmation(update: Update, context: ContextTypes.DEFAU
             return UM_START
         
         # حذف المستخدم (Soft Delete)
-        user.is_active = False
+        if hasattr(user, 'is_active'):
+            user.is_active = False
         user.is_approved = False  # تأكد من إلغاء الموافقة أيضاً
-        user.is_suspended = False # تأكد من إلغاء التجميد أيضاً
+        if hasattr(user, 'is_suspended'):
+            user.is_suspended = False  # تأكد من إلغاء التجميد أيضاً
         s.commit()
     
     message = f"🗑 **تم إلغاء تنشيط حساب المستخدم**\n\n"
@@ -620,7 +662,7 @@ async def _execute_suspension(query, context, reason):
             return
         
         user.is_suspended = True
-        user.suspended_at = datetime.utcnow()
+        user.suspended_at = datetime.now()
         user.suspension_reason = reason
         s.commit()
     
@@ -664,7 +706,7 @@ async def _execute_suspension_message(update, context, reason):
             return
         
         user.is_suspended = True
-        user.suspended_at = datetime.utcnow()
+        user.suspended_at = datetime.now()
         user.suspension_reason = reason
         s.commit()
     
@@ -748,7 +790,7 @@ def register(app):
         name="user_management_conv",
         per_chat=True,
         per_user=True,
-        per_message=False,
+        per_message=True,  # ✅ تفعيل per_message لتجنب التحذيرات
     )
     app.add_handler(conv)
 

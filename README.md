@@ -5,10 +5,16 @@
 ## ✨ الميزات الرئيسية
 
 ### 📊 إدارة البيانات
-- 👥 **إدارة المرضى**: قاعدة بيانات مع 98 مريض جاهز
+- 👥 **إدارة المرضى**: قاعدة بيانات مع 98 مريض جاهز + بحث محسّن
 - 🏥 **إدارة الأطباء**: نظام بحث ذكي بالأسماء والتخصصات
 - 📝 **تقارير طبية**: تقارير شاملة مع تفاصيل كاملة
 - 📅 **جدولة المواعيد**: تتبع المواعيد والمتابعة
+- 📋 **التقرير الأولي**: عرض التقارير الأولية للمرضى
+
+### 👥 دعم المجموعات (جديد!)
+- 📢 **إرسال تلقائي**: التقارير تُرسل تلقائياً للمجموعة بعد الحفظ
+- 🔒 **أمان**: إضافة التقارير من الدردشة الخاصة فقط
+- 🎯 **واجهة نظيفة**: الأزرار مخفية في المجموعة
 
 ### 🔧 التقنيات المتقدمة
 - 🧠 **ذكاء اصطناعي**: تحليل البيانات وتوليد التقارير
@@ -16,11 +22,9 @@
 - 🔄 **نسخ احتياطي تلقائي**: كل 10 دقائق + يومي
 - 📱 **واجهات متعددة**: Webhook و Polling
 
-### 🚀 الاستضافة المتقدمة
-- 🐳 **Docker**: حاويات جاهزة للنشر
+### 🚀 الاستضافة
 - ⚡ **Hetzner VPS**: سكريبتات نشر كاملة
-- 🔄 **GitHub Actions**: CI/CD تلقائي
-- 📊 **مراقبة شاملة**: سجلات وتنبيهات
+- 💻 **الوضع المحلي**: للتطوير والاختبار
 
 ## 📋 المتطلبات
 
@@ -30,42 +34,79 @@
 
 ### ☁️ استضافة سحابية
 - خادم Hetzner VPS (CX11: €2.89/شهر)
-- أو حساب Google Cloud
-- أو حساب Railway/Render
 
 ### 🛠️ متطلبات التطوير
 - Python 3.12+
-- حساب GitHub
-- مفتاح SSH
 
 ## 🚀 التشغيل المحلي (للتطوير)
 
-### 1. تحضير البيئة
-```bash
-git clone https://github.com/YOUR_USERNAME/YOUR_REPO.git
-cd medical-reports-bot
-python -m venv venv
-venv\Scripts\activate  # على Windows
-pip install -r requirements.txt
+### على Windows:
+```powershell
+# 1. انتقل إلى مجلد المشروع
+cd botuser@
+
+# 2. شغّل السكريبت
+.\run_local.ps1
 ```
 
-### 2. إعداد التكوين
+### على Linux/Mac:
+```bash
+# 1. انتقل إلى مجلد المشروع
+cd botuser@
+
+# 2. اجعل السكريبت قابل للتنفيذ
+chmod +x run_local.sh
+
+# 3. شغّل السكريبت
+./run_local.sh
+```
+
+### إعداد ملف config.env:
 ```bash
 cp config.env.example config.env
-# عدل config.env بالقيم الصحيحة
+# عدل config.env بالقيم الصحيحة (BOT_TOKEN, ADMIN_IDS, etc.)
 ```
 
-### 3. تشغيل البوت
-```bash
-python app.py
-```
+**ملاحظة:** السكريبتات تقوم تلقائياً بـ:
+- إنشاء البيئة الافتراضية إذا لم تكن موجودة
+- تثبيت المتطلبات
+- ضبط متغيرات البيئة للوضع المحلي
+- تشغيل البوت في وضع Polling
 
 ## 🌐 طرق النشر المتاحة
 
 ### 🖥️ **Hetzner VPS** ⭐ (الموصى به - الأسهل والأرخص)
+
+#### الإعداد الأولي:
 ```bash
-# الخطوات المباشرة:
-curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/hetzner-setup.sh | bash
+# على السيرفر، شغّل سكريبت الإعداد (مرة واحدة)
+sudo bash hetzner-setup.sh
+```
+
+#### رفع المشروع:
+```bash
+# من جهازك المحلي
+scp -r botuser@/* botuser@YOUR_SERVER_IP:/home/botuser/medical-bot/
+```
+
+#### إعداد ملف config.env على السيرفر:
+```bash
+# على السيرفر
+cd /home/botuser/medical-bot
+cp config.env.example config.env
+nano config.env  # عدّل القيم
+```
+
+#### تشغيل البوت باستخدام systemd:
+```bash
+# إعداد الخدمة
+sudo cp medical-bot.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable medical-bot
+sudo systemctl start medical-bot
+
+# التحقق من الحالة
+sudo systemctl status medical-bot
 ```
 
 **المميزات:**
@@ -73,6 +114,9 @@ curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/hetzne
 - ✅ أداء ممتاز للشرق الأوسط
 - ✅ نسخ احتياطي تلقائي
 - ✅ سهولة الصيانة
+- ✅ يعمل في وضع Polling (أسهل وأكثر موثوقية)
+
+**للمزيد من التفاصيل:** راجع [SETUP_GUIDE.md](SETUP_GUIDE.md)
 
 ### ☁️ **Google Cloud Run** (للأداء العالي)
 ```bash

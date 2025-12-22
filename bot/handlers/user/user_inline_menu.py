@@ -142,6 +142,16 @@ async def handle_user_menu_callback(update: Update, context: ContextTypes.DEFAUL
         # تقارير الشهر
         await show_month_reports(query, tg_id)
     
+    elif action == "initial_case":
+        # التقرير الأولي للمرضى - يتم التعامل معه في ConversationHandler
+        await query.edit_message_text(
+            "📋 **التقرير الأولي للمرضى**\n\n"
+            "جارٍ تحميل قائمة المرضى...",
+            parse_mode="Markdown"
+        )
+        # سيتم التعامل معه في ConversationHandler
+        return
+    
     elif action == "help":
         # المساعدة
         await query.edit_message_text(

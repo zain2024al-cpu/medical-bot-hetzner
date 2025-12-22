@@ -1,52 +1,52 @@
 # ================================================
-# Run Bot Locally (Polling Mode)
+# Run Bot Locally (Polling Mode) - Windows
 # ================================================
 
 Write-Host ""
 Write-Host "================================================" -ForegroundColor Cyan
-Write-Host "Running Bot Locally (Polling Mode)" -ForegroundColor Cyan
+Write-Host "تشغيل البوت محلياً (وضع Polling)" -ForegroundColor Cyan
 Write-Host "================================================" -ForegroundColor Cyan
 Write-Host ""
 
-# Check if config.env exists
+# التحقق من وجود config.env
 if (-not (Test-Path "config.env")) {
-    Write-Host "ERROR: config.env file not found!" -ForegroundColor Red
-    Write-Host "Please create config.env file with BOT_TOKEN" -ForegroundColor Yellow
+    Write-Host "خطأ: ملف config.env غير موجود!" -ForegroundColor Red
+    Write-Host "يرجى إنشاء ملف config.env مع BOT_TOKEN" -ForegroundColor Yellow
+    Write-Host "يمكنك نسخ config.env.example إلى config.env" -ForegroundColor Yellow
     exit 1
 }
 
-# Check if virtual environment exists
+# التحقق من وجود البيئة الافتراضية
 if (-not (Test-Path "venv")) {
-    Write-Host "Creating virtual environment..." -ForegroundColor Yellow
+    Write-Host "إنشاء البيئة الافتراضية..." -ForegroundColor Yellow
     python -m venv venv
 }
 
-# Activate virtual environment
-Write-Host "Activating virtual environment..." -ForegroundColor Yellow
+# تفعيل البيئة الافتراضية
+Write-Host "تفعيل البيئة الافتراضية..." -ForegroundColor Yellow
 & .\venv\Scripts\Activate.ps1
 
-# Upgrade pip
-Write-Host "Upgrading pip..." -ForegroundColor Yellow
+# ترقية pip
+Write-Host "ترقية pip..." -ForegroundColor Yellow
 python -m pip install --upgrade pip
 
-# Install dependencies
-Write-Host "Installing dependencies..." -ForegroundColor Yellow
+# تثبيت المتطلبات
+Write-Host "تثبيت المتطلبات..." -ForegroundColor Yellow
 pip install -r requirements.txt
 
+# ضبط المتغيرات للوضع المحلي
+$env:HETZNER_DEPLOYMENT = "false"
+$env:PORT = "0"
+$env:WEBHOOK_URL = ""
+
 Write-Host ""
 Write-Host "================================================" -ForegroundColor Green
-Write-Host "Starting bot in polling mode..." -ForegroundColor Green
+Write-Host "بدء البوت في الوضع المحلي (Polling)..." -ForegroundColor Green
 Write-Host "================================================" -ForegroundColor Green
 Write-Host ""
-Write-Host "The bot will run in POLLING mode (local development)" -ForegroundColor Yellow
-Write-Host "No SERVICE_URL environment variable = Polling mode" -ForegroundColor Yellow
-Write-Host ""
-Write-Host "Press Ctrl+C to stop the bot" -ForegroundColor Yellow
+Write-Host "البوت يعمل في الوضع المحلي (Polling)" -ForegroundColor Yellow
+Write-Host "اضغط Ctrl+C لإيقاف البوت" -ForegroundColor Yellow
 Write-Host ""
 
-# Clear SERVICE_URL to force polling mode
-$env:SERVICE_URL = ""
-$env:PORT = ""
-
-# Run the bot
+# تشغيل البوت
 python app.py

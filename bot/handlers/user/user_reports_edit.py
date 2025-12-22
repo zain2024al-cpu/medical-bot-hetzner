@@ -18,6 +18,65 @@ from services.inline_calendar import create_calendar_keyboard, create_quick_date
 # حالات المحادثة
 SELECT_REPORT, SELECT_FIELD, EDIT_VALUE, CONFIRM_EDIT, EDIT_DATE_CALENDAR, EDIT_DATE_TIME = range(6)
 
+def medical_action_to_flow_type(medical_action):
+    """تحويل medical_action إلى flow_type"""
+    if not medical_action:
+        return "new_consult"
+    
+    action_lower = medical_action.lower().strip()
+    
+    # خريطة التحويل
+    action_to_flow = {
+        "استشارة جديدة": "new_consult",
+        "متابعة في الرقود": "followup",
+        "مراجعة / عودة دورية": "followup",
+        "استشارة مع قرار عملية": "surgery_consult",
+        "طوارئ": "emergency",
+        "عملية": "operation",
+        "استشارة أخيرة": "final_consult",
+        "ترقيد": "admission",
+        "خروج من المستشفى": "discharge",
+        "علاج طبيعي": "rehab_physical",
+        "أجهزة تعويضية": "rehab_device",
+        "أشعة وفحوصات": "radiology",
+    }
+    
+    # البحث المباشر
+    if medical_action in action_to_flow:
+        return action_to_flow[medical_action]
+    
+    # البحث الجزئي
+    for action_key, flow_type in action_to_flow.items():
+        if action_key in medical_action or medical_action in action_key:
+            return flow_type
+    
+    # البحث في النص الإنجليزي
+    if "new consult" in action_lower or "new_consult" in action_lower:
+        return "new_consult"
+    elif "followup" in action_lower or "follow-up" in action_lower:
+        return "followup"
+    elif "surgery" in action_lower and "consult" in action_lower:
+        return "surgery_consult"
+    elif "emergency" in action_lower:
+        return "emergency"
+    elif "operation" in action_lower:
+        return "operation"
+    elif "final consult" in action_lower or "final_consult" in action_lower:
+        return "final_consult"
+    elif "admission" in action_lower:
+        return "admission"
+    elif "discharge" in action_lower:
+        return "discharge"
+    elif "rehab" in action_lower and "physical" in action_lower:
+        return "rehab_physical"
+    elif "rehab" in action_lower and "device" in action_lower:
+        return "rehab_device"
+    elif "radiology" in action_lower:
+        return "radiology"
+    
+    # افتراضي
+    return "new_consult"
+
 def get_all_editable_fields():
     """إرجاع جميع الحقول القابلة للتعديل من جميع أنواع الإجراءات"""
     return [
@@ -245,8 +304,223 @@ async def start_edit_reports(update: Update, context: ContextTypes.DEFAULT_TYPE)
             pass
         return ConversationHandler.END
 
+def parse_report_to_report_tmp(report, flow_type):
+    """تحويل بيانات التقرير من قاعدة البيانات إلى report_tmp"""
+    import re
+    from datetime import datetime
+    
+    report_tmp = {
+        "patient_name": None,
+        "hospital_name": None,
+        "department_name": None,
+        "doctor_name": None,
+        "report_date": report.report_date,
+        "medical_action": report.medical_action,
+        "current_flow": flow_type,
+        "translator_id": report.translator_id,
+    }
+    
+    # جلب البيانات الأساسية
+    with SessionLocal() as s:
+        patient = s.query(Patient).filter_by(id=report.patient_id).first()
+        hospital = s.query(Hospital).filter_by(id=report.hospital_id).first()
+        department = s.query(Department).filter_by(id=report.department_id).first() if report.department_id else None
+        doctor = s.query(Doctor).filter_by(id=report.doctor_id).first() if report.doctor_id else None
+        
+        report_tmp["patient_name"] = patient.full_name if patient else ""
+        report_tmp["hospital_name"] = hospital.name if hospital else ""
+        report_tmp["department_name"] = department.name if department else ""
+        report_tmp["doctor_name"] = doctor.full_name if doctor else ""
+    
+    # تحليل الحقول حسب flow_type
+    if flow_type in ["new_consult", "followup", "emergency"]:
+        report_tmp["complaint"] = report.complaint_text or ""
+        
+        # تحليل doctor_decision لفصل التشخيص والقرار
+        decision_text = report.doctor_decision or ""
+        if "التشخيص:" in decision_text:
+            parts = decision_text.split("التشخيص:")
+            if len(parts) > 1:
+                diagnosis_part = parts[1].split("قرار الطبيب:")[0].strip()
+                report_tmp["diagnosis"] = diagnosis_part
+                if "قرار الطبيب:" in decision_text:
+                    decision_part = decision_text.split("قرار الطبيب:")[1].strip()
+                    report_tmp["decision"] = decision_part
+        else:
+            report_tmp["diagnosis"] = ""
+            report_tmp["decision"] = decision_text
+        
+        if flow_type == "new_consult":
+            # استخراج الفحوصات
+            if "الفحوصات المطلوبة:" in decision_text:
+                tests_part = decision_text.split("الفحوصات المطلوبة:")[1].strip()
+                report_tmp["tests"] = tests_part
+            else:
+                report_tmp["tests"] = ""
+        
+        if flow_type == "emergency":
+            # استخراج وضع الحالة
+            if "وضع الحالة:" in decision_text:
+                status_part = decision_text.split("وضع الحالة:")[1].strip()
+                report_tmp["status"] = status_part
+            else:
+                report_tmp["status"] = ""
+    
+    elif flow_type == "surgery_consult":
+        decision_text = report.doctor_decision or ""
+        
+        # استخراج التشخيص
+        if "التشخيص:" in decision_text:
+            report_tmp["diagnosis"] = decision_text.split("التشخيص:")[1].split("قرار الطبيب:")[0].strip()
+        else:
+            report_tmp["diagnosis"] = ""
+        
+        # استخراج قرار الطبيب
+        if "قرار الطبيب:" in decision_text:
+            decision_part = decision_text.split("قرار الطبيب:")[1]
+            if "اسم العملية" in decision_part:
+                decision_part = decision_part.split("اسم العملية")[0].strip()
+            report_tmp["decision"] = decision_part.strip()
+        else:
+            report_tmp["decision"] = ""
+        
+        # استخراج اسم العملية
+        if "اسم العملية بالإنجليزي:" in decision_text:
+            report_tmp["operation_name_en"] = decision_text.split("اسم العملية بالإنجليزي:")[1].split("نسبة نجاح")[0].strip()
+        else:
+            report_tmp["operation_name_en"] = ""
+        
+        # استخراج نسبة النجاح
+        if "نسبة نجاح العملية:" in decision_text:
+            report_tmp["success_rate"] = decision_text.split("نسبة نجاح العملية:")[1].split("نسبة الاستفادة")[0].strip()
+        else:
+            report_tmp["success_rate"] = ""
+        
+        # استخراج نسبة الاستفادة
+        if "نسبة الاستفادة من العملية:" in decision_text:
+            report_tmp["benefit_rate"] = decision_text.split("نسبة الاستفادة من العملية:")[1].split("الفحوصات")[0].strip()
+        else:
+            report_tmp["benefit_rate"] = ""
+        
+        # استخراج الفحوصات
+        if "الفحوصات المطلوبة:" in decision_text:
+            report_tmp["tests"] = decision_text.split("الفحوصات المطلوبة:")[1].strip()
+        else:
+            report_tmp["tests"] = ""
+    
+    elif flow_type == "operation":
+        decision_text = report.doctor_decision or ""
+        
+        # استخراج تفاصيل العملية
+        if "تفاصيل العملية:" in decision_text:
+            report_tmp["operation_details"] = decision_text.split("تفاصيل العملية:")[1].split("اسم العملية")[0].strip()
+        else:
+            report_tmp["operation_details"] = ""
+        
+        # استخراج اسم العملية
+        if "اسم العملية بالإنجليزي:" in decision_text:
+            report_tmp["operation_name_en"] = decision_text.split("اسم العملية بالإنجليزي:")[1].split("ملاحظات")[0].strip()
+        else:
+            report_tmp["operation_name_en"] = ""
+        
+        # استخراج الملاحظات
+        if "ملاحظات:" in decision_text:
+            report_tmp["notes"] = decision_text.split("ملاحظات:")[1].strip()
+        else:
+            report_tmp["notes"] = ""
+    
+    elif flow_type == "final_consult":
+        decision_text = report.doctor_decision or ""
+        
+        # استخراج التشخيص النهائي
+        if "التشخيص النهائي:" in decision_text:
+            report_tmp["diagnosis"] = decision_text.split("التشخيص النهائي:")[1].split("قرار الطبيب")[0].strip()
+        else:
+            report_tmp["diagnosis"] = ""
+        
+        # استخراج قرار الطبيب
+        if "قرار الطبيب:" in decision_text:
+            report_tmp["decision"] = decision_text.split("قرار الطبيب:")[1].split("التوصيات")[0].strip()
+        else:
+            report_tmp["decision"] = ""
+        
+        # استخراج التوصيات
+        if "التوصيات الطبية:" in decision_text:
+            report_tmp["recommendations"] = decision_text.split("التوصيات الطبية:")[1].strip()
+        else:
+            report_tmp["recommendations"] = ""
+    
+    elif flow_type == "admission":
+        decision_text = report.doctor_decision or ""
+        
+        # استخراج سبب الرقود
+        if "سبب الرقود:" in decision_text:
+            report_tmp["admission_reason"] = decision_text.split("سبب الرقود:")[1].split("رقم الغرفة")[0].strip()
+        else:
+            report_tmp["admission_reason"] = ""
+        
+        # استخراج رقم الغرفة
+        if "رقم الغرفة:" in decision_text:
+            report_tmp["room_number"] = decision_text.split("رقم الغرفة:")[1].split("ملاحظات")[0].strip()
+        else:
+            report_tmp["room_number"] = ""
+        
+        # استخراج الملاحظات
+        if "ملاحظات:" in decision_text:
+            report_tmp["notes"] = decision_text.split("ملاحظات:")[1].strip()
+        else:
+            report_tmp["notes"] = ""
+    
+    elif flow_type == "discharge":
+        decision_text = report.doctor_decision or ""
+        
+        # محاولة تحديد نوع الخروج
+        if "ملخص الرقود:" in decision_text:
+            report_tmp["discharge_type"] = "admission"
+            report_tmp["admission_summary"] = decision_text.split("ملخص الرقود:")[1].strip()
+        elif "تفاصيل العملية:" in decision_text:
+            report_tmp["discharge_type"] = "operation"
+            report_tmp["operation_details"] = decision_text.split("تفاصيل العملية:")[1].split("اسم العملية")[0].strip()
+            if "اسم العملية بالإنجليزي:" in decision_text:
+                report_tmp["operation_name_en"] = decision_text.split("اسم العملية بالإنجليزي:")[1].strip()
+        else:
+            report_tmp["discharge_type"] = "admission"
+    
+    elif flow_type == "rehab_physical":
+        decision_text = report.doctor_decision or ""
+        if "تفاصيل الجلسة:" in decision_text:
+            report_tmp["therapy_details"] = decision_text.split("تفاصيل الجلسة:")[1].strip()
+        else:
+            report_tmp["therapy_details"] = ""
+    
+    elif flow_type == "rehab_device":
+        decision_text = report.doctor_decision or ""
+        if "تفاصيل الجهاز:" in decision_text:
+            report_tmp["device_details"] = decision_text.split("تفاصيل الجهاز:")[1].strip()
+        else:
+            report_tmp["device_details"] = ""
+    
+    elif flow_type == "radiology":
+        decision_text = report.doctor_decision or ""
+        if "نوع الأشعة والفحوصات:" in decision_text:
+            report_tmp["radiology_type"] = decision_text.split("نوع الأشعة والفحوصات:")[1].strip()
+        else:
+            report_tmp["radiology_type"] = ""
+    
+    # تاريخ العودة وسبب العودة (مشترك)
+    report_tmp["followup_date"] = report.followup_date
+    report_tmp["followup_reason"] = report.followup_reason or ""
+    
+    # استخراج وقت العودة من followup_date إذا كان موجوداً
+    if report.followup_date:
+        report_tmp["followup_time"] = report.followup_date.strftime("%H:%M") if hasattr(report.followup_date, 'strftime') else ""
+    else:
+        report_tmp["followup_time"] = ""
+    
+    return report_tmp
+
 async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """معالجة اختيار التقرير"""
+    """معالجة اختيار التقرير - إعادة المستخدم إلى نفس الخطوات"""
     import logging
     logger = logging.getLogger(__name__)
     
@@ -277,86 +551,56 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
                 await query.edit_message_text("⚠️ **خطأ:** لا يمكنك تعديل هذا التقرير")
                 return ConversationHandler.END
             
-            # جلب بيانات التقرير الكاملة
-            patient = s.query(Patient).filter_by(id=report.patient_id).first()
-            hospital = s.query(Hospital).filter_by(id=report.hospital_id).first()
-            department = s.query(Department).filter_by(id=report.department_id).first() if report.department_id else None
-            doctor = s.query(Doctor).filter_by(id=report.doctor_id).first() if report.doctor_id else None
+            # تحديد flow_type من medical_action
+            flow_type = medical_action_to_flow_type(report.medical_action)
+            logger.info(f"✅ Flow type determined: {flow_type} from medical_action: {report.medical_action}")
             
-            # حفظ البيانات الحالية
-            context.user_data['current_report_data'] = {
-                'patient_name': patient.full_name if patient else "غير معروف",
-                'hospital_name': hospital.name if hospital else "غير معروف",
-                'department_name': department.name if department else "غير محدد",
-                'doctor_name': doctor.full_name if doctor else "لم يتم التحديد",
-                'medical_action': report.medical_action or "غير محدد",
-                'complaint_text': report.complaint_text or "لا يوجد",
-                'doctor_decision': report.doctor_decision or "لا يوجد",
-                'diagnosis': report.diagnosis or "لا يوجد",
-                'treatment_plan': report.treatment_plan or "لا يوجد",
-                'medications': report.medications or "لا يوجد",
-                'notes': report.notes or "لا يوجد",
-                'case_status': report.case_status or "لا يوجد",
-                'followup_date': report.followup_date.strftime('%Y-%m-%d') if report.followup_date else None,
-                'followup_time': report.followup_time,
-                'followup_reason': report.followup_reason or "لا يوجد",
-                'report_date': report.report_date.strftime('%Y-%m-%d %H:%M')
-            }
+            # تحويل بيانات التقرير إلى report_tmp
+            report_tmp = parse_report_to_report_tmp(report, flow_type)
+            context.user_data['report_tmp'] = report_tmp
+            context.user_data['report_tmp']['is_edit_mode'] = True
+            context.user_data['report_tmp']['edit_report_id'] = report_id
             
-            # تحويل موعد العودة إلى صيغة 12 ساعة للعرض
-            followup_display = "لا يوجد"
-            if context.user_data['current_report_data']['followup_date']:
-                date_part = context.user_data['current_report_data']['followup_date']
-                followup_time = context.user_data['current_report_data']['followup_time']
-                
-                if followup_time:
-                    try:
-                        # تحويل الوقت من صيغة 24 ساعة (HH:MM) إلى صيغة 12 ساعة
-                        hour, minute = followup_time.split(':')
-                        hour_int = int(hour)
-                        if hour_int == 0:
-                            time_display = f"12:{minute} صباحاً"
-                        elif hour_int < 12:
-                            time_display = f"{hour_int}:{minute} صباحاً"
-                        elif hour_int == 12:
-                            time_display = f"12:{minute} ظهراً"
-                        else:
-                            time_display = f"{hour_int-12}:{minute} مساءً"
-                        followup_display = f"{date_part} الساعة {time_display}"
-                    except:
-                        followup_display = f"{date_part} الساعة {followup_time}"
-                else:
-                    followup_display = date_part
+            logger.info(f"✅ تم تحميل بيانات التقرير في report_tmp: {list(report_tmp.keys())}")
             
-            # عرض بيانات التقرير
-            medical_action = context.user_data['current_report_data']['medical_action']
-            editable_fields = get_all_editable_fields()  # عرض جميع الحقول
+            # استيراد دالة start_report من user_reports_add_new_system
+            from bot.handlers.user.user_reports_add_new_system import start_report
             
-            text = f"📋 **بيانات التقرير #{report_id}**\n\n"
-            text += f"📅 **تاريخ التقرير:** {context.user_data['current_report_data']['report_date']}\n"
-            text += f"👤 **اسم المريض:** {context.user_data['current_report_data']['patient_name']}\n"
-            text += f"🏥 **المستشفى:** {context.user_data['current_report_data']['hospital_name']}\n"
-            text += f"🏷️ **القسم:** {context.user_data['current_report_data']['department_name']}\n"
-            text += f"👨‍⚕️ **الطبيب:** {context.user_data['current_report_data']['doctor_name']}\n"
-            text += f"⚕️ **نوع الإجراء:** {medical_action}\n\n"
-            text += "اختر الحقل الذي تريد تعديله:"
-            
-            # بناء الأزرار حسب نوع الإجراء
-            keyboard = []
-            for field_name, field_display in editable_fields:
-                keyboard.append([InlineKeyboardButton(field_display, callback_data=f"edit_field:{field_name}")])
-            
-            keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="edit_back")])
-            keyboard.append([InlineKeyboardButton("❌ إلغاء", callback_data="edit_cancel")])
-            
+            # إعادة المستخدم إلى نفس الخطوات
             await query.edit_message_text(
-                text,
-                reply_markup=InlineKeyboardMarkup(keyboard),
+                f"✏️ **تعديل التقرير #{report_id}**\n\n"
+                f"📋 **نوع الإجراء:** {report.medical_action}\n"
+                f"🔄 **جارٍ إعادة تحميل التقرير...**",
                 parse_mode=ParseMode.MARKDOWN
             )
             
-            logger.info(f"✅ تم عرض بيانات التقرير #{report_id}")
-            return SELECT_FIELD
+            # بدء نفس التدفق
+            # نحتاج إلى إعادة المستخدم إلى الخطوة المناسبة حسب flow_type
+            # سنستخدم start_report ولكن مع report_tmp محمّل مسبقاً
+            
+            # إرسال رسالة جديدة لبدء التدفق
+            await query.message.reply_text(
+                "✏️ **تعديل التقرير**\n\n"
+                "تم تحميل بيانات التقرير. سيتم إعادة عرض الخطوات للتعديل.",
+                parse_mode=ParseMode.MARKDOWN
+            )
+            
+            # بدء التدفق من البداية (لكن مع البيانات المحمّلة)
+            # سنستخدم ConversationHandler الموجود في user_reports_add_new_system
+            # لكن نحتاج إلى إعادة توجيه المستخدم إلى الخطوة المناسبة
+            
+            # للآن، سنعرض الملخص النهائي مباشرة مع إمكانية التعديل
+            from bot.handlers.user.user_reports_add_new_system import show_final_summary
+            
+            await show_final_summary(query.message, context, flow_type)
+            
+            # إرجاع state التأكيد المناسب
+            from bot.handlers.user.user_reports_add_new_system import get_confirm_state
+            confirm_state = get_confirm_state(flow_type)
+            context.user_data['_conversation_state'] = confirm_state
+            
+            logger.info(f"✅ تم تحميل التقرير وإعادة عرضه للتحرير - flow_type: {flow_type}")
+            return confirm_state
             
     except Exception as e:
         logger.error(f"❌ خطأ في handle_report_selection: {e}", exc_info=True)
