@@ -964,8 +964,15 @@ async def start_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     import logging
     logger = logging.getLogger(__name__)
     
+    # تسجيل تفصيلي للمساعدة في التشخيص
+    logger.info("=" * 80)
+    logger.info("🚀 start_report CALLED")
+    logger.info(f"   User ID: {update.effective_user.id if update.effective_user else 'N/A'}")
+    logger.info(f"   Chat Type: {update.effective_chat.type if update.effective_chat else 'N/A'}")
+    logger.info(f"   Message Text: {update.message.text if update.message and update.message.text else 'N/A'}")
+    logger.info("=" * 80)
+    
     try:
-        logger.info(f"start_report called by user {update.effective_user.id if update.effective_user else 'N/A'}")
         
         # ✅ منع إضافة التقارير من المجموعات - السماح فقط في الدردشة الخاصة
         chat = update.effective_chat
@@ -992,15 +999,17 @@ async def start_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "state_manager": state_manager,
             "action_type": None
         }
+        
+        # ✅ تنظيف أي بيانات من التقرير الأولي لضمان عدم التعارض
+        context.user_data.pop("initial_case_search", None)
+        context.user_data['_current_search_type'] = 'patient'  # تعيين نوع البحث الافتراضي
 
         # تحديث الـ conversation state
         context.user_data['_conversation_state'] = STATE_SELECT_DATE
 
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("📅 إدخال التاريخ الحالي",
-            callback_data="date:now")],
-            [InlineKeyboardButton("📅 إدخال من التقويم",
-            callback_data="date:calendar")],
+            [InlineKeyboardButton("📅 إدخال التاريخ الحالي", callback_data="date:now")],
+            [InlineKeyboardButton("📅 إدخال من التقويم", callback_data="date:calendar")],
             [InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]
         ])
 
@@ -6097,6 +6106,8 @@ async def render_translator_selection(message, context, flow_type):
 
 async def ask_translator_name(message, context, flow_type):
     """طلب اسم المترجم - مشترك لجميع المسارات (يستخدم render_translator_selection)"""
+    # تعيين نوع البحث للمترجمين
+    context.user_data['_current_search_type'] = 'translator'
     await render_translator_selection(message, context, flow_type)
 
 
@@ -6803,7 +6814,17 @@ async def handle_edit_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     await query.answer()
     if query.data.startswith("edit:"):
         flow_type = query.data.split(":")[1]
-        return await handle_edit_before_save(query, context, flow_type)
+        # إذا كان المستخدم في EDIT_FIELD state، نعيده إلى confirm state
+        current_state = context.user_data.get('_conversation_state')
+        if current_state == "EDIT_FIELD":
+            # إعادة عرض الملخص والعودة إلى confirm state
+            await show_final_summary(query.message, context, flow_type)
+            confirm_state = get_confirm_state(flow_type)
+            context.user_data['_conversation_state'] = confirm_state
+            return confirm_state
+        else:
+            # إذا لم يكن في EDIT_FIELD، نعرض قائمة الحقول
+            return await handle_edit_before_save(query, context, flow_type)
     return ConversationHandler.END
 
 async def handle_save_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -8533,6 +8554,7 @@ def register(app):
             NEW_CONSULT_CONFIRM: [
                 CallbackQueryHandler(handle_final_confirm, pattern="^(save|review|publish|back_to_summary|edit):"),
                 CallbackQueryHandler(handle_save_callback, pattern="^save:"),
+                CallbackQueryHandler(handle_edit_field_selection, pattern="^edit_field:"),
             ],
             # مسار استشارة مع قرار عملية
             SURGERY_CONSULT_DIAGNOSIS: [
@@ -8574,6 +8596,7 @@ def register(app):
             SURGERY_CONSULT_CONFIRM: [
                 CallbackQueryHandler(handle_final_confirm, pattern="^(save|review|publish|back_to_summary|edit):"),
                 CallbackQueryHandler(handle_save_callback, pattern="^save:"),
+                CallbackQueryHandler(handle_edit_field_selection, pattern="^edit_field:"),
             ],
             # مسار استشارة أخيرة
             FINAL_CONSULT_DIAGNOSIS: [
@@ -8594,6 +8617,7 @@ def register(app):
             FINAL_CONSULT_CONFIRM: [
                 CallbackQueryHandler(handle_final_confirm, pattern="^(save|review|publish|back_to_summary|edit):"),
                 CallbackQueryHandler(handle_save_callback, pattern="^save:"),
+                CallbackQueryHandler(handle_edit_field_selection, pattern="^edit_field:"),
             ],
             # مسار متابعة في الرقود
             FOLLOWUP_COMPLAINT: [
@@ -8627,6 +8651,7 @@ def register(app):
             FOLLOWUP_CONFIRM: [
                 CallbackQueryHandler(handle_final_confirm, pattern="^(save|review|publish|back_to_summary|edit):"),
                 CallbackQueryHandler(handle_save_callback, pattern="^save:"),
+                CallbackQueryHandler(handle_edit_field_selection, pattern="^edit_field:"),
             ],
             # مسار طوارئ
             EMERGENCY_COMPLAINT: [
@@ -8668,6 +8693,7 @@ def register(app):
             EMERGENCY_CONFIRM: [
                 CallbackQueryHandler(handle_final_confirm, pattern="^(save|review|publish|back_to_summary|edit):"),
                 CallbackQueryHandler(handle_save_callback, pattern="^save:"),
+                CallbackQueryHandler(handle_edit_field_selection, pattern="^edit_field:"),
             ],
             # مسار عملية
             OPERATION_DETAILS_AR: [
@@ -8699,6 +8725,7 @@ def register(app):
             OPERATION_CONFIRM: [
                 CallbackQueryHandler(handle_final_confirm, pattern="^(save|review|publish|back_to_summary|edit):"),
                 CallbackQueryHandler(handle_save_callback, pattern="^save:"),
+                CallbackQueryHandler(handle_edit_field_selection, pattern="^edit_field:"),
             ],
             # مسار علاج طبيعي / أجهزة تعويضية
             REHAB_TYPE: [
@@ -8727,6 +8754,7 @@ def register(app):
             PHYSICAL_THERAPY_CONFIRM: [
                 CallbackQueryHandler(handle_final_confirm, pattern="^(save|review|publish|back_to_summary|edit):"),
                 CallbackQueryHandler(handle_save_callback, pattern="^save:"),
+                CallbackQueryHandler(handle_edit_field_selection, pattern="^edit_field:"),
             ],
             DEVICE_NAME_DETAILS: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_device_name_details),
@@ -8751,6 +8779,7 @@ def register(app):
             DEVICE_CONFIRM: [
                 CallbackQueryHandler(handle_final_confirm, pattern="^(save|review|publish|back_to_summary|edit):"),
                 CallbackQueryHandler(handle_save_callback, pattern="^save:"),
+                CallbackQueryHandler(handle_edit_field_selection, pattern="^edit_field:"),
             ],
             # مسار أشعة وفحوصات
             RADIOLOGY_TYPE: [
@@ -8769,6 +8798,7 @@ def register(app):
             RADIOLOGY_CONFIRM: [
                 CallbackQueryHandler(handle_final_confirm, pattern="^(save|review|publish|back_to_summary|edit):"),
                 CallbackQueryHandler(handle_save_callback, pattern="^save:"),
+                CallbackQueryHandler(handle_edit_field_selection, pattern="^edit_field:"),
             ],
             # مسار ترقيد
             ADMISSION_REASON: [
@@ -8801,6 +8831,7 @@ def register(app):
             ADMISSION_CONFIRM: [
                 CallbackQueryHandler(handle_final_confirm, pattern="^(save|review|publish|back_to_summary|edit):"),
                 CallbackQueryHandler(handle_save_callback, pattern="^save:"),
+                CallbackQueryHandler(handle_edit_field_selection, pattern="^edit_field:"),
             ],
             # مسار خروج من المستشفى
             DISCHARGE_TYPE: [
@@ -8836,10 +8867,12 @@ def register(app):
             DISCHARGE_CONFIRM: [
                 CallbackQueryHandler(handle_final_confirm, pattern="^(save|review|publish|back_to_summary|edit):"),
                 CallbackQueryHandler(handle_save_callback, pattern="^save:"),
+                CallbackQueryHandler(handle_edit_field_selection, pattern="^edit_field:"),
             ],
             # State عام لمعالجة التعديل
             "EDIT_FIELD": [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_edit_field_input),
+                CallbackQueryHandler(handle_edit_callback, pattern="^edit:"),
             ],
             # أضف هنا باقي المسارات بنفس الطريقة (FOLLOWUP_COMPLAINT، ADMISSION_COMPLAINT، ...)
         },
@@ -8859,47 +8892,70 @@ def register(app):
             # DEBUG: إضافة fallback لالتقاط جميع callbacks غير متطابقة في حالة R_ACTION_TYPE
             CallbackQueryHandler(debug_all_callbacks, pattern=".*"),
         ],
-        per_message=True,  # ✅ تفعيل per_message لتجنب التحذيرات
+        per_message=False,  # ✅ False لأن لدينا MessageHandler في entry_points
         per_chat=True,
         per_user=True,
     )
     # تسجيل InlineQueryHandler موحد للبحث عن المرضى والأطباء - قبل ConversationHandler
     async def unified_inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handler موحد للبحث - يحدد النوع بناءً على علامة البحث"""
-        print("🎯🎯🎯 UNIFIED_INLINE_QUERY_HANDLER TRIGGERED! 🎯🎯🎯")
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        query_text = update.inline_query.query.strip() if update.inline_query.query else ""
+        logger.info("🎯🎯🎯 UNIFIED_INLINE_QUERY_HANDLER TRIGGERED! 🎯🎯🎯")
 
         report_tmp = context.user_data.get("report_tmp", {})
         search_type = context.user_data.get('_current_search_type', 'patient')
+        initial_case_search = context.user_data.get("initial_case_search")
+        
+        logger.info(f"🎯 Report TMP exists: {bool(report_tmp)}")
+        logger.info(f"🎯 Search type: {search_type}")
+        logger.info(f"🎯 Initial case search: {initial_case_search}")
+        logger.info(f"🎯 Query text: '{query_text}'")
+        
+        # ✅ التحقق: هل المستخدم في وضع التقرير الأولي فقط (وليس في وضع إضافة تقرير جديد)؟
+        # إذا كان في وضع التقرير الأولي وليس في وضع إضافة تقرير جديد، نستخدم handle_initial_case_inline_query
+        if initial_case_search is not None and initial_case_search.get("active") is True and not report_tmp:
+            # المستخدم في وضع التقرير الأولي فقط - نستدعي handle_initial_case_inline_query
+            logger.info("🎯 User is in initial case search mode - calling initial case handler")
+            from bot.handlers.user.user_initial_case import handle_initial_case_inline_query
+            await handle_initial_case_inline_query(update, context)
+            return
 
-        print(f"🎯 Report TMP exists: {bool(report_tmp)}")
-        print(f"🎯 Search type: {search_type}")
-        print(f"🎯 Query text: '{update.inline_query.query if update.inline_query else 'N/A'}'")
-
+        # ✅ تحديد نوع البحث بناءً على search_type أولاً (قبل التحقق من report_tmp)
+        # هذا يضمن أن البحث عن الأطباء والمترجمين يعمل بشكل صحيح
+        
+        # البحث عن الأطباء
+        if search_type == 'doctor':
+            if not report_tmp:
+                logger.info("🎯 No report_tmp for doctor search, returning empty results")
+                await update.inline_query.answer([], cache_time=1)
+                return
+            logger.info("🎯 Calling doctor search")
+            await doctor_inline_query_handler(update, context)
+            return
+        
+        # البحث عن المترجمين
+        if search_type == 'translator':
+            logger.info("🎯 Calling translator search")
+            await translator_inline_query_handler(update, context)
+            return
+        
+        # البحث عن المرضى (افتراضي)
         # السماح بالبحث عن المرضى دائماً (حتى لو لم يكن report_tmp موجوداً)
         # لأن البحث عن المرضى يمكن أن يحدث في أي وقت
-        if search_type == 'patient' or not report_tmp:
-            print("🎯 Calling patient search (always allowed)")
+        if search_type == 'patient' or not search_type or search_type not in ['doctor', 'translator']:
+            logger.info("🎯 Calling patient search (default)")
             await patient_inline_query_handler(update, context)
             return
 
-        # للبحث عن الأطباء، نحتاج report_tmp
-        if search_type == 'doctor':
-            if not report_tmp:
-                print("🎯 No report_tmp for doctor search, returning empty results")
-                await update.inline_query.answer([], cache_time=1)
-                return
-            print("🎯 Calling doctor search")
-            await doctor_inline_query_handler(update, context)
-            return
-
-        # افتراضياً نبحث في المرضى
-        print("🎯 Unknown search type, defaulting to patient search")
-        await patient_inline_query_handler(update, context)
-
     # تسجيل InlineQueryHandler أولاً لضمان أنه يلتقط inline queries قبل ConversationHandler
-    app.add_handler(InlineQueryHandler(unified_inline_query_handler))
+    # group=0 (افتراضي) - سيتم استدعاؤه مع handle_initial_case_inline_query
+    # لكن unified_inline_query_handler سيعمل كـ fallback إذا لم يرسل handle_initial_case_inline_query إجابة
+    app.add_handler(InlineQueryHandler(unified_inline_query_handler), group=0)
     # تسجيل InlineQueryHandler للمترجمين
-    app.add_handler(InlineQueryHandler(translator_inline_query_handler))
+    app.add_handler(InlineQueryHandler(translator_inline_query_handler), group=2)
 
     # ثم تسجيل ConversationHandler
     app.add_handler(conv_handler)
