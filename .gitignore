@@ -63,6 +63,9 @@ config.env
 .env.production
 .env.staging
 secrets.json
+*.yaml
+env.yaml
+hetzner-env.yaml
 
 # 📁 Temporary files
 tmp/
