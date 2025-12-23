@@ -7,10 +7,20 @@ from dotenv import load_dotenv
 
 # 🧭 تحميل متغيرات البيئة من ملف config.env (للتطوير المحلي فقط)
 # في الاستضافة السحابية، المتغيرات تكون متوفرة مباشرة في البيئة
-try:
-    load_dotenv("config.env")
-except FileNotFoundError:
-    pass  # طبيعي في الاستضافة السحابية
+# محاولة تحميل من عدة مواقع محتملة
+config_paths = [
+    "config.env",  # المجلد الحالي أولاً
+    "/home/botuser/medical-bot/temp_upload/config.env",  # مسار السيرفر الرئيسي
+    "/home/botuser/medical-bot/config.env",  # مسار بديل
+    os.path.join(os.path.dirname(os.path.dirname(__file__)), "config.env"),  # مسار نسبي
+]
+
+config_loaded = False
+for path in config_paths:
+    if os.path.exists(path):
+        if load_dotenv(path):
+            config_loaded = True
+            break
 
 # 🧭 توكن بوت التليجرام من @BotFather
 BOT_TOKEN = os.getenv("BOT_TOKEN")
