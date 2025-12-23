@@ -7865,8 +7865,10 @@ async def show_final_summary(message, context, flow_type):
     summary += f"\n👤 **المترجم:** {data.get('translator_name', 'غير محدد')}"
 
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("📋 مراجعة التقرير", callback_data=f"review:{flow_type}")],
-        [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back")],
+        [
+            InlineKeyboardButton("✏️ مراجعة وتعديل التقرير", callback_data=f"edit:{flow_type}"),
+            InlineKeyboardButton("📤 نشر التقرير", callback_data=f"publish:{flow_type}")
+        ],
         [InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]
     ])
 
@@ -7891,14 +7893,11 @@ async def show_review_screen(query, context, flow_type):
         # بناء رسالة المراجعة
         review_text = "📋 **مراجعة التقرير**\n\n"
         review_text += "يمكنك الآن:\n"
-        review_text += "• ✏️ تعديل أي حقل في التقرير\n"
-        review_text += "• 📤 نشر التقرير مباشرة\n"
-        review_text += "• 🔙 الرجوع للملخص\n\n"
-        review_text += "اختر الإجراء المطلوب:"
+        review_text += "• ✏️ تعديل أي حقل في التقرير\n\n"
+        review_text += "اختر الحقل الذي تريد تعديله:"
         
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("✏️ تعديل الحقول", callback_data=f"edit:{flow_type}")],
-            [InlineKeyboardButton("📤 نشر التقرير", callback_data=f"publish:{flow_type}")],
             [InlineKeyboardButton("🔙 رجوع للملخص", callback_data=f"back_to_summary:{flow_type}")],
             [InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]
         ])
@@ -9107,6 +9106,23 @@ def register(app):
 
     app.add_handler(ChosenInlineResultHandler(handle_chosen_inline_result))
 
+    # دالة مساعدة لبدء التقرير من callback query
+    async def start_report_from_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """بدء إضافة تقرير من callback query"""
+        query = update.callback_query
+        if query:
+            # إنشاء update object مع message من callback_query
+            class SimpleUpdate:
+                def __init__(self, update_obj, msg):
+                    self.update_id = update_obj.update_id
+                    self.effective_user = update_obj.effective_user
+                    self.effective_chat = msg.chat if msg else None
+                    self.message = msg
+            
+            simple_update = SimpleUpdate(update, query.message)
+            return await start_report(simple_update, context)
+        return ConversationHandler.END
+    
     # تسجيل ConversationHandler لإضافة التقارير
     conv_handler = ConversationHandler(
         entry_points=[
@@ -9116,6 +9132,8 @@ def register(app):
             MessageHandler(filters.ChatType.PRIVATE & filters.Regex(r"^📝 إضافة تقرير جديد$"), start_report),
             MessageHandler(filters.ChatType.PRIVATE & filters.Regex(r"إضافة تقرير جديد"), start_report),
             MessageHandler(filters.ChatType.PRIVATE & filters.TEXT & filters.Regex(r"📝.*إضافة.*تقرير.*جديد"), start_report),
+            # ✅ إضافة entry point للـ callback queries (للأزرار)
+            CallbackQueryHandler(start_report_from_callback, pattern="^(date:now|date:calendar)$"),
         ],
         states={
             STATE_SELECT_DATE: [

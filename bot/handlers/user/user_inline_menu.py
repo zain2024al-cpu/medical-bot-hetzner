@@ -80,27 +80,100 @@ async def handle_user_menu_callback(update: Update, context: ContextTypes.DEFAUL
     # ================================================
     
     if action == "add_report":
-        # إضافة تقرير جديد - تفعيل النظام الموجود
-        await query.edit_message_text(
-            "📝 **إضافة تقرير جديد**\n\n"
-            "يرجى الضغط على الزر أدناه في لوحة الأزرار:\n"
-            "👉 **\"📝 إضافة تقرير جديد\"**\n\n"
-            "أو استخدم الأمر: /add"
-        )
-        # إعادة عرض القائمة
-        await query.message.reply_text(
-            "اختر العملية:",
-            reply_markup=user_main_inline_kb()
-        )
+        # إضافة تقرير جديد - استخدام callback data لدخول ConversationHandler
+        from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+        from telegram.constants import ChatType
+        
+        try:
+            # التحقق من أن المحادثة خاصة
+            if query.message.chat.type != ChatType.PRIVATE:
+                await query.edit_message_text(
+                    "⚠️ **لا يمكن إضافة التقارير من المجموعة!**\n\n"
+                    "💡 يرجى استخدام الدردشة الخاصة مع البوت.",
+                    parse_mode="Markdown"
+                )
+                return
+            
+            # التحقق من الموافقة
+            if not is_user_approved(query.from_user.id):
+                await query.edit_message_text(
+                    "⏳ بانتظار موافقة الإدارة.",
+                    parse_mode="Markdown"
+                )
+                return
+            
+            # إرسال رسالة جديدة مع keyboard
+            # سيتم التعامل مع callback "date:now" أو "date:calendar" من قبل ConversationHandler
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("📅 إدخال التاريخ الحالي", callback_data="date:now")],
+                [InlineKeyboardButton("📅 إدخال من التقويم", callback_data="date:calendar")],
+                [InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]
+            ])
+            
+            await query.message.reply_text(
+                "📅 **إضافة تقرير جديد**\n\n"
+                "اختر طريقة إدخال التاريخ:",
+                reply_markup=keyboard,
+                parse_mode="Markdown"
+            )
+            await query.answer("تم فتح نموذج إضافة التقرير")
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"❌ خطأ في بدء إضافة تقرير: {e}", exc_info=True)
+            await query.edit_message_text(
+                "❌ **حدث خطأ**\n\n"
+                "يرجى المحاولة مرة أخرى أو استخدام الأمر: /add",
+                parse_mode="Markdown"
+            )
     
     elif action == "quick_add":
-        # إضافة سريعة - نفس الإضافة العادية
-        await query.edit_message_text(
-            "⚡ **إضافة سريعة**\n\n"
-            "يرجى الضغط على:\n"
-            "👉 **\"📝 إضافة تقرير جديد\"** من لوحة الأزرار\n\n"
-            "أو استخدم: /add"
-        )
+        # إضافة سريعة - نفس الإضافة العادية (نفس الكود)
+        from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+        from telegram.constants import ChatType
+        
+        try:
+            # التحقق من أن المحادثة خاصة
+            if query.message.chat.type != ChatType.PRIVATE:
+                await query.edit_message_text(
+                    "⚠️ **لا يمكن إضافة التقارير من المجموعة!**\n\n"
+                    "💡 يرجى استخدام الدردشة الخاصة مع البوت.",
+                    parse_mode="Markdown"
+                )
+                return
+            
+            # التحقق من الموافقة
+            if not is_user_approved(query.from_user.id):
+                await query.edit_message_text(
+                    "⏳ بانتظار موافقة الإدارة.",
+                    parse_mode="Markdown"
+                )
+                return
+            
+            # إرسال رسالة جديدة مع keyboard
+            # سيتم التعامل مع callback "date:now" أو "date:calendar" من قبل ConversationHandler
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("📅 إدخال التاريخ الحالي", callback_data="date:now")],
+                [InlineKeyboardButton("📅 إدخال من التقويم", callback_data="date:calendar")],
+                [InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]
+            ])
+            
+            await query.message.reply_text(
+                "📅 **إضافة تقرير جديد**\n\n"
+                "اختر طريقة إدخال التاريخ:",
+                reply_markup=keyboard,
+                parse_mode="Markdown"
+            )
+            await query.answer("تم فتح نموذج إضافة التقرير")
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"❌ خطأ في بدء إضافة تقرير: {e}", exc_info=True)
+            await query.edit_message_text(
+                "❌ **حدث خطأ**\n\n"
+                "يرجى المحاولة مرة أخرى أو استخدام الأمر: /add",
+                parse_mode="Markdown"
+            )
     
     elif action == "schedule":
         # عرض الجدول - تفعيل النظام الموجود

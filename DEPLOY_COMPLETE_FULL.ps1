@@ -15,13 +15,11 @@ Write-Host ""
 
 # Step 1: Check if directory exists
 Write-Host "[1/5] 🔍 التحقق من المجلد على السيرفر..." -ForegroundColor Yellow
-$checkCmd = "test -d $REMOTE_PATH && echo 'EXISTS' || echo 'NOT_EXISTS'"
-$result = ssh -o StrictHostKeyChecking=no $HETZNER_USER@$HETZNER_IP $checkCmd
+$checkResult = ssh -o StrictHostKeyChecking=no "$HETZNER_USER@$HETZNER_IP" "test -d $REMOTE_PATH && echo EXISTS || echo NOT_EXISTS"
 
-if ($result -match "NOT_EXISTS") {
+if ($checkResult -match "NOT_EXISTS") {
     Write-Host "⚠️ المجلد غير موجود. جاري الإنشاء والاستنساخ..." -ForegroundColor Yellow
-    $setupCmd = "mkdir -p $REMOTE_PATH && cd $REMOTE_PATH && git clone $GIT_REPO . || (cd $REMOTE_PATH && git init && git remote add origin $GIT_REPO && git pull origin main)"
-    ssh -o StrictHostKeyChecking=no $HETZNER_USER@$HETZNER_IP $setupCmd
+    ssh -o StrictHostKeyChecking=no "$HETZNER_USER@$HETZNER_IP" "mkdir -p $REMOTE_PATH; cd $REMOTE_PATH; git clone $GIT_REPO . 2>/dev/null || (cd $REMOTE_PATH; git init; git remote add origin $GIT_REPO; git pull origin main)"
     if ($LASTEXITCODE -ne 0) {
         Write-Host "❌ فشل في إنشاء المجلد والاستنساخ" -ForegroundColor Red
         exit 1
@@ -34,48 +32,41 @@ if ($result -match "NOT_EXISTS") {
 # Step 2: Pull latest changes from GitHub
 Write-Host ""
 Write-Host "[2/5] 📥 جلب أحدث التحديثات من GitHub..." -ForegroundColor Yellow
-$pullCmd = "cd $REMOTE_PATH && git fetch origin main && git reset --hard origin/main && echo '✅ تم جلب التحديثات'"
-$pullResult = ssh -o StrictHostKeyChecking=no $HETZNER_USER@$HETZNER_IP $pullCmd
-Write-Host $pullResult
-
+ssh -o StrictHostKeyChecking=no "$HETZNER_USER@$HETZNER_IP" "cd $REMOTE_PATH; git fetch origin main; git reset --hard origin/main"
 if ($LASTEXITCODE -ne 0) {
     Write-Host "❌ فشل في جلب التحديثات" -ForegroundColor Red
     exit 1
 }
+Write-Host "✅ تم جلب التحديثات" -ForegroundColor Green
 
-# Step 3: Install/update dependencies
+# Step 3: Install/update dependencies (بساطة - تنفيذ مباشر)
 Write-Host ""
 Write-Host "[3/5] 📦 تحديث المتطلبات..." -ForegroundColor Yellow
-$installCmd = "cd $REMOTE_PATH && if [ -d venv ]; then source venv/bin/activate && pip install -r requirements.txt --quiet --upgrade; else python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt --quiet --upgrade; fi && echo '✅ تم تحديث المتطلبات'"
-$installResult = ssh -o StrictHostKeyChecking=no $HETZNER_USER@$HETZNER_IP $installCmd
-Write-Host $installResult
-
+ssh -o StrictHostKeyChecking=no "$HETZNER_USER@$HETZNER_IP" "cd $REMOTE_PATH; test -d venv && (source venv/bin/activate; pip install -r requirements.txt --quiet --upgrade) || (python3 -m venv venv; source venv/bin/activate; pip install -r requirements.txt --quiet --upgrade)"
 if ($LASTEXITCODE -ne 0) {
     Write-Host "⚠️ تحذير: قد تكون هناك مشكلة في تثبيت المتطلبات" -ForegroundColor Yellow
+} else {
+    Write-Host "✅ تم تحديث المتطلبات" -ForegroundColor Green
 }
 
 # Step 4: Restart service
 Write-Host ""
 Write-Host "[4/5] 🔄 إعادة تشغيل خدمة البوت..." -ForegroundColor Yellow
-$restartCmd = "systemctl daemon-reload && systemctl restart medical-bot && sleep 5 && echo '✅ تم إعادة التشغيل'"
-$restartResult = ssh -o StrictHostKeyChecking=no $HETZNER_USER@$HETZNER_IP $restartCmd
-Write-Host $restartResult
-
+ssh -o StrictHostKeyChecking=no "$HETZNER_USER@$HETZNER_IP" "systemctl daemon-reload; systemctl restart medical-bot; sleep 5"
 if ($LASTEXITCODE -ne 0) {
     Write-Host "❌ فشل في إعادة تشغيل الخدمة" -ForegroundColor Red
     exit 1
 }
+Write-Host "✅ تم إعادة التشغيل" -ForegroundColor Green
 
 # Step 5: Check service status
 Write-Host ""
 Write-Host "[5/5] 📊 التحقق من حالة الخدمة..." -ForegroundColor Yellow
-$statusCmd = "systemctl status medical-bot --no-pager | head -25"
-$statusResult = ssh -o StrictHostKeyChecking=no $HETZNER_USER@$HETZNER_IP $statusCmd
+$statusResult = ssh -o StrictHostKeyChecking=no "$HETZNER_USER@$HETZNER_IP" "systemctl status medical-bot --no-pager | head -25"
 Write-Host $statusResult
 
 # Check if service is running
-$activeCmd = "systemctl is-active medical-bot"
-$activeResult = ssh -o StrictHostKeyChecking=no $HETZNER_USER@$HETZNER_IP $activeCmd
+$activeResult = ssh -o StrictHostKeyChecking=no "$HETZNER_USER@$HETZNER_IP" "systemctl is-active medical-bot"
 
 if ($activeResult -match "active") {
     Write-Host ""
@@ -86,14 +77,13 @@ if ($activeResult -match "active") {
     Write-Host "📊 حالة الخدمة: ✅ تعمل" -ForegroundColor Green
     Write-Host ""
     Write-Host "📋 لمراقبة السجلات:" -ForegroundColor Cyan
-    Write-Host "   ssh $HETZNER_USER@$HETZNER_IP 'journalctl -u medical-bot -f'" -ForegroundColor White
+    Write-Host "   ssh $HETZNER_USER@$HETZNER_IP journalctl -u medical-bot -f" -ForegroundColor White
     Write-Host ""
 } else {
     Write-Host ""
     Write-Host "⚠️ تحذير: الخدمة قد لا تعمل بشكل صحيح" -ForegroundColor Yellow
     Write-Host "يرجى التحقق من السجلات:" -ForegroundColor Yellow
-    Write-Host "   ssh $HETZNER_USER@$HETZNER_IP 'journalctl -u medical-bot -n 50'" -ForegroundColor White
+    Write-Host "   ssh $HETZNER_USER@$HETZNER_IP journalctl -u medical-bot -n 50" -ForegroundColor White
     Write-Host ""
     exit 1
 }
-

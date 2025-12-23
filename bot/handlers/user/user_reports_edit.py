@@ -1237,6 +1237,26 @@ async def cancel_edit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("❌ **تم إلغاء عملية التعديل**")
     return ConversationHandler.END
 
+async def handle_edit_from_summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة زر 'مراجعة وتعديل التقرير' من الملخص"""
+    from bot.handlers.user.user_reports_add_new_system import handle_final_confirm
+    return await handle_final_confirm(update, context)
+
+async def handle_publish_from_summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة زر 'نشر التقرير' من الملخص"""
+    from bot.handlers.user.user_reports_add_new_system import handle_final_confirm
+    return await handle_final_confirm(update, context)
+
+async def handle_back_to_summary_from_edit(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة زر 'رجوع للملخص' من شاشة المراجعة"""
+    from bot.handlers.user.user_reports_add_new_system import handle_final_confirm
+    return await handle_final_confirm(update, context)
+
+async def handle_cancel_from_summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة زر 'إلغاء' من الملخص"""
+    from bot.handlers.user.user_reports_add_new_system import handle_cancel_navigation
+    return await handle_cancel_navigation(update, context)
+
 def register(app):
     """تسجيل معالج تعديل التقارير"""
     
@@ -1275,7 +1295,12 @@ def register(app):
         },
         fallbacks=[
             MessageHandler(filters.Regex("^❌ إلغاء العملية الحالية$"), cancel_edit),
-            CallbackQueryHandler(handle_report_selection, pattern="^edit_cancel$")
+            CallbackQueryHandler(handle_report_selection, pattern="^edit_cancel$"),
+            # معالجة callbacks من show_final_summary (عند التعديل من الملخص)
+            CallbackQueryHandler(handle_edit_from_summary, pattern="^edit:"),
+            CallbackQueryHandler(handle_publish_from_summary, pattern="^publish:"),
+            CallbackQueryHandler(handle_back_to_summary_from_edit, pattern="^back_to_summary:"),
+            CallbackQueryHandler(handle_cancel_from_summary, pattern="^nav:cancel")
         ],
         allow_reentry=True,
         per_chat=True,

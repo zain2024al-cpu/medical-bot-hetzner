@@ -23,6 +23,12 @@ except ImportError:
 # تفعيل الإرسال للمجموعة فقط (افتراضياً مفعّل)
 USE_GROUP_BROADCAST = os.getenv("USE_GROUP_BROADCAST", "true").lower() == "true"
 
+# طباعة معلومات المجموعة عند التحميل (للمساعدة في التشخيص)
+if REPORTS_GROUP_ID:
+    logger.info(f"📢 تم تحميل GROUP_CHAT_ID: {REPORTS_GROUP_ID}")
+else:
+    logger.warning("⚠️ GROUP_CHAT_ID غير محدد - سيتم إرسال التقارير للأدمن فقط!")
+
 
 async def broadcast_new_report(bot: Bot, report_data: dict):
     """
@@ -44,22 +50,33 @@ async def broadcast_new_report(bot: Bot, report_data: dict):
             # تحويل GROUP_CHAT_ID إلى int إذا كان string
             group_id = int(REPORTS_GROUP_ID) if isinstance(REPORTS_GROUP_ID, str) and REPORTS_GROUP_ID.lstrip('-').isdigit() else REPORTS_GROUP_ID
             
+            logger.info(f"📤 محاولة إرسال التقرير للمجموعة: {group_id}")
+            
             await bot.send_message(
                 chat_id=group_id,
                 text=message,
                 parse_mode=ParseMode.MARKDOWN,
                 disable_web_page_preview=True
             )
-            logger.info(f"✅ تم إرسال التقرير للمجموعة: {group_id}")
+            logger.info(f"✅ تم إرسال التقرير بنجاح للمجموعة: {group_id}")
             
-            # إرسال تنبيه بسيط للمستخدم (اختياري - يمكن تعطيله)
-            # await send_user_notification(bot, report_data)
+            # إرسال تنبيه للمستخدم أن التقرير تم إرساله بنجاح
+            try:
+                await send_user_notification(bot, report_data)
+            except Exception as e:
+                logger.debug(f"⚠️ لم يتم إرسال تنبيه للمستخدم: {e}")
+            
             return
 
         except Exception as e:
-            logger.error(f"❌ فشل إرسال التقرير للمجموعة: {e}", exc_info=True)
+            logger.error(f"❌ فشل إرسال التقرير للمجموعة {REPORTS_GROUP_ID}: {e}", exc_info=True)
+            logger.error(f"❌ نوع الخطأ: {type(e).__name__}")
+            logger.error(f"❌ تفاصيل الخطأ: {str(e)}")
+            
             # في حالة فشل الإرسال للمجموعة، نرسل للأدمن فقط كاحتياطي
             logger.warning("⚠️ محاولة إرسال للأدمن كاحتياطي")
+    else:
+        logger.warning("⚠️ REPORTS_GROUP_ID غير محدد - سيتم الإرسال للأدمن فقط")
     
     # 🏠 احتياطي: إرسال للأدمن فقط (في حالة عدم وجود معرف المجموعة أو فشل الإرسال)
     logger.info("📤 إرسال للأدمن فقط (احتياطي)")
