@@ -40,6 +40,9 @@ async def broadcast_new_report(bot: Bot, report_data: dict):
     Args:
         bot: كائن البوت
         report_data: بيانات التقرير كـ dictionary
+    
+    Returns:
+        tuple: (success: bool, error_message: str) - True إذا نجح الإرسال للمجموعة، False إذا فشل
     """
     # تنسيق الرسالة
     message = format_report_message(report_data)
@@ -66,30 +69,50 @@ async def broadcast_new_report(bot: Bot, report_data: dict):
             except Exception as e:
                 logger.debug(f"⚠️ لم يتم إرسال تنبيه للمستخدم: {e}")
             
-            return
+            return True, None
 
         except Exception as e:
-            logger.error(f"❌ فشل إرسال التقرير للمجموعة {REPORTS_GROUP_ID}: {e}", exc_info=True)
+            error_msg = str(e)
+            logger.error(f"❌ فشل إرسال التقرير للمجموعة {REPORTS_GROUP_ID}: {error_msg}", exc_info=True)
             logger.error(f"❌ نوع الخطأ: {type(e).__name__}")
-            logger.error(f"❌ تفاصيل الخطأ: {str(e)}")
+            logger.error(f"❌ تفاصيل الخطأ: {error_msg}")
             
             # في حالة فشل الإرسال للمجموعة، نرسل للأدمن فقط كاحتياطي
             logger.warning("⚠️ محاولة إرسال للأدمن كاحتياطي")
+            # محاولة إرسال احتياطي للأدمن
+            try:
+                for admin_id in ADMIN_IDS:
+                    try:
+                        await bot.send_message(
+                            chat_id=admin_id,
+                            text=message,
+                            parse_mode=ParseMode.MARKDOWN
+                        )
+                        logger.info(f"✅ تم إرسال التقرير إلى الأدمن {admin_id} (احتياطي)")
+                    except Exception as admin_error:
+                        logger.error(f"❌ فشل إرسال إلى الأدمن {admin_id}: {admin_error}")
+            except Exception as admin_fallback_error:
+                logger.error(f"❌ فشل في الإرسال الاحتياطي للأدمن: {admin_fallback_error}")
+            
+            return False, error_msg
     else:
         logger.warning("⚠️ REPORTS_GROUP_ID غير محدد - سيتم الإرسال للأدمن فقط")
-    
-    # 🏠 احتياطي: إرسال للأدمن فقط (في حالة عدم وجود معرف المجموعة أو فشل الإرسال)
-    logger.info("📤 إرسال للأدمن فقط (احتياطي)")
-    for admin_id in ADMIN_IDS:
+        # إرسال للأدمن فقط (في حالة عدم وجود معرف المجموعة)
         try:
-            await bot.send_message(
-                chat_id=admin_id,
-                text=message,
-                parse_mode=ParseMode.MARKDOWN
-            )
-            logger.info(f"✅ تم إرسال التقرير إلى الأدمن {admin_id}")
-        except Exception as e:
-            logger.error(f"❌ فشل إرسال إلى الأدمن {admin_id}: {e}")
+            for admin_id in ADMIN_IDS:
+                try:
+                    await bot.send_message(
+                        chat_id=admin_id,
+                        text=message,
+                        parse_mode=ParseMode.MARKDOWN
+                    )
+                    logger.info(f"✅ تم إرسال التقرير إلى الأدمن {admin_id}")
+                except Exception as e:
+                    logger.error(f"❌ فشل إرسال إلى الأدمن {admin_id}: {e}")
+        except Exception as admin_error:
+            logger.error(f"❌ فشل في الإرسال للأدمن: {admin_error}")
+        
+        return False, "GROUP_CHAT_ID غير محدد في config.env"
 
 
 async def send_user_notification(bot: Bot, report_data: dict):

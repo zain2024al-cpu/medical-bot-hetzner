@@ -8322,10 +8322,15 @@ async def save_report_to_database(query, context, flow_type):
                 broadcast_data['tests'] = data.get('tests', 'لا يوجد')
 
             # 📢 إرسال التقرير للمجموعة فقط (يتم تلقائياً في broadcast_new_report)
-            await broadcast_new_report(context.bot, broadcast_data)
-            logger.info(f"✅ تم إرسال التقرير #{report_id} للمجموعة")
+            broadcast_success, broadcast_error = await broadcast_new_report(context.bot, broadcast_data)
+            if broadcast_success:
+                logger.info(f"✅ تم إرسال التقرير #{report_id} للمجموعة")
+            else:
+                logger.warning(f"⚠️ فشل إرسال التقرير #{report_id} للمجموعة: {broadcast_error}")
         except Exception as e:
             logger.error(f"❌ خطأ في إرسال التقرير: {e}", exc_info=True)
+            broadcast_success = False
+            broadcast_error = str(e)
 
         # الرد للمستخدم
         if is_edit_mode and edit_report_id:
@@ -8347,10 +8352,26 @@ async def save_report_to_database(query, context, flow_type):
         if flow_type == "surgery_consult" and data.get("operation_name_en"):
             success_message += f"🏥 **اسم العملية:** {data.get('operation_name_en')}\n"
         
-        if is_edit_mode and edit_report_id:
-            success_message += f"\nتم تحديث التقرير وإرساله للمجموعة."
+        # إضافة رسالة عن حالة الإرسال
+        if 'broadcast_success' in locals() and broadcast_success:
+            if is_edit_mode and edit_report_id:
+                success_message += f"\n✅ تم تحديث التقرير وإرساله للمجموعة."
+            else:
+                success_message += f"\n✅ تم إرسال التقرير للمجموعة."
         else:
-            success_message += f"\nتم إرسال التقرير للمجموعة."
+            error_detail = broadcast_error if 'broadcast_error' in locals() and broadcast_error else "خطأ غير معروف"
+            if "GROUP_CHAT_ID" in error_detail or "غير محدد" in error_detail:
+                success_message += f"\n⚠️ **تحذير:** لم يتم إرسال التقرير للمجموعة.\n"
+                success_message += f"السبب: GROUP_CHAT_ID غير محدد في config.env\n"
+                success_message += f"📝 يرجى تحديث GROUP_CHAT_ID على السيرفر وإعادة تشغيل البوت."
+            elif "Chat not found" in error_detail or "chat_id" in error_detail.lower():
+                success_message += f"\n⚠️ **تحذير:** لم يتم إرسال التقرير للمجموعة.\n"
+                success_message += f"السبب: المجموعة غير موجودة أو البوت غير عضو فيها.\n"
+                success_message += f"📝 يرجى التحقق من GROUP_CHAT_ID وإضافة البوت للمجموعة."
+            else:
+                success_message += f"\n⚠️ **تحذير:** فشل إرسال التقرير للمجموعة.\n"
+                success_message += f"✅ التقرير محفوظ بنجاح، لكن لم يُرسل للمجموعة.\n"
+                success_message += f"🔍 تحقق من السجلات للتفاصيل."
         
         try:
             await query.edit_message_text(
