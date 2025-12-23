@@ -1239,8 +1239,44 @@ async def cancel_edit(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_edit_from_summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة زر 'مراجعة وتعديل التقرير' من الملخص"""
-    from bot.handlers.user.user_reports_add_new_system import handle_final_confirm
-    return await handle_final_confirm(update, context)
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        query = update.callback_query
+        if not query:
+            logger.error("❌ handle_edit_from_summary: No query found")
+            return ConversationHandler.END
+        
+        await query.answer()
+        
+        # استخراج flow_type من callback_data
+        parts = query.data.split(":")
+        flow_type = parts[1] if len(parts) > 1 else None
+        
+        # الحصول على flow_type من report_tmp إذا لم يكن في callback_data
+        data = context.user_data.get("report_tmp", {})
+        if not flow_type:
+            flow_type = data.get("current_flow")
+        
+        logger.info(f"✏️ Edit button clicked - flow_type: {flow_type}")
+        
+        # استخدام handle_edit_before_save من user_reports_add_new_system
+        from bot.handlers.user.user_reports_add_new_system import handle_edit_before_save
+        result = await handle_edit_before_save(query, context, flow_type)
+        
+        # handle_edit_before_save يرجع state، لكن نحن في ConversationHandler مختلف
+        # لذلك سنعود إلى SELECT_FIELD state الخاص بـ user_reports_edit
+        return SELECT_FIELD
+        
+    except Exception as e:
+        logger.error(f"❌ خطأ في handle_edit_from_summary: {e}", exc_info=True)
+        try:
+            if query:
+                await query.answer("⚠️ حدث خطأ أثناء فتح المراجعة", show_alert=True)
+        except:
+            pass
+        return ConversationHandler.END
 
 async def handle_publish_from_summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة زر 'نشر التقرير' من الملخص"""
@@ -1256,6 +1292,70 @@ async def handle_cancel_from_summary(update: Update, context: ContextTypes.DEFAU
     """معالجة زر 'إلغاء' من الملخص"""
     from bot.handlers.user.user_reports_add_new_system import handle_cancel_navigation
     return await handle_cancel_navigation(update, context)
+
+async def handle_edit_field_from_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة اختيار حقل من قائمة التعديل"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        query = update.callback_query
+        if not query:
+            return ConversationHandler.END
+        
+        await query.answer()
+        
+        # callback_data format: "edit_field:{flow_type}:{field_key}"
+        # استخدام handle_edit_field_selection من user_reports_add_new_system مباشرة
+        from bot.handlers.user.user_reports_add_new_system import handle_edit_field_selection
+        
+        result = await handle_edit_field_selection(update, context)
+        
+        # handle_edit_field_selection يرجع "EDIT_FIELD" string state
+        # لكن نحن في ConversationHandler لـ user_reports_edit، لذلك نرجع EDIT_VALUE
+        return EDIT_VALUE
+        
+    except Exception as e:
+        logger.error(f"❌ خطأ في handle_edit_field_from_menu: {e}", exc_info=True)
+        try:
+            if query:
+                await query.answer("⚠️ حدث خطأ", show_alert=True)
+        except:
+            pass
+        return ConversationHandler.END
+
+async def handle_review_from_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة زر 'رجوع' من قائمة الحقول (العودة إلى الملخص)"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        query = update.callback_query
+        if not query:
+            return ConversationHandler.END
+        
+        await query.answer()
+        
+        # callback_data format: "review:{flow_type}"
+        parts = query.data.split(":")
+        flow_type = parts[1] if len(parts) > 1 else None
+        
+        if not flow_type:
+            data = context.user_data.get("report_tmp", {})
+            flow_type = data.get("current_flow")
+        
+        logger.info(f"🔙 Back to summary - flow_type: {flow_type}")
+        
+        # إعادة عرض الملخص
+        from bot.handlers.user.user_reports_add_new_system import show_final_summary
+        await show_final_summary(query.message, context, flow_type)
+        
+        # إرجاع CONFIRM_EDIT state (أو يمكن إرجاع state آخر مناسب)
+        return ConversationHandler.END
+        
+    except Exception as e:
+        logger.error(f"❌ خطأ في handle_review_from_menu: {e}", exc_info=True)
+        return ConversationHandler.END
 
 def register(app):
     """تسجيل معالج تعديل التقارير"""
@@ -1300,7 +1400,10 @@ def register(app):
             CallbackQueryHandler(handle_edit_from_summary, pattern="^edit:"),
             CallbackQueryHandler(handle_publish_from_summary, pattern="^publish:"),
             CallbackQueryHandler(handle_back_to_summary_from_edit, pattern="^back_to_summary:"),
-            CallbackQueryHandler(handle_cancel_from_summary, pattern="^nav:cancel")
+            CallbackQueryHandler(handle_cancel_from_summary, pattern="^nav:cancel"),
+            # معالجة callbacks من show_edit_fields_menu (عند التعديل من قائمة الحقول)
+            CallbackQueryHandler(handle_edit_field_from_menu, pattern="^edit_field:"),
+            CallbackQueryHandler(handle_review_from_menu, pattern="^review:")
         ],
         allow_reentry=True,
         per_chat=True,
