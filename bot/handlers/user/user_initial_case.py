@@ -49,8 +49,8 @@ async def start_initial_case_search(update: Update, context: ContextTypes.DEFAUL
             )
         return ConversationHandler.END
     
-    # تهيئة البيانات
-    context.user_data["initial_case_search"] = {}
+    # تهيئة البيانات - وضع علامة أننا في وضع التقرير الأولي
+    context.user_data["initial_case_search"] = {"active": True}
     
     # عرض قائمة المرضى الذين لديهم تقرير أولي فقط
     message = query.message if query else update.message
@@ -219,6 +219,37 @@ async def handle_initial_case_back(update: Update, context: ContextTypes.DEFAULT
     
     # العودة إلى شاشة اختيار المريض
     await render_initial_case_patient_selection(query.message, context)
+    return INITIAL_CASE_SELECT_PATIENT
+
+async def handle_back_to_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """العودة إلى القائمة الرئيسية"""
+    query = update.callback_query
+    if query:
+        await query.answer()
+    
+    # مسح بيانات المحادثة
+    context.user_data.clear()
+    
+    # إرسال القائمة الرئيسية
+    from bot.keyboards import user_main_kb
+    if query:
+        await query.message.reply_text(
+            "📋 اختر العملية المطلوبة:",
+            reply_markup=user_main_kb()
+        )
+    else:
+        await update.message.reply_text(
+            "📋 اختر العملية المطلوبة:",
+            reply_markup=user_main_kb()
+        )
+    
+    # إنهاء ConversationHandler
+    return ConversationHandler.END
+
+async def handle_unhandled_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة النصوص غير المعالجة - العودة لشاشة اختيار المريض"""
+    # العودة إلى شاشة اختيار المريض
+    await render_initial_case_patient_selection(update.message, context)
     return INITIAL_CASE_SELECT_PATIENT
 
 
@@ -455,7 +486,7 @@ async def handle_initial_case_nav_cancel(update: Update, context: ContextTypes.D
     if query:
         await query.answer()
     
-    # تنظيف البيانات
+    # تنظيف البيانات - إزالة علامة التقرير الأولي
     context.user_data.pop("initial_case_search", None)
     
     # إنهاء المحادثة
@@ -477,6 +508,14 @@ async def handle_initial_case_nav_cancel(update: Update, context: ContextTypes.D
 
 async def handle_initial_case_inline_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة البحث السريع عن المرضى الذين لديهم تقرير أولي فقط (inline query)"""
+    # ✅ التحقق أولاً: هل المستخدم فعلاً في وضع التقرير الأولي؟
+    initial_case_search = context.user_data.get("initial_case_search")
+    report_tmp = context.user_data.get("report_tmp", {})
+    
+    # ✅ هذا الـ handler يتم استدعاؤه فقط من unified_inline_query_handler
+    # عندما يكون المستخدم في وضع التقرير الأولي
+    # لذلك لا نحتاج التحقق من report_tmp أو initial_case_search هنا
+    
     query_text = update.inline_query.query.strip() if update.inline_query.query else ""
     logger.info(f"🔍 initial_case_inline_query: Searching patients with initial case, query='{query_text}'")
     
@@ -630,27 +669,32 @@ def register(app):
                 CallbackQueryHandler(handle_initial_case_back, pattern="^initial_case:back"),
                 CallbackQueryHandler(handle_initial_case_nav_back, pattern="^nav:back"),
                 CallbackQueryHandler(handle_initial_case_nav_cancel, pattern="^nav:cancel"),
+                CallbackQueryHandler(handle_back_to_main_menu, pattern="^user_action:back_main$"),
                 MessageHandler(filters.TEXT & filters.Regex(r"^__INITIAL_CASE_SELECTED__:"), handle_initial_case_inline_selection),
             ],
             INITIAL_CASE_VIEW: [
                 CallbackQueryHandler(handle_initial_case_back, pattern="^initial_case:back"),
                 CallbackQueryHandler(handle_initial_case_nav_back, pattern="^nav:back"),
                 CallbackQueryHandler(handle_initial_case_nav_cancel, pattern="^nav:cancel"),
+                CallbackQueryHandler(handle_back_to_main_menu, pattern="^user_action:back_main$"),
             ],
         },
         fallbacks=[
             CallbackQueryHandler(handle_initial_case_back, pattern="^initial_case:back"),
             CallbackQueryHandler(handle_initial_case_nav_back, pattern="^nav:back"),
             CallbackQueryHandler(handle_initial_case_nav_cancel, pattern="^nav:cancel"),
-            MessageHandler(filters.TEXT & ~filters.COMMAND, lambda u, c: INITIAL_CASE_SELECT_PATIENT),
+            CallbackQueryHandler(handle_back_to_main_menu, pattern="^user_action:back_main$"),
+            MessageHandler(filters.TEXT & ~filters.COMMAND, handle_unhandled_text),
         ],
         name="user_initial_case_conv",
     )
     
     app.add_handler(conv_handler)
     
-    # Inline Query Handler للبحث السريع
-    app.add_handler(InlineQueryHandler(handle_initial_case_inline_query, pattern=".*"))
+    # Inline Query Handler للبحث السريع - مسجل في group=1 لضمان الأولوية
+    # لكن unified_inline_query_handler سيتحقق من initial_case_search ويستدعيه إذا لزم الأمر
+    # لذلك نترك unified_inline_query_handler يتعامل معه
+    # app.add_handler(InlineQueryHandler(handle_initial_case_inline_query, pattern=".*"), group=1)
     
     # Chosen Inline Result Handler
     app.add_handler(ChosenInlineResultHandler(handle_initial_case_chosen_inline))

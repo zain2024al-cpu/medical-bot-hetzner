@@ -210,3 +210,4 @@ async def safe_edit_message(query, text: str, **kwargs):
                     logger.error(f"❌ فشل إرسال رسالة بديلة: {fallback_error}")
                     raise
 
+

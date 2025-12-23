@@ -53,6 +53,71 @@ SessionLocal = sessionmaker(
 # Database Initialization
 # ================================================
 
+def migrate_initial_cases_table():
+    """
+    Migrate initial_cases table to add missing columns
+    This is safe to call multiple times
+    """
+    try:
+        from sqlalchemy import text, inspect
+        from sqlalchemy.exc import OperationalError
+        
+        logger.info("🔧 Checking initial_cases table structure...")
+        
+        with engine.connect() as conn:
+            # Get table info
+            inspector = inspect(engine)
+            if 'initial_cases' in inspector.get_table_names():
+                columns = [col['name'] for col in inspector.get_columns('initial_cases')]
+                logger.info(f"📋 Existing columns in initial_cases: {columns}")
+                
+                # List of columns that should exist (based on InitialCase model)
+                required_columns = {
+                    'patient_name': 'VARCHAR(255)',
+                    'patient_age': 'VARCHAR(255)',  # Changed from Integer to String
+                    'main_complaint': 'TEXT',
+                    'current_history': 'TEXT',
+                    'previous_procedures': 'TEXT',
+                    'test_details': 'TEXT',
+                    'notes': 'TEXT',
+                    'case_details': 'TEXT',
+                    'created_by': 'INTEGER',
+                    'created_at': 'DATETIME',
+                    'status': 'VARCHAR(50)',
+                }
+                
+                # Add missing columns
+                for col_name, col_type in required_columns.items():
+                    if col_name not in columns:
+                        logger.info(f"➕ Adding {col_name} column to initial_cases...")
+                        try:
+                            conn.execute(text(f"ALTER TABLE initial_cases ADD COLUMN {col_name} {col_type}"))
+                            conn.commit()
+                            logger.info(f"✅ Added {col_name} column successfully")
+                        except OperationalError as e:
+                            if "duplicate column name" in str(e).lower() or "already exists" in str(e).lower():
+                                logger.info(f"ℹ️ {col_name} column already exists")
+                            else:
+                                logger.error(f"❌ Error adding {col_name} column: {e}")
+                                raise
+                    else:
+                        logger.info(f"ℹ️ {col_name} column already exists")
+                
+                # Change patient_age to String if it's Integer
+                # Note: SQLite doesn't support changing column type directly
+                # We'll handle this in the model (already changed to String)
+                
+            else:
+                logger.info("ℹ️ initial_cases table doesn't exist yet - will be created by create_all()")
+        
+        return True
+    except Exception as e:
+        logger.error(f"❌ Migration failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
 def init_database():
     """
     Initialize database - create all tables
@@ -64,6 +129,9 @@ def init_database():
         # Create all tables first
         Base.metadata.create_all(bind=engine)
         logger.info(f"✅ Database tables created: {DATABASE_PATH}")
+        
+        # Run migrations for existing tables
+        migrate_initial_cases_table()
         
         # Enable WAL mode for better concurrency
         try:
@@ -256,6 +324,11 @@ try:
         logger.info(f"✅ Database loaded: {db_size:.2f} KB")
         # Ensure all tables exist (for migrations)
         Base.metadata.create_all(bind=engine)
+        # Run migrations for existing tables
+        try:
+            migrate_initial_cases_table()
+        except Exception as migration_error:
+            logger.warning(f"⚠️ Migration warning: {migration_error}")
 except Exception as e:
     logger.warning(f"Database init warning: {e}")
     import traceback

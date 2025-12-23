@@ -90,3 +90,4 @@ async def comprehensive_error_handler(update: Update, context: ContextTypes.DEFA
         logger.critical(f"💥 فشل معالج الأخطاء نفسه: {handler_error}")
         logger.critical(traceback.format_exc())
 
+

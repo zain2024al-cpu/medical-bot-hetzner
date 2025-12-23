@@ -248,10 +248,9 @@ class InitialCase(Base):
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     patient_id = Column(Integer, nullable=True, index=True)
-    translator_id = Column(Integer, nullable=True)
-    translator_name = Column(String(255), nullable=True)
+    # ✅ تم إزالة translator_id و translator_name - لا يتم استخدامهما في الحالات الأولية
     patient_name = Column(String(255), nullable=True)
-    patient_age = Column(Integer, nullable=True)
+    patient_age = Column(String(255), nullable=True)  # ✅ تغيير إلى String ليدعم "40 سنه" أو "3 سنوات"
     main_complaint = Column(Text, nullable=True)
     current_history = Column(Text, nullable=True)
     previous_procedures = Column(Text, nullable=True)

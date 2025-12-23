@@ -24,7 +24,11 @@ def register_all_handlers(app):
     from bot.handlers.user.user_start import register as register_user_start
     register_user_start(app)
     
-    # 🔸 تسجيل handlers الأدمن المتخصصة
+    # 🔸 تسجيل handlers الأدمن المتخصصة - ✅ يجب أن تكون قبل user handlers
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info("📋 تسجيل handlers الأدمن المتخصصة...")
+    
     from bot.handlers.admin import (
         admin_initial_case,
         admin_reports,
@@ -42,19 +46,31 @@ def register_all_handlers(app):
     from bot.handlers.admin.admin_data_analysis import register as register_data_analysis
     # تم حذف admin_patient_management
     
+    logger.info("📋 تسجيل admin_initial_case...")
     admin_initial_case.register(app)
+    logger.info("📋 تسجيل admin_reports...")
     admin_reports.register(app)  # ✅ نظام الطباعة المحدث (مع خيار القسم)
+    logger.info("📋 تسجيل admin_ai...")
     admin_ai.register(app)
+    logger.info("📋 تسجيل admin_notes...")
     admin_notes.register(app)
     # admin_users.register(app)  # تم تعطيله - استخدم admin_users_management بدلاً منه
+    logger.info("📋 تسجيل register_schedule_management...")
     register_schedule_management(app)
+    logger.info("📋 تسجيل register_evaluation...")
     register_evaluation(app)
+    logger.info("📋 تسجيل register_users_management...")
     register_users_management(app)  # ✅ النظام الجديد الكامل
+    logger.info("📋 تسجيل register_admin_admins...")
     register_admin_admins(app)  # ✅ إدارة الأدمنين
     # register_admin_printing(app)  # ❌ تم تعطيله - تداخل مع admin_reports (نفس الزر)
+    logger.info("📋 تسجيل register_daily_patients...")
     register_daily_patients(app)  # ✅ إدارة أسماء المرضى اليومية
+    logger.info("📋 تسجيل register_data_analysis...")
     register_data_analysis(app)  # ✅ نظام تحليل البيانات الشامل
     # تم حذف register_patient_management - نظام بسيط
+    
+    logger.info("✅ تم تسجيل جميع handlers الأدمن المتخصصة")
 
     # 🔹 تسجيل handlers المستخدم المتخصصة
     from bot.handlers.user import (

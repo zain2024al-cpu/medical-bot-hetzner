@@ -173,3 +173,4 @@ systemctl restart medical-bot
 - Hetzner Console: https://console.hetzner.com
 - Server IP: 5.223.58.71
 
+

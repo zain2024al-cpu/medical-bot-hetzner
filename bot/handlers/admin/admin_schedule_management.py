@@ -20,16 +20,34 @@ from bot.keyboards import admin_main_kb
 logger = logging.getLogger(__name__)
 
 # حالات المحادثة
-UPLOAD_SCHEDULE, CONFIRM_SCHEDULE, VIEW_SCHEDULE = range(3)
+SCHEDULE_MENU, UPLOAD_SCHEDULE, CONFIRM_SCHEDULE, VIEW_SCHEDULE = range(4)
 
 async def start_schedule_management(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """بدء إدارة الجدول"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     user = update.effective_user
+    
+    logger.info("=" * 80)
+    logger.info(f"✅ start_schedule_management called! Update ID: {update.update_id}")
+    
+    if not update.message:
+        logger.error("❌ No message in update!")
+        return ConversationHandler.END
+    
+    user = update.effective_user
+    
+    logger.info(f"✅ User ID: {user.id if user else 'None'}")
+    logger.info(f"✅ Message text: '{update.message.text if update.message else 'None'}'")
     
     # التحقق من أن المستخدم أدمن
     if not is_admin(user.id):
+        logger.warning(f"❌ User {user.id if user else 'None'} is not admin")
         await update.message.reply_text("🚫 هذه الخاصية مخصصة للإدمن فقط.")
         return ConversationHandler.END
+    
+    logger.info("✅ Starting schedule management conversation")
 
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("📤 رفع جدول جديد", callback_data="upload_schedule")],
@@ -40,19 +58,32 @@ async def start_schedule_management(update: Update, context: ContextTypes.DEFAUL
         [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_main")]
     ])
 
-    await update.message.reply_text(
-        "📅 **إدارة جدول المترجمين**\n\n"
-        "اختر العملية المطلوبة:",
-        reply_markup=keyboard,
-        parse_mode=ParseMode.MARKDOWN
-    )
+    try:
+        await update.message.reply_text(
+            "📅 **إدارة جدول المترجمين**\n\n"
+            "اختر العملية المطلوبة:",
+            reply_markup=keyboard,
+            parse_mode=ParseMode.MARKDOWN
+        )
+        logger.info(f"✅ Message sent successfully. Returning SCHEDULE_MENU: {SCHEDULE_MENU}")
+        logger.info("=" * 80)
+        return SCHEDULE_MENU
+    except Exception as e:
+        logger.error(f"❌ Error sending message: {e}", exc_info=True)
+        logger.info("=" * 80)
+        return ConversationHandler.END
 
 async def handle_schedule_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة اختيار العملية"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     query = update.callback_query
     await query.answer()
     
     choice = query.data
+    logger.info(f"✅ handle_schedule_choice called with choice: '{choice}'")
+    logger.info(f"✅ Current state: {context.user_data.get('_conversation_state', 'None')}")
     
     if choice == "upload_schedule":
         await query.edit_message_text(
@@ -80,7 +111,11 @@ async def handle_schedule_choice(update: Update, context: ContextTypes.DEFAULT_T
             "🔙 العودة للقائمة الرئيسية",
             reply_markup=admin_main_kb()
         )
+        context.user_data.clear()
         return ConversationHandler.END
+    
+    # إذا لم يكن هناك تطابق، العودة للقائمة
+    return SCHEDULE_MENU
 
 async def upload_schedule_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """رفع صورة الجدول"""
@@ -244,22 +279,34 @@ async def create_daily_tracking_records(update: Update, context: ContextTypes.DE
         print(f"❌ خطأ في إنشاء سجلات التتبع: {e}")
 
 async def view_current_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """عرض الجدول الحالي"""
+    """عرض الجدول الحالي - جدول اليوم"""
     query = update.callback_query
     await query.answer()
     
     try:
         with SessionLocal() as s:
-            # البحث عن آخر جدول تم رفعه في DailySchedule
-            daily_schedule = s.query(DailySchedule).order_by(DailySchedule.date.desc()).first()
+            # ✅ البحث عن جدول اليوم (وليس آخر جدول)
+            today = date.today()
+            from sqlalchemy import func, cast, Date
+            
+            # ✅ البحث عن جدول اليوم فقط - مقارنة التاريخ فقط (بدون الوقت)
+            daily_schedule = s.query(DailySchedule).filter(
+                func.date(DailySchedule.date) == today
+            ).first()
             
             if not daily_schedule:
+                keyboard = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🔙 العودة", callback_data="back_to_schedule")]
+                ])
                 await query.edit_message_text(
-                    "⚠️ **لا يوجد جدول متاح حالياً**\n\n"
-                    "لم يتم رفع أي جدول بعد.\n"
-                    "استخدم 'رفع جدول جديد' لرفع جدول.",
+                    f"⚠️ **لا يوجد جدول متاح لليوم**\n\n"
+                    f"📅 **تاريخ اليوم:** {today.strftime('%Y-%m-%d')}\n\n"
+                    f"لم يتم رفع جدول لليوم بعد.\n"
+                    f"استخدم 'رفع جدول جديد' لرفع جدول.",
+                    reply_markup=keyboard,
                     parse_mode=ParseMode.MARKDOWN
                 )
+                return SCHEDULE_MENU
             elif (
                 not daily_schedule.photo_file_id
                 and (not daily_schedule.photo_path or not os.path.exists(daily_schedule.photo_path))
@@ -274,9 +321,18 @@ async def view_current_schedule(update: Update, context: ContextTypes.DEFAULT_TY
                 # معلومات الجدول
                 days_ar = {0: 'الاثنين', 1: 'الثلاثاء', 2: 'الأربعاء', 3: 'الخميس', 4: 'الجمعة', 5: 'السبت', 6: 'الأحد'}
                 schedule_date = daily_schedule.date or datetime.utcnow()
-                day_name = days_ar.get(schedule_date.weekday(), '')
-                date_str = schedule_date.strftime('%Y-%m-%d')
+                # ✅ تحويل إلى date object للمقارنة
+                if isinstance(schedule_date, datetime):
+                    schedule_date_obj = schedule_date.date()
+                else:
+                    schedule_date_obj = schedule_date
+                day_name = days_ar.get(schedule_date.weekday() if isinstance(schedule_date, datetime) else schedule_date_obj.weekday(), '')
+                date_str = schedule_date_obj.strftime('%Y-%m-%d') if hasattr(schedule_date_obj, 'strftime') else str(schedule_date_obj)
                 time_str = daily_schedule.created_at.strftime('%H:%M') if daily_schedule.created_at else "غير محدد"
+                
+                # ✅ التحقق من أن الجدول هو لليوم
+                is_today = (schedule_date_obj == today)
+                schedule_label = "📅 **جدول اليوم**" if is_today else f"📅 **جدول {date_str}**"
                 
                 # عرض الجدول
                 await query.edit_message_text("📋 **الجدول الحالي:**")
@@ -286,7 +342,7 @@ async def view_current_schedule(update: Update, context: ContextTypes.DEFAULT_TY
                     await context.bot.send_photo(
                         chat_id=query.message.chat_id,
                         photo=daily_schedule.photo_file_id,
-                        caption=f"📅 **جدول اليوم**\n\n"
+                        caption=f"{schedule_label}\n\n"
                                 f"📆 التاريخ: {date_str} ({day_name})\n"
                                 f"🕐 آخر تحديث: {time_str}\n"
                                 f"👤 رافع الجدول: Admin ID {daily_schedule.uploaded_by}",
@@ -297,7 +353,7 @@ async def view_current_schedule(update: Update, context: ContextTypes.DEFAULT_TY
                         await context.bot.send_photo(
                             chat_id=query.message.chat_id,
                             photo=photo_file,
-                            caption=f"📅 **جدول اليوم**\n\n"
+                            caption=f"{schedule_label}\n\n"
                                     f"📆 التاريخ: {date_str} ({day_name})\n"
                                     f"🕐 آخر تحديث: {time_str}\n"
                                     f"👤 رافع الجدول: Admin ID {daily_schedule.uploaded_by}",
@@ -333,7 +389,15 @@ async def view_current_schedule(update: Update, context: ContextTypes.DEFAULT_TY
             parse_mode=ParseMode.MARKDOWN
         )
     
-    return ConversationHandler.END
+    # إضافة زر للعودة
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔙 العودة", callback_data="back_to_schedule")]
+    ])
+    await query.message.reply_text(
+        "🔙 العودة لقائمة إدارة الجدول",
+        reply_markup=keyboard
+    )
+    return SCHEDULE_MENU
 
 async def track_daily_reports(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """تتبع التقارير اليومية"""
@@ -388,8 +452,14 @@ async def track_daily_reports(update: Update, context: ContextTypes.DEFAULT_TYPE
                 return
         
         if not tracking_records:
-            await query.edit_message_text("⚠️ لا توجد سجلات تتبع لهذا اليوم.")
-            return
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔙 العودة", callback_data="back_to_schedule")]
+            ])
+            await query.edit_message_text(
+                "⚠️ لا توجد سجلات تتبع لهذا اليوم.",
+                reply_markup=keyboard
+            )
+            return SCHEDULE_MENU
         
         # عرض الإحصائيات
         completed = sum(1 for r in tracking_records if r.is_completed)
@@ -422,6 +492,7 @@ async def track_daily_reports(update: Update, context: ContextTypes.DEFAULT_TYPE
             reply_markup=keyboard,
             parse_mode=ParseMode.MARKDOWN
         )
+        return SCHEDULE_MENU
 
 async def send_notifications_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """قائمة إرسال التنبيهات"""
@@ -441,6 +512,7 @@ async def send_notifications_menu(update: Update, context: ContextTypes.DEFAULT_
         reply_markup=keyboard,
         parse_mode=ParseMode.MARKDOWN
     )
+    return SCHEDULE_MENU
 
 async def send_reminders_to_late_translators(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """إرسال تذكيرات للمترجمين المتأخرين"""
@@ -458,8 +530,14 @@ async def send_reminders_to_late_translators(update: Update, context: ContextTyp
         ).all()
         
         if not late_translators:
-            await query.edit_message_text("✅ جميع المترجمين مكتملون أو تم إرسال التذكيرات لهم.")
-            return
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔙 العودة", callback_data="back_to_schedule")]
+            ])
+            await query.edit_message_text(
+                "✅ جميع المترجمين مكتملون أو تم إرسال التذكيرات لهم.",
+                reply_markup=keyboard
+            )
+            return SCHEDULE_MENU
         
         sent_count = 0
         for record in late_translators:
@@ -483,11 +561,16 @@ async def send_reminders_to_late_translators(update: Update, context: ContextTyp
         
         s.commit()
         
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 العودة", callback_data="back_to_schedule")]
+        ])
         await query.edit_message_text(
             f"✅ **تم إرسال {sent_count} تذكير للمترجمين المتأخرين**\n\n"
             f"📅 التاريخ: {today.strftime('%Y-%m-%d')}",
+            reply_markup=keyboard,
             parse_mode=ParseMode.MARKDOWN
         )
+        return SCHEDULE_MENU
 
 async def cancel_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """إلغاء رفع الجدول"""
@@ -497,8 +580,15 @@ async def cancel_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def back_to_schedule_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """العودة لقائمة إدارة الجدول"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     query = update.callback_query
-    await query.answer()
+    if query:
+        await query.answer()
+    
+    logger.info(f"✅ back_to_schedule_menu called")
+    logger.info(f"✅ Current state before: {context.user_data.get('_conversation_state', 'None')}")
     
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("📤 رفع جدول جديد", callback_data="upload_schedule")],
@@ -509,12 +599,26 @@ async def back_to_schedule_menu(update: Update, context: ContextTypes.DEFAULT_TY
         [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_main")]
     ])
 
-    await query.edit_message_text(
-        "📅 **إدارة جدول المترجمين**\n\n"
-        "اختر العملية المطلوبة:",
-        reply_markup=keyboard,
-        parse_mode=ParseMode.MARKDOWN
-    )
+    try:
+        if query:
+            await query.edit_message_text(
+                "📅 **إدارة جدول المترجمين**\n\n"
+                "اختر العملية المطلوبة:",
+                reply_markup=keyboard,
+                parse_mode=ParseMode.MARKDOWN
+            )
+        else:
+            await update.message.reply_text(
+                "📅 **إدارة جدول المترجمين**\n\n"
+                "اختر العملية المطلوبة:",
+                reply_markup=keyboard,
+                parse_mode=ParseMode.MARKDOWN
+            )
+        logger.info(f"✅ Message sent successfully. Returning SCHEDULE_MENU: {SCHEDULE_MENU}")
+        return SCHEDULE_MENU
+    except Exception as e:
+        logger.error(f"❌ Error in back_to_schedule_menu: {e}", exc_info=True)
+        return SCHEDULE_MENU
 
 async def start_daily_patients_from_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """فتح إدارة أسماء المرضى اليومية من داخل إدارة الجدول"""
@@ -589,6 +693,7 @@ async def handle_manage_patients(update: Update, context: ContextTypes.DEFAULT_T
         reply_markup=keyboard,
         parse_mode=ParseMode.MARKDOWN
     )
+    return SCHEDULE_MENU
 
 async def handle_view_patient_names(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """عرض أسماء المرضى من قاعدة البيانات"""
@@ -957,10 +1062,26 @@ def register(app):
     
     conv = ConversationHandler(
         entry_points=[
-            MessageHandler(filters.Regex("^📅 إدارة الجدول$"), start_schedule_management),
-            CallbackQueryHandler(handle_schedule_choice, pattern="^upload_schedule$|^view_schedule$|^track_reports$|^send_notifications$|^daily_patients$|^back_to_main$")
+            # ✅ استخدام pattern مرن جداً - يطابق أي نص يحتوي على "إدارة الجدول"
+            MessageHandler(
+                filters.ChatType.PRIVATE & 
+                filters.TEXT & 
+                ~filters.COMMAND & 
+                filters.Regex(r".*إدارة.*الجدول.*"),
+                start_schedule_management
+            ),
+            # ✅ pattern بديل بدون ChatType للتوافق
+            MessageHandler(
+                filters.TEXT & 
+                ~filters.COMMAND & 
+                filters.Regex(r".*إدارة.*الجدول.*"),
+                start_schedule_management
+            ),
         ],
         states={
+            SCHEDULE_MENU: [
+                CallbackQueryHandler(handle_schedule_choice, pattern="^upload_schedule$|^view_schedule$|^track_reports$|^send_notifications$|^daily_patients$|^back_to_main$"),
+            ],
             UPLOAD_SCHEDULE: [
                 MessageHandler(filters.PHOTO, upload_schedule_image),
                 CallbackQueryHandler(cancel_upload, pattern="^cancel_upload$"),
@@ -973,17 +1094,23 @@ def register(app):
             ]
         },
         fallbacks=[
+            CallbackQueryHandler(back_to_schedule_menu, pattern="^back_to_schedule$"),
             CallbackQueryHandler(send_reminders_to_late_translators, pattern="^remind_late$"),
             CallbackQueryHandler(send_notifications_menu, pattern="^general_notification$|^daily_report$"),
             CallbackQueryHandler(track_daily_reports, pattern="^refresh_tracking$|^send_reminders$"),
             CallbackQueryHandler(start_daily_patients_from_schedule, pattern="^daily_patients$"),
+            CallbackQueryHandler(handle_schedule_choice, pattern="^upload_schedule$|^view_schedule$|^track_reports$|^send_notifications$|^manage_patients$|^back_to_main$"),
             MessageHandler(filters.Regex("^إلغاء$|^الغاء$|^cancel$"), cancel_upload)
         ],
         name="admin_schedule_management_conv",
         per_chat=True,
         per_user=True,
-        per_message=True,  # ✅ تفعيل per_message لتجنب التحذيرات
+        per_message=False,  # ✅ تعطيل per_message للسماح بمعالجة الرسائل بشكل صحيح
+        allow_reentry=True,  # ✅ السماح بإعادة الدخول للقائمة الرئيسية
     )
+    
+    # ✅ تسجيل ConversationHandler في group=0 لضمان الأولوية
+    app.add_handler(conv, group=0)
     
     # دالة wrapper لإضافة اسم (لحل مشكلة async)
     async def start_add_patient_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1020,4 +1147,5 @@ def register(app):
     app.add_handler(CallbackQueryHandler(handle_confirm_delete, pattern="^confirm_delete:\\d+:.*"))
     app.add_handler(CallbackQueryHandler(handle_edit_patient_name, pattern="^edit_patient_name$"))
     
-    app.add_handler(conv)
+    # ✅ تسجيل ConversationHandler في group=0 لضمان الأولوية
+    app.add_handler(conv, group=0)

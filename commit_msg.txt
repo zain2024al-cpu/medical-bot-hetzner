@@ -1,0 +1,7 @@
+Fix: إصلاح مشكلة البحث عن الأطباء والمترجمين وإصلاح تعديل التقرير قبل الحفظ
+
+- إصلاح unified_inline_query_handler للتحقق من search_type أولاً
+- إضافة handle_edit_field_selection إلى جميع CONFIRM states
+- إصلاح زر الرجوع في شاشة التعديل
+- تحسين معالجة edit_field callbacks
+

@@ -7,6 +7,7 @@ from telegram.ext import (
     MessageHandler,
     filters,
 )
+from telegram.constants import ChatType
 from db.models import Report, Patient, InitialCase
 from services.pdf_generator import generate_pdf_report
 from bot.shared_utils import format_datetime, parse_date
@@ -40,14 +41,27 @@ def _get_navigation_buttons(show_back=False, show_skip=False, show_preview=False
     return InlineKeyboardMarkup(buttons)
 
 async def start_add_case(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """بدء إضافة حالة أولية - مع logging للتحقق"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # ✅ Logging للتحقق من استدعاء الدالة
+    logger.info(f"✅ start_add_case called! Update ID: {update.update_id}")
+    
     # التحقق من أن المستخدم أدمن
     from bot.shared_auth import is_admin
     user = update.effective_user
+    
+    logger.info(f"✅ User ID: {user.id if user else 'None'}, is_admin: {is_admin(user.id) if user else False}")
+    
     if not is_admin(user.id):
+        logger.warning(f"❌ User {user.id if user else 'None'} is not admin")
         await update.message.reply_text("🚫 هذه الخاصية مخصصة للإدمن فقط.")
         return ConversationHandler.END
 
     context.user_data.clear()
+    logger.info("✅ Starting add case conversation")
+    logger.info(f"✅ Will return ASK_PATIENT_NAME state: {ASK_PATIENT_NAME}")
     
     # بدء مباشر - بدون مقدمات
     first_question = """
@@ -63,14 +77,34 @@ async def start_add_case(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ])
     
     await update.message.reply_text(first_question, reply_markup=keyboard)
+    logger.info(f"✅ Returning ASK_PATIENT_NAME: {ASK_PATIENT_NAME}")
     return ASK_PATIENT_NAME
 
 async def ask_age(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة اسم المريض والانتقال لسؤال العمر"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info("=" * 80)
+    logger.info(f"✅ ask_age called! Update ID: {update.update_id}")
+    logger.info(f"✅ User ID: {update.effective_user.id if update.effective_user else 'None'}")
+    logger.info(f"✅ Chat ID: {update.effective_chat.id if update.effective_chat else 'None'}")
+    logger.info(f"✅ Current state in user_data: {context.user_data.get('_conversation_state', 'None')}")
+    logger.info(f"✅ All user_data keys: {list(context.user_data.keys())}")
+    
+    if not update.message:
+        logger.error("❌ No message in update!")
+        return ConversationHandler.END
+    
     text = update.message.text.strip()
+    logger.info(f"✅ Received text: '{text}'")
+    
     if text.lower() in ['إلغاء', 'الغاء', 'cancel']:
+        logger.info("✅ Cancelling conversation")
         return await cancel(update, context)
     
     context.user_data["patient_name"] = text
+    logger.info(f"✅ Saved patient_name: {text}")
     
     age_text = f"""
 ✅ **تم حفظ:** {text}
@@ -90,8 +124,15 @@ async def ask_age(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]
     ])
     
-    await update.message.reply_text(age_text, reply_markup=keyboard)
-    return ASK_AGE
+    try:
+        await update.message.reply_text(age_text, reply_markup=keyboard)
+        logger.info(f"✅ Message sent successfully. Returning ASK_AGE state: {ASK_AGE}")
+        logger.info("=" * 80)
+        return ASK_AGE
+    except Exception as e:
+        logger.error(f"❌ Error sending message: {e}", exc_info=True)
+        logger.info("=" * 80)
+        return ConversationHandler.END
 
 async def ask_main_complaint(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
@@ -370,6 +411,13 @@ async def handle_procedure_search(update: Update, context: ContextTypes.DEFAULT_
     # تعيين حالة بحث
     context.user_data["searching_procedures"] = True
     return ASK_PREVIOUS_PROCEDURES
+
+async def handle_procedure_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة النص المدخل في حالة ASK_PREVIOUS_PROCEDURES"""
+    if context.user_data.get("searching_procedures"):
+        return await handle_procedure_search_query(update, context)
+    else:
+        return await ask_has_tests(update, context)
 
 async def handle_procedure_search_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة نتائج البحث"""
@@ -797,6 +845,7 @@ async def save_case(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # إنشاء الحالة الأولية في الجدول الجديد
             initial_case = InitialCase(
                 patient_id=patient.id,
+                patient_name=data.get('patient_name'),  # ✅ حفظ اسم المريض للبحث السريع
                 patient_age=data.get('patient_age'),
                 main_complaint=data.get('main_complaint'),
                 current_history=data.get('current_history'),
@@ -873,7 +922,21 @@ def register(app):
     conv = ConversationHandler(
         entry_points=[
             CommandHandler("add_case", start_add_case),
-            MessageHandler(filters.Regex("^➕ إضافة حالة أولية$"), start_add_case)
+            # ✅ استخدام pattern مرن جداً - يطابق أي نص يحتوي على "إضافة حالة أولية"
+            MessageHandler(
+                filters.ChatType.PRIVATE & 
+                filters.TEXT & 
+                ~filters.COMMAND & 
+                filters.Regex(r".*إضافة.*حالة.*أولية.*"),
+                start_add_case
+            ),
+            # ✅ pattern بديل بدون ChatType للتوافق
+            MessageHandler(
+                filters.TEXT & 
+                ~filters.COMMAND & 
+                filters.Regex(r".*إضافة.*حالة.*أولية.*"),
+                start_add_case
+            ),
         ],
         states={
             ASK_PATIENT_NAME: [
@@ -907,7 +970,7 @@ def register(app):
                 CallbackQueryHandler(handle_procedure_search, pattern="^proc:search$"),
                 CallbackQueryHandler(handle_procedure_manual, pattern="^proc:manual$"),
                 CallbackQueryHandler(handle_procedure_back, pattern="^proc:back$"),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, lambda u, c: handle_procedure_search_query(u, c) if c.user_data.get("searching_procedures") else ask_has_tests(u, c)),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_procedure_text_input),
                 CallbackQueryHandler(handle_skip_procedures, pattern="^skip:procedures$"),
                 CallbackQueryHandler(handle_back_button, pattern="^back:"),
                 CallbackQueryHandler(handle_nav_cancel, pattern="^nav:cancel$")
@@ -936,6 +999,7 @@ def register(app):
         name="admin_initial_case_conv",
         per_chat=True,
         per_user=True,
-        per_message=True,  # ✅ تفعيل per_message لتجنب التحذيرات
+        per_message=False,  # ✅ تعطيل per_message للسماح بمعالجة الرسائل بشكل صحيح
     )
-    app.add_handler(conv)
+    # ✅ تسجيل ConversationHandler في group=0 لضمان الأولوية
+    app.add_handler(conv, group=0)

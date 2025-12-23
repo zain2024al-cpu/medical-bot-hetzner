@@ -30,8 +30,20 @@ def _escape_markdown_v2(text: str) -> str:
 
 async def start_user_management(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """بدء إدارة المستخدمين"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info("=" * 80)
+    logger.info(f"✅ start_user_management called! Update ID: {update.update_id}")
+    
+    if not update.message:
+        logger.error("❌ No message in update!")
+        return ConversationHandler.END
+    
     user = update.effective_user
     
+    logger.info(f"✅ User ID: {user.id if user else 'None'}")
+    logger.info(f"✅ Message text: '{update.message.text if update.message else 'None'}'")
     logger.info(f"🔍 محاولة الوصول لإدارة المستخدمين من: {user.id}")
     
     if not is_admin(user.id):
@@ -42,13 +54,21 @@ async def start_user_management(update: Update, context: ContextTypes.DEFAULT_TY
     logger.info(f"✅ الأدمن {user.id} دخل لإدارة المستخدمين")
     
     context.user_data.clear()
-    await update.message.reply_text(
-        "👥 **إدارة المستخدمين**\n\n"
-        "اختر نوع العرض:",
-        reply_markup=_main_kb(),
-        parse_mode="Markdown"
-    )
-    return UM_START
+    
+    try:
+        await update.message.reply_text(
+            "👥 **إدارة المستخدمين**\n\n"
+            "اختر نوع العرض:",
+            reply_markup=_main_kb(),
+            parse_mode="Markdown"
+        )
+        logger.info(f"✅ Message sent successfully. Returning UM_START: {UM_START}")
+        logger.info("=" * 80)
+        return UM_START
+    except Exception as e:
+        logger.error(f"❌ Error sending message: {e}", exc_info=True)
+        logger.info("=" * 80)
+        return ConversationHandler.END
 
 def _main_kb():
     """لوحة المفاتيح الرئيسية"""
@@ -760,7 +780,21 @@ def register(app):
     """تسجيل الهاندلرز"""
     conv = ConversationHandler(
         entry_points=[
-            MessageHandler(filters.Regex("^👥 إدارة المستخدمين$"), start_user_management)
+            # ✅ استخدام pattern مرن جداً - يطابق أي نص يحتوي على "إدارة المستخدمين"
+            MessageHandler(
+                filters.ChatType.PRIVATE & 
+                filters.TEXT & 
+                ~filters.COMMAND & 
+                filters.Regex(r".*إدارة.*المستخدمين.*"),
+                start_user_management
+            ),
+            # ✅ pattern بديل بدون ChatType للتوافق
+            MessageHandler(
+                filters.TEXT & 
+                ~filters.COMMAND & 
+                filters.Regex(r".*إدارة.*المستخدمين.*"),
+                start_user_management
+            ),
         ],
         states={
             UM_START: [
@@ -790,8 +824,9 @@ def register(app):
         name="user_management_conv",
         per_chat=True,
         per_user=True,
-        per_message=True,  # ✅ تفعيل per_message لتجنب التحذيرات
+        per_message=False,  # ✅ تعطيل per_message للسماح بمعالجة الرسائل بشكل صحيح
     )
-    app.add_handler(conv)
+    # ✅ تسجيل ConversationHandler في group=0 لضمان الأولوية
+    app.add_handler(conv, group=0)
 
 

@@ -120,6 +120,10 @@ async def handle_hospital_selection(update: Update, context: ContextTypes.DEFAUL
 
     # حفظ اسم المستشفى
     context.user_data['selected_hospital'] = hospital_name
+    
+    # ✅ إضافة STATE_SELECT_HOSPITAL إلى سجل التنقل
+    nav_push(context, STATE_SELECT_HOSPITAL)
+    context.user_data['_conversation_state'] = STATE_SELECT_HOSPITAL
 
     # الانتقال للخطوة التالية (اختيار القسم)
     await query.edit_message_text(
@@ -233,61 +237,172 @@ R_DOCTOR = STATE_SELECT_DOCTOR
 R_ACTION_TYPE = STATE_SELECT_ACTION_TYPE
 
 # =============================
-# State History Stack Manager
-# إدارة تاريخ التنقل بين الـ states
+# Navigation Stack Implementation
+# نظام سجل التنقل المبني على context.user_data['history']
+# =============================
+
+def nav_push(context, state):
+    """
+    إضافة state جديد إلى سجل التنقل (History Stack)
+    
+    Args:
+        context: ContextTypes.DEFAULT_TYPE
+        state: State constant (مثل STATE_SELECT_HOSPITAL)
+    
+    Returns:
+        None
+    """
+    if 'history' not in context.user_data:
+        context.user_data['history'] = []
+    
+    history = context.user_data['history']
+    
+    # ✅ منع التكرار: لا نضيف نفس الـ state مرتين متتاليتين
+    if state is not None and (not history or history[-1] != state):
+        history.append(state)
+        logger.info(f"📝 NAV_PUSH: ✅ Added state {state}, history={history}")
+        # طباعة مباشرة للتحقق
+        print(f"📝 NAV_PUSH: ✅ Added state {state}")
+        print(f"📝 NAV_PUSH: Full history = {history}")
+        import sys
+        sys.stdout.flush()
+    else:
+        logger.info(f"📝 NAV_PUSH: ⚠️ Skipped duplicate state {state}, history={history}")
+        print(f"📝 NAV_PUSH: ⚠️ Skipped duplicate state {state}, history={history}")
+        import sys
+        sys.stdout.flush()
+
+
+def nav_pop(context):
+    """
+    إزالة وإرجاع آخر state من سجل التنقل
+    
+    Args:
+        context: ContextTypes.DEFAULT_TYPE
+    
+    Returns:
+        State constant أو None إذا كان السجل فارغاً
+    """
+    history = context.user_data.get('history', [])
+    if history:
+        popped = history.pop()
+        logger.info(f"📝 NAV_POP: Removed state {popped}, remaining history={history}")
+        return popped
+    logger.warning("📝 NAV_POP: History is empty")
+    return None
+
+
+def nav_peek(context):
+    """
+    رؤية آخر state بدون إزالته
+    
+    Args:
+        context: ContextTypes.DEFAULT_TYPE
+    
+    Returns:
+        State constant أو None إذا كان السجل فارغاً
+    """
+    history = context.user_data.get('history', [])
+    if history:
+        return history[-1]
+    return None
+
+
+def nav_get_previous(context):
+    """
+    الحصول على الـ state السابق (قبل الأخير)
+    
+    Args:
+        context: ContextTypes.DEFAULT_TYPE
+    
+    Returns:
+        State constant أو None إذا لم يكن هناك state سابق
+    """
+    history = context.user_data.get('history', [])
+    if len(history) >= 2:
+        return history[-2]
+    return None
+
+
+def nav_clear(context):
+    """
+    تنظيف سجل التنقل بالكامل
+    
+    Args:
+        context: ContextTypes.DEFAULT_TYPE
+    
+    Returns:
+        None
+    """
+    context.user_data['history'] = []
+    logger.info("📝 NAV_CLEAR: History cleared")
+
+
+def nav_get_history(context):
+    """
+    الحصول على نسخة من سجل التنقل الكامل
+    
+    Args:
+        context: ContextTypes.DEFAULT_TYPE
+    
+    Returns:
+        List of states
+    """
+    return context.user_data.get('history', []).copy()
+
+
+# =============================
+# Backward Compatibility - StateHistoryManager (deprecated)
+# للحفاظ على التوافق مع الكود القديم
 # =============================
 
 class StateHistoryManager:
-    """مدير تاريخ الـ states لضمان التنقل الصحيح خطوة بخطوة"""
+    """مدير تاريخ الـ states - DEPRECATED: استخدم nav_* functions بدلاً منها"""
 
     def __init__(self):
         self._history = []
 
     def push_state(self, state):
-        """إضافة state جديد إلى التاريخ - منع التكرار"""
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.info(f"📝 push_state: Called with state {state}, current history={self._history}")
+        """DEPRECATED: استخدم nav_push()"""
+        logger.warning("⚠️ StateHistoryManager.push_state() is deprecated. Use nav_push() instead.")
         if state is not None and (not self._history or self._history[-1] != state):
             self._history.append(state)
-            logger.info(f"📝 push_state: ✅ Added state {state}, new history={self._history}")
-        else:
-            logger.info(f"📝 push_state: ⚠️ State {state} already exists or None, history={self._history}")
 
     def pop_state(self):
-        """إزالة وإرجاع آخر state"""
+        """DEPRECATED: استخدم nav_pop()"""
         if self._history:
             return self._history.pop()
         return None
 
     def peek_state(self):
-        """رؤية آخر state بدون إزالته"""
+        """DEPRECATED: استخدم nav_peek()"""
         if self._history:
             return self._history[-1]
         return None
 
     def get_previous_state(self):
-        """الحصول على الـ state السابق"""
+        """DEPRECATED: استخدم nav_get_previous()"""
         if len(self._history) >= 2:
             return self._history[-2]
         return None
 
     def clear_history(self):
-        """تنظيف التاريخ"""
+        """DEPRECATED: استخدم nav_clear()"""
         self._history.clear()
 
     def get_history(self):
-        """الحصول على التاريخ الكامل"""
+        """DEPRECATED: استخدم nav_get_history()"""
         return self._history.copy()
 
     def set_history(self, history):
-        """تحديث التاريخ"""
+        """DEPRECATED"""
         if isinstance(history, list):
             self._history = history.copy()
 
     @staticmethod
     def get_state_manager(context):
-        """الحصول على state manager من context"""
+        """DEPRECATED: استخدم nav_* functions مباشرة"""
+        logger.warning("⚠️ StateHistoryManager.get_state_manager() is deprecated. Use nav_* functions instead.")
         report_tmp = context.user_data.get("report_tmp", {})
         if "state_manager" not in report_tmp:
             report_tmp["state_manager"] = StateHistoryManager()
@@ -295,9 +410,12 @@ class StateHistoryManager:
 
     @staticmethod
     def transition_to_state(context, new_state):
-        """دالة مساعدة للانتقال إلى state جديد مع حفظه في التاريخ"""
-        state_manager = StateHistoryManager.get_state_manager(context)
-        state_manager.push_state(new_state)
+        """DEPRECATED: استخدم nav_push() مباشرة"""
+        logger.warning("⚠️ StateHistoryManager.transition_to_state() is deprecated. Use nav_push() instead.")
+        current_state = context.user_data.get('_conversation_state')
+        if current_state is not None and current_state != new_state:
+            nav_push(context, current_state)
+        nav_push(context, new_state)
         context.user_data['_conversation_state'] = new_state
 
 # =============================
@@ -473,13 +591,225 @@ def _cancel_kb():
         [[InlineKeyboardButton("❌ إلغاء العملية", callback_data="nav:cancel")]])
 
 
-def _nav_buttons(show_back=True):
-    """أزرار التنقل الأساسية"""
+# =============================
+# State Dictionary System - نظام الحالات المخصص
+# =============================
+
+# State names mapping
+STATE_NAMES = {
+    STATE_SELECT_DATE: "date_selection",
+    STATE_SELECT_PATIENT: "patient_selection",
+    STATE_SELECT_HOSPITAL: "hospital_selection",
+    STATE_SELECT_DEPARTMENT: "department_selection",
+    STATE_SELECT_SUBDEPARTMENT: "subdepartment_selection",
+    STATE_SELECT_DOCTOR: "search_doctor_screen",
+    R_ACTION_TYPE: "action_type_selection",
+    NEW_CONSULT_COMPLAINT: "new_consult_complaint",
+    NEW_CONSULT_DECISION: "new_consult_decision",
+    NEW_CONSULT_TESTS: "new_consult_tests",
+}
+
+# Reverse mapping: state_name -> state constant
+STATE_NAME_TO_CONSTANT = {v: k for k, v in STATE_NAMES.items()}
+
+# =============================
+# Step Indexing System - نظام مؤشر الأسئلة
+# =============================
+
+# قائمة ثابتة بالأسئلة لكل نوع إجراء
+FLOW_QUESTIONS = {
+    "new_consult": [
+        {
+            "question": "شكوى المريض",
+            "field": "complaint",
+            "state": NEW_CONSULT_COMPLAINT,
+            "prompt": "يرجى إدخال شكوى المريض:",
+            "validation": {"min_length": 3, "max_length": 500}
+        },
+        {
+            "question": "قرار الطبيب",
+            "field": "decision",
+            "state": NEW_CONSULT_DECISION,
+            "prompt": "يرجى إدخال قرار الطبيب:",
+            "validation": {"min_length": 3, "max_length": 500}
+        },
+        {
+            "question": "الفحوصات المطلوبة",
+            "field": "tests",
+            "state": NEW_CONSULT_TESTS,
+            "prompt": "يرجى إدخال الفحوصات المطلوبة قبل العملية:\n(أو اكتب 'لا يوجد' إذا لم تكن هناك فحوصات)",
+            "validation": {"min_length": 3, "max_length": 500, "allow_empty": True}
+        }
+    ],
+    # يمكن إضافة أنواع إجراءات أخرى هنا
+}
+
+def get_step_back_button():
+    """إنشاء زر الرجوع للخطوة السابقة"""
+    return InlineKeyboardButton("🔙 تراجع عن هذا السؤال", callback_data="step:back")
+
+def get_current_step(context):
+    """الحصول على الخطوة الحالية من user_data"""
+    return context.user_data.get("current_step", 0)
+
+def set_current_step(context, step):
+    """تعيين الخطوة الحالية"""
+    context.user_data["current_step"] = step
+
+def get_current_flow(context):
+    """الحصول على نوع الإجراء الحالي"""
+    return context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
+
+def get_questions_for_flow(flow_type):
+    """الحصول على قائمة الأسئلة لنوع إجراء معين"""
+    return FLOW_QUESTIONS.get(flow_type, FLOW_QUESTIONS["new_consult"])
+
+def get_current_question(context):
+    """الحصول على السؤال الحالي"""
+    flow_type = get_current_flow(context)
+    questions = get_questions_for_flow(flow_type)
+    current_step = get_current_step(context)
+    
+    if 0 <= current_step < len(questions):
+        return questions[current_step]
+    return None
+
+def get_previous_question(context):
+    """الحصول على السؤال السابق"""
+    flow_type = get_current_flow(context)
+    questions = get_questions_for_flow(flow_type)
+    current_step = get_current_step(context)
+    
+    if current_step > 0:
+        return questions[current_step - 1]
+    return None
+
+async def send_question_with_back_button(message, question, context):
+    """إرسال سؤال مع زر الرجوع"""
+    import logging
+    import sys
+    logger = logging.getLogger(__name__)
+    
+    keyboard = InlineKeyboardMarkup([
+        [get_step_back_button()],
+        [InlineKeyboardButton("❌ إلغاء العملية", callback_data="nav:cancel")]
+    ])
+    
+    logger.info(f"SEND_QUESTION: Sending question '{question['question']}' with step back button")
+    print(f"SEND_QUESTION: 📤 Sending question: {question['question']}")
+    print(f"SEND_QUESTION: 📤 Keyboard buttons: step:back, nav:cancel")
+    sys.stdout.flush()
+    
+    result = await message.reply_text(
+        f"**{question['question']}**\n\n{question['prompt']}",
+        reply_markup=keyboard,
+        parse_mode="Markdown"
+    )
+    
+    logger.info(f"SEND_QUESTION: Message sent successfully, message_id = {result.message_id}")
+    print(f"SEND_QUESTION: ✅ Message sent, message_id = {result.message_id}")
+    sys.stdout.flush()
+    
+    return result
+
+async def handle_step_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة الرجوع للخطوة السابقة"""
+    query = update.callback_query
+    if not query:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error("STEP_BACK: No callback query found")
+        return None
+    
+    await query.answer()
+    
+    import logging
+    import sys
+    logger = logging.getLogger(__name__)
+    
+    current_step = get_current_step(context)
+    flow_type = get_current_flow(context)
+    questions = get_questions_for_flow(flow_type)
+    
+    logger.info(f"STEP_BACK: Called! Current step = {current_step}, Flow = {flow_type}")
+    print(f"\n{'='*80}")
+    print(f"STEP_BACK: Called!")
+    print(f"  Current step = {current_step}")
+    print(f"  Flow type = {flow_type}")
+    print(f"  Questions count = {len(questions)}")
+    print(f"{'='*80}\n")
+    sys.stdout.flush()
+    
+    # إذا كنا في الخطوة الأولى، نرجع إلى نوع الإجراء
+    if current_step <= 0:
+        logger.info("STEP_BACK: At first step, returning to action type")
+        try:
+            await query.message.delete()
+        except:
+            pass
+        await show_action_type_menu(query.message, context)
+        context.user_data['last_valid_state'] = 'action_type_selection'
+        context.user_data['_conversation_state'] = R_ACTION_TYPE
+        return R_ACTION_TYPE
+    
+    # طرح 1 من المؤشر
+    new_step = current_step - 1
+    set_current_step(context, new_step)
+    
+    # حذف الإجابة الأخيرة
+    previous_question = questions[current_step - 1]
+    field_name = previous_question["field"]
+    report_tmp = context.user_data.get("report_tmp", {})
+    if field_name in report_tmp:
+        del report_tmp[field_name]
+        logger.info(f"STEP_BACK: Deleted answer for field '{field_name}'")
+    
+    # إعادة إرسال السؤال السابق
+    question = questions[new_step]
+    try:
+        await query.message.delete()
+    except:
+        pass
+    
+    await send_question_with_back_button(query.message, question, context)
+    
+    # تحديث state
+    context.user_data['_conversation_state'] = question["state"]
+    logger.info(f"STEP_BACK: Returning to step {new_step}, state = {question['state']}")
+    
+    return question["state"]
+
+def get_back_button(previous_state_name):
+    """
+    دالة لإنشاء زر الرجوع ببيانات الحالة السابقة بدقة
+    
+    Args:
+        previous_state_name: اسم الحالة السابقة (مثل "hospital_selection")
+    
+    Returns:
+        List containing InlineKeyboardButton
+    """
+    return [InlineKeyboardButton("🔙 رجوع", callback_data=f"go_to_{previous_state_name}")]
+
+def _nav_buttons(show_back=True, previous_state_name=None):
+    """
+    أزرار التنقل الأساسية - نظام State Dictionary الجديد
+    
+    Args:
+        show_back: إذا True، يعرض زر الرجوع
+        previous_state_name: اسم الحالة السابقة (مثل "hospital_selection")
+                          إذا None، يستخدم nav:back القديم
+    """
     buttons = []
 
     if show_back:
-        buttons.append([InlineKeyboardButton(
-            "🔙 رجوع", callback_data="nav:back")])
+        if previous_state_name:
+            # ✅ استخدام State Dictionary System
+            buttons.append(get_back_button(previous_state_name))
+        else:
+            # ✅ استخدام النظام القديم للتوافق
+            buttons.append([InlineKeyboardButton(
+                "🔙 رجوع", callback_data="nav:back")])
 
     buttons.append([InlineKeyboardButton(
         "❌ إلغاء العملية", callback_data="nav:cancel")])
@@ -621,11 +951,15 @@ async def handle_cancel_navigation(update: Update, context: ContextTypes.DEFAULT
     
     # تنظيف شامل لجميع البيانات
     try:
-        # 1. تنظيف report_tmp (يحتوي على جميع بيانات التقرير)
+        # 1. تنظيف Navigation Stack
+        nav_clear(context)
+        logger.info("✅ تم تنظيف Navigation Stack (history)")
+        
+        # 2. تنظيف report_tmp (يحتوي على جميع بيانات التقرير)
         if "report_tmp" in context.user_data:
             report_tmp = context.user_data["report_tmp"]
             
-            # تنظيف state_manager إذا كان موجوداً
+            # تنظيف state_manager إذا كان موجوداً (للتوافق مع الكود القديم)
             if "state_manager" in report_tmp:
                 state_manager = report_tmp.get("state_manager")
                 if state_manager and hasattr(state_manager, 'clear_history'):
@@ -636,15 +970,15 @@ async def handle_cancel_navigation(update: Update, context: ContextTypes.DEFAULT
             context.user_data.pop("report_tmp", None)
             logger.info("✅ تم حذف report_tmp")
         
-        # 2. تنظيف conversation state
+        # 3. تنظيف conversation state
         context.user_data.pop("_conversation_state", None)
         logger.info("✅ تم تنظيف _conversation_state")
         
-        # 3. تنظيف search type
+        # 4. تنظيف search type
         context.user_data.pop("_current_search_type", None)
         logger.info("✅ تم تنظيف _current_search_type")
         
-        # 4. تنظيف أي بيانات إضافية قد تكون متبقية
+        # 5. تنظيف أي بيانات إضافية قد تكون متبقية
         keys_to_remove = [
             "patient_search_mode",
             "hospitals_search_mode",
@@ -669,61 +1003,187 @@ async def handle_cancel_navigation(update: Update, context: ContextTypes.DEFAULT
 
 # الدوال القديمة تم استبدالها بـ StateHistoryManager و Data Managers المنفصلة
 
+async def handle_go_to_state(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    معالجة الانتقال إلى state محدد - نظام State Dictionary الجديد
+    يستخدم callback_data="go_to_{state_name}"
+    """
+    query = update.callback_query
+    if not query:
+        logger.error("❌ handle_go_to_state: No callback query found")
+        return ConversationHandler.END
+    
+    await query.answer()
+    
+    try:
+        # استخراج اسم الحالة من callback_data
+        # callback_data format: "go_to_{state_name}"
+        callback_data = query.data
+        if not callback_data.startswith("go_to_"):
+            logger.error(f"❌ handle_go_to_state: Invalid callback_data format: {callback_data}")
+            return ConversationHandler.END
+        
+        state_name = callback_data.replace("go_to_", "")
+        target_state = STATE_NAME_TO_CONSTANT.get(state_name)
+        
+        if target_state is None:
+            logger.error(f"❌ handle_go_to_state: Unknown state name: {state_name}")
+            await query.answer("⚠️ خطأ: حالة غير معروفة", show_alert=True)
+            return ConversationHandler.END
+        
+        logger.info(f"🔙 GO_TO_STATE: Navigating to {state_name} (state={target_state})")
+        
+        # تحديث conversation state
+        context.user_data['_conversation_state'] = target_state
+        
+        # ✅ عرض الشاشة المناسبة حسب target_state
+        if target_state == STATE_SELECT_DATE:
+            try:
+                await query.message.delete()
+            except:
+                pass
+            await render_date_selection(query.message, context)
+            return STATE_SELECT_DATE
+        
+        elif target_state == STATE_SELECT_PATIENT:
+            PatientDataManager.clear_patient_data(context)
+            try:
+                await query.message.delete()
+            except:
+                pass
+            await show_patient_selection(query.message, context)
+            return STATE_SELECT_PATIENT
+        
+        elif target_state == STATE_SELECT_HOSPITAL:
+            try:
+                await query.message.delete()
+            except:
+                pass
+            await render_hospital_selection(query.message, context)
+            return STATE_SELECT_HOSPITAL
+        
+        elif target_state == STATE_SELECT_DEPARTMENT:
+            DepartmentDataManager.clear_department_data(context, full_clear=False)
+            try:
+                await query.message.delete()
+            except:
+                pass
+            await render_department_selection(query.message, context)
+            return STATE_SELECT_DEPARTMENT
+        
+        elif target_state == STATE_SELECT_DOCTOR:
+            DoctorDataManager.clear_doctor_data(context)
+            try:
+                await query.message.delete()
+            except:
+                pass
+            await render_doctor_selection(query.message, context)
+            return STATE_SELECT_DOCTOR
+        
+        elif target_state == R_ACTION_TYPE:
+            # تنظيف بيانات المسار عند الرجوع إلى نوع الإجراء
+            report_tmp = context.user_data.get("report_tmp", {})
+            report_tmp.pop("medical_action", None)
+            report_tmp.pop("action_type", None)
+            report_tmp.pop("current_flow", None)
+            try:
+                await query.message.delete()
+            except:
+                pass
+            await show_action_type_menu(query.message, context)
+            return R_ACTION_TYPE
+        
+        elif target_state == NEW_CONSULT_COMPLAINT:
+            try:
+                await query.message.delete()
+            except:
+                pass
+            await query.message.reply_text(
+                "شكوى المريض\n\n"
+                "يرجى إدخال شكوى المريض:",
+                reply_markup=_nav_buttons(show_back=True, previous_state_name="action_type_selection"),
+                parse_mode="Markdown"
+            )
+            return NEW_CONSULT_COMPLAINT
+        
+        else:
+            logger.warning(f"🔙 GO_TO_STATE: Unknown target state: {target_state}")
+            return target_state
+    
+    except Exception as e:
+        logger.error(f"❌ Error in handle_go_to_state: {e}", exc_info=True)
+        import traceback
+        traceback.print_exc()
+        return ConversationHandler.END
+
+
 async def handle_back_navigation(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE):
-    """معالجة الرجوع للخطوة السابقة - يعيد الـ state السابق فقط"""
-    import logging
-    logger = logging.getLogger(__name__)
-
+    """
+    معالجة الرجوع للخطوة السابقة - نظام Navigation Stack القديم (للتوافق)
+    الآن نفضل استخدام handle_go_to_state مع State Dictionary
+    """
     query = update.callback_query
+    if not query:
+        logger.error("❌ handle_back_navigation: No callback query found")
+        return ConversationHandler.END
+    
     await query.answer()
 
     try:
-        # الحصول على State History Manager
-        state_manager = StateHistoryManager.get_state_manager(context)
-        current_history = state_manager.get_history()
-
-        logger.info(f"🔙 handle_back_navigation: current_history={current_history}")
-
-        # إذا لم تكن هناك history
-        if not current_history:
-            logger.warning("🔙 handle_back_navigation: No history available")
-            return ConversationHandler.END
-
-        # الحصول على الـ state الحالي أولاً
+        # ✅ الحصول على سجل التنقل من context.user_data['history']
+        history = nav_get_history(context)
         current_state = context.user_data.get('_conversation_state')
+
+        logger.info(f"🔙 BACK: current_state={current_state}, history={history}")
+
+        # إذا لم تكن هناك history، نرجع للبداية
+        if not history:
+            logger.warning("🔙 BACK: No history, going to start")
+            try:
+                await query.message.delete()
+            except:
+                pass
+            await render_date_selection(query.message, context)
+            nav_push(context, STATE_SELECT_DATE)
+            context.user_data['_conversation_state'] = STATE_SELECT_DATE
+            return STATE_SELECT_DATE
+
+        # ✅ منطق بسيط: إزالة الـ state الحالي والحصول على السابق
+        popped = nav_pop(context)
+        previous_step = nav_peek(context)
+        new_history = nav_get_history(context)
         
-        # الحصول على الـ state السابق
-        previous_step = state_manager.get_previous_state()
+        logger.info(f"🔙 BACK: popped={popped}, previous_step={previous_step}, new_history={new_history}")
+        # طباعة مباشرة للتحقق
+        print(f"\n{'='*80}")
+        print(f"🔙 BACK NAVIGATION DEBUG:")
+        print(f"  Current state: {current_state}")
+        print(f"  History before pop: {history}")
+        print(f"  Popped state: {popped}")
+        print(f"  Previous step: {previous_step}")
+        print(f"  New history: {new_history}")
+        print(f"{'='*80}\n")
+        import sys
+        sys.stdout.flush()
 
-        logger.info(f"🔙 handle_back_navigation: current_state={current_state}, previous_step={previous_step}, history_length={len(current_history)}")
-        logger.info(f"🔙 handle_back_navigation: FULL history={current_history}")
-        logger.info(f"🔙 handle_back_navigation: Current context _conversation_state: {context.user_data.get('_conversation_state')}")
-        logger.info(f"🔙 handle_back_navigation: Current context states: {context.user_data.get('report_tmp', {}).get('state_manager', {}).get_history() if 'report_tmp' in context.user_data else 'No report_tmp'}")
-
-        # طباعة تفصيلية عن الـ states
-        if 'report_tmp' in context.user_data and 'state_manager' in context.user_data['report_tmp']:
-            manager = context.user_data['report_tmp']['state_manager']
-            logger.info(f"🔙 StateManager history: {manager.get_history()}")
-            logger.info(f"🔙 StateManager peek_state: {manager.peek_state()}")
-            logger.info(f"🔙 StateManager get_previous_state: {manager.get_previous_state()}")
-
-        # منطق بسيط: الرجوع خطوة واحدة للخلف فقط
+        # إذا لم يكن هناك previous_step، نرجع للبداية
         if previous_step is None:
-            # إذا كانت هناك خطوة واحدة فقط، نرجع للبداية
-            previous_step = STATE_SELECT_DATE
-            state_manager.clear_history()
-            logger.info("🔙 handle_back_navigation: Going to start (STATE_SELECT_DATE)")
-        else:
-            # إزالة الـ state الحالي من التاريخ
-            popped = state_manager.pop_state()
-            logger.info(f"🔙 handle_back_navigation: popped={popped}, Going back to {previous_step}, new_history={state_manager.get_history()}")
+            logger.info("🔙 BACK: No previous step, going to start")
+            try:
+                await query.message.delete()
+            except:
+                pass
+            await render_date_selection(query.message, context)
+            nav_push(context, STATE_SELECT_DATE)
+            context.user_data['_conversation_state'] = STATE_SELECT_DATE
+            return STATE_SELECT_DATE
 
-        # تحديث الـ conversation state للخطوة السابقة
+        # تحديث الـ conversation state
         context.user_data['_conversation_state'] = previous_step
 
-        # عرض رسالة تأكيد الرجوع
+        # ✅ عرض الشاشة المناسبة حسب previous_step
         step_names = {
             STATE_SELECT_DATE: "اختيار التاريخ",
             STATE_SELECT_PATIENT: "اختيار المريض",
@@ -731,87 +1191,137 @@ async def handle_back_navigation(
             STATE_SELECT_DEPARTMENT: "اختيار القسم",
             STATE_SELECT_SUBDEPARTMENT: "اختيار القسم الفرعي",
             STATE_SELECT_DOCTOR: "اختيار الطبيب",
-            R_ACTION_TYPE: "اختيار نوع الإجراء"
+            R_ACTION_TYPE: "اختيار نوع الإجراء",
+            NEW_CONSULT_COMPLAINT: "شكوى المريض",
+            NEW_CONSULT_DECISION: "قرار الطبيب",
+            NEW_CONSULT_TESTS: "الفحوصات المطلوبة",
         }
         step_name = step_names.get(previous_step, "الخطوة السابقة")
-
-        # إرسال رسالة تأكيد الرجوع
         await query.answer(f"🔙 تم الرجوع لـ: {step_name}", show_alert=False)
 
-        # Rendering Logic: عرض الشاشة المناسبة حسب الـ state السابق
-        logger.info(f"🔙 Rendering step: {previous_step}")
+        # Rendering Logic
+        logger.info(f"🔙 BACK: Rendering step: {previous_step}")
 
         if previous_step == STATE_SELECT_DATE:
-            await query.message.delete()
+            try:
+                await query.message.delete()
+            except:
+                pass
             await render_date_selection(query.message, context)
             return STATE_SELECT_DATE
 
         elif previous_step == STATE_SELECT_PATIENT:
             PatientDataManager.clear_patient_data(context)
-            await query.message.delete()
+            try:
+                await query.message.delete()
+            except:
+                pass
             await show_patient_selection(query.message, context)
             return STATE_SELECT_PATIENT
 
         elif previous_step == STATE_SELECT_HOSPITAL:
-            await query.message.delete()
+            try:
+                await query.message.delete()
+            except:
+                pass
             await render_hospital_selection(query.message, context)
             return STATE_SELECT_HOSPITAL
 
         elif previous_step == STATE_SELECT_DEPARTMENT:
             DepartmentDataManager.clear_department_data(context, full_clear=False)
-            await query.message.delete()
+            try:
+                await query.message.delete()
+            except:
+                pass
             await render_department_selection(query.message, context)
             return STATE_SELECT_DEPARTMENT
 
         elif previous_step == STATE_SELECT_SUBDEPARTMENT:
-            # الرجوع من القسم الفرعي إلى القسم الرئيسي
             DepartmentDataManager.clear_department_data(context, full_clear=False)
-            await query.message.delete()
+            try:
+                await query.message.delete()
+            except:
+                pass
             await render_department_selection(query.message, context)
             return STATE_SELECT_DEPARTMENT
 
         elif previous_step == STATE_SELECT_DOCTOR:
             DoctorDataManager.clear_doctor_data(context)
-            await query.message.delete()
-            await render_doctor_selection(query.message, context)
-            return STATE_SELECT_DOCTOR
-
-        elif previous_step == R_ACTION_TYPE:
-            # الرجوع إلى شاشة نوع الإجراء
-            context.user_data["report_tmp"].pop("medical_action", None)
-            context.user_data["report_tmp"].pop("action_type", None)
-            context.user_data["report_tmp"].pop("current_flow", None)
-            await query.message.delete()
-            await show_action_type_menu(query.message, context)
-            return R_ACTION_TYPE
-
-        # معالجة عامة: للرجوع من أي state بعد R_ACTION_TYPE
-        # نحاول إعادة عرض الشاشة المناسبة
-        else:
-            logger.info(f"🔙 handle_back_navigation: Generic handling for state {previous_step}")
-            
-            # محاولة إعادة عرض الشاشة المناسبة حسب الـ state
-            # إذا كان الـ state السابق هو R_ACTION_TYPE، نعرض شاشة نوع الإجراء
-            if previous_step == R_ACTION_TYPE:
-                context.user_data["report_tmp"].pop("medical_action", None)
-                context.user_data["report_tmp"].pop("action_type", None)
-                context.user_data["report_tmp"].pop("current_flow", None)
-                await query.message.delete()
-                await show_action_type_menu(query.message, context)
-                return R_ACTION_TYPE
-            
-            # للـ states الأخرى، نحاول إعادة عرض الشاشة المناسبة
-            # نستخدم fallback بسيط - إعادة عرض نفس الشاشة
             try:
                 await query.message.delete()
             except:
                 pass
-            # إعادة عرض نفس الشاشة (سيتم التعامل معها من خلال ConversationHandler)
-            # نعيد الـ state السابق للسماح للـ ConversationHandler بالتعامل معه
+            await render_doctor_selection(query.message, context)
+            return STATE_SELECT_DOCTOR
+
+        elif previous_step == R_ACTION_TYPE:
+            # تنظيف بيانات المسار عند الرجوع إلى نوع الإجراء
+            report_tmp = context.user_data.get("report_tmp", {})
+            report_tmp.pop("medical_action", None)
+            report_tmp.pop("action_type", None)
+            report_tmp.pop("current_flow", None)
+            try:
+                await query.message.delete()
+            except:
+                pass
+            await show_action_type_menu(query.message, context)
+            return R_ACTION_TYPE
+
+        # ✅ معالجة flow states
+        elif previous_step == NEW_CONSULT_COMPLAINT:
+            try:
+                await query.message.delete()
+            except:
+                pass
+            await query.message.reply_text(
+                "شكوى المريض\n\n"
+                "يرجى إدخال شكوى المريض:",
+                reply_markup=_nav_buttons(show_back=True, previous_state_name="action_type_selection"),
+                parse_mode="Markdown"
+            )
+            return NEW_CONSULT_COMPLAINT
+
+        elif previous_step == NEW_CONSULT_DECISION:
+            try:
+                await query.message.delete()
+            except:
+                pass
+            await query.message.reply_text(
+                "✅ تم الحفظ\n\n"
+                "📝 **قرار الطبيب**\n\n"
+                "يرجى إدخال قرار الطبيب:",
+                reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
+                parse_mode="Markdown"
+            )
+            return NEW_CONSULT_DECISION
+
+        elif previous_step == NEW_CONSULT_TESTS:
+            try:
+                await query.message.delete()
+            except:
+                pass
+            await query.message.reply_text(
+                "✅ تم الحفظ\n\n"
+                "🔬 **الفحوصات المطلوبة**\n\n"
+                "يرجى إدخال الفحوصات المطلوبة (أو اكتب 'لا يوجد'):",
+                reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_decision"),
+                parse_mode="Markdown"
+            )
+            return NEW_CONSULT_TESTS
+
+        # Fallback للـ states الأخرى
+        else:
+            logger.warning(f"🔙 BACK: Unknown state {previous_step}, using fallback")
+            try:
+                await query.message.delete()
+            except:
+                pass
             return previous_step
 
     except Exception as e:
         logger.error(f"❌ Error in handle_back_navigation: {e}", exc_info=True)
+        import traceback
+        traceback.print_exc()
         return ConversationHandler.END
 
 
@@ -895,6 +1405,9 @@ async def render_doctor_selection(message, context):
     # تنظيف بيانات الطبيب القديمة
     DoctorDataManager.clear_doctor_data(context)
 
+    # ✅ تعيين نوع البحث إلى 'doctor' لضمان عمل البحث بشكل صحيح
+    context.user_data['_current_search_type'] = 'doctor'
+
     # التحقق من وجود بيانات المستشفى والقسم
     report_tmp = context.user_data.get("report_tmp", {})
     hospital_name = report_tmp.get("hospital_name", "")
@@ -904,6 +1417,7 @@ async def render_doctor_selection(message, context):
     logger = logging.getLogger(__name__)
     logger.info(f"🎯 render_doctor_selection: hospital='{hospital_name}', department='{department_name}'")
     logger.info(f"🎯 render_doctor_selection: all report_tmp keys: {list(report_tmp.keys())}")
+    logger.info(f"🎯 render_doctor_selection: _current_search_type set to 'doctor'")
 
     keyboard = []
 
@@ -990,13 +1504,12 @@ async def start_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not await ensure_approved(update, context):
             return ConversationHandler.END
 
-        # تهيئة State History Manager
-        state_manager = StateHistoryManager()
-        state_manager.push_state(STATE_SELECT_DATE)
+        # ✅ تهيئة Navigation Stack
+        nav_push(context, STATE_SELECT_DATE)
+        context.user_data['_conversation_state'] = STATE_SELECT_DATE
 
-        # تهيئة البيانات مع State Manager
+        # تهيئة البيانات
         context.user_data["report_tmp"] = {
-            "state_manager": state_manager,
             "action_type": None
         }
         
@@ -1072,9 +1585,8 @@ async def handle_date_choice(
         time_str = format_time_12h(now)
         date_str = now.strftime('%Y-%m-%d')
 
-        # حفظ الـ state في التاريخ قبل الانتقال للمريض
-        state_manager = StateHistoryManager.get_state_manager(context)
-        state_manager.push_state(STATE_SELECT_PATIENT)
+        # ✅ حفظ الـ state في سجل التنقل قبل الانتقال للمريض
+        nav_push(context, STATE_SELECT_PATIENT)
         context.user_data['_conversation_state'] = STATE_SELECT_PATIENT
 
         await query.edit_message_text(
@@ -1300,9 +1812,8 @@ async def handle_date_time_minute(
             dt.month, dt.month)} {
                 dt.year} ({day_name}) - {time_display}"
 
-        # حفظ الـ state في التاريخ قبل الانتقال للمريض
-        state_manager = StateHistoryManager.get_state_manager(context)
-        state_manager.push_state(STATE_SELECT_PATIENT)
+        # ✅ حفظ الـ state في سجل التنقل قبل الانتقال للمريض
+        nav_push(context, STATE_SELECT_PATIENT)
         context.user_data['_conversation_state'] = STATE_SELECT_PATIENT
 
         await query.edit_message_text(
@@ -1348,9 +1859,8 @@ async def handle_date_time_skip(
      6: 'الأحد'}
         day_name = days_ar.get(dt.weekday(), '')
 
-        # حفظ الـ state في التاريخ قبل الانتقال للمريض
-        state_manager = StateHistoryManager.get_state_manager(context)
-        state_manager.push_state(STATE_SELECT_PATIENT)
+        # ✅ حفظ الـ state في سجل التنقل قبل الانتقال للمريض
+        nav_push(context, STATE_SELECT_PATIENT)
         context.user_data['_conversation_state'] = STATE_SELECT_PATIENT
 
         await query.edit_message_text(
@@ -1367,11 +1877,8 @@ async def handle_date_time_skip(
 
 async def show_patient_selection(message, context, search_query=""):
     """Navigation wrapper - يحدث state ثم يستدعي rendering"""
-    # تحديث State History - إضافة الـ state الحالي
-    state_manager = StateHistoryManager.get_state_manager(context)
-    state_manager.push_state(STATE_SELECT_PATIENT)
-
-    # تحديث الـ conversation state للـ inline queries
+    # ✅ تحديث last_valid_state
+    context.user_data['last_valid_state'] = 'patient_selection'
     context.user_data['_conversation_state'] = STATE_SELECT_PATIENT
     context.user_data['_current_search_type'] = 'patient'  # علامة لتحديد نوع البحث
 
@@ -1697,11 +2204,8 @@ def _build_hospitals_keyboard(page=0, search_query="", context=None):
 
 async def show_hospitals_menu(message, context, page=0, search_query=""):
     """Navigation wrapper - يحدث state ثم يستدعي rendering"""
-    # تحديث State History - إضافة الـ state الحالي
-    state_manager = StateHistoryManager.get_state_manager(context)
-    state_manager.push_state(STATE_SELECT_HOSPITAL)
-
-    # تحديث الـ conversation state للـ inline queries
+    # ✅ تحديث Navigation Stack - إضافة الـ state الحالي
+    nav_push(context, STATE_SELECT_HOSPITAL)
     context.user_data['_conversation_state'] = STATE_SELECT_HOSPITAL
 
     # استدعاء rendering function
@@ -1722,34 +2226,70 @@ async def handle_hospital_selection(
         return await handle_back_navigation(update, context)
 
     # استخدام index بدلاً من الاسم الكامل
+    import logging
+    logger = logging.getLogger(__name__)
+    
     if query.data.startswith("hospital_idx:"):
         hospital_index = int(query.data.split(":", 1)[1])
         hospitals_list = context.user_data.get(
             "report_tmp", {}).get(
             "hospitals_list", [])
+        
+        # ✅ إذا لم يكن hospitals_list موجوداً، نحاول إعادة بناؤه
+        if not hospitals_list:
+            logger.warning(f"⚠️ hospitals_list is empty, rebuilding it. Index: {hospital_index}")
+            # إعادة بناء القائمة
+            hospitals_list = _sort_hospitals_custom(list(PREDEFINED_HOSPITALS))
+            context.user_data.setdefault("report_tmp", {})["hospitals_list"] = hospitals_list
+            logger.info(f"✅ Rebuilt hospitals_list with {len(hospitals_list)} hospitals")
+        
         if 0 <= hospital_index < len(hospitals_list):
             choice = hospitals_list[hospital_index]
+            logger.info(f"✅ Selected hospital at index {hospital_index}: {choice}")
         else:
-            # إذا فشل، نستخدم الطريقة القديمة كبديل
-            choice = query.data.split(":", 1)[1] if ":" in query.data else ""
+            # إذا فشل، نحاول إعادة بناء القائمة مرة أخرى
+            logger.error(f"❌ Invalid hospital index: {hospital_index}, list length: {len(hospitals_list)}")
+            # إعادة بناء القائمة
+            hospitals_list = _sort_hospitals_custom(list(PREDEFINED_HOSPITALS))
+            context.user_data.setdefault("report_tmp", {})["hospitals_list"] = hospitals_list
+            if 0 <= hospital_index < len(hospitals_list):
+                choice = hospitals_list[hospital_index]
+                logger.info(f"✅ Selected hospital after rebuild at index {hospital_index}: {choice}")
+            else:
+                logger.error(f"❌ Still invalid index after rebuild: {hospital_index}")
+                await query.answer("❌ خطأ في اختيار المستشفى. يرجى المحاولة مرة أخرى.", show_alert=True)
+                return STATE_SELECT_HOSPITAL
     else:
         choice = query.data.split(":", 1)[1]
+        logger.info(f"✅ Selected hospital from callback data: {choice}")
 
     context.user_data["report_tmp"]["hospital_name"] = choice
     context.user_data["report_tmp"].pop("hospitals_search", None)
     context.user_data["report_tmp"].pop("hospitals_search_mode", None)
     context.user_data["report_tmp"].pop("hospitals_list", None)
     
-    # حفظ الـ state في المستشفى قبل الانتقال للقسم
-    state_manager = StateHistoryManager.get_state_manager(context)
-    state_manager.push_state(STATE_SELECT_DEPARTMENT)
+    # ✅ تحديث last_valid_state
+    context.user_data['last_valid_state'] = 'department_selection'
     context.user_data['_conversation_state'] = STATE_SELECT_DEPARTMENT
 
-    await query.edit_message_text(
-        f"✅ **تم اختيار المستشفى**\n\n"
-        f"🏥 **المستشفى:**\n"
-        f"{choice}"
-    )
+    # ✅ معالجة خطأ Message_id_invalid - إرسال رسالة جديدة بدلاً من التعديل
+    try:
+        await query.edit_message_text(
+            f"✅ **تم اختيار المستشفى**\n\n"
+            f"🏥 **المستشفى:**\n"
+            f"{choice}"
+        )
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"⚠️ Could not edit message, sending new one: {e}")
+        # إرسال رسالة جديدة بدلاً من التعديل
+        await query.message.reply_text(
+            f"✅ **تم اختيار المستشفى**\n\n"
+            f"🏥 **المستشفى:**\n"
+            f"{choice}"
+        )
+    
     await show_departments_menu(query.message, context)
     return STATE_SELECT_DEPARTMENT
 
@@ -1895,9 +2435,12 @@ def _build_departments_keyboard(page=0, search_query="", context=None):
         if nav_buttons:
             keyboard.append(nav_buttons)
 
-    # أزرار التحكم
-    control_buttons = []
-    control_buttons.append(InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel"))
+    # ✅ أزرار التحكم - استخدام State Dictionary System
+    # زر الرجوع يعود إلى شاشة المستشفى
+    control_buttons = [
+        InlineKeyboardButton("🔙 رجوع", callback_data="go_to_hospital_selection"),
+        InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
+    ]
     keyboard.append(control_buttons)
 
     text = (
@@ -1913,11 +2456,8 @@ def _build_departments_keyboard(page=0, search_query="", context=None):
 
 async def show_departments_menu(message, context, page=0, search_query=""):
     """Navigation wrapper - يحدث state ثم يستدعي rendering"""
-    # تحديث State History - إضافة الـ state الحالي
-    state_manager = StateHistoryManager.get_state_manager(context)
-    state_manager.push_state(STATE_SELECT_DEPARTMENT)
-
-    # تحديث الـ conversation state للـ inline queries
+    # ✅ تحديث last_valid_state
+    context.user_data['last_valid_state'] = 'department_selection'
     context.user_data['_conversation_state'] = STATE_SELECT_DEPARTMENT
 
     # استدعاء rendering function
@@ -1990,10 +2530,9 @@ async def handle_department_selection(
         context.user_data["report_tmp"]["department_name"] = dept
         context.user_data["report_tmp"].setdefault("step_history", []).append(R_DEPARTMENT)
         
-        # حفظ الـ state في القسم قبل الانتقال للطبيب
-        state_manager = StateHistoryManager.get_state_manager(context)
-        state_manager.push_state(STATE_SELECT_DOCTOR)
-        context.user_data['_conversation_state'] = STATE_SELECT_DOCTOR
+        # ✅ إضافة STATE_SELECT_DEPARTMENT إلى سجل التنقل
+        nav_push(context, STATE_SELECT_DEPARTMENT)
+        context.user_data['_conversation_state'] = STATE_SELECT_DEPARTMENT
 
         await query.edit_message_text(
             f"✅ **تم اختيار القسم**\n\n"
@@ -2042,9 +2581,8 @@ async def handle_department_search(
 
 async def show_subdepartment_options(message, context, main_dept, page=0):
     """عرض التخصصات الفرعية - مع إدارة State History"""
-    # تحديث State History - إضافة الـ state الحالي
-    state_manager = StateHistoryManager.get_state_manager(context)
-    state_manager.push_state(STATE_SELECT_SUBDEPARTMENT)
+    # ✅ تحديث Navigation Stack - إضافة الـ state الحالي
+    nav_push(context, STATE_SELECT_SUBDEPARTMENT)
 
     # تحديث الـ conversation state
     context.user_data['_conversation_state'] = STATE_SELECT_SUBDEPARTMENT
@@ -2135,9 +2673,8 @@ async def handle_subdepartment_choice(
     context.user_data["report_tmp"]["department_name"] = choice
     context.user_data["report_tmp"].setdefault("step_history", []).append(R_SUBDEPARTMENT)
 
-    # حفظ الـ state في القسم قبل الانتقال للطبيب
-    state_manager = StateHistoryManager.get_state_manager(context)
-    state_manager.push_state(STATE_SELECT_DOCTOR)
+    # ✅ تحديث last_valid_state
+    context.user_data['last_valid_state'] = 'search_doctor_screen'
     context.user_data['_conversation_state'] = STATE_SELECT_DOCTOR
 
     await query.edit_message_text(f"✅ تم اختيار القسم: {choice}")
@@ -2162,11 +2699,8 @@ async def handle_subdepartment_page(
 
 async def show_doctor_selection(message, context, search_query=""):
     """Navigation wrapper - يحدث state ثم يستدعي rendering"""
-    # تحديث State History - إضافة الـ state الحالي
-    state_manager = StateHistoryManager.get_state_manager(context)
-    # لا نحتاج لحفظ STATE_SELECT_DOCTOR هنا لأنه يتم حفظه في show_doctor_input
-
-    # تحديث الـ conversation state للـ inline queries
+    # ✅ تحديث last_valid_state
+    context.user_data['last_valid_state'] = 'search_doctor_screen'
     context.user_data['_conversation_state'] = STATE_SELECT_DOCTOR
 
     # استدعاء rendering function
@@ -2179,12 +2713,9 @@ async def show_doctor_input(message, context):
     logger = logging.getLogger(__name__)
     logger.info("🏥 show_doctor_input: Called")
 
-    # تحديث State History - إضافة الـ state الحالي
-    state_manager = StateHistoryManager.get_state_manager(context)
-    logger.info(f"🏥 show_doctor_input: About to push STATE_SELECT_DOCTOR")
-    state_manager.push_state(STATE_SELECT_DOCTOR)
-
-    # تحديث الـ conversation state للـ inline queries
+    # ✅ تحديث last_valid_state
+    logger.info(f"🏥 show_doctor_input: Setting last_valid_state to search_doctor_screen")
+    context.user_data['last_valid_state'] = 'search_doctor_screen'
     context.user_data['_conversation_state'] = STATE_SELECT_DOCTOR
     context.user_data['_current_search_type'] = 'doctor'  # علامة لتحديد نوع البحث
 
@@ -2264,6 +2795,10 @@ async def handle_doctor(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data.setdefault("report_tmp", {})["doctor_name"] = doctor_name
             context.user_data["report_tmp"].setdefault("step_history", []).append(R_DOCTOR)
             context.user_data["report_tmp"].pop("doctor_manual_mode", None)
+            
+            # ✅ تحديث last_valid_state للبحث النصي
+            context.user_data['last_valid_state'] = 'search_doctor_screen'
+            context.user_data['_conversation_state'] = STATE_SELECT_DOCTOR
 
             # حذف الرسالة الخاصة
             try:
@@ -2290,10 +2825,14 @@ async def handle_doctor(update: Update, context: ContextTypes.DEFAULT_TYPE):
             sys.stdout.flush()
             logger.info(f"➡️ Moving to R_ACTION_TYPE state after doctor selection")
             logger.info(f"HANDLE_DOCTOR: R_ACTION_TYPE value = {R_ACTION_TYPE}")
-            # حفظ الحالة يدوياً في user_data للمساعدة في التتبع
+            
+            # ✅ تحديث last_valid_state قبل الانتقال إلى نوع الإجراء
+            context.user_data['last_valid_state'] = 'action_type_selection'
             context.user_data['_conversation_state'] = R_ACTION_TYPE
+            
             await show_action_type_menu(update.message, context)
             logger.info(f"show_action_type_menu called, returning R_ACTION_TYPE")
+            logger.info(f"📋 Moving to action_type_selection")
             print(f"HANDLE_DOCTOR: Returning R_ACTION_TYPE = {R_ACTION_TYPE}")
             print("=" * 80)
             sys.stdout.flush()
@@ -2310,7 +2849,7 @@ async def handle_doctor(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(
                 f"⚠️ **خطأ: {msg}**\n\n"
                 f"يرجى إدخال اسم الطبيب:",
-                reply_markup=_nav_buttons(show_back=True),
+                reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
                 parse_mode="Markdown"
             )
             return STATE_SELECT_DOCTOR
@@ -2321,10 +2860,14 @@ async def handle_doctor(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["report_tmp"].pop("doctor_manual_mode", None)
         logger.info(f"✅ تم حفظ اسم الطبيب يدوياً: {text}")
 
-        # حفظ الـ state في الطبيب قبل الانتقال لنوع الإجراء
-        state_manager = StateHistoryManager.get_state_manager(context)
-        state_manager.push_state(R_ACTION_TYPE)
+        # ✅ تحديث last_valid_state للبحث النصي
+        context.user_data['last_valid_state'] = 'search_doctor_screen'
+        context.user_data['_conversation_state'] = STATE_SELECT_DOCTOR
+        
+        # ✅ تحديث last_valid_state قبل الانتقال إلى نوع الإجراء
+        context.user_data['last_valid_state'] = 'action_type_selection'
         context.user_data['_conversation_state'] = R_ACTION_TYPE
+        logger.info(f"📋 Moving to action_type_selection")
 
         await update.message.reply_text(
             f"✅ **تم حفظ اسم الطبيب**\n\n"
@@ -2455,9 +2998,10 @@ def _build_action_type_keyboard(page=0):
         display = f"⚕️ {action_name[:20]}..." if len(action_name) > 20 else f"⚕️ {action_name}"
         keyboard.append([InlineKeyboardButton(display, callback_data=callback_data)])
 
-    # أزرار التنقل الرئيسية (لا توجد أزرار صفحات)
+    # ✅ أزرار التنقل الرئيسية - استخدام State Dictionary System
+    # زر الرجوع يعود إلى شاشة البحث عن الطبيب
     keyboard.append([
-        InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
+        InlineKeyboardButton("🔙 رجوع", callback_data="go_to_search_doctor_screen"),
         InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
     ])
 
@@ -2475,6 +3019,10 @@ async def show_action_type_menu(message, context, page=0):
     import sys
     logger = logging.getLogger(__name__)
 
+    # ✅ تحديث last_valid_state
+    context.user_data['last_valid_state'] = 'action_type_selection'
+    context.user_data['_conversation_state'] = R_ACTION_TYPE
+
     print("\n" + "=" * 80)
     print("🎯 SHOW_ACTION_TYPE_MENU: Function called")
     print(f"🎯 SHOW_ACTION_TYPE_MENU: Total actions = {len(PREDEFINED_ACTIONS)}")
@@ -2485,6 +3033,7 @@ async def show_action_type_menu(message, context, page=0):
     logger.info("=" * 80)
     logger.info("SHOW_ACTION_TYPE_MENU: Function called")
     logger.info(f"SHOW_ACTION_TYPE_MENU: Total actions = {len(PREDEFINED_ACTIONS)}")
+    logger.info(f"SHOW_ACTION_TYPE_MENU: R_ACTION_TYPE saved to history")
 
     # تجاهل page parameter - عرض جميع الأزرار في صفحة واحدة
     text, keyboard, total_pages = _build_action_type_keyboard(0)
@@ -2992,15 +3541,11 @@ async def handle_action_type_choice(update: Update, context: ContextTypes.DEFAUL
         logger.info(f"ACTION_TYPE_CHOICE: Calling flow function = {routing['flow'].__name__}")
         logger.info(f"ACTION_TYPE_CHOICE: Message target type = {type(message_target)}")
 
-        # ⚠️ مهم جداً: حفظ R_ACTION_TYPE في التاريخ قبل الانتقال إلى الـ flow التالي
+        # ✅ تحديث last_valid_state قبل الانتقال إلى الـ flow التالي
         # هذا يضمن أن زر الرجوع يعمل بشكل صحيح
-        state_manager = StateHistoryManager.get_state_manager(context)
-        # التأكد من أن R_ACTION_TYPE موجود في التاريخ (يجب أن يكون موجوداً بالفعل)
-        current_history = state_manager.get_history()
-        if not current_history or current_history[-1] != R_ACTION_TYPE:
-            logger.warning(f"ACTION_TYPE_CHOICE: R_ACTION_TYPE not in history! Current history: {current_history}")
-            # إضافة R_ACTION_TYPE إذا لم يكن موجوداً
-            state_manager.push_state(R_ACTION_TYPE)
+        context.user_data['last_valid_state'] = 'action_type_selection'
+        context.user_data['_conversation_state'] = R_ACTION_TYPE
+        logger.info(f"ACTION_TYPE_CHOICE: Set last_valid_state to action_type_selection")
 
         # تهيئة state_to_return بالقيمة الافتراضية من routing
         state_to_return = routing.get("state", R_ACTION_TYPE)
@@ -3168,16 +3713,46 @@ async def start_new_consultation_flow(message, context):
         print(f"NEW_CONSULT_FLOW: NEW_CONSULT_COMPLAINT state value = {NEW_CONSULT_COMPLAINT}")
         sys.stdout.flush()
         
-        # ⚠️ مهم جداً: حفظ NEW_CONSULT_COMPLAINT في التاريخ قبل إرسال الرسالة
+        # ✅ مهم جداً: التأكد من أن R_ACTION_TYPE موجود في سجل التنقل قبل إضافة NEW_CONSULT_COMPLAINT
         # هذا يضمن أن زر الرجوع يعمل بشكل صحيح
-        StateHistoryManager.transition_to_state(context, NEW_CONSULT_COMPLAINT)
+        current_history = nav_get_history(context)
         
-        result = await message.reply_text(
-            "شكوى المريض\n\n"
-            "يرجى إدخال شكوى المريض:",
-            reply_markup=_nav_buttons(show_back=True),
-            parse_mode="Markdown"
-        )
+        logger.info(f"NEW_CONSULT_FLOW: Current history BEFORE adding NEW_CONSULT_COMPLAINT: {current_history}")
+        
+        # ✅ مهم جداً: التأكد من أن R_ACTION_TYPE موجود في سجل التنقل قبل flow states
+        # إذا لم يكن موجوداً، نضيفه قبل إضافة NEW_CONSULT_COMPLAINT
+        print(f"\n{'='*80}")
+        print(f"NEW_CONSULT_FLOW: Navigation History Check")
+        print(f"  Current history: {current_history}")
+        print(f"  R_ACTION_TYPE value: {R_ACTION_TYPE}")
+        print(f"  Last item in history: {current_history[-1] if current_history else 'None'}")
+        print(f"  R_ACTION_TYPE in history: {R_ACTION_TYPE in current_history if current_history else False}")
+        print(f"{'='*80}\n")
+        import sys
+        sys.stdout.flush()
+        
+        # ✅ التأكد من أن last_valid_state = 'action_type_selection' قبل إضافة NEW_CONSULT_COMPLAINT
+        # هذا يضمن أن زر الرجوع يعمل بشكل صحيح
+        if context.user_data.get('last_valid_state') != 'action_type_selection':
+            logger.info(f"NEW_CONSULT_FLOW: Setting last_valid_state to action_type_selection")
+            context.user_data['last_valid_state'] = 'action_type_selection'
+        
+        # ✅ تهيئة Step Indexing System
+        set_current_step(context, 0)  # البدء من السؤال الأول
+        context.user_data['last_valid_state'] = 'new_consult_complaint'
+        context.user_data['_conversation_state'] = NEW_CONSULT_COMPLAINT
+        logger.info(f"NEW_CONSULT_FLOW: Initialized step indexing, step = 0")
+        print(f"NEW_CONSULT_FLOW: ✅ Step Indexing initialized, current_step = 0")
+        sys.stdout.flush()
+        
+        # ✅ إرسال السؤال الأول مع زر الرجوع
+        questions = get_questions_for_flow("new_consult")
+        question = questions[0]
+        logger.info(f"NEW_CONSULT_FLOW: Sending first question: {question['question']}")
+        print(f"NEW_CONSULT_FLOW: 📝 Sending question: {question['question']}")
+        print(f"NEW_CONSULT_FLOW: 📝 Question prompt: {question['prompt']}")
+        sys.stdout.flush()
+        result = await send_question_with_back_button(message, question, context)
         print(f"NEW_CONSULT_FLOW: Message sent successfully, message_id = {result.message_id}")
         print(f"NEW_CONSULT_FLOW: Waiting for user input in state NEW_CONSULT_COMPLAINT = {NEW_CONSULT_COMPLAINT}")
         print(f"NEW_CONSULT_FLOW: ConversationHandler should now be in state = {NEW_CONSULT_COMPLAINT}")
@@ -3228,12 +3803,25 @@ async def handle_new_consult_complaint(update: Update, context: ContextTypes.DEF
     if not valid:
         logger.warning(f"NEW_CONSULT_COMPLAINT: Validation failed, returning to same state")
         try:
-            await update.message.reply_text(
-                f"خطأ: {msg}\n\n"
-                f"يرجى إدخال شكوى المريض:",
-                reply_markup=_nav_buttons(show_back=True),
-                parse_mode="Markdown"
-            )
+            # ✅ إعادة إرسال السؤال الحالي مع زر الرجوع
+            questions = get_questions_for_flow("new_consult")
+            current_step = get_current_step(context)
+            if 0 <= current_step < len(questions):
+                question = questions[current_step]
+                await update.message.reply_text(
+                    f"⚠️ **خطأ: {msg}**\n\n**{question['question']}**\n\n{question['prompt']}",
+                    reply_markup=InlineKeyboardMarkup([
+                        [get_step_back_button()],
+                        [InlineKeyboardButton("❌ إلغاء العملية", callback_data="nav:cancel")]
+                    ]),
+                    parse_mode="Markdown"
+                )
+            else:
+                await update.message.reply_text(
+                    f"خطأ: {msg}\n\nيرجى إدخال شكوى المريض:",
+                    reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
+                    parse_mode="Markdown"
+                )
         except Exception as e:
             logger.error(f"NEW_CONSULT_COMPLAINT: Failed to send error message: {e}", exc_info=True)
             # محاولة بديلة
@@ -3246,18 +3834,31 @@ async def handle_new_consult_complaint(update: Update, context: ContextTypes.DEF
     # إذا وصلنا هنا، التحقق نجح
     logger.info(f"NEW_CONSULT_COMPLAINT: Validation passed, saving complaint")
     context.user_data.setdefault("report_tmp", {})["complaint"] = text
-
+    
+    # ✅ تحديث Step Indexing - الانتقال للسؤال التالي
+    current_step = get_current_step(context)
+    set_current_step(context, current_step + 1)
+    
     try:
-        logger.info("NEW_CONSULT_COMPLAINT: Sending decision request message...")
-        await update.message.reply_text(
-            "✅ تم الحفظ\n\n"
-            "📝 **قرار الطبيب**\n\n"
-            "يرجى إدخال قرار الطبيب:",
-            reply_markup=_nav_buttons(show_back=True),
-            parse_mode="Markdown"
-        )
-        logger.info("NEW_CONSULT_COMPLAINT: Message sent, returning NEW_CONSULT_DECISION")
-        return NEW_CONSULT_DECISION
+        logger.info("NEW_CONSULT_COMPLAINT: Sending next question...")
+        
+        # ✅ الحصول على السؤال التالي
+        questions = get_questions_for_flow("new_consult")
+        if current_step + 1 < len(questions):
+            next_question = questions[current_step + 1]
+            context.user_data['_conversation_state'] = next_question["state"]
+            
+            await update.message.reply_text(
+                f"✅ تم الحفظ\n\n",
+                parse_mode="Markdown"
+            )
+            await send_question_with_back_button(update.message, next_question, context)
+            logger.info(f"NEW_CONSULT_COMPLAINT: Sent next question, step = {current_step + 1}")
+            return next_question["state"]
+        else:
+            # لا توجد أسئلة أخرى، الانتقال للخطوة التالية في الـ flow
+            context.user_data['_conversation_state'] = NEW_CONSULT_DECISION
+            return NEW_CONSULT_DECISION
     except Exception as e:
         logger.error(f"NEW_CONSULT_COMPLAINT: Error sending decision request: {e}", exc_info=True)
         # محاولة بديلة
@@ -3299,21 +3900,39 @@ async def handle_new_consult_diagnosis(update: Update, context: ContextTypes.DEF
         return NEW_CONSULT_DIAGNOSIS
 
     if not valid:
-        await update.message.reply_text(
-            f"⚠️ **خطأ: {msg}**\n\n"
-            f"يرجى إدخال التشخيص:",
-            reply_markup=_nav_buttons(show_back=True),
-            parse_mode="Markdown"
-        )
+        # ✅ إعادة إرسال السؤال الحالي مع زر الرجوع
+        questions = get_questions_for_flow("new_consult")
+        current_step = get_current_step(context)
+        if 0 <= current_step < len(questions):
+            question = questions[current_step]
+            await update.message.reply_text(
+                f"⚠️ **خطأ: {msg}**\n\n**{question['question']}**\n\n{question['prompt']}",
+                reply_markup=InlineKeyboardMarkup([
+                    [get_step_back_button()],
+                    [InlineKeyboardButton("❌ إلغاء العملية", callback_data="nav:cancel")]
+                ]),
+                parse_mode="Markdown"
+            )
+        else:
+            await update.message.reply_text(
+                f"⚠️ **خطأ: {msg}**\n\nيرجى إدخال التشخيص:",
+                reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
+                parse_mode="Markdown"
+            )
         return NEW_CONSULT_DIAGNOSIS
 
     context.user_data["report_tmp"]["diagnosis"] = text
+
+    # ✅ حفظ NEW_CONSULT_DECISION في التاريخ قبل الانتقال
+    # ✅ تحديث last_valid_state
+    context.user_data['last_valid_state'] = 'new_consult_decision'
+    context.user_data['_conversation_state'] = NEW_CONSULT_DECISION
 
     await update.message.reply_text(
         "✅ تم الحفظ\n\n"
         "📝 **قرار الطبيب**\n\n"
         "يرجى إدخال قرار الطبيب:",
-        reply_markup=_nav_buttons(show_back=True),
+        reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
         parse_mode="Markdown"
     )
 
@@ -3330,30 +3949,49 @@ async def handle_new_consult_decision(update: Update, context: ContextTypes.DEFA
     valid, msg = validate_text_input(text, min_length=3, max_length=500)
 
     if not valid:
-        await update.message.reply_text(
-            f"⚠️ **خطأ: {msg}**\n\n"
-            f"يرجى إدخال قرار الطبيب:",
-            reply_markup=_nav_buttons(show_back=True),
-            parse_mode="Markdown"
-        )
+        # ✅ إعادة إرسال السؤال الحالي مع زر الرجوع
+        questions = get_questions_for_flow("new_consult")
+        current_step = get_current_step(context)
+        if 0 <= current_step < len(questions):
+            question = questions[current_step]
+            await update.message.reply_text(
+                f"⚠️ **خطأ: {msg}**\n\n**{question['question']}**\n\n{question['prompt']}",
+                reply_markup=InlineKeyboardMarkup([
+                    [get_step_back_button()],
+                    [InlineKeyboardButton("❌ إلغاء العملية", callback_data="nav:cancel")]
+                ]),
+                parse_mode="Markdown"
+            )
+        else:
+            await update.message.reply_text(
+                f"⚠️ **خطأ: {msg}**\n\nيرجى إدخال قرار الطبيب:",
+                reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
+                parse_mode="Markdown"
+            )
         return NEW_CONSULT_DECISION
 
     context.user_data["report_tmp"]["decision"] = text
-
-    # حفظ الـ state في التاريخ قبل الانتقال
-    StateHistoryManager.transition_to_state(context, NEW_CONSULT_TESTS)
-
-    await update.message.reply_text(
-        "✅ تم الحفظ\n\n"
-        "🔬 **الفحوصات المطلوبة**\n\n"
-        "يرجى إدخال الفحوصات المطلوبة قبل العملية:\n"
-        "(أو اكتب 'لا يوجد' إذا لم تكن هناك فحوصات)",
-        reply_markup=_nav_buttons(show_back=True),
-        parse_mode="Markdown"
-    )
-
-    context.user_data['_conversation_state'] = NEW_CONSULT_TESTS
-    return NEW_CONSULT_TESTS
+    
+    # ✅ تحديث Step Indexing - الانتقال للسؤال التالي
+    current_step = get_current_step(context)
+    set_current_step(context, current_step + 1)
+    
+    # ✅ الحصول على السؤال التالي
+    questions = get_questions_for_flow("new_consult")
+    if current_step + 1 < len(questions):
+        next_question = questions[current_step + 1]
+        context.user_data['_conversation_state'] = next_question["state"]
+        
+        await update.message.reply_text(
+            f"✅ تم الحفظ\n\n",
+            parse_mode="Markdown"
+        )
+        await send_question_with_back_button(update.message, next_question, context)
+        return next_question["state"]
+    else:
+        # لا توجد أسئلة أخرى، الانتقال للخطوة التالية في الـ flow
+        context.user_data['_conversation_state'] = NEW_CONSULT_TESTS
+        return NEW_CONSULT_TESTS
 
 
 @debug_state_monitor("NEW_CONSULT_TESTS")
@@ -3366,15 +4004,32 @@ async def handle_new_consult_tests(update: Update, context: ContextTypes.DEFAULT
     else:
         valid, msg = validate_text_input(text, min_length=3, max_length=500)
         if not valid:
-            await update.message.reply_text(
-                f"⚠️ **خطأ: {msg}**\n\n"
-                f"يرجى إدخال الفحوصات المطلوبة:",
-                reply_markup=_nav_buttons(show_back=True),
-                parse_mode="Markdown"
-            )
+            # ✅ إعادة إرسال السؤال الحالي مع زر الرجوع
+            questions = get_questions_for_flow("new_consult")
+            current_step = get_current_step(context)
+            if 0 <= current_step < len(questions):
+                question = questions[current_step]
+                await update.message.reply_text(
+                    f"⚠️ **خطأ: {msg}**\n\n**{question['question']}**\n\n{question['prompt']}",
+                    reply_markup=InlineKeyboardMarkup([
+                        [get_step_back_button()],
+                        [InlineKeyboardButton("❌ إلغاء العملية", callback_data="nav:cancel")]
+                    ]),
+                    parse_mode="Markdown"
+                )
+            else:
+                await update.message.reply_text(
+                    f"⚠️ **خطأ: {msg}**\n\nيرجى إدخال الفحوصات المطلوبة:",
+                    reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
+                    parse_mode="Markdown"
+                )
             return NEW_CONSULT_TESTS
 
     context.user_data["report_tmp"]["tests"] = text
+    
+    # ✅ تحديث Step Indexing - الانتقال للسؤال التالي (إن وجد)
+    current_step = get_current_step(context)
+    set_current_step(context, current_step + 1)
 
     # عرض تقويم تاريخ العودة (اختياري)
     await _render_followup_calendar(update.message, context)
@@ -3416,7 +4071,7 @@ async def handle_new_consult_followup_date_skip(update: Update, context: Context
         "✅ تم التخطي\n\n"
         "✍️ **سبب العودة**\n\n"
         "يرجى إدخال سبب العودة:",
-        reply_markup=_nav_buttons(show_back=True),
+        reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
         parse_mode="Markdown"
     )
 
@@ -3725,7 +4380,7 @@ async def handle_new_consult_followup_time_hour(update: Update, context: Context
             "✅ تم الحفظ\n\n"
             "✍️ **سبب العودة**\n\n"
             "يرجى إدخال سبب العودة:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         
@@ -3841,7 +4496,7 @@ async def handle_new_consult_followup_time_minute(update: Update, context: Conte
         await query.message.reply_text(
             "✍️ **سبب العودة**\n\n"
             "يرجى إدخال سبب العودة:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return next_state
@@ -3925,7 +4580,7 @@ async def handle_new_consult_followup_time_skip(update: Update, context: Context
         await query.message.reply_text(
             "✍️ **سبب العودة**\n\n"
             "يرجى إدخال سبب العودة:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return next_state
@@ -3965,7 +4620,7 @@ async def handle_new_consult_followup_reason(update: Update, context: ContextTyp
         await update.message.reply_text(
             f"⚠️ **خطأ: {msg}**\n\n"
             f"يرجى إدخال سبب العودة:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return NEW_CONSULT_FOLLOWUP_REASON
@@ -4003,9 +4658,9 @@ async def start_followup_flow(message, context):
     context.user_data.setdefault("report_tmp", {})["medical_action"] = "متابعة في الرقود"
     context.user_data["report_tmp"]["current_flow"] = "followup"
     
-    # حفظ الـ state في التاريخ
-    state_manager = StateHistoryManager.get_state_manager(context)
-    state_manager.push_state(FOLLOWUP_COMPLAINT)
+    # ✅ حفظ الـ state في سجل التنقل
+    nav_push(context, FOLLOWUP_COMPLAINT)
+    context.user_data['_conversation_state'] = FOLLOWUP_COMPLAINT
     
     # حفظ الحالة يدوياً في user_data للمساعدة في التتبع
     context.user_data['_conversation_state'] = FOLLOWUP_COMPLAINT
@@ -4013,7 +4668,7 @@ async def start_followup_flow(message, context):
     await message.reply_text(
         "💬 **شكوى المريض**\n\n"
         "يرجى إدخال شكوى المريض:",
-        reply_markup=_nav_buttons(show_back=True),
+        reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
         parse_mode="Markdown"
     )
     
@@ -4045,7 +4700,7 @@ async def start_periodic_followup_flow(message, context):
     await message.reply_text(
         "💬 **شكوى المريض**\n\n"
         "يرجى إدخال شكوى المريض:",
-        reply_markup=_nav_buttons(show_back=True),
+        reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
         parse_mode="Markdown"
     )
     
@@ -4066,7 +4721,7 @@ async def handle_followup_complaint(update: Update, context: ContextTypes.DEFAUL
         await update.message.reply_text(
             f"⚠️ **خطأ: {msg}**\n\n"
             f"يرجى إدخال شكوى المريض:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return FOLLOWUP_COMPLAINT
@@ -4080,7 +4735,7 @@ async def handle_followup_complaint(update: Update, context: ContextTypes.DEFAUL
         "✅ تم الحفظ\n\n"
         "🔬 **التشخيص الطبي**\n\n"
         "يرجى إدخال التشخيص:",
-        reply_markup=_nav_buttons(show_back=True),
+        reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
         parse_mode="Markdown"
     )
 
@@ -4098,7 +4753,7 @@ async def handle_followup_diagnosis(update: Update, context: ContextTypes.DEFAUL
         await update.message.reply_text(
             f"⚠️ **خطأ: {msg}**\n\n"
             f"يرجى إدخال التشخيص:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return FOLLOWUP_DIAGNOSIS
@@ -4112,7 +4767,7 @@ async def handle_followup_diagnosis(update: Update, context: ContextTypes.DEFAUL
         "✅ تم الحفظ\n\n"
         "📝 **قرار الطبيب**\n\n"
         "يرجى إدخال قرار الطبيب:",
-        reply_markup=_nav_buttons(show_back=True),
+        reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
         parse_mode="Markdown"
     )
 
@@ -4130,7 +4785,7 @@ async def handle_followup_decision(update: Update, context: ContextTypes.DEFAULT
         await update.message.reply_text(
             f"⚠️ **خطأ: {msg}**\n\n"
             f"يرجى إدخال قرار الطبيب:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return FOLLOWUP_DECISION
@@ -4141,7 +4796,7 @@ async def handle_followup_decision(update: Update, context: ContextTypes.DEFAULT
         "✅ تم الحفظ\n\n"
         "🏥 **رقم الغرفة والطابق**\n\n"
         "يرجى إدخال رقم الغرفة والطابق:",
-        reply_markup=_nav_buttons(show_back=True),
+        reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
         parse_mode="Markdown"
     )
 
@@ -4161,7 +4816,7 @@ async def handle_followup_room_floor(update: Update, context: ContextTypes.DEFAU
         await update.message.reply_text(
             "⚠️ **خطأ في الإدخال**\n\n"
             "يرجى إدخال رقم الغرفة والطابق (مثال: غرفة 205 - الطابق 2):",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return FOLLOWUP_ROOM_FLOOR
@@ -4185,7 +4840,7 @@ async def handle_followup_reason(update: Update, context: ContextTypes.DEFAULT_T
         await update.message.reply_text(
             f"⚠️ **خطأ: {msg}**\n\n"
             f"يرجى إدخال سبب العودة:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return FOLLOWUP_REASON
@@ -4232,7 +4887,7 @@ async def start_emergency_flow(message, context):
     await message.reply_text(
         "💬 **شكوى المريض**\n\n"
         "يرجى إدخال شكوى المريض:",
-        reply_markup=_nav_buttons(show_back=True),
+        reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
         parse_mode="Markdown"
     )
     
@@ -4253,7 +4908,7 @@ async def handle_emergency_complaint(update: Update, context: ContextTypes.DEFAU
         await update.message.reply_text(
             f"⚠️ **خطأ: {msg}**\n\n"
             f"يرجى إدخال شكوى المريض:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return EMERGENCY_COMPLAINT
@@ -4264,7 +4919,7 @@ async def handle_emergency_complaint(update: Update, context: ContextTypes.DEFAU
         "✅ تم الحفظ\n\n"
         "🔬 **التشخيص الطبي**\n\n"
         "يرجى إدخال التشخيص الطبي:",
-        reply_markup=_nav_buttons(show_back=True),
+        reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
         parse_mode="Markdown"
     )
 
@@ -4282,7 +4937,7 @@ async def handle_emergency_diagnosis(update: Update, context: ContextTypes.DEFAU
         await update.message.reply_text(
             f"⚠️ **خطأ: {msg}**\n\n"
             f"يرجى إدخال التشخيص:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return EMERGENCY_DIAGNOSIS
@@ -4293,7 +4948,7 @@ async def handle_emergency_diagnosis(update: Update, context: ContextTypes.DEFAU
         "✅ تم الحفظ\n\n"
         "📝 **قرار الطبيب وماذا تم للحالة في الطوارئ**\n\n"
         "يرجى إدخال قرار الطبيب وتفاصيل ما تم للحالة:",
-        reply_markup=_nav_buttons(show_back=True),
+        reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
         parse_mode="Markdown"
     )
 
@@ -4311,7 +4966,7 @@ async def handle_emergency_decision(update: Update, context: ContextTypes.DEFAUL
         await update.message.reply_text(
             f"⚠️ **خطأ: {msg}**\n\n"
             f"يرجى إدخال قرار الطبيب وتفاصيل ما تم للحالة:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return EMERGENCY_DECISION
@@ -4396,7 +5051,7 @@ async def handle_emergency_status_text(update: Update, context: ContextTypes.DEF
         await update.message.reply_text(
             f"⚠️ **خطأ: {msg}**\n\n"
             f"يرجى إدخال وضع الحالة:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return EMERGENCY_STATUS
@@ -4410,7 +5065,7 @@ async def handle_emergency_status_text(update: Update, context: ContextTypes.DEF
         "يرجى إدخال التاريخ والوقت:\n"
         "الصيغة: YYYY-MM-DD HH:MM\n"
         "مثال: 2025-10-30 14:30",
-        reply_markup=_nav_buttons(show_back=True),
+        reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
         parse_mode="Markdown"
     )
 
@@ -4436,7 +5091,7 @@ async def handle_emergency_admission_type_choice(update: Update, context: Contex
             f"✅ تم اختيار: {admission_type_text}\n\n"
             "🛏️ **رقم الغرفة**\n\n"
             "يرجى إدخال رقم الغرفة:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return EMERGENCY_ROOM_NUMBER
@@ -4458,7 +5113,7 @@ async def handle_emergency_room_number(update: Update, context: ContextTypes.DEF
         await update.message.reply_text(
             f"⚠️ **خطأ: {msg}**\n\n"
             f"يرجى إدخال رقم الغرفة:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return EMERGENCY_ROOM_NUMBER
@@ -4495,7 +5150,7 @@ async def handle_emergency_date_time_text(update: Update, context: ContextTypes.
         "✅ تم الحفظ\n\n"
         "✍️ **سبب العودة**\n\n"
         "يرجى إدخال سبب العودة:",
-        reply_markup=_nav_buttons(show_back=True),
+        reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
         parse_mode="Markdown"
     )
 
@@ -4510,7 +5165,7 @@ async def handle_emergency_reason(update: Update, context: ContextTypes.DEFAULT_
         await update.message.reply_text(
             f"⚠️ **خطأ: {msg}**\n\n"
             f"يرجى إدخال سبب العودة:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return EMERGENCY_REASON
@@ -4541,7 +5196,7 @@ async def start_admission_flow(message, context):
     await message.reply_text(
         "🛏️ **سبب الرقود**\n\n"
         "يرجى إدخال سبب رقود المريض:",
-        reply_markup=_nav_buttons(show_back=True),
+        reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
         parse_mode="Markdown"
     )
     
@@ -4556,7 +5211,7 @@ async def handle_admission_reason(update: Update, context: ContextTypes.DEFAULT_
         await update.message.reply_text(
             f"⚠️ **خطأ: {msg}**\n\n"
             f"يرجى إدخال سبب الرقود:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return ADMISSION_REASON
@@ -4570,7 +5225,7 @@ async def handle_admission_reason(update: Update, context: ContextTypes.DEFAULT_
         "مثال: غرفة 205 - الطابق 2\n"
         "أو: Room 205, Floor 2\n\n"
         "(أو اكتب 'لم يتم التحديد' إذا لم يتم تحديدها بعد)",
-        reply_markup=_nav_buttons(show_back=True),
+        reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
         parse_mode="Markdown"
     )
 
@@ -4591,7 +5246,7 @@ async def handle_admission_room(update: Update, context: ContextTypes.DEFAULT_TY
         "📝 **ملاحظات**\n\n"
         "يرجى إدخال أي ملاحظات إضافية:\n"
         "(أو اكتب 'لا يوجد')",
-        reply_markup=_nav_buttons(show_back=True),
+        reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
         parse_mode="Markdown"
     )
 
@@ -4634,7 +5289,7 @@ async def handle_admission_followup_date_text(update: Update, context: ContextTy
         "✅ تم الحفظ\n\n"
         "✍️ **سبب العودة**\n\n"
         "يرجى إدخال سبب العودة:",
-        reply_markup=_nav_buttons(show_back=True),
+        reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
         parse_mode="Markdown"
     )
 
@@ -4649,7 +5304,7 @@ async def handle_admission_followup_reason(update: Update, context: ContextTypes
         await update.message.reply_text(
             f"⚠️ **خطأ: {msg}**\n\n"
             f"يرجى إدخال سبب العودة:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return ADMISSION_FOLLOWUP_REASON
@@ -4698,7 +5353,7 @@ async def start_surgery_consult_flow(message, context):
     await message.reply_text(
         "🔬 **التشخيص الطبي**\n\n"
         "يرجى إدخال التشخيص الطبي:",
-        reply_markup=_nav_buttons(show_back=True),
+        reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
         parse_mode="Markdown"
     )
     
@@ -4719,7 +5374,7 @@ async def handle_surgery_consult_diagnosis(update: Update, context: ContextTypes
         await update.message.reply_text(
             f"⚠️ **خطأ: {msg}**\n\n"
             f"يرجى إدخال التشخيص:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return SURGERY_CONSULT_DIAGNOSIS
@@ -4730,7 +5385,7 @@ async def handle_surgery_consult_diagnosis(update: Update, context: ContextTypes
         "✅ تم الحفظ\n\n"
         "📝 **قرار الطبيب وتفاصيل العملية**\n\n"
         "يرجى إدخال قرار الطبيب وتفاصيل العملية المقترحة:",
-        reply_markup=_nav_buttons(show_back=True),
+        reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
         parse_mode="Markdown"
     )
 
@@ -4748,7 +5403,7 @@ async def handle_surgery_consult_decision(update: Update, context: ContextTypes.
         await update.message.reply_text(
             f"⚠️ **خطأ: {msg}**\n\n"
             f"يرجى إدخال قرار الطبيب وتفاصيل العملية:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return SURGERY_CONSULT_DECISION
@@ -4760,7 +5415,7 @@ async def handle_surgery_consult_decision(update: Update, context: ContextTypes.
         "🔤 **اسم العملية بالإنجليزي**\n\n"
         "يرجى إدخال اسم العملية بالإنجليزي:\n"
         "مثال: Laparoscopic Cholecystectomy",
-        reply_markup=_nav_buttons(show_back=True),
+        reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
         parse_mode="Markdown"
     )
 
@@ -4776,7 +5431,7 @@ async def handle_surgery_consult_name_en(update: Update, context: ContextTypes.D
             f"⚠️ **خطأ: {msg}**\n\n"
             f"يرجى إدخال اسم العملية بالإنجليزي فقط:\n"
             f"مثال: Laparoscopic Cholecystectomy",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return SURGERY_CONSULT_NAME_EN
@@ -4788,7 +5443,7 @@ async def handle_surgery_consult_name_en(update: Update, context: ContextTypes.D
         "📊 **نسبة نجاح العملية**\n\n"
         "يرجى إدخال نسبة نجاح العملية المتوقعة:\n"
         "مثال: 95%",
-        reply_markup=_nav_buttons(show_back=True),
+        reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
         parse_mode="Markdown"
     )
 
@@ -4806,7 +5461,7 @@ async def handle_surgery_consult_success_rate(update: Update, context: ContextTy
         await update.message.reply_text(
             f"⚠️ **خطأ: {msg}**\n\n"
             f"يرجى إدخال نسبة نجاح العملية:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return SURGERY_CONSULT_SUCCESS_RATE
@@ -4818,7 +5473,7 @@ async def handle_surgery_consult_success_rate(update: Update, context: ContextTy
         "💡 **نسبة الاستفادة من العملية**\n\n"
         "يرجى إدخال نسبة الاستفادة المتوقعة من العملية:\n"
         "مثال: تحسن كامل، تحسن جزئي، تحسن طفيف",
-        reply_markup=_nav_buttons(show_back=True),
+        reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
         parse_mode="Markdown"
     )
     
@@ -4839,7 +5494,7 @@ async def handle_surgery_consult_benefit_rate(update: Update, context: ContextTy
         await update.message.reply_text(
             f"⚠️ **خطأ: {msg}**\n\n"
             f"يرجى إدخال نسبة الاستفادة من العملية:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return SURGERY_CONSULT_BENEFIT_RATE
@@ -4851,7 +5506,7 @@ async def handle_surgery_consult_benefit_rate(update: Update, context: ContextTy
         "🔬 **الفحوصات والأشعة المطلوبة**\n\n"
         "يرجى إدخال الفحوصات والأشعة المطلوبة قبل العملية:\n"
         "(أو اكتب 'لا يوجد')",
-        reply_markup=_nav_buttons(show_back=True),
+        reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
         parse_mode="Markdown"
     )
     
@@ -4909,7 +5564,7 @@ async def handle_surgery_consult_followup_choice(update: Update, context: Contex
             "مثال: الإدارة سوف تقرر التاريخ\n"
             "أو: سيتم تحديد التاريخ لاحقاً\n"
             "أو: حسب جدول الطبيب",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         # تعيين علامة أن المستخدم يريد إدخال نص
@@ -4925,7 +5580,7 @@ async def handle_surgery_consult_followup_choice(update: Update, context: Contex
             "✅ تم تخطي تاريخ العودة\n\n"
             "✍️ **سبب العودة**\n\n"
             "يرجى إدخال سبب العودة:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return SURGERY_CONSULT_FOLLOWUP_REASON
@@ -4948,7 +5603,7 @@ async def handle_surgery_consult_followup_date_text(update: Update, context: Con
             f"✅ تم الحفظ: {text}\n\n"
             "✍️ **سبب العودة**\n\n"
             "يرجى إدخال سبب العودة:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return SURGERY_CONSULT_FOLLOWUP_REASON
@@ -4964,7 +5619,7 @@ async def handle_surgery_consult_followup_date_text(update: Update, context: Con
             "✅ تم الحفظ\n\n"
             "✍️ **سبب العودة**\n\n"
             "يرجى إدخال سبب العودة:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return SURGERY_CONSULT_FOLLOWUP_REASON
@@ -4978,7 +5633,7 @@ async def handle_surgery_consult_followup_date_text(update: Update, context: Con
             f"✅ تم الحفظ: {text}\n\n"
             "✍️ **سبب العودة**\n\n"
             "يرجى إدخال سبب العودة:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return SURGERY_CONSULT_FOLLOWUP_REASON
@@ -4992,7 +5647,7 @@ async def handle_surgery_consult_followup_reason(update: Update, context: Contex
         await update.message.reply_text(
             f"⚠️ **خطأ: {msg}**\n\n"
             f"يرجى إدخال سبب العودة:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return SURGERY_CONSULT_FOLLOWUP_REASON
@@ -5040,7 +5695,7 @@ async def start_operation_flow(message, context):
     await message.reply_text(
         "⚕️ **تفاصيل العملية التي تمت للحالة**\n\n"
         "يرجى إدخال تفاصيل العملية بالعربي:",
-        reply_markup=_nav_buttons(show_back=True),
+        reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
         parse_mode="Markdown"
     )
     
@@ -5058,7 +5713,7 @@ async def handle_operation_details_ar(update: Update, context: ContextTypes.DEFA
         await update.message.reply_text(
             f"⚠️ **خطأ: {msg}**\n\n"
             f"يرجى إدخال تفاصيل العملية:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return OPERATION_DETAILS_AR
@@ -5070,7 +5725,7 @@ async def handle_operation_details_ar(update: Update, context: ContextTypes.DEFA
         "🔤 **اسم العملية بالإنجليزي**\n\n"
         "يرجى إدخال اسم العملية بالإنجليزي:\n"
         "مثال: Appendectomy",
-        reply_markup=_nav_buttons(show_back=True),
+        reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
         parse_mode="Markdown"
     )
 
@@ -5086,7 +5741,7 @@ async def handle_operation_name_en(update: Update, context: ContextTypes.DEFAULT
             f"⚠️ **خطأ: {msg}**\n\n"
             f"يرجى إدخال اسم العملية بالإنجليزي فقط:\n"
             f"مثال: Appendectomy",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return OPERATION_NAME_EN
@@ -5098,7 +5753,7 @@ async def handle_operation_name_en(update: Update, context: ContextTypes.DEFAULT
         "📝 **ملاحظات**\n\n"
         "يرجى إدخال أي ملاحظات إضافية:\n"
         "(أو اكتب 'لا يوجد')",
-        reply_markup=_nav_buttons(show_back=True),
+        reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
         parse_mode="Markdown"
     )
 
@@ -5141,7 +5796,7 @@ async def handle_operation_followup_date_text(update: Update, context: ContextTy
         "✅ تم الحفظ\n\n"
         "✍️ **سبب العودة**\n\n"
         "يرجى إدخال سبب العودة:",
-        reply_markup=_nav_buttons(show_back=True),
+        reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
         parse_mode="Markdown"
     )
 
@@ -5156,7 +5811,7 @@ async def handle_operation_followup_reason(update: Update, context: ContextTypes
         await update.message.reply_text(
             f"⚠️ **خطأ: {msg}**\n\n"
             f"يرجى إدخال سبب العودة:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return OPERATION_FOLLOWUP_REASON
@@ -5198,7 +5853,7 @@ async def start_final_consult_flow(message, context):
     await message.reply_text(
         "🔬 **التشخيص النهائي**\n\n"
         "يرجى إدخال التشخيص النهائي:",
-        reply_markup=_nav_buttons(show_back=True),
+        reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
         parse_mode="Markdown"
     )
     
@@ -5219,7 +5874,7 @@ async def handle_final_consult_diagnosis(update: Update, context: ContextTypes.D
         await update.message.reply_text(
             f"⚠️ **خطأ: {msg}**\n\n"
             f"يرجى إدخال التشخيص:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return FINAL_CONSULT_DIAGNOSIS
@@ -5230,7 +5885,7 @@ async def handle_final_consult_diagnosis(update: Update, context: ContextTypes.D
         "✅ تم الحفظ\n\n"
         "📝 **تفاصيل قرار الطبيب**\n\n"
         "يرجى إدخال تفاصيل قرار الطبيب:",
-        reply_markup=_nav_buttons(show_back=True),
+        reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
         parse_mode="Markdown"
     )
 
@@ -5248,7 +5903,7 @@ async def handle_final_consult_decision(update: Update, context: ContextTypes.DE
         await update.message.reply_text(
             f"⚠️ **خطأ: {msg}**\n\n"
             f"يرجى إدخال تفاصيل قرار الطبيب:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return FINAL_CONSULT_DECISION
@@ -5259,7 +5914,7 @@ async def handle_final_consult_decision(update: Update, context: ContextTypes.DE
         "✅ تم الحفظ\n\n"
         "💡 **التوصيات الطبية**\n\n"
         "يرجى إدخال التوصيات الطبية النهائية:",
-        reply_markup=_nav_buttons(show_back=True),
+        reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
         parse_mode="Markdown"
     )
 
@@ -5274,7 +5929,7 @@ async def handle_final_consult_recommendations(update: Update, context: ContextT
         await update.message.reply_text(
             f"⚠️ **خطأ: {msg}**\n\n"
             f"يرجى إدخال التوصيات الطبية:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return FINAL_CONSULT_RECOMMENDATIONS
@@ -5332,7 +5987,7 @@ async def handle_discharge_type(update: Update, context: ContextTypes.DEFAULT_TY
         await query.message.reply_text(
             "📋 **أبرز ما تم للحالة أثناء الرقود**\n\n"
             "يرجى إدخال ملخص ما تم للحالة:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return DISCHARGE_ADMISSION_SUMMARY
@@ -5342,7 +5997,7 @@ async def handle_discharge_type(update: Update, context: ContextTypes.DEFAULT_TY
         await query.message.reply_text(
             "⚕️ **تفاصيل العملية التي تمت للحالة**\n\n"
             "يرجى إدخال تفاصيل العملية:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return DISCHARGE_OPERATION_DETAILS
@@ -5357,7 +6012,7 @@ async def handle_discharge_admission_summary(update: Update, context: ContextTyp
         await update.message.reply_text(
             f"⚠️ **خطأ: {msg}**\n\n"
             f"يرجى إدخال ملخص ما تم للحالة:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return DISCHARGE_ADMISSION_SUMMARY
@@ -5379,7 +6034,7 @@ async def handle_discharge_operation_details(update: Update, context: ContextTyp
         await update.message.reply_text(
             f"⚠️ **خطأ: {msg}**\n\n"
             f"يرجى إدخال تفاصيل العملية:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return DISCHARGE_OPERATION_DETAILS
@@ -5390,7 +6045,7 @@ async def handle_discharge_operation_details(update: Update, context: ContextTyp
         "✅ تم الحفظ\n\n"
         "🔤 **اسم العملية بالإنجليزي**\n\n"
         "يرجى إدخال اسم العملية بالإنجليزي:",
-        reply_markup=_nav_buttons(show_back=True),
+        reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
         parse_mode="Markdown"
     )
 
@@ -5406,7 +6061,7 @@ async def handle_discharge_operation_name_en(update: Update, context: ContextTyp
             f"⚠️ **خطأ: {msg}**\n\n"
             f"يرجى إدخال اسم العملية بالإنجليزي فقط:\n"
             f"مثال: Appendectomy",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return DISCHARGE_OPERATION_NAME_EN
@@ -5441,7 +6096,7 @@ async def handle_discharge_followup_date_text(update: Update, context: ContextTy
         "✅ تم الحفظ\n\n"
         "✍️ **سبب العودة**\n\n"
         "يرجى إدخال سبب العودة:",
-        reply_markup=_nav_buttons(show_back=True),
+        reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
         parse_mode="Markdown"
     )
 
@@ -5456,7 +6111,7 @@ async def handle_discharge_followup_reason(update: Update, context: ContextTypes
         await update.message.reply_text(
             f"⚠️ **خطأ: {msg}**\n\n"
             f"يرجى إدخال سبب العودة:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return DISCHARGE_FOLLOWUP_REASON
@@ -5530,7 +6185,7 @@ async def handle_rehab_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text(
             "🏃 **تفاصيل جلسة العلاج الطبيعي**\n\n"
             "يرجى إدخال تفاصيل الجلسة:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return PHYSICAL_THERAPY_DETAILS
@@ -5543,7 +6198,7 @@ async def handle_rehab_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text(
             "🦾 **اسم الجهاز الذي تم توفيره مع التفاصيل**\n\n"
             "يرجى إدخال اسم الجهاز والتفاصيل:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return DEVICE_NAME_DETAILS
@@ -5558,7 +6213,7 @@ async def handle_physical_therapy_details(update: Update, context: ContextTypes.
         await update.message.reply_text(
             f"⚠️ **خطأ: {msg}**\n\n"
             f"يرجى إدخال تفاصيل جلسة العلاج الطبيعي:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return PHYSICAL_THERAPY_DETAILS
@@ -5618,7 +6273,7 @@ async def handle_physical_therapy_followup_date_text(update: Update, context: Co
         "✅ تم الحفظ\n\n"
         "✍️ **سبب العودة**\n\n"
         "يرجى إدخال سبب العودة:",
-        reply_markup=_nav_buttons(show_back=True),
+        reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
         parse_mode="Markdown"
     )
 
@@ -5633,7 +6288,7 @@ async def handle_physical_therapy_followup_reason(update: Update, context: Conte
         await update.message.reply_text(
             f"⚠️ **خطأ: {msg}**\n\n"
             f"يرجى إدخال سبب العودة:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return PHYSICAL_THERAPY_FOLLOWUP_REASON
@@ -5655,7 +6310,7 @@ async def handle_device_name_details(update: Update, context: ContextTypes.DEFAU
         await update.message.reply_text(
             f"⚠️ **خطأ: {msg}**\n\n"
             f"يرجى إدخال اسم الجهاز والتفاصيل:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return DEVICE_NAME_DETAILS
@@ -5690,7 +6345,7 @@ async def handle_device_followup_date_text(update: Update, context: ContextTypes
         "✅ تم الحفظ\n\n"
         "✍️ **سبب العودة**\n\n"
         "يرجى إدخال سبب العودة:",
-        reply_markup=_nav_buttons(show_back=True),
+        reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
         parse_mode="Markdown"
     )
 
@@ -5705,7 +6360,7 @@ async def handle_device_followup_reason(update: Update, context: ContextTypes.DE
         await update.message.reply_text(
             f"⚠️ **خطأ: {msg}**\n\n"
             f"يرجى إدخال سبب العودة:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return DEVICE_FOLLOWUP_REASON
@@ -5737,7 +6392,7 @@ async def start_radiology_flow(message, context):
     await message.reply_text(
         "🔬 **نوع الأشعة والفحوصات**\n\n"
         "يرجى إدخال نوع الأشعة أو الفحوصات:",
-        reply_markup=_nav_buttons(show_back=True),
+        reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
         parse_mode="Markdown"
     )
     
@@ -5755,7 +6410,7 @@ async def handle_radiology_type(update: Update, context: ContextTypes.DEFAULT_TY
         await update.message.reply_text(
             f"⚠️ **خطأ: {msg}**\n\n"
             f"يرجى إدخال نوع الأشعة:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         return RADIOLOGY_TYPE
@@ -6268,7 +6923,7 @@ async def handle_translator_choice(update: Update, context: ContextTypes.DEFAULT
             await query.edit_message_text(
                 "👤 **إدخال اسم المترجم**\n\n"
                 "يرجى إدخال اسم المترجم:",
-                reply_markup=_nav_buttons(show_back=True),
+                reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
                 parse_mode="Markdown"
             )
 
@@ -6281,7 +6936,7 @@ async def handle_translator_choice(update: Update, context: ContextTypes.DEFAULT
             await query.edit_message_text(
                 "➕ **إضافة مترجم جديد**\n\n"
                 "يرجى إدخال اسم المترجم الجديد:",
-                reply_markup=_nav_buttons(show_back=True),
+                reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
                 parse_mode="Markdown"
             )
 
@@ -6444,7 +7099,7 @@ async def handle_translator_text(update: Update, context: ContextTypes.DEFAULT_T
         await update.message.reply_text(
             f"⚠️ **خطأ: {msg}**\n\n"
             f"يرجى إدخال اسم المترجم:",
-            reply_markup=_nav_buttons(show_back=True),
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
             parse_mode="Markdown"
         )
         # إرجاع نفس state المترجم
@@ -8526,12 +9181,18 @@ def register(app):
             # إضافة جميع المسارات الخاصة بأنواع الإجراءات:
             NEW_CONSULT_COMPLAINT: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_new_consult_complaint),
+                # ✅ Step Indexing System - معالجة step:back
+                CallbackQueryHandler(handle_step_back, pattern="^step:back$"),
             ],
             NEW_CONSULT_DECISION: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_new_consult_decision),
+                # ✅ Step Indexing System - معالجة step:back
+                CallbackQueryHandler(handle_step_back, pattern="^step:back$"),
             ],
             NEW_CONSULT_TESTS: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_new_consult_tests),
+                # ✅ Step Indexing System - معالجة step:back
+                CallbackQueryHandler(handle_step_back, pattern="^step:back$"),
             ],
             NEW_CONSULT_FOLLOWUP_DATE: [
                 CallbackQueryHandler(handle_new_consult_followup_calendar_nav, pattern="^followup_cal_(prev|next):"),
@@ -8886,6 +9547,11 @@ def register(app):
             # معالج للرسائل التي تحتوي على "إضافة تقرير جديد" (للتعامل مع الأزرار) - فقط في الدردشة الخاصة
             MessageHandler(filters.ChatType.PRIVATE & filters.TEXT & filters.Regex(r".*إضافة.*تقرير.*جديد.*"), start_report),
             # معالج زر الرجوع - يعمل في جميع الـ states
+            # ✅ State Dictionary System - معالجة go_to_* callbacks
+            CallbackQueryHandler(handle_go_to_state, pattern="^go_to_"),
+            # ✅ Step Indexing System - معالجة step:back
+            CallbackQueryHandler(handle_step_back, pattern="^step:back$"),
+            # ✅ النظام القديم للتوافق
             CallbackQueryHandler(handle_back_navigation, pattern="^nav:back$"),
             # معالج زر الإلغاء - يعمل في جميع الـ states
             CallbackQueryHandler(handle_cancel_navigation, pattern="^nav:cancel$"),

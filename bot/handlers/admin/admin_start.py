@@ -109,8 +109,14 @@ async def handle_back_to_main(update: Update, context: ContextTypes.DEFAULT_TYPE
         pass
 
 
+# ✅ تم إزالة debug_admin_message - الاعتماد على ConversationHandlers فقط
+
+
 # 🧩 تسجيل الهاندلرز الخاصة بلوحة التحكم
 def register(app):
+    # ✅ تم إزالة debug_admin_message - الاعتماد على ConversationHandlers فقط
+    # ConversationHandlers مسجلة في handlers_registry.py وستتعامل مع الأزرار بشكل صحيح
+    
     app.add_handler(CommandHandler("admin", admin_start))
     app.add_handler(MessageHandler(filters.Regex("^ℹ️ مساعدة$"), admin_start))
     app.add_handler(CallbackQueryHandler(handle_user_approval, pattern="^(approve|reject):"))

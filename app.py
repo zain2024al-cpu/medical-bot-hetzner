@@ -99,10 +99,6 @@ async def main():
         poll_interval=0.5,  # استعلام سريع
         timeout=600,  # 10 دقائق - timeout عالي
         bootstrap_retries=20,  # محاولات أكثر للاتصال
-        read_timeout=900,  # 15 دقيقة
-        write_timeout=900,  # 15 دقيقة
-        connect_timeout=180,  # 3 دقائق
-        pool_timeout=600,  # 10 دقائق
         close_loop=False,  # عدم إغلاق الـ loop عند الأخطاء
     )
 
