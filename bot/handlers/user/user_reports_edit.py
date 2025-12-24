@@ -1477,9 +1477,11 @@ async def handle_edit_field_from_menu(update: Update, context: ContextTypes.DEFA
             logger.warning(f"⚠️ خطأ في تنسيق القيمة الحالية: {e}")
             current_value_display = "لا يوجد"
         
-        text = f"✏️ **تعديل {field_display}**\n\n"
-        # Escape الأحرف الخاصة في Markdown V1 للقيمة الحالية
+        # Escape جميع النصوص التي تأتي من المستخدم
+        field_display_escaped = escape_markdown_v1(str(field_display))
         current_value_escaped = escape_markdown_v1(str(current_value_display))
+        
+        text = f"✏️ **تعديل {field_display_escaped}**\n\n"
         text += f"**القيمة الحالية:**\n{current_value_escaped}\n\n"
         text += "أرسل القيمة الجديدة:"
         
