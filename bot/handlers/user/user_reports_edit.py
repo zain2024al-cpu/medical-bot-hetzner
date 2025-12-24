@@ -10,6 +10,7 @@ from telegram.ext import (
 )
 from telegram.constants import ParseMode
 from datetime import datetime, date
+import re
 from db.session import SessionLocal
 from db.models import Report, Translator, Patient, Hospital, Department, Doctor
 from bot.shared_auth import is_admin
@@ -17,6 +18,14 @@ from services.inline_calendar import create_calendar_keyboard, create_quick_date
 
 # حالات المحادثة
 SELECT_REPORT, SELECT_FIELD, EDIT_VALUE, CONFIRM_EDIT, EDIT_DATE_CALENDAR, EDIT_DATE_TIME = range(6)
+
+def escape_markdown_v1(text: str) -> str:
+    """تهريب الأحرف الخاصة في Markdown V1"""
+    if not text:
+        return ""
+    # الأحرف الخاصة في Markdown V1: * _ [ ] ( ) `
+    escape_chars = r'_*[]()`'
+    return re.sub(r'([{}])'.format(re.escape(escape_chars)), r'\\\1', text)
 
 def medical_action_to_flow_type(medical_action):
     """تحويل medical_action إلى flow_type"""
@@ -1469,7 +1478,9 @@ async def handle_edit_field_from_menu(update: Update, context: ContextTypes.DEFA
             current_value_display = "لا يوجد"
         
         text = f"✏️ **تعديل {field_display}**\n\n"
-        text += f"**القيمة الحالية:**\n{current_value_display}\n\n"
+        # Escape الأحرف الخاصة في Markdown V1 للقيمة الحالية
+        current_value_escaped = escape_markdown_v1(str(current_value_display))
+        text += f"**القيمة الحالية:**\n{current_value_escaped}\n\n"
         text += "أرسل القيمة الجديدة:"
         
         keyboard = [
