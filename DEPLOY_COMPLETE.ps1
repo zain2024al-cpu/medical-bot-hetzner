@@ -55,3 +55,4 @@ Write-Host "To view logs:" -ForegroundColor Yellow
 Write-Host "  ssh $HETZNER_USER@$HETZNER_IP 'journalctl -u medical-bot -f'" -ForegroundColor White
 
 
+

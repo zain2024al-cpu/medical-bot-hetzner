@@ -88,3 +88,4 @@ Write-Host "  ssh $HETZNER_USER@$HETZNER_IP 'sudo journalctl -u medical-bot -f'"
 Write-Host ""
 
 
+

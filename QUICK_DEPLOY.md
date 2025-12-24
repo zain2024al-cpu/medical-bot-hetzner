@@ -65,3 +65,4 @@ journalctl -u medical-bot -f
 - ✅ جميع الملفات الحساسة محمية
 
 
+

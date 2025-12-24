@@ -561,7 +561,34 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
             context.user_data['report_tmp']['is_edit_mode'] = True
             context.user_data['report_tmp']['edit_report_id'] = report_id
             
+            # إنشاء current_report_data من بيانات التقرير (للتوافق مع الكود القديم)
+            patient = s.query(Patient).filter_by(id=report.patient_id).first()
+            hospital = s.query(Hospital).filter_by(id=report.hospital_id).first()
+            department = s.query(Department).filter_by(id=report.department_id).first() if report.department_id else None
+            doctor = s.query(Doctor).filter_by(id=report.doctor_id).first() if report.doctor_id else None
+            
+            context.user_data['current_report_data'] = {
+                'report_id': report_id,
+                'report_date': report.report_date.strftime('%Y-%m-%d %H:%M') if report.report_date else '',
+                'patient_name': patient.full_name if patient else '',
+                'hospital_name': hospital.name if hospital else '',
+                'department_name': department.name if department else '',
+                'doctor_name': doctor.full_name if doctor else '',
+                'medical_action': report.medical_action or '',
+                'complaint_text': report.complaint_text or '',
+                'doctor_decision': report.doctor_decision or '',
+                'diagnosis': report.diagnosis or '',
+                'treatment_plan': report.treatment_plan or '',
+                'medications': report.medications or '',
+                'notes': report.notes or '',
+                'case_status': report.case_status or '',
+                'followup_date': report.followup_date.strftime('%Y-%m-%d') if report.followup_date else '',
+                'followup_time': report.followup_time or '',
+                'followup_reason': report.followup_reason or '',
+            }
+            
             logger.info(f"✅ تم تحميل بيانات التقرير في report_tmp: {list(report_tmp.keys())}")
+            logger.info(f"✅ تم إنشاء current_report_data: {list(context.user_data['current_report_data'].keys())}")
             
             # استيراد دالة start_report من user_reports_add_new_system
             from bot.handlers.user.user_reports_add_new_system import start_report
@@ -650,13 +677,35 @@ async def handle_field_selection(update: Update, context: ContextTypes.DEFAULT_T
         }
         
         field_display = field_names.get(field_name, field_name)
-        current_value = context.user_data['current_report_data'].get(field_name, "لا يوجد")
+        
+        # الحصول على القيمة الحالية من current_report_data أو report_tmp
+        current_report_data = context.user_data.get('current_report_data', {})
+        report_tmp = context.user_data.get('report_tmp', {})
+        
+        if field_name in current_report_data:
+            current_value = current_report_data.get(field_name, "لا يوجد")
+        else:
+            # محاولة الحصول من report_tmp
+            # تحويل field_name إلى field_key في report_tmp
+            field_key_mapping = {
+                "complaint_text": "complaint",
+                "doctor_decision": "decision",
+                "diagnosis": "diagnosis",
+                "treatment_plan": "treatment_plan",
+                "medications": "medications",
+                "notes": "notes",
+                "case_status": "status",
+                "followup_date": "followup_date",
+                "followup_reason": "followup_reason",
+            }
+            field_key = field_key_mapping.get(field_name, field_name)
+            current_value = report_tmp.get(field_key, "لا يوجد")
         
         # إذا كان الحقل هو التاريخ، نعرض التقويم
         if field_name == "followup_date":
             text = f"📅 **تعديل {field_display}**\n\n"
             if current_value and current_value != "لا يوجد":
-                followup_time = context.user_data['current_report_data'].get('followup_time', '')
+                followup_time = current_report_data.get('followup_time', '') or report_tmp.get('followup_time', '')
                 if followup_time:
                     text += f"**القيمة الحالية:** {current_value} الساعة {followup_time}\n\n"
                 else:
@@ -1293,8 +1342,31 @@ async def handle_cancel_from_summary(update: Update, context: ContextTypes.DEFAU
     from bot.handlers.user.user_reports_add_new_system import handle_cancel_navigation
     return await handle_cancel_navigation(update, context)
 
+def map_field_key_to_db_field(field_key):
+    """تحويل field_key من report_tmp إلى اسم الحقل في قاعدة البيانات"""
+    field_mapping = {
+        "complaint": "complaint_text",
+        "diagnosis": "diagnosis",
+        "decision": "doctor_decision",
+        "tests": "notes",
+        "status": "case_status",
+        "followup_date": "followup_date",
+        "followup_reason": "followup_reason",
+        "treatment_plan": "treatment_plan",
+        "medications": "medications",
+        "notes": "notes",
+        "case_status": "case_status",
+        # الحقول الأساسية
+        "patient_name": "patient_name",  # سيتم التعامل معها بشكل خاص
+        "hospital_name": "hospital_name",  # سيتم التعامل معها بشكل خاص
+        "department_name": "department_name",  # سيتم التعامل معها بشكل خاص
+        "doctor_name": "doctor_name",  # سيتم التعامل معها بشكل خاص
+        "report_date": "report_date",  # سيتم التعامل معها بشكل خاص
+    }
+    return field_mapping.get(field_key, field_key)
+
 async def handle_edit_field_from_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """معالجة اختيار حقل من قائمة التعديل"""
+    """معالجة اختيار حقل من قائمة التعديل (من show_edit_fields_menu)"""
     import logging
     logger = logging.getLogger(__name__)
     
@@ -1306,13 +1378,94 @@ async def handle_edit_field_from_menu(update: Update, context: ContextTypes.DEFA
         await query.answer()
         
         # callback_data format: "edit_field:{flow_type}:{field_key}"
-        # استخدام handle_edit_field_selection من user_reports_add_new_system مباشرة
-        from bot.handlers.user.user_reports_add_new_system import handle_edit_field_selection
+        parts = query.data.split(":")
+        if len(parts) < 3:
+            await query.edit_message_text("❌ خطأ في البيانات")
+            return ConversationHandler.END
         
-        result = await handle_edit_field_selection(update, context)
+        flow_type = parts[1]
+        field_key = parts[2]  # مثل "complaint", "diagnosis", "decision"
         
-        # handle_edit_field_selection يرجع "EDIT_FIELD" string state
-        # لكن نحن في ConversationHandler لـ user_reports_edit، لذلك نرجع EDIT_VALUE
+        logger.info(f"✏️ handle_edit_field_from_menu: flow_type={flow_type}, field_key={field_key}")
+        
+        # تحويل field_key إلى اسم الحقل في قاعدة البيانات
+        db_field_name = map_field_key_to_db_field(field_key)
+        
+        # حفظ معلومات التعديل
+        context.user_data["edit_field_key"] = field_key
+        context.user_data["edit_flow_type"] = flow_type
+        context.user_data["edit_field"] = db_field_name
+        
+        # الحصول على القيمة الحالية من report_tmp أو current_report_data
+        report_tmp = context.user_data.get("report_tmp", {})
+        current_report_data = context.user_data.get("current_report_data", {})
+        
+        # محاولة الحصول على القيمة من report_tmp أولاً، ثم من current_report_data
+        if field_key in report_tmp:
+            current_value = report_tmp.get(field_key)
+        else:
+            # تحويل field_key إلى db_field_name للحصول على القيمة من current_report_data
+            db_field_name = map_field_key_to_db_field(field_key)
+            current_value = current_report_data.get(db_field_name, "غير محدد")
+        
+        # إذا كان الحقل من الحقول الأساسية (patient_name, hospital_name, etc.)
+        # نحتاج إلى معالجة خاصة
+        if field_key in ["patient_name", "hospital_name", "department_name", "doctor_name", "report_date"]:
+            await query.edit_message_text(
+                f"⚠️ **لا يمكن تعديل هذا الحقل من هنا**\n\n"
+                f"الحقل '{field_key}' يحتاج إلى تعديل من خلال واجهة خاصة.\n\n"
+                f"يرجى استخدام زر '🔙 رجوع' للرجوع إلى قائمة الحقول.",
+                parse_mode="Markdown"
+            )
+            return SELECT_FIELD
+        
+        # إذا كان الحقل هو التاريخ، نعرض التقويم
+        if field_key == "followup_date":
+            # استخدام handle_field_selection مع callback_data معدّل
+            # إنشاء callback_data جديد بالصيغة المتوقعة
+            query.data = f"edit_field:{db_field_name}"
+            return await handle_field_selection(update, context)
+        
+        # للحقول النصية الأخرى
+        # عرض واجهة التعديل
+        field_names = {
+            'complaint_text': 'شكوى المريض',
+            'doctor_decision': 'قرار الطبيب',
+            'diagnosis': 'التشخيص الطبي',
+            'treatment_plan': 'التوصيات / خطة العلاج',
+            'medications': 'الأدوية / الفحوصات',
+            'notes': 'الملاحظات / الفحوصات',
+            'case_status': 'حالة الطوارئ',
+            'followup_date': 'موعد العودة',
+            'followup_reason': 'سبب العودة'
+        }
+        
+        field_display = field_names.get(db_field_name, db_field_name)
+        
+        # تنسيق القيمة الحالية للعرض
+        if isinstance(current_value, datetime):
+            current_value_display = current_value.strftime('%Y-%m-%d %H:%M')
+        elif current_value and current_value != "غير محدد":
+            current_value_display = str(current_value)
+        else:
+            current_value_display = "لا يوجد"
+        
+        text = f"✏️ **تعديل {field_display}**\n\n"
+        text += f"**القيمة الحالية:**\n{current_value_display}\n\n"
+        text += "أرسل القيمة الجديدة:"
+        
+        keyboard = [
+            [InlineKeyboardButton("🔙 رجوع", callback_data=f"review:{flow_type}")],
+            [InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]
+        ]
+        
+        await query.edit_message_text(
+            text,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode=ParseMode.MARKDOWN
+        )
+        
+        logger.info(f"✅ تم عرض حقل التعديل: {field_key} -> {db_field_name}")
         return EDIT_VALUE
         
     except Exception as e:
@@ -1320,6 +1473,11 @@ async def handle_edit_field_from_menu(update: Update, context: ContextTypes.DEFA
         try:
             if query:
                 await query.answer("⚠️ حدث خطأ", show_alert=True)
+                await query.edit_message_text(
+                    "❌ **حدث خطأ أثناء تحميل الحقل**\n\n"
+                    "يرجى المحاولة مرة أخرى.",
+                    parse_mode=ParseMode.MARKDOWN
+                )
         except:
             pass
         return ConversationHandler.END

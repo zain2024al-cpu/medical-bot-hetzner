@@ -106,3 +106,4 @@ Write-Host "   tail -f logs/bot.log" -ForegroundColor Cyan
 Write-Host ""
 
 
+

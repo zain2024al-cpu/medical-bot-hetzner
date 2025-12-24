@@ -64,3 +64,4 @@ ssh root@5.223.58.71 "systemctl status medical-bot --no-pager -l | head -n 10"
 3. ✅ البوت يستجيب للأوامر بشكل صحيح
 
 
+

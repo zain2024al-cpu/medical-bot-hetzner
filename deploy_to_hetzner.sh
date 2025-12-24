@@ -112,3 +112,4 @@ echo "💡 للتحقق من السجلات:"
 echo "   ssh $SERVER_USER@$SERVER_IP 'journalctl -u $SERVICE_NAME -f'"
 
 
+

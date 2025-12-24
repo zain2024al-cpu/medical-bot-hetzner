@@ -239,3 +239,4 @@ Write-Host "   ssh $HETZNER_USER@$HETZNER_IP 'journalctl -u $SERVICE_NAME -f'" -
 Write-Host ""
 
 
+
