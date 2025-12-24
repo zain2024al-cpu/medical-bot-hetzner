@@ -1390,6 +1390,7 @@ async def handle_edit_field_from_menu(update: Update, context: ContextTypes.DEFA
         
         # تحويل field_key إلى اسم الحقل في قاعدة البيانات
         db_field_name = map_field_key_to_db_field(field_key)
+        logger.info(f"📋 field_key={field_key} -> db_field_name={db_field_name}")
         
         # حفظ معلومات التعديل
         context.user_data["edit_field_key"] = field_key
@@ -1399,14 +1400,23 @@ async def handle_edit_field_from_menu(update: Update, context: ContextTypes.DEFA
         # الحصول على القيمة الحالية من report_tmp أو current_report_data
         report_tmp = context.user_data.get("report_tmp", {})
         current_report_data = context.user_data.get("current_report_data", {})
+        logger.info(f"📊 report_tmp keys: {list(report_tmp.keys())}")
+        logger.info(f"📊 current_report_data keys: {list(current_report_data.keys())}")
         
         # محاولة الحصول على القيمة من report_tmp أولاً، ثم من current_report_data
+        current_value = None
         if field_key in report_tmp:
             current_value = report_tmp.get(field_key)
-        else:
-            # تحويل field_key إلى db_field_name للحصول على القيمة من current_report_data
-            db_field_name = map_field_key_to_db_field(field_key)
-            current_value = current_report_data.get(db_field_name, "غير محدد")
+        
+        # إذا لم نجد القيمة في report_tmp، جرب current_report_data
+        if current_value is None or current_value == "":
+            current_value = current_report_data.get(db_field_name, None)
+        
+        # إذا لم نجد القيمة في أي مكان، استخدم "غير محدد"
+        if current_value is None or current_value == "":
+            current_value = "غير محدد"
+        
+        logger.info(f"📋 القيمة الحالية للحقل {field_key} (db: {db_field_name}): {current_value}")
         
         # إذا كان الحقل من الحقول الأساسية (patient_name, hospital_name, etc.)
         # نحتاج إلى معالجة خاصة
@@ -1415,7 +1425,7 @@ async def handle_edit_field_from_menu(update: Update, context: ContextTypes.DEFA
                 f"⚠️ **لا يمكن تعديل هذا الحقل من هنا**\n\n"
                 f"الحقل '{field_key}' يحتاج إلى تعديل من خلال واجهة خاصة.\n\n"
                 f"يرجى استخدام زر '🔙 رجوع' للرجوع إلى قائمة الحقول.",
-                parse_mode="Markdown"
+                parse_mode=ParseMode.MARKDOWN
             )
             return SELECT_FIELD
         
@@ -1443,11 +1453,19 @@ async def handle_edit_field_from_menu(update: Update, context: ContextTypes.DEFA
         field_display = field_names.get(db_field_name, db_field_name)
         
         # تنسيق القيمة الحالية للعرض
-        if isinstance(current_value, datetime):
-            current_value_display = current_value.strftime('%Y-%m-%d %H:%M')
-        elif current_value and current_value != "غير محدد":
-            current_value_display = str(current_value)
-        else:
+        try:
+            if current_value is None or current_value == "" or current_value == "غير محدد":
+                current_value_display = "لا يوجد"
+            elif isinstance(current_value, datetime):
+                current_value_display = current_value.strftime('%Y-%m-%d %H:%M')
+            elif isinstance(current_value, date):
+                current_value_display = current_value.strftime('%Y-%m-%d')
+            else:
+                current_value_display = str(current_value).strip()
+                if not current_value_display:
+                    current_value_display = "لا يوجد"
+        except Exception as e:
+            logger.warning(f"⚠️ خطأ في تنسيق القيمة الحالية: {e}")
             current_value_display = "لا يوجد"
         
         text = f"✏️ **تعديل {field_display}**\n\n"
