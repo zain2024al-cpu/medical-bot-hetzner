@@ -223,8 +223,10 @@ async def save_report_to_db(query, context):
         
         # المترجم
         translator = None
+        created_by_tg_user_id = None
         if query.from_user:
             translator = session.query(Translator).filter_by(tg_user_id=query.from_user.id).first()
+            created_by_tg_user_id = query.from_user.id
         
         # إنشاء التقرير
         print("📝 إنشاء التقرير...")
@@ -234,6 +236,7 @@ async def save_report_to_db(query, context):
             department_id=department.id,
             doctor_id=doctor.id if doctor else None,
             translator_id=translator.id if translator else None,
+            created_by_tg_user_id=created_by_tg_user_id,  # المستخدم الذي أنشأ التقرير
             complaint_text=data_tmp.get("complaint_text", ""),
             doctor_decision=data_tmp.get("doctor_decision", ""),
             medical_action=data_tmp.get("medical_action", ""),

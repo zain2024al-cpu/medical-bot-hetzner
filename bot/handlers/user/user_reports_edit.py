@@ -231,10 +231,13 @@ async def start_edit_reports(update: Update, context: ContextTypes.DEFAULT_TYPE)
             return ConversationHandler.END
         
         with SessionLocal() as s:
-            # البحث عن المترجم
+            # البحث عن المترجم (للتأكد من أن المستخدم مسجل)
             translator = s.query(Translator).filter_by(tg_user_id=user.id).first()
             
+            logger.info(f"🔍 البحث عن المترجم: user_id={user.id}, translator={translator}")
+            
             if not translator:
+                logger.warning(f"⚠️ لم يتم العثور على المترجم للمستخدم {user.id}")
                 await update.message.reply_text(
                     "⚠️ **لم يتم العثور على بيانات المترجم**\n\n"
                     "يرجى التواصل مع الإدارة لتسجيل بياناتك.",
@@ -242,22 +245,30 @@ async def start_edit_reports(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 )
                 return ConversationHandler.END
             
-            # البحث عن تقارير اليوم فقط
+            # البحث عن تقارير اليوم التي أضافها المستخدم الحالي
+            # نبحث عن التقارير التي translator_id يشير إلى مترجم مربوط بـ tg_user_id للمستخدم الحالي
             today = date.today()
             today_start = datetime.combine(today, datetime.min.time())
             today_end = datetime.combine(today, datetime.max.time())
 
+            logger.info(f"🔍 البحث عن تقارير اليوم للمستخدم {user.id}, today={today}")
+
+            # البحث عن التقارير التي created_by_tg_user_id == user.id (المستخدم الحالي)
+            # بغض النظر عن translator_id (المترجم المختار من القائمة)
             reports = s.query(Report).filter(
-                Report.translator_id == translator.id,
+                Report.created_by_tg_user_id == user.id,
                 Report.report_date >= today_start,
                 Report.report_date <= today_end
             ).order_by(Report.report_date.desc()).all()
 
+            logger.info(f"📊 عدد تقارير اليوم: {len(reports)}")
+
             if not reports:
+                logger.warning(f"⚠️ لا توجد تقارير لليوم")
                 await update.message.reply_text(
                     "📋 **لا توجد تقارير لليوم**\n\n"
                     f"📅 **التاريخ:** {today.strftime('%Y-%m-%d')}\n\n"
-                    "لم تقم بإضافة أي تقارير اليوم.\n"
+                    "لم يتم إضافة أي تقارير اليوم.\n"
                     "استخدم زر '📝 إضافة تقرير جديد' لإضافة تقرير.",
                     parse_mode=ParseMode.MARKDOWN
                 )
@@ -278,11 +289,15 @@ async def start_edit_reports(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 patient = s.query(Patient).filter_by(id=report.patient_id).first()
                 patient_name = patient.full_name if patient else "غير معروف"
                 
+                # جلب بيانات المترجم المحفوظ في التقرير (المترجم المختار عند الإضافة)
+                report_translator = s.query(Translator).filter_by(id=report.translator_id).first() if report.translator_id else None
+                translator_name = report_translator.full_name if report_translator else "غير معروف"
+                
                 # تنسيق التاريخ
                 date_str = report.report_date.strftime('%Y-%m-%d %H:%M')
                 
-                # نص الزر
-                button_text = f"#{report.id} | {patient_name} | {date_str}"
+                # نص الزر (مع اسم المترجم المحفوظ في التقرير)
+                button_text = f"#{report.id} | {patient_name} | {translator_name} | {date_str}"
                 keyboard.append([
                     InlineKeyboardButton(
                         button_text, 
@@ -312,6 +327,153 @@ async def start_edit_reports(update: Update, context: ContextTypes.DEFAULT_TYPE)
         except:
             pass
         return ConversationHandler.END
+
+def build_report_data_for_broadcast(report_id):
+    """بناء report_data من Report ID للإرسال للمجموعة"""
+    from datetime import datetime
+    
+    # جلب التقرير من قاعدة البيانات (للتأكد من الحصول على البيانات المحدثة)
+    # استخدام session جديدة بعد commit للتأكد من قراءة البيانات المحدثة
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    with SessionLocal() as s:
+        # استخدام merge=False وexpire_on_commit=True للتأكد من قراءة البيانات المحدثة
+        # جلب التقرير مباشرة من قاعدة البيانات (بدون cache)
+        report = s.query(Report).filter_by(id=report_id).options(
+            # استخدام with_for_update() أو refresh للتأكد من قراءة البيانات المحدثة
+        ).first()
+        
+        if not report:
+            logger.error(f"❌ لم يتم العثور على التقرير #{report_id}")
+            return None
+        
+        # إجبار SQLAlchemy على إعادة قراءة جميع الحقول من قاعدة البيانات
+        s.expire(report)
+        s.refresh(report)  # إعادة تحميل من قاعدة البيانات
+        
+        logger.info(f"✅ تم تحميل التقرير #{report_id} من قاعدة البيانات")
+        
+        # جلب البيانات المرتبطة
+        patient = s.query(Patient).filter_by(id=report.patient_id).first()
+        hospital = s.query(Hospital).filter_by(id=report.hospital_id).first()
+        department = s.query(Department).filter_by(id=report.department_id).first() if report.department_id else None
+        doctor = s.query(Doctor).filter_by(id=report.doctor_id).first() if report.doctor_id else None
+        translator = s.query(Translator).filter_by(id=report.translator_id).first() if report.translator_id else None
+        
+        # تنسيق followup_date
+        followup_display = 'لا يوجد'
+        if report.followup_date:
+            followup_display = report.followup_date.strftime('%Y-%m-%d')
+            if report.followup_time:
+                try:
+                    hour, minute = report.followup_time.split(':')
+                    hour_int = int(hour)
+                    if hour_int == 0:
+                        time_display = f"12:{minute} صباحاً"
+                    elif hour_int < 12:
+                        time_display = f"{hour_int}:{minute} صباحاً"
+                    elif hour_int == 12:
+                        time_display = f"12:{minute} ظهراً"
+                    else:
+                        time_display = f"{hour_int-12}:{minute} مساءً"
+                    followup_display += f" الساعة {time_display}"
+                except:
+                    followup_display += f" الساعة {report.followup_time}"
+        
+        # قراءة القيم المحدثة مباشرة من قاعدة البيانات
+        # الأولوية دائماً للقيم المنفصلة (diagnosis, treatment_plan, etc.) لأنها أحدث
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # قراءة جميع الحقول مباشرة من قاعدة البيانات (القيم المحدثة)
+        doctor_decision_text = report.doctor_decision or ''
+        diagnosis_value = report.diagnosis or ''  # أولوية: استخدام diagnosis مباشرة من قاعدة البيانات (محدث)
+        complaint_text_value = report.complaint_text or ''  # مباشر من قاعدة البيانات (محدث)
+        treatment_plan_value = report.treatment_plan or ''  # مباشر من قاعدة البيانات (محدث)
+        medications_value = report.medications or ''  # مباشر من قاعدة البيانات (محدث)
+        notes_value = report.notes or ''  # مباشر من قاعدة البيانات (محدث)
+        case_status_value = report.case_status or ''  # مباشر من قاعدة البيانات (محدث)
+        followup_reason_value = report.followup_reason or ''  # مباشر من قاعدة البيانات (محدث)
+        
+        # استخراج recommendations من doctor_decision لـ final_consult
+        recommendations_value = ''
+        if report.medical_action == 'استشارة أخيرة' and doctor_decision_text and 'التوصيات الطبية:' in doctor_decision_text:
+            recommendations_parts = doctor_decision_text.split('التوصيات الطبية:')
+            if len(recommendations_parts) > 1:
+                recommendations_value = recommendations_parts[1].strip()
+        
+        logger.info(f"🔍 قراءة البيانات المحدثة من قاعدة البيانات - report_id={report_id}")
+        logger.info(f"   diagnosis='{diagnosis_value[:50] if diagnosis_value else 'None'}'")
+        logger.info(f"   complaint_text='{complaint_text_value[:50] if complaint_text_value else 'None'}'")
+        logger.info(f"   doctor_decision='{doctor_decision_text[:50] if doctor_decision_text else 'None'}'")
+        
+        # استخراج decision من doctor_decision لـ "استشارة مع قرار عملية" و "استشارة أخيرة"
+        decision_value = ''
+        if report.medical_action == 'استشارة مع قرار عملية':
+            # إذا كان diagnosis موجوداً في قاعدة البيانات، نستخدمه مباشرة (محدث من التعديل)
+            # لا نحتاج لاستخراجه من doctor_decision
+            
+            # استخراج decision من doctor_decision
+            if doctor_decision_text and 'قرار الطبيب:' in doctor_decision_text:
+                decision_parts = doctor_decision_text.split('قرار الطبيب:')
+                if len(decision_parts) > 1:
+                    decision_value = decision_parts[1].strip()
+                    # إزالة أجزاء أخرى قد تكون موجودة
+                    if 'اسم العملية' in decision_value:
+                        decision_value = decision_value.split('اسم العملية')[0].strip()
+            elif doctor_decision_text:
+                # إذا لم يكن هناك "قرار الطبيب:"، نستخدم doctor_decision كاملاً
+                decision_value = doctor_decision_text
+        elif report.medical_action == 'استشارة أخيرة':
+            # استخراج decision من doctor_decision لـ final_consult
+            if doctor_decision_text and 'قرار الطبيب:' in doctor_decision_text:
+                decision_parts = doctor_decision_text.split('قرار الطبيب:')
+                if len(decision_parts) > 1:
+                    decision_value = decision_parts[1].split('التوصيات')[0].strip()
+            elif doctor_decision_text:
+                # إذا لم يكن هناك "قرار الطبيب:"، نستخدم doctor_decision كاملاً
+                decision_value = doctor_decision_text
+        else:
+            # للأنواع الأخرى، نستخدم doctor_decision كاملاً كـ decision
+            decision_value = doctor_decision_text
+        
+        # بناء report_data - استخدام القيم المحدثة مباشرة من قاعدة البيانات
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        report_data = {
+            'report_date': report.report_date.strftime('%Y-%m-%d %H:%M') if report.report_date else 'غير محدد',
+            'patient_name': patient.full_name if patient else 'غير محدد',
+            'hospital_name': hospital.name if hospital else 'غير محدد',
+            'department_name': department.name if department else 'غير محدد',
+            'doctor_name': doctor.full_name if doctor else 'لم يتم التحديد',
+            'medical_action': report.medical_action or 'غير محدد',
+            'complaint_text': complaint_text_value,  # مباشر من قاعدة البيانات (محدث)
+            'doctor_decision': doctor_decision_text,  # مباشر من قاعدة البيانات (محدث)
+            'diagnosis': diagnosis_value,  # مباشر من قاعدة البيانات (محدث) - أولوية للقيم المحدثة
+            'decision': decision_value,  # مستخرج من doctor_decision أو كاملاً حسب نوع الإجراء
+            'recommendations': recommendations_value,  # مستخرج من doctor_decision لـ final_consult
+            'treatment_plan': treatment_plan_value,  # مباشر من قاعدة البيانات (محدث)
+            'medications': medications_value,  # مباشر من قاعدة البيانات (محدث)
+            'notes': notes_value,  # مباشر من قاعدة البيانات (محدث)
+            'case_status': case_status_value or 'لا يوجد',  # مباشر من قاعدة البيانات (محدث)
+            'followup_date': followup_display,
+            'followup_reason': followup_reason_value or 'لا يوجد',  # مباشر من قاعدة البيانات (محدث)
+            'translator_name': translator.full_name if translator else "غير محدد",
+            'translator_id': translator.id if translator else None,
+        }
+        
+        # Logging للتشخيص - التأكد من القيم المحدثة
+        logger.info(f"📊 report_data built للتقارير المعدلة:")
+        logger.info(f"   ✅ complaint_text='{report_data['complaint_text'][:80] if report_data['complaint_text'] else 'None'}'")
+        logger.info(f"   ✅ diagnosis='{report_data['diagnosis'][:80] if report_data['diagnosis'] else 'None'}'")
+        logger.info(f"   ✅ doctor_decision='{report_data['doctor_decision'][:80] if report_data['doctor_decision'] else 'None'}'")
+        logger.info(f"   ✅ treatment_plan='{report_data['treatment_plan'][:80] if report_data['treatment_plan'] else 'None'}'")
+        logger.info(f"   ✅ medications='{report_data['medications'][:80] if report_data['medications'] else 'None'}'")
+        logger.info(f"   ✅ notes='{report_data['notes'][:80] if report_data['notes'] else 'None'}'")
+        
+        return report_data
 
 def parse_report_to_report_tmp(report, flow_type):
     """تحويل بيانات التقرير من قاعدة البيانات إلى report_tmp"""
@@ -345,18 +507,29 @@ def parse_report_to_report_tmp(report, flow_type):
     if flow_type in ["new_consult", "followup", "emergency"]:
         report_tmp["complaint"] = report.complaint_text or ""
         
-        # تحليل doctor_decision لفصل التشخيص والقرار
-        decision_text = report.doctor_decision or ""
-        if "التشخيص:" in decision_text:
-            parts = decision_text.split("التشخيص:")
-            if len(parts) > 1:
-                diagnosis_part = parts[1].split("قرار الطبيب:")[0].strip()
-                report_tmp["diagnosis"] = diagnosis_part
-                if "قرار الطبيب:" in decision_text:
-                    decision_part = decision_text.split("قرار الطبيب:")[1].strip()
-                    report_tmp["decision"] = decision_part
+        # استخدام diagnosis مباشرة من قاعدة البيانات إذا كان موجوداً
+        if report.diagnosis:
+            report_tmp["diagnosis"] = report.diagnosis
         else:
-            report_tmp["diagnosis"] = ""
+            # إذا لم يكن موجوداً، نحاول استخراجه من doctor_decision
+            decision_text = report.doctor_decision or ""
+            if "التشخيص:" in decision_text:
+                parts = decision_text.split("التشخيص:")
+                if len(parts) > 1:
+                    diagnosis_part = parts[1].split("قرار الطبيب:")[0].strip()
+                    report_tmp["diagnosis"] = diagnosis_part
+                else:
+                    report_tmp["diagnosis"] = ""
+            else:
+                report_tmp["diagnosis"] = ""
+        
+        # تحليل doctor_decision لاستخراج القرار فقط
+        decision_text = report.doctor_decision or ""
+        if "قرار الطبيب:" in decision_text:
+            decision_part = decision_text.split("قرار الطبيب:")[1].strip()
+            report_tmp["decision"] = decision_part
+        else:
+            # إذا لم يكن هناك "قرار الطبيب:"، نستخدم doctor_decision كاملاً
             report_tmp["decision"] = decision_text
         
         if flow_type == "new_consult":
@@ -378,11 +551,15 @@ def parse_report_to_report_tmp(report, flow_type):
     elif flow_type == "surgery_consult":
         decision_text = report.doctor_decision or ""
         
-        # استخراج التشخيص
-        if "التشخيص:" in decision_text:
-            report_tmp["diagnosis"] = decision_text.split("التشخيص:")[1].split("قرار الطبيب:")[0].strip()
+        # استخدام diagnosis مباشرة من قاعدة البيانات إذا كان موجوداً
+        if report.diagnosis:
+            report_tmp["diagnosis"] = report.diagnosis
         else:
-            report_tmp["diagnosis"] = ""
+            # إذا لم يكن موجوداً، نحاول استخراجه من doctor_decision
+            if "التشخيص:" in decision_text:
+                report_tmp["diagnosis"] = decision_text.split("التشخيص:")[1].split("قرار الطبيب:")[0].strip()
+            else:
+                report_tmp["diagnosis"] = ""
         
         # استخراج قرار الطبيب
         if "قرار الطبيب:" in decision_text:
@@ -441,11 +618,15 @@ def parse_report_to_report_tmp(report, flow_type):
     elif flow_type == "final_consult":
         decision_text = report.doctor_decision or ""
         
-        # استخراج التشخيص النهائي
-        if "التشخيص النهائي:" in decision_text:
-            report_tmp["diagnosis"] = decision_text.split("التشخيص النهائي:")[1].split("قرار الطبيب")[0].strip()
+        # استخدام diagnosis مباشرة من قاعدة البيانات إذا كان موجوداً
+        if report.diagnosis:
+            report_tmp["diagnosis"] = report.diagnosis
         else:
-            report_tmp["diagnosis"] = ""
+            # إذا لم يكن موجوداً، نحاول استخراجه من doctor_decision
+            if "التشخيص النهائي:" in decision_text:
+                report_tmp["diagnosis"] = decision_text.split("التشخيص النهائي:")[1].split("قرار الطبيب")[0].strip()
+            else:
+                report_tmp["diagnosis"] = ""
         
         # استخراج قرار الطبيب
         if "قرار الطبيب:" in decision_text:
@@ -555,8 +736,10 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
                 await query.edit_message_text("⚠️ **خطأ:** لم يتم العثور على التقرير")
                 return ConversationHandler.END
             
-            # التحقق من أن التقرير يخص المترجم
-            if report.translator_id != context.user_data.get('translator_id'):
+            # التحقق من أن التقرير يخص المستخدم الحالي (باستخدام created_by_tg_user_id)
+            user = update.effective_user
+            if report.created_by_tg_user_id != user.id:
+                logger.warning(f"⚠️ المستخدم {user.id} حاول تعديل تقرير #{report_id} الذي أضافه المستخدم {report.created_by_tg_user_id}")
                 await query.edit_message_text("⚠️ **خطأ:** لا يمكنك تعديل هذا التقرير")
                 return ConversationHandler.END
             
@@ -603,9 +786,12 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
             from bot.handlers.user.user_reports_add_new_system import start_report
             
             # إعادة المستخدم إلى نفس الخطوات
+            # تهريب medical_action
+            medical_action_escaped = escape_markdown_v1(str(report.medical_action)) if report.medical_action else "غير محدد"
+            
             await query.edit_message_text(
                 f"✏️ **تعديل التقرير #{report_id}**\n\n"
-                f"📋 **نوع الإجراء:** {report.medical_action}\n"
+                f"📋 **نوع الإجراء:** {medical_action_escaped}\n"
                 f"🔄 **جارٍ إعادة تحميل التقرير...**",
                 parse_mode=ParseMode.MARKDOWN
             )
@@ -669,8 +855,29 @@ async def handle_field_selection(update: Update, context: ContextTypes.DEFAULT_T
             return await start_edit_reports_from_callback(query, context)
         
         # استخراج اسم الحقل
-        field_name = query.data.split(':')[1]
-        context.user_data['edit_field'] = field_name
+        # الصيغة الجديدة: "edit_field:{flow_type}:{field_key}"
+        # الصيغة القديمة: "edit_field:{field_name}"
+        parts = query.data.split(':')
+        if len(parts) == 3:
+            # الصيغة الجديدة: edit_field:{flow_type}:{field_key}
+            flow_type = parts[1]
+            field_key = parts[2]
+            # تحويل field_key إلى db_field_name
+            db_field_name = map_field_key_to_db_field(field_key)
+            context.user_data['edit_field'] = db_field_name
+            context.user_data['edit_field_key'] = field_key
+            context.user_data['edit_flow_type'] = flow_type
+            field_name = db_field_name  # استخدام db_field_name
+            logger.info(f"✅ الصيغة الجديدة: flow_type={flow_type}, field_key={field_key} -> db_field_name={db_field_name}")
+        elif len(parts) == 2:
+            # الصيغة القديمة: edit_field:{field_name}
+            field_name = parts[1]
+            context.user_data['edit_field'] = field_name
+            logger.info(f"✅ الصيغة القديمة: field_name={field_name}")
+        else:
+            logger.error(f"❌ صيغة callback_data غير صحيحة: {query.data}")
+            await query.edit_message_text("❌ **خطأ:** صيغة البيانات غير صحيحة")
+            return ConversationHandler.END
         
         # أسماء الحقول بالعربي
         field_names = {
@@ -710,15 +917,20 @@ async def handle_field_selection(update: Update, context: ContextTypes.DEFAULT_T
             field_key = field_key_mapping.get(field_name, field_name)
             current_value = report_tmp.get(field_key, "لا يوجد")
         
+        # تهريب الأحرف الخاصة في Markdown
+        field_display_escaped = escape_markdown_v1(str(field_display))
+        
         # إذا كان الحقل هو التاريخ، نعرض التقويم
         if field_name == "followup_date":
-            text = f"📅 **تعديل {field_display}**\n\n"
+            text = f"📅 **تعديل {field_display_escaped}**\n\n"
             if current_value and current_value != "لا يوجد":
                 followup_time = current_report_data.get('followup_time', '') or report_tmp.get('followup_time', '')
+                current_value_escaped = escape_markdown_v1(str(current_value))
                 if followup_time:
-                    text += f"**القيمة الحالية:** {current_value} الساعة {followup_time}\n\n"
+                    followup_time_escaped = escape_markdown_v1(str(followup_time))
+                    text += f"**القيمة الحالية:** {current_value_escaped} الساعة {followup_time_escaped}\n\n"
                 else:
-                    text += f"**القيمة الحالية:** {current_value}\n\n"
+                    text += f"**القيمة الحالية:** {current_value_escaped}\n\n"
             else:
                 text += "**القيمة الحالية:** لا يوجد موعد\n\n"
             text += "اختر التاريخ من التقويم:"
@@ -737,8 +949,12 @@ async def handle_field_selection(update: Update, context: ContextTypes.DEFAULT_T
             logger.info(f"✅ تم عرض حقل التعديل: {field_name} (تاريخ)")
             return EDIT_DATE_CALENDAR
         else:
-            text = f"✏️ **تعديل {field_display}**\n\n"
-            text += f"**القيمة الحالية:**\n{current_value}\n\n"
+            # تهريب القيمة الحالية
+            current_value_str = str(current_value) if current_value else "لا يوجد"
+            current_value_escaped = escape_markdown_v1(current_value_str)
+            
+            text = f"✏️ **تعديل {field_display_escaped}**\n\n"
+            text += f"**القيمة الحالية:**\n{current_value_escaped}\n\n"
             text += "أرسل القيمة الجديدة:"
             
             keyboard = [
@@ -986,10 +1202,14 @@ async def confirm_date_edit(message_or_query, context, selected_date, selected_t
     else:
         new_display = selected_date.strftime('%Y-%m-%d')
     
+    # تهريب الأحرف الخاصة في Markdown
+    old_display_escaped = escape_markdown_v1(str(old_display))
+    new_display_escaped = escape_markdown_v1(str(new_display))
+    
     text = "📝 **تأكيد التعديل**\n\n"
     text += f"**الحقل:** موعد العودة\n\n"
-    text += f"**القيمة القديمة:**\n{old_display}\n\n"
-    text += f"**القيمة الجديدة:**\n{new_display}\n\n"
+    text += f"**القيمة القديمة:**\n{old_display_escaped}\n\n"
+    text += f"**القيمة الجديدة:**\n{new_display_escaped}\n\n"
     text += "هل تريد حفظ التعديل؟"
     
     keyboard = [
@@ -1089,11 +1309,16 @@ async def handle_new_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
     field_display = field_names.get(field_name, field_name)
     old_value = context.user_data['current_report_data'].get(field_name, "لا يوجد")
     
+    # تهريب الأحرف الخاصة في Markdown
+    field_display_escaped = escape_markdown_v1(str(field_display))
+    old_value_escaped = escape_markdown_v1(str(old_value))
+    new_value_escaped = escape_markdown_v1(str(new_value))
+    
     # عرض الملخص
     text = "📝 **تأكيد التعديل**\n\n"
-    text += f"**الحقل:** {field_display}\n\n"
-    text += f"**القيمة القديمة:**\n{old_value}\n\n"
-    text += f"**القيمة الجديدة:**\n{new_value}\n\n"
+    text += f"**الحقل:** {field_display_escaped}\n\n"
+    text += f"**القيمة القديمة:**\n{old_value_escaped}\n\n"
+    text += f"**القيمة الجديدة:**\n{new_value_escaped}\n\n"
     text += "هل تريد حفظ التعديل؟"
     
     keyboard = [
@@ -1112,6 +1337,9 @@ async def handle_new_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_confirm_edit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة تأكيد الحفظ"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     query = update.callback_query
     await query.answer()
     
@@ -1128,6 +1356,31 @@ async def handle_confirm_edit(update: Update, context: ContextTypes.DEFAULT_TYPE
         field_name = context.user_data.get('edit_field')
         new_value = context.user_data.get('new_value')
         
+        # للتشخيص: طباعة جميع القيم
+        logger.info(f"🔍 handle_confirm_edit - report_id={report_id}, field_name={field_name}, new_value={new_value[:50] if new_value else 'None'}")
+        logger.info(f"🔍 context.user_data keys: {list(context.user_data.keys())}")
+        
+        # التحقق من أن field_name صحيح - إذا كان غير صحيح، استخدم edit_field_key
+        valid_db_fields = ['complaint_text', 'doctor_decision', 'diagnosis', 'treatment_plan', 'medications', 'notes', 'case_status', 'followup_date', 'followup_reason']
+        if not field_name or field_name not in valid_db_fields:
+            logger.warning(f"⚠️ field_name غير صحيح أو غير موجود: {field_name}")
+            # محاولة استخدام edit_field_key لاستخراج db_field_name الصحيح
+            field_key = context.user_data.get('edit_field_key')
+            if field_key:
+                db_field_name = map_field_key_to_db_field(field_key)
+                logger.info(f"🔄 استخدام edit_field_key={field_key} -> db_field_name={db_field_name}")
+                if db_field_name and db_field_name in valid_db_fields:
+                    field_name = db_field_name
+                    logger.info(f"✅ تم تصحيح field_name إلى: {field_name}")
+                else:
+                    logger.error(f"❌ فشل استخراج db_field_name الصحيح - field_key={field_key}, db_field_name={db_field_name}")
+                    await query.edit_message_text("⚠️ **خطأ:** لم يتم تحديد الحقل المراد تعديله بشكل صحيح")
+                    return ConversationHandler.END
+            else:
+                logger.error(f"❌ لا يوجد edit_field_key في context.user_data")
+                await query.edit_message_text("⚠️ **خطأ:** لم يتم تحديد الحقل المراد تعديله")
+                return ConversationHandler.END
+        
         with SessionLocal() as s:
             report = s.query(Report).filter_by(id=report_id).first()
             
@@ -1141,7 +1394,28 @@ async def handle_confirm_edit(update: Update, context: ContextTypes.DEFAULT_TYPE
                 old_value = old_value.strftime('%Y-%m-%d %H:%M')
             
             # تحديث الحقل
-            if field_name == "followup_date":
+            # معالجة خاصة لـ recommendations في final_consult (يُحفظ في doctor_decision)
+            edit_field_key = context.user_data.get('edit_field_key')
+            edit_flow_type = context.user_data.get('edit_flow_type')
+            if edit_field_key == "recommendations" and edit_flow_type == "final_consult":
+                # استخراج doctor_decision الحالي
+                doctor_decision_text = report.doctor_decision or ""
+                diagnosis = report.diagnosis or ""
+                
+                # استخراج decision من doctor_decision
+                decision = ""
+                if "قرار الطبيب:" in doctor_decision_text:
+                    decision_parts = doctor_decision_text.split("قرار الطبيب:")
+                    if len(decision_parts) > 1:
+                        decision = decision_parts[1].split("التوصيات")[0].strip()
+                elif doctor_decision_text and not diagnosis:
+                    decision = doctor_decision_text
+                
+                # بناء doctor_decision الجديد مع recommendations المحدثة
+                new_doctor_decision = f"التشخيص النهائي: {diagnosis}\n\nقرار الطبيب: {decision}\n\nالتوصيات الطبية: {new_value}"
+                report.doctor_decision = new_doctor_decision
+                logger.info(f"✅ تم تحديث recommendations في doctor_decision لـ final_consult")
+            elif field_name == "followup_date":
                 if new_value == "لا يوجد":
                     report.followup_date = None
                     report.followup_time = None
@@ -1167,6 +1441,10 @@ async def handle_confirm_edit(update: Update, context: ContextTypes.DEFAULT_TYPE
             report.updated_at = datetime.now()
             
             s.commit()
+            logger.info(f"✅ تم حفظ التعديل في قاعدة البيانات: report_id={report_id}, field={field_name}, value={str(new_value)[:50] if new_value else 'None'}")
+            
+            # إغلاق الـ session الحالية
+            s.close()
             
             # أسماء الحقول بالعربي
             field_names = {
@@ -1183,17 +1461,31 @@ async def handle_confirm_edit(update: Update, context: ContextTypes.DEFAULT_TYPE
             
             field_display = field_names.get(field_name, field_name)
             
-            # رسالة النجاح
+            # تهريب الأحرف الخاصة في Markdown
+            field_display_escaped = escape_markdown_v1(str(field_display))
+            new_value_escaped = escape_markdown_v1(str(new_value)) if new_value else ""
+            
+            # رسالة النجاح مع زر "نشر من جديد"
             success_text = f"✅ **تم حفظ التعديل بنجاح**\n\n"
             success_text += f"📋 **رقم التقرير:** #{report_id}\n"
-            success_text += f"✏️ **الحقل المعدل:** {field_display}\n"
+            success_text += f"✏️ **الحقل المعدل:** {field_display_escaped}\n"
             success_text += f"📅 **وقت التعديل:** {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n"
-            success_text += f"**القيمة الجديدة:**\n{new_value}"
+            success_text += f"**القيمة الجديدة:**\n{new_value_escaped}\n\n"
+            success_text += "📢 اضغط على زر 'نشر من جديد' لإرسال التقرير المعدل للمجموعة"
             
-            await query.edit_message_text(success_text, parse_mode=ParseMode.MARKDOWN)
+            keyboard = [
+                [InlineKeyboardButton("📢 نشر من جديد", callback_data=f"republish_report:{report_id}")],
+                [InlineKeyboardButton("✅ تم", callback_data="edit_done")]
+            ]
+            
+            await query.edit_message_text(
+                success_text, 
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode=ParseMode.MARKDOWN
+            )
         
-        # تنظيف البيانات
-        context.user_data.clear()
+        # حفظ report_id في user_data للاستخدام لاحقاً
+        context.user_data['last_edited_report_id'] = report_id
         
         return ConversationHandler.END
     
@@ -1355,8 +1647,10 @@ def map_field_key_to_db_field(field_key):
     """تحويل field_key من report_tmp إلى اسم الحقل في قاعدة البيانات"""
     field_mapping = {
         "complaint": "complaint_text",
+        "complaint_text": "complaint_text",
         "diagnosis": "diagnosis",
         "decision": "doctor_decision",
+        "recommendations": "doctor_decision",  # recommendations يُحفظ في doctor_decision (يتم التعامل معه بشكل خاص)
         "tests": "notes",
         "status": "case_status",
         "followup_date": "followup_date",
@@ -1365,6 +1659,7 @@ def map_field_key_to_db_field(field_key):
         "medications": "medications",
         "notes": "notes",
         "case_status": "case_status",
+        "doctor_decision": "doctor_decision",
         # الحقول الأساسية
         "patient_name": "patient_name",  # سيتم التعامل معها بشكل خاص
         "hospital_name": "hospital_name",  # سيتم التعامل معها بشكل خاص
@@ -1401,10 +1696,20 @@ async def handle_edit_field_from_menu(update: Update, context: ContextTypes.DEFA
         db_field_name = map_field_key_to_db_field(field_key)
         logger.info(f"📋 field_key={field_key} -> db_field_name={db_field_name}")
         
-        # حفظ معلومات التعديل
+        # التأكد من أن db_field_name صحيح
+        if not db_field_name or db_field_name == field_key:
+            logger.warning(f"⚠️ db_field_name غير صحيح أو لم يتم العثور عليه - field_key={field_key}, db_field_name={db_field_name}")
+            # إذا كان field_key هو اسم حقل صحيح في قاعدة البيانات، استخدمه مباشرة
+            valid_db_fields = ['complaint_text', 'doctor_decision', 'diagnosis', 'treatment_plan', 'medications', 'notes', 'case_status', 'followup_date', 'followup_reason']
+            if field_key in valid_db_fields:
+                db_field_name = field_key
+                logger.info(f"✅ استخدام field_key مباشرة كـ db_field_name: {db_field_name}")
+        
+        # حفظ معلومات التعديل - التأكد من حفظ db_field_name الصحيح
         context.user_data["edit_field_key"] = field_key
         context.user_data["edit_flow_type"] = flow_type
-        context.user_data["edit_field"] = db_field_name
+        context.user_data["edit_field"] = db_field_name  # يجب أن يكون اسم الحقل في قاعدة البيانات
+        logger.info(f"✅ تم حفظ edit_field={db_field_name} في context.user_data")
         
         # الحصول على القيمة الحالية من report_tmp أو current_report_data
         report_tmp = context.user_data.get("report_tmp", {})
@@ -1546,6 +1851,92 @@ async def handle_review_from_menu(update: Update, context: ContextTypes.DEFAULT_
         logger.error(f"❌ خطأ في handle_review_from_menu: {e}", exc_info=True)
         return ConversationHandler.END
 
+async def handle_republish_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة زر 'نشر من جديد' لإرسال التقرير المعدل للمجموعة"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        query = update.callback_query
+        if not query:
+            return
+        
+        await query.answer()
+        
+        # استخراج report_id من callback_data
+        parts = query.data.split(":")
+        report_id = int(parts[1]) if len(parts) > 1 else None
+        
+        if not report_id:
+            await query.edit_message_text("❌ **خطأ:** لم يتم العثور على رقم التقرير")
+            return
+        
+        logger.info(f"📢 بدء إعادة نشر التقرير #{report_id} للمجموعة...")
+        
+        # عرض رسالة "جارٍ الإرسال..."
+        await query.edit_message_text(
+            "📤 **جارٍ إرسال التقرير المعدل للمجموعة...**\n\n"
+            "⏳ يرجى الانتظار...",
+            parse_mode=ParseMode.MARKDOWN
+        )
+        
+        try:
+            from services.broadcast_service import broadcast_new_report
+            report_data = build_report_data_for_broadcast(report_id)
+            
+            if report_data:
+                logger.info(f"📊 تم بناء report_data للتقرير #{report_id}")
+                logger.info(f"📋 محتوى report_data: diagnosis='{report_data.get('diagnosis', 'None')[:50] if report_data.get('diagnosis') else 'None'}', complaint_text='{report_data.get('complaint_text', 'None')[:50] if report_data.get('complaint_text') else 'None'}', doctor_decision='{report_data.get('doctor_decision', 'None')[:50] if report_data.get('doctor_decision') else 'None'}'")
+                broadcast_success, broadcast_error = await broadcast_new_report(context.bot, report_data)
+                
+                if broadcast_success:
+                    logger.info(f"✅ ✅ ✅ تم إرسال التقرير المعدل #{report_id} للمجموعة بنجاح ✅ ✅ ✅")
+                    await query.edit_message_text(
+                        f"✅ **تم إرسال التقرير المعدل للمجموعة بنجاح**\n\n"
+                        f"📋 **رقم التقرير:** #{report_id}\n\n"
+                        f"📢 التقرير الآن متاح في المجموعة مع جميع التعديلات الجديدة",
+                        parse_mode=ParseMode.MARKDOWN
+                    )
+                else:
+                    logger.error(f"❌ فشل إرسال التقرير المعدل #{report_id} للمجموعة: {broadcast_error}")
+                    await query.edit_message_text(
+                        f"❌ **فشل إرسال التقرير للمجموعة**\n\n"
+                        f"📋 **رقم التقرير:** #{report_id}\n\n"
+                        f"**السبب:** {broadcast_error}\n\n"
+                        f"يرجى المحاولة مرة أخرى أو التواصل مع الإدارة.",
+                        parse_mode=ParseMode.MARKDOWN
+                    )
+            else:
+                logger.error(f"❌ فشل بناء report_data للتقرير #{report_id}")
+                await query.edit_message_text(
+                    f"❌ **خطأ:** فشل تحميل بيانات التقرير\n\n"
+                    f"📋 **رقم التقرير:** #{report_id}\n\n"
+                    f"يرجى المحاولة مرة أخرى.",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+        except Exception as e:
+            logger.error(f"❌ خطأ في إعادة نشر التقرير: {e}", exc_info=True)
+            await query.edit_message_text(
+                f"❌ **حدث خطأ أثناء إرسال التقرير**\n\n"
+                f"📋 **رقم التقرير:** #{report_id}\n\n"
+                f"يرجى المحاولة مرة أخرى أو التواصل مع الإدارة.",
+                parse_mode=ParseMode.MARKDOWN
+            )
+    except Exception as e:
+        logger.error(f"❌ خطأ في handle_republish_report: {e}", exc_info=True)
+        try:
+            if query:
+                await query.answer("⚠️ حدث خطأ", show_alert=True)
+        except:
+            pass
+
+async def handle_edit_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة زر 'تم' بعد حفظ التعديل"""
+    query = update.callback_query
+    if query:
+        await query.answer()
+        await query.edit_message_text("✅ **تم الحفظ بنجاح**")
+
 def register(app):
     """تسجيل معالج تعديل التقارير"""
     
@@ -1592,7 +1983,10 @@ def register(app):
             CallbackQueryHandler(handle_cancel_from_summary, pattern="^nav:cancel"),
             # معالجة callbacks من show_edit_fields_menu (عند التعديل من قائمة الحقول)
             CallbackQueryHandler(handle_edit_field_from_menu, pattern="^edit_field:"),
-            CallbackQueryHandler(handle_review_from_menu, pattern="^review:")
+            CallbackQueryHandler(handle_review_from_menu, pattern="^review:"),
+            # معالجة زر "نشر من جديد" بعد حفظ التعديل
+            CallbackQueryHandler(handle_republish_report, pattern="^republish_report:"),
+            CallbackQueryHandler(handle_edit_done, pattern="^edit_done$")
         ],
         allow_reentry=True,
         per_chat=True,
@@ -1601,3 +1995,7 @@ def register(app):
     )
     
     app.add_handler(conv_handler)
+    
+    # إضافة handler منفصل لزر "نشر من جديد" (يعمل حتى بعد انتهاء المحادثة)
+    app.add_handler(CallbackQueryHandler(handle_republish_report, pattern="^republish_report:"))
+    app.add_handler(CallbackQueryHandler(handle_edit_done, pattern="^edit_done$"))

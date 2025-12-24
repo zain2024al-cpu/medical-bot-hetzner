@@ -4792,15 +4792,23 @@ async def handle_followup_decision(update: Update, context: ContextTypes.DEFAULT
 
     context.user_data["report_tmp"]["decision"] = text
 
-    await update.message.reply_text(
-        "✅ تم الحفظ\n\n"
-        "🏥 **رقم الغرفة والطابق**\n\n"
-        "يرجى إدخال رقم الغرفة والطابق:",
-        reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
-        parse_mode="Markdown"
-    )
-
-    return FOLLOWUP_ROOM_FLOOR
+    # التحقق من نوع الإجراء: إذا كان "مراجعة / عودة دورية"، نتخطى رقم الغرفة
+    medical_action = context.user_data.get("report_tmp", {}).get("medical_action", "")
+    
+    if medical_action == "مراجعة / عودة دورية":
+        # تخطي رقم الغرفة والطابق - الانتقال مباشرة إلى تاريخ العودة
+        await _render_followup_calendar(update.message, context)
+        return FOLLOWUP_DATE_TIME
+    else:
+        # للأنواع الأخرى (مثل "متابعة في الرقود")، نعرض رقم الغرفة
+        await update.message.reply_text(
+            "✅ تم الحفظ\n\n"
+            "🏥 **رقم الغرفة والطابق**\n\n"
+            "يرجى إدخال رقم الغرفة والطابق:",
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint"),
+            parse_mode="Markdown"
+        )
+        return FOLLOWUP_ROOM_FLOOR
 
 
 @debug_state_monitor("FOLLOWUP_ROOM_FLOOR")
@@ -7523,11 +7531,16 @@ async def handle_edit_field_selection(update: Update, context: ContextTypes.DEFA
         context.user_data["edit_flow_type"] = flow_type
         
         # عرض واجهة التعديل حسب نوع الحقل
+        field_display_name = get_field_display_name(field_key)
+        field_display_escaped = escape_markdown_v1(str(field_display_name))
+        current_value_formatted = format_field_value(current_value)
+        current_value_escaped = escape_markdown_v1(str(current_value_formatted))
+        
         if field_key in ["report_date", "followup_date", "delivery_date"]:
             # للحقول التاريخية - عرض التقويم
             await query.edit_message_text(
-                f"📅 **تعديل {get_field_display_name(field_key)}**\n\n"
-                f"**القيمة الحالية:** {format_field_value(current_value)}\n\n"
+                f"📅 **تعديل {field_display_escaped}**\n\n"
+                f"**القيمة الحالية:** {current_value_escaped}\n\n"
                 f"اختر التاريخ من التقويم:",
                 parse_mode="Markdown"
             )
@@ -7538,8 +7551,8 @@ async def handle_edit_field_selection(update: Update, context: ContextTypes.DEFA
         else:
             # للحقول النصية - طلب إدخال جديد
             await query.edit_message_text(
-                f"✏️ **تعديل {get_field_display_name(field_key)}**\n\n"
-                f"**القيمة الحالية:**\n{format_field_value(current_value)}\n\n"
+                f"✏️ **تعديل {field_display_escaped}**\n\n"
+                f"**القيمة الحالية:**\n{current_value_escaped}\n\n"
                 f"أرسل القيمة الجديدة:",
                 reply_markup=InlineKeyboardMarkup([
                     [InlineKeyboardButton("🔙 رجوع", callback_data=f"edit:{flow_type}")],
@@ -7559,6 +7572,15 @@ async def handle_edit_field_selection(update: Update, context: ContextTypes.DEFA
             parse_mode="Markdown"
         )
         return ConversationHandler.END
+
+def escape_markdown_v1(text: str) -> str:
+    """تهريب الأحرف الخاصة في Markdown V1"""
+    import re
+    if not text:
+        return ""
+    # الأحرف الخاصة في Markdown V1: * _ [ ] ( ) `
+    escape_chars = r'_*[]()`'
+    return re.sub(r'([{}])'.format(re.escape(escape_chars)), r'\\\1', text)
 
 def get_field_display_name(field_key):
     """الحصول على اسم الحقل للعرض"""
@@ -8237,12 +8259,21 @@ async def save_report_to_database(query, context, flow_type):
             logger.info(f"✅ Report #{report_id} updated successfully")
         else:
             # إنشاء تقرير جديد
+            # حفظ translator_id للمترجم المختار من القائمة (للإظهار في التقرير)
+            selected_translator_id = data.get("translator_id")
+            
+            # حفظ created_by_tg_user_id للمستخدم الذي أنشأ التقرير (لعرضه في قائمة التعديل)
+            created_by_tg_user_id = None
+            if query and query.from_user:
+                created_by_tg_user_id = query.from_user.id
+            
             new_report = Report(
                 patient_id=patient.id,
                 hospital_id=hospital.id,
                 department_id=department.id if department else None,
                 doctor_id=doctor.id if doctor else None,
-                translator_id=data.get("translator_id"),
+                translator_id=selected_translator_id,  # المترجم المختار من القائمة
+                created_by_tg_user_id=created_by_tg_user_id,  # المستخدم الذي أنشأ التقرير
                 complaint_text=complaint_text,
                 doctor_decision=decision_text,
                 medical_action=final_medical_action,

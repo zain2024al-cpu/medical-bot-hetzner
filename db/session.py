@@ -53,6 +53,56 @@ SessionLocal = sessionmaker(
 # Database Initialization
 # ================================================
 
+def migrate_reports_table_add_created_by():
+    """
+    Migrate reports table to add created_by_tg_user_id column
+    This is safe to call multiple times
+    """
+    try:
+        from sqlalchemy import text, inspect
+        from sqlalchemy.exc import OperationalError
+        
+        logger.info("🔧 Checking reports table structure for created_by_tg_user_id...")
+        
+        with engine.connect() as conn:
+            # Get table info
+            inspector = inspect(engine)
+            if 'reports' in inspector.get_table_names():
+                columns = [col['name'] for col in inspector.get_columns('reports')]
+                
+                if 'created_by_tg_user_id' not in columns:
+                    logger.info("➕ Adding created_by_tg_user_id column to reports table...")
+                    try:
+                        conn.execute(text("ALTER TABLE reports ADD COLUMN created_by_tg_user_id INTEGER"))
+                        conn.commit()
+                        logger.info("✅ Added created_by_tg_user_id column successfully")
+                        
+                        # Create index
+                        try:
+                            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_reports_created_by_tg_user_id ON reports(created_by_tg_user_id)"))
+                            conn.commit()
+                            logger.info("✅ Created index for created_by_tg_user_id")
+                        except Exception as index_error:
+                            logger.warning(f"⚠️ Could not create index: {index_error}")
+                    except OperationalError as e:
+                        if "duplicate column name" in str(e).lower() or "already exists" in str(e).lower():
+                            logger.info("ℹ️ created_by_tg_user_id column already exists")
+                        else:
+                            logger.error(f"❌ Error adding created_by_tg_user_id column: {e}")
+                            raise
+                else:
+                    logger.info("ℹ️ created_by_tg_user_id column already exists")
+            else:
+                logger.info("ℹ️ reports table doesn't exist yet - will be created by create_all()")
+        
+        return True
+    except Exception as e:
+        logger.error(f"❌ Migration failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
 def migrate_initial_cases_table():
     """
     Migrate initial_cases table to add missing columns
@@ -131,6 +181,7 @@ def init_database():
         logger.info(f"✅ Database tables created: {DATABASE_PATH}")
         
         # Run migrations for existing tables
+        migrate_reports_table_add_created_by()
         migrate_initial_cases_table()
         
         # Enable WAL mode for better concurrency
@@ -326,6 +377,7 @@ try:
         Base.metadata.create_all(bind=engine)
         # Run migrations for existing tables
         try:
+            migrate_reports_table_add_created_by()
             migrate_initial_cases_table()
         except Exception as migration_error:
             logger.warning(f"⚠️ Migration warning: {migration_error}")

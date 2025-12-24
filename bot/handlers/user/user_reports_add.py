@@ -890,8 +890,10 @@ async def save_radiology_report(query, context):
         
         # المترجم
         translator = None
+        created_by_tg_user_id = None
         if query.from_user:
             translator = session.query(Translator).filter_by(tg_user_id=query.from_user.id).first()
+            created_by_tg_user_id = query.from_user.id
             print(f"👤 المترجم: {translator.full_name if translator else 'غير موجود'}")
         
         # إنشاء التقرير
@@ -902,6 +904,7 @@ async def save_radiology_report(query, context):
             department_id=department.id if department else None,
             doctor_id=doctor.id if doctor else None,
             translator_id=translator.id if translator else None,
+            created_by_tg_user_id=created_by_tg_user_id,  # المستخدم الذي أنشأ التقرير
             complaint_text="أشعة وفحوصات",
             doctor_decision=f"نوع: {data_tmp.get('radiology_type', 'غير محدد')}",
             medical_action=data_tmp.get("medical_action", ""),

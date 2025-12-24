@@ -124,7 +124,8 @@ class Report(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     
     # Foreign Keys (all nullable for flexibility)
-    translator_id = Column(Integer, nullable=True, index=True)
+    translator_id = Column(Integer, nullable=True, index=True)  # المترجم المختار من القائمة
+    created_by_tg_user_id = Column(Integer, nullable=True, index=True)  # المستخدم الذي أنشأ التقرير (telegram user id)
     patient_id = Column(Integer, nullable=True, index=True)
     hospital_id = Column(Integer, nullable=True)
     department_id = Column(Integer, nullable=True)

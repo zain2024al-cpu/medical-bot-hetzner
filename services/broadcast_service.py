@@ -63,6 +63,22 @@ async def broadcast_new_report(bot: Bot, report_data: dict):
             )
             logger.info(f"✅ تم إرسال التقرير بنجاح للمجموعة: {group_id}")
             
+            # إرسال التقرير للأدمن أيضاً (بالإضافة للمجموعة)
+            try:
+                for admin_id in ADMIN_IDS:
+                    try:
+                        await bot.send_message(
+                            chat_id=admin_id,
+                            text=message,
+                            parse_mode=ParseMode.MARKDOWN,
+                            disable_web_page_preview=True
+                        )
+                        logger.info(f"✅ تم إرسال التقرير إلى الأدمن {admin_id}")
+                    except Exception as admin_error:
+                        logger.error(f"❌ فشل إرسال إلى الأدمن {admin_id}: {admin_error}")
+            except Exception as admin_fallback_error:
+                logger.error(f"❌ فشل في الإرسال للأدمن: {admin_fallback_error}")
+            
             # إرسال تنبيه للمستخدم أن التقرير تم إرساله بنجاح
             try:
                 await send_user_notification(bot, report_data)
@@ -289,6 +305,29 @@ def format_report_message(data: dict) -> str:
         # الفحوصات والأشعة
         if data.get('tests') and data.get('tests').strip() and data.get('tests') != 'لا يوجد':
             message += f"🧪 **الفحوصات والأشعة:**\n{data['tests']}\n\n"
+    
+    # عرض الحقول الفردية لـ "استشارة أخيرة" (final_consult) بشكل منفصل إذا كان diagnosis موجوداً
+    elif data.get('medical_action') == 'استشارة أخيرة' and data.get('diagnosis') and data.get('diagnosis').strip():
+        # التشخيص النهائي
+        message += f"🔬 **التشخيص النهائي:**\n{data['diagnosis']}\n\n"
+        
+        # استخراج قرار الطبيب من doctor_decision
+        doctor_decision_text = data.get('doctor_decision', '')
+        if doctor_decision_text and 'قرار الطبيب:' in doctor_decision_text:
+            decision_parts = doctor_decision_text.split('قرار الطبيب:')
+            if len(decision_parts) > 1:
+                decision = decision_parts[1].split('التوصيات')[0].strip()
+                if decision:
+                    message += f"📝 **قرار الطبيب:**\n{decision}\n\n"
+        
+        # التوصيات الطبية - استخدام recommendations من data إذا كان موجوداً، وإلا استخراجه من doctor_decision
+        recommendations = data.get('recommendations', '')
+        if not recommendations and doctor_decision_text and 'التوصيات الطبية:' in doctor_decision_text:
+            recommendations_parts = doctor_decision_text.split('التوصيات الطبية:')
+            if len(recommendations_parts) > 1:
+                recommendations = recommendations_parts[1].strip()
+        if recommendations and recommendations.strip():
+            message += f"💡 **التوصيات الطبية:**\n{recommendations}\n\n"
     
     # قرار الطبيب - التحقق من نوع المحتوى (للأنواع الأخرى)
     elif data.get('doctor_decision') and data.get('doctor_decision').strip():
