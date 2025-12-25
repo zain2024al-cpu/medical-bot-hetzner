@@ -56,3 +56,5 @@ Write-Host "  ssh $HETZNER_USER@$HETZNER_IP 'journalctl -u medical-bot -f'" -For
 
 
 
+
+

@@ -134,7 +134,7 @@ async def handle_hospital_selection(update: Update, context: ContextTypes.DEFAUL
             [InlineKeyboardButton("🫀 القلب", callback_data="dept:cardiology")],
             [InlineKeyboardButton("🧠 الأعصاب", callback_data="dept:neurology")],
             [InlineKeyboardButton("🫁 الجهاز التنفسي", callback_data="dept:pulmonary")],
-            [InlineKeyboardButton("✏️ تعديل Back", callback_data="edit_during_entry:show_menu")]
+            [InlineKeyboardButton("🔙 رجوع", callback_data="go_to_hospital_selection")]
         ])
     )
 
@@ -604,9 +604,72 @@ STATE_NAMES = {
     STATE_SELECT_SUBDEPARTMENT: "subdepartment_selection",
     STATE_SELECT_DOCTOR: "search_doctor_screen",
     R_ACTION_TYPE: "action_type_selection",
+    # استشارة جديدة
     NEW_CONSULT_COMPLAINT: "new_consult_complaint",
     NEW_CONSULT_DECISION: "new_consult_decision",
     NEW_CONSULT_TESTS: "new_consult_tests",
+    NEW_CONSULT_FOLLOWUP_DATE: "new_consult_followup_date",
+    NEW_CONSULT_FOLLOWUP_TIME: "new_consult_followup_time",
+    NEW_CONSULT_FOLLOWUP_REASON: "new_consult_followup_reason",
+    # مراجعة/عودة دورية
+    FOLLOWUP_COMPLAINT: "followup_complaint",
+    FOLLOWUP_DIAGNOSIS: "followup_diagnosis",
+    FOLLOWUP_DECISION: "followup_decision",
+    FOLLOWUP_ROOM_FLOOR: "followup_room_floor",
+    FOLLOWUP_DATE_TIME: "followup_date_time",
+    FOLLOWUP_REASON: "followup_reason",
+    # طوارئ
+    EMERGENCY_COMPLAINT: "emergency_complaint",
+    EMERGENCY_DIAGNOSIS: "emergency_diagnosis",
+    EMERGENCY_DECISION: "emergency_decision",
+    EMERGENCY_STATUS: "emergency_status",
+    EMERGENCY_ADMISSION_TYPE: "emergency_admission_type",
+    EMERGENCY_ROOM_NUMBER: "emergency_room_number",
+    EMERGENCY_DATE_TIME: "emergency_date_time",
+    EMERGENCY_REASON: "emergency_reason",
+    # ترقيد
+    ADMISSION_REASON: "admission_reason",
+    ADMISSION_ROOM: "admission_room",
+    ADMISSION_NOTES: "admission_notes",
+    ADMISSION_FOLLOWUP_DATE: "admission_followup_date",
+    ADMISSION_FOLLOWUP_REASON: "admission_followup_reason",
+    # استشارة مع قرار عملية
+    SURGERY_CONSULT_DIAGNOSIS: "surgery_consult_diagnosis",
+    SURGERY_CONSULT_DECISION: "surgery_consult_decision",
+    SURGERY_CONSULT_NAME_EN: "surgery_consult_name_en",
+    SURGERY_CONSULT_SUCCESS_RATE: "surgery_consult_success_rate",
+    SURGERY_CONSULT_BENEFIT_RATE: "surgery_consult_benefit_rate",
+    SURGERY_CONSULT_TESTS: "surgery_consult_tests",
+    SURGERY_CONSULT_FOLLOWUP_DATE: "surgery_consult_followup_date",
+    SURGERY_CONSULT_FOLLOWUP_REASON: "surgery_consult_followup_reason",
+    # عملية
+    OPERATION_DETAILS_AR: "operation_details_ar",
+    OPERATION_NAME_EN: "operation_name_en",
+    OPERATION_NOTES: "operation_notes",
+    OPERATION_FOLLOWUP_DATE: "operation_followup_date",
+    OPERATION_FOLLOWUP_REASON: "operation_followup_reason",
+    # استشارة أخيرة
+    FINAL_CONSULT_DIAGNOSIS: "final_consult_diagnosis",
+    FINAL_CONSULT_DECISION: "final_consult_decision",
+    FINAL_CONSULT_RECOMMENDATIONS: "final_consult_recommendations",
+    # خروج من المستشفى
+    DISCHARGE_TYPE: "discharge_type",
+    DISCHARGE_ADMISSION_SUMMARY: "discharge_admission_summary",
+    DISCHARGE_OPERATION_DETAILS: "discharge_operation_details",
+    DISCHARGE_OPERATION_NAME_EN: "discharge_operation_name_en",
+    DISCHARGE_FOLLOWUP_DATE: "discharge_followup_date",
+    DISCHARGE_FOLLOWUP_REASON: "discharge_followup_reason",
+    # علاج طبيعي / أجهزة تعويضية
+    REHAB_TYPE: "rehab_type",
+    PHYSICAL_THERAPY_DETAILS: "physical_therapy_details",
+    PHYSICAL_THERAPY_FOLLOWUP_DATE: "physical_therapy_followup_date",
+    PHYSICAL_THERAPY_FOLLOWUP_REASON: "physical_therapy_followup_reason",
+    DEVICE_NAME_DETAILS: "device_name",
+    DEVICE_FOLLOWUP_DATE: "device_followup_date",
+    DEVICE_FOLLOWUP_REASON: "device_followup_reason",
+    # أشعة وفحوصات
+    RADIOLOGY_TYPE: "radiology_type",
+    RADIOLOGY_DELIVERY_DATE: "radiology_delivery_date",
 }
 
 # Reverse mapping: state_name -> state constant
@@ -809,8 +872,8 @@ def _nav_buttons(show_back=True, previous_state_name=None, current_state=None, c
         if current_state is None and context:
             current_state = context.user_data.get('_conversation_state')
         
-        # الحالات قبل نوع الإجراء (من اسم المريض إلى اسم الطبيب) - زر رجوع عادي
-        states_before_action = [
+        # الحالات التي تستخدم زر الرجوع العادي (من المستشفى إلى الطبيب)
+        states_with_back_button = [
             STATE_SELECT_DATE,
             STATE_SELECT_DATE_TIME,
             STATE_SELECT_PATIENT,
@@ -824,8 +887,8 @@ def _nav_buttons(show_back=True, previous_state_name=None, current_state=None, c
         use_edit_button = True  # افتراضي: زر التعديل
         
         if current_state is not None:
-            # إذا كانت الحالة قبل نوع الإجراء، استخدم زر الرجوع
-            if current_state in states_before_action:
+            # إذا كانت الحالة من المستشفى إلى الطبيب، استخدم زر الرجوع العادي
+            if current_state in states_with_back_button:
                 use_edit_button = False
         
         if use_edit_button:
@@ -833,7 +896,7 @@ def _nav_buttons(show_back=True, previous_state_name=None, current_state=None, c
             buttons.append([InlineKeyboardButton(
                 "✏️ تعديل Back", callback_data="edit_during_entry:show_menu")])
         else:
-            # ✅ استخدام زر الرجوع العادي (قبل نوع الإجراء)
+            # ✅ استخدام زر الرجوع العادي (من المستشفى إلى الطبيب)
             if previous_state_name:
                 buttons.append(get_back_button(previous_state_name))
             else:
@@ -1387,9 +1450,9 @@ async def render_patient_selection(message, context):
         callback_data="patient:show_list:0"
     )])
 
-    # أزرار التنقل
+    # أزرار التنقل - استخدام زر الرجوع العادي
     keyboard.append([
-        InlineKeyboardButton("✏️ تعديل Back", callback_data="edit_during_entry:show_menu"),
+        InlineKeyboardButton("🔙 رجوع", callback_data="go_to_date_selection"),
         InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
     ])
 
@@ -1462,9 +1525,9 @@ async def render_doctor_selection(message, context):
         callback_data="doctor_manual"
     )])
 
-    # أزرار التنقل
+    # أزرار التنقل - استخدام زر الرجوع العادي
     keyboard.append([
-        InlineKeyboardButton("✏️ تعديل Back", callback_data="edit_during_entry:show_menu"),
+        InlineKeyboardButton("🔙 رجوع", callback_data="go_to_department_selection"),
         InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
     ])
 
@@ -2214,9 +2277,9 @@ def _build_hospitals_keyboard(page=0, search_query="", context=None):
         if nav_buttons:
             keyboard.append(nav_buttons)
 
-    # أزرار التنقل
+    # أزرار التنقل - استخدام زر الرجوع العادي
     keyboard.append([
-        InlineKeyboardButton("✏️ تعديل Back", callback_data="edit_during_entry:show_menu"),
+        InlineKeyboardButton("🔙 رجوع", callback_data="go_to_patient_selection"),
         InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
     ])
 
@@ -2929,7 +2992,7 @@ async def handle_doctor(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("🔍 بحث الآن", switch_inline_query_current_chat="")],
                 [InlineKeyboardButton("✏️ إدخال يدوي", callback_data="doctor_manual")],
-                [InlineKeyboardButton("✏️ تعديل Back", callback_data="edit_during_entry:show_menu")],
+                [InlineKeyboardButton("🔙 رجوع", callback_data="go_to_department_selection")],
                 [InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]
             ])
         )
@@ -3525,11 +3588,11 @@ async def handle_action_type_choice(update: Update, context: ContextTypes.DEFAUL
                 except:
                     pass
                 
-                # رسالة تأكيد
+                # رسالة تأكيد واضحة مع اسم الحقل المطلوب
                 await query.edit_message_text(
                     f"✅ **تم حفظ التعديل**\n\n"
                     f"**⚕️ نوع الإجراء:**\n{action_name}\n\n"
-                    f"يمكنك متابعة إدخال **{current_field_name}**.",
+                    f"📝 **الحقل التالي:**\nيرجى إدخال **{current_field_name}** الآن.",
                     parse_mode="Markdown"
                 )
                 
@@ -7816,43 +7879,93 @@ def get_field_display_name_from_state(state):
     if state in STATE_NAMES:
         state_name = STATE_NAMES[state]
         field_display_map = {
+            # استشارة جديدة
             "new_consult_complaint": "💬 شكوى المريض",
             "new_consult_decision": "📝 قرار الطبيب",
             "new_consult_tests": "🧪 الفحوصات",
+            "new_consult_followup_date": "📅 موعد العودة",
+            "new_consult_followup_time": "⏰ وقت العودة",
+            "new_consult_followup_reason": "✍️ سبب العودة",
+            # مراجعة/عودة دورية
             "followup_complaint": "💬 شكوى المريض",
             "followup_diagnosis": "🔬 التشخيص الطبي",
             "followup_decision": "📝 قرار الطبيب",
-            "surgery_consult_diagnosis": "🔬 التشخيص",
-            "surgery_consult_decision": "📝 قرار الطبيب وتفاصيل العملية",
-            "surgery_consult_name_en": "🔤 اسم العملية بالإنجليزي",
-            "surgery_consult_success_rate": "📊 نسبة نجاح العملية",
-            "surgery_consult_benefit_rate": "💡 نسبة الاستفادة",
-            "surgery_consult_tests": "🧪 الفحوصات والأشعة",
+            "followup_room_floor": "🚪 رقم الغرفة والطابق",
+            "followup_date_time": "📅 تاريخ ووقت العودة",
+            "followup_reason": "✍️ سبب العودة",
+            # طوارئ
             "emergency_complaint": "💬 شكوى المريض",
             "emergency_diagnosis": "🔬 التشخيص الطبي",
             "emergency_decision": "📝 قرار الطبيب وماذا تم",
             "emergency_status": "🏥 وضع الحالة",
             "emergency_admission_type": "🛏️ نوع الترقيد",
             "emergency_room_number": "🚪 رقم الغرفة والطابق",
-            "final_consult_diagnosis": "🔬 التشخيص النهائي",
-            "final_consult_decision": "📝 قرار الطبيب",
-            "final_consult_recommendations": "💡 التوصيات الطبية",
-            "operation_details_ar": "⚕️ تفاصيل العملية بالعربي",
-            "operation_name_en": "🔤 اسم العملية بالإنجليزي",
-            "operation_notes": "📝 ملاحظات",
+            "emergency_date_time": "📅 تاريخ ووقت الطوارئ",
+            "emergency_reason": "✍️ سبب العودة",
+            # ترقيد
             "admission_reason": "🛏️ سبب الرقود",
             "admission_room": "🚪 رقم الغرفة والطابق",
             "admission_notes": "📝 ملاحظات",
+            "admission_followup_date": "📅 موعد العودة",
+            "admission_followup_reason": "✍️ سبب العودة",
+            # استشارة مع قرار عملية
+            "surgery_consult_diagnosis": "🔬 التشخيص",
+            "surgery_consult_decision": "📝 قرار الطبيب وتفاصيل العملية",
+            "surgery_consult_name_en": "🔤 اسم العملية بالإنجليزي",
+            "surgery_consult_success_rate": "📊 نسبة نجاح العملية",
+            "surgery_consult_benefit_rate": "💡 نسبة الاستفادة",
+            "surgery_consult_tests": "🧪 الفحوصات والأشعة",
+            "surgery_consult_followup_date": "📅 موعد العودة",
+            "surgery_consult_followup_reason": "✍️ سبب العودة",
+            # عملية
+            "operation_details_ar": "⚕️ تفاصيل العملية بالعربي",
+            "operation_name_en": "🔤 اسم العملية بالإنجليزي",
+            "operation_notes": "📝 ملاحظات",
+            "operation_followup_date": "📅 موعد العودة",
+            "operation_followup_reason": "✍️ سبب العودة",
+            # استشارة أخيرة
+            "final_consult_diagnosis": "🔬 التشخيص النهائي",
+            "final_consult_decision": "📝 قرار الطبيب",
+            "final_consult_recommendations": "💡 التوصيات الطبية",
+            # خروج من المستشفى
             "discharge_type": "🚪 نوع الخروج",
             "discharge_admission_summary": "📋 ملخص الرقود",
             "discharge_operation_details": "⚕️ تفاصيل العملية",
             "discharge_operation_name_en": "🔤 اسم العملية بالإنجليزي",
+            "discharge_followup_date": "📅 موعد العودة",
+            "discharge_followup_reason": "✍️ سبب العودة",
+            # علاج طبيعي / أجهزة تعويضية
+            "rehab_type": "🏃 نوع إعادة التأهيل",
             "physical_therapy_details": "🏃 تفاصيل جلسة العلاج الطبيعي",
+            "physical_therapy_followup_date": "📅 موعد العودة",
+            "physical_therapy_followup_reason": "✍️ سبب العودة",
             "device_name": "🦾 اسم الجهاز والتفاصيل",
+            "device_followup_date": "📅 موعد العودة",
+            "device_followup_reason": "✍️ سبب العودة",
+            # أشعة وفحوصات
             "radiology_type": "🔬 نوع الأشعة/الفحص",
             "radiology_delivery_date": "📅 تاريخ الاستلام",
         }
-        return field_display_map.get(state_name, "الحقل الحالي")
+        result = field_display_map.get(state_name, "الحقل الحالي")
+        # إذا لم نجد الحقل، نحاول استخراجه من اسم الحالة
+        if result == "الحقل الحالي":
+            if "complaint" in state_name:
+                result = "💬 شكوى المريض"
+            elif "diagnosis" in state_name:
+                result = "🔬 التشخيص الطبي"
+            elif "decision" in state_name:
+                result = "📝 قرار الطبيب"
+            elif "tests" in state_name:
+                result = "🧪 الفحوصات"
+            elif "followup" in state_name and "date" in state_name:
+                result = "📅 موعد العودة"
+            elif "followup" in state_name and "reason" in state_name:
+                result = "✍️ سبب العودة"
+            elif "room" in state_name or "floor" in state_name:
+                result = "🚪 رقم الغرفة والطابق"
+            elif "notes" in state_name:
+                result = "📝 ملاحظات"
+        return result
     return "الحقل الحالي"
 
 def format_field_value(value):
@@ -8063,53 +8176,20 @@ async def handle_edit_field_input_during_entry(update: Update, context: ContextT
         
         # الحصول على اسم الحقل الحالي (الذي كان فيه المستخدم قبل التعديل)
         current_field_name = "الحقل الحالي"
-        if last_state and last_state in STATE_NAMES:
-            state_name = STATE_NAMES[last_state]
-            # محاولة استخراج اسم الحقل من اسم الحالة
-            field_display_map = {
-                "new_consult_complaint": "💬 شكوى المريض",
-                "new_consult_decision": "📝 قرار الطبيب",
-                "new_consult_tests": "🧪 الفحوصات",
-                "followup_complaint": "💬 شكوى المريض",
-                "followup_diagnosis": "🔬 التشخيص الطبي",
-                "followup_decision": "📝 قرار الطبيب",
-                "surgery_consult_diagnosis": "🔬 التشخيص",
-                "surgery_consult_decision": "📝 قرار الطبيب وتفاصيل العملية",
-                "surgery_consult_name_en": "🔤 اسم العملية بالإنجليزي",
-                "surgery_consult_success_rate": "📊 نسبة نجاح العملية",
-                "surgery_consult_benefit_rate": "💡 نسبة الاستفادة",
-                "surgery_consult_tests": "🧪 الفحوصات والأشعة",
-                "emergency_complaint": "💬 شكوى المريض",
-                "emergency_diagnosis": "🔬 التشخيص الطبي",
-                "emergency_decision": "📝 قرار الطبيب وماذا تم",
-                "emergency_status": "🏥 وضع الحالة",
-                "emergency_admission_type": "🛏️ نوع الترقيد",
-                "emergency_room_number": "🚪 رقم الغرفة والطابق",
-                "final_consult_diagnosis": "🔬 التشخيص النهائي",
-                "final_consult_decision": "📝 قرار الطبيب",
-                "final_consult_recommendations": "💡 التوصيات الطبية",
-                "operation_details_ar": "⚕️ تفاصيل العملية بالعربي",
-                "operation_name_en": "🔤 اسم العملية بالإنجليزي",
-                "operation_notes": "📝 ملاحظات",
-                "admission_reason": "🛏️ سبب الرقود",
-                "admission_room": "🚪 رقم الغرفة والطابق",
-                "admission_notes": "📝 ملاحظات",
-                "discharge_type": "🚪 نوع الخروج",
-                "discharge_admission_summary": "📋 ملخص الرقود",
-                "discharge_operation_details": "⚕️ تفاصيل العملية",
-                "discharge_operation_name_en": "🔤 اسم العملية بالإنجليزي",
-                "physical_therapy_details": "🏃 تفاصيل جلسة العلاج الطبيعي",
-                "device_name": "🦾 اسم الجهاز والتفاصيل",
-                "radiology_type": "🔬 نوع الأشعة/الفحص",
-                "radiology_delivery_date": "📅 تاريخ الاستلام",
-            }
-            current_field_name = field_display_map.get(state_name, "الحقل الحالي")
+        if last_state:
+            try:
+                current_field_name = get_field_display_name_from_state(last_state)
+                logger.info(f"📝 الحقل التالي بعد التعديل: {current_field_name} (state: {last_state})")
+            except Exception as e:
+                logger.error(f"❌ خطأ في get_field_display_name_from_state: {e}")
+                pass
         
-        # رسالة تأكيد واضحة مع اسم الحقل الحالي
+        # رسالة تأكيد واضحة مع اسم الحقل المطلوب
+        field_display = get_field_display_name(field_key)
         await update.message.reply_text(
             f"✅ **تم حفظ التعديل**\n\n"
-            f"**{get_field_display_name(field_key)}:**\n{text[:100]}\n\n"
-            f"يمكنك متابعة إدخال **{current_field_name}**.",
+            f"**{field_display}:**\n{text[:100]}\n\n"
+            f"📝 **الحقل التالي:**\nيرجى إدخال **{current_field_name}** الآن.",
             parse_mode="Markdown"
         )
         

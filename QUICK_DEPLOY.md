@@ -66,3 +66,5 @@ journalctl -u medical-bot -f
 
 
 
+
+
