@@ -134,7 +134,7 @@ async def handle_hospital_selection(update: Update, context: ContextTypes.DEFAUL
             [InlineKeyboardButton("🫀 القلب", callback_data="dept:cardiology")],
             [InlineKeyboardButton("🧠 الأعصاب", callback_data="dept:neurology")],
             [InlineKeyboardButton("🫁 الجهاز التنفسي", callback_data="dept:pulmonary")],
-            [InlineKeyboardButton("⬅️ رجوع للمستشفيات", callback_data="nav:back")]
+            [InlineKeyboardButton("✏️ تعديل Back", callback_data="edit_during_entry:show_menu")]
         ])
     )
 
@@ -781,35 +781,30 @@ async def handle_step_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def get_back_button(previous_state_name):
     """
-    دالة لإنشاء زر الرجوع ببيانات الحالة السابقة بدقة
+    دالة لإنشاء زر التعديل بدلاً من الرجوع
     
     Args:
-        previous_state_name: اسم الحالة السابقة (مثل "hospital_selection")
+        previous_state_name: اسم الحالة السابقة (مثل "hospital_selection") - غير مستخدم الآن
     
     Returns:
         List containing InlineKeyboardButton
     """
-    return [InlineKeyboardButton("🔙 رجوع", callback_data=f"go_to_{previous_state_name}")]
+    return [InlineKeyboardButton("✏️ تعديل Back", callback_data="edit_during_entry:show_menu")]
 
 def _nav_buttons(show_back=True, previous_state_name=None):
     """
-    أزرار التنقل الأساسية - نظام State Dictionary الجديد
+    أزرار التنقل الأساسية - نظام التعديل أثناء الإدخال
     
     Args:
-        show_back: إذا True، يعرض زر الرجوع
-        previous_state_name: اسم الحالة السابقة (مثل "hospital_selection")
-                          إذا None، يستخدم nav:back القديم
+        show_back: إذا True، يعرض زر التعديل
+        previous_state_name: اسم الحالة السابقة (مثل "hospital_selection") - غير مستخدم الآن
     """
     buttons = []
 
     if show_back:
-        if previous_state_name:
-            # ✅ استخدام State Dictionary System
-            buttons.append(get_back_button(previous_state_name))
-        else:
-            # ✅ استخدام النظام القديم للتوافق
-            buttons.append([InlineKeyboardButton(
-                "🔙 رجوع", callback_data="nav:back")])
+        # ✅ استخدام زر التعديل بدلاً من الرجوع
+        buttons.append([InlineKeyboardButton(
+            "✏️ تعديل Back", callback_data="edit_during_entry:show_menu")])
 
     buttons.append([InlineKeyboardButton(
         "❌ إلغاء العملية", callback_data="nav:cancel")])
@@ -870,7 +865,7 @@ def _build_hour_keyboard():
     
     keyboard.append([InlineKeyboardButton("⏭️ بدون وقت", callback_data="time_skip")])
     keyboard.append([
-        InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
+        InlineKeyboardButton("✏️ تعديل Back", callback_data="edit_during_entry:show_menu"),
         InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel"),
     ])
     return InlineKeyboardMarkup(keyboard)
@@ -883,7 +878,7 @@ def _build_minute_keyboard(hour: str):
         minute_options = ["00", "15", "30", "45"]
         keyboard = [
             [InlineKeyboardButton(f"{hour}:{m}", callback_data=f"followup_time_minute:{hour}:{m}") for m in minute_options],
-            [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"), InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]
+            [InlineKeyboardButton("✏️ تعديل Back", callback_data="edit_during_entry:show_menu"), InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]
         ]
         return InlineKeyboardMarkup(keyboard)
     """بناء لوحة اختيار الدقائق مع عرض الوقت بصيغة 12 ساعة"""
@@ -919,7 +914,7 @@ def _build_minute_keyboard(hour: str):
         "⏭️ بدون وقت", callback_data="time_skip")])
     keyboard.append([
         InlineKeyboardButton("🔙 تغيير الساعة", callback_data="time_back_hour"),
-        InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
+        InlineKeyboardButton("✏️ تعديل Back", callback_data="edit_during_entry:show_menu"),
     ])
     keyboard.append([InlineKeyboardButton(
         "❌ إلغاء", callback_data="nav:cancel")])
@@ -1360,7 +1355,7 @@ async def render_patient_selection(message, context):
 
     # أزرار التنقل
     keyboard.append([
-        InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
+        InlineKeyboardButton("✏️ تعديل Back", callback_data="edit_during_entry:show_menu"),
         InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
     ])
 
@@ -1435,7 +1430,7 @@ async def render_doctor_selection(message, context):
 
     # أزرار التنقل
     keyboard.append([
-        InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
+        InlineKeyboardButton("✏️ تعديل Back", callback_data="edit_during_entry:show_menu"),
         InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
     ])
 
@@ -1744,7 +1739,7 @@ async def handle_date_time_hour(
         keyboard.append(row)
 
         keyboard.append([
-            InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
+            InlineKeyboardButton("✏️ تعديل Back", callback_data="edit_during_entry:show_menu"),
             InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel"),
         ])
 
@@ -2187,7 +2182,7 @@ def _build_hospitals_keyboard(page=0, search_query="", context=None):
 
     # أزرار التنقل
     keyboard.append([
-        InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
+        InlineKeyboardButton("✏️ تعديل Back", callback_data="edit_during_entry:show_menu"),
         InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
     ])
 
@@ -2627,7 +2622,7 @@ async def show_subdepartment_options(message, context, main_dept, page=0):
             keyboard.append(nav_buttons)
 
     keyboard.append([InlineKeyboardButton(
-        "🔙 رجوع", callback_data="nav:back")])
+        "✏️ تعديل Back", callback_data="edit_during_entry:show_menu")])
     keyboard.append([InlineKeyboardButton(
         "❌ إلغاء", callback_data="nav:cancel")])
 
@@ -2900,7 +2895,7 @@ async def handle_doctor(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("🔍 بحث الآن", switch_inline_query_current_chat="")],
                 [InlineKeyboardButton("✏️ إدخال يدوي", callback_data="doctor_manual")],
-                [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back")],
+                [InlineKeyboardButton("✏️ تعديل Back", callback_data="edit_during_entry:show_menu")],
                 [InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]
             ])
         )
@@ -4178,7 +4173,7 @@ async def handle_new_consult_followup_calendar_day(update: Update, context: Cont
 
         keyboard.append([InlineKeyboardButton("🕐 أوقات أخرى", callback_data="followup_time_hour:more")])
         keyboard.append([
-            InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
+            InlineKeyboardButton("✏️ تعديل Back", callback_data="edit_during_entry:show_menu"),
             InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
         ])
 
@@ -4274,7 +4269,7 @@ async def handle_new_consult_followup_time_hour(update: Update, context: Context
             keyboard.append(row)
         
         keyboard.append([
-            InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
+            InlineKeyboardButton("✏️ تعديل Back", callback_data="edit_during_entry:show_menu"),
             InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel"),
         ])
         
@@ -4987,7 +4982,7 @@ async def handle_emergency_decision(update: Update, context: ContextTypes.DEFAUL
         [InlineKeyboardButton("🛏️ تم الترقيد", callback_data="emerg_status:admitted")],
         [InlineKeyboardButton("⚕️ تم إجراء عملية", callback_data="emerg_status:operation")],
         [InlineKeyboardButton("✍️ إدخال يدوي", callback_data="emerg_status:manual")],
-        [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back")],
+        [InlineKeyboardButton("✏️ تعديل Back", callback_data="edit_during_entry:show_menu")],
         [InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]
     ])
 
@@ -5030,7 +5025,7 @@ async def handle_emergency_status_choice(update: Update, context: ContextTypes.D
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("🏥 العناية المركزة", callback_data="emerg_admission:icu")],
             [InlineKeyboardButton("🛏️ الرقود", callback_data="emerg_admission:ward")],
-            [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back")],
+            [InlineKeyboardButton("✏️ تعديل Back", callback_data="edit_during_entry:show_menu")],
             [InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]
         ])
         
@@ -5540,7 +5535,7 @@ async def handle_surgery_consult_tests(update: Update, context: ContextTypes.DEF
         [InlineKeyboardButton("✏️ إدخال نص (مثل: الإدارة سوف تقرر)", callback_data="surgery_followup:text")],
         [InlineKeyboardButton("⏭️ تخطي", callback_data="surgery_followup:skip")],
         [
-            InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
+            InlineKeyboardButton("✏️ تعديل Back", callback_data="edit_during_entry:show_menu"),
             InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
         ]
     ])
@@ -5969,7 +5964,7 @@ async def start_discharge_flow(message, context):
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("🛏️ خروج بعد رقود طبي", callback_data="discharge_type:admission")],
         [InlineKeyboardButton("⚕️ خروج بعد عملية", callback_data="discharge_type:operation")],
-        [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back")],
+        [InlineKeyboardButton("✏️ تعديل Back", callback_data="edit_during_entry:show_menu")],
         [InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]
     ])
 
@@ -6164,7 +6159,7 @@ async def start_rehab_flow(message, context):
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("🏃 علاج طبيعي", callback_data="rehab_type:physical_therapy")],
         [InlineKeyboardButton("🦾 أجهزة تعويضية", callback_data="rehab_type:device")],
-        [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back")],
+        [InlineKeyboardButton("✏️ تعديل Back", callback_data="edit_during_entry:show_menu")],
         [InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]
     ])
 
@@ -6475,7 +6470,7 @@ def _build_main_calendar_markup(year: int, month: int):
         keyboard.append(row)
 
     keyboard.append([
-        InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
+        InlineKeyboardButton("✏️ تعديل Back", callback_data="edit_during_entry:show_menu"),
         InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
     ])
 
@@ -6522,7 +6517,7 @@ def _build_followup_calendar_markup(year: int, month: int):
 
     # أزرار التنقل
     keyboard.append([
-        InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
+        InlineKeyboardButton("✏️ تعديل Back", callback_data="edit_during_entry:show_menu"),
         InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
     ])
 
@@ -6578,7 +6573,7 @@ def _build_followup_minute_keyboard(hour: str):
         keyboard.append(row)
 
     keyboard.append([
-        InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
+        InlineKeyboardButton("✏️ تعديل Back", callback_data="edit_during_entry:show_menu"),
         InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
     ])
 
@@ -6643,7 +6638,7 @@ def _build_radiology_calendar_markup(year: int, month: int):
         keyboard.append(row)
 
     keyboard.append([
-        InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
+        InlineKeyboardButton("✏️ تعديل Back", callback_data="edit_during_entry:show_menu"),
         InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
     ])
 
@@ -6749,7 +6744,7 @@ async def render_translator_selection(message, context, flow_type):
 
     # أزرار التنقل
     keyboard.append([
-        InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
+        InlineKeyboardButton("✏️ تعديل Back", callback_data="edit_during_entry:show_menu"),
         InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
     ])
 
@@ -7366,6 +7361,107 @@ def get_editable_fields_by_flow_type(flow_type):
     }
     return fields_map.get(flow_type, [])
 
+async def show_edit_fields_menu_during_entry(query, context, flow_type=None):
+    """عرض قائمة الحقول المدخلة فقط (للتعديل أثناء الإدخال)"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        # استخراج flow_type من report_tmp إذا لم يتم تمريره
+        if not flow_type:
+            flow_type = context.user_data.get("report_tmp", {}).get("current_flow")
+            if not flow_type:
+                # محاولة استخراج من medical_action
+                medical_action = context.user_data.get("report_tmp", {}).get("medical_action")
+                action_to_flow = {
+                    "استشارة جديدة": "new_consult",
+                    "مراجعة / عودة دورية": "followup",
+                    "استشارة مع قرار عملية": "surgery_consult",
+                    "طوارئ": "emergency",
+                    "ترقيد": "admission",
+                    "عملية": "operation",
+                    "استشارة أخيرة": "final_consult",
+                    "خروج": "discharge",
+                    "علاج طبيعي": "rehab_physical",
+                    "أجهزة تعويضية": "rehab_device",
+                    "أشعة": "radiology"
+                }
+                flow_type = action_to_flow.get(medical_action, "new_consult")
+        
+        data = context.user_data.get("report_tmp", {})
+        editable_fields = get_editable_fields_by_flow_type(flow_type)
+        
+        # تصفية الحقول المدخلة فقط (الحقول التي لها قيمة)
+        entered_fields = []
+        for field_key, field_display in editable_fields:
+            current_value = data.get(field_key)
+            # التحقق من وجود قيمة فعلية (ليس None وليس فارغ)
+            if current_value is not None:
+                if isinstance(current_value, str) and current_value.strip():
+                    entered_fields.append((field_key, field_display, current_value))
+                elif not isinstance(current_value, str):
+                    entered_fields.append((field_key, field_display, current_value))
+        
+        if not entered_fields:
+            await query.edit_message_text(
+                "ℹ️ **لا توجد حقول مدخلة حتى الآن**\n\n"
+                "يرجى إدخال بعض الحقول أولاً ثم المحاولة مرة أخرى.",
+                parse_mode="Markdown"
+            )
+            # العودة للحالة الحالية
+            current_state = context.user_data.get('_conversation_state')
+            return current_state if current_state else ConversationHandler.END
+        
+        text = "✏️ **تعديل الحقول المدخلة**\n\n"
+        text += "اختر الحقل الذي تريد تعديله:\n\n"
+        
+        keyboard = []
+        for field_key, field_display, current_value in entered_fields:
+            # تنسيق القيمة للعرض
+            if isinstance(current_value, datetime):
+                value_display = current_value.strftime('%Y-%m-%d %H:%M')
+            elif isinstance(current_value, str) and len(current_value) > 30:
+                value_display = current_value[:27] + "..."
+            else:
+                value_display = str(current_value)[:30]
+            
+            button_text = f"{field_display}"
+            if value_display:
+                button_text += f"\n({value_display})"
+            
+            keyboard.append([
+                InlineKeyboardButton(
+                    button_text,
+                    callback_data=f"edit_field_during:{flow_type}:{field_key}"
+                )
+            ])
+        
+        # حفظ الحالة الحالية للعودة إليها بعد التعديل
+        current_state = context.user_data.get('_conversation_state')
+        context.user_data['_last_state_before_edit'] = current_state
+        
+        keyboard.append([InlineKeyboardButton("✅ إلغاء (العودة للمتابعة)", callback_data="edit_during_entry:cancel")])
+        
+        await query.edit_message_text(
+            text,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown"
+        )
+        
+        logger.info(f"✅ تم عرض قائمة الحقول المدخلة ({len(entered_fields)} حقل), flow_type={flow_type}")
+        return "EDIT_FIELDS_DURING_ENTRY"
+        
+    except Exception as e:
+        logger.error(f"❌ خطأ في show_edit_fields_menu_during_entry: {e}", exc_info=True)
+        await query.edit_message_text(
+            "❌ **حدث خطأ أثناء عرض قائمة التعديل**\n\n"
+            "يرجى المحاولة مرة أخرى.",
+            parse_mode="Markdown"
+        )
+        # العودة للحالة الحالية
+        current_state = context.user_data.get('_conversation_state')
+        return current_state if current_state else ConversationHandler.END
+
 async def show_edit_fields_menu(query, context, flow_type):
     """عرض قائمة الحقول القابلة للتعديل"""
     import logging
@@ -7597,6 +7693,22 @@ def get_field_display_name(field_key):
         "followup_date": "📅 موعد العودة",
         "followup_time": "⏰ وقت العودة",
         "followup_reason": "✍️ سبب العودة",
+        "status": "🏥 وضع الحالة",
+        "admission_type": "🛏️ نوع الترقيد",
+        "room_number": "🚪 رقم الغرفة والطابق",
+        "admission_reason": "🛏️ سبب الرقود",
+        "notes": "📝 ملاحظات",
+        "operation_details": "⚕️ تفاصيل العملية بالعربي",
+        "operation_name_en": "🔤 اسم العملية بالإنجليزي",
+        "success_rate": "📊 نسبة نجاح العملية",
+        "benefit_rate": "💡 نسبة الاستفادة",
+        "recommendations": "💡 التوصيات الطبية",
+        "discharge_type": "🚪 نوع الخروج",
+        "admission_summary": "📋 ملخص الرقود",
+        "therapy_details": "🏃 تفاصيل جلسة العلاج الطبيعي",
+        "device_name": "🦾 اسم الجهاز والتفاصيل",
+        "radiology_type": "🔬 نوع الأشعة/الفحص",
+        "delivery_date": "📅 تاريخ الاستلام",
     }
     return names.get(field_key, field_key)
 
@@ -7610,12 +7722,213 @@ def format_field_value(value):
         return str(value)
     return str(value)
 
-async def handle_edit_field_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """معالجة إدخال النص بعد اختيار حقل للتعديل"""
+async def handle_edit_during_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة زر 'تعديل Back' أثناء الإدخال"""
     import logging
     logger = logging.getLogger(__name__)
     
     try:
+        query = update.callback_query
+        if not query:
+            return ConversationHandler.END
+        
+        await query.answer()
+        
+        callback_data = query.data
+        if callback_data == "edit_during_entry:show_menu":
+            # عرض قائمة الحقول المدخلة
+            return await show_edit_fields_menu_during_entry(query, context)
+        elif callback_data == "edit_during_entry:cancel":
+            # العودة للحالة الحالية
+            last_state = context.user_data.get('_last_state_before_edit')
+            if last_state:
+                context.user_data['_conversation_state'] = last_state
+                context.user_data.pop('_last_state_before_edit', None)
+                # حذف رسالة القائمة
+                try:
+                    await query.message.delete()
+                except:
+                    pass
+                logger.info(f"✅ العودة للحالة السابقة: {last_state}")
+                return last_state
+            else:
+                await query.edit_message_text(
+                    "✅ تم الإلغاء",
+                    parse_mode="Markdown"
+                )
+                return ConversationHandler.END
+        
+        return ConversationHandler.END
+        
+    except Exception as e:
+        logger.error(f"❌ خطأ في handle_edit_during_entry: {e}", exc_info=True)
+        if query:
+            await query.edit_message_text(
+                "❌ **حدث خطأ**\n\n"
+                "يرجى المحاولة مرة أخرى.",
+                parse_mode="Markdown"
+            )
+        return ConversationHandler.END
+
+async def handle_edit_field_during_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة اختيار حقل للتعديل أثناء الإدخال"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        query = update.callback_query
+        await query.answer()
+        
+        # استخراج flow_type و field_key
+        parts = query.data.split(":")
+        if len(parts) < 3:
+            await query.edit_message_text("❌ خطأ في البيانات")
+            return ConversationHandler.END
+        
+        flow_type = parts[1]
+        field_key = parts[2]
+        
+        logger.info(f"✏️ handle_edit_field_during_entry: flow_type={flow_type}, field_key={field_key}")
+        
+        data = context.user_data.get("report_tmp", {})
+        current_value = data.get(field_key, "غير محدد")
+        
+        # حفظ معلومات التعديل
+        context.user_data["edit_field_key"] = field_key
+        context.user_data["edit_flow_type"] = flow_type
+        context.user_data["edit_during_entry"] = True  # علامة أن هذا تعديل أثناء الإدخال
+        
+        # عرض واجهة التعديل حسب نوع الحقل
+        field_display_name = get_field_display_name(field_key)
+        field_display_escaped = escape_markdown_v1(str(field_display_name))
+        current_value_formatted = format_field_value(current_value)
+        current_value_escaped = escape_markdown_v1(str(current_value_formatted))
+        
+        if field_key in ["report_date", "followup_date", "delivery_date"]:
+            # للحقول التاريخية - عرض التقويم (مؤقتاً: طلب إدخال نصي)
+            await query.edit_message_text(
+                f"📅 **تعديل {field_display_escaped}**\n\n"
+                f"**القيمة الحالية:** {current_value_escaped}\n\n"
+                f"أرسل التاريخ الجديد بصيغة: YYYY-MM-DD HH:MM",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("✅ إلغاء (العودة للمتابعة)", callback_data="edit_during_entry:cancel")],
+                    [InlineKeyboardButton("❌ إلغاء العملية", callback_data="nav:cancel")]
+                ]),
+                parse_mode="Markdown"
+            )
+            context.user_data['_conversation_state'] = "EDIT_FIELD_DURING_ENTRY"
+            return "EDIT_FIELD_DURING_ENTRY"
+        else:
+            # للحقول النصية - طلب إدخال جديد
+            await query.edit_message_text(
+                f"✏️ **تعديل {field_display_escaped}**\n\n"
+                f"**القيمة الحالية:**\n{current_value_escaped}\n\n"
+                f"أرسل القيمة الجديدة:",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("✅ إلغاء (العودة للمتابعة)", callback_data="edit_during_entry:cancel")],
+                    [InlineKeyboardButton("❌ إلغاء العملية", callback_data="nav:cancel")]
+                ]),
+                parse_mode="Markdown"
+            )
+            context.user_data['_conversation_state'] = "EDIT_FIELD_DURING_ENTRY"
+            return "EDIT_FIELD_DURING_ENTRY"
+        
+    except Exception as e:
+        logger.error(f"❌ خطأ في handle_edit_field_during_entry: {e}", exc_info=True)
+        await query.edit_message_text(
+            "❌ **حدث خطأ أثناء اختيار الحقل**\n\n"
+            "يرجى المحاولة مرة أخرى.",
+            parse_mode="Markdown"
+        )
+        return ConversationHandler.END
+
+async def handle_edit_field_input_during_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة إدخال القيمة الجديدة أثناء الإدخال والعودة للحالة الحالية"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        text = update.message.text.strip()
+        field_key = context.user_data.get("edit_field_key")
+        flow_type = context.user_data.get("edit_flow_type")
+        is_during_entry = context.user_data.get("edit_during_entry", False)
+        
+        if not field_key or not flow_type:
+            logger.error("❌ لم يتم العثور على field_key أو flow_type")
+            await update.message.reply_text(
+                "❌ **حدث خطأ**\n\n"
+                "لم يتم العثور على معلومات التعديل.",
+                parse_mode="Markdown"
+            )
+            return ConversationHandler.END
+        
+        logger.info(f"✏️ handle_edit_field_input_during_entry: field_key={field_key}, flow_type={flow_type}, text={text[:50]}")
+        
+        # التحقق من صحة الإدخال
+        if not text or len(text) < 1:
+            await update.message.reply_text(
+                "⚠️ **خطأ:** النص فارغ\n\n"
+                f"يرجى إدخال {get_field_display_name(field_key)}:",
+                parse_mode="Markdown"
+            )
+            return "EDIT_FIELD_DURING_ENTRY"
+        
+        # حفظ القيمة الجديدة
+        data = context.user_data.get("report_tmp", {})
+        data[field_key] = text
+        
+        # مسح معلومات التعديل
+        context.user_data.pop("edit_field_key", None)
+        context.user_data.pop("edit_flow_type", None)
+        context.user_data.pop("edit_during_entry", None)
+        
+        logger.info(f"✅ تم حفظ التعديل: {field_key} = {text[:50]}")
+        
+        # رسالة تأكيد
+        await update.message.reply_text(
+            f"✅ **تم حفظ التعديل**\n\n"
+            f"**{get_field_display_name(field_key)}:**\n{text[:100]}\n\n"
+            f"يمكنك متابعة إدخال باقي الحقول.",
+            parse_mode="Markdown"
+        )
+        
+        # العودة للحالة الحالية التي كان فيها المستخدم قبل التعديل
+        last_state = context.user_data.get('_last_state_before_edit')
+        if last_state:
+            context.user_data['_conversation_state'] = last_state
+            context.user_data.pop('_last_state_before_edit', None)
+            logger.info(f"✅ العودة للحالة السابقة بعد التعديل: {last_state}")
+            return last_state
+        else:
+            # إذا لم تكن هناك حالة محفوظة، نحاول العثور على الحالة الحالية
+            current_state = context.user_data.get('_conversation_state')
+            if current_state:
+                logger.info(f"✅ العودة للحالة الحالية: {current_state}")
+                return current_state
+            else:
+                logger.warning("⚠️ لم يتم العثور على حالة للعودة إليها")
+                return ConversationHandler.END
+        
+    except Exception as e:
+        logger.error(f"❌ خطأ في handle_edit_field_input_during_entry: {e}", exc_info=True)
+        await update.message.reply_text(
+            "❌ **حدث خطأ أثناء حفظ التعديل**\n\n"
+            "يرجى المحاولة مرة أخرى.",
+            parse_mode="Markdown"
+        )
+        return ConversationHandler.END
+
+async def handle_edit_field_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة إدخال النص بعد اختيار حقل للتعديل (للحالات القديمة)"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        # التحقق إذا كان هذا تعديل أثناء الإدخال
+        is_during_entry = context.user_data.get("edit_during_entry", False)
+        if is_during_entry:
+            return await handle_edit_field_input_during_entry(update, context)
+        
         text = update.message.text.strip()
         field_key = context.user_data.get("edit_field_key")
         flow_type = context.user_data.get("edit_flow_type")
@@ -9605,6 +9918,14 @@ def register(app):
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_edit_field_input),
                 CallbackQueryHandler(handle_edit_callback, pattern="^edit:"),
             ],
+            "EDIT_FIELDS_DURING_ENTRY": [
+                CallbackQueryHandler(handle_edit_field_during_entry, pattern="^edit_field_during:"),
+                CallbackQueryHandler(handle_edit_during_entry, pattern="^edit_during_entry:"),
+            ],
+            "EDIT_FIELD_DURING_ENTRY": [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_edit_field_input_during_entry),
+                CallbackQueryHandler(handle_edit_during_entry, pattern="^edit_during_entry:"),
+            ],
             # أضف هنا باقي المسارات بنفس الطريقة (FOLLOWUP_COMPLAINT، ADMISSION_COMPLAINT، ...)
         },
         fallbacks=[
@@ -9616,13 +9937,16 @@ def register(app):
             CommandHandler("cancel", handle_cancel_navigation),
             # معالج للرسائل التي تحتوي على "إضافة تقرير جديد" (للتعامل مع الأزرار) - فقط في الدردشة الخاصة
             MessageHandler(filters.ChatType.PRIVATE & filters.TEXT & filters.Regex(r".*إضافة.*تقرير.*جديد.*"), start_report),
-            # معالج زر الرجوع - يعمل في جميع الـ states
+            # ✅ معالج زر التعديل أثناء الإدخال - يعمل في جميع الـ states
+            CallbackQueryHandler(handle_edit_during_entry, pattern="^edit_during_entry:"),
+            CallbackQueryHandler(handle_edit_field_during_entry, pattern="^edit_field_during:"),
+            # معالج زر الرجوع - يعمل في جميع الـ states (للتوافق مع الكود القديم)
             # ✅ State Dictionary System - معالجة go_to_* callbacks
             CallbackQueryHandler(handle_go_to_state, pattern="^go_to_"),
             # ✅ Step Indexing System - معالجة step:back
             CallbackQueryHandler(handle_step_back, pattern="^step:back$"),
-            # ✅ النظام القديم للتوافق
-            CallbackQueryHandler(handle_back_navigation, pattern="^nav:back$"),
+            # ✅ النظام القديم للتوافق (تم تعطيله - استبدل بزر التعديل)
+            # CallbackQueryHandler(handle_back_navigation, pattern="^nav:back$"),
             # معالج زر الإلغاء - يعمل في جميع الـ states
             CallbackQueryHandler(handle_cancel_navigation, pattern="^nav:cancel$"),
             # DEBUG: إضافة fallback لالتقاط جميع callbacks غير متطابقة في حالة R_ACTION_TYPE
