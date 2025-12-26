@@ -115,8 +115,17 @@ async def broadcast_new_report(bot: Bot, report_data: dict):
             
             # تحديد نوع الخطأ وإعطاء رسالة واضحة
             if "Forbidden" in error_msg or "bot was blocked" in error_msg.lower():
-                logger.error(f"❌ البوت محظور أو ليس لديه صلاحيات في المجموعة {REPORTS_GROUP_ID}")
-                logger.error(f"💡 الحل: تأكد من إضافة البوت للمجموعة ومنحه صلاحيات إرسال الرسائل")
+                if "kicked" in error_msg.lower() or "removed" in error_msg.lower():
+                    logger.error(f"❌ البوت تم طرده من المجموعة {REPORTS_GROUP_ID}")
+                    logger.error(f"💡 الحل: يجب إعادة إضافة البوت للمجموعة!")
+                    logger.error(f"💡 الخطوات:")
+                    logger.error(f"   1. افتح المجموعة: -1002158238388")
+                    logger.error(f"   2. اضغط على 'Add Members' أو 'إضافة أعضاء'")
+                    logger.error(f"   3. ابحث عن البوت وأضفه مرة أخرى")
+                    logger.error(f"   4. اجعله أدمن (Admin) مع صلاحيات إرسال الرسائل")
+                else:
+                    logger.error(f"❌ البوت محظور أو ليس لديه صلاحيات في المجموعة {REPORTS_GROUP_ID}")
+                    logger.error(f"💡 الحل: تأكد من إضافة البوت للمجموعة ومنحه صلاحيات إرسال الرسائل")
             elif "Chat not found" in error_msg or "chat not found" in error_msg.lower():
                 logger.error(f"❌ المجموعة غير موجودة أو البوت غير عضو فيها: {REPORTS_GROUP_ID}")
                 logger.error(f"💡 الحل: أضف البوت للمجموعة الجديدة: -1002158238388")
