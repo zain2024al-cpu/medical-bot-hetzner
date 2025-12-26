@@ -9857,7 +9857,7 @@ def register(app):
     # =============================
 
     async def patient_inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handler منفصل للبحث عن المرضى فقط - لا يتداخل مع الأطباء"""
+        """Handler منفصل للبحث عن المرضى فقط - يقرأ من الملف أولاً"""
         import logging
         logger = logging.getLogger(__name__)
 
@@ -9866,63 +9866,79 @@ def register(app):
 
         results = []
 
+        # ✅ قراءة من الملف أولاً (لضمان عرض الأسماء المحدثة فقط)
         try:
-            with SessionLocal() as s:
+            import os
+            # محاولة عدة مسارات محتملة للملف
+            possible_paths = [
+                os.path.join(os.getcwd(), 'data', 'patient_names.txt'),
+                'data/patient_names.txt',
+                '/home/botuser/medical-bot/temp_upload/data/patient_names.txt',
+                '/root/medical-bot-hetzner/data/patient_names.txt',
+            ]
+            
+            file_path = None
+            for path in possible_paths:
+                if os.path.exists(path):
+                    file_path = path
+                    logger.info(f"✅ تم العثور على ملف patient_names.txt في: {path}")
+                    break
+            
+            if file_path:
+                names = []
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith('#'):
+                            names.append(line)
+                
+                # فلترة حسب query_text
                 if query_text:
-                    # عند البحث، عرض جميع النتائج المطابقة (حتى 50 - الحد الأقصى لـ Telegram)
-                    patients = s.query(Patient).filter(
-                        Patient.full_name.ilike(f"%{query_text}%")
-                    ).order_by(Patient.full_name).limit(50).all()
-                else:
-                    # عند عدم وجود بحث، عرض آخر 50 مريض (الحد الأقصى لـ Telegram Inline Query)
-                    patients = s.query(Patient).order_by(Patient.full_name).limit(50).all()
-
-                for patient in patients:
+                    names = [n for n in names if query_text.lower() in n.lower()]
+                
+                # إنشاء نتائج من الملف (حتى 50 - الحد الأقصى لـ Telegram)
+                for idx, name in enumerate(names[:50]):
                     result = InlineQueryResultArticle(
-                        id=f"patient_{patient.id}",
-                        title=f"👤 {patient.full_name}",
+                        id=f"patient_file_{idx}",
+                        title=f"👤 {name}",
                         description=f"اختر هذا المريض",
                         input_message_content=InputTextMessageContent(
-                            message_text=f"__PATIENT_SELECTED__:{patient.id}:{patient.full_name}"
+                            message_text=f"__PATIENT_SELECTED__:0:{name}"
                         )
                     )
                     results.append(result)
-
-            logger.info(f"patient_inline_query_handler: Found {len(results)} patients from database")
-
-        except Exception as db_error:
-            logger.error(f"❌ خطأ في البحث عن المرضى من قاعدة البيانات: {db_error}", exc_info=True)
-            # Fallback: قراءة من الملف
+                
+                logger.info(f"✅ patient_inline_query_handler: Found {len(results)} patients from file")
+            else:
+                logger.warning("⚠️ لم يتم العثور على ملف patient_names.txt، محاولة قاعدة البيانات")
+                raise FileNotFoundError("File not found")
+                
+        except Exception as file_error:
+            logger.error(f"❌ خطأ في قراءة ملف المرضى: {file_error}", exc_info=True)
+            # Fallback: قراءة من قاعدة البيانات
             try:
-                import os
-                file_path = "data/patient_names.txt"
-                if os.path.exists(file_path):
-                    names = []
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        for line in f:
-                            line = line.strip()
-                            if line and not line.startswith('#'):
-                                names.append(line)
-
-                    # فلترة حسب query_text
+                with SessionLocal() as s:
                     if query_text:
-                        names = [n for n in names if query_text.lower() in n.lower()]
+                        patients = s.query(Patient).filter(
+                            Patient.full_name.ilike(f"%{query_text}%")
+                        ).order_by(Patient.full_name).limit(50).all()
+                    else:
+                        patients = s.query(Patient).order_by(Patient.full_name).limit(50).all()
 
-                    # إنشاء نتائج من الملف (حتى 50 - الحد الأقصى لـ Telegram)
-                    for idx, name in enumerate(names[:50]):
+                    for patient in patients:
                         result = InlineQueryResultArticle(
-                            id=f"patient_file_{idx}",
-                            title=f"👤 {name}",
+                            id=f"patient_{patient.id}",
+                            title=f"👤 {patient.full_name}",
                             description=f"اختر هذا المريض",
                             input_message_content=InputTextMessageContent(
-                                message_text=f"__PATIENT_SELECTED__:0:{name}"
+                                message_text=f"__PATIENT_SELECTED__:{patient.id}:{patient.full_name}"
                             )
                         )
                         results.append(result)
 
-                    logger.info(f"patient_inline_query_handler: Found {len(results)} patients from file (fallback)")
-            except Exception as file_error:
-                logger.error(f"❌ خطأ في قراءة ملف المرضى: {file_error}")
+                logger.info(f"patient_inline_query_handler: Found {len(results)} patients from database (fallback)")
+            except Exception as db_error:
+                logger.error(f"❌ خطأ في البحث عن المرضى من قاعدة البيانات: {db_error}", exc_info=True)
 
         # إرسال النتائج
         if not results:
