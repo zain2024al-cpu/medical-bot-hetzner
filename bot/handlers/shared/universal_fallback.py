@@ -286,10 +286,11 @@ def register(app):
     # معالج لـ callback queries غير المعالجة (يجب أن يكون pattern محدد لتجنب التعارض)
     # لا نستخدم pattern=".*" لأنه قد يتعارض مع handlers أخرى
     # بدلاً من ذلك، نستخدم pattern محدد للـ callbacks غير المعالجة
+    # استثناء callbacks المعالجة: admin:, um:, nav:, save:, edit:, confirm_delete:, select_edit:, add_patient_name, manage_patients, view_patient_names, delete_patient_name, edit_patient_name
     app.add_handler(
         CallbackQueryHandler(
             handle_unexpected_callback,
-            pattern=r"^(?!admin:|um:|nav:|save:|edit:|confirm_delete:|select_edit:).*"  # يطابق callbacks غير المعالجة
+            pattern=r"^(?!admin:|um:|nav:|save:|edit:|confirm_delete:|select_edit:|add_patient_name$|manage_patients$|view_patient_names$|delete_patient_name$|edit_patient_name$).*"  # يطابق callbacks غير المعالجة
         ),
         group=99  # أولوية منخفضة
     )
