@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 # محاولة تحميل من عدة مواقع محتملة
 config_paths = [
     "config.env",  # المجلد الحالي أولاً
+    "/root/medical-bot-hetzner/config.env",  # مسار Hetzner VPS
     "/home/botuser/medical-bot/temp_upload/config.env",  # مسار السيرفر الرئيسي
     "/home/botuser/medical-bot/config.env",  # مسار بديل
     os.path.join(os.path.dirname(os.path.dirname(__file__)), "config.env"),  # مسار نسبي
