@@ -25,7 +25,16 @@ USE_GROUP_BROADCAST = os.getenv("USE_GROUP_BROADCAST", "true").lower() == "true"
 
 # طباعة معلومات المجموعة عند التحميل (للمساعدة في التشخيص)
 if REPORTS_GROUP_ID:
-    logger.info(f"📢 تم تحميل GROUP_CHAT_ID: {REPORTS_GROUP_ID}")
+    logger.info(f"📢 تم تحميل GROUP_CHAT_ID: {REPORTS_GROUP_ID} (نوع: {type(REPORTS_GROUP_ID).__name__})")
+    # محاولة تحويل إلى int للتحقق
+    try:
+        if isinstance(REPORTS_GROUP_ID, str):
+            test_id = int(REPORTS_GROUP_ID)
+            logger.info(f"✅ GROUP_CHAT_ID صحيح ويمكن تحويله إلى int: {test_id}")
+        else:
+            logger.info(f"✅ GROUP_CHAT_ID من نوع: {type(REPORTS_GROUP_ID).__name__}")
+    except Exception as e:
+        logger.error(f"❌ خطأ في تحويل GROUP_CHAT_ID إلى int: {e}")
 else:
     logger.warning("⚠️ GROUP_CHAT_ID غير محدد - سيتم إرسال التقارير للأدمن فقط!")
 
@@ -51,9 +60,19 @@ async def broadcast_new_report(bot: Bot, report_data: dict):
     if REPORTS_GROUP_ID:
         try:
             # تحويل GROUP_CHAT_ID إلى int إذا كان string
-            group_id = int(REPORTS_GROUP_ID) if isinstance(REPORTS_GROUP_ID, str) and REPORTS_GROUP_ID.lstrip('-').isdigit() else REPORTS_GROUP_ID
+            if isinstance(REPORTS_GROUP_ID, str):
+                # إزالة أي مسافات أو أحرف غير مرغوبة
+                clean_id = REPORTS_GROUP_ID.strip()
+                # التحقق من أن الرقم صحيح (يمكن أن يكون سالباً)
+                if clean_id.lstrip('-').isdigit():
+                    group_id = int(clean_id)
+                else:
+                    logger.error(f"❌ GROUP_CHAT_ID غير صحيح: {REPORTS_GROUP_ID}")
+                    return False, f"GROUP_CHAT_ID غير صحيح: {REPORTS_GROUP_ID}"
+            else:
+                group_id = REPORTS_GROUP_ID
             
-            logger.info(f"📤 محاولة إرسال التقرير للمجموعة: {group_id}")
+            logger.info(f"📤 محاولة إرسال التقرير للمجموعة: {group_id} (نوع: {type(group_id).__name__})")
             
             await bot.send_message(
                 chat_id=group_id,
