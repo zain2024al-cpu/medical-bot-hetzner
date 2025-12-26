@@ -2016,12 +2016,37 @@ async def show_patient_list(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     # ✅ محاولة تحميل الأسماء من الملف أولاً (لضمان عرض الأسماء المحدثة)
     patient_names = []
     try:
-        from db.patient_names_loader import get_patient_names_from_database_or_file
-        # استخدام prefer_database=False لقراءة من الملف مباشرة
-        patient_names = get_patient_names_from_database_or_file(prefer_database=False)
-        logger.info(f"✅ تم تحميل {len(patient_names)} اسم من ملف patient_names.txt")
+        import os
+        # محاولة عدة مسارات محتملة للملف
+        possible_paths = [
+            os.path.join(os.getcwd(), 'data', 'patient_names.txt'),
+            'data/patient_names.txt',
+            '/home/botuser/medical-bot/temp_upload/data/patient_names.txt',
+            '/root/medical-bot-hetzner/data/patient_names.txt',
+        ]
+        
+        file_path = None
+        for path in possible_paths:
+            if os.path.exists(path):
+                file_path = path
+                logger.info(f"✅ تم العثور على ملف patient_names.txt في: {path}")
+                break
+        
+        if file_path:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # استخراج الأسماء (تجاهل التعليقات والأسطر الفارغة)
+            for line in content.split('\n'):
+                line = line.strip()
+                if line and not line.startswith('#'):
+                    patient_names.append(line)
+            
+            logger.info(f"✅ تم تحميل {len(patient_names)} اسم من ملف patient_names.txt")
+        else:
+            logger.warning("⚠️ لم يتم العثور على ملف patient_names.txt في أي من المسارات المحتملة")
     except Exception as e:
-        logger.error(f"❌ خطأ في تحميل الأسماء من الملف: {e}")
+        logger.error(f"❌ خطأ في تحميل الأسماء من الملف: {e}", exc_info=True)
         patient_names = []
     
     # ✅ إذا لم توجد أسماء في الملف، جلب من قاعدة البيانات
