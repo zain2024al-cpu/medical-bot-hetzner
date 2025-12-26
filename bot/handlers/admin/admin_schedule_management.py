@@ -757,6 +757,8 @@ async def handle_add_patient_name(update: Update, context: ContextTypes.DEFAULT_
                 parse_mode=ParseMode.MARKDOWN
             )
             logger.info(f"✅ Message edited successfully. Returning ADD_PATIENT_NAME")
+            # حفظ state في context.user_data للتحقق لاحقاً
+            context.user_data['_conversation_state'] = "ADD_PATIENT_NAME"
             logger.info("=" * 80)
             return "ADD_PATIENT_NAME"
         except Exception as e:
@@ -769,6 +771,8 @@ async def handle_add_patient_name(update: Update, context: ContextTypes.DEFAULT_
                     parse_mode=ParseMode.MARKDOWN
                 )
                 logger.info(f"✅ Message sent via reply. Returning ADD_PATIENT_NAME")
+                # حفظ state في context.user_data للتحقق لاحقاً
+                context.user_data['_conversation_state'] = "ADD_PATIENT_NAME"
                 logger.info("=" * 80)
                 return "ADD_PATIENT_NAME"
             except Exception as e2:
@@ -783,10 +787,12 @@ async def handle_add_patient_name(update: Update, context: ContextTypes.DEFAULT_
 async def handle_patient_name_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة إدخال اسم المريض الجديد"""
     import logging
+    import os
     logger = logging.getLogger(__name__)
     
     logger.info("=" * 80)
     logger.info(f"✅ handle_patient_name_input called! Update ID: {update.update_id}")
+    logger.info(f"📝 Current conversation state: {context.user_data.get('_conversation_state', 'None')}")
     
     if not update.message:
         logger.error("❌ No message in update!")
@@ -855,6 +861,8 @@ async def handle_patient_name_input(update: Update, context: ContextTypes.DEFAUL
         parse_mode=ParseMode.MARKDOWN
     )
     logger.info(f"✅ Success message sent. Ending conversation.")
+    # تنظيف state
+    context.user_data.pop('_conversation_state', None)
     logger.info("=" * 80)
     return ConversationHandler.END
 

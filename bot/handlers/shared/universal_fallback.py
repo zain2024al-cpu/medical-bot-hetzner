@@ -53,22 +53,29 @@ async def _process_unexpected_message(update: Update, context: ContextTypes.DEFA
         # التحقق من أن المستخدم أدمن
         is_user_admin = is_admin(user.id) if user else False
         
-        # إذا كانت الرسالة في محادثة نشطة، تحقق من أنها ليست رسالة عشوائية
-        # إذا كانت رسالة عشوائية في محادثة نشطة، أرسل توجيه سريع
+        # إذا كانت الرسالة في محادثة نشطة (ConversationHandler)، تجاهلها
+        # ConversationHandler يستخدم states مختلفة مثل "ADD_PATIENT_NAME", "EDIT_NAME_INPUT", etc.
+        # يجب أن نتحقق من وجود أي conversation state نشط
+        
+        # التحقق من وجود conversation state من ConversationHandler
+        # ConversationHandler يضبط state في context.user_data
+        # نحتاج للتحقق من وجود أي state نشط
+        
+        # طريقة أفضل: التحقق من وجود بيانات محادثة نشطة
+        # إذا كان هناك أي conversation handler نشط، سيكون هناك state محدد
+        # لكن بما أننا لا نعرف الـ state بالضبط، سنتحقق من وجود بيانات محادثة
+        
+        # تجاهل الرسالة إذا كانت هناك محادثة نشطة (دع ConversationHandler يتعامل معها)
+        # ConversationHandler في group=1، و universal fallback في group=99
+        # لذا ConversationHandler يجب أن يعمل أولاً
+        # لكن للاحتياط، نتجاهل الرسالة إذا كانت تبدو كجزء من محادثة
+        
+        # في الواقع، بما أن ConversationHandler في group أقل (1) من universal fallback (99)
+        # فإن ConversationHandler يجب أن يعمل أولاً
+        # لذا لا نحتاج للتحقق هنا - إذا وصلت الرسالة هنا، فهي غير معالجة
+        # لكن للاحتياط، نتجاهل إذا كان هناك state محدد
         if context.user_data.get('_conversation_state'):
-            # التحقق من أن الرسالة ليست أمراً معروفاً
-            known_commands = ["/start", "/cancel", "/help", "إلغاء", "مساعدة", "help"]
-            if not any(cmd in message_text.lower() for cmd in known_commands):
-                # رسالة عشوائية في محادثة نشطة - أرسل توجيه سريع
-                try:
-                    await update.message.reply_text(
-                        "⚠️ **أنت في محادثة نشطة**\n\n"
-                        "يرجى إكمال العملية الحالية أو استخدام 'إلغاء' للخروج.",
-                        parse_mode="Markdown"
-                    )
-                except:
-                    pass
-            logger.debug(f"📝 Conversation active, message: {message_text[:50]}")
+            logger.debug(f"📝 Conversation active (_conversation_state: {context.user_data.get('_conversation_state')}), ignoring message: {message_text[:50]}")
             return
         
         # معالجة الرسائل العشوائية
