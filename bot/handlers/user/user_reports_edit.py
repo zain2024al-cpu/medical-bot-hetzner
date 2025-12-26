@@ -48,6 +48,7 @@ def medical_action_to_flow_type(medical_action):
         "علاج طبيعي": "rehab_physical",
         "أجهزة تعويضية": "rehab_device",
         "أشعة وفحوصات": "radiology",
+        "تأجيل موعد": "appointment_reschedule",
     }
     
     # البحث المباشر

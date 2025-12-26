@@ -567,7 +567,13 @@ class DepartmentDataManager:
     RADIOLOGY_TYPE, RADIOLOGY_DELIVERY_DATE, RADIOLOGY_TRANSLATOR, RADIOLOGY_CONFIRM
 ) = range(82, 86)
 
-# مسار 11: عودة بعد استخدام الأدوية - تم حذفه
+# مسار 11: تأجيل موعد (86-91)
+(
+    APP_RESCHEDULE_REASON, APP_RESCHEDULE_RETURN_DATE, APP_RESCHEDULE_RETURN_REASON,
+    APP_RESCHEDULE_TRANSLATOR, APP_RESCHEDULE_CONFIRM
+) = range(86, 91)
+
+# مسار 12: عودة بعد استخدام الأدوية - تم حذفه
 
 # =============================
 # دوال مساعدة للأزرار
@@ -670,6 +676,14 @@ STATE_NAMES = {
     # أشعة وفحوصات
     RADIOLOGY_TYPE: "radiology_type",
     RADIOLOGY_DELIVERY_DATE: "radiology_delivery_date",
+    RADIOLOGY_TRANSLATOR: "radiology_translator",
+    RADIOLOGY_CONFIRM: "radiology_confirm",
+    # تأجيل موعد
+    APP_RESCHEDULE_REASON: "app_reschedule_reason",
+    APP_RESCHEDULE_RETURN_DATE: "app_reschedule_return_date",
+    APP_RESCHEDULE_RETURN_REASON: "app_reschedule_return_reason",
+    APP_RESCHEDULE_TRANSLATOR: "app_reschedule_translator",
+    APP_RESCHEDULE_CONFIRM: "app_reschedule_confirm",
 }
 
 # Reverse mapping: state_name -> state constant
@@ -1197,6 +1211,19 @@ async def handle_go_to_state(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 parse_mode="Markdown"
             )
             return NEW_CONSULT_COMPLAINT
+        
+        elif target_state == APP_RESCHEDULE_REASON:
+            try:
+                await query.message.delete()
+            except:
+                pass
+            await query.message.reply_text(
+                "📅 **سبب تأجيل الموعد**\n\n"
+                "يرجى إدخال سبب تأجيل الموعد:",
+                reply_markup=_nav_buttons(show_back=True, previous_state_name="action_type_selection", context=context),
+                parse_mode="Markdown"
+            )
+            return APP_RESCHEDULE_REASON
         
         else:
             logger.warning(f"🔙 GO_TO_STATE: Unknown target state: {target_state}")
@@ -3064,6 +3091,11 @@ def _get_action_routing():
             "flow": start_discharge_flow,
             "pre_process": None
         },
+        "تأجيل موعد": {
+            "state": APP_RESCHEDULE_REASON,
+            "flow": start_appointment_reschedule_flow,
+            "pre_process": None
+        },
     }
 
     # Logging للتحقق من المفاتيح
@@ -3568,6 +3600,7 @@ async def handle_action_type_choice(update: Update, context: ContextTypes.DEFAUL
                 "عملية": "operation",
                 "استشارة أخيرة": "final_consult",
                 "علاج طبيعي وإعادة تأهيل": "rehab_physical",
+                "تأجيل موعد": "appointment_reschedule",
             }
             new_flow_type = action_to_flow_type.get(action_name, "new_consult")
             context.user_data["report_tmp"]["current_flow"] = new_flow_type
@@ -3626,6 +3659,7 @@ async def handle_action_type_choice(update: Update, context: ContextTypes.DEFAUL
             "عملية": "operation",
             "استشارة أخيرة": "final_consult",
             "علاج طبيعي وإعادة تأهيل": "rehab_physical",
+            "تأجيل موعد": "appointment_reschedule",
         }
 
         flow_type = action_to_flow_type.get(action_name, "new_consult")
@@ -6875,6 +6909,189 @@ async def handle_radiology_calendar_day(update: Update, context: ContextTypes.DE
         return RADIOLOGY_DELIVERY_DATE
 
 # =============================
+# مسار 11: تأجيل موعد
+# =============================
+
+async def start_appointment_reschedule_flow(message, context):
+    """بدء مسار تأجيل موعد"""
+    # التأكد من حفظ medical_action و current_flow
+    context.user_data.setdefault("report_tmp", {})["medical_action"] = "تأجيل موعد"
+    context.user_data["report_tmp"]["current_flow"] = "appointment_reschedule"
+    
+    # حفظ الـ state في التاريخ
+    nav_push(context, APP_RESCHEDULE_REASON)
+    
+    # حفظ الحالة يدوياً في user_data للمساعدة في التتبع
+    context.user_data['_conversation_state'] = APP_RESCHEDULE_REASON
+    
+    await message.reply_text(
+        "📅 **سبب تأجيل الموعد**\n\n"
+        "يرجى إدخال سبب تأجيل الموعد:",
+        reply_markup=_nav_buttons(show_back=True, previous_state_name="action_type_selection", context=context),
+        parse_mode="Markdown"
+    )
+    
+    return APP_RESCHEDULE_REASON
+
+async def handle_app_reschedule_reason(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """الحقل 1: سبب تأجيل الموعد"""
+    context.user_data['_conversation_state'] = APP_RESCHEDULE_REASON
+    
+    text = update.message.text.strip()
+    valid, msg = validate_text_input(text, min_length=3, max_length=500)
+
+    if not valid:
+        await update.message.reply_text(
+            f"⚠️ **خطأ: {msg}**\n\n"
+            f"يرجى إدخال سبب تأجيل الموعد:",
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="action_type_selection", context=context),
+            parse_mode="Markdown"
+        )
+        return APP_RESCHEDULE_REASON
+
+    context.user_data.setdefault("report_tmp", {})["app_reschedule_reason"] = text
+    context.user_data["report_tmp"]["current_flow"] = "appointment_reschedule"
+    context.user_data["report_tmp"]["medical_action"] = "تأجيل موعد"
+
+    # الانتقال إلى تاريخ العودة
+    await update.message.reply_text("✅ تم الحفظ")
+    await _render_app_reschedule_calendar(update.message, context)
+    
+    context.user_data['_conversation_state'] = APP_RESCHEDULE_RETURN_DATE
+    return APP_RESCHEDULE_RETURN_DATE
+
+async def _render_app_reschedule_calendar(message, context, year=None, month=None):
+    """عرض تقويم تاريخ العودة"""
+    if year is None or month is None:
+        today = datetime.now().date()
+        year = today.year
+        month = today.month
+    
+    cal = calendar.Calendar(firstweekday=calendar.SATURDAY)
+    weeks = cal.monthdayscalendar(year, month)
+    today = datetime.now().date()
+    
+    keyboard = []
+    
+    # تقويم الشهر مع أزرار التنقل
+    keyboard.append([
+        InlineKeyboardButton("⬅️", callback_data=f"app_reschedule_cal_prev:{year}-{month:02d}"),
+        InlineKeyboardButton(f"{MONTH_NAMES_AR.get(month, month)} {year}", callback_data="noop"),
+        InlineKeyboardButton("➡️", callback_data=f"app_reschedule_cal_next:{year}-{month:02d}"),
+    ])
+    keyboard.append([InlineKeyboardButton(day, callback_data="noop") for day in WEEKDAYS_AR])
+    
+    for week in weeks:
+        row = []
+        for day in week:
+            if day == 0:
+                row.append(InlineKeyboardButton(" ", callback_data="noop"))
+            else:
+                date_str = f"{year}-{month:02d}-{day:02d}"
+                try:
+                    date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
+                    if date_obj < today:
+                        row.append(InlineKeyboardButton(" ", callback_data="noop"))
+                    else:
+                        if date_obj == today:
+                            row.append(InlineKeyboardButton(f"📍{day}", callback_data=f"app_reschedule_cal_day:{date_str}"))
+                        else:
+                            row.append(InlineKeyboardButton(str(day), callback_data=f"app_reschedule_cal_day:{date_str}"))
+                except:
+                    row.append(InlineKeyboardButton(" ", callback_data="noop"))
+        keyboard.append(row)
+    
+    keyboard.append([
+        InlineKeyboardButton("🔙 رجوع", callback_data="go_to_app_reschedule_reason")
+    ])
+    
+    await message.reply_text(
+        "📅 **تاريخ العودة**\n\n"
+        "يرجى اختيار تاريخ العودة:",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode="Markdown"
+    )
+
+async def handle_app_reschedule_calendar_nav(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالج التنقل في تقويم تأجيل الموعد"""
+    query = update.callback_query
+    await query.answer()
+    prefix, ym = query.data.split(":", 1)
+    year, month = map(int, ym.split("-"))
+    if prefix == "app_reschedule_cal_prev":
+        month -= 1
+        if month < 1:
+            month = 12
+            year -= 1
+    elif prefix == "app_reschedule_cal_next":
+        month += 1
+        if month > 12:
+            month = 1
+            year += 1
+    await _render_app_reschedule_calendar(query.message, context, year, month)
+    context.user_data['_conversation_state'] = APP_RESCHEDULE_RETURN_DATE
+    return APP_RESCHEDULE_RETURN_DATE
+
+async def handle_app_reschedule_calendar_day(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالج اختيار تاريخ العودة"""
+    query = update.callback_query
+    await query.answer()
+    date_str = query.data.split(":", 1)[1]
+    try:
+        return_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        context.user_data.setdefault("report_tmp", {})["app_reschedule_return_date"] = return_date
+        context.user_data["report_tmp"]["followup_date"] = return_date
+
+        days_ar = {0: 'الاثنين', 1: 'الثلاثاء', 2: 'الأربعاء', 3: 'الخميس', 4: 'الجمعة', 5: 'السبت', 6: 'الأحد'}
+        day_name = days_ar.get(return_date.weekday(), '')
+        date_display = f"📅 {return_date.strftime('%d')} {MONTH_NAMES_AR.get(return_date.month, return_date.month)} {return_date.year} ({day_name})"
+
+        await query.edit_message_text(
+            f"✅ **تم اختيار التاريخ**\n\n"
+            f"📅 **تاريخ العودة:**\n"
+            f"{date_display}"
+        )
+        
+        # الانتقال إلى سبب العودة
+        await query.message.reply_text(
+            "📝 **سبب العودة**\n\n"
+            "يرجى إدخال سبب العودة:",
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="app_reschedule_return_date", context=context),
+            parse_mode="Markdown"
+        )
+        
+        context.user_data['_conversation_state'] = APP_RESCHEDULE_RETURN_REASON
+        return APP_RESCHEDULE_RETURN_REASON
+    except ValueError:
+        await query.answer("صيغة غير صالحة", show_alert=True)
+        return APP_RESCHEDULE_RETURN_DATE
+
+async def handle_app_reschedule_return_reason(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """الحقل 3: سبب العودة"""
+    context.user_data['_conversation_state'] = APP_RESCHEDULE_RETURN_REASON
+    
+    text = update.message.text.strip()
+    valid, msg = validate_text_input(text, min_length=3, max_length=500)
+
+    if not valid:
+        await update.message.reply_text(
+            f"⚠️ **خطأ: {msg}**\n\n"
+            f"يرجى إدخال سبب العودة:",
+            reply_markup=_nav_buttons(show_back=True, previous_state_name="app_reschedule_return_date", context=context),
+            parse_mode="Markdown"
+        )
+        return APP_RESCHEDULE_RETURN_REASON
+
+    context.user_data.setdefault("report_tmp", {})["app_reschedule_return_reason"] = text
+    context.user_data["report_tmp"]["followup_reason"] = text
+
+    # الانتقال إلى اسم المترجم
+    await ask_translator_name(update.message, context, "appointment_reschedule")
+    
+    context.user_data['_conversation_state'] = APP_RESCHEDULE_TRANSLATOR
+    return APP_RESCHEDULE_TRANSLATOR
+
+# =============================
 # دالة مشتركة: اسم المترجم
 # =============================
 
@@ -7330,6 +7547,7 @@ def get_translator_state(flow_type):
         "new_consult": NEW_CONSULT_TRANSLATOR,
         "followup": FOLLOWUP_TRANSLATOR,
         "surgery_consult": SURGERY_CONSULT_TRANSLATOR,
+        "appointment_reschedule": APP_RESCHEDULE_TRANSLATOR,
         "emergency": EMERGENCY_TRANSLATOR,
         "admission": ADMISSION_TRANSLATOR,
         "operation": OPERATION_TRANSLATOR,
@@ -7347,6 +7565,7 @@ def get_confirm_state(flow_type):
         "new_consult": NEW_CONSULT_CONFIRM,
         "followup": FOLLOWUP_CONFIRM,
         "surgery_consult": SURGERY_CONSULT_CONFIRM,
+        "appointment_reschedule": APP_RESCHEDULE_CONFIRM,
         "emergency": EMERGENCY_CONFIRM,
         "admission": ADMISSION_CONFIRM,
         "operation": OPERATION_CONFIRM,
@@ -7354,6 +7573,7 @@ def get_confirm_state(flow_type):
         "discharge": DISCHARGE_CONFIRM,
         "rehab_physical": PHYSICAL_THERAPY_CONFIRM,
         "device": DEVICE_CONFIRM,
+        "appointment_reschedule": APP_RESCHEDULE_CONFIRM,
         "radiology": RADIOLOGY_CONFIRM
     }
     return states.get(flow_type, NEW_CONSULT_CONFIRM)
@@ -8473,6 +8693,18 @@ async def show_final_summary(message, context, flow_type):
             summary += f"📅 **تاريخ تسليم النتائج:** {date_str}\n"
         else:
             summary += f"📅 **تاريخ تسليم النتائج:** غير محدد\n"
+    elif flow_type == "appointment_reschedule":
+        summary += f"📅 **سبب تأجيل الموعد:** {data.get('app_reschedule_reason', 'غير محدد')}\n"
+        return_date = data.get('app_reschedule_return_date') or data.get('followup_date')
+        if return_date:
+            if hasattr(return_date, 'strftime'):
+                date_str = return_date.strftime('%Y-%m-%d')
+            else:
+                date_str = str(return_date)
+            summary += f"📅 **تاريخ العودة:** {date_str}\n"
+        else:
+            summary += f"📅 **تاريخ العودة:** غير محدد\n"
+        summary += f"📝 **سبب العودة:** {data.get('app_reschedule_return_reason', 'غير محدد')}\n"
     
     elif flow_type == "discharge":
         discharge_type = data.get("discharge_type", "")
@@ -8585,7 +8817,7 @@ async def handle_final_confirm(update: Update, context: ContextTypes.DEFAULT_TYP
     data = context.user_data.get("report_tmp", {})
     current_flow = data.get("current_flow", "")
     if flow_type not in ["new_consult", "followup", "emergency", "admission", "surgery_consult", 
-                         "operation", "final_consult", "discharge", "rehab_physical", "rehab_device", "radiology"]:
+                         "operation", "final_consult", "discharge", "rehab_physical", "rehab_device", "radiology", "appointment_reschedule"]:
         if current_flow:
             flow_type = current_flow
             logger.info(f"💾 Using current_flow from report_tmp: {flow_type}")
@@ -8823,6 +9055,12 @@ async def save_report_to_database(query, context, flow_type):
             # لا يوجد شكوى للمريض في نوع الإجراء "أشعة وفحوصات"
             complaint_text = ""
             decision_text = f"نوع الأشعة والفحوصات: {radiology_type}"
+        elif flow_type == "appointment_reschedule":
+            app_reschedule_reason = data.get("app_reschedule_reason", "")
+            app_reschedule_return_reason = data.get("app_reschedule_return_reason", "")
+            # لا يوجد شكوى للمريض في نوع الإجراء "تأجيل موعد"
+            complaint_text = ""
+            decision_text = f"سبب تأجيل الموعد: {app_reschedule_reason}\n\nسبب العودة: {app_reschedule_return_reason}"
         elif flow_type in ["new_consult", "followup", "emergency"]:
             complaint_text = data.get("complaint", "")
             diagnosis = data.get("diagnosis", "")
@@ -10141,6 +10379,30 @@ def register(app):
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_translator_text),
             ],
             RADIOLOGY_CONFIRM: [
+                CallbackQueryHandler(handle_final_confirm, pattern="^(save|review|publish|back_to_summary|edit):"),
+                CallbackQueryHandler(handle_save_callback, pattern="^save:"),
+            ],
+            # تأجيل موعد
+            APP_RESCHEDULE_REASON: [
+                CallbackQueryHandler(handle_go_to_state, pattern="^go_to_"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_app_reschedule_reason),
+            ],
+            APP_RESCHEDULE_RETURN_DATE: [
+                CallbackQueryHandler(handle_app_reschedule_calendar_nav, pattern="^app_reschedule_cal_(prev|next):"),
+                CallbackQueryHandler(handle_app_reschedule_calendar_day, pattern="^app_reschedule_cal_day:"),
+                CallbackQueryHandler(handle_go_to_state, pattern="^go_to_app_reschedule_reason"),
+            ],
+            APP_RESCHEDULE_RETURN_REASON: [
+                CallbackQueryHandler(handle_go_to_state, pattern="^go_to_"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_app_reschedule_return_reason),
+            ],
+            APP_RESCHEDULE_TRANSLATOR: [
+                CallbackQueryHandler(handle_translator_choice, pattern="^translator:"),
+                CallbackQueryHandler(handle_translator_list_callback, pattern="^translator:(show_list|back_to_menu):"),
+                MessageHandler(filters.TEXT & filters.Regex(r"^__TRANSLATOR_SELECTED__:"), handle_translator_inline_selection),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_translator_text),
+            ],
+            APP_RESCHEDULE_CONFIRM: [
                 CallbackQueryHandler(handle_final_confirm, pattern="^(save|review|publish|back_to_summary|edit):"),
                 CallbackQueryHandler(handle_save_callback, pattern="^save:"),
                 CallbackQueryHandler(handle_edit_field_selection, pattern="^edit_field:"),
