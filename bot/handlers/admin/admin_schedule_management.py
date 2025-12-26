@@ -740,49 +740,123 @@ async def handle_view_patient_names(update: Update, context: ContextTypes.DEFAUL
 
 async def handle_add_patient_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """بدء إضافة اسم مريض جديد"""
-    query = update.callback_query
-    await query.answer()
+    import logging
+    logger = logging.getLogger(__name__)
     
-    await query.edit_message_text(
-        "➕ **إضافة اسم مريض جديد**\n\n"
-        "📝 اكتب الاسم الكامل للمريض:\n"
-        "مثال: أحمد محمد",
-        parse_mode=ParseMode.MARKDOWN
-    )
-    return "ADD_PATIENT_NAME"
+    logger.info("=" * 80)
+    logger.info(f"✅ handle_add_patient_name called! Update ID: {update.update_id}")
+    
+    query = update.callback_query
+    if query:
+        await query.answer()
+        try:
+            await query.edit_message_text(
+                "➕ **إضافة اسم مريض جديد**\n\n"
+                "📝 اكتب الاسم الكامل للمريض:\n"
+                "مثال: أحمد محمد",
+                parse_mode=ParseMode.MARKDOWN
+            )
+            logger.info(f"✅ Message edited successfully. Returning ADD_PATIENT_NAME")
+            logger.info("=" * 80)
+            return "ADD_PATIENT_NAME"
+        except Exception as e:
+            logger.error(f"❌ Error editing message: {e}", exc_info=True)
+            try:
+                await query.message.reply_text(
+                    "➕ **إضافة اسم مريض جديد**\n\n"
+                    "📝 اكتب الاسم الكامل للمريض:\n"
+                    "مثال: أحمد محمد",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+                logger.info(f"✅ Message sent via reply. Returning ADD_PATIENT_NAME")
+                logger.info("=" * 80)
+                return "ADD_PATIENT_NAME"
+            except Exception as e2:
+                logger.error(f"❌ Error sending message: {e2}", exc_info=True)
+                logger.info("=" * 80)
+                return ConversationHandler.END
+    
+    logger.error("❌ No callback query in update!")
+    logger.info("=" * 80)
+    return ConversationHandler.END
 
 async def handle_patient_name_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة إدخال اسم المريض الجديد"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info("=" * 80)
+    logger.info(f"✅ handle_patient_name_input called! Update ID: {update.update_id}")
+    
+    if not update.message:
+        logger.error("❌ No message in update!")
+        return ConversationHandler.END
+    
     name = update.message.text.strip()
+    logger.info(f"✅ Received name: '{name}'")
     
     if not name or len(name) < 2:
+        logger.warning(f"⚠️ Name too short: '{name}'")
         await update.message.reply_text(
             "⚠️ **خطأ:** الاسم قصير جداً\n\n"
-            "يرجى إدخال اسم صحيح:",
+            "يرجى إدخال اسم صحيح (حرفين على الأقل):",
             parse_mode=ParseMode.MARKDOWN
         )
         return "ADD_PATIENT_NAME"
     
     # إضافة الاسم للملف
     try:
-        with open('data/patient_names.txt', 'a', encoding='utf-8') as f:
-            f.write(f"\n{name}")
-        
-        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")]])
-        
-        await update.message.reply_text(
-            f"✅ **تم إضافة الاسم:** {name}\n\n"
-            f"📝 يمكنك إضافة المزيد أو الرجوع للقائمة",
-            reply_markup=keyboard,
-            parse_mode=ParseMode.MARKDOWN
-        )
-        return ConversationHandler.END
-    except Exception as e:
-        await update.message.reply_text(
-            f"❌ **خطأ في الحفظ:** {str(e)}",
-            parse_mode=ParseMode.MARKDOWN
-        )
-        return ConversationHandler.END
+            # التأكد من وجود المجلد
+            os.makedirs('data', exist_ok=True)
+            
+            # قراءة الملف أولاً للتحقق من عدم وجود الاسم مسبقاً
+            existing_names = []
+            try:
+                with open('data/patient_names.txt', 'r', encoding='utf-8') as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith('#'):
+                            existing_names.append(line)
+            except FileNotFoundError:
+                pass
+            
+            # التحقق من عدم وجود الاسم مسبقاً
+            if name in existing_names:
+                logger.warning(f"⚠️ Name '{name}' already exists")
+                await update.message.reply_text(
+                    f"⚠️ **الاسم موجود مسبقاً:** {name}\n\n"
+                    f"يرجى إدخال اسم آخر:",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+                return "ADD_PATIENT_NAME"
+            
+            # إضافة الاسم
+            with open('data/patient_names.txt', 'a', encoding='utf-8') as f:
+                f.write(f"\n{name}")
+            logger.info(f"✅ Name '{name}' added to file successfully")
+        except Exception as e:
+            logger.error(f"❌ Error saving name to file: {e}", exc_info=True)
+            await update.message.reply_text(
+                f"❌ **خطأ في الحفظ:** {str(e)}\n\n"
+                f"يرجى المحاولة مرة أخرى:",
+                parse_mode=ParseMode.MARKDOWN
+            )
+            return "ADD_PATIENT_NAME"
+    
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("➕ إضافة اسم آخر", callback_data="add_patient_name")],
+        [InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")]
+    ])
+    
+    await update.message.reply_text(
+        f"✅ **تم إضافة الاسم بنجاح:** {name}\n\n"
+        f"📝 يمكنك إضافة المزيد أو الرجوع للقائمة",
+        reply_markup=keyboard,
+        parse_mode=ParseMode.MARKDOWN
+    )
+    logger.info(f"✅ Success message sent. Ending conversation.")
+    logger.info("=" * 80)
+    return ConversationHandler.END
 
 async def handle_delete_patient_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """واجهة حذف اسم مريض"""
@@ -958,35 +1032,87 @@ async def handle_edit_patient_name(update: Update, context: ContextTypes.DEFAULT
 
 async def handle_select_edit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة اختيار اسم للتعديل"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info("=" * 80)
+    logger.info(f"✅ handle_select_edit called! Update ID: {update.update_id}")
+    
     query = update.callback_query
+    if not query:
+        logger.error("❌ No callback query in update!")
+        return ConversationHandler.END
+    
     await query.answer()
     
     # استخراج البيانات
-    parts = query.data.split(':', 2)
-    index = int(parts[1])
-    old_name = parts[2]
-    
-    # حفظ في context
-    context.user_data['edit_patient_index'] = index
-    context.user_data['edit_patient_old_name'] = old_name
-    
-    await query.edit_message_text(
-        f"✏️ **تعديل اسم المريض**\n\n"
-        f"📝 **الاسم الحالي:** {old_name}\n\n"
-        f"اكتب الاسم الجديد:",
-        parse_mode=ParseMode.MARKDOWN
-    )
-    
-    return "EDIT_NAME_INPUT"
+    try:
+        parts = query.data.split(':', 2)
+        if len(parts) < 3:
+            logger.error(f"❌ Invalid callback data: {query.data}")
+            await query.edit_message_text("❌ **خطأ:** بيانات غير صحيحة", parse_mode=ParseMode.MARKDOWN)
+            return ConversationHandler.END
+        
+        index = int(parts[1])
+        old_name = parts[2]
+        
+        logger.info(f"✅ Editing name at index {index}: '{old_name}'")
+        
+        # حفظ في context
+        context.user_data['edit_patient_index'] = index
+        context.user_data['edit_patient_old_name'] = old_name
+        
+        try:
+            await query.edit_message_text(
+                f"✏️ **تعديل اسم المريض**\n\n"
+                f"📝 **الاسم الحالي:** {old_name}\n\n"
+                f"اكتب الاسم الجديد:",
+                parse_mode=ParseMode.MARKDOWN
+            )
+            logger.info(f"✅ Message edited successfully. Returning EDIT_NAME_INPUT")
+            logger.info("=" * 80)
+            return "EDIT_NAME_INPUT"
+        except Exception as e:
+            logger.error(f"❌ Error editing message: {e}", exc_info=True)
+            try:
+                await query.message.reply_text(
+                    f"✏️ **تعديل اسم المريض**\n\n"
+                    f"📝 **الاسم الحالي:** {old_name}\n\n"
+                    f"اكتب الاسم الجديد:",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+                logger.info(f"✅ Message sent via reply. Returning EDIT_NAME_INPUT")
+                logger.info("=" * 80)
+                return "EDIT_NAME_INPUT"
+            except Exception as e2:
+                logger.error(f"❌ Error sending message: {e2}", exc_info=True)
+                logger.info("=" * 80)
+                return ConversationHandler.END
+    except ValueError as e:
+        logger.error(f"❌ Error parsing callback data: {e}")
+        await query.edit_message_text("❌ **خطأ:** بيانات غير صحيحة", parse_mode=ParseMode.MARKDOWN)
+        return ConversationHandler.END
 
 async def handle_edit_name_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة إدخال الاسم الجديد للتعديل"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info("=" * 80)
+    logger.info(f"✅ handle_edit_name_input called! Update ID: {update.update_id}")
+    
+    if not update.message:
+        logger.error("❌ No message in update!")
+        return ConversationHandler.END
+    
     new_name = update.message.text.strip()
+    logger.info(f"✅ Received new name: '{new_name}'")
     
     if not new_name or len(new_name) < 2:
+        logger.warning(f"⚠️ Name too short: '{new_name}'")
         await update.message.reply_text(
             "⚠️ **خطأ:** الاسم قصير جداً\n\n"
-            "يرجى إدخال اسم صحيح:",
+            "يرجى إدخال اسم صحيح (حرفين على الأقل):",
             parse_mode=ParseMode.MARKDOWN
         )
         return "EDIT_NAME_INPUT"
@@ -995,61 +1121,88 @@ async def handle_edit_name_input(update: Update, context: ContextTypes.DEFAULT_T
     index = context.user_data.get('edit_patient_index')
     old_name = context.user_data.get('edit_patient_old_name')
     
+    logger.info(f"✅ Editing name at index {index}: '{old_name}' -> '{new_name}'")
+    
     if index is None or old_name is None:
+        logger.error("❌ Missing edit data in context")
         await update.message.reply_text("❌ **خطأ:** لم يتم اختيار اسم للتعديل", parse_mode=ParseMode.MARKDOWN)
         return ConversationHandler.END
     
-    # قراءة الملف
+    # تعديل الاسم في الملف
     try:
-        with open('data/patient_names.txt', 'r', encoding='utf-8') as f:
-            lines = f.readlines()
-    except FileNotFoundError:
-        await update.message.reply_text("❌ **خطأ في القراءة**", parse_mode=ParseMode.MARKDOWN)
-        return
-    
-    # تعديل الاسم
-    new_lines = []
-    names = []
-    for line in lines:
-        stripped = line.strip()
-        if stripped and not stripped.startswith('#'):
-            names.append(stripped)
+            # قراءة الملف
+            with open('data/patient_names.txt', 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+        except FileNotFoundError:
+            logger.error("❌ File not found")
+            await update.message.reply_text("❌ **خطأ في القراءة**", parse_mode=ParseMode.MARKDOWN)
+            return ConversationHandler.END
+        
+        # تعديل الاسم
+        new_lines = []
+        names = []
+        for line in lines:
+            stripped = line.strip()
+            if stripped and not stripped.startswith('#'):
+                names.append(stripped)
+            else:
+                new_lines.append(line)
+        
+        # تعديل الاسم في القائمة
+        if index < len(names) and names[index] == old_name:
+            names[index] = new_name
+            logger.info(f"✅ Name updated in list at index {index}")
         else:
-            new_lines.append(line)
-    
-    # تعديل الاسم في القائمة
-    if index < len(names) and names[index] == old_name:
-        names[index] = new_name
-    
-    # إعادة بناء الملف
-    for name in names:
-        new_lines.append(name + '\n')
-    
-    # حفظ الملف
-    try:
-        with open('data/patient_names.txt', 'w', encoding='utf-8') as f:
-            f.writelines(new_lines)
+            logger.warning(f"⚠️ Name not found at index {index} or name mismatch")
+            # محاولة البحث عن الاسم في القائمة
+            try:
+                actual_index = names.index(old_name)
+                names[actual_index] = new_name
+                logger.info(f"✅ Name found and updated at actual index {actual_index}")
+            except ValueError:
+                logger.error(f"❌ Name '{old_name}' not found in list")
+                await update.message.reply_text(
+                    f"❌ **خطأ:** لم يتم العثور على الاسم '{old_name}'",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+                return ConversationHandler.END
         
-        # مسح البيانات المحفوظة
-        context.user_data.pop('edit_patient_index', None)
-        context.user_data.pop('edit_patient_old_name', None)
+        # إعادة بناء الملف
+        for name in names:
+            new_lines.append(name + '\n')
         
-        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")]])
-        
-        await update.message.reply_text(
-            f"✅ **تم تعديل الاسم بنجاح**\n\n"
-            f"📝 **من:** {old_name}\n"
-            f"📝 **إلى:** {new_name}",
-            reply_markup=keyboard,
-            parse_mode=ParseMode.MARKDOWN
-        )
-        return ConversationHandler.END
-    except Exception as e:
-        await update.message.reply_text(
-            f"❌ **خطأ في الحفظ:** {str(e)}",
-            parse_mode=ParseMode.MARKDOWN
-        )
-        return ConversationHandler.END
+        # حفظ الملف
+        try:
+            with open('data/patient_names.txt', 'w', encoding='utf-8') as f:
+                f.writelines(new_lines)
+            logger.info(f"✅ File saved successfully")
+        except Exception as e:
+            logger.error(f"❌ Error saving file: {e}", exc_info=True)
+            await update.message.reply_text(
+                f"❌ **خطأ في الحفظ:** {str(e)}",
+                parse_mode=ParseMode.MARKDOWN
+            )
+            return ConversationHandler.END
+    
+    # مسح البيانات المحفوظة
+    context.user_data.pop('edit_patient_index', None)
+    context.user_data.pop('edit_patient_old_name', None)
+    
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✏️ تعديل اسم آخر", callback_data="edit_patient_name")],
+        [InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")]
+    ])
+    
+    await update.message.reply_text(
+        f"✅ **تم تعديل الاسم بنجاح**\n\n"
+        f"📝 **من:** {old_name}\n"
+        f"📝 **إلى:** {new_name}",
+        reply_markup=keyboard,
+        parse_mode=ParseMode.MARKDOWN
+    )
+    logger.info(f"✅ Success message sent. Ending conversation.")
+    logger.info("=" * 80)
+    return ConversationHandler.END
 
 def register(app):
     """تسجيل الهاندلرز"""
@@ -1109,11 +1262,9 @@ def register(app):
         allow_reentry=True,  # ✅ السماح بإعادة الدخول للقائمة الرئيسية
     )
     
-    # ✅ تسجيل ConversationHandler في group=0 لضمان الأولوية
-    app.add_handler(conv, group=0)
-    
     # دالة wrapper لإضافة اسم (لحل مشكلة async)
     async def start_add_patient_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        logger.info(f"✅ start_add_patient_name called! Update ID: {update.update_id}")
         return await handle_add_patient_name(update, context)
     
     # ConversationHandler لإدارة الأسماء (إضافة وتعديل)
@@ -1131,21 +1282,24 @@ def register(app):
             ]
         },
         fallbacks=[
-            CallbackQueryHandler(handle_manage_patients, pattern="^manage_patients$")
+            CallbackQueryHandler(handle_manage_patients, pattern="^manage_patients$"),
+            MessageHandler(filters.Regex("^إلغاء$|^الغاء$|^cancel$"), handle_manage_patients)
         ],
         per_chat=True,
         per_user=True,
-        per_message=True,  # ✅ تفعيل per_message لتجنب التحذيرات
-        name="patient_names_conv"
+        per_message=False,  # ✅ تعطيل per_message للسماح بمعالجة الرسائل بشكل صحيح
+        name="patient_names_conv",
+        allow_reentry=True  # ✅ السماح بإعادة الدخول
     )
     
     # إضافة معالجات لأزرار إدارة الأسماء
-    app.add_handler(patient_names_conv)  # تسجيل ConversationHandler أولاً
-    app.add_handler(CallbackQueryHandler(handle_manage_patients, pattern="^manage_patients$"))
-    app.add_handler(CallbackQueryHandler(handle_view_patient_names, pattern="^view_patient_names$"))
-    app.add_handler(CallbackQueryHandler(handle_delete_patient_name, pattern="^delete_patient_name$"))
-    app.add_handler(CallbackQueryHandler(handle_confirm_delete, pattern="^confirm_delete:\\d+:.*"))
-    app.add_handler(CallbackQueryHandler(handle_edit_patient_name, pattern="^edit_patient_name$"))
+    # ✅ تسجيل ConversationHandler في group=1 لتجنب التعارض مع conv
+    app.add_handler(patient_names_conv, group=1)
+    app.add_handler(CallbackQueryHandler(handle_manage_patients, pattern="^manage_patients$"), group=1)
+    app.add_handler(CallbackQueryHandler(handle_view_patient_names, pattern="^view_patient_names$"), group=1)
+    app.add_handler(CallbackQueryHandler(handle_delete_patient_name, pattern="^delete_patient_name$"), group=1)
+    app.add_handler(CallbackQueryHandler(handle_confirm_delete, pattern="^confirm_delete:\\d+:.*"), group=1)
+    app.add_handler(CallbackQueryHandler(handle_edit_patient_name, pattern="^edit_patient_name$"), group=1)
     
-    # ✅ تسجيل ConversationHandler في group=0 لضمان الأولوية
+    # ✅ تسجيل ConversationHandler الرئيسي في group=0 لضمان الأولوية
     app.add_handler(conv, group=0)
