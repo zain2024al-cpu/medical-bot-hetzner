@@ -814,24 +814,32 @@ async def handle_patient_name_input(update: Update, context: ContextTypes.DEFAUL
     try:
         # الحصول على المسار المطلق للملف
         import os
-        # استخدام المسار النسبي من موقع التطبيق (app.py)
-        # app.py في الجذر، لذا data/patient_names.txt يجب أن يكون في نفس المستوى
-        # لكن قد يكون app.py في مجلد مختلف، لذا نستخدم os.getcwd() أو نجد المسار من __file__
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        # الانتقال من bot/handlers/admin/admin_schedule_management.py إلى الجذر
-        # bot/handlers/admin -> bot/handlers -> bot -> root
-        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
-        data_dir = os.path.join(base_dir, 'data')
-        file_path = os.path.join(data_dir, 'patient_names.txt')
+        # طريقة 1: استخدام المسار النسبي من موقع العمل الحالي (app.py)
+        # app.py يعمل من الجذر، لذا data/patient_names.txt يجب أن يكون في نفس المستوى
+        file_path = 'data/patient_names.txt'
+        data_dir = 'data'
         
-        # بديل: استخدام المسار النسبي البسيط (من موقع العمل الحالي)
-        # إذا كان app.py في الجذر، يمكن استخدام 'data/patient_names.txt' مباشرة
-        # لكن للاحتياط، نستخدم المسار المطلق
-        logger.info(f"📁 Current file: {__file__}")
-        logger.info(f"📁 Current dir: {current_dir}")
-        logger.info(f"📁 Base dir: {base_dir}")
-        logger.info(f"📁 Data dir: {data_dir}")
-        logger.info(f"📁 File path: {file_path}")
+        # طريقة 2: حساب المسار المطلق من موقع الملف الحالي (fallback)
+        try:
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            # الانتقال من bot/handlers/admin/admin_schedule_management.py إلى الجذر
+            # bot/handlers/admin -> bot/handlers -> bot -> root
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
+            absolute_data_dir = os.path.join(base_dir, 'data')
+            absolute_file_path = os.path.join(absolute_data_dir, 'patient_names.txt')
+            
+            # استخدام المسار المطلق إذا كان موجوداً
+            if os.path.exists(absolute_data_dir) or os.path.exists(base_dir):
+                file_path = absolute_file_path
+                data_dir = absolute_data_dir
+                logger.info(f"📁 Using absolute path: {file_path}")
+            else:
+                logger.info(f"📁 Using relative path: {file_path}")
+        except Exception as path_error:
+            logger.warning(f"⚠️ Error calculating absolute path: {path_error}, using relative path")
+        
+        logger.info(f"📁 Final file path: {file_path}")
+        logger.info(f"📁 Final data dir: {data_dir}")
         
         # التأكد من وجود المجلد
         os.makedirs(data_dir, exist_ok=True)
