@@ -25,6 +25,15 @@ jobs:
         # التحقق من وجود SSH key
         if [ -z "${{ secrets.SSH_PRIVATE_KEY }}" ]; then
           echo "❌ Error: SSH_PRIVATE_KEY secret is not set"
+          echo ""
+          echo "📋 To fix this issue:"
+          echo "1. Go to: https://github.com/${{ github.repository }}/settings/secrets/actions"
+          echo "2. Click 'New repository secret'"
+          echo "3. Name: SSH_PRIVATE_KEY"
+          echo "4. Value: (Paste your SSH private key)"
+          echo ""
+          echo "💡 The SSH private key should start with: -----BEGIN OPENSSH PRIVATE KEY-----"
+          echo "💡 And end with: -----END OPENSSH PRIVATE KEY-----"
           exit 1
         fi
         
@@ -35,6 +44,12 @@ jobs:
         # التحقق من وجود HETZNER_HOST
         if [ -z "${{ secrets.HETZNER_HOST }}" ]; then
           echo "❌ Error: HETZNER_HOST secret is not set"
+          echo ""
+          echo "📋 To fix this issue:"
+          echo "1. Go to: https://github.com/${{ github.repository }}/settings/secrets/actions"
+          echo "2. Click 'New repository secret'"
+          echo "3. Name: HETZNER_HOST"
+          echo "4. Value: (Your server IP address, e.g., 5.223.58.71)"
           exit 1
         fi
         
