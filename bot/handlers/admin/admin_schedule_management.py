@@ -119,56 +119,145 @@ async def handle_schedule_choice(update: Update, context: ContextTypes.DEFAULT_T
 
 async def upload_schedule_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """رفع صورة الجدول"""
-    if not update.message.photo:
-        await update.message.reply_text("⚠️ يرجى إرسال صورة الجدول.\n\n❌ أو اكتب 'إلغاء' لإنهاء العملية")
-        return UPLOAD_SCHEDULE
+    import logging
+    logger = logging.getLogger(__name__)
     
-    # حفظ الصورة
-    photo = update.message.photo[-1]  # أعلى دقة
-    file = await context.bot.get_file(photo.file_id)
-    
-    # إنشاء مجلد للصور إذا لم يكن موجوداً
-    os.makedirs("uploads/schedules", exist_ok=True)
-    
-    # اسم الملف
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"schedule_{timestamp}.jpg"
-    file_path = f"uploads/schedules/{filename}"
-    
-    # تحميل الصورة
-    await file.download_to_drive(file_path)
-    
-    # حفظ في قاعدة البيانات
-    with SessionLocal() as s:
-        schedule_image = ScheduleImage(
-            file_id=photo.file_id,
-            file_path=file_path,
-            uploader_id=update.effective_user.id
-        )
-        s.add(schedule_image)
-        s.commit()
-        s.refresh(schedule_image)
+    try:
+        if not update.message:
+            logger.error("❌ No message in update")
+            return UPLOAD_SCHEDULE
         
-        context.user_data["schedule_image_id"] = schedule_image.id
-        context.user_data["file_path"] = file_path
-        context.user_data["photo_file_id"] = photo.file_id
-    
-    # تأكيد الرفع
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("✅ تأكيد وحفظ الجدول", callback_data="confirm_schedule")],
-        [InlineKeyboardButton("❌ إلغاء", callback_data="cancel_upload")]
-    ])
-    
-    await update.message.reply_text(
-        f"✅ **تم رفع الجدول بنجاح!**\n\n"
-        f"📁 اسم الملف: {filename}\n"
-        f"📅 التاريخ: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n"
-        f"هل تريد حفظ الجدول في النظام؟",
-        reply_markup=keyboard,
-        parse_mode=ParseMode.MARKDOWN
-    )
-    
-    return CONFIRM_SCHEDULE
+        if not update.message.photo:
+            await update.message.reply_text(
+                "⚠️ **يرجى إرسال صورة الجدول**\n\n"
+                "❌ أو اكتب 'إلغاء' لإنهاء العملية",
+                parse_mode=ParseMode.MARKDOWN
+            )
+            return UPLOAD_SCHEDULE
+        
+        # حفظ الصورة
+        photo = update.message.photo[-1]  # أعلى دقة
+        logger.info(f"✅ Received photo: file_id={photo.file_id}, size={photo.file_size}")
+        
+        # الحصول على الملف
+        try:
+            file = await context.bot.get_file(photo.file_id)
+            logger.info(f"✅ Got file object: {file.file_path}")
+        except Exception as e:
+            logger.error(f"❌ Error getting file: {e}", exc_info=True)
+            await update.message.reply_text(
+                f"❌ **خطأ في الحصول على الصورة:** {str(e)}\n\n"
+                f"يرجى المحاولة مرة أخرى",
+                parse_mode=ParseMode.MARKDOWN
+            )
+            return UPLOAD_SCHEDULE
+        
+        # إنشاء مجلد للصور إذا لم يكن موجوداً (استخدام مسار مطلق)
+        possible_dirs = [
+            os.path.join(os.getcwd(), 'uploads', 'schedules'),
+            'uploads/schedules',
+            '/home/botuser/medical-bot/temp_upload/uploads/schedules',
+            '/root/medical-bot-hetzner/uploads/schedules',
+        ]
+        
+        upload_dir = None
+        for dir_path in possible_dirs:
+            try:
+                os.makedirs(dir_path, exist_ok=True)
+                if os.path.exists(dir_path) and os.access(dir_path, os.W_OK):
+                    upload_dir = dir_path
+                    logger.info(f"✅ Using upload directory: {upload_dir}")
+                    break
+            except Exception as e:
+                logger.warning(f"⚠️ Cannot use directory {dir_path}: {e}")
+                continue
+        
+        if not upload_dir:
+            upload_dir = possible_dirs[0]
+            os.makedirs(upload_dir, exist_ok=True)
+            logger.warning(f"⚠️ Using fallback directory: {upload_dir}")
+        
+        # اسم الملف
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"schedule_{timestamp}.jpg"
+        file_path = os.path.join(upload_dir, filename)
+        
+        # تحميل الصورة
+        try:
+            await file.download_to_drive(file_path)
+            logger.info(f"✅ Downloaded file to: {file_path}")
+            
+            # التحقق من أن الملف تم تحميله
+            if not os.path.exists(file_path):
+                raise Exception("File was not downloaded successfully")
+            
+            file_size = os.path.getsize(file_path)
+            logger.info(f"✅ File size: {file_size} bytes")
+        except Exception as e:
+            logger.error(f"❌ Error downloading file: {e}", exc_info=True)
+            await update.message.reply_text(
+                f"❌ **خطأ في تحميل الصورة:** {str(e)}\n\n"
+                f"يرجى المحاولة مرة أخرى",
+                parse_mode=ParseMode.MARKDOWN
+            )
+            return UPLOAD_SCHEDULE
+        
+        # حفظ في قاعدة البيانات
+        try:
+            with SessionLocal() as s:
+                schedule_image = ScheduleImage(
+                    file_id=photo.file_id,
+                    file_path=file_path,
+                    uploader_id=update.effective_user.id
+                )
+                s.add(schedule_image)
+                s.commit()
+                s.refresh(schedule_image)
+                
+                context.user_data["schedule_image_id"] = schedule_image.id
+                context.user_data["file_path"] = file_path
+                context.user_data["photo_file_id"] = photo.file_id
+                
+                logger.info(f"✅ Saved to database: schedule_image_id={schedule_image.id}")
+        except Exception as e:
+            logger.error(f"❌ Error saving to database: {e}", exc_info=True)
+            await update.message.reply_text(
+                f"❌ **خطأ في حفظ الصورة في قاعدة البيانات:** {str(e)}\n\n"
+                f"يرجى المحاولة مرة أخرى",
+                parse_mode=ParseMode.MARKDOWN
+            )
+            return UPLOAD_SCHEDULE
+        
+        # تأكيد الرفع
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("✅ تأكيد وحفظ الجدول", callback_data="confirm_schedule")],
+            [InlineKeyboardButton("❌ إلغاء", callback_data="cancel_upload")]
+        ])
+        
+        await update.message.reply_text(
+            f"✅ **تم رفع الجدول بنجاح!**\n\n"
+            f"📁 **اسم الملف:** {filename}\n"
+            f"📅 **التاريخ:** {datetime.now().strftime('%Y-%m-%d %H:%M')}\n"
+            f"💾 **حجم الملف:** {file_size / 1024:.2f} KB\n\n"
+            f"هل تريد حفظ الجدول في النظام؟",
+            reply_markup=keyboard,
+            parse_mode=ParseMode.MARKDOWN
+        )
+        
+        return CONFIRM_SCHEDULE
+        
+    except Exception as e:
+        logger.error(f"❌ Unexpected error in upload_schedule_image: {e}", exc_info=True)
+        try:
+            await update.message.reply_text(
+                f"❌ **حدث خطأ غير متوقع**\n\n"
+                f"**الخطأ:** {str(e)}\n\n"
+                f"يرجى المحاولة مرة أخرى أو التواصل مع الدعم الفني",
+                parse_mode=ParseMode.MARKDOWN
+            )
+        except:
+            pass
+        return UPLOAD_SCHEDULE
 
 async def confirm_schedule_save(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """تأكيد حفظ الجدول"""
