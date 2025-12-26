@@ -104,115 +104,80 @@ jobs:
         # إعادة تشغيل البوت على السيرفر
         echo "🔄 Restarting bot on server..."
         
-        # إنشاء سكريبت مؤقت لإعادة التشغيل
-        RESTART_SCRIPT="/tmp/restart-bot-$GITHUB_RUN_ID.sh"
-        cat > $RESTART_SCRIPT << 'RESTART_EOF'
-#!/bin/bash
-set -e
-
-echo "📂 Checking deployment directory..."
-# الانتقال للمجلد
-if [ ! -d ~/medical-bot/temp_upload ]; then
-  echo "❌ Error: Directory ~/medical-bot/temp_upload does not exist"
-  exit 1
-fi
-
-cd ~/medical-bot/temp_upload
-echo "✅ Changed to deployment directory: $(pwd)"
-
-# تفعيل البيئة الافتراضية (إذا كانت موجودة)
-if [ -f venv/bin/activate ]; then
-  source venv/bin/activate
-  echo "✅ Virtual environment activated"
-else
-  echo "⚠️ Warning: venv not found, skipping activation"
-fi
-
-# تثبيت المتطلبات الجديدة (إذا كانت هناك) - لا نخرج عند الفشل
-if [ -f requirements.txt ]; then
-  pip install -r requirements.txt --quiet --upgrade 2>&1 || {
-    echo "⚠️ Warning: Some packages failed to install (continuing anyway)"
-  }
-  echo "✅ Requirements check completed"
-else
-  echo "⚠️ Warning: requirements.txt not found"
-fi
-
-# إعادة تشغيل البوت
-echo "🔄 Restarting medical-bot service..."
-SERVICE_RESTARTED=0
-SERVICE_ERROR=""
-
-# محاولة باستخدام sudo
-echo "🔍 Trying to restart with sudo..."
-if sudo systemctl restart medical-bot 2>&1; then
-  echo "✅ Service restarted using sudo"
-  sleep 5
-  if sudo systemctl is-active --quiet medical-bot; then
-    echo "✅ Service is active"
-    sudo systemctl status medical-bot --no-pager -l 2>&1 | head -20 || true
-    SERVICE_RESTARTED=1
-  else
-    echo "⚠️ Service restarted but not active"
-    SERVICE_ERROR="Service restarted but not active"
-  fi
-else
-  SERVICE_ERROR="Failed to restart with sudo"
-  echo "⚠️ $SERVICE_ERROR"
-fi
-
-# إذا فشل sudo، جرب systemctl --user
-if [ $SERVICE_RESTARTED -eq 0 ]; then
-  echo "🔍 Trying to restart with systemctl --user..."
-  if systemctl --user restart medical-bot 2>&1; then
-    echo "✅ Service restarted using systemctl --user"
-    sleep 5
-    if systemctl --user is-active --quiet medical-bot; then
-      echo "✅ Service is active"
-      systemctl --user status medical-bot --no-pager -l 2>&1 | head -20 || true
-      SERVICE_RESTARTED=1
-    else
-      echo "⚠️ Service restarted but not active"
-      SERVICE_ERROR="Service restarted but not active (user mode)"
-    fi
-  else
-    SERVICE_ERROR="Failed to restart with systemctl --user"
-    echo "⚠️ $SERVICE_ERROR"
-  fi
-fi
-
-# إذا فشل كلاهما، هذا خطأ حرج
-if [ $SERVICE_RESTARTED -eq 0 ]; then
-  echo "❌ Error: Cannot restart service using either method"
-  echo "⚠️ Error details: $SERVICE_ERROR"
-  echo "⚠️ But deployment files were uploaded successfully"
-  echo "💡 You may need to restart the service manually"
-  exit 1
-fi
-
-echo "✅ Deployment completed successfully!"
-RESTART_EOF
-
-        chmod +x $RESTART_SCRIPT
-        
-        # رفع السكريبت وتنفيذه
-        scp -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no -o ConnectTimeout=30 \
-          $RESTART_SCRIPT botuser@${{ secrets.HETZNER_HOST }}:/tmp/restart-bot.sh || {
-          echo "❌ Error: Failed to upload restart script"
-          exit 1
-        }
-        
+        # تنفيذ الأوامر مباشرة على السيرفر
         ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no -o ConnectTimeout=30 \
-          botuser@${{ secrets.HETZNER_HOST }} "bash /tmp/restart-bot.sh && rm -f /tmp/restart-bot.sh" || {
+          botuser@${{ secrets.HETZNER_HOST }} bash -c "
+          set -e
+          echo '📂 Checking deployment directory...'
+          if [ ! -d ~/medical-bot/temp_upload ]; then
+            echo '❌ Error: Directory ~/medical-bot/temp_upload does not exist'
+            exit 1
+          fi
+          cd ~/medical-bot/temp_upload
+          DEPLOY_DIR=\$(pwd)
+          echo '✅ Changed to deployment directory: '\$DEPLOY_DIR
+          if [ -f venv/bin/activate ]; then
+            source venv/bin/activate
+            echo '✅ Virtual environment activated'
+          else
+            echo '⚠️ Warning: venv not found, skipping activation'
+          fi
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt --quiet --upgrade 2>&1 || {
+              echo '⚠️ Warning: Some packages failed to install (continuing anyway)'
+            }
+            echo '✅ Requirements check completed'
+          else
+            echo '⚠️ Warning: requirements.txt not found'
+          fi
+          echo '🔄 Restarting medical-bot service...'
+          SERVICE_RESTARTED=0
+          SERVICE_ERROR=''
+          if sudo systemctl restart medical-bot 2>&1; then
+            echo '✅ Service restarted using sudo'
+            sleep 5
+            if sudo systemctl is-active --quiet medical-bot; then
+              echo '✅ Service is active'
+              sudo systemctl status medical-bot --no-pager -l 2>&1 | head -20 || true
+              SERVICE_RESTARTED=1
+            else
+              echo '⚠️ Service restarted but not active'
+              SERVICE_ERROR='Service restarted but not active'
+            fi
+          else
+            SERVICE_ERROR='Failed to restart with sudo'
+            echo '⚠️ '$SERVICE_ERROR
+          fi
+          if [ $SERVICE_RESTARTED -eq 0 ]; then
+            echo '🔍 Trying to restart with systemctl --user...'
+            if systemctl --user restart medical-bot 2>&1; then
+              echo '✅ Service restarted using systemctl --user'
+              sleep 5
+              if systemctl --user is-active --quiet medical-bot; then
+                echo '✅ Service is active'
+                systemctl --user status medical-bot --no-pager -l 2>&1 | head -20 || true
+                SERVICE_RESTARTED=1
+              else
+                echo '⚠️ Service restarted but not active'
+                SERVICE_ERROR='Service restarted but not active (user mode)'
+              fi
+            else
+              SERVICE_ERROR='Failed to restart with systemctl --user'
+              echo '⚠️ '$SERVICE_ERROR
+            fi
+          fi
+          if [ $SERVICE_RESTARTED -eq 0 ]; then
+            echo '❌ Error: Cannot restart service using either method'
+            echo '⚠️ Error details: '$SERVICE_ERROR
+            echo '⚠️ But deployment files were uploaded successfully'
+            echo '💡 You may need to restart the service manually'
+            exit 1
+          fi
+          echo '✅ Deployment completed successfully!'
+        " || {
           echo "❌ Error: Failed to restart service"
-          # تنظيف السكريبت على السيرفر حتى في حالة الفشل
-          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
-            botuser@${{ secrets.HETZNER_HOST }} "rm -f /tmp/restart-bot.sh" || true
           exit 1
         }
-        
-        # تنظيف السكريبت المؤقت محلياً
-        rm -f $RESTART_SCRIPT
 
     - name: 📊 Deployment Status
       run: |
