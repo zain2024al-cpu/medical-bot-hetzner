@@ -51,20 +51,45 @@ jobs:
         # إعادة تشغيل البوت على السيرفر
         echo "🔄 Restarting bot on server..."
         ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no botuser@${{ secrets.HETZNER_HOST }} << 'EOF'
-          cd ~/medical-bot/temp_upload
+          set -e  # Exit on error
+          
+          cd ~/medical-bot/temp_upload || {
+            echo "❌ Error: Cannot cd to ~/medical-bot/temp_upload"
+            exit 1
+          }
 
-          # تفعيل البيئة الافتراضية
-          source venv/bin/activate || true
+          # تفعيل البيئة الافتراضية (إذا كانت موجودة)
+          if [ -f venv/bin/activate ]; then
+            source venv/bin/activate
+            echo "✅ Virtual environment activated"
+          else
+            echo "⚠️ Warning: venv not found, skipping activation"
+          fi
 
           # تثبيت المتطلبات الجديدة (إذا كانت هناك)
-          pip install -r requirements.txt --quiet --upgrade || true
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt --quiet --upgrade || {
+              echo "⚠️ Warning: Some packages failed to install"
+            }
+            echo "✅ Requirements updated"
+          else
+            echo "⚠️ Warning: requirements.txt not found"
+          fi
 
-          # إعادة تشغيل البوت (باستخدام sudo من root)
-          sudo systemctl restart medical-bot || systemctl --user restart medical-bot || true
-
-          # التحقق من حالة البوت
-          sleep 5
-          sudo systemctl status medical-bot --no-pager -l || systemctl --user status medical-bot --no-pager -l || true
+          # إعادة تشغيل البوت
+          echo "🔄 Restarting medical-bot service..."
+          if sudo systemctl restart medical-bot 2>/dev/null; then
+            echo "✅ Service restarted using sudo"
+            sleep 5
+            sudo systemctl status medical-bot --no-pager -l | head -20 || true
+          elif systemctl --user restart medical-bot 2>/dev/null; then
+            echo "✅ Service restarted using systemctl --user"
+            sleep 5
+            systemctl --user status medical-bot --no-pager -l | head -20 || true
+          else
+            echo "❌ Error: Cannot restart service"
+            exit 1
+          fi
 
           echo "✅ Deployment completed successfully!"
         EOF
