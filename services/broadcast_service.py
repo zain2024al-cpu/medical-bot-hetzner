@@ -89,9 +89,21 @@ async def broadcast_new_report(bot: Bot, report_data: dict):
 
         except Exception as e:
             error_msg = str(e)
+            error_type = type(e).__name__
             logger.error(f"❌ فشل إرسال التقرير للمجموعة {REPORTS_GROUP_ID}: {error_msg}", exc_info=True)
-            logger.error(f"❌ نوع الخطأ: {type(e).__name__}")
+            logger.error(f"❌ نوع الخطأ: {error_type}")
             logger.error(f"❌ تفاصيل الخطأ: {error_msg}")
+            
+            # تحديد نوع الخطأ وإعطاء رسالة واضحة
+            if "Forbidden" in error_msg or "bot was blocked" in error_msg.lower():
+                logger.error(f"❌ البوت محظور أو ليس لديه صلاحيات في المجموعة {REPORTS_GROUP_ID}")
+                logger.error(f"💡 الحل: تأكد من إضافة البوت للمجموعة ومنحه صلاحيات إرسال الرسائل")
+            elif "Chat not found" in error_msg or "chat not found" in error_msg.lower():
+                logger.error(f"❌ المجموعة غير موجودة أو البوت غير عضو فيها: {REPORTS_GROUP_ID}")
+                logger.error(f"💡 الحل: أضف البوت للمجموعة الجديدة: -1002158238388")
+            elif "Bad Request" in error_msg:
+                logger.error(f"❌ خطأ في الطلب - قد يكون GROUP_CHAT_ID غير صحيح: {REPORTS_GROUP_ID}")
+                logger.error(f"💡 الحل: تحقق من GROUP_CHAT_ID في config.env")
             
             # في حالة فشل الإرسال للمجموعة، نرسل للأدمن فقط كاحتياطي
             logger.warning("⚠️ محاولة إرسال للأدمن كاحتياطي")
