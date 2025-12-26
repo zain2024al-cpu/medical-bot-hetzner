@@ -17,103 +17,202 @@ jobs:
 
     - name: 🔐 Setup SSH
       run: |
+        set -e
+        echo "🔐 Setting up SSH connection..."
         mkdir -p ~/.ssh
+        chmod 700 ~/.ssh
+        
+        # التحقق من وجود SSH key
+        if [ -z "${{ secrets.SSH_PRIVATE_KEY }}" ]; then
+          echo "❌ Error: SSH_PRIVATE_KEY secret is not set"
+          exit 1
+        fi
+        
+        # حفظ SSH key
         echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
         chmod 600 ~/.ssh/id_ed25519
-        ssh-keyscan -H ${{ secrets.HETZNER_HOST }} >> ~/.ssh/known_hosts
+        
+        # التحقق من وجود HETZNER_HOST
+        if [ -z "${{ secrets.HETZNER_HOST }}" ]; then
+          echo "❌ Error: HETZNER_HOST secret is not set"
+          exit 1
+        fi
+        
+        # إضافة host key
+        ssh-keyscan -H ${{ secrets.HETZNER_HOST }} >> ~/.ssh/known_hosts 2>&1 || true
+        
+        # اختبار الاتصال
+        echo "🔍 Testing SSH connection..."
+        ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no -o ConnectTimeout=10 botuser@${{ secrets.HETZNER_HOST }} "echo '✅ SSH connection successful'" || {
+          echo "❌ Error: Cannot connect to server"
+          echo "Please check:"
+          echo "  1. SSH_PRIVATE_KEY is correct"
+          echo "  2. HETZNER_HOST is correct"
+          echo "  3. Server is accessible"
+          exit 1
+        }
+        echo "✅ SSH setup completed successfully"
 
     - name: 🚀 Deploy to Hetzner
       run: |
+        set -e
         echo "🚀 Starting deployment to Hetzner VPS..."
         echo "Server: ${{ secrets.HETZNER_HOST }}"
+        echo "Commit: ${GITHUB_SHA}"
 
         # إنشاء مجلد مؤقت للمشروع
         DEPLOY_DIR="/tmp/medical-bot-deploy-$GITHUB_RUN_ID"
         mkdir -p $DEPLOY_DIR
+        echo "✅ Created temporary directory: $DEPLOY_DIR"
 
         # نسخ الملفات (استثناء الملفات غير المطلوبة)
+        echo "📦 Copying files to temporary directory..."
         rsync -av --exclude='.git' --exclude='__pycache__' --exclude='*.pyc' \
           --exclude='venv' --exclude='exports' --exclude='logs' \
           --exclude='.env' --exclude='config.env' \
-          ./ $DEPLOY_DIR/
+          ./ $DEPLOY_DIR/ || {
+          echo "❌ Error: Failed to copy files to temporary directory"
+          exit 1
+        }
+        echo "✅ Files copied successfully"
+
+        # التحقق من وجود rsync
+        if ! command -v rsync &> /dev/null; then
+          echo "❌ Error: rsync is not installed"
+          exit 1
+        fi
 
         # رفع المشروع للسيرفر (إلى المسار الصحيح)
-        echo "📤 Uploading project files..."
+        echo "📤 Uploading project files to server..."
         rsync -avz --delete --exclude='.git' --exclude='__pycache__' \
           --exclude='venv' --exclude='exports' --exclude='logs' \
           --exclude='*.pyc' --exclude='.env' --exclude='config.env' \
-          -e "ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no" \
-          $DEPLOY_DIR/ botuser@${{ secrets.HETZNER_HOST }}:~/medical-bot/temp_upload/
+          -e "ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no -o ConnectTimeout=30" \
+          $DEPLOY_DIR/ botuser@${{ secrets.HETZNER_HOST }}:~/medical-bot/temp_upload/ || {
+          echo "❌ Error: Failed to upload files to server"
+          echo "Please check:"
+          echo "  1. Server path exists: ~/medical-bot/temp_upload/"
+          echo "  2. SSH key has write permissions"
+          echo "  3. Network connection is stable"
+          exit 1
+        }
+        echo "✅ Files uploaded successfully"
 
         # تنظيف المجلد المؤقت
         rm -rf $DEPLOY_DIR
 
         # إعادة تشغيل البوت على السيرفر
         echo "🔄 Restarting bot on server..."
-        ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no botuser@${{ secrets.HETZNER_HOST }} << 'EOF'
-          set +e  # Don't exit on error - we'll handle errors manually
-          
-          # الانتقال للمجلد
-          cd ~/medical-bot/temp_upload
-          if [ $? -ne 0 ]; then
-            echo "❌ Error: Cannot cd to ~/medical-bot/temp_upload"
-            exit 1
-          fi
-          echo "✅ Changed to deployment directory"
+        
+        # إنشاء سكريبت مؤقت لإعادة التشغيل
+        RESTART_SCRIPT="/tmp/restart-bot-$GITHUB_RUN_ID.sh"
+        cat > $RESTART_SCRIPT << 'RESTART_EOF'
+#!/bin/bash
+set -e
 
-          # تفعيل البيئة الافتراضية (إذا كانت موجودة)
-          if [ -f venv/bin/activate ]; then
-            source venv/bin/activate
-            echo "✅ Virtual environment activated"
-          else
-            echo "⚠️ Warning: venv not found, skipping activation"
-          fi
+echo "📂 Checking deployment directory..."
+# الانتقال للمجلد
+if [ ! -d ~/medical-bot/temp_upload ]; then
+  echo "❌ Error: Directory ~/medical-bot/temp_upload does not exist"
+  exit 1
+fi
 
-          # تثبيت المتطلبات الجديدة (إذا كانت هناك) - لا نخرج عند الفشل
-          if [ -f requirements.txt ]; then
-            pip install -r requirements.txt --quiet --upgrade 2>&1
-            if [ $? -eq 0 ]; then
-              echo "✅ Requirements updated"
-            else
-              echo "⚠️ Warning: Some packages failed to install (continuing anyway)"
-            fi
-          else
-            echo "⚠️ Warning: requirements.txt not found"
-          fi
+cd ~/medical-bot/temp_upload
+echo "✅ Changed to deployment directory: $(pwd)"
 
-          # إعادة تشغيل البوت
-          echo "🔄 Restarting medical-bot service..."
-          SERVICE_RESTARTED=0
-          
-          # محاولة باستخدام sudo
-          sudo systemctl restart medical-bot 2>/dev/null
-          if [ $? -eq 0 ]; then
-            echo "✅ Service restarted using sudo"
-            sleep 5
-            sudo systemctl status medical-bot --no-pager -l 2>/dev/null | head -20 || true
-            SERVICE_RESTARTED=1
-          fi
-          
-          # إذا فشل sudo، جرب systemctl --user
-          if [ $SERVICE_RESTARTED -eq 0 ]; then
-            systemctl --user restart medical-bot 2>/dev/null
-            if [ $? -eq 0 ]; then
-              echo "✅ Service restarted using systemctl --user"
-              sleep 5
-              systemctl --user status medical-bot --no-pager -l 2>/dev/null | head -20 || true
-              SERVICE_RESTARTED=1
-            fi
-          fi
-          
-          # إذا فشل كلاهما، هذا خطأ حرج
-          if [ $SERVICE_RESTARTED -eq 0 ]; then
-            echo "❌ Error: Cannot restart service using either method"
-            echo "⚠️ But deployment files were uploaded successfully"
-            exit 0  # نخرج بنجاح لأن الملفات تم رفعها بنجاح
-          fi
+# تفعيل البيئة الافتراضية (إذا كانت موجودة)
+if [ -f venv/bin/activate ]; then
+  source venv/bin/activate
+  echo "✅ Virtual environment activated"
+else
+  echo "⚠️ Warning: venv not found, skipping activation"
+fi
 
-          echo "✅ Deployment completed successfully!"
-        EOF
+# تثبيت المتطلبات الجديدة (إذا كانت هناك) - لا نخرج عند الفشل
+if [ -f requirements.txt ]; then
+  pip install -r requirements.txt --quiet --upgrade 2>&1 || {
+    echo "⚠️ Warning: Some packages failed to install (continuing anyway)"
+  }
+  echo "✅ Requirements check completed"
+else
+  echo "⚠️ Warning: requirements.txt not found"
+fi
+
+# إعادة تشغيل البوت
+echo "🔄 Restarting medical-bot service..."
+SERVICE_RESTARTED=0
+SERVICE_ERROR=""
+
+# محاولة باستخدام sudo
+echo "🔍 Trying to restart with sudo..."
+if sudo systemctl restart medical-bot 2>&1; then
+  echo "✅ Service restarted using sudo"
+  sleep 5
+  if sudo systemctl is-active --quiet medical-bot; then
+    echo "✅ Service is active"
+    sudo systemctl status medical-bot --no-pager -l 2>&1 | head -20 || true
+    SERVICE_RESTARTED=1
+  else
+    echo "⚠️ Service restarted but not active"
+    SERVICE_ERROR="Service restarted but not active"
+  fi
+else
+  SERVICE_ERROR="Failed to restart with sudo"
+  echo "⚠️ $SERVICE_ERROR"
+fi
+
+# إذا فشل sudo، جرب systemctl --user
+if [ $SERVICE_RESTARTED -eq 0 ]; then
+  echo "🔍 Trying to restart with systemctl --user..."
+  if systemctl --user restart medical-bot 2>&1; then
+    echo "✅ Service restarted using systemctl --user"
+    sleep 5
+    if systemctl --user is-active --quiet medical-bot; then
+      echo "✅ Service is active"
+      systemctl --user status medical-bot --no-pager -l 2>&1 | head -20 || true
+      SERVICE_RESTARTED=1
+    else
+      echo "⚠️ Service restarted but not active"
+      SERVICE_ERROR="Service restarted but not active (user mode)"
+    fi
+  else
+    SERVICE_ERROR="Failed to restart with systemctl --user"
+    echo "⚠️ $SERVICE_ERROR"
+  fi
+fi
+
+# إذا فشل كلاهما، هذا خطأ حرج
+if [ $SERVICE_RESTARTED -eq 0 ]; then
+  echo "❌ Error: Cannot restart service using either method"
+  echo "⚠️ Error details: $SERVICE_ERROR"
+  echo "⚠️ But deployment files were uploaded successfully"
+  echo "💡 You may need to restart the service manually"
+  exit 1
+fi
+
+echo "✅ Deployment completed successfully!"
+RESTART_EOF
+
+        chmod +x $RESTART_SCRIPT
+        
+        # رفع السكريبت وتنفيذه
+        scp -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no -o ConnectTimeout=30 \
+          $RESTART_SCRIPT botuser@${{ secrets.HETZNER_HOST }}:/tmp/restart-bot.sh || {
+          echo "❌ Error: Failed to upload restart script"
+          exit 1
+        }
+        
+        ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no -o ConnectTimeout=30 \
+          botuser@${{ secrets.HETZNER_HOST }} "bash /tmp/restart-bot.sh && rm -f /tmp/restart-bot.sh" || {
+          echo "❌ Error: Failed to restart service"
+          # تنظيف السكريبت على السيرفر حتى في حالة الفشل
+          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
+            botuser@${{ secrets.HETZNER_HOST }} "rm -f /tmp/restart-bot.sh" || true
+          exit 1
+        }
+        
+        # تنظيف السكريبت المؤقت محلياً
+        rm -f $RESTART_SCRIPT
 
     - name: 📊 Deployment Status
       run: |
