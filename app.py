@@ -76,6 +76,14 @@ async def main():
     except Exception as e:
         logger.warning(f"⚠️ فشل بدء مراقبة الأداء: {e}")
 
+    # 🛡️ تهيئة نظام المرونة والاستقرار
+    try:
+        from services.resilience_manager import initialize_resilience_system
+        await initialize_resilience_system()
+        logger.info("✅ تم تهيئة نظام المرونة والاستقرار")
+    except Exception as e:
+        logger.warning(f"⚠️ فشل تهيئة نظام المرونة: {e}")
+    
     # 🛡️ إضافة معالج أخطاء شامل
     try:
         from services.error_handler import comprehensive_error_handler

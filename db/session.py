@@ -27,19 +27,21 @@ DATABASE_PATH = os.getenv("DATABASE_PATH", DEFAULT_DB_PATH)
 # Create SQLite URL
 DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
 
-# Create engine with SQLite-specific settings
+# Create engine with SQLite-specific settings - محسّن للأداء العالي والاستقرار
 engine = create_engine(
     DATABASE_URL,
     echo=False,  # Set to True for SQL debugging
     connect_args={
         "check_same_thread": False,  # Allow multi-threading
-        "timeout": 120,  # 120 second timeout - زيادة كبيرة لدعم الضغط العالي و20+ مستخدم
+        "timeout": 180,  # 180 second timeout - زيادة لدعم الضغط العالي جداً
         "isolation_level": None  # Enable autocommit for WAL mode
     },
-    pool_pre_ping=True,  # Verify connections before using
-    pool_recycle=3600,  # Recycle connections after 1 hour
-    pool_size=30,  # Connection pool size - زيادة لدعم 20+ مستخدم
-    max_overflow=20  # Max additional connections - زيادة للضغط العالي
+    pool_pre_ping=True,  # Verify connections before using - مهم للاستقرار
+    pool_recycle=1800,  # Recycle connections after 30 minutes (أسرع من 1 ساعة)
+    pool_size=50,  # Connection pool size - زيادة كبيرة لدعم 50+ مستخدم متزامن
+    max_overflow=30,  # Max additional connections - زيادة للضغط العالي
+    pool_timeout=60,  # Timeout للحصول على connection من pool
+    pool_reset_on_return='commit'  # Reset connections on return for stability
 )
 
 # Create session factory
@@ -223,22 +225,55 @@ def drop_all_tables():
 @contextmanager
 def get_db() -> Generator[Session, None, None]:
     """
-    Get database session with automatic cleanup
+    Get database session with automatic cleanup and resilience
     
     Usage:
         with get_db() as db:
             user = db.query(User).first()
     """
-    session = SessionLocal()
-    try:
-        yield session
-        session.commit()
-    except Exception as e:
-        session.rollback()
-        logger.error(f"❌ Database error: {e}")
-        raise
-    finally:
-        session.close()
+    session = None
+    max_retries = 3
+    retry_delay = 0.5
+    
+    for attempt in range(max_retries):
+        try:
+            session = SessionLocal()
+            yield session
+            session.commit()
+            break  # نجح - اخرج من loop
+        except (OperationalError, DisconnectionError) as e:
+            if session:
+                try:
+                    session.rollback()
+                except:
+                    pass
+                try:
+                    session.close()
+                except:
+                    pass
+            
+            if attempt < max_retries - 1:
+                logger.warning(f"⚠️ Database error (attempt {attempt + 1}/{max_retries}): {e}")
+                import time
+                time.sleep(retry_delay * (attempt + 1))  # Exponential backoff
+                session = None
+            else:
+                logger.error(f"❌ Database error after {max_retries} attempts: {e}")
+                raise
+        except Exception as e:
+            if session:
+                try:
+                    session.rollback()
+                except:
+                    pass
+            logger.error(f"❌ Database error: {e}")
+            raise
+        finally:
+            if session:
+                try:
+                    session.close()
+                except Exception as close_error:
+                    logger.warning(f"⚠️ Error closing session: {close_error}")
 
 
 def get_session() -> Session:
