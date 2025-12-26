@@ -186,6 +186,14 @@ async def handle_user_management_callback(update: Update, context: ContextTypes.
                         return await _show_approved_users(query, context, page=page_num)
                     elif user_type == "suspended":
                         return await _show_suspended_users(query, context, page=page_num)
+                    elif user_type == "search":
+                        # إعادة البحث باستخدام النص المحفوظ
+                        search_text = context.user_data.get("search_text", "")
+                        if search_text:
+                            return await _show_search_results(query, context, search_text, page=page_num)
+                        else:
+                            # إذا لم يكن هناك نص بحث محفوظ، العودة للقائمة الرئيسية
+                            return await _back_to_main(query, context)
             except (ValueError, IndexError) as e:
                 logger.error(f"❌ Error parsing page data: {e}")
         elif data == "noop":
