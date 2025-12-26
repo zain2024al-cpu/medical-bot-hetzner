@@ -283,10 +283,13 @@ def resilient(func: Callable) -> Callable:
     return wrapper
 
 def safe_database_operation(func: Callable) -> Callable:
-    """Decorator للعمليات الآمنة على قاعدة البيانات"""
+    """
+    Decorator للعمليات الآمنة على قاعدة البيانات
+    يستخدم get_db() مباشرة مع retry logic المدمج
+    """
     @wraps(func)
     async def wrapper(*args, **kwargs):
-        # استخدام get_db() مباشرة - يحتوي على retry logic
+        # استخدام get_db() مباشرة - يحتوي على retry logic مدمج
         from db.session import get_db
         import asyncio
         from concurrent.futures import ThreadPoolExecutor
@@ -297,15 +300,22 @@ def safe_database_operation(func: Callable) -> Callable:
         def sync_get_db():
             return get_db()
         
-        # تنفيذ get_db() في thread منفصل
-        db_context = await loop.run_in_executor(executor, sync_get_db)
-        session = db_context.__enter__()
+        # تنفيذ get_db() في thread منفصل (لأنه synchronous)
         try:
-            result = await func(session, *args, **kwargs)
-            db_context.__exit__(None, None, None)
-            return result
+            db_context = await loop.run_in_executor(executor, sync_get_db)
+            session = db_context.__enter__()
+            try:
+                result = await func(session, *args, **kwargs)
+                # commit يتم تلقائياً في __exit__ إذا لم يكن هناك خطأ
+                db_context.__exit__(None, None, None)
+                return result
+            except Exception as e:
+                # rollback يتم تلقائياً في __exit__ عند الخطأ
+                exc_type, exc_val, exc_tb = type(e), e, e.__traceback__
+                db_context.__exit__(exc_type, exc_val, exc_tb)
+                raise
         except Exception as e:
-            db_context.__exit__(type(e), e, None)
+            logger.error(f"❌ Error in safe_database_operation: {e}")
             raise
     return wrapper
 

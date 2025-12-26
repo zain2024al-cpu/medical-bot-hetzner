@@ -191,13 +191,16 @@
 
 ### للمطورين:
 
-1. **استخدام resilient_db_session()**
+1. **استخدام get_db() مباشرة (موصى به)**
    ```python
-   from services.resilience_manager import resilient_db_session
+   from db.session import get_db
    
-   async with resilient_db_session() as session:
+   with get_db() as session:
        # عمليات قاعدة البيانات
+       # get_db() يحتوي على retry logic مدمج
    ```
+   
+   **ملاحظة:** `resilient_db_session()` تم استبداله بـ `get_db()` الذي يحتوي على retry logic مدمج
 
 2. **استخدام retry_with_backoff()**
    ```python
