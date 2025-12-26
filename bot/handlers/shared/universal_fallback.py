@@ -57,25 +57,26 @@ async def _process_unexpected_message(update: Update, context: ContextTypes.DEFA
         # ConversationHandler يستخدم states مختلفة مثل "ADD_PATIENT_NAME", "EDIT_NAME_INPUT", etc.
         # يجب أن نتحقق من وجود أي conversation state نشط
         
-        # التحقق من وجود conversation state من ConversationHandler
+        # التحقق من وجود conversation state نشط
         # ConversationHandler يضبط state في context.user_data
         # نحتاج للتحقق من وجود أي state نشط
         
         # طريقة أفضل: التحقق من وجود بيانات محادثة نشطة
         # إذا كان هناك أي conversation handler نشط، سيكون هناك state محدد
-        # لكن بما أننا لا نعرف الـ state بالضبط، سنتحقق من وجود بيانات محادثة
-        
-        # تجاهل الرسالة إذا كانت هناك محادثة نشطة (دع ConversationHandler يتعامل معها)
-        # ConversationHandler في group=1، و universal fallback في group=99
+        # ConversationHandler في group=0، و universal fallback في group=99
         # لذا ConversationHandler يجب أن يعمل أولاً
         # لكن للاحتياط، نتجاهل الرسالة إذا كانت تبدو كجزء من محادثة
         
-        # في الواقع، بما أن ConversationHandler في group أقل (1) من universal fallback (99)
-        # فإن ConversationHandler يجب أن يعمل أولاً
-        # لذا لا نحتاج للتحقق هنا - إذا وصلت الرسالة هنا، فهي غير معالجة
-        # لكن للاحتياط، نتجاهل إذا كان هناك state محدد
-        if context.user_data.get('_conversation_state'):
-            logger.debug(f"📝 Conversation active (_conversation_state: {context.user_data.get('_conversation_state')}), ignoring message: {message_text[:50]}")
+        # التحقق من وجود conversation state
+        conversation_state = context.user_data.get('_conversation_state')
+        if conversation_state:
+            logger.debug(f"📝 Conversation active (_conversation_state: {conversation_state}), ignoring message: {message_text[:50]}")
+            return
+        
+        # التحقق من وجود states محتملة أخرى لـ ConversationHandler
+        # بعض ConversationHandlers قد تستخدم states مختلفة
+        if any(key in context.user_data for key in ['waiting_for_patient_name', 'edit_patient_old_name', '_state']):
+            logger.debug(f"📝 Conversation active (other state indicators), ignoring message: {message_text[:50]}")
             return
         
         # معالجة الرسائل العشوائية

@@ -812,19 +812,34 @@ async def handle_patient_name_input(update: Update, context: ContextTypes.DEFAUL
     
     # إضافة الاسم للملف
     try:
+        # الحصول على المسار المطلق للملف
+        import os
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        data_dir = os.path.join(base_dir, 'data')
+        file_path = os.path.join(data_dir, 'patient_names.txt')
+        
+        logger.info(f"📁 File path: {file_path}")
+        logger.info(f"📁 Base dir: {base_dir}")
+        logger.info(f"📁 Data dir: {data_dir}")
+        
         # التأكد من وجود المجلد
-        os.makedirs('data', exist_ok=True)
+        os.makedirs(data_dir, exist_ok=True)
+        logger.info(f"✅ Data directory created/verified: {data_dir}")
         
         # قراءة الملف أولاً للتحقق من عدم وجود الاسم مسبقاً
         existing_names = []
         try:
-            with open('data/patient_names.txt', 'r', encoding='utf-8') as f:
-                for line in f:
-                    line = line.strip()
-                    if line and not line.startswith('#'):
-                        existing_names.append(line)
-        except FileNotFoundError:
-            pass
+            if os.path.exists(file_path):
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith('#'):
+                            existing_names.append(line)
+                logger.info(f"📋 Loaded {len(existing_names)} existing names from file")
+            else:
+                logger.info(f"📋 File doesn't exist yet, will create new file")
+        except Exception as e:
+            logger.error(f"❌ Error reading file: {e}", exc_info=True)
         
         # التحقق من عدم وجود الاسم مسبقاً
         if name in existing_names:
@@ -837,9 +852,20 @@ async def handle_patient_name_input(update: Update, context: ContextTypes.DEFAUL
             return "ADD_PATIENT_NAME"
         
         # إضافة الاسم
-        with open('data/patient_names.txt', 'a', encoding='utf-8') as f:
-            f.write(f"\n{name}")
-        logger.info(f"✅ Name '{name}' added to file successfully")
+        with open(file_path, 'a', encoding='utf-8') as f:
+            # إذا كان الملف فارغاً أو جديداً، لا نضيف newline في البداية
+            if existing_names or os.path.getsize(file_path) > 0:
+                f.write(f"\n{name}")
+            else:
+                f.write(name)
+        logger.info(f"✅ Name '{name}' added to file successfully at: {file_path}")
+        
+        # التحقق من أن الملف تم حفظه
+        if os.path.exists(file_path):
+            file_size = os.path.getsize(file_path)
+            logger.info(f"✅ File exists and size is: {file_size} bytes")
+        else:
+            logger.error(f"❌ File was not created at: {file_path}")
     except Exception as e:
         logger.error(f"❌ Error saving name to file: {e}", exc_info=True)
         await update.message.reply_text(
@@ -1301,8 +1327,8 @@ def register(app):
     )
     
     # إضافة معالجات لأزرار إدارة الأسماء
-    # ✅ تسجيل ConversationHandler في group=1 لتجنب التعارض مع conv
-    app.add_handler(patient_names_conv, group=1)
+    # ✅ تسجيل ConversationHandler في group=0 لضمان الأولوية (قبل universal fallback في group=99)
+    app.add_handler(patient_names_conv, group=0)
     app.add_handler(CallbackQueryHandler(handle_manage_patients, pattern="^manage_patients$"), group=1)
     app.add_handler(CallbackQueryHandler(handle_view_patient_names, pattern="^view_patient_names$"), group=1)
     app.add_handler(CallbackQueryHandler(handle_delete_patient_name, pattern="^delete_patient_name$"), group=1)
