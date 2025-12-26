@@ -814,13 +814,24 @@ async def handle_patient_name_input(update: Update, context: ContextTypes.DEFAUL
     try:
         # الحصول على المسار المطلق للملف
         import os
-        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        # استخدام المسار النسبي من موقع التطبيق (app.py)
+        # app.py في الجذر، لذا data/patient_names.txt يجب أن يكون في نفس المستوى
+        # لكن قد يكون app.py في مجلد مختلف، لذا نستخدم os.getcwd() أو نجد المسار من __file__
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        # الانتقال من bot/handlers/admin/admin_schedule_management.py إلى الجذر
+        # bot/handlers/admin -> bot/handlers -> bot -> root
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
         data_dir = os.path.join(base_dir, 'data')
         file_path = os.path.join(data_dir, 'patient_names.txt')
         
-        logger.info(f"📁 File path: {file_path}")
+        # بديل: استخدام المسار النسبي البسيط (من موقع العمل الحالي)
+        # إذا كان app.py في الجذر، يمكن استخدام 'data/patient_names.txt' مباشرة
+        # لكن للاحتياط، نستخدم المسار المطلق
+        logger.info(f"📁 Current file: {__file__}")
+        logger.info(f"📁 Current dir: {current_dir}")
         logger.info(f"📁 Base dir: {base_dir}")
         logger.info(f"📁 Data dir: {data_dir}")
+        logger.info(f"📁 File path: {file_path}")
         
         # التأكد من وجود المجلد
         os.makedirs(data_dir, exist_ok=True)
