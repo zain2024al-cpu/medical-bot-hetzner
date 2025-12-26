@@ -765,33 +765,63 @@ async def handle_manage_patients(update: Update, context: ContextTypes.DEFAULT_T
     )
     return SCHEDULE_MENU
 
-async def handle_view_patient_names(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """عرض أسماء المرضى من الملف"""
+async def handle_view_patient_names(update: Update, context: ContextTypes.DEFAULT_TYPE, page: int = 0):
+    """عرض أسماء المرضى من الملف مع pagination"""
     query = update.callback_query
-    await query.answer()
+    if query:
+        await query.answer()
     
     # ✅ قراءة الأسماء من الملف مباشرة
     names = read_patient_names_from_file()
     
     if not names:
         text = "📋 **قائمة أسماء المرضى**\n\n⚠️ لا توجد أسماء مسجلة"
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")]
+        ])
     else:
-        text = f"📋 **قائمة أسماء المرضى**\n\n📊 **العدد:** {len(names)}\n\n"
-        for i, name in enumerate(names[:30], 1):  # أول 30 اسم
+        items_per_page = 20
+        total_pages = max(1, (len(names) + items_per_page - 1) // items_per_page)
+        page = max(0, min(page, total_pages - 1))
+        
+        start_idx = page * items_per_page
+        end_idx = min(start_idx + items_per_page, len(names))
+        names_page = names[start_idx:end_idx]
+        
+        text = f"📋 **قائمة أسماء المرضى**\n\n"
+        text += f"📊 **العدد الإجمالي:** {len(names)} مريض\n"
+        text += f"📄 **الصفحة:** {page + 1} من {total_pages}\n\n"
+        
+        for i, name in enumerate(names_page, start=start_idx + 1):
             text += f"{i}. {name}\n"
         
-        if len(names) > 30:
-            text += f"\n... و {len(names) - 30} اسم آخر"
+        keyboard = []
+        nav_buttons = []
+        if page > 0:
+            nav_buttons.append(InlineKeyboardButton("⬅️ السابق", callback_data=f"view_patients_page:{page-1}"))
+        if page < total_pages - 1:
+            nav_buttons.append(InlineKeyboardButton("التالي ➡️", callback_data=f"view_patients_page:{page+1}"))
+        
+        if nav_buttons:
+            keyboard.append(nav_buttons)
+        
+        keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")])
     
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")]
-    ])
-    
-    await query.edit_message_text(
-        text,
-        reply_markup=keyboard,
-        parse_mode=ParseMode.MARKDOWN
-    )
+    try:
+        if query:
+            await query.edit_message_text(
+                text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode=ParseMode.MARKDOWN
+            )
+        else:
+            await update.message.reply_text(
+                text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode=ParseMode.MARKDOWN
+            )
+    except Exception as e:
+        logger.error(f"❌ Error displaying patient names: {e}", exc_info=True)
 
 async def handle_add_patient_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """بدء إضافة اسم مريض جديد"""
@@ -914,138 +944,203 @@ async def handle_patient_name_input(update: Update, context: ContextTypes.DEFAUL
     logger.info("=" * 80)
     return ConversationHandler.END
 
-async def handle_delete_patient_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """واجهة حذف اسم مريض"""
+async def handle_delete_patient_name(update: Update, context: ContextTypes.DEFAULT_TYPE, page: int = 0):
+    """واجهة حذف اسم مريض مع pagination"""
     query = update.callback_query
-    await query.answer()
+    if query:
+        await query.answer()
     
-    # ✅ قراءة الأسماء من الملف
-    names = read_patient_names_from_file()
-    
-    if not names:
+    try:
+        # ✅ قراءة الأسماء من الملف
+        names = read_patient_names_from_file()
+        
+        if not names:
+            await query.edit_message_text(
+                "⚠️ **لا توجد أسماء لحذفها**",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")]]),
+                parse_mode=ParseMode.MARKDOWN
+            )
+            return
+        
+        # Pagination
+        items_per_page = 10
+        total_pages = max(1, (len(names) + items_per_page - 1) // items_per_page)
+        page = max(0, min(page, total_pages - 1))
+        
+        start_idx = page * items_per_page
+        end_idx = min(start_idx + items_per_page, len(names))
+        names_page = names[start_idx:end_idx]
+        
+        # عرض الأسماء مع أزرار حذف
+        keyboard = []
+        for i, name in enumerate(names_page):
+            actual_index = start_idx + i
+            keyboard.append([InlineKeyboardButton(
+                f"🗑️ {name}",
+                callback_data=f"confirm_delete:{actual_index}:{name}"
+            )])
+        
+        # أزرار التنقل
+        nav_buttons = []
+        if page > 0:
+            nav_buttons.append(InlineKeyboardButton("⬅️ السابق", callback_data=f"delete_patients_page:{page-1}"))
+        if page < total_pages - 1:
+            nav_buttons.append(InlineKeyboardButton("التالي ➡️", callback_data=f"delete_patients_page:{page+1}"))
+        
+        if nav_buttons:
+            keyboard.append(nav_buttons)
+        
+        keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")])
+        
+        text = f"🗑️ **حذف اسم مريض**\n\n"
+        text += f"📊 **العدد الإجمالي:** {len(names)} مريض\n"
+        text += f"📄 **الصفحة:** {page + 1} من {total_pages}\n\n"
+        text += f"اختر الاسم المراد حذفه:"
+        
         await query.edit_message_text(
-            "⚠️ **لا توجد أسماء لحذفها**",
+            text,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode=ParseMode.MARKDOWN
+        )
+    except Exception as e:
+        logger.error(f"❌ Error in handle_delete_patient_name: {e}", exc_info=True)
+        await query.edit_message_text(
+            f"❌ **حدث خطأ غير متوقع**\n\n{str(e)}",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")]]),
             parse_mode=ParseMode.MARKDOWN
         )
-        return
-    
-    # عرض الأسماء مع أزرار حذف (أول 10 فقط لتجنب مشاكل الكيبورد الكبير)
-    keyboard = []
-    for i, name in enumerate(names[:10]):
-        keyboard.append([InlineKeyboardButton(
-            f"🗑️ {name}",
-            callback_data=f"confirm_delete:{i}:{name}"
-        )])
-    
-    if len(names) > 10:
-        keyboard.append([InlineKeyboardButton(
-            f"⚠️ عرض {len(names) - 10} اسم آخر...",
-            callback_data="delete_page_2"
-        )])
-    
-    keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")])
-    
-    await query.edit_message_text(
-        f"🗑️ **حذف اسم مريض**\n\n"
-        f"📊 **العدد:** {len(names)}\n\n"
-        f"اختر الاسم المراد حذفه:",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode=ParseMode.MARKDOWN
-    )
 
 async def handle_confirm_delete(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """تأكيد حذف اسم مريض"""
     query = update.callback_query
     await query.answer()
     
-    # استخراج البيانات
-    parts = query.data.split(':', 2)
-    # تحقق مما إذا كان parts[1] رقمياً قبل التحويل
-    if len(parts) < 2 or not parts[1].isdigit():
-        # إذا لم يكن رقمياً، قم بمعالجة الخطأ أو تجاهله
-        logger.warning(f"Received non-digit index for delete confirmation: {query.data}")
-        await query.edit_message_text("❌ خطأ: طلب حذف غير صالح.")
-        return ConversationHandler.END
-    index = int(parts[1])
-    name_to_delete = parts[2]
-    
-    # ✅ قراءة الأسماء من الملف
-    names = read_patient_names_from_file()
-    
-    # حذف الاسم من القائمة
-    if index < len(names) and names[index] == name_to_delete:
-        names.pop(index)
-        logger.info(f"✅ Name '{name_to_delete}' removed from list at index {index}")
-    else:
-        # محاولة البحث عن الاسم في القائمة
-        try:
-            actual_index = names.index(name_to_delete)
-            names.pop(actual_index)
-            logger.info(f"✅ Name '{name_to_delete}' found and removed at actual index {actual_index}")
-        except ValueError:
-            logger.error(f"❌ Name '{name_to_delete}' not found in list")
+    try:
+        # استخراج البيانات
+        parts = query.data.split(':', 2)
+        # تحقق مما إذا كان parts[1] رقمياً قبل التحويل
+        if len(parts) < 3 or not parts[1].isdigit():
+            logger.warning(f"Received invalid delete confirmation: {query.data}")
             await query.edit_message_text(
-                f"❌ **خطأ:** لم يتم العثور على الاسم '{name_to_delete}'",
+                "❌ **خطأ:** طلب حذف غير صالح",
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")]]),
                 parse_mode=ParseMode.MARKDOWN
             )
             return
-    
-    # ✅ حفظ الملف مع الحفاظ على التعليقات
-    if write_patient_names_to_file(names):
+        
+        index = int(parts[1])
+        name_to_delete = parts[2]
+        
+        # ✅ قراءة الأسماء من الملف
+        names = read_patient_names_from_file()
+        
+        # حذف الاسم من القائمة
+        if index < len(names) and names[index] == name_to_delete:
+            names.pop(index)
+            logger.info(f"✅ Name '{name_to_delete}' removed from list at index {index}")
+        else:
+            # محاولة البحث عن الاسم في القائمة
+            try:
+                actual_index = names.index(name_to_delete)
+                names.pop(actual_index)
+                logger.info(f"✅ Name '{name_to_delete}' found and removed at actual index {actual_index}")
+            except ValueError:
+                logger.error(f"❌ Name '{name_to_delete}' not found in list")
+                await query.edit_message_text(
+                    f"❌ **خطأ:** لم يتم العثور على الاسم '{name_to_delete}'",
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")]]),
+                    parse_mode=ParseMode.MARKDOWN
+                )
+                return
+        
+        # ✅ حفظ الملف مع الحفاظ على التعليقات
+        if write_patient_names_to_file(names):
+            await query.edit_message_text(
+                f"✅ **تم حذف الاسم بنجاح**\n\n"
+                f"📝 **الاسم المحذوف:** {name_to_delete}\n"
+                f"📊 **عدد الأسماء المتبقية:** {len(names)}",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")]]),
+                parse_mode=ParseMode.MARKDOWN
+            )
+        else:
+            await query.edit_message_text(
+                f"❌ **خطأ في الحفظ**",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")]]),
+                parse_mode=ParseMode.MARKDOWN
+            )
+    except Exception as e:
+        logger.error(f"❌ Error in handle_confirm_delete: {e}", exc_info=True)
         await query.edit_message_text(
-            f"✅ **تم حذف الاسم:** {name_to_delete}\n\n"
-            f"📊 **عدد الأسماء المتبقية:** {len(names)}",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")]]),
-            parse_mode=ParseMode.MARKDOWN
-        )
-    else:
-        await query.edit_message_text(
-            f"❌ **خطأ في الحفظ**",
+            f"❌ **حدث خطأ غير متوقع**\n\n{str(e)}",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")]]),
             parse_mode=ParseMode.MARKDOWN
         )
 
-async def handle_edit_patient_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """واجهة تعديل اسم مريض"""
+async def handle_edit_patient_name(update: Update, context: ContextTypes.DEFAULT_TYPE, page: int = 0):
+    """واجهة تعديل اسم مريض مع pagination"""
     query = update.callback_query
-    await query.answer()
+    if query:
+        await query.answer()
     
-    # ✅ قراءة الأسماء من الملف
-    names = read_patient_names_from_file()
-    
-    if not names:
+    try:
+        # ✅ قراءة الأسماء من الملف
+        names = read_patient_names_from_file()
+        
+        if not names:
+            await query.edit_message_text(
+                "⚠️ **لا توجد أسماء لتعديلها**",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")]]),
+                parse_mode=ParseMode.MARKDOWN
+            )
+            return
+        
+        # Pagination
+        items_per_page = 10
+        total_pages = max(1, (len(names) + items_per_page - 1) // items_per_page)
+        page = max(0, min(page, total_pages - 1))
+        
+        start_idx = page * items_per_page
+        end_idx = min(start_idx + items_per_page, len(names))
+        names_page = names[start_idx:end_idx]
+        
+        # عرض الأسماء مع أزرار تعديل
+        keyboard = []
+        for i, name in enumerate(names_page):
+            actual_index = start_idx + i
+            keyboard.append([InlineKeyboardButton(
+                f"✏️ {name}",
+                callback_data=f"select_edit:{actual_index}:{name}"
+            )])
+        
+        # أزرار التنقل
+        nav_buttons = []
+        if page > 0:
+            nav_buttons.append(InlineKeyboardButton("⬅️ السابق", callback_data=f"edit_patients_page:{page-1}"))
+        if page < total_pages - 1:
+            nav_buttons.append(InlineKeyboardButton("التالي ➡️", callback_data=f"edit_patients_page:{page+1}"))
+        
+        if nav_buttons:
+            keyboard.append(nav_buttons)
+        
+        keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")])
+        
+        text = f"✏️ **تعديل اسم مريض**\n\n"
+        text += f"📊 **العدد الإجمالي:** {len(names)} مريض\n"
+        text += f"📄 **الصفحة:** {page + 1} من {total_pages}\n\n"
+        text += f"اختر الاسم المراد تعديله:"
+        
         await query.edit_message_text(
-            "⚠️ **لا توجد أسماء لتعديلها**",
+            text,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode=ParseMode.MARKDOWN
+        )
+    except Exception as e:
+        logger.error(f"❌ Error in handle_edit_patient_name: {e}", exc_info=True)
+        await query.edit_message_text(
+            f"❌ **حدث خطأ غير متوقع**\n\n{str(e)}",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")]]),
             parse_mode=ParseMode.MARKDOWN
         )
-        return
-    
-    # عرض الأسماء مع أزرار تعديل (أول 10 فقط)
-    keyboard = []
-    for i, name in enumerate(names[:10]):
-        keyboard.append([InlineKeyboardButton(
-            f"✏️ {name}",
-            callback_data=f"select_edit:{i}:{name}"
-        )])
-    
-    if len(names) > 10:
-        keyboard.append([InlineKeyboardButton(
-            f"⚠️ عرض {len(names) - 10} اسم آخر...",
-            callback_data="edit_page_2"
-        )])
-    
-    keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")])
-    
-    await query.edit_message_text(
-        f"✏️ **تعديل اسم مريض**\n\n"
-        f"📊 **العدد:** {len(names)}\n\n"
-        f"اختر الاسم المراد تعديله:",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode=ParseMode.MARKDOWN
-    )
 
 async def handle_select_edit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة اختيار اسم للتعديل"""
@@ -1298,12 +1393,37 @@ def register(app):
     
     # إضافة معالجات لأزرار إدارة الأسماء
     # ✅ تسجيل ConversationHandler في group=0 لضمان الأولوية (قبل universal fallback في group=99)
+    # معالجات pagination
+    async def handle_view_patients_page(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """معالجة pagination لعرض الأسماء"""
+        query = update.callback_query
+        await query.answer()
+        page = int(query.data.split(':')[1])
+        return await handle_view_patient_names(update, context, page)
+    
+    async def handle_delete_patients_page(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """معالجة pagination لحذف الأسماء"""
+        query = update.callback_query
+        await query.answer()
+        page = int(query.data.split(':')[1])
+        return await handle_delete_patient_name(update, context, page)
+    
+    async def handle_edit_patients_page(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """معالجة pagination لتعديل الأسماء"""
+        query = update.callback_query
+        await query.answer()
+        page = int(query.data.split(':')[1])
+        return await handle_edit_patient_name(update, context, page)
+    
     app.add_handler(patient_names_conv, group=0)
     app.add_handler(CallbackQueryHandler(handle_manage_patients, pattern="^manage_patients$"), group=1)
     app.add_handler(CallbackQueryHandler(handle_view_patient_names, pattern="^view_patient_names$"), group=1)
+    app.add_handler(CallbackQueryHandler(handle_view_patients_page, pattern="^view_patients_page:(\\d+)$"), group=1)
     app.add_handler(CallbackQueryHandler(handle_delete_patient_name, pattern="^delete_patient_name$"), group=1)
+    app.add_handler(CallbackQueryHandler(handle_delete_patients_page, pattern="^delete_patients_page:(\\d+)$"), group=1)
     app.add_handler(CallbackQueryHandler(handle_confirm_delete, pattern="^confirm_delete:\\d+:.*"), group=1)
     app.add_handler(CallbackQueryHandler(handle_edit_patient_name, pattern="^edit_patient_name$"), group=1)
+    app.add_handler(CallbackQueryHandler(handle_edit_patients_page, pattern="^edit_patients_page:(\\d+)$"), group=1)
     
     # ✅ تسجيل ConversationHandler الرئيسي في group=0 لضمان الأولوية
     app.add_handler(conv, group=0)
