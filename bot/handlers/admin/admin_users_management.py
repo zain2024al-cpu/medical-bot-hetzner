@@ -82,11 +82,24 @@ def _main_kb():
         [InlineKeyboardButton("❌ إلغاء", callback_data="um:cancel")]
     ])
 
-def _users_kb(users, user_type="all"):
-    """لوحة مفاتيح المستخدمين"""
+def _users_kb(users, user_type="all", page=0, users_per_page=10):
+    """لوحة مفاتيح المستخدمين مع pagination"""
     buttons = []
     
-    for user in users[:10]:  # حد أقصى 10 مستخدمين
+    # حساب عدد الصفحات
+    total_users = len(users)
+    total_pages = (total_users + users_per_page - 1) // users_per_page if total_users > 0 else 1
+    
+    # التأكد من أن رقم الصفحة صحيح
+    page = max(0, min(page, total_pages - 1))
+    
+    # حساب نطاق المستخدمين للصفحة الحالية
+    start_idx = page * users_per_page
+    end_idx = min(start_idx + users_per_page, total_users)
+    users_for_page = users[start_idx:end_idx]
+    
+    # إضافة أزرار المستخدمين
+    for user in users_for_page:
         # تحديد الأيقونة بناءً على الحالة
         if getattr(user, 'is_suspended', False):
             status_icon = "🔒"
@@ -97,6 +110,21 @@ def _users_kb(users, user_type="all"):
         
         button_text = f"{status_icon} {user.full_name}"
         buttons.append([InlineKeyboardButton(button_text, callback_data=f"um:user:{user.id}")])
+    
+    # إضافة أزرار التنقل بين الصفحات
+    nav_buttons = []
+    if total_pages > 1:
+        if page > 0:
+            nav_buttons.append(InlineKeyboardButton("⬅️ السابق", callback_data=f"um:page:{user_type}:{page - 1}"))
+        
+        # عرض رقم الصفحة الحالية
+        nav_buttons.append(InlineKeyboardButton(f"📄 {page + 1}/{total_pages}", callback_data="um:noop"))
+        
+        if page < total_pages - 1:
+            nav_buttons.append(InlineKeyboardButton("التالي ➡️", callback_data=f"um:page:{user_type}:{page + 1}"))
+        
+        if nav_buttons:
+            buttons.append(nav_buttons)
     
     buttons.append([InlineKeyboardButton("🔙 رجوع", callback_data="um:back")])
     return InlineKeyboardMarkup(buttons)
@@ -136,13 +164,34 @@ async def handle_user_management_callback(update: Update, context: ContextTypes.
     
     try:
         if data == "view_all":
-            return await _show_all_users(query, context)
+            return await _show_all_users(query, context, page=0)
         elif data == "view_pending":
-            return await _show_pending_users(query, context)
+            return await _show_pending_users(query, context, page=0)
         elif data == "view_approved":
-            return await _show_approved_users(query, context)
+            return await _show_approved_users(query, context, page=0)
         elif data == "view_suspended":
-            return await _show_suspended_users(query, context)
+            return await _show_suspended_users(query, context, page=0)
+        elif data.startswith("page:"):
+            # معالجة pagination: page:user_type:page_num
+            try:
+                parts = data.split(":")
+                if len(parts) == 3:
+                    user_type = parts[1]
+                    page_num = int(parts[2])
+                    if user_type == "all":
+                        return await _show_all_users(query, context, page=page_num)
+                    elif user_type == "pending":
+                        return await _show_pending_users(query, context, page=page_num)
+                    elif user_type == "approved":
+                        return await _show_approved_users(query, context, page=page_num)
+                    elif user_type == "suspended":
+                        return await _show_suspended_users(query, context, page=page_num)
+            except (ValueError, IndexError) as e:
+                logger.error(f"❌ Error parsing page data: {e}")
+        elif data == "noop":
+            # لا شيء - المستخدم ضغط على زر رقم الصفحة
+            await query.answer()
+            return UM_SELECT_USER
         elif data == "stats":
             return await _show_statistics(query, context)
         elif data == "search":
@@ -174,78 +223,91 @@ async def handle_user_management_callback(update: Update, context: ContextTypes.
             pass
         return UM_START
 
-async def _show_all_users(query, context):
+async def _show_all_users(query, context, page=0):
     """عرض جميع المستخدمين"""
     with SessionLocal() as s:
         users = s.query(Translator).order_by(Translator.created_at.desc()).all()
         
         if not users:
-            await query.message.reply_text(
+            await query.edit_message_text(
                 "📋 **لا يوجد مستخدمين مسجلين**\n\n"
                 "لم يتم تسجيل أي مستخدم بعد.\n\n"
                 "اختر خياراً آخر:",
                 reply_markup=_main_kb(),
                 parse_mode="Markdown"
             )
-            try:
-                await query.delete_message()
-            except:
-                pass
             return UM_START
         
-        text = f"📋 **جميع المستخدمين ({len(users)})**\n\n"
+        users_per_page = 10
+        total_users = len(users)
+        total_pages = (total_users + users_per_page - 1) // users_per_page if total_users > 0 else 1
+        page = max(0, min(page, total_pages - 1))
+        start_idx = page * users_per_page
+        end_idx = min(start_idx + users_per_page, total_users)
+        
+        text = f"📋 **جميع المستخدمين ({total_users})**\n\n"
+        if total_pages > 1:
+            text += f"📄 الصفحة {page + 1} من {total_pages} (المستخدمين {start_idx + 1}-{end_idx})\n\n"
         text += "اختر مستخدماً لعرض التفاصيل:"
-        await query.edit_message_text(text, reply_markup=_users_kb(users), parse_mode="Markdown")
+        await query.edit_message_text(text, reply_markup=_users_kb(users, "all", page), parse_mode="Markdown")
         return UM_SELECT_USER
 
-async def _show_pending_users(query, context):
+async def _show_pending_users(query, context, page=0):
     """عرض المستخدمين المعلقين"""
     with SessionLocal() as s:
         users = s.query(Translator).filter_by(is_approved=False).order_by(Translator.created_at.desc()).all()
         
         if not users:
-            # استخدام reply بدلاً من edit لتجنب خطأ "Message is not modified"
-            await query.message.reply_text(
+            await query.edit_message_text(
                 "⏳ **لا يوجد مستخدمين معلقين**\n\n"
                 "✅ لا توجد طلبات انضمام بانتظار الموافقة.\n\n"
                 "اختر خياراً آخر:",
                 reply_markup=_main_kb(),
                 parse_mode="Markdown"
             )
-            # حذف الرسالة القديمة
-            try:
-                await query.delete_message()
-            except:
-                pass
             return UM_START
         
-        text = f"⏳ **المستخدمين المعلقين ({len(users)})**\n\n"
+        users_per_page = 10
+        total_users = len(users)
+        total_pages = (total_users + users_per_page - 1) // users_per_page if total_users > 0 else 1
+        page = max(0, min(page, total_pages - 1))
+        start_idx = page * users_per_page
+        end_idx = min(start_idx + users_per_page, total_users)
+        
+        text = f"⏳ **المستخدمين المعلقين ({total_users})**\n\n"
+        if total_pages > 1:
+            text += f"📄 الصفحة {page + 1} من {total_pages} (المستخدمين {start_idx + 1}-{end_idx})\n\n"
         text += "اختر مستخدماً لعرض التفاصيل:"
-        await query.edit_message_text(text, reply_markup=_users_kb(users), parse_mode="Markdown")
+        await query.edit_message_text(text, reply_markup=_users_kb(users, "pending", page), parse_mode="Markdown")
         return UM_SELECT_USER
 
-async def _show_approved_users(query, context):
+async def _show_approved_users(query, context, page=0):
     """عرض المستخدمين الموافق عليهم"""
     with SessionLocal() as s:
         users = s.query(Translator).filter_by(is_approved=True).order_by(Translator.created_at.desc()).all()
         
         if not users:
-            await query.message.reply_text(
+            await query.edit_message_text(
                 "✅ **لا يوجد مستخدمين نشطين**\n\n"
                 "لم يتم الموافقة على أي مستخدم بعد.\n\n"
                 "اختر خياراً آخر:",
                 reply_markup=_main_kb(),
                 parse_mode="Markdown"
             )
-            try:
-                await query.delete_message()
-            except:
-                pass
             return UM_START
         
-        text = f"✅ **المستخدمين النشطين ({len(users)})**\n\n"
+        users_per_page = 10
+        total_users = len(users)
+        total_pages = (total_users + users_per_page - 1) // users_per_page if total_users > 0 else 1
+        page = max(0, min(page, total_pages - 1))
+        start_idx = page * users_per_page
+        end_idx = min(start_idx + users_per_page, total_users)
+        
+        text = f"✅ **المستخدمين النشطين ({total_users})**\n\n"
+        if total_pages > 1:
+            text += f"📄 الصفحة {page + 1} من {total_pages} (المستخدمين {start_idx + 1}-{end_idx})\n\n"
         text += "اختر مستخدماً لعرض التفاصيل:"
-        await query.edit_message_text(text, reply_markup=_users_kb(users), parse_mode="Markdown")
+        await query.edit_message_text(text, reply_markup=_users_kb(users, "approved", page), parse_mode="Markdown")
         return UM_SELECT_USER
 
 async def _show_user_details(query, context, user_id):
@@ -443,28 +505,33 @@ async def _handle_user_action(query, context, action):
         await query.edit_message_text(f"{message}\n\n👥 إدارة المستخدمين:", reply_markup=_main_kb(), parse_mode="Markdown")
         return UM_START
 
-async def _show_suspended_users(query, context):
+async def _show_suspended_users(query, context, page=0):
     """عرض المستخدمين المجمدين"""
     with SessionLocal() as s:
         users = s.query(Translator).filter_by(is_suspended=True).order_by(Translator.suspended_at.desc()).all()
         
         if not users:
-            await query.message.reply_text(
+            await query.edit_message_text(
                 "🔓 **لا يوجد مستخدمين مجمدين**\n\n"
                 "✅ جميع المستخدمين نشطين حالياً.\n\n"
                 "اختر خياراً آخر:",
                 reply_markup=_main_kb(),
                 parse_mode="Markdown"
             )
-            try:
-                await query.delete_message()
-            except:
-                pass
             return UM_START
         
-        text = f"🔒 **المستخدمين المجمدين ({len(users)})**\n\n"
+        users_per_page = 10
+        total_users = len(users)
+        total_pages = (total_users + users_per_page - 1) // users_per_page if total_users > 0 else 1
+        page = max(0, min(page, total_pages - 1))
+        start_idx = page * users_per_page
+        end_idx = min(start_idx + users_per_page, total_users)
+        
+        text = f"🔒 **المستخدمين المجمدين ({total_users})**\n\n"
+        if total_pages > 1:
+            text += f"📄 الصفحة {page + 1} من {total_pages} (المستخدمين {start_idx + 1}-{end_idx})\n\n"
         text += "اختر مستخدماً لعرض التفاصيل:"
-        await query.edit_message_text(text, reply_markup=_users_kb(users), parse_mode="Markdown")
+        await query.edit_message_text(text, reply_markup=_users_kb(users, "suspended", page), parse_mode="Markdown")
         return UM_SELECT_USER
 
 
@@ -521,17 +588,55 @@ async def _start_search(query, context):
     )
     return UM_SEARCH
 
+async def _show_search_results(query, context, search_text, page=0):
+    """عرض نتائج البحث (للاستخدام في pagination)"""
+    with SessionLocal() as s:
+        # البحث في الاسم والهاتف
+        users = s.query(Translator).filter(
+            (Translator.full_name.ilike(f"%{search_text}%")) | 
+            (Translator.phone_number.ilike(f"%{search_text}%"))
+        ).order_by(Translator.created_at.desc()).all()
+        
+        if not users:
+            await query.edit_message_text(
+                f"❌ **لم يتم العثور على نتائج**\n\n"
+                f"لم يتم العثور على مستخدمين بـ: `{search_text}`\n\n"
+                f"جرب مرة أخرى أو ارجع للقائمة الرئيسية.",
+                reply_markup=_back_kb(),
+                parse_mode="Markdown"
+            )
+            return UM_SEARCH
+        
+        users_per_page = 10
+        total_users = len(users)
+        total_pages = (total_users + users_per_page - 1) // users_per_page if total_users > 0 else 1
+        page = max(0, min(page, total_pages - 1))
+        start_idx = page * users_per_page
+        end_idx = min(start_idx + users_per_page, total_users)
+        
+        text = f"🔍 **نتائج البحث عن:** `{search_text}`\n\n"
+        text += f"📊 وجدت {total_users} نتيجة\n\n"
+        if total_pages > 1:
+            text += f"📄 الصفحة {page + 1} من {total_pages} (المستخدمين {start_idx + 1}-{end_idx})\n\n"
+        text += "اختر مستخدماً لعرض التفاصيل:"
+        
+        await query.edit_message_text(text, reply_markup=_users_kb(users, "search", page), parse_mode="Markdown")
+        return UM_SELECT_USER
 
-async def handle_search_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+async def handle_search_query(update: Update, context: ContextTypes.DEFAULT_TYPE, page=0):
     """معالجة البحث"""
     search_text = update.message.text.strip()
+    
+    # حفظ نص البحث في context للاستخدام في pagination
+    context.user_data["search_text"] = search_text
     
     with SessionLocal() as s:
         # البحث في الاسم والهاتف
         users = s.query(Translator).filter(
             (Translator.full_name.ilike(f"%{search_text}%")) | 
             (Translator.phone_number.ilike(f"%{search_text}%"))
-        ).all()
+        ).order_by(Translator.created_at.desc()).all()
         
         if not users:
             await update.message.reply_text(
@@ -543,10 +648,20 @@ async def handle_search_query(update: Update, context: ContextTypes.DEFAULT_TYPE
             )
             return UM_SEARCH
         
-        text = f"🔍 **نتائج البحث عن:** `{search_text}`\n\n"
-        text += f"وجدت {len(users)} نتيجة\n\n"
+        users_per_page = 10
+        total_users = len(users)
+        total_pages = (total_users + users_per_page - 1) // users_per_page if total_users > 0 else 1
+        page = max(0, min(page, total_pages - 1))
+        start_idx = page * users_per_page
+        end_idx = min(start_idx + users_per_page, total_users)
         
-        await update.message.reply_text(text, reply_markup=_users_kb(users), parse_mode="Markdown")
+        text = f"🔍 **نتائج البحث عن:** `{search_text}`\n\n"
+        text += f"📊 وجدت {total_users} نتيجة\n\n"
+        if total_pages > 1:
+            text += f"📄 الصفحة {page + 1} من {total_pages} (المستخدمين {start_idx + 1}-{end_idx})\n\n"
+        text += "اختر مستخدماً لعرض التفاصيل:"
+        
+        await update.message.reply_text(text, reply_markup=_users_kb(users, "search", page), parse_mode="Markdown")
         return UM_SELECT_USER
 
 
