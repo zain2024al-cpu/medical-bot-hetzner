@@ -806,42 +806,42 @@ async def handle_patient_name_input(update: Update, context: ContextTypes.DEFAUL
     
     # إضافة الاسم للملف
     try:
-            # التأكد من وجود المجلد
-            os.makedirs('data', exist_ok=True)
-            
-            # قراءة الملف أولاً للتحقق من عدم وجود الاسم مسبقاً
-            existing_names = []
-            try:
-                with open('data/patient_names.txt', 'r', encoding='utf-8') as f:
-                    for line in f:
-                        line = line.strip()
-                        if line and not line.startswith('#'):
-                            existing_names.append(line)
-            except FileNotFoundError:
-                pass
-            
-            # التحقق من عدم وجود الاسم مسبقاً
-            if name in existing_names:
-                logger.warning(f"⚠️ Name '{name}' already exists")
-                await update.message.reply_text(
-                    f"⚠️ **الاسم موجود مسبقاً:** {name}\n\n"
-                    f"يرجى إدخال اسم آخر:",
-                    parse_mode=ParseMode.MARKDOWN
-                )
-                return "ADD_PATIENT_NAME"
-            
-            # إضافة الاسم
-            with open('data/patient_names.txt', 'a', encoding='utf-8') as f:
-                f.write(f"\n{name}")
-            logger.info(f"✅ Name '{name}' added to file successfully")
-        except Exception as e:
-            logger.error(f"❌ Error saving name to file: {e}", exc_info=True)
+        # التأكد من وجود المجلد
+        os.makedirs('data', exist_ok=True)
+        
+        # قراءة الملف أولاً للتحقق من عدم وجود الاسم مسبقاً
+        existing_names = []
+        try:
+            with open('data/patient_names.txt', 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#'):
+                        existing_names.append(line)
+        except FileNotFoundError:
+            pass
+        
+        # التحقق من عدم وجود الاسم مسبقاً
+        if name in existing_names:
+            logger.warning(f"⚠️ Name '{name}' already exists")
             await update.message.reply_text(
-                f"❌ **خطأ في الحفظ:** {str(e)}\n\n"
-                f"يرجى المحاولة مرة أخرى:",
+                f"⚠️ **الاسم موجود مسبقاً:** {name}\n\n"
+                f"يرجى إدخال اسم آخر:",
                 parse_mode=ParseMode.MARKDOWN
             )
             return "ADD_PATIENT_NAME"
+        
+        # إضافة الاسم
+        with open('data/patient_names.txt', 'a', encoding='utf-8') as f:
+            f.write(f"\n{name}")
+        logger.info(f"✅ Name '{name}' added to file successfully")
+    except Exception as e:
+        logger.error(f"❌ Error saving name to file: {e}", exc_info=True)
+        await update.message.reply_text(
+            f"❌ **خطأ في الحفظ:** {str(e)}\n\n"
+            f"يرجى المحاولة مرة أخرى:",
+            parse_mode=ParseMode.MARKDOWN
+        )
+        return "ADD_PATIENT_NAME"
     
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("➕ إضافة اسم آخر", callback_data="add_patient_name")],
@@ -1130,59 +1130,59 @@ async def handle_edit_name_input(update: Update, context: ContextTypes.DEFAULT_T
     
     # تعديل الاسم في الملف
     try:
-            # قراءة الملف
-            with open('data/patient_names.txt', 'r', encoding='utf-8') as f:
-                lines = f.readlines()
-        except FileNotFoundError:
-            logger.error("❌ File not found")
-            await update.message.reply_text("❌ **خطأ في القراءة**", parse_mode=ParseMode.MARKDOWN)
-            return ConversationHandler.END
-        
-        # تعديل الاسم
-        new_lines = []
-        names = []
-        for line in lines:
-            stripped = line.strip()
-            if stripped and not stripped.startswith('#'):
-                names.append(stripped)
-            else:
-                new_lines.append(line)
-        
-        # تعديل الاسم في القائمة
-        if index < len(names) and names[index] == old_name:
-            names[index] = new_name
-            logger.info(f"✅ Name updated in list at index {index}")
+        # قراءة الملف
+        with open('data/patient_names.txt', 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+    except FileNotFoundError:
+        logger.error("❌ File not found")
+        await update.message.reply_text("❌ **خطأ في القراءة**", parse_mode=ParseMode.MARKDOWN)
+        return ConversationHandler.END
+    
+    # تعديل الاسم
+    new_lines = []
+    names = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped and not stripped.startswith('#'):
+            names.append(stripped)
         else:
-            logger.warning(f"⚠️ Name not found at index {index} or name mismatch")
-            # محاولة البحث عن الاسم في القائمة
-            try:
-                actual_index = names.index(old_name)
-                names[actual_index] = new_name
-                logger.info(f"✅ Name found and updated at actual index {actual_index}")
-            except ValueError:
-                logger.error(f"❌ Name '{old_name}' not found in list")
-                await update.message.reply_text(
-                    f"❌ **خطأ:** لم يتم العثور على الاسم '{old_name}'",
-                    parse_mode=ParseMode.MARKDOWN
-                )
-                return ConversationHandler.END
-        
-        # إعادة بناء الملف
-        for name in names:
-            new_lines.append(name + '\n')
-        
-        # حفظ الملف
+            new_lines.append(line)
+    
+    # تعديل الاسم في القائمة
+    if index < len(names) and names[index] == old_name:
+        names[index] = new_name
+        logger.info(f"✅ Name updated in list at index {index}")
+    else:
+        logger.warning(f"⚠️ Name not found at index {index} or name mismatch")
+        # محاولة البحث عن الاسم في القائمة
         try:
-            with open('data/patient_names.txt', 'w', encoding='utf-8') as f:
-                f.writelines(new_lines)
-            logger.info(f"✅ File saved successfully")
-        except Exception as e:
-            logger.error(f"❌ Error saving file: {e}", exc_info=True)
+            actual_index = names.index(old_name)
+            names[actual_index] = new_name
+            logger.info(f"✅ Name found and updated at actual index {actual_index}")
+        except ValueError:
+            logger.error(f"❌ Name '{old_name}' not found in list")
             await update.message.reply_text(
-                f"❌ **خطأ في الحفظ:** {str(e)}",
+                f"❌ **خطأ:** لم يتم العثور على الاسم '{old_name}'",
                 parse_mode=ParseMode.MARKDOWN
             )
             return ConversationHandler.END
+    
+    # إعادة بناء الملف
+    for name in names:
+        new_lines.append(name + '\n')
+    
+    # حفظ الملف
+    try:
+        with open('data/patient_names.txt', 'w', encoding='utf-8') as f:
+            f.writelines(new_lines)
+        logger.info(f"✅ File saved successfully")
+    except Exception as e:
+        logger.error(f"❌ Error saving file: {e}", exc_info=True)
+        await update.message.reply_text(
+            f"❌ **خطأ في الحفظ:** {str(e)}",
+            parse_mode=ParseMode.MARKDOWN
+        )
+        return ConversationHandler.END
     
     # مسح البيانات المحفوظة
     context.user_data.pop('edit_patient_index', None)
