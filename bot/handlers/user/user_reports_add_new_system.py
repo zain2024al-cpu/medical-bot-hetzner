@@ -2006,68 +2006,95 @@ async def show_patient_selection(message, context, search_query=""):
 
 
 async def show_patient_list(update: Update, context: ContextTypes.DEFAULT_TYPE, page: int = 0):
-    """عرض قائمة المرضى مع pagination"""
+    """عرض قائمة المرضى مع pagination - من ملف patient_names.txt أو قاعدة البيانات"""
     query = update.callback_query
     if query:
         await query.answer()
     
     items_per_page = 10  # 10 أسماء في كل صفحة
     
-    with SessionLocal() as s:
-        # جلب جميع المرضى مرتبين حسب الاسم
-        all_patients = s.query(Patient).order_by(Patient.full_name).all()
-        total = len(all_patients)
-        total_pages = max(1, (total + items_per_page - 1) // items_per_page)
-        page = max(0, min(page, total_pages - 1))
-        
-        start_idx = page * items_per_page
-        end_idx = min(start_idx + items_per_page, total)
-        patients_page = all_patients[start_idx:end_idx]
-        
-        keyboard = []
-        
-        # إضافة أزرار المرضى
-        for patient in patients_page:
-            keyboard.append([InlineKeyboardButton(
-                f"👤 {patient.full_name}",
-                callback_data=f"patient_idx:{patient.id}"
-            )])
-        
-        # أزرار التنقل بين الصفحات
-        nav_buttons = []
-        if page > 0:
-            nav_buttons.append(InlineKeyboardButton("⬅️ السابق", callback_data=f"patient:show_list:{page-1}"))
-        if page < total_pages - 1:
-            nav_buttons.append(InlineKeyboardButton("التالي ➡️", callback_data=f"patient:show_list:{page+1}"))
-        
-        if nav_buttons:
-            keyboard.append(nav_buttons)
-        
-        # أزرار إضافية
-        keyboard.append([
-            InlineKeyboardButton("🔍 بحث سريع", switch_inline_query_current_chat=""),
-            InlineKeyboardButton("🔙 رجوع", callback_data="patient:back_to_menu")
-        ])
-        
-        text = f"👤 **قائمة المرضى**\n\n"
-        text += f"📊 **العدد الإجمالي:** {total} مريض\n"
-        text += f"📄 **الصفحة:** {page + 1} من {total_pages}\n\n"
-        text += "اختر المريض من القائمة:"
-        
-        if query:
-            await query.edit_message_text(
-                text,
-                reply_markup=InlineKeyboardMarkup(keyboard),
-                parse_mode="Markdown"
-            )
-        else:
-            await update.message.reply_text(
-                text,
-                reply_markup=InlineKeyboardMarkup(keyboard),
-                parse_mode="Markdown"
-            )
-        
-        return STATE_SELECT_PATIENT
+    # ✅ محاولة تحميل الأسماء من الملف أولاً (لضمان عرض الأسماء المحدثة)
+    patient_names = []
+    try:
+        from db.patient_names_loader import get_patient_names_from_database_or_file
+        # استخدام prefer_database=False لقراءة من الملف مباشرة
+        patient_names = get_patient_names_from_database_or_file(prefer_database=False)
+        logger.info(f"✅ تم تحميل {len(patient_names)} اسم من ملف patient_names.txt")
+    except Exception as e:
+        logger.error(f"❌ خطأ في تحميل الأسماء من الملف: {e}")
+        patient_names = []
+    
+    # ✅ إذا لم توجد أسماء في الملف، جلب من قاعدة البيانات
+    if not patient_names:
+        try:
+            with SessionLocal() as s:
+                all_patients = s.query(Patient).order_by(Patient.full_name).all()
+                patient_names = [p.full_name for p in all_patients if p.full_name]
+                logger.info(f"✅ تم تحميل {len(patient_names)} اسم من قاعدة البيانات")
+        except Exception as e:
+            logger.error(f"❌ خطأ في تحميل الأسماء من قاعدة البيانات: {e}")
+            patient_names = []
+    
+    # إزالة التكرارات والحفاظ على الترتيب
+    seen = set()
+    unique_names = []
+    for name in patient_names:
+        if name and name not in seen:
+            seen.add(name)
+            unique_names.append(name)
+    
+    total = len(unique_names)
+    total_pages = max(1, (total + items_per_page - 1) // items_per_page)
+    page = max(0, min(page, total_pages - 1))
+    
+    start_idx = page * items_per_page
+    end_idx = min(start_idx + items_per_page, total)
+    names_page = unique_names[start_idx:end_idx]
+    
+    keyboard = []
+    
+    # إضافة أزرار المرضى
+    for name in names_page:
+        keyboard.append([InlineKeyboardButton(
+            f"👤 {name}",
+            callback_data=f"patient_name:{name}"
+        )])
+    
+    # أزرار التنقل بين الصفحات
+    nav_buttons = []
+    if page > 0:
+        nav_buttons.append(InlineKeyboardButton("⬅️ السابق", callback_data=f"patient:show_list:{page-1}"))
+    if page < total_pages - 1:
+        nav_buttons.append(InlineKeyboardButton("التالي ➡️", callback_data=f"patient:show_list:{page+1}"))
+    
+    if nav_buttons:
+        keyboard.append(nav_buttons)
+    
+    # أزرار إضافية
+    keyboard.append([
+        InlineKeyboardButton("🔍 بحث سريع", switch_inline_query_current_chat=""),
+        InlineKeyboardButton("🔙 رجوع", callback_data="patient:back_to_menu")
+    ])
+    
+    text = f"👤 **قائمة المرضى**\n\n"
+    text += f"📊 **العدد الإجمالي:** {total} مريض\n"
+    text += f"📄 **الصفحة:** {page + 1} من {total_pages}\n\n"
+    text += "اختر المريض من القائمة:"
+    
+    if query:
+        await query.edit_message_text(
+            text,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown"
+        )
+    else:
+        await update.message.reply_text(
+            text,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown"
+        )
+    
+    return STATE_SELECT_PATIENT
 
 async def handle_patient_list_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة callbacks قائمة المرضى"""
@@ -2098,6 +2125,32 @@ async def handle_patient_selection(
     # معالجة callbacks قائمة المرضى
     if query.data.startswith("patient:show_list:") or query.data == "patient:back_to_menu":
         return await handle_patient_list_callback(update, context)
+    
+    # ✅ معالجة اختيار المريض من القائمة (من الملف)
+    if query.data.startswith("patient_name:"):
+        patient_name = query.data.split(":", 1)[1]
+        # حفظ اسم المريض
+        context.user_data.setdefault("report_tmp", {})["patient_name"] = patient_name
+        context.user_data["report_tmp"].setdefault("step_history", []).append(STATE_SELECT_PATIENT)
+        
+        # محاولة العثور على المريض في قاعدة البيانات (إن وجد)
+        try:
+            with SessionLocal() as s:
+                patient = s.query(Patient).filter_by(full_name=patient_name).first()
+                if patient:
+                    context.user_data["report_tmp"]["patient_id"] = patient.id
+        except Exception as e:
+            logger.error(f"❌ خطأ في البحث عن المريض في قاعدة البيانات: {e}")
+        
+        await query.edit_message_text(
+            f"✅ **تم اختيار المريض**\n\n"
+            f"👤 **المريض:**\n"
+            f"{patient_name}"
+        )
+        
+        # الانتقال إلى اختيار المستشفى
+        await show_hospitals_menu(query.message, context)
+        return STATE_SELECT_HOSPITAL
 
     # اختيار من القائمة
     patient_id = int(query.data.split(":", 1)[1])
@@ -10057,12 +10110,12 @@ def register(app):
                 CallbackQueryHandler(handle_date_time_back_hour, pattern="^time_back_hour$"),
             ],
             STATE_SELECT_PATIENT: [
-                CallbackQueryHandler(handle_patient_selection, pattern="^patient_idx:"),
+                CallbackQueryHandler(handle_patient_selection, pattern="^(patient_idx:|patient_name:)"),
                 CallbackQueryHandler(handle_patient_list_callback, pattern="^patient:(show_list:|back_to_menu)"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_patient),
             ],
             R_PATIENT: [
-                CallbackQueryHandler(handle_patient_selection, pattern="^patient_idx:"),
+                CallbackQueryHandler(handle_patient_selection, pattern="^(patient_idx:|patient_name:)"),
                 CallbackQueryHandler(handle_patient_list_callback, pattern="^patient:(show_list:|back_to_menu)"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_patient),
             ],
