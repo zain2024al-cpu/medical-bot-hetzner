@@ -1,0 +1,64 @@
+# ================================================
+# قائمة المستشفيات الكاملة - من PREDEFINED_HOSPITALS
+# ================================================
+# إجمالي المستشفيات: 40 مستشفى (بعد إضافة المستشفيات الجديدة)
+# ================================================
+# تم إعادة ترتيب القائمة حسب الطلب
+# ================================================
+
+Silverline Diagnostics
+Manipal Hospital, Old Airport Road
+Manipal Hospital, Yelahanka
+Fortis Hospital, BG Road
+Sakra World Hospital
+Aster Whitefield Hospital
+M S Ramaiah Memorial Hospital
+Aster RV
+St. John's Medical College Hospital
+SPARSH Hospital, Hennur Road
+Sankara Eye Hospital
+KARE Prosthetics & Orthotics
+SPARSH Hospital, Infantry Road
+Apollo Hospital, BG
+L V Prasad Eye Institute, Hyderabad
+Narayana Hospital, Bommasandra
+Rainbow Children's Hospital, Marathahalli
+Bhagwan Mahaveer Jain Hospital
+Manipal Hospital - Millers Road
+Trilife Hospital
+Aster CMI
+NU Hospitals, Rajajinagar
+Zion Hospital
+Cura Hospital
+KIMS Hospital, Mahadevapura
+NU hospital padmanabhanagar
+Kiran Diagnostic Center
+Nueclear Diagnostics
+AIG Hospitals, Hyderabad
+BLK-Max Super Specialty Hospital, Delhi
+Max Super Speciality Hospital, Saket, Delhi
+Rainbow Children's Hospital, Delhi
+HCG Hospital K R Road
+Gleneagles Global Hospital, Kengeri
+Rela Hospital, Chennai
+Narayana Nethralaya, Bannerghatta
+Narayana Nethralaya Eye Hospital, Rajajinagar
+Narayana Nethralaya Bommasandra
+Manipal Hospital - Yeshwanthpur
+Manipal Hospital - Sarjapur Road
+Sankara Eye Hospital, Chennai
+
+# ================================================
+# ملاحظات:
+# - تم إعادة ترتيب القائمة حسب الطلب
+# - تم إضافة مستشفيات جديدة:
+#   - Manipal Hospital, Yelahanka
+#   - NU hospital padmanabhanagar
+#   - Kiran Diagnostic Center
+#   - Rainbow Children's Hospital, Delhi
+#   - Narayana Nethralaya, Bannerghatta
+#   - Narayana Nethralaya Eye Hospital, Rajajinagar
+#   - Narayana Nethralaya Bommasandra
+#   - Sankara Eye Hospital, Chennai
+# - تم تحديث أسماء بعض المستشفيات
+# ================================================
