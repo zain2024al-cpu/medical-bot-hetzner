@@ -655,28 +655,98 @@ async def start_daily_patients_from_schedule(update: Update, context: ContextTyp
 # إدارة أسماء المرضى (نظام الملف)
 # ================================================
 
+def get_patient_names_file_path():
+    """الحصول على المسار المطلق لملف patient_names.txt"""
+    import os
+    possible_paths = [
+        os.path.join(os.getcwd(), 'data', 'patient_names.txt'),
+        'data/patient_names.txt',
+        '/home/botuser/medical-bot/temp_upload/data/patient_names.txt',
+        '/root/medical-bot-hetzner/data/patient_names.txt',
+    ]
+    
+    for path in possible_paths:
+        if os.path.exists(path):
+            return path
+    
+    # إذا لم يوجد، نعيد المسار الأول (سيتم إنشاؤه)
+    return possible_paths[0]
+
+def read_patient_names_from_file():
+    """قراءة أسماء المرضى من الملف"""
+    import os
+    file_path = get_patient_names_file_path()
+    names = []
+    
+    try:
+        if os.path.exists(file_path):
+            with open(file_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#'):
+                        names.append(line)
+            logger.info(f"✅ تم تحميل {len(names)} اسم من الملف: {file_path}")
+        else:
+            logger.warning(f"⚠️ الملف غير موجود: {file_path}")
+    except Exception as e:
+        logger.error(f"❌ خطأ في قراءة الملف: {e}", exc_info=True)
+    
+    return names
+
+def write_patient_names_to_file(names):
+    """كتابة أسماء المرضى إلى الملف مع الحفاظ على التعليقات"""
+    import os
+    file_path = get_patient_names_file_path()
+    data_dir = os.path.dirname(file_path)
+    
+    # التأكد من وجود المجلد
+    if data_dir:
+        os.makedirs(data_dir, exist_ok=True)
+    
+    # قراءة الملف الحالي للحفاظ على التعليقات
+    header_lines = []
+    try:
+        if os.path.exists(file_path):
+            with open(file_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    stripped = line.strip()
+                    if stripped.startswith('#') or not stripped:
+                        header_lines.append(line)
+                    else:
+                        break
+    except Exception:
+        pass
+    
+    # إذا لم تكن هناك تعليقات، إضافة تعليقات افتراضية
+    if not header_lines:
+        header_lines = [
+            "# قائمة أسماء المرضى - يتم التحديث تلقائياً من قاعدة البيانات\n",
+            f"# آخر تحديث: {len(names)} مريضاً\n",
+            "# ملاحظة: لا تحذف هذا الملف\n",
+            "\n"
+        ]
+    
+    # كتابة الملف
+    try:
+        with open(file_path, 'w', encoding='utf-8') as f:
+            # كتابة التعليقات
+            f.writelines(header_lines)
+            # كتابة الأسماء
+            for name in names:
+                f.write(name + '\n')
+        logger.info(f"✅ تم حفظ {len(names)} اسم في الملف: {file_path}")
+        return True
+    except Exception as e:
+        logger.error(f"❌ خطأ في كتابة الملف: {e}", exc_info=True)
+        return False
+
 async def handle_manage_patients(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """إدارة أسماء المرضى من قاعدة البيانات"""
+    """إدارة أسماء المرضى من الملف"""
     query = update.callback_query
     await query.answer()
     
-    # قراءة الأسماء من قاعدة البيانات (مع fallback للملف)
-    try:
-        from db.patient_names_loader import get_patient_names_from_database_or_file
-        names = get_patient_names_from_database_or_file(prefer_database=True)
-    except Exception as e:
-        logger.error(f"❌ خطأ في تحميل أسماء المرضى: {e}")
-        # Fallback: قراءة من الملف
-        try:
-            with open('data/patient_names.txt', 'r', encoding='utf-8') as f:
-                content = f.read()
-            names = []
-            for line in content.split('\n'):
-                line = line.strip()
-                if line and not line.startswith('#'):
-                    names.append(line)
-        except FileNotFoundError:
-            names = []
+    # ✅ قراءة الأسماء من الملف مباشرة
+    names = read_patient_names_from_file()
     
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("➕ إضافة اسم جديد", callback_data="add_patient_name")],
@@ -696,27 +766,12 @@ async def handle_manage_patients(update: Update, context: ContextTypes.DEFAULT_T
     return SCHEDULE_MENU
 
 async def handle_view_patient_names(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """عرض أسماء المرضى من قاعدة البيانات"""
+    """عرض أسماء المرضى من الملف"""
     query = update.callback_query
     await query.answer()
     
-    # قراءة الأسماء من قاعدة البيانات (مع fallback للملف)
-    try:
-        from db.patient_names_loader import get_patient_names_from_database_or_file
-        names = get_patient_names_from_database_or_file(prefer_database=True)
-    except Exception as e:
-        logger.error(f"❌ خطأ في تحميل أسماء المرضى: {e}")
-        # Fallback: قراءة من الملف
-        try:
-            with open('data/patient_names.txt', 'r', encoding='utf-8') as f:
-                content = f.read()
-            names = []
-            for line in content.split('\n'):
-                line = line.strip()
-                if line and not line.startswith('#'):
-                    names.append(line)
-        except FileNotFoundError:
-            names = []
+    # ✅ قراءة الأسماء من الملف مباشرة
+    names = read_patient_names_from_file()
     
     if not names:
         text = "📋 **قائمة أسماء المرضى**\n\n⚠️ لا توجد أسماء مسجلة"
@@ -812,53 +867,8 @@ async def handle_patient_name_input(update: Update, context: ContextTypes.DEFAUL
     
     # إضافة الاسم للملف
     try:
-        # الحصول على المسار المطلق للملف
-        import os
-        # طريقة 1: استخدام المسار النسبي من موقع العمل الحالي (app.py)
-        # app.py يعمل من الجذر، لذا data/patient_names.txt يجب أن يكون في نفس المستوى
-        file_path = 'data/patient_names.txt'
-        data_dir = 'data'
-        
-        # طريقة 2: حساب المسار المطلق من موقع الملف الحالي (fallback)
-        try:
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            # الانتقال من bot/handlers/admin/admin_schedule_management.py إلى الجذر
-            # bot/handlers/admin -> bot/handlers -> bot -> root
-            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
-            absolute_data_dir = os.path.join(base_dir, 'data')
-            absolute_file_path = os.path.join(absolute_data_dir, 'patient_names.txt')
-            
-            # استخدام المسار المطلق إذا كان موجوداً
-            if os.path.exists(absolute_data_dir) or os.path.exists(base_dir):
-                file_path = absolute_file_path
-                data_dir = absolute_data_dir
-                logger.info(f"📁 Using absolute path: {file_path}")
-            else:
-                logger.info(f"📁 Using relative path: {file_path}")
-        except Exception as path_error:
-            logger.warning(f"⚠️ Error calculating absolute path: {path_error}, using relative path")
-        
-        logger.info(f"📁 Final file path: {file_path}")
-        logger.info(f"📁 Final data dir: {data_dir}")
-        
-        # التأكد من وجود المجلد
-        os.makedirs(data_dir, exist_ok=True)
-        logger.info(f"✅ Data directory created/verified: {data_dir}")
-        
-        # قراءة الملف أولاً للتحقق من عدم وجود الاسم مسبقاً
-        existing_names = []
-        try:
-            if os.path.exists(file_path):
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    for line in f:
-                        line = line.strip()
-                        if line and not line.startswith('#'):
-                            existing_names.append(line)
-                logger.info(f"📋 Loaded {len(existing_names)} existing names from file")
-            else:
-                logger.info(f"📋 File doesn't exist yet, will create new file")
-        except Exception as e:
-            logger.error(f"❌ Error reading file: {e}", exc_info=True)
+        # ✅ قراءة الأسماء الحالية من الملف
+        existing_names = read_patient_names_from_file()
         
         # التحقق من عدم وجود الاسم مسبقاً
         if name in existing_names:
@@ -870,21 +880,14 @@ async def handle_patient_name_input(update: Update, context: ContextTypes.DEFAUL
             )
             return "ADD_PATIENT_NAME"
         
-        # إضافة الاسم
-        with open(file_path, 'a', encoding='utf-8') as f:
-            # إذا كان الملف فارغاً أو جديداً، لا نضيف newline في البداية
-            if existing_names or os.path.getsize(file_path) > 0:
-                f.write(f"\n{name}")
-            else:
-                f.write(name)
-        logger.info(f"✅ Name '{name}' added to file successfully at: {file_path}")
+        # إضافة الاسم الجديد
+        existing_names.append(name)
         
-        # التحقق من أن الملف تم حفظه
-        if os.path.exists(file_path):
-            file_size = os.path.getsize(file_path)
-            logger.info(f"✅ File exists and size is: {file_size} bytes")
+        # ✅ حفظ الملف مع الحفاظ على التعليقات
+        if write_patient_names_to_file(existing_names):
+            logger.info(f"✅ Name '{name}' added to file successfully")
         else:
-            logger.error(f"❌ File was not created at: {file_path}")
+            raise Exception("Failed to write to file")
     except Exception as e:
         logger.error(f"❌ Error saving name to file: {e}", exc_info=True)
         await update.message.reply_text(
@@ -916,24 +919,8 @@ async def handle_delete_patient_name(update: Update, context: ContextTypes.DEFAU
     query = update.callback_query
     await query.answer()
     
-    # قراءة الملف
-    try:
-        with open('data/patient_names.txt', 'r', encoding='utf-8') as f:
-            content = f.read()
-    except FileNotFoundError:
-        await query.edit_message_text(
-            "⚠️ **لا توجد أسماء لحذفها**",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")]]),
-            parse_mode=ParseMode.MARKDOWN
-        )
-        return
-    
-    # استخراج الأسماء
-    names = []
-    for line in content.split('\n'):
-        line = line.strip()
-        if line and not line.startswith('#'):
-            names.append(line)
+    # ✅ قراءة الأسماء من الملف
+    names = read_patient_names_from_file()
     
     if not names:
         await query.edit_message_text(
@@ -983,46 +970,39 @@ async def handle_confirm_delete(update: Update, context: ContextTypes.DEFAULT_TY
     index = int(parts[1])
     name_to_delete = parts[2]
     
-    # قراءة الملف
-    try:
-        with open('data/patient_names.txt', 'r', encoding='utf-8') as f:
-            lines = f.readlines()
-    except FileNotFoundError:
-        await query.edit_message_text("❌ **خطأ في القراءة**", parse_mode=ParseMode.MARKDOWN)
-        return
-    
-    # حذف الاسم
-    new_lines = []
-    names = []
-    for line in lines:
-        stripped = line.strip()
-        if stripped and not stripped.startswith('#'):
-            names.append(stripped)
-        else:
-            new_lines.append(line)
+    # ✅ قراءة الأسماء من الملف
+    names = read_patient_names_from_file()
     
     # حذف الاسم من القائمة
     if index < len(names) and names[index] == name_to_delete:
         names.pop(index)
+        logger.info(f"✅ Name '{name_to_delete}' removed from list at index {index}")
+    else:
+        # محاولة البحث عن الاسم في القائمة
+        try:
+            actual_index = names.index(name_to_delete)
+            names.pop(actual_index)
+            logger.info(f"✅ Name '{name_to_delete}' found and removed at actual index {actual_index}")
+        except ValueError:
+            logger.error(f"❌ Name '{name_to_delete}' not found in list")
+            await query.edit_message_text(
+                f"❌ **خطأ:** لم يتم العثور على الاسم '{name_to_delete}'",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")]]),
+                parse_mode=ParseMode.MARKDOWN
+            )
+            return
     
-    # إعادة بناء الملف
-    for name in names:
-        new_lines.append(name + '\n')
-    
-    # حفظ الملف
-    try:
-        with open('data/patient_names.txt', 'w', encoding='utf-8') as f:
-            f.writelines(new_lines)
-        
+    # ✅ حفظ الملف مع الحفاظ على التعليقات
+    if write_patient_names_to_file(names):
         await query.edit_message_text(
             f"✅ **تم حذف الاسم:** {name_to_delete}\n\n"
             f"📊 **عدد الأسماء المتبقية:** {len(names)}",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")]]),
             parse_mode=ParseMode.MARKDOWN
         )
-    except Exception as e:
+    else:
         await query.edit_message_text(
-            f"❌ **خطأ في الحفظ:** {str(e)}",
+            f"❌ **خطأ في الحفظ**",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")]]),
             parse_mode=ParseMode.MARKDOWN
         )
@@ -1032,24 +1012,8 @@ async def handle_edit_patient_name(update: Update, context: ContextTypes.DEFAULT
     query = update.callback_query
     await query.answer()
     
-    # قراءة الملف
-    try:
-        with open('data/patient_names.txt', 'r', encoding='utf-8') as f:
-            content = f.read()
-    except FileNotFoundError:
-        await query.edit_message_text(
-            "⚠️ **لا توجد أسماء لتعديلها**",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")]]),
-            parse_mode=ParseMode.MARKDOWN
-        )
-        return
-    
-    # استخراج الأسماء
-    names = []
-    for line in content.split('\n'):
-        line = line.strip()
-        if line and not line.startswith('#'):
-            names.append(line)
+    # ✅ قراءة الأسماء من الملف
+    names = read_patient_names_from_file()
     
     if not names:
         await query.edit_message_text(
@@ -1181,25 +1145,18 @@ async def handle_edit_name_input(update: Update, context: ContextTypes.DEFAULT_T
         await update.message.reply_text("❌ **خطأ:** لم يتم اختيار اسم للتعديل", parse_mode=ParseMode.MARKDOWN)
         return ConversationHandler.END
     
-    # تعديل الاسم في الملف
-    try:
-        # قراءة الملف
-        with open('data/patient_names.txt', 'r', encoding='utf-8') as f:
-            lines = f.readlines()
-    except FileNotFoundError:
-        logger.error("❌ File not found")
-        await update.message.reply_text("❌ **خطأ في القراءة**", parse_mode=ParseMode.MARKDOWN)
-        return ConversationHandler.END
+    # ✅ قراءة الأسماء من الملف
+    names = read_patient_names_from_file()
     
-    # تعديل الاسم
-    new_lines = []
-    names = []
-    for line in lines:
-        stripped = line.strip()
-        if stripped and not stripped.startswith('#'):
-            names.append(stripped)
-        else:
-            new_lines.append(line)
+    # التحقق من عدم وجود الاسم الجديد مسبقاً
+    if new_name in names and new_name != old_name:
+        logger.warning(f"⚠️ New name '{new_name}' already exists")
+        await update.message.reply_text(
+            f"⚠️ **الاسم موجود مسبقاً:** {new_name}\n\n"
+            f"يرجى إدخال اسم آخر:",
+            parse_mode=ParseMode.MARKDOWN
+        )
+        return "EDIT_NAME_INPUT"
     
     # تعديل الاسم في القائمة
     if index < len(names) and names[index] == old_name:
@@ -1220,22 +1177,16 @@ async def handle_edit_name_input(update: Update, context: ContextTypes.DEFAULT_T
             )
             return ConversationHandler.END
     
-    # إعادة بناء الملف
-    for name in names:
-        new_lines.append(name + '\n')
-    
-    # حفظ الملف
-    try:
-        with open('data/patient_names.txt', 'w', encoding='utf-8') as f:
-            f.writelines(new_lines)
-        logger.info(f"✅ File saved successfully")
-    except Exception as e:
-        logger.error(f"❌ Error saving file: {e}", exc_info=True)
+    # ✅ حفظ الملف مع الحفاظ على التعليقات
+    if not write_patient_names_to_file(names):
+        logger.error(f"❌ Error saving file")
         await update.message.reply_text(
-            f"❌ **خطأ في الحفظ:** {str(e)}",
+            f"❌ **خطأ في الحفظ**",
             parse_mode=ParseMode.MARKDOWN
         )
         return ConversationHandler.END
+    
+    logger.info(f"✅ File saved successfully")
     
     # مسح البيانات المحفوظة
     context.user_data.pop('edit_patient_index', None)
