@@ -111,41 +111,9 @@ async def retry_with_backoff(
 # Database Resilience
 # ================================================
 
-@asynccontextmanager
-async def resilient_db_session():
-    """Database session مع معالجة أخطاء شاملة"""
-    from db.session import SessionLocal
-    
-    session = None
-    try:
-        session = SessionLocal()
-        yield session
-        session.commit()
-    except (OperationalError, DisconnectionError, SQLTimeoutError) as e:
-        if session:
-            session.rollback()
-        logger.error(f"❌ Database error: {e}")
-        
-        # إعادة المحاولة مع circuit breaker
-        try:
-            db_circuit_breaker.call(SessionLocal)
-            session = SessionLocal()
-            yield session
-            session.commit()
-        except Exception as retry_error:
-            logger.error(f"❌ Database retry failed: {retry_error}")
-            raise
-    except Exception as e:
-        if session:
-            session.rollback()
-        logger.error(f"❌ Unexpected database error: {e}")
-        raise
-    finally:
-        if session:
-            try:
-                session.close()
-            except Exception as close_error:
-                logger.warning(f"⚠️ Error closing session: {close_error}")
+# ملاحظة: resilient_db_session() تم استبداله باستخدام get_db() مباشرة
+# get_db() في db/session.py يحتوي الآن على retry logic مدمج
+# يمكن استخدام get_db() مباشرة بدلاً من resilient_db_session()
 
 # ================================================
 # Health Check System
@@ -318,8 +286,27 @@ def safe_database_operation(func: Callable) -> Callable:
     """Decorator للعمليات الآمنة على قاعدة البيانات"""
     @wraps(func)
     async def wrapper(*args, **kwargs):
-        async with resilient_db_session() as session:
-            return await func(session, *args, **kwargs)
+        # استخدام get_db() مباشرة - يحتوي على retry logic
+        from db.session import get_db
+        import asyncio
+        from concurrent.futures import ThreadPoolExecutor
+        
+        executor = ThreadPoolExecutor(max_workers=1)
+        loop = asyncio.get_event_loop()
+        
+        def sync_get_db():
+            return get_db()
+        
+        # تنفيذ get_db() في thread منفصل
+        db_context = await loop.run_in_executor(executor, sync_get_db)
+        session = db_context.__enter__()
+        try:
+            result = await func(session, *args, **kwargs)
+            db_context.__exit__(None, None, None)
+            return result
+        except Exception as e:
+            db_context.__exit__(type(e), e, None)
+            raise
     return wrapper
 
 # ================================================
