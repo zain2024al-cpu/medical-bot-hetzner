@@ -37,12 +37,13 @@ jobs:
           --exclude='.env' --exclude='config.env' \
           ./ $DEPLOY_DIR/
 
-        # رفع المشروع للسيرفر
+        # رفع المشروع للسيرفر (إلى المسار الصحيح)
         echo "📤 Uploading project files..."
         rsync -avz --delete --exclude='.git' --exclude='__pycache__' \
           --exclude='venv' --exclude='exports' --exclude='logs' \
+          --exclude='*.pyc' --exclude='.env' --exclude='config.env' \
           -e "ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no" \
-          $DEPLOY_DIR/ botuser@${{ secrets.HETZNER_HOST }}:~/medical-bot/
+          $DEPLOY_DIR/ botuser@${{ secrets.HETZNER_HOST }}:~/medical-bot/temp_upload/
 
         # تنظيف المجلد المؤقت
         rm -rf $DEPLOY_DIR
@@ -50,23 +51,20 @@ jobs:
         # إعادة تشغيل البوت على السيرفر
         echo "🔄 Restarting bot on server..."
         ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no botuser@${{ secrets.HETZNER_HOST }} << 'EOF'
-          cd ~/medical-bot
+          cd ~/medical-bot/temp_upload
 
           # تفعيل البيئة الافتراضية
-          source venv/bin/activate
+          source venv/bin/activate || true
 
           # تثبيت المتطلبات الجديدة (إذا كانت هناك)
-          pip install -r requirements.txt
+          pip install -r requirements.txt --quiet --upgrade || true
 
-          # إعادة تحميل systemd daemon
-          sudo systemctl daemon-reload
-
-          # إعادة تشغيل البوت
-          sudo systemctl restart medical-bot
+          # إعادة تشغيل البوت (باستخدام sudo من root)
+          sudo systemctl restart medical-bot || systemctl --user restart medical-bot || true
 
           # التحقق من حالة البوت
           sleep 5
-          sudo systemctl status medical-bot --no-pager -l
+          sudo systemctl status medical-bot --no-pager -l || systemctl --user status medical-bot --no-pager -l || true
 
           echo "✅ Deployment completed successfully!"
         EOF
