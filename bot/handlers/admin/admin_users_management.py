@@ -36,6 +36,50 @@ async def start_user_management(update: Update, context: ContextTypes.DEFAULT_TY
     logger.info("=" * 80)
     logger.info(f"✅ start_user_management called! Update ID: {update.update_id}")
     
+    # معالجة callback query إذا كان موجوداً
+    if update.callback_query:
+        query = update.callback_query
+        await query.answer()
+        user = update.effective_user
+        
+        logger.info(f"✅ Callback query from user: {user.id if user else 'None'}")
+        logger.info(f"✅ Callback data: '{query.data if query.data else 'None'}'")
+        
+        if not is_admin(user.id):
+            logger.warning(f"❌ المستخدم {user.id} ليس أدمن")
+            await query.edit_message_text("🚫 هذه الخاصية مخصصة للإدمن فقط.")
+            return ConversationHandler.END
+        
+        logger.info(f"✅ الأدمن {user.id} دخل لإدارة المستخدمين")
+        context.user_data.clear()
+        
+        try:
+            await query.edit_message_text(
+                "👥 **إدارة المستخدمين**\n\n"
+                "اختر نوع العرض:",
+                reply_markup=_main_kb(),
+                parse_mode="Markdown"
+            )
+            logger.info(f"✅ Message sent successfully. Returning UM_START: {UM_START}")
+            logger.info("=" * 80)
+            return UM_START
+        except Exception as e:
+            logger.error(f"❌ Error editing message: {e}", exc_info=True)
+            try:
+                await query.message.reply_text(
+                    "👥 **إدارة المستخدمين**\n\n"
+                    "اختر نوع العرض:",
+                    reply_markup=_main_kb(),
+                    parse_mode="Markdown"
+                )
+                logger.info(f"✅ Message sent via reply. Returning UM_START: {UM_START}")
+                logger.info("=" * 80)
+                return UM_START
+            except Exception as e2:
+                logger.error(f"❌ Error sending message: {e2}", exc_info=True)
+                logger.info("=" * 80)
+                return ConversationHandler.END
+    
     if not update.message:
         logger.error("❌ No message in update!")
         return ConversationHandler.END
@@ -903,6 +947,8 @@ def register(app):
     """تسجيل الهاندلرز"""
     conv = ConversationHandler(
         entry_points=[
+            # ✅ معالجة callback query من الزر "admin:manage_users"
+            CallbackQueryHandler(start_user_management, pattern=r"^admin:manage_users$"),
             # ✅ استخدام pattern مرن جداً - يطابق أي نص يحتوي على "إدارة المستخدمين"
             MessageHandler(
                 filters.ChatType.PRIVATE & 
