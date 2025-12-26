@@ -338,12 +338,14 @@ def _build_hospitals_keyboard(page=0, search_query=""):
     items_per_page = 8
     
     # تصفية المستشفيات إذا كان هناك بحث
+    # ✅ استخدام الترتيب المحدد في PREDEFINED_HOSPITALS (بدون إعادة ترتيب)
     if search_query:
         search_lower = search_query.lower()
-        filtered_hospitals = [h for h in PREDEFINED_HOSPITALS if search_lower in h.lower()]
-        hospitals_list = sorted(filtered_hospitals)
+        # الحفاظ على الترتيب الأصلي عند البحث
+        hospitals_list = [h for h in PREDEFINED_HOSPITALS if search_lower in h.lower()]
     else:
-        hospitals_list = sorted(PREDEFINED_HOSPITALS.copy())
+        # استخدام الترتيب المحدد في PREDEFINED_HOSPITALS كما هو
+        hospitals_list = list(PREDEFINED_HOSPITALS)
     
     total = len(hospitals_list)
     total_pages = max(1, (total + items_per_page - 1) // items_per_page)

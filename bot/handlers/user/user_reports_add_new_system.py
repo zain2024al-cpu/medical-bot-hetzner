@@ -2227,13 +2227,15 @@ def _build_hospitals_keyboard(page=0, search_query="", context=None):
     items_per_page = 8
 
     # تصفية المستشفيات إذا كان هناك بحث
+    # ✅ استخدام الترتيب المحدد في PREDEFINED_HOSPITALS (بدون إعادة ترتيب)
     if search_query:
         search_lower = search_query.lower()
-        filtered_hospitals = [
-    h for h in PREDEFINED_HOSPITALS if search_lower in h.lower()]
-        hospitals_list = _sort_hospitals_custom(filtered_hospitals)
+        # الحفاظ على الترتيب الأصلي عند البحث
+        hospitals_list = [
+            h for h in PREDEFINED_HOSPITALS if search_lower in h.lower()]
     else:
-        hospitals_list = _sort_hospitals_custom(PREDEFINED_HOSPITALS.copy())
+        # استخدام الترتيب المحدد في PREDEFINED_HOSPITALS كما هو
+        hospitals_list = list(PREDEFINED_HOSPITALS)
 
     total = len(hospitals_list)
     total_pages = max(1, (total + items_per_page - 1) // items_per_page)
@@ -2331,7 +2333,7 @@ async def handle_hospital_selection(
         if not hospitals_list:
             logger.warning(f"⚠️ hospitals_list is empty, rebuilding it. Index: {hospital_index}")
             # إعادة بناء القائمة
-            hospitals_list = _sort_hospitals_custom(list(PREDEFINED_HOSPITALS))
+            hospitals_list = list(PREDEFINED_HOSPITALS)  # ✅ استخدام الترتيب المحدد بدون إعادة ترتيب
             context.user_data.setdefault("report_tmp", {})["hospitals_list"] = hospitals_list
             logger.info(f"✅ Rebuilt hospitals_list with {len(hospitals_list)} hospitals")
         
@@ -2342,7 +2344,7 @@ async def handle_hospital_selection(
             # إذا فشل، نحاول إعادة بناء القائمة مرة أخرى
             logger.error(f"❌ Invalid hospital index: {hospital_index}, list length: {len(hospitals_list)}")
             # إعادة بناء القائمة
-            hospitals_list = _sort_hospitals_custom(list(PREDEFINED_HOSPITALS))
+            hospitals_list = list(PREDEFINED_HOSPITALS)  # ✅ استخدام الترتيب المحدد بدون إعادة ترتيب
             context.user_data.setdefault("report_tmp", {})["hospitals_list"] = hospitals_list
             if 0 <= hospital_index < len(hospitals_list):
                 choice = hospitals_list[hospital_index]
