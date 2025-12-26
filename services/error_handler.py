@@ -20,7 +20,36 @@ logger = logging.getLogger(__name__)
 async def comprehensive_error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     معالج أخطاء شامل - يمنع توقف البوت عند أي خطأ
+    مع timeout protection لضمان عدم التعليق
     """
+    import asyncio
+    
+    try:
+        # Timeout protection - إذا استغرق المعالج أكثر من 5 ثواني، تخطيه
+        try:
+            await asyncio.wait_for(
+                _process_error(update, context),
+                timeout=5.0
+            )
+        except asyncio.TimeoutError:
+            logger.critical(f"💥 Error handler timeout for update {update.update_id if update else 'N/A'}")
+            # محاولة إرسال رسالة بسيطة جداً
+            try:
+                if update and update.effective_chat:
+                    if update.message:
+                        await update.message.reply_text("⚠️ حدث خطأ. يرجى المحاولة مرة أخرى.")
+                    elif update.callback_query:
+                        await update.callback_query.answer("⚠️ حدث خطأ", show_alert=True)
+            except:
+                pass
+    except Exception as handler_error:
+        # حتى معالج الأخطاء فشل!
+        logger.critical(f"💥 فشل معالج الأخطاء نفسه: {handler_error}")
+        import traceback
+        logger.critical(traceback.format_exc())
+
+async def _process_error(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة الخطأ الفعلية"""
     try:
         error = context.error
         
@@ -145,11 +174,9 @@ async def comprehensive_error_handler(update: Update, context: ContextTypes.DEFA
                     context.user_data.pop("_temp_error_state", None)
             except:
                 pass
-        
-    except Exception as handler_error:
-        # حتى معالج الأخطاء فشل!
-        logger.critical(f"💥 فشل معالج الأخطاء نفسه: {handler_error}")
-        logger.critical(traceback.format_exc())
+    except Exception as process_error:
+        logger.error(f"❌ Error in _process_error: {process_error}")
+        raise
 
 
 

@@ -104,10 +104,11 @@ async def main():
     await app.run_polling(
         allowed_updates=Update.ALL_TYPES,
         drop_pending_updates=True,
-        poll_interval=0.5,  # استعلام سريع
-        timeout=600,  # 10 دقائق - timeout عالي
+        poll_interval=0.3,  # استعلام أسرع للاستجابة الفورية
+        timeout=300,  # 5 دقائق - timeout محسّن
         bootstrap_retries=20,  # محاولات أكثر للاتصال
         close_loop=False,  # عدم إغلاق الـ loop عند الأخطاء
+        stop_signals=None,  # عدم التوقف عند الإشارات
     )
 
 # ================================================

@@ -12,9 +12,11 @@ def register_all_handlers(app):
     from bot.handlers.shared.shared_refresh import register as register_shared_refresh
     from bot.handlers.shared.shared_schedule import register as register_shared_schedule
     from bot.handlers.shared.group_handler import register as register_group_handler
+    from bot.handlers.shared.universal_fallback import register as register_universal_fallback
     register_shared_refresh(app)
     register_shared_schedule(app)
     register_group_handler(app)  # ✅ معالجة الرسائل في المجموعات
+    register_universal_fallback(app)  # ✅ معالجة جميع الرسائل غير المعالجة
     
     # 🔸 تسجيل واجهة الأدمن
     from bot.handlers.admin.admin_start import register as register_admin_start
