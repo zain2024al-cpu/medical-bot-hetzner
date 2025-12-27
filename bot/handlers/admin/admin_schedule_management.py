@@ -868,28 +868,74 @@ def write_patient_names_to_file(names):
 
 async def handle_manage_patients(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """إدارة أسماء المرضى من الملف"""
-    query = update.callback_query
-    await query.answer()
+    import logging
+    logger = logging.getLogger(__name__)
     
-    # ✅ قراءة الأسماء من الملف مباشرة
-    names = read_patient_names_from_file()
-    
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("➕ إضافة اسم جديد", callback_data="add_patient_name")],
-        [InlineKeyboardButton("📋 عرض جميع الأسماء", callback_data="view_patient_names")],
-        [InlineKeyboardButton("✏️ تعديل اسم", callback_data="edit_patient_name")],
-        [InlineKeyboardButton("🗑️ حذف اسم", callback_data="delete_patient_name")],
-        [InlineKeyboardButton("🔙 رجوع", callback_data="back_to_schedule")]
-    ])
-    
-    await query.edit_message_text(
-        f"📝 **إدارة أسماء المرضى**\n\n"
-        f"📊 **عدد الأسماء:** {len(names)}\n\n"
-        f"اختر العملية:",
-        reply_markup=keyboard,
-        parse_mode=ParseMode.MARKDOWN
-    )
-    return SCHEDULE_MENU
+    try:
+        query = update.callback_query
+        if not query:
+            logger.error("❌ handle_manage_patients: No callback query found")
+            return SCHEDULE_MENU
+        
+        await query.answer()
+        
+        # ✅ قراءة الأسماء من الملف مباشرة
+        try:
+            names = read_patient_names_from_file()
+        except Exception as read_error:
+            logger.error(f"❌ Error reading patient names: {read_error}", exc_info=True)
+            names = []
+        
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("➕ إضافة اسم جديد", callback_data="add_patient_name")],
+            [InlineKeyboardButton("📋 عرض جميع الأسماء", callback_data="view_patient_names")],
+            [InlineKeyboardButton("✏️ تعديل اسم", callback_data="edit_patient_name")],
+            [InlineKeyboardButton("🗑️ حذف اسم", callback_data="delete_patient_name")],
+            [InlineKeyboardButton("🔙 رجوع", callback_data="back_to_schedule")]
+        ])
+        
+        try:
+            await query.edit_message_text(
+                f"📝 **إدارة أسماء المرضى**\n\n"
+                f"📊 **عدد الأسماء:** {len(names)}\n\n"
+                f"اختر العملية:",
+                reply_markup=keyboard,
+                parse_mode=ParseMode.MARKDOWN
+            )
+        except Exception as edit_error:
+            logger.error(f"❌ Error editing message: {edit_error}", exc_info=True)
+            try:
+                # محاولة إرسال بدون Markdown
+                await query.edit_message_text(
+                    f"📝 إدارة أسماء المرضى\n\n"
+                    f"📊 عدد الأسماء: {len(names)}\n\n"
+                    f"اختر العملية:",
+                    reply_markup=keyboard
+                )
+            except Exception as fallback_error:
+                logger.error(f"❌ Error sending plain text: {fallback_error}", exc_info=True)
+                try:
+                    await query.answer("⚠️ حدث خطأ في عرض القائمة", show_alert=True)
+                except:
+                    pass
+        
+        return SCHEDULE_MENU
+    except Exception as e:
+        logger.error(f"❌ Unexpected error in handle_manage_patients: {e}", exc_info=True)
+        try:
+            if query:
+                await query.answer("⚠️ حدث خطأ غير متوقع", show_alert=True)
+                await query.edit_message_text(
+                    "❌ **حدث خطأ غير متوقع**\n\n"
+                    "يرجى المحاولة مرة أخرى أو التواصل مع الإدارة.",
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("🔙 رجوع", callback_data="back_to_schedule")]
+                    ]),
+                    parse_mode=ParseMode.MARKDOWN
+                )
+        except:
+            pass
+        return SCHEDULE_MENU
 
 async def handle_view_patient_names(update: Update, context: ContextTypes.DEFAULT_TYPE, page: int = 0):
     """عرض أسماء المرضى من الملف مع pagination"""
