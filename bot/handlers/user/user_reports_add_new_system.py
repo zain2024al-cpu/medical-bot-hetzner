@@ -8164,6 +8164,42 @@ def escape_markdown_v1(text: str) -> str:
     escape_chars = r'_*[]()`'
     return re.sub(r'([{}])'.format(re.escape(escape_chars)), r'\\\1', text)
 
+def map_field_key_to_report_tmp_key(field_key):
+    """تحويل field_key إلى اسم الحقل الفعلي في report_tmp"""
+    mapping = {
+        "complaint": "complaint_text",  # شكوى المريض
+        "decision": "doctor_decision",  # قرار الطبيب
+        "diagnosis": "diagnosis",  # التشخيص
+        "tests": "tests",  # الفحوصات
+        "notes": "notes",  # الملاحظات
+        "admission_reason": "admission_reason",  # سبب الرقود
+        "room_number": "room_number",  # رقم الغرفة
+        "status": "status",  # وضع الحالة
+        "admission_type": "admission_type",  # نوع الترقيد
+        "operation_details": "operation_details_ar",  # تفاصيل العملية
+        "operation_name_en": "operation_name_en",  # اسم العملية بالإنجليزي
+        "success_rate": "success_rate",  # نسبة النجاح
+        "benefit_rate": "benefit_rate",  # نسبة الاستفادة
+        "recommendations": "recommendations",  # التوصيات
+        "discharge_type": "discharge_type",  # نوع الخروج
+        "admission_summary": "admission_summary",  # ملخص الرقود
+        "therapy_details": "therapy_details",  # تفاصيل العلاج الطبيعي
+        "device_name": "device_name",  # اسم الجهاز
+        "radiology_type": "radiology_type",  # نوع الأشعة
+        "delivery_date": "delivery_date",  # تاريخ الاستلام
+        # الحقول التي لا تحتاج تحويل
+        "medical_action": "medical_action",
+        "report_date": "report_date",
+        "patient_name": "patient_name",
+        "hospital_name": "hospital_name",
+        "department_name": "department_name",
+        "doctor_name": "doctor_name",
+        "followup_date": "followup_date",
+        "followup_time": "followup_time",
+        "followup_reason": "followup_reason",
+    }
+    return mapping.get(field_key, field_key)
+
 def get_field_display_name(field_key):
     """الحصول على اسم الحقل للعرض"""
     names = {
@@ -8521,16 +8557,21 @@ async def handle_edit_field_input_during_entry(update: Update, context: ContextT
             )
             return "EDIT_FIELD_DURING_ENTRY"
         
-        # حفظ القيمة الجديدة
+        # حفظ القيمة الجديدة - تحويل field_key إلى اسم الحقل الفعلي في report_tmp
         data = context.user_data.get("report_tmp", {})
-        data[field_key] = text
+        actual_field_key = map_field_key_to_report_tmp_key(field_key)
+        data[actual_field_key] = text
+        
+        # أيضاً حفظ في field_key الأصلي للتوافق مع الكود القديم
+        if actual_field_key != field_key:
+            data[field_key] = text
         
         # مسح معلومات التعديل
         context.user_data.pop("edit_field_key", None)
         context.user_data.pop("edit_flow_type", None)
         context.user_data.pop("edit_during_entry", None)
         
-        logger.info(f"✅ تم حفظ التعديل: {field_key} = {text[:50]}")
+        logger.info(f"✅ تم حفظ التعديل: {field_key} -> {actual_field_key} = {text[:50]}")
         
         # العودة للحالة الحالية التي كان فيها المستخدم قبل التعديل
         last_state = context.user_data.get('_last_state_before_edit')
