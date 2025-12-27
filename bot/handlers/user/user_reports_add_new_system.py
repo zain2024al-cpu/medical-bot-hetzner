@@ -4059,7 +4059,7 @@ async def handle_new_consult_complaint(update: Update, context: ContextTypes.DEF
     logger.info(f"NEW_CONSULT_COMPLAINT: Received text length = {len(text)}")
     
     try:
-        valid, msg = validate_text_input(text, min_length=3, max_length=500)
+        valid, msg = validate_text_input(text, min_length=3, max_length=1000)
         logger.info(f"NEW_CONSULT_COMPLAINT: Validation result = {valid}, message = {msg}")
     except Exception as e:
         logger.error(f"NEW_CONSULT_COMPLAINT: Error in validation: {e}", exc_info=True)
@@ -4158,7 +4158,7 @@ async def handle_new_consult_diagnosis(update: Update, context: ContextTypes.DEF
     logger.info(f"NEW_CONSULT_DIAGNOSIS: Received text length = {len(text)}")
     
     try:
-        valid, msg = validate_text_input(text, min_length=3, max_length=500)
+        valid, msg = validate_text_input(text, min_length=3, max_length=1000)
         logger.info(f"NEW_CONSULT_DIAGNOSIS: Validation result = {valid}, message = {msg}")
     except Exception as e:
         logger.error(f"NEW_CONSULT_DIAGNOSIS: Error in validation: {e}", exc_info=True)
@@ -4211,7 +4211,7 @@ async def handle_new_consult_decision(update: Update, context: ContextTypes.DEFA
     context.user_data.setdefault("report_tmp", {})
     
     text = update.message.text.strip()
-    valid, msg = validate_text_input(text, min_length=3, max_length=500)
+    valid, msg = validate_text_input(text, min_length=3, max_length=1000)
 
     if not valid:
         # ✅ إعادة إرسال السؤال الحالي مع زر الرجوع
@@ -4267,7 +4267,7 @@ async def handle_new_consult_tests(update: Update, context: ContextTypes.DEFAULT
     if text.lower() in ['لا يوجد', 'لا', 'no', 'none']:
         text = "لا يوجد"
     else:
-        valid, msg = validate_text_input(text, min_length=3, max_length=500)
+        valid, msg = validate_text_input(text, min_length=3, max_length=1000)
         if not valid:
             # ✅ إعادة إرسال السؤال الحالي مع زر الرجوع
             questions = get_questions_for_flow("new_consult")
@@ -4980,7 +4980,7 @@ async def handle_followup_complaint(update: Update, context: ContextTypes.DEFAUL
     context.user_data.setdefault("report_tmp", {})
     
     text = update.message.text.strip()
-    valid, msg = validate_text_input(text, min_length=3, max_length=500)
+    valid, msg = validate_text_input(text, min_length=3, max_length=1000)
 
     if not valid:
         await update.message.reply_text(
@@ -5012,7 +5012,7 @@ async def handle_followup_diagnosis(update: Update, context: ContextTypes.DEFAUL
     context.user_data.setdefault("report_tmp", {})
     
     text = update.message.text.strip()
-    valid, msg = validate_text_input(text, min_length=3, max_length=500)
+    valid, msg = validate_text_input(text, min_length=3, max_length=1000)
 
     if not valid:
         await update.message.reply_text(
@@ -5044,7 +5044,7 @@ async def handle_followup_decision(update: Update, context: ContextTypes.DEFAULT
     context.user_data.setdefault("report_tmp", {})
     
     text = update.message.text.strip()
-    valid, msg = validate_text_input(text, min_length=3, max_length=500)
+    valid, msg = validate_text_input(text, min_length=3, max_length=1000)
 
     if not valid:
         await update.message.reply_text(
@@ -5175,7 +5175,7 @@ async def handle_emergency_complaint(update: Update, context: ContextTypes.DEFAU
     context.user_data['_conversation_state'] = EMERGENCY_COMPLAINT
     
     text = update.message.text.strip()
-    valid, msg = validate_text_input(text, min_length=3, max_length=500)
+    valid, msg = validate_text_input(text, min_length=3, max_length=1000)
 
     if not valid:
         await update.message.reply_text(
@@ -5204,7 +5204,7 @@ async def handle_emergency_diagnosis(update: Update, context: ContextTypes.DEFAU
     context.user_data.setdefault("report_tmp", {})
     
     text = update.message.text.strip()
-    valid, msg = validate_text_input(text, min_length=3, max_length=500)
+    valid, msg = validate_text_input(text, min_length=3, max_length=1000)
 
     if not valid:
         await update.message.reply_text(
@@ -5233,7 +5233,7 @@ async def handle_emergency_decision(update: Update, context: ContextTypes.DEFAUL
     context.user_data.setdefault("report_tmp", {})
     
     text = update.message.text.strip()
-    valid, msg = validate_text_input(text, min_length=3, max_length=500)
+    valid, msg = validate_text_input(text, min_length=3, max_length=1000)
 
     if not valid:
         await update.message.reply_text(
@@ -5478,7 +5478,7 @@ async def start_admission_flow(message, context):
 async def handle_admission_reason(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """الحقل 1: سبب الرقود"""
     text = update.message.text.strip()
-    valid, msg = validate_text_input(text, min_length=3, max_length=500)
+    valid, msg = validate_text_input(text, min_length=3, max_length=1000)
 
     if not valid:
         await update.message.reply_text(
@@ -5641,7 +5641,7 @@ async def handle_surgery_consult_diagnosis(update: Update, context: ContextTypes
     context.user_data['_conversation_state'] = SURGERY_CONSULT_DIAGNOSIS
     
     text = update.message.text.strip()
-    valid, msg = validate_text_input(text, min_length=3, max_length=500)
+    valid, msg = validate_text_input(text, min_length=3, max_length=1000)
 
     if not valid:
         await update.message.reply_text(
@@ -6141,7 +6141,7 @@ async def handle_final_consult_diagnosis(update: Update, context: ContextTypes.D
     context.user_data['_conversation_state'] = FINAL_CONSULT_DIAGNOSIS
     
     text = update.message.text.strip()
-    valid, msg = validate_text_input(text, min_length=3, max_length=500)
+    valid, msg = validate_text_input(text, min_length=3, max_length=1000)
 
     if not valid:
         await update.message.reply_text(
@@ -6480,7 +6480,7 @@ async def handle_rehab_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_physical_therapy_details(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """علاج طبيعي - الحقل 1: تفاصيل الجلسة"""
     text = update.message.text.strip()
-    valid, msg = validate_text_input(text, min_length=5, max_length=500)
+    valid, msg = validate_text_input(text, min_length=5, max_length=1000)
 
     if not valid:
         await update.message.reply_text(
@@ -6577,7 +6577,7 @@ async def handle_physical_therapy_followup_reason(update: Update, context: Conte
 async def handle_device_name_details(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """أجهزة تعويضية - الحقل 1: اسم الجهاز والتفاصيل"""
     text = update.message.text.strip()
-    valid, msg = validate_text_input(text, min_length=5, max_length=500)
+    valid, msg = validate_text_input(text, min_length=5, max_length=1000)
 
     if not valid:
         await update.message.reply_text(
@@ -6677,7 +6677,7 @@ async def handle_radiology_type(update: Update, context: ContextTypes.DEFAULT_TY
     context.user_data['_conversation_state'] = RADIOLOGY_TYPE
     
     text = update.message.text.strip()
-    valid, msg = validate_text_input(text, min_length=3, max_length=500)
+    valid, msg = validate_text_input(text, min_length=3, max_length=1000)
 
     if not valid:
         await update.message.reply_text(
@@ -7016,7 +7016,7 @@ async def handle_app_reschedule_reason(update: Update, context: ContextTypes.DEF
     context.user_data['_conversation_state'] = APP_RESCHEDULE_REASON
     
     text = update.message.text.strip()
-    valid, msg = validate_text_input(text, min_length=3, max_length=500)
+    valid, msg = validate_text_input(text, min_length=3, max_length=1000)
 
     if not valid:
         await update.message.reply_text(
@@ -7149,7 +7149,7 @@ async def handle_app_reschedule_return_reason(update: Update, context: ContextTy
     context.user_data['_conversation_state'] = APP_RESCHEDULE_RETURN_REASON
     
     text = update.message.text.strip()
-    valid, msg = validate_text_input(text, min_length=3, max_length=500)
+    valid, msg = validate_text_input(text, min_length=3, max_length=1000)
 
     if not valid:
         await update.message.reply_text(
