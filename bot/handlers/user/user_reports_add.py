@@ -756,7 +756,7 @@ async def handle_radiology_enter_button(update: Update, context: ContextTypes.DE
 
 async def handle_radiology_type_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
-    valid, msg = validate_text_input(text, min_length=3, max_length=500)
+    valid, msg = validate_text_input(text, min_length=3, max_length=1000)
     if not valid:
         await update.message.reply_text(f"⚠️ **خطأ: {msg}**", reply_markup=_cancel_kb(), parse_mode="Markdown")
         return R_RADIOLOGY_TYPE
@@ -1036,7 +1036,7 @@ async def handle_case_status_choice(update: Update, context: ContextTypes.DEFAUL
 
 async def handle_case_status_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
-    valid, msg = validate_text_input(text, min_length=3, max_length=500)
+    valid, msg = validate_text_input(text, min_length=3, max_length=1000)
     if not valid:
         await update.message.reply_text(f"⚠️ {msg}", reply_markup=_cancel_kb(), parse_mode="Markdown")
         return R_CASE_STATUS
@@ -1523,7 +1523,7 @@ async def handle_followup_date_text(update: Update, context: ContextTypes.DEFAUL
 
 async def handle_followup_reason(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
-    valid, msg = validate_text_input(text, min_length=3, max_length=500)
+    valid, msg = validate_text_input(text, min_length=3, max_length=1000)
     if not valid:
         await update.message.reply_text(f"⚠️ {msg}", reply_markup=_cancel_kb(), parse_mode="Markdown")
         return R_FOLLOWUP_REASON
