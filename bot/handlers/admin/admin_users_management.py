@@ -496,40 +496,126 @@ async def _handle_user_action(query, context, action):
         user_name = user.full_name
         
         if action == "approve":
-            user.is_approved = True
-            user.is_suspended = False
-            s.commit()
-            message = f"✅ **تم الموافقة على المستخدم**\n\n👤 {user_name}"
-            
-            # إرسال إشعار للمستخدم
             try:
-                await context.bot.send_message(
-                    chat_id=user_tg_id,
-                    text="🎉 **مرحباً بك!**\n\n"
-                         "✅ تم الموافقة على حسابك.\n"
-                         "يمكنك الآن استخدام النظام بالكامل.\n\n"
-                         "اضغط /start للبدء!",
-                    parse_mode="Markdown"
-                )
+                user.is_approved = True
+                user.is_suspended = False
+                s.commit()
+                
+                user_name_escaped = _escape_markdown_v2(str(user_name))
+                message = f"✅ **تم الموافقة على المستخدم**\n\n👤 {user_name_escaped}"
+                
+                # إرسال رسالة تأكيد للأدمن
+                try:
+                    await query.edit_message_text(
+                        f"{message}\n\n👥 إدارة المستخدمين:",
+                        reply_markup=_main_kb(),
+                        parse_mode="Markdown"
+                    )
+                except Exception as edit_error:
+                    logger.error(f"❌ Error editing message after approve: {edit_error}", exc_info=True)
+                    try:
+                        message_plain = message.replace('**', '').replace('*', '')
+                        await query.edit_message_text(
+                            f"{message_plain}\n\n👥 إدارة المستخدمين:",
+                            reply_markup=_main_kb()
+                        )
+                    except Exception as fallback_error:
+                        logger.error(f"❌ Error sending plain text after approve: {fallback_error}", exc_info=True)
+                        await query.answer("✅ تم الموافقة على المستخدم", show_alert=False)
+                
+                # إرسال إشعار للمستخدم
+                try:
+                    await context.bot.send_message(
+                        chat_id=user_tg_id,
+                        text="🎉 **مرحباً بك!**\n\n"
+                             "✅ تم الموافقة على حسابك.\n"
+                             "يمكنك الآن استخدام النظام بالكامل.\n\n"
+                             "اضغط /start للبدء!",
+                        parse_mode="Markdown"
+                    )
+                except Exception as e:
+                    logger.error(f"فشل إرسال إشعار الموافقة: {e}")
+                
+                # مسح بيانات المستخدم المحدد من context
+                context.user_data.pop("selected_user_id", None)
+                
+                return UM_START
+                
             except Exception as e:
-                logger.error(f"فشل إرسال إشعار الموافقة: {e}")
+                logger.error(f"❌ Error in approve action: {e}", exc_info=True)
+                try:
+                    await query.edit_message_text(
+                        f"❌ **حدث خطأ أثناء الموافقة على المستخدم**\n\n"
+                        f"**الخطأ:** {str(e)}\n\n"
+                        f"يرجى المحاولة مرة أخرى.",
+                        reply_markup=_main_kb(),
+                        parse_mode="Markdown"
+                    )
+                except:
+                    await query.answer("❌ حدث خطأ أثناء الموافقة على المستخدم", show_alert=True)
+                return UM_START
                 
         elif action == "reject":
-            s.delete(user)
-            s.commit()
-            message = f"❌ **تم رفض المستخدم**\n\n👤 {user_name}"
-            
-            # إرسال إشعار للمستخدم
             try:
-                await context.bot.send_message(
-                    chat_id=user_tg_id,
-                    text="❌ **تم رفض طلبك**\n\n"
-                         "عذراً، لم تتم الموافقة على حسابك.\n"
-                         "للمزيد من المعلومات، يرجى التواصل مع الإدارة.",
-                    parse_mode="Markdown"
-                )
+                # حفظ الاسم قبل الحذف
+                user_name_escaped = _escape_markdown_v2(str(user_name))
+                
+                # حذف المستخدم من قاعدة البيانات
+                s.delete(user)
+                s.commit()
+                
+                # إرسال رسالة تأكيد للأدمن
+                message = f"❌ **تم رفض المستخدم**\n\n👤 {user_name_escaped}"
+                
+                try:
+                    await query.edit_message_text(
+                        f"{message}\n\n👥 إدارة المستخدمين:",
+                        reply_markup=_main_kb(),
+                        parse_mode="Markdown"
+                    )
+                except Exception as edit_error:
+                    logger.error(f"❌ Error editing message after reject: {edit_error}", exc_info=True)
+                    try:
+                        # محاولة إرسال بدون Markdown
+                        message_plain = message.replace('**', '').replace('*', '')
+                        await query.edit_message_text(
+                            f"{message_plain}\n\n👥 إدارة المستخدمين:",
+                            reply_markup=_main_kb()
+                        )
+                    except Exception as fallback_error:
+                        logger.error(f"❌ Error sending plain text after reject: {fallback_error}", exc_info=True)
+                        await query.answer("✅ تم رفض المستخدم", show_alert=False)
+                
+                # إرسال إشعار للمستخدم المرفوض
+                try:
+                    await context.bot.send_message(
+                        chat_id=user_tg_id,
+                        text="❌ **تم رفض طلبك**\n\n"
+                             "عذراً، لم تتم الموافقة على حسابك.\n"
+                             "للمزيد من المعلومات، يرجى التواصل مع الإدارة.",
+                        parse_mode="Markdown"
+                    )
+                except Exception as e:
+                    logger.error(f"فشل إرسال إشعار الرفض: {e}")
+                
+                # مسح بيانات المستخدم المحدد من context
+                context.user_data.pop("selected_user_id", None)
+                
+                return UM_START
+                
             except Exception as e:
-                logger.error(f"فشل إرسال إشعار الرفض: {e}")
+                logger.error(f"❌ Error in reject action: {e}", exc_info=True)
+                try:
+                    await query.edit_message_text(
+                        f"❌ **حدث خطأ أثناء رفض المستخدم**\n\n"
+                        f"**الخطأ:** {str(e)}\n\n"
+                        f"يرجى المحاولة مرة أخرى.",
+                        reply_markup=_main_kb(),
+                        parse_mode="Markdown"
+                    )
+                except:
+                    await query.answer("❌ حدث خطأ أثناء رفض المستخدم", show_alert=True)
+                return UM_START
                 
         elif action == "suspend":
             # حفظ معلومات المستخدم للاستخدام لاحقاً
@@ -556,29 +642,70 @@ async def _handle_user_action(query, context, action):
             return UM_SUSPEND_REASON
                 
         elif action == "unsuspend":
-            user.is_suspended = False
-            if hasattr(user, 'suspended_at'):
-                user.suspended_at = None
-            if hasattr(user, 'suspension_reason'):
-                user.suspension_reason = None
-            s.commit()
-            message = f"🔓 **تم إلغاء تجميد المستخدم بنجاح**\n\n"
-            message += f"👤 **الاسم:** {user_name}\n"
-            message += f"📅 **التاريخ:** {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n"
-            message += f"✅ يمكنه الآن استخدام النظام بشكل كامل."
-            
-            # إرسال إشعار للمستخدم
             try:
-                await context.bot.send_message(
-                    chat_id=user_tg_id,
-                    text="🔓 **تم تفعيل حسابك**\n\n"
-                         "✅ تم إلغاء تجميد حسابك.\n"
-                         "يمكنك الآن استخدام النظام بالكامل.\n\n"
-                         "اضغط /start للمتابعة!",
-                    parse_mode="Markdown"
-                )
+                user.is_suspended = False
+                if hasattr(user, 'suspended_at'):
+                    user.suspended_at = None
+                if hasattr(user, 'suspension_reason'):
+                    user.suspension_reason = None
+                s.commit()
+                
+                user_name_escaped = _escape_markdown_v2(str(user_name))
+                message = f"🔓 **تم إلغاء تجميد المستخدم بنجاح**\n\n"
+                message += f"👤 **الاسم:** {user_name_escaped}\n"
+                message += f"📅 **التاريخ:** {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n"
+                message += f"✅ يمكنه الآن استخدام النظام بشكل كامل."
+                
+                # إرسال رسالة تأكيد للأدمن
+                try:
+                    await query.edit_message_text(
+                        f"{message}\n\n👥 إدارة المستخدمين:",
+                        reply_markup=_main_kb(),
+                        parse_mode="Markdown"
+                    )
+                except Exception as edit_error:
+                    logger.error(f"❌ Error editing message after unsuspend: {edit_error}", exc_info=True)
+                    try:
+                        message_plain = message.replace('**', '').replace('*', '')
+                        await query.edit_message_text(
+                            f"{message_plain}\n\n👥 إدارة المستخدمين:",
+                            reply_markup=_main_kb()
+                        )
+                    except Exception as fallback_error:
+                        logger.error(f"❌ Error sending plain text after unsuspend: {fallback_error}", exc_info=True)
+                        await query.answer("✅ تم إلغاء تجميد المستخدم", show_alert=False)
+                
+                # إرسال إشعار للمستخدم
+                try:
+                    await context.bot.send_message(
+                        chat_id=user_tg_id,
+                        text="🔓 **تم تفعيل حسابك**\n\n"
+                             "✅ تم إلغاء تجميد حسابك.\n"
+                             "يمكنك الآن استخدام النظام بالكامل.\n\n"
+                             "اضغط /start للمتابعة!",
+                        parse_mode="Markdown"
+                    )
+                except Exception as e:
+                    logger.error(f"فشل إرسال إشعار إلغاء التجميد: {e}")
+                
+                # مسح بيانات المستخدم المحدد من context
+                context.user_data.pop("selected_user_id", None)
+                
+                return UM_START
+                
             except Exception as e:
-                logger.error(f"فشل إرسال إشعار إلغاء التجميد: {e}")
+                logger.error(f"❌ Error in unsuspend action: {e}", exc_info=True)
+                try:
+                    await query.edit_message_text(
+                        f"❌ **حدث خطأ أثناء إلغاء تجميد المستخدم**\n\n"
+                        f"**الخطأ:** {str(e)}\n\n"
+                        f"يرجى المحاولة مرة أخرى.",
+                        reply_markup=_main_kb(),
+                        parse_mode="Markdown"
+                    )
+                except:
+                    await query.answer("❌ حدث خطأ أثناء إلغاء تجميد المستخدم", show_alert=True)
+                return UM_START
                 
         elif action == "delete":
             # طلب تأكيد الحذف
@@ -605,7 +732,15 @@ async def _handle_user_action(query, context, action):
             )
             return UM_USER_ACTIONS
         
-        await query.edit_message_text(f"{message}\n\n👥 إدارة المستخدمين:", reply_markup=_main_kb(), parse_mode="Markdown")
+        # هذا السطر يجب ألا يصل إليه أبداً لأن جميع الحالات ترجع قبلها
+        # لكن نضعه كـ fallback للسلامة
+        logger.warning(f"⚠️ _handle_user_action reached end without return for action: {action}")
+        await query.edit_message_text(
+            "❌ **حدث خطأ غير متوقع**\n\n"
+            "يرجى المحاولة مرة أخرى.",
+            reply_markup=_main_kb(),
+            parse_mode="Markdown"
+        )
         return UM_START
 
 async def _show_suspended_users(query, context, page=0):
