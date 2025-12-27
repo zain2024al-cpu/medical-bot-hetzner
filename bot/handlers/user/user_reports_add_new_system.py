@@ -8826,8 +8826,8 @@ async def show_final_summary(message, context, flow_type):
         summary += f"🏷️ **القسم:** {department_name}\n"
         summary += f"👨‍⚕️ **الطبيب:** {doctor_name}\n\n"
 
-    # نوع الإجراء
-    action_names = {
+        # نوع الإجراء
+        action_names = {
         "new_consult": "استشارة جديدة",
         "followup": "متابعة في الرقود",
         "surgery_consult": "استشارة مع قرار عملية",
