@@ -8302,19 +8302,55 @@ async def handle_edit_during_entry(update: Update, context: ContextTypes.DEFAULT
             if last_state:
                 context.user_data['_conversation_state'] = last_state
                 context.user_data.pop('_last_state_before_edit', None)
+                
+                # الحصول على flow_type الحالي
+                flow_type = context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
+                
+                # الحصول على اسم الحقل الحالي
+                field_display = get_field_display_name_from_state(last_state)
+                
+                # بناء رسالة توضح الخطوة التالية
+                text = f"✅ **تم الإلغاء**\n\n"
+                text += f"📋 **أنت الآن في:** {field_display}\n\n"
+                text += f"يرجى إكمال إدخال البيانات في هذا الحقل."
+                
                 # حذف رسالة القائمة
                 try:
                     await query.message.delete()
                 except:
                     pass
-                logger.info(f"✅ العودة للحالة السابقة: {last_state}")
+                
+                # إرسال رسالة توضح الخطوة التالية
+                try:
+                    await query.message.reply_text(
+                        text,
+                        parse_mode="Markdown"
+                    )
+                except:
+                    # إذا فشل، نستخدم edit_message_text
+                    await query.edit_message_text(
+                        text,
+                        parse_mode="Markdown"
+                    )
+                
+                logger.info(f"✅ العودة للحالة السابقة: {last_state}, field: {field_display}")
                 return last_state
             else:
+                # إذا لم يكن هناك state محفوظ، نحاول الحصول على flow_type وإرجاع الحالة الأولى
+                flow_type = context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
+                first_state = get_first_state(flow_type)
+                context.user_data['_conversation_state'] = first_state
+                
+                field_display = get_field_display_name_from_state(first_state)
+                
                 await query.edit_message_text(
-                    "✅ تم الإلغاء",
+                    f"✅ **تم الإلغاء**\n\n"
+                    f"📋 **أنت الآن في:** {field_display}\n\n"
+                    f"يرجى إكمال إدخال البيانات في هذا الحقل.",
                     parse_mode="Markdown"
                 )
-                return ConversationHandler.END
+                logger.info(f"⚠️ لم يكن هناك state محفوظ، العودة للحالة الأولى: {first_state}")
+                return first_state
         
         return ConversationHandler.END
         
