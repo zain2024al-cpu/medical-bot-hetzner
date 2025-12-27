@@ -96,11 +96,14 @@ async def handle_schedule_choice(update: Update, context: ContextTypes.DEFAULT_T
     logger.info(f"✅ Current state: {context.user_data.get('_conversation_state', 'None')}")
     
     if choice == "upload_schedule":
+        logger.info(f"✅ User selected upload_schedule. Setting state to UPLOAD_SCHEDULE: {UPLOAD_SCHEDULE}")
+        context.user_data["_conversation_state"] = UPLOAD_SCHEDULE
         await query.edit_message_text(
             "📤 **رفع جدول جديد**\n\n"
             "أرسل صورة الجدول الآن:",
             parse_mode=ParseMode.MARKDOWN
         )
+        logger.info(f"✅ Message sent. Returning UPLOAD_SCHEDULE: {UPLOAD_SCHEDULE}")
         return UPLOAD_SCHEDULE
     
     elif choice == "view_schedule":
@@ -132,12 +135,32 @@ async def upload_schedule_image(update: Update, context: ContextTypes.DEFAULT_TY
     import logging
     logger = logging.getLogger(__name__)
     
+    logger.info("=" * 80)
+    logger.info(f"✅ upload_schedule_image called! Update ID: {update.update_id}")
+    
     try:
         if not update.message:
             logger.error("❌ No message in update")
             return UPLOAD_SCHEDULE
         
-        if not update.message.photo:
+        logger.info(f"✅ Message exists. Photo: {bool(update.message.photo)}, Document: {bool(update.message.document)}")
+        
+        # دعم الصور والملفات
+        photo = None
+        file_id = None
+        filename = None
+        
+        if update.message.photo:
+            photo = update.message.photo[-1]  # أعلى دقة
+            file_id = photo.file_id
+            filename = f"schedule_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
+            logger.info(f"✅ Received photo: file_id={file_id}, size={photo.file_size}")
+        elif update.message.document and update.message.document.mime_type and update.message.document.mime_type.startswith("image"):
+            file_id = update.message.document.file_id
+            filename = update.message.document.file_name or f"schedule_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
+            logger.info(f"✅ Received document image: file_id={file_id}, filename={filename}")
+        else:
+            logger.warning("⚠️ No photo or image document in message")
             await update.message.reply_text(
                 "⚠️ **يرجى إرسال صورة الجدول**\n\n"
                 "❌ أو اكتب 'إلغاء' لإنهاء العملية",
@@ -145,13 +168,9 @@ async def upload_schedule_image(update: Update, context: ContextTypes.DEFAULT_TY
             )
             return UPLOAD_SCHEDULE
         
-        # حفظ الصورة
-        photo = update.message.photo[-1]  # أعلى دقة
-        logger.info(f"✅ Received photo: file_id={photo.file_id}, size={photo.file_size}")
-        
         # الحصول على الملف
         try:
-            file = await context.bot.get_file(photo.file_id)
+            file = await context.bot.get_file(file_id)
             logger.info(f"✅ Got file object: {file.file_path}")
         except Exception as e:
             logger.error(f"❌ Error getting file: {e}", exc_info=True)
@@ -216,7 +235,7 @@ async def upload_schedule_image(update: Update, context: ContextTypes.DEFAULT_TY
         try:
             with SessionLocal() as s:
                 schedule_image = ScheduleImage(
-                    file_id=photo.file_id,
+                    file_id=file_id,
                     file_path=file_path,
                     uploader_id=update.effective_user.id
                 )
@@ -226,7 +245,7 @@ async def upload_schedule_image(update: Update, context: ContextTypes.DEFAULT_TY
                 
                 context.user_data["schedule_image_id"] = schedule_image.id
                 context.user_data["file_path"] = file_path
-                context.user_data["photo_file_id"] = photo.file_id
+                context.user_data["photo_file_id"] = file_id
                 
                 logger.info(f"✅ Saved to database: schedule_image_id={schedule_image.id}")
         except Exception as e:
@@ -254,6 +273,8 @@ async def upload_schedule_image(update: Update, context: ContextTypes.DEFAULT_TY
             parse_mode=ParseMode.MARKDOWN
         )
         
+        logger.info(f"✅ Success message sent. Returning CONFIRM_SCHEDULE: {CONFIRM_SCHEDULE}")
+        logger.info("=" * 80)
         return CONFIRM_SCHEDULE
         
     except Exception as e:
@@ -1565,6 +1586,8 @@ def register(app):
             ],
             UPLOAD_SCHEDULE: [
                 MessageHandler(filters.PHOTO, upload_schedule_image),
+                MessageHandler(filters.Document.IMAGE, upload_schedule_image),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, upload_schedule_image),  # Fallback for text messages
                 CallbackQueryHandler(cancel_upload, pattern="^cancel_upload$"),
             ],
             CONFIRM_SCHEDULE: [
