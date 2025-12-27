@@ -7345,59 +7345,130 @@ async def handle_translator_list_callback(update: Update, context: ContextTypes.
 
 async def handle_translator_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة اختيار المترجم"""
-    query = update.callback_query
-    await query.answer()
-
-    parts = query.data.split(":")
-    flow_type = parts[1]
+    import logging
+    logger = logging.getLogger(__name__)
     
-    # معالجة اختيار المترجم من القائمة (translator_idx)
-    if query.data.startswith("translator_idx:"):
-        try:
-            translator_id = int(parts[2])
-            with SessionLocal() as s:
-                translator = s.query(Translator).filter_by(id=translator_id).first()
-                if translator:
-                    context.user_data.setdefault("report_tmp", {})["translator_name"] = translator.full_name
-                    context.user_data["report_tmp"]["translator_id"] = translator.id
-                else:
-                    context.user_data.setdefault("report_tmp", {})["translator_name"] = "غير محدد"
-                    context.user_data["report_tmp"]["translator_id"] = None
-            
-            await query.edit_message_text("✅ تم اختيار المترجم")
-            await show_final_summary(query.message, context, flow_type)
-            
-            confirm_state = get_confirm_state(flow_type)
-            context.user_data['_conversation_state'] = confirm_state
-            return confirm_state
-        except (ValueError, IndexError) as e:
-            logger.error(f"❌ Error parsing translator ID: {e}")
-            await query.answer("⚠️ خطأ في اختيار المترجم", show_alert=True)
-            return get_translator_state(flow_type)
-    
-    # معالجة الخيارات القديمة (auto, manual, add_new)
-    if len(parts) > 2:
-        choice = parts[2]
+    try:
+        query = update.callback_query
+        if not query:
+            logger.error("❌ handle_translator_choice: No query found")
+            return ConversationHandler.END
         
-        if choice == "auto":
-            user_id = query.from_user.id
-            with SessionLocal() as s:
-                translator = s.query(Translator).filter_by(tg_user_id=user_id).first()
-                if translator:
-                    context.user_data.setdefault("report_tmp", {})["translator_name"] = translator.full_name
-                    context.user_data["report_tmp"]["translator_id"] = translator.id
-                else:
-                    context.user_data.setdefault("report_tmp", {})["translator_name"] = "غير محدد"
-                    context.user_data["report_tmp"]["translator_id"] = None
+        await query.answer()
 
-            await query.edit_message_text("✅ تم اختيار المترجم")
-            await show_final_summary(query.message, context, flow_type)
+        parts = query.data.split(":")
+        if len(parts) < 2:
+            logger.error(f"❌ Invalid callback_data format: {query.data}")
+            await query.answer("⚠️ خطأ في البيانات", show_alert=True)
+            flow_type = context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
+            return get_translator_state(flow_type)
+        
+        flow_type = parts[1]
+        logger.info(f"✅ handle_translator_choice: flow_type={flow_type}, callback_data={query.data}")
+        
+        # معالجة اختيار المترجم من القائمة (translator_idx)
+        if query.data.startswith("translator_idx:"):
+            try:
+                translator_id = int(parts[2])
+                logger.info(f"✅ Selecting translator by ID: {translator_id}")
+                
+                with SessionLocal() as s:
+                    translator = s.query(Translator).filter_by(id=translator_id).first()
+                    if translator:
+                        context.user_data.setdefault("report_tmp", {})["translator_name"] = translator.full_name
+                        context.user_data["report_tmp"]["translator_id"] = translator.id
+                        logger.info(f"✅ Translator selected: {translator.full_name}")
+                    else:
+                        context.user_data.setdefault("report_tmp", {})["translator_name"] = "غير محدد"
+                        context.user_data["report_tmp"]["translator_id"] = None
+                        logger.warning(f"⚠️ Translator ID {translator_id} not found")
+                
+                try:
+                    await query.edit_message_text("✅ تم اختيار المترجم")
+                except Exception as e:
+                    logger.warning(f"⚠️ Could not edit message: {e}")
+                    try:
+                        await query.message.reply_text("✅ تم اختيار المترجم")
+                    except:
+                        pass
+                
+                try:
+                    await show_final_summary(query.message, context, flow_type)
+                except Exception as e:
+                    logger.error(f"❌ Error in show_final_summary: {e}", exc_info=True)
+                    await query.message.reply_text(
+                        f"❌ **حدث خطأ أثناء عرض الملخص**\n\n"
+                        f"يرجى المحاولة مرة أخرى.",
+                        parse_mode="Markdown"
+                    )
+                    flow_type = context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
+                    return get_translator_state(flow_type)
+                
+                confirm_state = get_confirm_state(flow_type)
+                context.user_data['_conversation_state'] = confirm_state
+                logger.info(f"✅ Returning confirm_state: {confirm_state}")
+                return confirm_state
+            except (ValueError, IndexError) as e:
+                logger.error(f"❌ Error parsing translator ID: {e}", exc_info=True)
+                await query.answer("⚠️ خطأ في اختيار المترجم", show_alert=True)
+                flow_type = context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
+                return get_translator_state(flow_type)
+            except Exception as e:
+                logger.error(f"❌ Unexpected error in translator_idx handler: {e}", exc_info=True)
+                await query.answer("⚠️ حدث خطأ غير متوقع", show_alert=True)
+                flow_type = context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
+                return get_translator_state(flow_type)
+        
+        # معالجة الخيارات القديمة (auto, manual, add_new)
+        if len(parts) > 2:
+            choice = parts[2]
+            
+            if choice == "auto":
+                try:
+                    user_id = query.from_user.id
+                    logger.info(f"✅ Auto-selecting translator for user: {user_id}")
+                    
+                    with SessionLocal() as s:
+                        translator = s.query(Translator).filter_by(tg_user_id=user_id).first()
+                        if translator:
+                            context.user_data.setdefault("report_tmp", {})["translator_name"] = translator.full_name
+                            context.user_data["report_tmp"]["translator_id"] = translator.id
+                            logger.info(f"✅ Auto translator found: {translator.full_name}")
+                        else:
+                            context.user_data.setdefault("report_tmp", {})["translator_name"] = "غير محدد"
+                            context.user_data["report_tmp"]["translator_id"] = None
+                            logger.warning(f"⚠️ No translator found for user {user_id}")
 
-            # إرجاع state التأكيد المناسب
-            confirm_state = get_confirm_state(flow_type)
-            # حفظ الحالة يدوياً في user_data للمساعدة في التتبع
-            context.user_data['_conversation_state'] = confirm_state
-            return confirm_state
+                    try:
+                        await query.edit_message_text("✅ تم اختيار المترجم")
+                    except Exception as e:
+                        logger.warning(f"⚠️ Could not edit message: {e}")
+                        try:
+                            await query.message.reply_text("✅ تم اختيار المترجم")
+                        except:
+                            pass
+                    
+                    try:
+                        await show_final_summary(query.message, context, flow_type)
+                    except Exception as e:
+                        logger.error(f"❌ Error in show_final_summary: {e}", exc_info=True)
+                        await query.message.reply_text(
+                            f"❌ **حدث خطأ أثناء عرض الملخص**\n\n"
+                            f"يرجى المحاولة مرة أخرى.",
+                            parse_mode="Markdown"
+                        )
+                        flow_type = context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
+                        return get_translator_state(flow_type)
+
+                    confirm_state = get_confirm_state(flow_type)
+                    context.user_data['_conversation_state'] = confirm_state
+                    logger.info(f"✅ Returning confirm_state: {confirm_state}")
+                    return confirm_state
+                except Exception as e:
+                    logger.error(f"❌ Unexpected error in auto translator selection: {e}", exc_info=True)
+                    await query.answer("⚠️ حدث خطأ غير متوقع", show_alert=True)
+                    flow_type = context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
+                    return get_translator_state(flow_type)
 
         elif choice == "manual":
             await query.edit_message_text(
