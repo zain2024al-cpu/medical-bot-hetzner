@@ -1137,18 +1137,19 @@ def register(app):
             CallbackQueryHandler(start_user_management, pattern=r"^admin:manage_users$"),
             # ✅ استخدام pattern مرن جداً - يطابق أي نص يحتوي على "إدارة المستخدمين"
             # يطابق: "👥 إدارة المستخدمين" أو "إدارة المستخدمين" أو أي نص يحتوي على "إدارة" و "المستخدمين"
+            # Pattern 1: يطابق النص بالضبط مع emoji
             MessageHandler(
                 filters.ChatType.PRIVATE & 
                 filters.TEXT & 
                 ~filters.COMMAND & 
-                filters.Regex(r".*إدارة.*المستخدمين.*|.*👥.*إدارة.*المستخدمين.*"),
+                filters.Regex(r"^👥\s*إدارة\s*المستخدمين$|.*إدارة.*المستخدمين.*"),
                 start_user_management
             ),
             # ✅ pattern بديل بدون ChatType للتوافق
             MessageHandler(
                 filters.TEXT & 
                 ~filters.COMMAND & 
-                filters.Regex(r".*إدارة.*المستخدمين.*|.*👥.*إدارة.*المستخدمين.*"),
+                filters.Regex(r"^👥\s*إدارة\s*المستخدمين$|.*إدارة.*المستخدمين.*"),
                 start_user_management
             ),
         ],
