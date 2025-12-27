@@ -1650,7 +1650,7 @@ def register(app):
     app.add_handler(CallbackQueryHandler(handle_view_patients_page, pattern="^view_patients_page:(\\d+)$"), group=1)
     app.add_handler(CallbackQueryHandler(handle_delete_patient_name, pattern="^delete_patient_name$"), group=1)
     app.add_handler(CallbackQueryHandler(handle_delete_patients_page, pattern="^delete_patients_page:(\\d+)$"), group=1)
-    app.add_handler(CallbackQueryHandler(handle_confirm_delete, pattern="^confirm_delete:\\d+:.*"), group=1)
+    app.add_handler(CallbackQueryHandler(handle_confirm_delete, pattern="^confirm_delete:\\d+$"), group=1)
     app.add_handler(CallbackQueryHandler(handle_edit_patient_name, pattern="^edit_patient_name$"), group=1)
     app.add_handler(CallbackQueryHandler(handle_edit_patients_page, pattern="^edit_patients_page:(\\d+)$"), group=1)
     
