@@ -7470,32 +7470,60 @@ async def handle_translator_choice(update: Update, context: ContextTypes.DEFAULT
                     flow_type = context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
                     return get_translator_state(flow_type)
 
-        elif choice == "manual":
-            await query.edit_message_text(
-                "👤 **إدخال اسم المترجم**\n\n"
-                "يرجى إدخال اسم المترجم:",
-                reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint", context=context),
-                parse_mode="Markdown"
-            )
+            elif choice == "manual":
+                try:
+                    await query.edit_message_text(
+                        "👤 **إدخال اسم المترجم**\n\n"
+                        "يرجى إدخال اسم المترجم:",
+                        reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint", context=context),
+                        parse_mode="Markdown"
+                    )
 
-            context.user_data.setdefault("report_tmp", {})["current_flow"] = flow_type
-            translator_state = get_translator_state(flow_type)
-            context.user_data['_conversation_state'] = translator_state
-            return translator_state
+                    context.user_data.setdefault("report_tmp", {})["current_flow"] = flow_type
+                    translator_state = get_translator_state(flow_type)
+                    context.user_data['_conversation_state'] = translator_state
+                    return translator_state
+                except Exception as e:
+                    logger.error(f"❌ Error in manual translator input: {e}", exc_info=True)
+                    await query.answer("⚠️ حدث خطأ غير متوقع", show_alert=True)
+                    flow_type = context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
+                    return get_translator_state(flow_type)
+            
+            elif choice == "add_new":
+                try:
+                    await query.edit_message_text(
+                        "➕ **إضافة مترجم جديد**\n\n"
+                        "يرجى إدخال اسم المترجم الجديد:",
+                        reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint", context=context),
+                        parse_mode="Markdown"
+                    )
+
+                    context.user_data.setdefault("report_tmp", {})["current_flow"] = flow_type
+                    context.user_data.setdefault("report_tmp", {})["translator_add_new"] = True  # علامة لإضافة المترجم الجديد
+                    translator_state = get_translator_state(flow_type)
+                    context.user_data['_conversation_state'] = translator_state
+                    return translator_state
+                except Exception as e:
+                    logger.error(f"❌ Error in add_new translator: {e}", exc_info=True)
+                    await query.answer("⚠️ حدث خطأ غير متوقع", show_alert=True)
+                    flow_type = context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
+                    return get_translator_state(flow_type)
         
-        elif choice == "add_new":
-            await query.edit_message_text(
-                "➕ **إضافة مترجم جديد**\n\n"
-                "يرجى إدخال اسم المترجم الجديد:",
-                reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint", context=context),
-                parse_mode="Markdown"
-            )
-
-            context.user_data.setdefault("report_tmp", {})["current_flow"] = flow_type
-            context.user_data.setdefault("report_tmp", {})["translator_add_new"] = True  # علامة لإضافة المترجم الجديد
-            translator_state = get_translator_state(flow_type)
-            context.user_data['_conversation_state'] = translator_state
-            return translator_state
+        # إذا لم يكن هناك تطابق
+        logger.warning(f"⚠️ Unknown translator choice: {query.data}")
+        await query.answer("⚠️ خيار غير معروف", show_alert=True)
+        flow_type = context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
+        return get_translator_state(flow_type)
+        
+    except Exception as e:
+        logger.error(f"❌ Unexpected error in handle_translator_choice: {e}", exc_info=True)
+        try:
+            if query:
+                await query.answer("⚠️ حدث خطأ غير متوقع، يرجى المحاولة مرة أخرى", show_alert=True)
+        except:
+            pass
+        flow_type = context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
+        return get_translator_state(flow_type)
 
 async def handle_translator_inline_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة اختيار المترجم من inline query (عند إرسال الرسالة)"""
