@@ -12,7 +12,7 @@ from datetime import datetime, date
 from db.session import SessionLocal
 from db.models import (
     ScheduleImage, TranslatorSchedule, DailyReportTracking, 
-    TranslatorNotification, Translator, DailySchedule
+    TranslatorNotification, Translator, DailySchedule, Patient
 )
 from bot.shared_auth import is_admin
 from bot.keyboards import admin_main_kb
@@ -1007,6 +1007,23 @@ async def handle_patient_name_input(update: Update, context: ContextTypes.DEFAUL
             logger.info(f"✅ Name '{name}' added to file successfully")
         else:
             raise Exception("Failed to write to file")
+        
+        # ✅ حفظ اسم المريض في قاعدة البيانات أيضاً
+        try:
+            with SessionLocal() as s:
+                # التحقق من وجود المريض في قاعدة البيانات
+                patient = s.query(Patient).filter_by(full_name=name).first()
+                if not patient:
+                    # إنشاء مريض جديد في قاعدة البيانات
+                    patient = Patient(full_name=name)
+                    s.add(patient)
+                    s.commit()
+                    logger.info(f"✅ Name '{name}' saved to database successfully (ID: {patient.id})")
+                else:
+                    logger.info(f"✅ Name '{name}' already exists in database (ID: {patient.id})")
+        except Exception as db_error:
+            logger.error(f"❌ Error saving name to database: {db_error}", exc_info=True)
+            # لا نرفض العملية إذا فشل حفظ قاعدة البيانات، لأن الملف تم حفظه بنجاح
     except Exception as e:
         logger.error(f"❌ Error saving name to file: {e}", exc_info=True)
         await update.message.reply_text(
