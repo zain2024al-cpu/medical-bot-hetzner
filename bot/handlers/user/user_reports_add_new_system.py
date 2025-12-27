@@ -8800,24 +8800,31 @@ async def show_final_summary(message, context, flow_type):
     import logging
     logger = logging.getLogger(__name__)
     
-    data = context.user_data.get("report_tmp", {})
+    try:
+        data = context.user_data.get("report_tmp", {})
 
-    # بناء الملخص بناءً على نوع المسار
-    report_date = data.get("report_date")
-    if report_date and hasattr(report_date, 'strftime'):
-        days_ar = {0: 'الاثنين', 1: 'الثلاثاء', 2: 'الأربعاء', 3: 'الخميس', 
-                   4: 'الجمعة', 5: 'السبت', 6: 'الأحد'}
-        day_name = days_ar.get(report_date.weekday(), '')
-        date_str = f"{report_date.strftime('%Y-%m-%d')} ({day_name}) {report_date.strftime('%H:%M')}"
-    else:
-        date_str = str(report_date) if report_date else 'غير محدد'
+        # بناء الملخص بناءً على نوع المسار
+        report_date = data.get("report_date")
+        if report_date and hasattr(report_date, 'strftime'):
+            days_ar = {0: 'الاثنين', 1: 'الثلاثاء', 2: 'الأربعاء', 3: 'الخميس', 
+                       4: 'الجمعة', 5: 'السبت', 6: 'الأحد'}
+            day_name = days_ar.get(report_date.weekday(), '')
+            date_str = f"{report_date.strftime('%Y-%m-%d')} ({day_name}) {report_date.strftime('%H:%M')}"
+        else:
+            date_str = str(report_date) if report_date else 'غير محدد'
 
-    summary = f"📋 **ملخص التقرير**\n\n"
-    summary += f"📅 **التاريخ:** {date_str}\n"
-    summary += f"👤 **المريض:** {data.get('patient_name', 'غير محدد')}\n"
-    summary += f"🏥 **المستشفى:** {data.get('hospital_name', 'غير محدد')}\n"
-    summary += f"🏷️ **القسم:** {data.get('department_name', 'غير محدد')}\n"
-    summary += f"👨‍⚕️ **الطبيب:** {data.get('doctor_name', 'غير محدد')}\n\n"
+        # تهريب القيم المدخلة من المستخدم لتجنب أخطاء Markdown
+        patient_name = escape_markdown_v1(str(data.get('patient_name', 'غير محدد')))
+        hospital_name = escape_markdown_v1(str(data.get('hospital_name', 'غير محدد')))
+        department_name = escape_markdown_v1(str(data.get('department_name', 'غير محدد')))
+        doctor_name = escape_markdown_v1(str(data.get('doctor_name', 'غير محدد')))
+
+        summary = f"📋 **ملخص التقرير**\n\n"
+        summary += f"📅 **التاريخ:** {date_str}\n"
+        summary += f"👤 **المريض:** {patient_name}\n"
+        summary += f"🏥 **المستشفى:** {hospital_name}\n"
+        summary += f"🏷️ **القسم:** {department_name}\n"
+        summary += f"👨‍⚕️ **الطبيب:** {doctor_name}\n\n"
 
     # نوع الإجراء
     action_names = {
@@ -8839,84 +8846,32 @@ async def show_final_summary(message, context, flow_type):
 
     summary += f"⚕️ **نوع الإجراء:** {medical_action_display}\n\n"
 
-    # تفاصيل حسب نوع المسار
-    if flow_type in ["new_consult", "followup", "emergency"]:
-        summary += f"💬 **الشكوى:** {data.get('complaint_text') or data.get('complaint', 'غير محدد')}\n"
-        summary += f"🔬 **التشخيص:** {data.get('diagnosis', 'غير محدد')}\n"
-        summary += f"📝 **قرار الطبيب:** {data.get('doctor_decision') or data.get('decision', 'غير محدد')}\n"
+        # تفاصيل حسب نوع المسار
+        if flow_type in ["new_consult", "followup", "emergency"]:
+            complaint = escape_markdown_v1(str(data.get('complaint_text') or data.get('complaint', 'غير محدد')))
+            diagnosis = escape_markdown_v1(str(data.get('diagnosis', 'غير محدد')))
+            decision = escape_markdown_v1(str(data.get('doctor_decision') or data.get('decision', 'غير محدد')))
+            
+            summary += f"💬 **الشكوى:** {complaint}\n"
+            summary += f"🔬 **التشخيص:** {diagnosis}\n"
+            summary += f"📝 **قرار الطبيب:** {decision}\n"
 
-        if flow_type == "new_consult":
-            summary += f"🔬 **الفحوصات المطلوبة:** {data.get('tests', 'لا يوجد')}\n"
+            if flow_type == "new_consult":
+                tests = escape_markdown_v1(str(data.get('tests', 'لا يوجد')))
+                summary += f"🔬 **الفحوصات المطلوبة:** {tests}\n"
 
-        if flow_type == "followup":
-            # عرض رقم الغرفة والطابق لمتابعة في الرقود
-            room_floor = data.get('room_floor') or data.get('room_number', '')
-            if room_floor:
-                summary += f"🚪 **رقم الغرفة والطابق:** {room_floor}\n"
+            if flow_type == "followup":
+                # عرض رقم الغرفة والطابق لمتابعة في الرقود
+                room_floor = data.get('room_floor') or data.get('room_number', '')
+                if room_floor:
+                    room_floor_escaped = escape_markdown_v1(str(room_floor))
+                    summary += f"🚪 **رقم الغرفة والطابق:** {room_floor_escaped}\n"
 
-        if flow_type == "emergency":
-            summary += f"🏥 **وضع الحالة:** {data.get('status', 'غير محدد')}\n"
+            if flow_type == "emergency":
+                status = escape_markdown_v1(str(data.get('status', 'غير محدد')))
+                summary += f"🏥 **وضع الحالة:** {status}\n"
 
-        # تاريخ العودة
-        followup_date = data.get('followup_date')
-        if followup_date:
-            if hasattr(followup_date, 'strftime'):
-                date_str = followup_date.strftime('%Y-%m-%d')
-            else:
-                date_str = str(followup_date)
-            followup_time = data.get('followup_time', '')
-            if followup_time:
-                summary += f"📅 **تاريخ العودة:** {date_str} الساعة {followup_time}\n"
-            else:
-                summary += f"📅 **تاريخ العودة:** {date_str}\n"
-            summary += f"✍️ **سبب العودة:** {data.get('followup_reason', 'غير محدد')}\n"
-
-    elif flow_type == "admission":
-        summary += f"🛏️ **سبب الرقود:** {data.get('admission_reason', 'غير محدد')}\n"
-        summary += f"🚪 **رقم الغرفة والطابق:** {data.get('room_number', 'لم يتم التحديد')}\n"
-        summary += f"📝 **ملاحظات:** {data.get('notes', 'لا يوجد')}\n"
-        followup_date = data.get('followup_date')
-        if followup_date:
-            if hasattr(followup_date, 'strftime'):
-                date_str = followup_date.strftime('%Y-%m-%d')
-            else:
-                date_str = str(followup_date)
-            summary += f"📅 **تاريخ العودة:** {date_str}\n"
-            summary += f"✍️ **سبب العودة:** {data.get('followup_reason', 'غير محدد')}\n"
-        else:
-            summary += f"📅 **تاريخ العودة:** لا يوجد\n"
-    
-    elif flow_type == "operation":
-        summary += f"⚕️ **تفاصيل العملية بالعربي:** {data.get('operation_details', 'غير محدد')}\n"
-        summary += f"🔤 **اسم العملية بالإنجليزي:** {data.get('operation_name_en', 'غير محدد')}\n"
-        summary += f"📝 **ملاحظات:** {data.get('notes', 'لا يوجد')}\n"
-        followup_date = data.get('followup_date')
-        if followup_date:
-            if hasattr(followup_date, 'strftime'):
-                date_str = followup_date.strftime('%Y-%m-%d')
-            else:
-                date_str = str(followup_date)
-            followup_time = data.get('followup_time', '')
-            if followup_time:
-                summary += f"📅 **تاريخ العودة:** {date_str} الساعة {followup_time}\n"
-            else:
-                summary += f"📅 **تاريخ العودة:** {date_str}\n"
-            summary += f"✍️ **سبب العودة:** {data.get('followup_reason', 'غير محدد')}\n"
-        else:
-            summary += f"📅 **تاريخ العودة:** لا يوجد\n"
-    
-    elif flow_type == "surgery_consult":
-        summary += f"🔬 **التشخيص:** {data.get('diagnosis', 'غير محدد')}\n"
-        summary += f"📝 **قرار الطبيب:** {data.get('doctor_decision') or data.get('decision', 'غير محدد')}\n"
-        summary += f"🔤 **اسم العملية بالإنجليزي:** {data.get('operation_name_en', 'غير محدد')}\n"
-        summary += f"📊 **نسبة نجاح العملية:** {data.get('success_rate', 'غير محدد')}\n"
-        summary += f"💡 **نسبة الاستفادة من العملية:** {data.get('benefit_rate', 'غير محدد')}\n"
-        summary += f"🔬 **الفحوصات المطلوبة:** {data.get('tests', 'لا يوجد')}\n"
-        # التحقق من وجود نص تاريخ العودة أولاً
-        followup_date_text = data.get('followup_date_text')
-        if followup_date_text:
-            summary += f"📅 **تاريخ العودة:** {followup_date_text}\n"
-        else:
+            # تاريخ العودة
             followup_date = data.get('followup_date')
             if followup_date:
                 if hasattr(followup_date, 'strftime'):
@@ -8928,112 +8883,238 @@ async def show_final_summary(message, context, flow_type):
                     summary += f"📅 **تاريخ العودة:** {date_str} الساعة {followup_time}\n"
                 else:
                     summary += f"📅 **تاريخ العودة:** {date_str}\n"
+                followup_reason = escape_markdown_v1(str(data.get('followup_reason', 'غير محدد')))
+                summary += f"✍️ **سبب العودة:** {followup_reason}\n"
+
+        elif flow_type == "admission":
+            admission_reason = escape_markdown_v1(str(data.get('admission_reason', 'غير محدد')))
+            room_number = escape_markdown_v1(str(data.get('room_number', 'لم يتم التحديد')))
+            notes = escape_markdown_v1(str(data.get('notes', 'لا يوجد')))
+            
+            summary += f"🛏️ **سبب الرقود:** {admission_reason}\n"
+            summary += f"🚪 **رقم الغرفة والطابق:** {room_number}\n"
+            summary += f"📝 **ملاحظات:** {notes}\n"
+            followup_date = data.get('followup_date')
+            if followup_date:
+                if hasattr(followup_date, 'strftime'):
+                    date_str = followup_date.strftime('%Y-%m-%d')
+                else:
+                    date_str = str(followup_date)
+                summary += f"📅 **تاريخ العودة:** {date_str}\n"
+                followup_reason = escape_markdown_v1(str(data.get('followup_reason', 'غير محدد')))
+                summary += f"✍️ **سبب العودة:** {followup_reason}\n"
             else:
                 summary += f"📅 **تاريخ العودة:** لا يوجد\n"
-        summary += f"✍️ **سبب العودة:** {data.get('followup_reason', 'غير محدد')}\n"
-    
-    elif flow_type == "final_consult":
-        summary += f"🔬 **التشخيص النهائي:** {data.get('diagnosis', 'غير محدد')}\n"
-        summary += f"📝 **قرار الطبيب:** {data.get('doctor_decision') or data.get('decision', 'غير محدد')}\n"
-        summary += f"💡 **التوصيات الطبية:** {data.get('recommendations', 'غير محدد')}\n"
-    
-    elif flow_type == "rehab_physical":
-        summary += f"🏃 **تفاصيل جلسة العلاج الطبيعي:** {data.get('therapy_details', 'غير محدد')}\n"
-        followup_date = data.get('followup_date')
-        if followup_date:
-            if hasattr(followup_date, 'strftime'):
-                date_str = followup_date.strftime('%Y-%m-%d')
-            else:
-                date_str = str(followup_date)
-            followup_time = data.get('followup_time', '')
-            if followup_time:
-                summary += f"📅 **تاريخ العودة:** {date_str} الساعة {followup_time}\n"
-            else:
-                summary += f"📅 **تاريخ العودة:** {date_str}\n"
-            summary += f"✍️ **سبب العودة:** {data.get('followup_reason', 'غير محدد')}\n"
-        else:
-            summary += f"📅 **تاريخ العودة:** لا يوجد\n"
-    
-    elif flow_type == "rehab_device":
-        summary += f"🦾 **اسم الجهاز والتفاصيل:** {data.get('device_details', 'غير محدد')}\n"
-        followup_date = data.get('followup_date')
-        if followup_date:
-            if hasattr(followup_date, 'strftime'):
-                date_str = followup_date.strftime('%Y-%m-%d')
-            else:
-                date_str = str(followup_date)
-            followup_time = data.get('followup_time', '')
-            if followup_time:
-                summary += f"📅 **تاريخ العودة:** {date_str} الساعة {followup_time}\n"
-            else:
-                summary += f"📅 **تاريخ العودة:** {date_str}\n"
-            summary += f"✍️ **سبب العودة:** {data.get('followup_reason', 'غير محدد')}\n"
-        else:
-            summary += f"📅 **تاريخ العودة:** لا يوجد\n"
-    
-    elif flow_type == "radiology":
-        summary += f"🔬 **نوع الأشعة والفحوصات:** {data.get('radiology_type', 'غير محدد')}\n"
-        delivery_date = data.get('radiology_delivery_date') or data.get('followup_date')
-        if delivery_date:
-            if hasattr(delivery_date, 'strftime'):
-                date_str = delivery_date.strftime('%Y-%m-%d')
-            else:
-                date_str = str(delivery_date)
-            summary += f"📅 **تاريخ تسليم النتائج:** {date_str}\n"
-        else:
-            summary += f"📅 **تاريخ تسليم النتائج:** غير محدد\n"
-    elif flow_type == "appointment_reschedule":
-        summary += f"📅 **سبب تأجيل الموعد:** {data.get('app_reschedule_reason', 'غير محدد')}\n"
-        return_date = data.get('app_reschedule_return_date') or data.get('followup_date')
-        if return_date:
-            if hasattr(return_date, 'strftime'):
-                date_str = return_date.strftime('%Y-%m-%d')
-            else:
-                date_str = str(return_date)
-            summary += f"📅 **تاريخ العودة:** {date_str}\n"
-        else:
-            summary += f"📅 **تاريخ العودة:** غير محدد\n"
-        summary += f"📝 **سبب العودة:** {data.get('app_reschedule_return_reason', 'غير محدد')}\n"
-    
-    elif flow_type == "discharge":
-        discharge_type = data.get("discharge_type", "")
-        if discharge_type == "admission":
-            summary += f"📋 **ملخص الرقود:** {data.get('admission_summary', 'غير محدد')}\n"
-        elif discharge_type == "operation":
-            summary += f"⚕️ **تفاصيل العملية:** {data.get('operation_details', 'غير محدد')}\n"
-            summary += f"🔤 **اسم العملية بالإنجليزي:** {data.get('operation_name_en', 'غير محدد')}\n"
         
-        followup_date = data.get('followup_date')
-        if followup_date:
-            if hasattr(followup_date, 'strftime'):
-                date_str = followup_date.strftime('%Y-%m-%d')
+        elif flow_type == "operation":
+            operation_details = escape_markdown_v1(str(data.get('operation_details', 'غير محدد')))
+            operation_name_en = escape_markdown_v1(str(data.get('operation_name_en', 'غير محدد')))
+            notes = escape_markdown_v1(str(data.get('notes', 'لا يوجد')))
+            
+            summary += f"⚕️ **تفاصيل العملية بالعربي:** {operation_details}\n"
+            summary += f"🔤 **اسم العملية بالإنجليزي:** {operation_name_en}\n"
+            summary += f"📝 **ملاحظات:** {notes}\n"
+            followup_date = data.get('followup_date')
+            if followup_date:
+                if hasattr(followup_date, 'strftime'):
+                    date_str = followup_date.strftime('%Y-%m-%d')
+                else:
+                    date_str = str(followup_date)
+                followup_time = data.get('followup_time', '')
+                if followup_time:
+                    summary += f"📅 **تاريخ العودة:** {date_str} الساعة {followup_time}\n"
+                else:
+                    summary += f"📅 **تاريخ العودة:** {date_str}\n"
+                followup_reason = escape_markdown_v1(str(data.get('followup_reason', 'غير محدد')))
+                summary += f"✍️ **سبب العودة:** {followup_reason}\n"
             else:
-                date_str = str(followup_date)
-            followup_time = data.get('followup_time', '')
-            if followup_time:
-                summary += f"📅 **تاريخ العودة:** {date_str} الساعة {followup_time}\n"
+                summary += f"📅 **تاريخ العودة:** لا يوجد\n"
+        
+        elif flow_type == "surgery_consult":
+            diagnosis = escape_markdown_v1(str(data.get('diagnosis', 'غير محدد')))
+            decision = escape_markdown_v1(str(data.get('doctor_decision') or data.get('decision', 'غير محدد')))
+            operation_name_en = escape_markdown_v1(str(data.get('operation_name_en', 'غير محدد')))
+            success_rate = escape_markdown_v1(str(data.get('success_rate', 'غير محدد')))
+            benefit_rate = escape_markdown_v1(str(data.get('benefit_rate', 'غير محدد')))
+            tests = escape_markdown_v1(str(data.get('tests', 'لا يوجد')))
+            
+            summary += f"🔬 **التشخيص:** {diagnosis}\n"
+            summary += f"📝 **قرار الطبيب:** {decision}\n"
+            summary += f"🔤 **اسم العملية بالإنجليزي:** {operation_name_en}\n"
+            summary += f"📊 **نسبة نجاح العملية:** {success_rate}\n"
+            summary += f"💡 **نسبة الاستفادة من العملية:** {benefit_rate}\n"
+            summary += f"🔬 **الفحوصات المطلوبة:** {tests}\n"
+            # التحقق من وجود نص تاريخ العودة أولاً
+            followup_date_text = data.get('followup_date_text')
+            if followup_date_text:
+                followup_date_text_escaped = escape_markdown_v1(str(followup_date_text))
+                summary += f"📅 **تاريخ العودة:** {followup_date_text_escaped}\n"
             else:
+                followup_date = data.get('followup_date')
+                if followup_date:
+                    if hasattr(followup_date, 'strftime'):
+                        date_str = followup_date.strftime('%Y-%m-%d')
+                    else:
+                        date_str = str(followup_date)
+                    followup_time = data.get('followup_time', '')
+                    if followup_time:
+                        summary += f"📅 **تاريخ العودة:** {date_str} الساعة {followup_time}\n"
+                    else:
+                        summary += f"📅 **تاريخ العودة:** {date_str}\n"
+                else:
+                    summary += f"📅 **تاريخ العودة:** لا يوجد\n"
+            followup_reason = escape_markdown_v1(str(data.get('followup_reason', 'غير محدد')))
+            summary += f"✍️ **سبب العودة:** {followup_reason}\n"
+        
+        elif flow_type == "final_consult":
+            diagnosis = escape_markdown_v1(str(data.get('diagnosis', 'غير محدد')))
+            decision = escape_markdown_v1(str(data.get('doctor_decision') or data.get('decision', 'غير محدد')))
+            recommendations = escape_markdown_v1(str(data.get('recommendations', 'غير محدد')))
+            
+            summary += f"🔬 **التشخيص النهائي:** {diagnosis}\n"
+            summary += f"📝 **قرار الطبيب:** {decision}\n"
+            summary += f"💡 **التوصيات الطبية:** {recommendations}\n"
+        
+        elif flow_type == "rehab_physical":
+            therapy_details = escape_markdown_v1(str(data.get('therapy_details', 'غير محدد')))
+            summary += f"🏃 **تفاصيل جلسة العلاج الطبيعي:** {therapy_details}\n"
+            followup_date = data.get('followup_date')
+            if followup_date:
+                if hasattr(followup_date, 'strftime'):
+                    date_str = followup_date.strftime('%Y-%m-%d')
+                else:
+                    date_str = str(followup_date)
+                followup_time = data.get('followup_time', '')
+                if followup_time:
+                    summary += f"📅 **تاريخ العودة:** {date_str} الساعة {followup_time}\n"
+                else:
+                    summary += f"📅 **تاريخ العودة:** {date_str}\n"
+                followup_reason = escape_markdown_v1(str(data.get('followup_reason', 'غير محدد')))
+                summary += f"✍️ **سبب العودة:** {followup_reason}\n"
+            else:
+                summary += f"📅 **تاريخ العودة:** لا يوجد\n"
+        
+        elif flow_type == "rehab_device":
+            device_details = escape_markdown_v1(str(data.get('device_details', 'غير محدد')))
+            summary += f"🦾 **اسم الجهاز والتفاصيل:** {device_details}\n"
+            followup_date = data.get('followup_date')
+            if followup_date:
+                if hasattr(followup_date, 'strftime'):
+                    date_str = followup_date.strftime('%Y-%m-%d')
+                else:
+                    date_str = str(followup_date)
+                followup_time = data.get('followup_time', '')
+                if followup_time:
+                    summary += f"📅 **تاريخ العودة:** {date_str} الساعة {followup_time}\n"
+                else:
+                    summary += f"📅 **تاريخ العودة:** {date_str}\n"
+                followup_reason = escape_markdown_v1(str(data.get('followup_reason', 'غير محدد')))
+                summary += f"✍️ **سبب العودة:** {followup_reason}\n"
+            else:
+                summary += f"📅 **تاريخ العودة:** لا يوجد\n"
+        
+        elif flow_type == "radiology":
+            radiology_type = escape_markdown_v1(str(data.get('radiology_type', 'غير محدد')))
+            summary += f"🔬 **نوع الأشعة والفحوصات:** {radiology_type}\n"
+            delivery_date = data.get('radiology_delivery_date') or data.get('followup_date')
+            if delivery_date:
+                if hasattr(delivery_date, 'strftime'):
+                    date_str = delivery_date.strftime('%Y-%m-%d')
+                else:
+                    date_str = str(delivery_date)
+                summary += f"📅 **تاريخ تسليم النتائج:** {date_str}\n"
+            else:
+                summary += f"📅 **تاريخ تسليم النتائج:** غير محدد\n"
+        elif flow_type == "appointment_reschedule":
+            app_reschedule_reason = escape_markdown_v1(str(data.get('app_reschedule_reason', 'غير محدد')))
+            app_reschedule_return_reason = escape_markdown_v1(str(data.get('app_reschedule_return_reason', 'غير محدد')))
+            
+            summary += f"📅 **سبب تأجيل الموعد:** {app_reschedule_reason}\n"
+            return_date = data.get('app_reschedule_return_date') or data.get('followup_date')
+            if return_date:
+                if hasattr(return_date, 'strftime'):
+                    date_str = return_date.strftime('%Y-%m-%d')
+                else:
+                    date_str = str(return_date)
                 summary += f"📅 **تاريخ العودة:** {date_str}\n"
-            summary += f"✍️ **سبب العودة:** {data.get('followup_reason', 'غير محدد')}\n"
-        else:
-            summary += f"📅 **تاريخ العودة:** لا يوجد\n"
+            else:
+                summary += f"📅 **تاريخ العودة:** غير محدد\n"
+            summary += f"📝 **سبب العودة:** {app_reschedule_return_reason}\n"
+        
+        elif flow_type == "discharge":
+            discharge_type = data.get("discharge_type", "")
+            if discharge_type == "admission":
+                admission_summary = escape_markdown_v1(str(data.get('admission_summary', 'غير محدد')))
+                summary += f"📋 **ملخص الرقود:** {admission_summary}\n"
+            elif discharge_type == "operation":
+                operation_details = escape_markdown_v1(str(data.get('operation_details', 'غير محدد')))
+                operation_name_en = escape_markdown_v1(str(data.get('operation_name_en', 'غير محدد')))
+                summary += f"⚕️ **تفاصيل العملية:** {operation_details}\n"
+                summary += f"🔤 **اسم العملية بالإنجليزي:** {operation_name_en}\n"
+            
+            followup_date = data.get('followup_date')
+            if followup_date:
+                if hasattr(followup_date, 'strftime'):
+                    date_str = followup_date.strftime('%Y-%m-%d')
+                else:
+                    date_str = str(followup_date)
+                followup_time = data.get('followup_time', '')
+                if followup_time:
+                    summary += f"📅 **تاريخ العودة:** {date_str} الساعة {followup_time}\n"
+                else:
+                    summary += f"📅 **تاريخ العودة:** {date_str}\n"
+                followup_reason = escape_markdown_v1(str(data.get('followup_reason', 'غير محدد')))
+                summary += f"✍️ **سبب العودة:** {followup_reason}\n"
+            else:
+                summary += f"📅 **تاريخ العودة:** لا يوجد\n"
 
-    # إضافة معلومات المترجم
-    summary += f"\n👤 **المترجم:** {data.get('translator_name', 'غير محدد')}"
+        # إضافة معلومات المترجم
+        translator_name = escape_markdown_v1(str(data.get('translator_name', 'غير محدد')))
+        summary += f"\n👤 **المترجم:** {translator_name}"
 
-    keyboard = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("✏️ مراجعة وتعديل التقرير", callback_data=f"edit:{flow_type}"),
-            InlineKeyboardButton("📤 نشر التقرير", callback_data=f"publish:{flow_type}")
-        ],
-        [InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]
-    ])
+        keyboard = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("✏️ مراجعة وتعديل التقرير", callback_data=f"edit:{flow_type}"),
+                InlineKeyboardButton("📤 نشر التقرير", callback_data=f"publish:{flow_type}")
+            ],
+            [InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]
+        ])
 
-    await message.reply_text(
-        summary,
-        reply_markup=keyboard,
-        parse_mode="Markdown"
-    )
+        # محاولة إرسال الرسالة مع Markdown
+        try:
+            await message.reply_text(
+                summary,
+                reply_markup=keyboard,
+                parse_mode="Markdown"
+            )
+        except Exception as parse_error:
+            # إذا فشل parsing Markdown، إرسال بدون Markdown
+            logger.error(f"❌ Markdown parsing error: {parse_error}", exc_info=True)
+            try:
+                # إزالة تنسيق Markdown من الملخص
+                summary_plain = summary.replace('**', '').replace('*', '')
+                await message.reply_text(
+                    summary_plain,
+                    reply_markup=keyboard
+                )
+            except Exception as fallback_error:
+                logger.error(f"❌ Error sending plain text summary: {fallback_error}", exc_info=True)
+                await message.reply_text(
+                    "❌ **حدث خطأ في عرض الملخص**\n\n"
+                    "يرجى المحاولة مرة أخرى أو التواصل مع الإدارة.",
+                    reply_markup=keyboard,
+                    parse_mode="Markdown"
+                )
+    except Exception as e:
+        logger.error(f"❌ Unexpected error in show_final_summary: {e}", exc_info=True)
+        try:
+            await message.reply_text(
+                "❌ **حدث خطأ غير متوقع**\n\n"
+                "يرجى المحاولة مرة أخرى أو التواصل مع الإدارة.",
+                parse_mode="Markdown"
+            )
+        except:
+            pass
 
 # =============================
 # شاشة المراجعة قبل النشر
