@@ -7235,6 +7235,7 @@ async def show_translator_list(update: Update, context: ContextTypes.DEFAULT_TYP
         # فقط المترجمين المعتمدين (is_approved = True)
         all_translators = s.query(Translator).filter(
             Translator.is_approved == True,
+            Translator.is_active == True,  # فقط المترجمين النشطين
             Translator.full_name.isnot(None),
             Translator.full_name != ""
         ).order_by(Translator.full_name).all()
@@ -7457,6 +7458,7 @@ async def show_translator_list(update: Update, context: ContextTypes.DEFAULT_TYP
         # فقط المترجمين المعتمدين (is_approved = True)
         all_translators = s.query(Translator).filter(
             Translator.is_approved == True,
+            Translator.is_active == True,  # فقط المترجمين النشطين
             Translator.full_name.isnot(None),
             Translator.full_name != ""
         ).order_by(Translator.full_name).all()
