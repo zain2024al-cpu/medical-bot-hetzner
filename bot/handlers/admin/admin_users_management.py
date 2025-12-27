@@ -366,67 +366,118 @@ async def _show_user_details(query, context, user_id):
     """عرض تفاصيل المستخدم"""
     from db.models import Report
     
-    with SessionLocal() as s:
-        user = s.query(Translator).filter_by(id=user_id).first()
-        
-        if not user:
-            await query.edit_message_text("❌ المستخدم غير موجود.", reply_markup=_main_kb())
-            return UM_START
-        
-        context.user_data["selected_user_id"] = user_id
-        
-        # حساب عدد التقارير (باستخدام func.count لتجنب مشاكل الأعمدة المفقودة)
-        try:
-            reports_count = s.query(func.count(Report.id)).filter_by(translator_id=user.id).scalar() or 0
-        except Exception as e:
-            logger.error(f"خطأ في حساب عدد التقارير: {e}", exc_info=True)
-            reports_count = 0
-        
-        # آخر تقرير (باستخدام فقط الأعمدة الأساسية)
-        try:
-            last_report = s.query(Report.id, Report.created_at).filter_by(translator_id=user.id).order_by(Report.created_at.desc()).first()
-            if last_report and hasattr(last_report, 'created_at') and last_report.created_at:
-                last_activity = last_report.created_at.strftime('%Y-%m-%d %H:%M')
-            else:
-                last_activity = "لا يوجد"
-        except Exception as e:
-            logger.error(f"خطأ في جلب آخر تقرير: {e}", exc_info=True)
-            last_activity = "لا يوجد"
-        
-        # التحقق من الحقول قبل استخدامها
-        is_approved = getattr(user, 'is_approved', False)
-        is_suspended = getattr(user, 'is_suspended', False)
-        
-        status = "✅ نشط" if is_approved else "⏳ معلق"
-        suspended = "🔒 مجمد" if is_suspended else "🔓 نشط"
-        
-        text = f"👤 **تفاصيل المستخدم**\n"
-        text += f"━━━━━━━━━━━━━━━━\n\n"
-        text += f"🆔 **Database ID:** {user.id}\n"
-        text += f"📱 **Telegram ID:** `{user.tg_user_id}`\n"
-        text += f"👤 **الاسم:** {user.full_name}\n"
-        text += f"📞 **الهاتف:** {user.phone_number or 'غير محدد'}\n\n"
-        text += f"📅 **تاريخ التسجيل:** {user.created_at.strftime('%Y-%m-%d %H:%M')}\n"
-        text += f"⏰ **آخر نشاط:** {last_activity}\n\n"
-        text += f"📊 **حالة الحساب:** {status}\n"
-        text += f"🔐 **حالة الوصول:** {suspended}\n"
-        text += f"📝 **عدد التقارير:** {reports_count}\n"
-        
-        if is_suspended:
-            suspended_at = getattr(user, 'suspended_at', None)
-            if suspended_at:
+    try:
+        await query.answer()
+    except Exception as e:
+        logger.error(f"❌ Error answering query: {e}")
+    
+    try:
+        with SessionLocal() as s:
+            user = s.query(Translator).filter_by(id=user_id).first()
+            
+            if not user:
                 try:
-                    text += f"\n⚠️ **تاريخ التجميد:** {suspended_at.strftime('%Y-%m-%d %H:%M')}\n"
-                except:
-                    text += f"\n⚠️ **تاريخ التجميد:** غير محدد\n"
-            suspension_reason = getattr(user, 'suspension_reason', None)
-            if suspension_reason:
-                text += f"📋 **سبب التجميد:** {suspension_reason}\n"
-        
-        text += f"\n━━━━━━━━━━━━━━━━"
-        
-        await query.edit_message_text(text, reply_markup=_user_actions_kb(), parse_mode="Markdown")
-        return UM_USER_ACTIONS
+                    await query.edit_message_text("❌ المستخدم غير موجود.", reply_markup=_main_kb(), parse_mode="Markdown")
+                except Exception as e:
+                    logger.error(f"❌ Error editing message: {e}")
+                    try:
+                        await query.message.reply_text("❌ المستخدم غير موجود.", reply_markup=_main_kb(), parse_mode="Markdown")
+                    except:
+                        pass
+                return UM_START
+            
+            context.user_data["selected_user_id"] = user_id
+            
+            # حساب عدد التقارير (باستخدام func.count لتجنب مشاكل الأعمدة المفقودة)
+            try:
+                reports_count = s.query(func.count(Report.id)).filter_by(translator_id=user.id).scalar() or 0
+            except Exception as e:
+                logger.error(f"خطأ في حساب عدد التقارير: {e}", exc_info=True)
+                reports_count = 0
+            
+            # آخر تقرير (باستخدام فقط الأعمدة الأساسية)
+            try:
+                last_report = s.query(Report.id, Report.created_at).filter_by(translator_id=user.id).order_by(Report.created_at.desc()).first()
+                if last_report and hasattr(last_report, 'created_at') and last_report.created_at:
+                    last_activity = last_report.created_at.strftime('%Y-%m-%d %H:%M')
+                else:
+                    last_activity = "لا يوجد"
+            except Exception as e:
+                logger.error(f"خطأ في جلب آخر تقرير: {e}", exc_info=True)
+                last_activity = "لا يوجد"
+            
+            # التحقق من الحقول قبل استخدامها
+            is_approved = getattr(user, 'is_approved', False)
+            is_suspended = getattr(user, 'is_suspended', False)
+            
+            status = "✅ نشط" if is_approved else "⏳ معلق"
+            suspended = "🔒 مجمد" if is_suspended else "🔓 نشط"
+            
+            # تهريب النصوص لتجنب أخطاء Markdown
+            user_name = _escape_markdown_v2(str(user.full_name or "غير محدد"))
+            phone_number = _escape_markdown_v2(str(user.phone_number or "غير محدد"))
+            suspension_reason_escaped = ""
+            
+            text = f"👤 **تفاصيل المستخدم**\n"
+            text += f"━━━━━━━━━━━━━━━━\n\n"
+            text += f"🆔 **Database ID:** {user.id}\n"
+            text += f"📱 **Telegram ID:** `{user.tg_user_id}`\n"
+            text += f"👤 **الاسم:** {user_name}\n"
+            text += f"📞 **الهاتف:** {phone_number}\n\n"
+            
+            try:
+                created_at_str = user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at else "غير محدد"
+            except:
+                created_at_str = "غير محدد"
+            
+            text += f"📅 **تاريخ التسجيل:** {created_at_str}\n"
+            text += f"⏰ **آخر نشاط:** {last_activity}\n\n"
+            text += f"📊 **حالة الحساب:** {status}\n"
+            text += f"🔐 **حالة الوصول:** {suspended}\n"
+            text += f"📝 **عدد التقارير:** {reports_count}\n"
+            
+            if is_suspended:
+                suspended_at = getattr(user, 'suspended_at', None)
+                if suspended_at:
+                    try:
+                        suspended_at_str = suspended_at.strftime('%Y-%m-%d %H:%M')
+                        text += f"\n⚠️ **تاريخ التجميد:** {suspended_at_str}\n"
+                    except:
+                        text += f"\n⚠️ **تاريخ التجميد:** غير محدد\n"
+                suspension_reason = getattr(user, 'suspension_reason', None)
+                if suspension_reason:
+                    suspension_reason_escaped = _escape_markdown_v2(str(suspension_reason))
+                    text += f"📋 **سبب التجميد:** {suspension_reason_escaped}\n"
+            
+            text += f"\n━━━━━━━━━━━━━━━━"
+            
+            try:
+                await query.edit_message_text(text, reply_markup=_user_actions_kb(), parse_mode="Markdown")
+            except Exception as parse_error:
+                logger.error(f"❌ Markdown parsing error: {parse_error}", exc_info=True)
+                # محاولة إرسال بدون Markdown
+                try:
+                    text_plain = text.replace('**', '').replace('*', '').replace('`', '')
+                    await query.edit_message_text(text_plain, reply_markup=_user_actions_kb())
+                except Exception as fallback_error:
+                    logger.error(f"❌ Error sending plain text: {fallback_error}", exc_info=True)
+                    try:
+                        await query.answer("⚠️ حدث خطأ في عرض التفاصيل", show_alert=True)
+                    except:
+                        pass
+                    return UM_START
+            
+            return UM_USER_ACTIONS
+    except Exception as e:
+        logger.error(f"❌ Error in _show_user_details: {e}", exc_info=True)
+        try:
+            await query.edit_message_text("❌ حدث خطأ في عرض تفاصيل المستخدم.", reply_markup=_main_kb(), parse_mode="Markdown")
+        except:
+            try:
+                await query.message.reply_text("❌ حدث خطأ في عرض تفاصيل المستخدم.", reply_markup=_main_kb(), parse_mode="Markdown")
+            except:
+                pass
+        return UM_START
 
 async def _handle_user_action(query, context, action):
     """معالجة إجراءات المستخدم"""
