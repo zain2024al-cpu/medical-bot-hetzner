@@ -9967,10 +9967,13 @@ def register(app):
 
         try:
             with SessionLocal() as s:
-                # جلب المترجمين المعتمدين فقط
+                # جلب المترجمين المعتمدين فقط من جدول Translator
+                # نستبعد المترجمين الذين تم إضافتهم تلقائياً من التقارير
+                # نعرض فقط المترجمين الذين أضافهم الأدمن في قاعدة البيانات
                 if query_text:
                     translators = s.query(Translator).filter(
                         Translator.is_approved == True,
+                        Translator.is_active == True,  # فقط المترجمين النشطين
                         Translator.full_name.isnot(None),
                         Translator.full_name != "",
                         Translator.full_name.ilike(f"%{query_text}%")
@@ -9978,6 +9981,7 @@ def register(app):
                 else:
                     translators = s.query(Translator).filter(
                         Translator.is_approved == True,
+                        Translator.is_active == True,  # فقط المترجمين النشطين
                         Translator.full_name.isnot(None),
                         Translator.full_name != ""
                     ).order_by(Translator.full_name).limit(50).all()
