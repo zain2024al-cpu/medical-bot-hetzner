@@ -827,16 +827,43 @@ def write_patient_names_to_file(names):
     
     # كتابة الملف
     try:
+        # التأكد من صلاحيات الكتابة
+        import stat
+        if os.path.exists(file_path):
+            # إزالة وضع القراءة فقط إذا كان موجوداً
+            current_permissions = os.stat(file_path).st_mode
+            os.chmod(file_path, current_permissions | stat.S_IWRITE)
+        
+        # التأكد من صلاحيات المجلد
+        if data_dir and os.path.exists(data_dir):
+            current_dir_permissions = os.stat(data_dir).st_mode
+            os.chmod(data_dir, current_dir_permissions | stat.S_IWRITE | stat.S_IEXEC)
+        
         with open(file_path, 'w', encoding='utf-8') as f:
             # كتابة التعليقات
             f.writelines(header_lines)
             # كتابة الأسماء
             for name in names:
                 f.write(name + '\n')
-        logger.info(f"✅ تم حفظ {len(names)} اسم في الملف: {file_path}")
-        return True
+        
+        # التأكد من أن الملف تم حفظه بنجاح
+        if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
+            logger.info(f"✅ تم حفظ {len(names)} اسم في الملف: {file_path}")
+            return True
+        else:
+            logger.error(f"❌ الملف لم يتم حفظه بشكل صحيح: {file_path}")
+            return False
+    except PermissionError as pe:
+        logger.error(f"❌ خطأ في الصلاحيات: {pe}", exc_info=True)
+        logger.error(f"   الملف: {file_path}")
+        logger.error(f"   المجلد: {data_dir}")
+        return False
     except Exception as e:
         logger.error(f"❌ خطأ في كتابة الملف: {e}", exc_info=True)
+        logger.error(f"   الملف: {file_path}")
+        logger.error(f"   المجلد: {data_dir}")
+        import traceback
+        logger.error(traceback.format_exc())
         return False
 
 async def handle_manage_patients(update: Update, context: ContextTypes.DEFAULT_TYPE):
