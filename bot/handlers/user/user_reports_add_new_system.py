@@ -9175,7 +9175,7 @@ async def save_report_to_database(query, context, flow_type):
             decision_text = f"تفاصيل العملية: {operation_details}\n\nاسم العملية بالإنجليزي: {operation_name}\n\nملاحظات: {notes}"
         elif flow_type == "surgery_consult":
             diagnosis = data.get("diagnosis", "")
-            decision = data.get("decision", "")
+            decision = data.get("doctor_decision") or data.get("decision", "")
             operation_name = data.get("operation_name_en", "")
             success_rate = data.get("success_rate", "")
             benefit_rate = data.get("benefit_rate", "")
@@ -9198,7 +9198,7 @@ async def save_report_to_database(query, context, flow_type):
                 decision_text += f"\n\nتاريخ العودة: {followup_date_text}"
         elif flow_type == "final_consult":
             diagnosis = data.get("diagnosis", "")
-            decision = data.get("decision", "")
+            decision = data.get("doctor_decision") or data.get("decision", "")
             recommendations = data.get("recommendations", "")
             complaint_text = ""
             decision_text = f"التشخيص النهائي: {diagnosis}\n\nقرار الطبيب: {decision}\n\nالتوصيات الطبية: {recommendations}"
