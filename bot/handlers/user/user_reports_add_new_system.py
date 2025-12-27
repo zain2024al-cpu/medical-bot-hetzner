@@ -3053,11 +3053,34 @@ async def handle_doctor(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return STATE_SELECT_DOCTOR
 
-        # ✅ حفظ اسم الطبيب
+        # ✅ حفظ اسم الطبيب في user_data
         context.user_data["report_tmp"]["doctor_name"] = text
         context.user_data["report_tmp"].setdefault("step_history", []).append(R_DOCTOR)
         context.user_data["report_tmp"].pop("doctor_manual_mode", None)
         logger.info(f"✅ تم حفظ اسم الطبيب يدوياً: {text}")
+        
+        # ✅ حفظ الطبيب في قاعدة البيانات مباشرة حتى يظهر في البحث
+        try:
+            from db.session import SessionLocal
+            from db.models import Doctor
+            
+            with SessionLocal() as s:
+                # البحث عن الطبيب في قاعدة البيانات
+                doctor = s.query(Doctor).filter_by(full_name=text).first()
+                if not doctor:
+                    # إنشاء طبيب جديد
+                    doctor = Doctor(
+                        name=text,
+                        full_name=text
+                    )
+                    s.add(doctor)
+                    s.commit()
+                    logger.info(f"✅ تم حفظ الطبيب في قاعدة البيانات: {text}")
+                else:
+                    logger.info(f"ℹ️ الطبيب موجود بالفعل في قاعدة البيانات: {text}")
+        except Exception as e:
+            logger.error(f"❌ خطأ في حفظ الطبيب في قاعدة البيانات: {e}", exc_info=True)
+            # لا نوقف العملية، فقط نسجل الخطأ
 
         # ✅ تحديث last_valid_state للبحث النصي
         context.user_data['last_valid_state'] = 'search_doctor_screen'
