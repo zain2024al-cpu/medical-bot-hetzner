@@ -7254,13 +7254,14 @@ async def show_translator_list(update: Update, context: ContextTypes.DEFAULT_TYP
     items_per_page = 10  # 10 أسماء في كل صفحة
     
     with SessionLocal() as s:
-        # جلب جميع المترجمين من قاعدة البيانات (من جدول users/translators)
-        # فقط المترجمين المعتمدين (is_approved = True)
+        # جلب المترجمين المضافة يدوياً فقط (ليس لديهم tg_user_id - لم يسجلوا في البوت)
+        # فقط المترجمين المعتمدين (is_approved = True) والنشطين (is_active = True)
         all_translators = s.query(Translator).filter(
             Translator.is_approved == True,
             Translator.is_active == True,  # فقط المترجمين النشطين
             Translator.full_name.isnot(None),
-            Translator.full_name != ""
+            Translator.full_name != "",
+            Translator.tg_user_id.is_(None)  # فقط المترجمين المضافة يدوياً (ليس لديهم حساب Telegram)
         ).order_by(Translator.full_name).all()
         
         total = len(all_translators)
@@ -7576,13 +7577,14 @@ async def show_translator_list(update: Update, context: ContextTypes.DEFAULT_TYP
     items_per_page = 10  # 10 أسماء في كل صفحة
     
     with SessionLocal() as s:
-        # جلب جميع المترجمين من قاعدة البيانات (من جدول users/translators)
-        # فقط المترجمين المعتمدين (is_approved = True)
+        # جلب المترجمين المضافة يدوياً فقط (ليس لديهم tg_user_id - لم يسجلوا في البوت)
+        # فقط المترجمين المعتمدين (is_approved = True) والنشطين (is_active = True)
         all_translators = s.query(Translator).filter(
             Translator.is_approved == True,
             Translator.is_active == True,  # فقط المترجمين النشطين
             Translator.full_name.isnot(None),
-            Translator.full_name != ""
+            Translator.full_name != "",
+            Translator.tg_user_id.is_(None)  # فقط المترجمين المضافة يدوياً (ليس لديهم حساب Telegram)
         ).order_by(Translator.full_name).all()
         
         total = len(all_translators)
