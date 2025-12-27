@@ -10170,15 +10170,15 @@ def register(app):
 
         try:
             with SessionLocal() as s:
-                # جلب المترجمين المعتمدين فقط من جدول Translator
-                # نستبعد المترجمين الذين تم إضافتهم تلقائياً من التقارير
-                # نعرض فقط المترجمين الذين أضافهم الأدمن في قاعدة البيانات
+                # جلب المترجمين المضافة يدوياً فقط (ليس لديهم tg_user_id - لم يسجلوا في البوت)
+                # فقط المترجمين المعتمدين (is_approved = True) والنشطين (is_active = True)
                 if query_text:
                     translators = s.query(Translator).filter(
                         Translator.is_approved == True,
                         Translator.is_active == True,  # فقط المترجمين النشطين
                         Translator.full_name.isnot(None),
                         Translator.full_name != "",
+                        Translator.tg_user_id.is_(None),  # فقط المترجمين المضافة يدوياً (ليس لديهم حساب Telegram)
                         Translator.full_name.ilike(f"%{query_text}%")
                     ).order_by(Translator.full_name).limit(50).all()
                 else:
@@ -10186,7 +10186,8 @@ def register(app):
                         Translator.is_approved == True,
                         Translator.is_active == True,  # فقط المترجمين النشطين
                         Translator.full_name.isnot(None),
-                        Translator.full_name != ""
+                        Translator.full_name != "",
+                        Translator.tg_user_id.is_(None)  # فقط المترجمين المضافة يدوياً (ليس لديهم حساب Telegram)
                     ).order_by(Translator.full_name).limit(50).all()
 
                 for translator in translators:
