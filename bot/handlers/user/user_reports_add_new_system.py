@@ -8444,7 +8444,9 @@ async def handle_edit_field_during_entry(update: Update, context: ContextTypes.D
         logger.info(f"✏️ handle_edit_field_during_entry: flow_type={flow_type}, field_key={field_key}")
         
         data = context.user_data.get("report_tmp", {})
-        current_value = data.get(field_key, "غير محدد")
+        # البحث عن القيمة الحالية باستخدام الاسم الفعلي للحقل
+        actual_field_key = map_field_key_to_report_tmp_key(field_key)
+        current_value = data.get(actual_field_key) or data.get(field_key, "غير محدد")
         
         # حفظ معلومات التعديل
         context.user_data["edit_field_key"] = field_key
@@ -8738,7 +8740,7 @@ async def show_final_summary(message, context, flow_type):
 
     # تفاصيل حسب نوع المسار
     if flow_type in ["new_consult", "followup", "emergency"]:
-        summary += f"💬 **الشكوى:** {data.get('complaint', 'غير محدد')}\n"
+        summary += f"💬 **الشكوى:** {data.get('complaint_text') or data.get('complaint', 'غير محدد')}\n"
         summary += f"🔬 **التشخيص:** {data.get('diagnosis', 'غير محدد')}\n"
         summary += f"📝 **قرار الطبيب:** {data.get('decision', 'غير محدد')}\n"
 
@@ -9242,7 +9244,7 @@ async def save_report_to_database(query, context, flow_type):
             complaint_text = ""
             decision_text = f"سبب تأجيل الموعد: {app_reschedule_reason}\n\nسبب العودة: {app_reschedule_return_reason}"
         elif flow_type in ["new_consult", "followup", "emergency"]:
-            complaint_text = data.get("complaint", "")
+            complaint_text = data.get("complaint_text") or data.get("complaint", "")
             diagnosis = data.get("diagnosis", "")
             decision = data.get("decision", "")
             decision_text = f"التشخيص: {diagnosis}\n\nقرار الطبيب: {decision}"
