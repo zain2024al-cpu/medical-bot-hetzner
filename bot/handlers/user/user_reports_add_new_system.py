@@ -8838,13 +8838,13 @@ async def show_final_summary(message, context, flow_type):
         "discharge": "خروج من المستشفى",
         "rehab_physical": "علاج طبيعي",
         "rehab_device": "أجهزة تعويضية",
-        "radiology": "أشعة وفحوصات"
-    }
-    
-    # استخدام medical_action من data إذا كان موجوداً، وإلا استخدام flow_type
-    medical_action_display = data.get("medical_action") or action_names.get(flow_type, 'غير محدد')
+            "radiology": "أشعة وفحوصات"
+        }
+        
+        # استخدام medical_action من data إذا كان موجوداً، وإلا استخدام flow_type
+        medical_action_display = data.get("medical_action") or action_names.get(flow_type, 'غير محدد')
 
-    summary += f"⚕️ **نوع الإجراء:** {medical_action_display}\n\n"
+        summary += f"⚕️ **نوع الإجراء:** {medical_action_display}\n\n"
 
         # تفاصيل حسب نوع المسار
         if flow_type in ["new_consult", "followup", "emergency"]:
