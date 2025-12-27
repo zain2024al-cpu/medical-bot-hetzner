@@ -8,6 +8,8 @@ from telegram.ext import ContextTypes, ConversationHandler, MessageHandler, Call
 from telegram.constants import ParseMode
 import os
 import logging
+import re
+import base64
 from datetime import datetime, date
 from db.session import SessionLocal
 from db.models import (
@@ -18,6 +20,14 @@ from bot.shared_auth import is_admin
 from bot.keyboards import admin_main_kb
 
 logger = logging.getLogger(__name__)
+
+def escape_markdown_v1(text: str) -> str:
+    """تهريب الأحرف الخاصة في Markdown V1"""
+    if not text:
+        return ""
+    # الأحرف الخاصة في Markdown V1: * _ [ ] ( ) `
+    escape_chars = r'_*[]()`'
+    return re.sub(r'([{}])'.format(re.escape(escape_chars)), r'\\\1', text)
 
 # حالات المحادثة
 SCHEDULE_MENU, UPLOAD_SCHEDULE, CONFIRM_SCHEDULE, VIEW_SCHEDULE = range(4)
@@ -882,7 +892,9 @@ async def handle_view_patient_names(update: Update, context: ContextTypes.DEFAUL
         text += f"📄 **الصفحة:** {page + 1} من {total_pages}\n\n"
         
         for i, name in enumerate(names_page, start=start_idx + 1):
-            text += f"{i}. {name}\n"
+            # تهريب الاسم لتجنب أخطاء Markdown parsing
+            name_escaped = escape_markdown_v1(str(name))
+            text += f"{i}. {name_escaped}\n"
         
         keyboard = []
         nav_buttons = []
@@ -911,6 +923,34 @@ async def handle_view_patient_names(update: Update, context: ContextTypes.DEFAUL
             )
     except Exception as e:
         logger.error(f"❌ Error displaying patient names: {e}", exc_info=True)
+        # محاولة إرسال بدون Markdown إذا فشل parsing
+        try:
+            text_plain = text.replace('**', '').replace('*', '')
+            if query:
+                await query.edit_message_text(
+                    text_plain,
+                    reply_markup=InlineKeyboardMarkup(keyboard)
+                )
+            else:
+                await update.message.reply_text(
+                    text_plain,
+                    reply_markup=InlineKeyboardMarkup(keyboard)
+                )
+        except Exception as fallback_error:
+            logger.error(f"❌ Error sending plain text: {fallback_error}", exc_info=True)
+            try:
+                if query:
+                    await query.answer("⚠️ حدث خطأ في عرض الأسماء", show_alert=True)
+                    await query.edit_message_text(
+                        "❌ **حدث خطأ في عرض الأسماء**\n\n"
+                        "يرجى المحاولة مرة أخرى أو التواصل مع الإدارة.",
+                        reply_markup=InlineKeyboardMarkup([
+                            [InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")]
+                        ]),
+                        parse_mode=ParseMode.MARKDOWN
+                    )
+            except:
+                pass
 
 async def handle_add_patient_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """بدء إضافة اسم مريض جديد"""
@@ -1081,9 +1121,11 @@ async def handle_delete_patient_name(update: Update, context: ContextTypes.DEFAU
         keyboard = []
         for i, name in enumerate(names_page):
             actual_index = start_idx + i
+            # تشفير الاسم باستخدام base64 لتجنب مشاكل الرموز الخاصة في callback_data
+            name_encoded = base64.b64encode(name.encode('utf-8')).decode('utf-8')
             keyboard.append([InlineKeyboardButton(
                 f"🗑️ {name}",
-                callback_data=f"confirm_delete:{actual_index}:{name}"
+                callback_data=f"confirm_delete:{actual_index}:{name_encoded}"
             )])
         
         # أزرار التنقل
@@ -1135,7 +1177,12 @@ async def handle_confirm_delete(update: Update, context: ContextTypes.DEFAULT_TY
             return
         
         index = int(parts[1])
-        name_to_delete = parts[2]
+        # فك تشفير الاسم من base64
+        try:
+            name_to_delete = base64.b64decode(parts[2].encode('utf-8')).decode('utf-8')
+        except Exception:
+            # إذا فشل فك التشفير، استخدم الاسم كما هو (للتوافق مع البيانات القديمة)
+            name_to_delete = parts[2]
         
         # ✅ قراءة الأسماء من الملف
         names = read_patient_names_from_file()
@@ -1161,9 +1208,11 @@ async def handle_confirm_delete(update: Update, context: ContextTypes.DEFAULT_TY
         
         # ✅ حفظ الملف مع الحفاظ على التعليقات
         if write_patient_names_to_file(names):
+            # تهريب الاسم لتجنب أخطاء Markdown parsing
+            name_escaped = escape_markdown_v1(str(name_to_delete))
             await query.edit_message_text(
                 f"✅ **تم حذف الاسم بنجاح**\n\n"
-                f"📝 **الاسم المحذوف:** {name_to_delete}\n"
+                f"📝 **الاسم المحذوف:** {name_escaped}\n"
                 f"📊 **عدد الأسماء المتبقية:** {len(names)}",
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")]]),
                 parse_mode=ParseMode.MARKDOWN
@@ -1213,9 +1262,11 @@ async def handle_edit_patient_name(update: Update, context: ContextTypes.DEFAULT
         keyboard = []
         for i, name in enumerate(names_page):
             actual_index = start_idx + i
+            # تشفير الاسم باستخدام base64 لتجنب مشاكل الرموز الخاصة في callback_data
+            name_encoded = base64.b64encode(name.encode('utf-8')).decode('utf-8')
             keyboard.append([InlineKeyboardButton(
                 f"✏️ {name}",
-                callback_data=f"select_edit:{actual_index}:{name}"
+                callback_data=f"select_edit:{actual_index}:{name_encoded}"
             )])
         
         # أزرار التنقل
@@ -1272,7 +1323,12 @@ async def handle_select_edit(update: Update, context: ContextTypes.DEFAULT_TYPE)
             return ConversationHandler.END
         
         index = int(parts[1])
-        old_name = parts[2]
+        # فك تشفير الاسم من base64
+        try:
+            old_name = base64.b64decode(parts[2].encode('utf-8')).decode('utf-8')
+        except Exception:
+            # إذا فشل فك التشفير، استخدم الاسم كما هو (للتوافق مع البيانات القديمة)
+            old_name = parts[2]
         
         logger.info(f"✅ Editing name at index {index}: '{old_name}'")
         
@@ -1281,9 +1337,11 @@ async def handle_select_edit(update: Update, context: ContextTypes.DEFAULT_TYPE)
         context.user_data['edit_patient_old_name'] = old_name
         
         try:
+            # تهريب الاسم لتجنب أخطاء Markdown parsing
+            old_name_escaped = escape_markdown_v1(str(old_name))
             await query.edit_message_text(
                 f"✏️ **تعديل اسم المريض**\n\n"
-                f"📝 **الاسم الحالي:** {old_name}\n\n"
+                f"📝 **الاسم الحالي:** {old_name_escaped}\n\n"
                 f"اكتب الاسم الجديد:",
                 parse_mode=ParseMode.MARKDOWN
             )
