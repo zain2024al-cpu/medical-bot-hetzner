@@ -8848,6 +8848,12 @@ async def show_final_summary(message, context, flow_type):
         if flow_type == "new_consult":
             summary += f"🔬 **الفحوصات المطلوبة:** {data.get('tests', 'لا يوجد')}\n"
 
+        if flow_type == "followup":
+            # عرض رقم الغرفة والطابق لمتابعة في الرقود
+            room_floor = data.get('room_floor') or data.get('room_number', '')
+            if room_floor:
+                summary += f"🚪 **رقم الغرفة والطابق:** {room_floor}\n"
+
         if flow_type == "emergency":
             summary += f"🏥 **وضع الحالة:** {data.get('status', 'غير محدد')}\n"
 
@@ -9353,6 +9359,11 @@ async def save_report_to_database(query, context, flow_type):
             if flow_type == "new_consult":
                 tests = data.get("tests", "لا يوجد")
                 decision_text += f"\n\nالفحوصات المطلوبة: {tests}"
+            elif flow_type == "followup":
+                # إضافة رقم الغرفة والطابق لمتابعة في الرقود
+                room_floor = data.get("room_floor") or data.get("room_number", "")
+                if room_floor:
+                    decision_text += f"\n\nرقم الغرفة والطابق: {room_floor}"
             elif flow_type == "emergency":
                 status = data.get("status", "")
                 decision_text += f"\n\nوضع الحالة: {status}"
