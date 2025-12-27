@@ -9380,7 +9380,7 @@ async def save_report_to_database(query, context, flow_type):
             # إضافة الحقول الفردية لـ surgery_consult لعرضها بشكل منفصل
             if flow_type == "surgery_consult":
                 broadcast_data['diagnosis'] = data.get('diagnosis', '')
-                broadcast_data['decision'] = data.get('decision', '')
+                broadcast_data['decision'] = data.get('doctor_decision') or data.get('decision', '')
                 broadcast_data['operation_name_en'] = data.get('operation_name_en', '')
                 broadcast_data['success_rate'] = data.get('success_rate', '')
                 broadcast_data['benefit_rate'] = data.get('benefit_rate', '')
