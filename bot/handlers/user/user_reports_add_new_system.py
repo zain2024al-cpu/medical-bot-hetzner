@@ -8742,7 +8742,7 @@ async def show_final_summary(message, context, flow_type):
     if flow_type in ["new_consult", "followup", "emergency"]:
         summary += f"💬 **الشكوى:** {data.get('complaint_text') or data.get('complaint', 'غير محدد')}\n"
         summary += f"🔬 **التشخيص:** {data.get('diagnosis', 'غير محدد')}\n"
-        summary += f"📝 **قرار الطبيب:** {data.get('decision', 'غير محدد')}\n"
+        summary += f"📝 **قرار الطبيب:** {data.get('doctor_decision') or data.get('decision', 'غير محدد')}\n"
 
         if flow_type == "new_consult":
             summary += f"🔬 **الفحوصات المطلوبة:** {data.get('tests', 'لا يوجد')}\n"
@@ -8800,7 +8800,7 @@ async def show_final_summary(message, context, flow_type):
     
     elif flow_type == "surgery_consult":
         summary += f"🔬 **التشخيص:** {data.get('diagnosis', 'غير محدد')}\n"
-        summary += f"📝 **قرار الطبيب:** {data.get('decision', 'غير محدد')}\n"
+        summary += f"📝 **قرار الطبيب:** {data.get('doctor_decision') or data.get('decision', 'غير محدد')}\n"
         summary += f"🔤 **اسم العملية بالإنجليزي:** {data.get('operation_name_en', 'غير محدد')}\n"
         summary += f"📊 **نسبة نجاح العملية:** {data.get('success_rate', 'غير محدد')}\n"
         summary += f"💡 **نسبة الاستفادة من العملية:** {data.get('benefit_rate', 'غير محدد')}\n"
@@ -8827,7 +8827,7 @@ async def show_final_summary(message, context, flow_type):
     
     elif flow_type == "final_consult":
         summary += f"🔬 **التشخيص النهائي:** {data.get('diagnosis', 'غير محدد')}\n"
-        summary += f"📝 **قرار الطبيب:** {data.get('decision', 'غير محدد')}\n"
+        summary += f"📝 **قرار الطبيب:** {data.get('doctor_decision') or data.get('decision', 'غير محدد')}\n"
         summary += f"💡 **التوصيات الطبية:** {data.get('recommendations', 'غير محدد')}\n"
     
     elif flow_type == "rehab_physical":
