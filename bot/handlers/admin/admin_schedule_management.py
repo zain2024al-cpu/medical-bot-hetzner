@@ -1148,11 +1148,11 @@ async def handle_delete_patient_name(update: Update, context: ContextTypes.DEFAU
         keyboard = []
         for i, name in enumerate(names_page):
             actual_index = start_idx + i
-            # تشفير الاسم باستخدام base64 لتجنب مشاكل الرموز الخاصة في callback_data
-            name_encoded = base64.b64encode(name.encode('utf-8')).decode('utf-8')
+            # استخدام الفهرس فقط لتجنب تجاوز حد 64 بايت في callback_data
+            # الاسم سيتم جلبها من القائمة باستخدام الفهرس
             keyboard.append([InlineKeyboardButton(
                 f"🗑️ {name}",
-                callback_data=f"confirm_delete:{actual_index}:{name_encoded}"
+                callback_data=f"confirm_delete:{actual_index}"
             )])
         
         # أزرار التنقل
@@ -1191,10 +1191,10 @@ async def handle_confirm_delete(update: Update, context: ContextTypes.DEFAULT_TY
     await query.answer()
     
     try:
-        # استخراج البيانات
-        parts = query.data.split(':', 2)
+        # استخراج البيانات - الآن فقط الفهرس
+        parts = query.data.split(':')
         # تحقق مما إذا كان parts[1] رقمياً قبل التحويل
-        if len(parts) < 3 or not parts[1].isdigit():
+        if len(parts) < 2 or not parts[1].isdigit():
             logger.warning(f"Received invalid delete confirmation: {query.data}")
             await query.edit_message_text(
                 "❌ **خطأ:** طلب حذف غير صالح",
@@ -1204,34 +1204,26 @@ async def handle_confirm_delete(update: Update, context: ContextTypes.DEFAULT_TY
             return
         
         index = int(parts[1])
-        # فك تشفير الاسم من base64
-        try:
-            name_to_delete = base64.b64decode(parts[2].encode('utf-8')).decode('utf-8')
-        except Exception:
-            # إذا فشل فك التشفير، استخدم الاسم كما هو (للتوافق مع البيانات القديمة)
-            name_to_delete = parts[2]
         
         # ✅ قراءة الأسماء من الملف
         names = read_patient_names_from_file()
         
+        # التحقق من صحة الفهرس
+        if index < 0 or index >= len(names):
+            logger.error(f"❌ Invalid index {index} for list of length {len(names)}")
+            await query.edit_message_text(
+                "❌ **خطأ:** الفهرس غير صالح",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")]]),
+                parse_mode=ParseMode.MARKDOWN
+            )
+            return
+        
+        # الحصول على الاسم قبل الحذف
+        name_to_delete = names[index]
+        
         # حذف الاسم من القائمة
-        if index < len(names) and names[index] == name_to_delete:
-            names.pop(index)
-            logger.info(f"✅ Name '{name_to_delete}' removed from list at index {index}")
-        else:
-            # محاولة البحث عن الاسم في القائمة
-            try:
-                actual_index = names.index(name_to_delete)
-                names.pop(actual_index)
-                logger.info(f"✅ Name '{name_to_delete}' found and removed at actual index {actual_index}")
-            except ValueError:
-                logger.error(f"❌ Name '{name_to_delete}' not found in list")
-                await query.edit_message_text(
-                    f"❌ **خطأ:** لم يتم العثور على الاسم '{name_to_delete}'",
-                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")]]),
-                    parse_mode=ParseMode.MARKDOWN
-                )
-                return
+        names.pop(index)
+        logger.info(f"✅ Name '{name_to_delete}' removed from list at index {index}")
         
         # ✅ حفظ الملف مع الحفاظ على التعليقات
         if write_patient_names_to_file(names):
