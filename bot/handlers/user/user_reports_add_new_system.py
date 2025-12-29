@@ -2284,18 +2284,37 @@ def _sort_hospitals_custom(hospitals_list):
     return sorted(hospitals_list, key=get_sort_key)
 
 
+def _get_hospitals_from_database_or_predefined():
+    """جلب المستشفيات من قاعدة البيانات أو القائمة الثابتة"""
+    try:
+        from db.session import SessionLocal
+        from db.models import Hospital
+        with SessionLocal() as s:
+            hospitals = s.query(Hospital).order_by(Hospital.name).all()
+            if hospitals:
+                return [h.name for h in hospitals if h.name]
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"⚠️ فشل تحميل المستشفيات من قاعدة البيانات: {e}")
+    # Fallback: استخدام القائمة الثابتة
+    return PREDEFINED_HOSPITALS.copy()
+
+
 def _build_hospitals_keyboard(page=0, search_query="", context=None):
     """بناء لوحة مفاتيح المستشفيات مع بحث"""
     items_per_page = 8
+
+    # جلب المستشفيات من قاعدة البيانات أو القائمة الثابتة
+    all_hospitals = _get_hospitals_from_database_or_predefined()
 
     # تصفية المستشفيات إذا كان هناك بحث
     if search_query:
         search_lower = search_query.lower()
         filtered_hospitals = [
-    h for h in PREDEFINED_HOSPITALS if search_lower in h.lower()]
+    h for h in all_hospitals if search_lower in h.lower()]
         hospitals_list = _sort_hospitals_custom(filtered_hospitals)
     else:
-        hospitals_list = _sort_hospitals_custom(PREDEFINED_HOSPITALS.copy())
+        hospitals_list = _sort_hospitals_custom(all_hospitals)
 
     total = len(hospitals_list)
     total_pages = max(1, (total + items_per_page - 1) // items_per_page)

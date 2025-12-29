@@ -38,6 +38,8 @@ def register_all_handlers(app):
     # from bot.handlers.admin.admin_printing import register as register_admin_printing  # تم تعطيله - تداخل
     from bot.handlers.admin.admin_daily_patients import register as register_daily_patients
     from bot.handlers.admin.admin_data_analysis import register as register_data_analysis
+    from bot.handlers.admin.admin_hospitals_management import register as register_hospitals_management
+    from bot.handlers.admin.admin_translators_management import register as register_translators_management
     # تم حذف admin_patient_management
     
     admin_initial_case.register(app)
@@ -52,6 +54,8 @@ def register_all_handlers(app):
     # register_admin_printing(app)  # ❌ تم تعطيله - تداخل مع admin_reports (نفس الزر)
     register_daily_patients(app)  # ✅ إدارة أسماء المرضى اليومية
     register_data_analysis(app)  # ✅ نظام تحليل البيانات الشامل
+    register_hospitals_management(app)  # ✅ إدارة المستشفيات
+    register_translators_management(app)  # ✅ إدارة المترجمين
     # تم حذف register_patient_management - نظام بسيط
 
     # 🔹 تسجيل handlers المستخدم المتخصصة

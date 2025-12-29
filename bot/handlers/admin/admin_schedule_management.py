@@ -37,6 +37,8 @@ async def start_schedule_management(update: Update, context: ContextTypes.DEFAUL
         [InlineKeyboardButton("📊 تتبع التقارير اليومية", callback_data="track_reports")],
         [InlineKeyboardButton("🔔 إرسال تنبيهات", callback_data="send_notifications")],
         [InlineKeyboardButton("📝 أسماء المرضى", callback_data="manage_patients")],
+        [InlineKeyboardButton("🏥 إدارة المستشفيات", callback_data="manage_hospitals")],
+        [InlineKeyboardButton("👥 إدارة المترجمين", callback_data="manage_translators")],
         [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_main")]
     ])
 
@@ -463,6 +465,8 @@ async def back_to_schedule_menu(update: Update, context: ContextTypes.DEFAULT_TY
         [InlineKeyboardButton("📊 تتبع التقارير اليومية", callback_data="track_reports")],
         [InlineKeyboardButton("🔔 إرسال تنبيهات", callback_data="send_notifications")],
         [InlineKeyboardButton("📝 أسماء المرضى", callback_data="manage_patients")],
+        [InlineKeyboardButton("🏥 إدارة المستشفيات", callback_data="manage_hospitals")],
+        [InlineKeyboardButton("👥 إدارة المترجمين", callback_data="manage_translators")],
         [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_main")]
     ])
 
@@ -615,19 +619,50 @@ async def handle_patient_name_input(update: Update, context: ContextTypes.DEFAUL
         )
         return "ADD_PATIENT_NAME"
     
-    # إضافة الاسم للملف
+    # إضافة الاسم لقاعدة البيانات والملف معاً
     try:
-        with open('data/patient_names.txt', 'a', encoding='utf-8') as f:
-            f.write(f"\n{name}")
+        # 1. إضافة الاسم لقاعدة البيانات
+        from db.models import Patient
+        db_success = False
+        try:
+            with SessionLocal() as s:
+                # التحقق من وجود الاسم مسبقاً
+                existing = s.query(Patient).filter_by(full_name=name).first()
+                if not existing:
+                    new_patient = Patient(full_name=name)
+                    s.add(new_patient)
+                    s.commit()
+                    logger.info(f"✅ تم إضافة المريض '{name}' إلى قاعدة البيانات")
+                    db_success = True
+                else:
+                    logger.info(f"ℹ️ المريض '{name}' موجود مسبقاً في قاعدة البيانات")
+                    db_success = True  # الاسم موجود بالفعل
+        except Exception as db_error:
+            logger.error(f"❌ خطأ في إضافة المريض لقاعدة البيانات: {db_error}")
+        
+        # 2. إضافة الاسم للملف (للتوافق مع الكود القديم)
+        try:
+            with open('data/patient_names.txt', 'a', encoding='utf-8') as f:
+                f.write(f"\n{name}")
+        except Exception as file_error:
+            logger.error(f"❌ خطأ في إضافة المريض للملف: {file_error}")
         
         keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")]])
         
-        await update.message.reply_text(
-            f"✅ **تم إضافة الاسم:** {name}\n\n"
-            f"📝 يمكنك إضافة المزيد أو الرجوع للقائمة",
-            reply_markup=keyboard,
-            parse_mode=ParseMode.MARKDOWN
-        )
+        if db_success:
+            await update.message.reply_text(
+                f"✅ **تم إضافة الاسم بنجاح:** {name}\n\n"
+                f"📝 سيظهر الاسم عند إنشاء تقرير جديد",
+                reply_markup=keyboard,
+                parse_mode=ParseMode.MARKDOWN
+            )
+        else:
+            await update.message.reply_text(
+                f"⚠️ **تم إضافة الاسم للملف فقط:** {name}\n\n"
+                f"📝 قد لا يظهر في البحث مباشرة",
+                reply_markup=keyboard,
+                parse_mode=ParseMode.MARKDOWN
+            )
         return ConversationHandler.END
     except Exception as e:
         await update.message.reply_text(
@@ -708,7 +743,19 @@ async def handle_confirm_delete(update: Update, context: ContextTypes.DEFAULT_TY
     index = int(parts[1])
     name_to_delete = parts[2]
     
-    # قراءة الملف
+    # 1. حذف من قاعدة البيانات
+    from db.models import Patient
+    try:
+        with SessionLocal() as s:
+            patient = s.query(Patient).filter_by(full_name=name_to_delete).first()
+            if patient:
+                s.delete(patient)
+                s.commit()
+                logger.info(f"✅ تم حذف المريض '{name_to_delete}' من قاعدة البيانات")
+    except Exception as db_error:
+        logger.error(f"❌ خطأ في حذف المريض من قاعدة البيانات: {db_error}")
+    
+    # 2. قراءة وحذف من الملف
     try:
         with open('data/patient_names.txt', 'r', encoding='utf-8') as f:
             lines = f.readlines()
@@ -716,7 +763,7 @@ async def handle_confirm_delete(update: Update, context: ContextTypes.DEFAULT_TY
         await query.edit_message_text("❌ **خطأ في القراءة**", parse_mode=ParseMode.MARKDOWN)
         return
     
-    # حذف الاسم
+    # حذف الاسم من الملف
     new_lines = []
     names = []
     for line in lines:
@@ -851,7 +898,19 @@ async def handle_edit_name_input(update: Update, context: ContextTypes.DEFAULT_T
         await update.message.reply_text("❌ **خطأ:** لم يتم اختيار اسم للتعديل", parse_mode=ParseMode.MARKDOWN)
         return ConversationHandler.END
     
-    # قراءة الملف
+    # 1. تعديل في قاعدة البيانات
+    from db.models import Patient
+    try:
+        with SessionLocal() as s:
+            patient = s.query(Patient).filter_by(full_name=old_name).first()
+            if patient:
+                patient.full_name = new_name
+                s.commit()
+                logger.info(f"✅ تم تعديل اسم المريض من '{old_name}' إلى '{new_name}' في قاعدة البيانات")
+    except Exception as db_error:
+        logger.error(f"❌ خطأ في تعديل اسم المريض في قاعدة البيانات: {db_error}")
+    
+    # 2. قراءة وتعديل الملف
     try:
         with open('data/patient_names.txt', 'r', encoding='utf-8') as f:
             lines = f.readlines()

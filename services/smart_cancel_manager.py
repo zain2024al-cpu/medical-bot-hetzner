@@ -124,3 +124,6 @@ class SmartCancelManager:
             print(f"   • {context_type}: {'تحذير' if warning else 'عادي'} - {len(message)} حرف")
 
         return True
+
+
+
