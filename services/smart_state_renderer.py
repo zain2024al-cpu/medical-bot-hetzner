@@ -4,12 +4,38 @@
 # ================================================
 
 import logging
+import os
+import sys
+import importlib.util
 from typing import Optional
-from bot.handlers.user.user_reports_add_new_system import (
-    show_patient_selection, show_doctor_input, show_translator_selection,
-    PatientDataManager, DoctorDataManager, smart_nav_manager,
-    STATE_SELECT_PATIENT, STATE_SELECT_DOCTOR, get_translator_state
-)
+
+# استيراد من الملف الأصلي أو النسخة المقسمة
+try:
+    # محاولة الاستيراد من النسخة المقسمة أولاً
+    from bot.handlers.user.user_reports_add_new_system.patient_handlers import show_patient_selection
+    from bot.handlers.user.user_reports_add_new_system.doctor_handlers import show_doctor_input
+    from bot.handlers.user.user_reports_add_new_system.flows.shared import show_translator_selection, get_translator_state
+    from bot.handlers.user.user_reports_add_new_system.managers import PatientDataManager, DoctorDataManager, smart_nav_manager
+    from bot.handlers.user.user_reports_add_new_system.states import STATE_SELECT_PATIENT, STATE_SELECT_DOCTOR
+except ImportError:
+    # Fallback: استيراد من الملف الأصلي
+    current_file = os.path.abspath(__file__)
+    bot_dir = os.path.dirname(os.path.dirname(current_file))
+    original_file = os.path.join(bot_dir, 'bot', 'handlers', 'user', 'user_reports_add_new_system.py')
+    
+    if os.path.exists(original_file):
+        spec = importlib.util.spec_from_file_location("user_reports_add_new_system_original", original_file)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        show_patient_selection = getattr(module, 'show_patient_selection', None)
+        show_doctor_input = getattr(module, 'show_doctor_input', None)
+        show_translator_selection = getattr(module, 'show_translator_selection', None)
+        PatientDataManager = getattr(module, 'PatientDataManager', None)
+        DoctorDataManager = getattr(module, 'DoctorDataManager', None)
+        smart_nav_manager = getattr(module, 'smart_nav_manager', None)
+        STATE_SELECT_PATIENT = getattr(module, 'STATE_SELECT_PATIENT', None)
+        STATE_SELECT_DOCTOR = getattr(module, 'STATE_SELECT_DOCTOR', None)
+        get_translator_state = getattr(module, 'get_translator_state', None)
 
 logger = logging.getLogger(__name__)
 
@@ -212,3 +238,4 @@ class SmartStateRenderer:
         print("   🎯 SmartStateRenderer جاهز!")
 
         return True
+

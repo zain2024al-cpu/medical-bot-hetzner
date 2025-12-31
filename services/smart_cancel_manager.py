@@ -46,25 +46,41 @@ class SmartCancelManager:
         """
         التعامل مع الإلغاء حسب السياق
         """
-        if cancel_context == 'draft_edit':
-            from bot.handlers.user.user_reports_add_new_system import cancel_draft_edit
-            await cancel_draft_edit(update, context)
-
-        elif cancel_context == 'report_edit':
-            from bot.handlers.user.user_reports_add_new_system import cancel_report_edit
-            await cancel_report_edit(update, context)
-
-        elif cancel_context == 'report_creation':
-            from bot.handlers.user.user_reports_add_new_system import cancel_report_creation
-            await cancel_report_creation(update, context)
-
-        elif cancel_context == 'search':
-            from bot.handlers.user.user_reports_add_new_system import cancel_search
-            await cancel_search(update, context)
-
-        else:
-            from bot.handlers.user.user_reports_add_new_system import cancel_general
-            await cancel_general(update, context)
+        # استيراد من الملف الأصلي (user_reports_add_new_system.py)
+        import sys
+        import os
+        import importlib.util
+        
+        # المسار إلى الملف الأصلي
+        current_file = os.path.abspath(__file__)
+        bot_dir = os.path.dirname(os.path.dirname(current_file))  # real_bot_final/
+        original_file = os.path.join(bot_dir, 'bot', 'handlers', 'user', 'user_reports_add_new_system.py')
+        
+        if os.path.exists(original_file):
+            spec = importlib.util.spec_from_file_location("user_reports_add_new_system_original", original_file)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            
+            if cancel_context == 'draft_edit':
+                cancel_draft_edit = getattr(module, 'cancel_draft_edit', None)
+                if cancel_draft_edit:
+                    await cancel_draft_edit(update, context)
+            elif cancel_context == 'report_edit':
+                cancel_report_edit = getattr(module, 'cancel_report_edit', None)
+                if cancel_report_edit:
+                    await cancel_report_edit(update, context)
+            elif cancel_context == 'report_creation':
+                cancel_report_creation = getattr(module, 'cancel_report_creation', None)
+                if cancel_report_creation:
+                    await cancel_report_creation(update, context)
+            elif cancel_context == 'search':
+                cancel_search = getattr(module, 'cancel_search', None)
+                if cancel_search:
+                    await cancel_search(update, context)
+            else:
+                cancel_general = getattr(module, 'cancel_general', None)
+                if cancel_general:
+                    await cancel_general(update, context)
 
     @staticmethod
     def get_cancel_message(cancel_context: str) -> str:
@@ -124,3 +140,4 @@ class SmartCancelManager:
             print(f"   • {context_type}: {'تحذير' if warning else 'عادي'} - {len(message)} حرف")
 
         return True
+

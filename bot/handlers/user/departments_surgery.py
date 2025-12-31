@@ -15,7 +15,8 @@ SURGERY_DEPARTMENTS = {
         "جراحة المسالك البولية | Urology",
         "جراحة الجهاز الهضمي | GI Surgery",
         "جراحة الأوعية الدموية | Vascular Surgery",
-        "جراحة الكبد والقنوات الصفراوية | Hepatobiliary Surgery"
+        "جراحة الكبد والقنوات الصفراوية | Hepatobiliary Surgery",
+        "جراحة الوجه والفكين | Oral & Maxillofacial Surgery"
     ]
 }
 

@@ -186,6 +186,36 @@ def reports_group_management_kb():
     return InlineKeyboardMarkup(keyboard)
 
 
+# ✅ القائمة الرئيسية للأدمن (Inline)
+def admin_main_inline_kb():
+    """
+    لوحة أدمن احترافية بأزرار مضمنة
+    """
+    keyboard = [
+        # الصف الأول: الحالات والتقارير
+        [
+            InlineKeyboardButton("➕ إضافة حالة أولية", callback_data="admin:add_initial_case"),
+            InlineKeyboardButton("🖨️ طباعة التقارير", callback_data="admin:print_reports")
+        ],
+        # الصف الثاني: إدارة المستخدمين والتقييم
+        [
+            InlineKeyboardButton("👥 إدارة المستخدمين", callback_data="admin:manage_users"),
+            InlineKeyboardButton("📊 تقييم المترجمين", callback_data="admin:evaluation")
+        ],
+        # الصف الثالث: التحليلات والأدمنين
+        [
+            InlineKeyboardButton("👑 إدارة الأدمنين", callback_data="admin:manage_admins"),
+            InlineKeyboardButton("📊 تحليل البيانات", callback_data="admin:analytics")
+        ],
+        # الصف الرابع: الجدول والتحديث
+        [
+            InlineKeyboardButton("📅 إدارة الجدول", callback_data="admin:schedule"),
+            InlineKeyboardButton("🔄 تحديث", callback_data="admin:refresh")
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
 # ✅ لوحة إدارة مجموعة محسنة
 def admin_main_inline_kb_with_group():
     """

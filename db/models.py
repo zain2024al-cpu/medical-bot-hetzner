@@ -168,6 +168,9 @@ class Report(Base):
     status = Column(String(50), default="active", nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=True, index=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
+    
+    # ✅ معرف المستخدم الذي أنشأ التقرير (Telegram User ID)
+    submitted_by_user_id = Column(Integer, nullable=True, index=True)
 
 
 # ================================================
@@ -336,8 +339,11 @@ class ScheduleImage(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     translator_id = Column(Integer, nullable=True)
     translator_name = Column(String(255), nullable=True)
+    file_id = Column(String(255), nullable=True)  # Telegram file_id for quick access
     file_path = Column(String(500), nullable=True)
+    uploader_id = Column(Integer, nullable=True)  # ID of admin who uploaded
     upload_date = Column(DateTime, default=datetime.utcnow, nullable=True)
+    uploaded_at = Column(DateTime, default=datetime.utcnow, nullable=True)  # Alias for compatibility
     extracted_text = Column(Text, nullable=True)
     status = Column(String(50), default="active", nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=True)

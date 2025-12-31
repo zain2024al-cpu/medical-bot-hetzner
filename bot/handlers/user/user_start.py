@@ -129,17 +129,17 @@ async def user_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         with SessionLocal() as s:
             tr = s.query(Translator).filter_by(tg_user_id=tg_id).first()
             if not tr:
-                # إنشاء المستخدم بدون موافقة تلقائية - يحتاج موافقة الأدمن ⚠️
+                # ⚠️ إنشاء المستخدم بدون موافقة تلقائية - يحتاج موافقة الأدمن
                 tr = Translator(
                     tg_user_id=tg_id,
                     full_name=user.first_name or "بدون اسم",
                     is_active=True,
-                    is_approved=False  # ❌ تم تعطيل الموافقة التلقائية - يحتاج موافقة أدمن
+                    is_approved=False  # ❌ يحتاج موافقة أدمن أولاً
                 )
                 s.add(tr)
                 s.commit()
                 created_at = tr.created_at
-                print(f"⚠️ مستخدم جديد ينتظر الموافقة: {user.first_name} (ID: {tg_id})")
+                logger.info(f"مستخدم جديد ينتظر الموافقة: {user.first_name} (ID: {tg_id})")
                 
                 # إرسال تنبيه للأدمن فوراً
                 from config.settings import ADMIN_IDS
@@ -148,7 +148,7 @@ async def user_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
                 if not ADMIN_IDS:
                     logger.warning("⚠️ لا يوجد أدمن محدد في ADMIN_IDS!")
-                    print("⚠️ تحذير: لا يوجد أدمن محدد في ADMIN_IDS!")
+                    logger.warning("لا يوجد أدمن محدد في ADMIN_IDS!")
                 else:
                     logger.info(f"📨 محاولة إرسال إشعار إلى {len(ADMIN_IDS)} أدمن...")
                     success_count = 0

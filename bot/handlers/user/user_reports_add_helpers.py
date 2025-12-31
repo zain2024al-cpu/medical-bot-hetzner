@@ -12,49 +12,22 @@ logger = logging.getLogger(__name__)
 
 
 # =============================
-# 📋 قوائم البيانات الثابتة
+# 📋 قوائم البيانات الموحدة
 # =============================
 
 # =============================
-# 🏥 قائمة المستشفيات
+# 🏥 قائمة المستشفيات - من الخدمة الموحدة
 # =============================
-PREDEFINED_HOSPITALS = [
-    "Manipal Hospital - Old Airport Road",
-    "Manipal Hospital - Millers Road",
-    "Manipal Hospital - Whitefield",
-    "Manipal Hospital - Yeshwanthpur",
-    "Manipal Hospital - Sarjapur Road",
-    "Aster CMI",
-    "Aster RV",
-    "Aster Whitefield",
-    "Sakra World Hospital, Bangalore",
-    "Fortis Hospital BG Road, Bangalore",
-    "Apollo Hospital, Bannerghatta, Bangalore",
-    "SPARSH Hospital, Infantry Road",
-    "SPARSH Hospital, Hennur Road",
-    "Sankara Eye Hospital, Bengaluru",
-    "St John Hospital, Bangalore",
-    "Trilife Hospital, Bangalore",
-    "Silverline Diagnostics Kalyan Nagar",
-    "M S Ramaiah Memorial Hospital, Bangalore",
-    "Narayana Hospital, Bommasandra",
-    "Gleneagles Global Hospital, Kengeri, Bangalore",
-    "Rela Hospital, Chennai",
-    "Rainbow Children's Hospital, Marathahalli",
-    "HCG Hospital K R Road, Bangalore",
-    "L V Prasad Eye Institute, Hyderabad",
-    "NU Hospitals, Rajajinagar",
-    "Zion Hospital, Kammanahalli",
-    "Cura Hospital, Kammanahalli",
-    "KIMS Hospital, Mahadevapura",
-    "KARE Prosthetics & Orthotics, Bangalore",
-    "Nueclear Diagnostics, Bangalore",
-    "BLK-Max Super Specialty Hospital, Delhi",
-    "Max Super Speciality Hospital, Saket, Delhi",
-    "Artemis Hospital, Delhi",
-    "Bhagwan Mahaveer Jain Hospital - Millers Road",
-    "AIG Hospitals, Hyderabad"
-]
+def get_predefined_hospitals():
+    """الحصول على المستشفيات من الخدمة الموحدة"""
+    try:
+        from services.hospitals_service import get_all_hospitals
+        return get_all_hospitals()
+    except Exception:
+        return []
+
+# للتوافق مع الكود القديم
+PREDEFINED_HOSPITALS = get_predefined_hospitals()
 
 
 # =============================
@@ -120,7 +93,8 @@ PREDEFINED_ACTIONS = [
     "عملية",
     "علاج طبيعي وإعادة تأهيل",
     "ترقيد",
-    "خروج من المستشفى"
+    "خروج من المستشفى",
+    "تأجيل موعد"
 ]
 
 
@@ -128,42 +102,35 @@ PREDEFINED_ACTIONS = [
 # 🔧 الدوال المساعدة
 # =============================
 
-def validate_text_input(text, min_length=3, max_length=1000):
-    """فحص صحة النص المدخل"""
-    if not text or len(text) < min_length:
-        return False, f"النص قصير جداً (يجب أن يكون {min_length} أحرف على الأقل)"
+def validate_text_input(text, min_length=1, max_length=None):
+    """
+    فحص صحة النص المدخل - يقبل جميع النصوص والرموز بدون أي قيود
+    ✅ يقبل: عربي، إنجليزي، أرقام، رموز، إيموجي، أي شيء
+    ✅ بدون حد أدنى أو أقصى للطول
+    """
+    # ✅ يقبل أي نص - حتى لو فارغ سنقبله
+    if text is None:
+        text = ""
     
-    if len(text) > max_length:
-        return False, f"النص طويل جداً ({len(text)} حرف، الحد الأقصى {max_length})"
+    text = str(text).strip()
     
+    # ✅ لا يوجد أي قيود على الطول - نقبل أي نص
+    # ✅ لا يوجد أي قيود على نوع الأحرف أو الرموز
+    # ✅ نقبل الإيموجي والرموز الخاصة
     return True, "صحيح"
 
 
-def validate_english_only(text, min_length=3, max_length=200):
-    """فحص أن النص يحتوي على أحرف إنجليزية فقط (مع السماح ببعض الرموز الطبية)"""
-    import re
+def validate_english_only(text, min_length=1, max_length=None):
+    """
+    فحص النص - يقبل جميع النصوص والرموز بدون أي قيود
+    ✅ يقبل: عربي، إنجليزي، أرقام، رموز، إيموجي، أي شيء
+    (اسم الدالة للتوافق مع الكود القديم فقط)
+    """
+    # ✅ يقبل أي نص - بدون قيود
+    if text is None:
+        text = ""
     
-    # التحقق من الطول أولاً
-    if not text or len(text) < min_length:
-        return False, f"النص قصير جداً (يجب أن يكون {min_length} أحرف على الأقل)"
-    
-    if len(text) > max_length:
-        return False, f"النص طويل جداً ({len(text)} حرف، الحد الأقصى {max_length})"
-    
-    # السماح فقط بـ:
-    # - أحرف إنجليزية (a-z, A-Z)
-    # - أرقام (0-9)
-    # - مسافات
-    # - رموز شائعة في الأسماء الطبية: -, /, (, ), &, ., ', "
-    pattern = r'^[a-zA-Z0-9\s\-/()&.\'"]+$'
-    
-    if not re.match(pattern, text):
-        return False, "⚠️ يجب إدخال النص بالإنجليزية فقط (أحرف لاتينية، أرقام، ومسافات فقط)"
-    
-    # التحقق من وجود حرف إنجليزي واحد على الأقل (وليس فقط أرقام ورموز)
-    if not re.search(r'[a-zA-Z]', text):
-        return False, "⚠️ يجب أن يحتوي النص على حرف إنجليزي واحد على الأقل"
-    
+    # ✅ لا يوجد أي قيود - يقبل عربي، إنجليزي، أرقام، رموز، إيموجي، كل شيء
     return True, "صحيح"
 
 
@@ -228,6 +195,13 @@ async def save_report_to_db(query, context):
         
         # إنشاء التقرير
         print("📝 إنشاء التقرير...")
+        # ✅ الحصول على معرف المستخدم الذي أنشأ التقرير
+        submitted_by_user_id = None
+        if query and query.from_user:
+            submitted_by_user_id = query.from_user.id
+        elif context.user_data.get('_user_id'):
+            submitted_by_user_id = context.user_data.get('_user_id')
+        
         new_report = Report(
             patient_id=patient.id,
             hospital_id=hospital.id,
@@ -241,6 +215,7 @@ async def save_report_to_db(query, context):
             followup_reason=data_tmp.get("followup_reason", ""),
             report_date=data_tmp.get("report_date") or datetime.utcnow(),
             created_at=datetime.utcnow(),
+            submitted_by_user_id=submitted_by_user_id,  # ✅ حفظ معرف المستخدم
         )
         session.add(new_report)
         session.commit()

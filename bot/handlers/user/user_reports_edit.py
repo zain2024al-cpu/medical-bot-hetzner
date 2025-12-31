@@ -238,24 +238,14 @@ async def start_edit_reports(update: Update, context: ContextTypes.DEFAULT_TYPE)
             return ConversationHandler.END
         
         with SessionLocal() as s:
-            # البحث عن المترجم
-            translator = s.query(Translator).filter_by(tg_user_id=user.id).first()
-            
-            if not translator:
-                await update.message.reply_text(
-                    "⚠️ **لم يتم العثور على بيانات المترجم**\n\n"
-                    "يرجى التواصل مع الإدارة لتسجيل بياناتك.",
-                    parse_mode=ParseMode.MARKDOWN
-                )
-                return ConversationHandler.END
-            
-            # البحث عن تقارير اليوم فقط
+            # ✅ البحث عن تقارير اليوم المقدمة من هذا المستخدم (بغض النظر عن اسم المترجم)
             today = date.today()
             today_start = datetime.combine(today, datetime.min.time())
             today_end = datetime.combine(today, datetime.max.time())
 
+            # البحث بمعرف المستخدم الذي أنشأ التقرير
             reports = s.query(Report).filter(
-                Report.translator_id == translator.id,
+                Report.submitted_by_user_id == user.id,
                 Report.report_date >= today_start,
                 Report.report_date <= today_end
             ).order_by(Report.report_date.desc()).all()
@@ -270,9 +260,8 @@ async def start_edit_reports(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 )
                 return ConversationHandler.END
 
-            # حفظ اسم المترجم
-            context.user_data['translator_name'] = translator.full_name
-            context.user_data['translator_id'] = translator.id
+            # حفظ معرف المستخدم للتحقق لاحقاً
+            context.user_data['submitted_by_user_id'] = user.id
 
             # إنشاء قائمة بالتقارير
             text = "✏️ **تعديل التقارير - اليوم**\n\n"
@@ -348,7 +337,8 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
                 return ConversationHandler.END
             
             # التحقق من أن التقرير يخص المترجم
-            if report.translator_id != context.user_data.get('translator_id'):
+            # ✅ التحقق من أن المستخدم هو من أنشأ التقرير
+            if report.submitted_by_user_id != context.user_data.get('submitted_by_user_id'):
                 await query.edit_message_text("⚠️ **خطأ:** لا يمكنك تعديل هذا التقرير")
                 return ConversationHandler.END
             
@@ -405,7 +395,6 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
             
             # عرض بيانات التقرير
             medical_action = context.user_data['current_report_data']['medical_action']
-            editable_fields = get_all_editable_fields()  # عرض جميع الحقول
             
             text = f"📋 **بيانات التقرير #{report_id}**\n\n"
             text += f"📅 **تاريخ التقرير:** {context.user_data['current_report_data']['report_date']}\n"
@@ -414,13 +403,29 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
             text += f"🏷️ **القسم:** {context.user_data['current_report_data']['department_name']}\n"
             text += f"👨‍⚕️ **الطبيب:** {context.user_data['current_report_data']['doctor_name']}\n"
             text += f"⚕️ **نوع الإجراء:** {medical_action}\n\n"
-            text += "اختر الحقل الذي تريد تعديله:"
+            text += "اختر الحقل الذي تريد تعديله:\n"
+            text += "_(يُعرض فقط الحقول التي تحتوي على قيم)_"
             
-            # بناء الأزرار حسب نوع الإجراء
+            # بناء الأزرار - فقط الحقول التي تحتوي على قيم
             keyboard = []
-            for field_name, field_display in editable_fields:
-                keyboard.append([InlineKeyboardButton(field_display, callback_data=f"edit_field:{field_name}")])
+            all_fields = get_editable_fields_by_action_type(medical_action)
             
+            for field_name, field_display in all_fields:
+                current_value = context.user_data['current_report_data'].get(field_name, "")
+                
+                # إضافة الزر فقط إذا كان الحقل يحتوي على قيمة
+                if current_value and current_value not in ["لا يوجد", "غير محدد", "", None]:
+                    # عرض القيمة الحالية مختصرة
+                    if len(str(current_value)) > 25:
+                        display_value = str(current_value)[:22] + "..."
+                    else:
+                        display_value = str(current_value)
+                    
+                    button_text = f"{field_display}: {display_value}"
+                    keyboard.append([InlineKeyboardButton(button_text, callback_data=f"edit_field:{field_name}")])
+            
+            # إضافة زر إعادة النشر
+            keyboard.append([InlineKeyboardButton("📢 إعادة نشر التقرير", callback_data="edit_republish")])
             keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="edit_back")])
             keyboard.append([InlineKeyboardButton("❌ إلغاء", callback_data="edit_cancel")])
             
@@ -445,6 +450,89 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
             pass
         return ConversationHandler.END
 
+async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """إعادة نشر التقرير بعد التعديل"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    query = update.callback_query
+    await query.answer()
+    
+    try:
+        report_id = context.user_data.get('edit_report_id')
+        
+        with SessionLocal() as s:
+            report = s.query(Report).filter_by(id=report_id).first()
+            
+            if not report:
+                await query.edit_message_text("⚠️ **خطأ:** لم يتم العثور على التقرير")
+                return ConversationHandler.END
+            
+            # جلب البيانات الكاملة
+            patient = s.query(Patient).filter_by(id=report.patient_id).first()
+            hospital = s.query(Hospital).filter_by(id=report.hospital_id).first()
+            department = s.query(Department).filter_by(id=report.department_id).first() if report.department_id else None
+            doctor = s.query(Doctor).filter_by(id=report.doctor_id).first() if report.doctor_id else None
+            translator = s.query(Translator).filter_by(id=report.translator_id).first() if report.translator_id else None
+            
+            # تجهيز بيانات البث
+            followup_display = 'لا يوجد'
+            if report.followup_date:
+                followup_display = report.followup_date.strftime('%Y-%m-%d')
+                if report.followup_time:
+                    followup_display += f" الساعة {report.followup_time}"
+            
+            broadcast_data = {
+                'report_date': report.report_date.strftime('%Y-%m-%d %H:%M') if report.report_date else datetime.now().strftime('%Y-%m-%d %H:%M'),
+                'patient_name': patient.full_name if patient else 'غير معروف',
+                'hospital_name': hospital.name if hospital else 'غير معروف',
+                'department_name': department.name if department else 'غير محدد',
+                'doctor_name': doctor.full_name if doctor else 'لم يتم التحديد',
+                'medical_action': report.medical_action or 'غير محدد',
+                'complaint_text': report.complaint_text or '',
+                'doctor_decision': report.doctor_decision or '',
+                'followup_date': followup_display,
+                'followup_reason': report.followup_reason or 'لا يوجد',
+                'translator_name': translator.full_name if translator else 'غير محدد',
+                'is_edit': True  # علامة أن هذا تقرير معدل
+            }
+            
+            # بث التقرير
+            try:
+                from services.broadcast_service import broadcast_new_report
+                await broadcast_new_report(context.bot, broadcast_data)
+                
+                await query.edit_message_text(
+                    f"✅ **تم إعادة نشر التقرير بنجاح!**\n\n"
+                    f"📋 **رقم التقرير:** #{report_id}\n"
+                    f"👤 **المريض:** {patient.full_name if patient else 'غير معروف'}\n"
+                    f"📅 **وقت النشر:** {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n"
+                    f"تم إرسال التقرير المعدل لجميع المستخدمين.",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+                
+                logger.info(f"✅ تم إعادة نشر التقرير #{report_id}")
+                
+            except Exception as e:
+                logger.error(f"❌ خطأ في إعادة النشر: {e}", exc_info=True)
+                await query.edit_message_text(
+                    f"❌ **حدث خطأ في إعادة النشر**\n\n"
+                    f"يرجى المحاولة مرة أخرى.",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+        
+        # تنظيف البيانات
+        context.user_data.clear()
+        return ConversationHandler.END
+        
+    except Exception as e:
+        logger.error(f"❌ خطأ في handle_republish: {e}", exc_info=True)
+        await query.edit_message_text(
+            "❌ **حدث خطأ**\n\nيرجى المحاولة مرة أخرى.",
+            parse_mode=ParseMode.MARKDOWN
+        )
+        return ConversationHandler.END
+
 async def handle_field_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة اختيار الحقل المراد تعديله"""
     import logging
@@ -462,6 +550,9 @@ async def handle_field_selection(update: Update, context: ContextTypes.DEFAULT_T
         
         if query.data == "edit_back":
             return await start_edit_reports_from_callback(query, context)
+        
+        if query.data == "edit_republish":
+            return await handle_republish(update, context)
         
         # استخراج اسم الحقل
         field_name = query.data.split(':')[1]
@@ -983,9 +1074,29 @@ async def show_field_selection(query, context):
             await query.edit_message_text("⚠️ **خطأ:** لم يتم العثور على التقرير")
             return ConversationHandler.END
         
+        # تحديث بيانات التقرير من قاعدة البيانات (للحصول على آخر التعديلات)
+        patient = s.query(Patient).filter_by(id=report.patient_id).first()
+        hospital = s.query(Hospital).filter_by(id=report.hospital_id).first()
+        department = s.query(Department).filter_by(id=report.department_id).first() if report.department_id else None
+        doctor = s.query(Doctor).filter_by(id=report.doctor_id).first() if report.doctor_id else None
+        
+        # تحديث البيانات المحفوظة
+        context.user_data['current_report_data'].update({
+            'complaint_text': report.complaint_text or "لا يوجد",
+            'doctor_decision': report.doctor_decision or "لا يوجد",
+            'diagnosis': report.diagnosis or "لا يوجد",
+            'treatment_plan': report.treatment_plan or "لا يوجد",
+            'medications': report.medications or "لا يوجد",
+            'notes': report.notes or "لا يوجد",
+            'case_status': report.case_status or "لا يوجد",
+            'followup_date': report.followup_date.strftime('%Y-%m-%d') if report.followup_date else None,
+            'followup_time': report.followup_time,
+            'followup_reason': report.followup_reason or "لا يوجد",
+        })
+        
         # عرض بيانات التقرير مرة أخرى
         medical_action = context.user_data['current_report_data']['medical_action']
-        editable_fields = get_editable_fields_by_action_type(medical_action)
+        all_fields = get_editable_fields_by_action_type(medical_action)
         
         text = f"📋 **بيانات التقرير #{report_id}**\n\n"
         text += f"📅 **تاريخ التقرير:** {context.user_data['current_report_data']['report_date']}\n"
@@ -994,13 +1105,27 @@ async def show_field_selection(query, context):
         text += f"🏷️ **القسم:** {context.user_data['current_report_data']['department_name']}\n"
         text += f"👨‍⚕️ **الطبيب:** {context.user_data['current_report_data']['doctor_name']}\n"
         text += f"⚕️ **نوع الإجراء:** {medical_action}\n\n"
-        text += "اختر الحقل الذي تريد تعديله:"
+        text += "اختر الحقل الذي تريد تعديله:\n"
+        text += "_(يُعرض فقط الحقول التي تحتوي على قيم)_"
         
-        # بناء الأزرار حسب نوع الإجراء
+        # بناء الأزرار - فقط الحقول التي تحتوي على قيم
         keyboard = []
-        for field_name, field_display in editable_fields:
-            keyboard.append([InlineKeyboardButton(field_display, callback_data=f"edit_field:{field_name}")])
+        for field_name, field_display in all_fields:
+            current_value = context.user_data['current_report_data'].get(field_name, "")
+            
+            # إضافة الزر فقط إذا كان الحقل يحتوي على قيمة
+            if current_value and current_value not in ["لا يوجد", "غير محدد", "", None]:
+                # عرض القيمة الحالية مختصرة
+                if len(str(current_value)) > 25:
+                    display_value = str(current_value)[:22] + "..."
+                else:
+                    display_value = str(current_value)
+                
+                button_text = f"{field_display}: {display_value}"
+                keyboard.append([InlineKeyboardButton(button_text, callback_data=f"edit_field:{field_name}")])
         
+        # إضافة زر إعادة النشر
+        keyboard.append([InlineKeyboardButton("📢 إعادة نشر التقرير", callback_data="edit_republish")])
         keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="edit_back")])
         keyboard.append([InlineKeyboardButton("❌ إلغاء", callback_data="edit_cancel")])
         
@@ -1082,6 +1207,7 @@ def register(app):
             ],
             SELECT_FIELD: [
                 CallbackQueryHandler(handle_field_selection, pattern="^edit_field:"),
+                CallbackQueryHandler(handle_field_selection, pattern="^edit_republish$"),
                 CallbackQueryHandler(handle_field_selection, pattern="^edit_back$"),
                 CallbackQueryHandler(handle_field_selection, pattern="^edit_cancel$")
             ],
