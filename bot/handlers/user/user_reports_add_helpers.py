@@ -128,12 +128,13 @@ PREDEFINED_ACTIONS = [
 # 🔧 الدوال المساعدة
 # =============================
 
-def validate_text_input(text, min_length=3, max_length=1000):
-    """فحص صحة النص المدخل"""
+def validate_text_input(text, min_length=3, max_length=None):
+    """فحص صحة النص المدخل - بدون حد أقصى افتراضياً"""
     if not text or len(text) < min_length:
         return False, f"النص قصير جداً (يجب أن يكون {min_length} أحرف على الأقل)"
     
-    if len(text) > max_length:
+    # ✅ إذا كان max_length=None، لا يوجد حد أقصى (مفتوح)
+    if max_length is not None and len(text) > max_length:
         return False, f"النص طويل جداً ({len(text)} حرف، الحد الأقصى {max_length})"
     
     return True, "صحيح"

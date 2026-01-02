@@ -84,3 +84,8 @@ def register_all_handlers(app):
     user_search_basic.register(app)
     user_help.register(app)
     # register_schedule_view(app)  # تم تعطيله - استخدم shared_schedule بدلاً منه
+    
+    # 🛡️ Universal Fallback - يجب أن يكون آخر شيء يتم تسجيله
+    # يتعامل مع جميع الأزرار والرسائل غير المعالجة لمنع تعليق البوت
+    from bot.handlers.shared.universal_fallback import register as register_universal_fallback
+    register_universal_fallback(app)  # ✅ Fallback شامل (group=999)

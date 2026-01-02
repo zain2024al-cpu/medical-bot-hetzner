@@ -741,6 +741,17 @@ async def cancel_report_creation(update, context):
     """
     إلغاء إنشاء تقرير جديد - تنظيف البيانات والعودة للبداية
     """
+    # ✅ تنظيف جميع البيانات المتعلقة بالتقرير أولاً
+    context.user_data.pop("report_tmp", None)
+    context.user_data.pop('_conversation_state', None)
+    context.user_data.pop('last_valid_state', None)
+    context.user_data.pop('editing_field', None)
+    context.user_data.pop('current_report_data', None)
+    context.user_data.pop('edit_draft_field', None)
+    
+    # إعادة تعيين سياق البحث
+    smart_nav_manager.clear_search_context()
+    
     query = update.callback_query
     if query:
         await query.answer("تم إلغاء إنشاء التقرير")
@@ -748,13 +759,8 @@ async def cancel_report_creation(update, context):
         try:
             await query.edit_message_text(
                 "❌ تم إلغاء إنشاء التقرير\n\n"
-                "⚠️ **تحذير:** سيتم حذف جميع البيانات التي أدخلتها\n"
-                "تأكد من حفظ أي معلومات مهمة قبل المتابعة\n\n"
-                "يمكنك البدء بإنشاء تقرير جديد في أي وقت",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🏥 إضافة تقرير جديد", callback_data="start_report")],
-                    [InlineKeyboardButton("📋 تعديل تقارير موجودة", callback_data="edit_reports")]
-                ]),
+                "استخدم زر *📝 إضافة تقرير جديد* من القائمة الرئيسية للبدء من جديد.",
+                reply_markup=None,
                 parse_mode="Markdown"
             )
         except:
@@ -762,22 +768,10 @@ async def cancel_report_creation(update, context):
     elif update.message:
         await update.message.reply_text(
             "❌ تم إلغاء إنشاء التقرير\n\n"
-            "⚠️ **تحذير:** سيتم حذف جميع البيانات التي أدخلتها\n"
-            "تأكد من حفظ أي معلومات مهمة قبل المتابعة\n\n"
-            "يمكنك البدء بإنشاء تقرير جديد في أي وقت",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🏥 إضافة تقرير جديد", callback_data="start_report")],
-                [InlineKeyboardButton("📋 تعديل تقارير موجودة", callback_data="edit_reports")]
-            ]),
+            "استخدم زر *📝 إضافة تقرير جديد* من القائمة الرئيسية للبدء من جديد.",
+            reply_markup=None,
             parse_mode="Markdown"
         )
-
-    # تنظيف جميع البيانات المتعلقة بالتقرير
-    context.user_data.pop("report_tmp", None)
-    context.user_data.pop('_conversation_state', None)
-
-    # إعادة تعيين سياق البحث
-    smart_nav_manager.clear_search_context()
 
     return ConversationHandler.END
 
@@ -1664,27 +1658,108 @@ async def render_date_selection(message, context):
         parse_mode="Markdown"
     )
 
-async def render_patient_selection(message, context):
-    """عرض شاشة اختيار المريض - rendering فقط"""
+def _get_patients_from_database():
+    """جلب أسماء المرضى من قاعدة البيانات مرتبة أبجدياً"""
+    try:
+        from db.session import SessionLocal
+        from db.models import Patient
+        with SessionLocal() as s:
+            patients = s.query(Patient).order_by(Patient.full_name).all()
+            if patients:
+                return [(p.id, p.full_name) for p in patients if p.full_name]
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"⚠️ فشل تحميل المرضى من قاعدة البيانات: {e}")
+    
+    # Fallback: قراءة من الملف
+    try:
+        with open('data/patient_names.txt', 'r', encoding='utf-8') as f:
+            names = [line.strip() for line in f if line.strip()]
+            # ترتيب أبجدي
+            names.sort()
+            return [(i, name) for i, name in enumerate(names)]
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"⚠️ فشل قراءة ملف أسماء المرضى: {e}")
+    
+    return []
+
+
+def _build_patients_keyboard(page=0, search_query="", context=None):
+    """بناء لوحة مفاتيح المرضى مع صفحات"""
+    items_per_page = 8
+
+    # جلب المرضى من قاعدة البيانات
+    all_patients = _get_patients_from_database()
+
+    # تصفية المرضى إذا كان هناك بحث
+    if search_query:
+        search_lower = search_query.lower()
+        filtered_patients = [(pid, name) for pid, name in all_patients if search_lower in name.lower()]
+        patients_list = filtered_patients
+    else:
+        patients_list = all_patients
+
+    total = len(patients_list)
+    total_pages = max(1, (total + items_per_page - 1) // items_per_page)
+    page = max(0, min(page, total_pages - 1))
+    start_idx = page * items_per_page
+    end_idx = min(start_idx + items_per_page, total)
+
     keyboard = []
 
-    # زر البحث الذكي (inline search) فقط
-    keyboard.append([InlineKeyboardButton(
-        "🔍 بحث عن مريض",
-        switch_inline_query_current_chat=""
-    )])
+    # حفظ قائمة المرضى في user_data للوصول إليها لاحقاً
+    if context:
+        context.user_data.setdefault("report_tmp", {})["patients_list"] = patients_list
+        context.user_data["report_tmp"]["patients_page"] = page
+
+    # عرض المرضى (سطر واحد لكل مريض)
+    for i in range(start_idx, end_idx):
+        patient_id, patient_name = patients_list[i]
+        keyboard.append([InlineKeyboardButton(
+            f"👤 {patient_name}",
+            callback_data=f"patient_btn:{patient_id}"
+        )])
+
+    # أزرار التنقل بين الصفحات
+    nav_buttons = []
+    if total_pages > 1:
+        if page > 0:
+            nav_buttons.append(InlineKeyboardButton(
+                "⬅️ السابق",
+                callback_data=f"patient_page:{page - 1}"))
+        nav_buttons.append(InlineKeyboardButton(
+            f"📄 {page + 1}/{total_pages}",
+            callback_data="noop"))
+        if page < total_pages - 1:
+            nav_buttons.append(InlineKeyboardButton(
+                "➡️ التالي",
+                callback_data=f"patient_page:{page + 1}"))
+        if nav_buttons:
+            keyboard.append(nav_buttons)
 
     # أزرار التنقل
     keyboard.append([InlineKeyboardButton(
         "❌ إلغاء", callback_data="nav:cancel")])
 
-    text = "👤 **اسم المريض** (الخطوة 2 من 5)\n\n"
-    text += "اضغط على زر '🔍 بحث عن مريض' للبحث عن المريض.\n"
-    text += "سيظهر اسم البوت في الكيبورد ويمكنك البحث والاختيار مباشرة."
+    text = (
+        f"👤 **اختيار المريض** (الخطوة 2 من 5)\n\n"
+        f"📋 **العدد:** {total} مريض"
+    )
+    if search_query:
+        text += f"\n🔍 **البحث:** {search_query}"
+    text += f"\n📄 **الصفحة:** {page + 1} من {total_pages}\n\n**اختر اسم المريض:**"
 
+    return text, InlineKeyboardMarkup(keyboard), search_query
+
+
+async def render_patient_selection(message, context, page=0, search_query=""):
+    """عرض شاشة اختيار المريض - rendering فقط مع قائمة أزرار"""
+    text, keyboard, _ = _build_patients_keyboard(page, search_query, context)
+    
     await message.reply_text(
         text,
-        reply_markup=InlineKeyboardMarkup(keyboard),
+        reply_markup=keyboard,
         parse_mode="Markdown"
     )
 
@@ -1711,8 +1786,198 @@ async def render_department_selection(message, context):
     # إرسال رسالة جديدة
     await message.reply_text(text, reply_markup=keyboard, parse_mode="Markdown")
 
-async def render_doctor_selection(message, context):
-    """عرض شاشة اختيار الطبيب - rendering فقط مع تحميل البيانات"""
+def _load_doctors_from_txt_file():
+    """
+    تحميل جميع الأطباء من ملف doctors.txt
+    التنسيق: اسم الطبيب | اسم المستشفى | القسم بالعربي | القسم بالإنجليزي
+    """
+    doctors_list = []
+    
+    try:
+        # البحث عن ملف الأطباء
+        possible_paths = [
+            os.path.join(os.path.dirname(__file__), '..', '..', '..', 'data', 'doctors.txt'),
+            'data/doctors.txt',
+            '../data/doctors.txt',
+            '../../data/doctors.txt'
+        ]
+        
+        txt_file = None
+        for path in possible_paths:
+            if os.path.exists(path):
+                txt_file = path
+                break
+        
+        if not txt_file:
+            logging.getLogger(__name__).warning("⚠️ لم يتم العثور على ملف doctors.txt")
+            return doctors_list
+        
+        with open(txt_file, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+        
+        for i, line in enumerate(lines):
+            line = line.strip()
+            # تجاهل الأسطر الفارغة والتعليقات
+            if not line or line.startswith('#'):
+                continue
+            
+            # تقسيم السطر حسب الفاصل |
+            parts = line.split('|')
+            if len(parts) >= 4:
+                doctor_name = parts[0].strip()
+                hospital_name = parts[1].strip()
+                dept_ar = parts[2].strip()
+                dept_en = parts[3].strip() if len(parts) > 3 else ""
+                
+                doctors_list.append({
+                    'id': i,
+                    'name': doctor_name,
+                    'hospital': hospital_name,
+                    'department_ar': dept_ar,
+                    'department_en': dept_en
+                })
+        
+        logging.getLogger(__name__).info(f"✅ تم تحميل {len(doctors_list)} طبيب من ملف doctors.txt")
+        
+    except Exception as e:
+        logging.getLogger(__name__).warning(f"⚠️ فشل تحميل الأطباء من الملف: {e}")
+    
+    return doctors_list
+
+
+# كاش للأطباء لتجنب قراءة الملف في كل مرة
+_DOCTORS_CACHE = None
+
+
+def _get_all_doctors():
+    """جلب جميع الأطباء (مع caching)"""
+    global _DOCTORS_CACHE
+    if _DOCTORS_CACHE is None:
+        _DOCTORS_CACHE = _load_doctors_from_txt_file()
+    return _DOCTORS_CACHE
+
+
+def _get_doctors_from_database(hospital_name: str = "", department_name: str = ""):
+    """
+    جلب الأطباء من ملف doctors.txt مع فلترة حسب المستشفى والقسم
+    """
+    all_doctors = _get_all_doctors()
+    
+    if not all_doctors:
+        return []
+    
+    # إذا لم يتم تحديد مستشفى أو قسم، إرجاع قائمة فارغة (لإظهار زر الإدخال اليدوي)
+    if not hospital_name and not department_name:
+        return []
+    
+    filtered_doctors = []
+    hospital_name_lower = hospital_name.lower().strip() if hospital_name else ""
+    department_name_lower = department_name.lower().strip() if department_name else ""
+    
+    for doc in all_doctors:
+        doc_hospital = doc.get('hospital', '').lower()
+        doc_dept_ar = doc.get('department_ar', '').lower()
+        doc_dept_en = doc.get('department_en', '').lower()
+        
+        # فلترة حسب المستشفى
+        hospital_match = False
+        if hospital_name_lower:
+            # مطابقة مرنة للمستشفى
+            if (hospital_name_lower in doc_hospital or 
+                doc_hospital in hospital_name_lower or
+                any(word in doc_hospital for word in hospital_name_lower.split() if len(word) > 3)):
+                hospital_match = True
+        else:
+            hospital_match = True  # لا يوجد فلتر مستشفى
+        
+        # فلترة حسب القسم
+        dept_match = False
+        if department_name_lower:
+            # مطابقة مرنة للقسم (عربي أو إنجليزي)
+            if (department_name_lower in doc_dept_ar or 
+                department_name_lower in doc_dept_en or
+                doc_dept_ar in department_name_lower or
+                doc_dept_en in department_name_lower or
+                any(word in doc_dept_ar or word in doc_dept_en for word in department_name_lower.split() if len(word) > 2)):
+                dept_match = True
+        else:
+            dept_match = True  # لا يوجد فلتر قسم
+        
+        # إضافة الطبيب إذا تطابق المستشفى والقسم
+        if hospital_match and dept_match:
+            filtered_doctors.append(doc)
+    
+    # ترتيب حسب الاسم وإزالة التكرارات
+    seen_names = set()
+    unique_doctors = []
+    for doc in filtered_doctors:
+        if doc['name'] not in seen_names:
+            seen_names.add(doc['name'])
+            unique_doctors.append(doc)
+    
+    return sorted(unique_doctors, key=lambda x: x['name'])
+
+
+def _build_doctors_keyboard(page: int, doctors: list, context):
+    """
+    بناء لوحة مفاتيح الأطباء مع التصفح (pagination)
+    """
+    DOCTORS_PER_PAGE = 8
+    total_doctors = len(doctors)
+    total_pages = max(1, (total_doctors + DOCTORS_PER_PAGE - 1) // DOCTORS_PER_PAGE)
+    
+    # التأكد من أن الصفحة في النطاق الصحيح
+    page = max(0, min(page, total_pages - 1))
+    
+    # حفظ قائمة الأطباء في context
+    context.user_data['_doctors_list'] = doctors
+    context.user_data['_doctors_page'] = page
+    
+    keyboard = []
+    
+    if total_doctors > 0:
+        # حساب نطاق الأطباء للصفحة الحالية
+        start_idx = page * DOCTORS_PER_PAGE
+        end_idx = min(start_idx + DOCTORS_PER_PAGE, total_doctors)
+        
+        # أزرار الأطباء (2 في كل صف)
+        row = []
+        for i in range(start_idx, end_idx):
+            doctor = doctors[i]
+            btn = InlineKeyboardButton(
+                f"👨‍⚕️ {doctor['name'][:25]}",
+                callback_data=f"doctor_idx:{i}"
+            )
+            row.append(btn)
+            if len(row) == 2:
+                keyboard.append(row)
+                row = []
+        
+        # إضافة الصف الأخير إذا كان فيه أزرار
+        if row:
+            keyboard.append(row)
+        
+        # أزرار التنقل بين الصفحات
+        if total_pages > 1:
+            nav_row = []
+            if page > 0:
+                nav_row.append(InlineKeyboardButton("⬅️ السابق", callback_data=f"doctor_page:{page-1}"))
+            nav_row.append(InlineKeyboardButton(f"📄 {page+1}/{total_pages}", callback_data="noop"))
+            if page < total_pages - 1:
+                nav_row.append(InlineKeyboardButton("➡️ التالي", callback_data=f"doctor_page:{page+1}"))
+            keyboard.append(nav_row)
+    
+    # زر الإدخال اليدوي دائماً
+    keyboard.append([InlineKeyboardButton("✏️ إدخال يدوي", callback_data="doctor_manual")])
+    
+    # زر الإلغاء
+    keyboard.append([InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")])
+    
+    return InlineKeyboardMarkup(keyboard), total_doctors
+
+
+async def render_doctor_selection(message, context, page=0):
+    """عرض شاشة اختيار الطبيب - نظام الأزرار مع فلترة"""
 
     # تنظيف بيانات الطبيب القديمة
     DoctorDataManager.clear_doctor_data(context)
@@ -1725,51 +1990,44 @@ async def render_doctor_selection(message, context):
     import logging
     logger = logging.getLogger(__name__)
     logger.info(f"🎯 render_doctor_selection: hospital='{hospital_name}', department='{department_name}'")
-    logger.info(f"🎯 render_doctor_selection: all report_tmp keys: {list(report_tmp.keys())}")
 
-    keyboard = []
+    # جلب الأطباء المفلترين من قاعدة البيانات
+    doctors = _get_doctors_from_database(hospital_name, department_name)
+    
+    # بناء الكيبورد
+    keyboard, total_doctors = _build_doctors_keyboard(page, doctors, context)
 
-    # زر البحث الذكي (inline search) - للأطباء فقط
-    keyboard.append([InlineKeyboardButton(
-        "🔍 بحث عن طبيب",
-        switch_inline_query_current_chat=""
-    )])
-
-    # زر إدخال يدوي
-    keyboard.append([InlineKeyboardButton(
-        "✏️ إدخال يدوي",
-        callback_data="doctor_manual"
-    )])
-
-    # أزرار التنقل
-    keyboard.append([InlineKeyboardButton(
-            "❌ إلغاء", callback_data="nav:cancel")])
-
+    # بناء النص
     text = "👨‍⚕️ **اسم الطبيب** (الخطوة 5 من 5)\n\n"
 
-    if hospital_name and department_name:
+    if hospital_name:
         text += f"🏥 **المستشفى:** {hospital_name}\n"
-        text += f"🏷️ **القسم:** {department_name}\n\n"
-        text += "اضغط على زر '🔍 بحث عن طبيب' للبحث عن الطبيب.\n"
-        text += "سيظهر اسم البوت في الكيبورد ويمكنك البحث والاختيار مباشرة.\n\n"
-        text += "أو اضغط على '✏️ إدخال يدوي' إذا كان الطبيب غير موجود."
+    if department_name:
+        text += f"🏷️ **القسم:** {department_name}\n"
+    
+    text += "\n"
+    
+    if total_doctors > 0:
+        text += f"📋 **عدد الأطباء:** {total_doctors}\n\n"
+        text += "👇 اختر الطبيب من القائمة أدناه:\n"
+        text += "أو اضغط '✏️ إدخال يدوي' إذا لم يكن الطبيب موجوداً."
     else:
-        text += "⚠️ **تحذير:** يرجى اختيار المستشفى والقسم أولاً للبحث عن الأطباء.\n\n"
-        text += "اضغط على زر '🔙 رجوع' للعودة واختيار المستشفى والقسم."
+        text += "⚠️ **لا يوجد أطباء مسجلين لهذا المستشفى/القسم**\n\n"
+        text += "👇 اضغط '✏️ إدخال يدوي' لإدخال اسم الطبيب.\n"
+        text += "سيتم حفظه تلقائياً للاستخدام المستقبلي."
 
     try:
         await message.reply_text(
             text,
-            reply_markup=InlineKeyboardMarkup(keyboard),
+            reply_markup=keyboard,
             parse_mode="Markdown"
         )
     except Exception as e:
         logger.error(f"❌ خطأ في عرض قائمة اختيار الطبيب: {e}", exc_info=True)
-        # محاولة بدون parse_mode
         try:
             await message.reply_text(
                 text.replace("**", ""),
-                reply_markup=InlineKeyboardMarkup(keyboard)
+                reply_markup=keyboard
             )
         except Exception as e2:
             logger.error(f"❌ خطأ في المحاولة الثانية: {e2}")
@@ -2113,7 +2371,7 @@ async def handle_date_time_skip(
     return R_DATE_TIME
 
 
-async def show_patient_selection(message, context, search_query=""):
+async def show_patient_selection(message, context, search_query="", page=0):
     """Navigation wrapper - يحدث state ثم يستدعي rendering"""
     # تحديث State History - إضافة الـ state الحالي
     state_manager = StateHistoryManager.get_state_manager(context)
@@ -2124,7 +2382,7 @@ async def show_patient_selection(message, context, search_query=""):
     context.user_data['_current_search_type'] = 'patient'  # علامة لتحديد نوع البحث
 
     # استدعاء rendering function
-    await render_patient_selection(message, context)
+    await render_patient_selection(message, context, page, search_query)
 
 
 async def handle_patient_selection(
@@ -2157,6 +2415,80 @@ async def handle_patient_selection(
             await query.answer("⚠️ خطأ: لم يتم العثور على المريض", show_alert=True)
             await show_patient_selection(query.message, context)
             return STATE_SELECT_PATIENT
+
+
+async def handle_patient_btn_selection(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE):
+    """معالجة اختيار المريض من زر القائمة (patient_btn:)"""
+    query = update.callback_query
+    await query.answer()
+
+    # استخراج معرف المريض
+    patient_id = query.data.split(":", 1)[1]
+
+    # جلب اسم المريض من القائمة المحفوظة
+    report_tmp = context.user_data.get("report_tmp", {})
+    patients_list = report_tmp.get("patients_list", [])
+
+    patient_name = None
+    try:
+        patient_id_int = int(patient_id)
+        # البحث في قائمة المرضى
+        for pid, pname in patients_list:
+            if pid == patient_id_int:
+                patient_name = pname
+                break
+        
+        # إذا لم نجد في القائمة المحفوظة، نبحث في قاعدة البيانات
+        if not patient_name:
+            with SessionLocal() as s:
+                patient = s.query(Patient).filter_by(id=patient_id_int).first()
+                if patient:
+                    patient_name = patient.full_name
+    except (ValueError, TypeError):
+        # إذا كان ID ليس رقماً، نستخدمه كاسم مباشرة
+        patient_name = patient_id
+
+    if patient_name:
+        context.user_data.setdefault("report_tmp", {})["patient_name"] = patient_name
+        context.user_data["report_tmp"].setdefault("step_history", []).append(R_PATIENT)
+        context.user_data["report_tmp"].pop("patient_search_mode", None)
+
+        await query.edit_message_text(
+            f"✅ **تم اختيار المريض**\n\n"
+            f"👤 **المريض:**\n"
+            f"{patient_name}",
+            parse_mode="Markdown"
+        )
+        await show_hospitals_menu(query.message, context)
+        return STATE_SELECT_HOSPITAL
+    else:
+        await query.answer("⚠️ خطأ: لم يتم العثور على المريض", show_alert=True)
+        text, keyboard, _ = _build_patients_keyboard(0, "", context)
+        await query.edit_message_text(text, reply_markup=keyboard, parse_mode="Markdown")
+        return STATE_SELECT_PATIENT
+
+
+async def handle_patient_page(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE):
+    """معالجة التنقل بين صفحات المرضى"""
+    query = update.callback_query
+    await query.answer()
+
+    # استخراج رقم الصفحة
+    page = int(query.data.split(":", 1)[1])
+
+    # بناء لوحة المفاتيح للصفحة المطلوبة
+    text, keyboard, _ = _build_patients_keyboard(page, "", context)
+
+    await query.edit_message_text(
+        text,
+        reply_markup=keyboard,
+        parse_mode="Markdown"
+    )
+    return STATE_SELECT_PATIENT
 
 
 async def handle_patient(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2860,10 +3192,90 @@ async def show_doctor_input(message, context):
     await render_doctor_selection(message, context)
 
 
+async def handle_doctor_page(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة التنقل بين صفحات الأطباء"""
+    query = update.callback_query
+    await query.answer()
+    
+    # استخراج رقم الصفحة
+    page = int(query.data.split(":")[1])
+    
+    # جلب قائمة الأطباء المحفوظة
+    doctors = context.user_data.get('_doctors_list', [])
+    
+    # بناء الكيبورد الجديد
+    keyboard, total_doctors = _build_doctors_keyboard(page, doctors, context)
+    
+    # تحديث الرسالة
+    report_tmp = context.user_data.get("report_tmp", {})
+    hospital_name = report_tmp.get("hospital_name", "")
+    department_name = report_tmp.get("department_name", "")
+    
+    text = "👨‍⚕️ **اسم الطبيب** (الخطوة 5 من 5)\n\n"
+    if hospital_name:
+        text += f"🏥 **المستشفى:** {hospital_name}\n"
+    if department_name:
+        text += f"🏷️ **القسم:** {department_name}\n"
+    text += f"\n📋 **عدد الأطباء:** {total_doctors}\n\n"
+    text += "👇 اختر الطبيب من القائمة أدناه:"
+    
+    try:
+        await query.edit_message_text(
+            text,
+            reply_markup=keyboard,
+            parse_mode="Markdown"
+        )
+    except Exception:
+        pass
+    
+    return STATE_SELECT_DOCTOR
+
+
+async def handle_doctor_btn_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة اختيار طبيب من الأزرار"""
+    query = update.callback_query
+    await query.answer("✅ تم اختيار الطبيب")
+    
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # استخراج index الطبيب
+    idx = int(query.data.split(":")[1])
+    
+    # جلب الطبيب من القائمة المحفوظة
+    doctors = context.user_data.get('_doctors_list', [])
+    
+    if idx < len(doctors):
+        doctor = doctors[idx]
+        doctor_name = doctor['name']
+        
+        # حفظ اسم الطبيب
+        context.user_data.setdefault("report_tmp", {})["doctor_name"] = doctor_name
+        context.user_data["report_tmp"].setdefault("step_history", []).append(R_DOCTOR)
+        context.user_data["report_tmp"].pop("doctor_manual_mode", None)
+        
+        logger.info(f"✅ تم اختيار الطبيب: {doctor_name}")
+        
+        # إرسال رسالة تأكيد
+        await query.edit_message_text(
+            f"✅ **تم اختيار الطبيب**\n\n"
+            f"👨‍⚕️ **الطبيب:** {doctor_name}",
+            parse_mode="Markdown"
+        )
+        
+        # الانتقال لخطوة نوع الإجراء
+        context.user_data['_conversation_state'] = R_ACTION_TYPE
+        await show_action_type_menu(query.message, context)
+        return R_ACTION_TYPE
+    else:
+        await query.edit_message_text("❌ خطأ في اختيار الطبيب، يرجى المحاولة مرة أخرى")
+        return STATE_SELECT_DOCTOR
+
+
 async def handle_doctor_selection(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE):
-    """معالجة اختيار زر الإدخال اليدوي أو اختيار طبيب من القائمة"""
+    """معالجة اختيار زر الإدخال اليدوي"""
     query = update.callback_query
     await query.answer()
     
@@ -2876,20 +3288,18 @@ async def handle_doctor_selection(
         if "report_tmp" not in context.user_data:
             context.user_data["report_tmp"] = {}
         
-        import logging
-        logger = logging.getLogger(__name__)
         logger.info("🔧 تم الضغط على زر الإدخال اليدوي للطبيب")
         
         try:
             await query.edit_message_text(
                 "👨‍⚕️ **اسم الطبيب**\n\n"
-                "✏️ يرجى إدخال اسم الطبيب:",
+                "✏️ يرجى إدخال اسم الطبيب:\n\n"
+                "💡 سيتم حفظ الاسم تلقائياً للاستخدام المستقبلي.",
                 reply_markup=_nav_buttons(show_back=False),
                 parse_mode="Markdown"
             )
         except Exception as e:
             logger.error(f"❌ خطأ في تعديل الرسالة: {e}")
-            # محاولة إرسال رسالة جديدة بدلاً من التعديل
             try:
                 await query.message.reply_text(
                     "👨‍⚕️ **اسم الطبيب**\n\n"
@@ -2903,12 +3313,11 @@ async def handle_doctor_selection(
         # ✅ تفعيل وضع الإدخال اليدوي
         context.user_data["report_tmp"]["doctor_manual_mode"] = True
         logger.info("✅ تم تفعيل وضع الإدخال اليدوي للطبيب")
-        logger.info(f"   الحالة الحالية: {context.user_data.get('_conversation_state', 'NOT SET')}")
         return STATE_SELECT_DOCTOR
 
 
 async def handle_doctor(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """معالجة إدخال اسم الطبيب يدوياً أو اختياره من inline query"""
+    """معالجة إدخال اسم الطبيب يدوياً"""
     import logging
     logger = logging.getLogger(__name__)
     
@@ -2918,52 +3327,6 @@ async def handle_doctor(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ✅ التأكد من وجود report_tmp
     if "report_tmp" not in context.user_data:
         context.user_data["report_tmp"] = {}
-    
-    # التحقق إذا كان هذا اختيار من inline query
-    if text.startswith("__DOCTOR_SELECTED__:"):
-        parts = text.split(":", 2)
-        if len(parts) == 3:
-            doctor_id = int(parts[1])
-            doctor_name = parts[2]
-
-            # حفظ اسم الطبيب
-            context.user_data.setdefault("report_tmp", {})["doctor_name"] = doctor_name
-            context.user_data["report_tmp"].setdefault("step_history", []).append(R_DOCTOR)
-            context.user_data["report_tmp"].pop("doctor_manual_mode", None)
-
-            # حذف الرسالة الخاصة
-            try:
-                await update.message.delete()
-            except:
-                pass
-
-            # إرسال رسالة تأكيد
-            await update.message.reply_text(
-                f"✅ **تم اختيار الطبيب**\n\n"
-                f"👨‍⚕️ **الطبيب:**\n"
-                f"{doctor_name}",
-            parse_mode="Markdown"
-        )
-
-            # الانتقال إلى خطوة نوع الإجراء
-            import logging
-            import sys
-            logger = logging.getLogger(__name__)
-            print("\n" + "=" * 80)
-            print("HANDLE_DOCTOR: About to return R_ACTION_TYPE")
-            print(f"HANDLE_DOCTOR: R_ACTION_TYPE value = {R_ACTION_TYPE}")
-            print(f"HANDLE_DOCTOR: Current state before return = {context.user_data.get('_conversation_state', 'NOT SET')}")
-            sys.stdout.flush()
-            logger.info(f"➡️ Moving to R_ACTION_TYPE state after doctor selection")
-            logger.info(f"HANDLE_DOCTOR: R_ACTION_TYPE value = {R_ACTION_TYPE}")
-            # حفظ الحالة يدوياً في user_data للمساعدة في التتبع
-            context.user_data['_conversation_state'] = R_ACTION_TYPE
-            await show_action_type_menu(update.message, context)
-            logger.info(f"show_action_type_menu called, returning R_ACTION_TYPE")
-            print(f"HANDLE_DOCTOR: Returning R_ACTION_TYPE = {R_ACTION_TYPE}")
-            print("=" * 80)
-            sys.stdout.flush()
-            return R_ACTION_TYPE
 
     # التحقق إذا كان في وضع الإدخال اليدوي
     manual_mode = context.user_data.get("report_tmp", {}).get("doctor_manual_mode", False)
@@ -2981,52 +3344,83 @@ async def handle_doctor(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return STATE_SELECT_DOCTOR
 
-        # ✅ حفظ اسم الطبيب
+        # ✅ حفظ اسم الطبيب في report_tmp
         context.user_data["report_tmp"]["doctor_name"] = text
         context.user_data["report_tmp"].setdefault("step_history", []).append(R_DOCTOR)
         context.user_data["report_tmp"].pop("doctor_manual_mode", None)
         logger.info(f"✅ تم حفظ اسم الطبيب يدوياً: {text}")
+        
+        # ✅ حفظ الطبيب في قاعدة البيانات للاستخدام المستقبلي
+        report_tmp = context.user_data.get("report_tmp", {})
+        hospital_name = report_tmp.get("hospital_name", "")
+        department_name = report_tmp.get("department_name", "")
+        
+        try:
+            if SessionLocal is not None:
+                with SessionLocal() as s:
+                    # البحث عن المستشفى
+                    hospital_id = None
+                    if hospital_name:
+                        hospital = s.query(Hospital).filter(
+                            Hospital.name.ilike(f"%{hospital_name}%")
+                        ).first()
+                        if hospital:
+                            hospital_id = hospital.id
+                    
+                    # البحث عن القسم
+                    department_id = None
+                    if department_name:
+                        dept = s.query(Department).filter(
+                            Department.name.ilike(f"%{department_name}%")
+                        ).first()
+                        if dept:
+                            department_id = dept.id
+                    
+                    # التحقق إذا كان الطبيب موجود مسبقاً
+                    existing_doctor = s.query(Doctor).filter(
+                        Doctor.name == text
+                    ).first()
+                    
+                    if not existing_doctor:
+                        # إضافة طبيب جديد
+                        new_doctor = Doctor(
+                            name=text,
+                            hospital_id=hospital_id,
+                            department_id=department_id
+                        )
+                        s.add(new_doctor)
+                        s.commit()
+                        logger.info(f"✅ تم حفظ الطبيب الجديد في قاعدة البيانات: {text}")
+                    else:
+                        logger.info(f"ℹ️ الطبيب موجود مسبقاً: {text}")
+        except Exception as e:
+            logger.warning(f"⚠️ فشل حفظ الطبيب في قاعدة البيانات: {e}")
 
         await update.message.reply_text(
             f"✅ **تم حفظ اسم الطبيب**\n\n"
-            f"👨‍⚕️ **الطبيب:**\n"
-            f"{text}",
+            f"👨‍⚕️ **الطبيب:** {text}\n\n"
+            f"💾 تم حفظه للاستخدام المستقبلي.",
             parse_mode="Markdown"
         )
-        import logging
-        import sys
-        logger = logging.getLogger(__name__)
-        print("\n" + "=" * 80)
-        print("HANDLE_DOCTOR: About to return R_ACTION_TYPE (manual entry)")
-        print(f"HANDLE_DOCTOR: R_ACTION_TYPE value = {R_ACTION_TYPE}")
-        print(f"HANDLE_DOCTOR: Current state before return = {context.user_data.get('_conversation_state', 'NOT SET')}")
-        sys.stdout.flush()
+        
         logger.info(f"➡️ Moving to R_ACTION_TYPE state after manual doctor entry")
-        logger.info(f"HANDLE_DOCTOR: R_ACTION_TYPE value = {R_ACTION_TYPE}")
+        context.user_data['_conversation_state'] = R_ACTION_TYPE
         await show_action_type_menu(update.message, context)
-        logger.info(f"show_action_type_menu called, returning R_ACTION_TYPE")
-        print(f"HANDLE_DOCTOR: Returning R_ACTION_TYPE = {R_ACTION_TYPE}")
-        print("=" * 80)
-        sys.stdout.flush()
         return R_ACTION_TYPE
 
-    # إذا لم يكن في وضع الإدخال اليدوي ولم يكن اختيار من inline query
-    # قد يكون المستخدم يريد الرجوع أو إلغاء
+    # إذا لم يكن في وضع الإدخال اليدوي
     if text.lower() in ["إلغاء", "رجوع", "cancel", "back"]:
         await update.message.reply_text(
             "❌ تم إلغاء اختيار الطبيب",
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔍 بحث الآن", switch_inline_query_current_chat="")],
                 [InlineKeyboardButton("✏️ إدخال يدوي", callback_data="doctor_manual")],
-                [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back")],
                 [InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]
             ])
         )
         return STATE_SELECT_DOCTOR
     
-    # إذا لم يكن في وضع الإدخال اليدوي، نعيد عرض القائمة
-    logger.warning(f"⚠️ handle_doctor: لم يتم التعرف على النص كاختيار طبيب أو إدخال يدوي. النص: '{text}'")
-    logger.info("ℹ️ إعادة عرض قائمة اختيار الطبيب")
+    # إعادة عرض القائمة
+    logger.warning(f"⚠️ handle_doctor: لم يتم التعرف على النص. النص: '{text}'")
     await show_doctor_selection(update.message, context)
     return STATE_SELECT_DOCTOR
 
@@ -7349,18 +7743,26 @@ async def show_final_summary(message, context, flow_type):
 
     keyboard = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("💾 حفظ التقرير", callback_data=f"save:{flow_type}"),
+            InlineKeyboardButton("📢 نشر التقرير", callback_data=f"save:{flow_type}"),
             InlineKeyboardButton("✏️ تعديل التقرير", callback_data=f"edit_draft:{flow_type}")
         ],
         [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back")],
         [InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]
     ])
 
-    await message.reply_text(
-        summary,
-        reply_markup=keyboard,
-        parse_mode="Markdown"
-    )
+    try:
+        await message.reply_text(
+            summary,
+            reply_markup=keyboard,
+            parse_mode="Markdown"
+        )
+    except Exception as e:
+        # Fallback بدون Markdown إذا كان النص يحتوي على أحرف خاصة
+        summary_plain = summary.replace("**", "")
+        await message.reply_text(
+            summary_plain,
+            reply_markup=keyboard
+        )
 
 # =============================
 # معالجة التأكيد والحفظ
@@ -8687,11 +9089,15 @@ def register(app):
                 CallbackQueryHandler(handle_subdepartment_page, pattern="^subdept_page:"),
             ],
             STATE_SELECT_DOCTOR: [
-                CallbackQueryHandler(handle_doctor_selection, pattern="^(doctor_idx:|doctor_manual)$"),
+                CallbackQueryHandler(handle_doctor_btn_selection, pattern="^doctor_idx:"),
+                CallbackQueryHandler(handle_doctor_page, pattern="^doctor_page:"),
+                CallbackQueryHandler(handle_doctor_selection, pattern="^doctor_manual$"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_doctor),
             ],
             R_DOCTOR: [
-                CallbackQueryHandler(handle_doctor_selection, pattern="^(doctor_idx:|doctor_manual)$"),
+                CallbackQueryHandler(handle_doctor_btn_selection, pattern="^doctor_idx:"),
+                CallbackQueryHandler(handle_doctor_page, pattern="^doctor_page:"),
+                CallbackQueryHandler(handle_doctor_selection, pattern="^doctor_manual$"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_doctor),
             ],
             R_ACTION_TYPE: [
@@ -9069,6 +9475,10 @@ def register(app):
             # أضف هنا باقي المسارات بنفس الطريقة (FOLLOWUP_COMPLAINT، ADMISSION_COMPLAINT، ...)
         },
         fallbacks=[
+            # معالجات للمرضى (أزرار اختيار المريض والتنقل بين الصفحات)
+            CallbackQueryHandler(handle_patient_btn_selection, pattern="^patient_btn:"),
+            CallbackQueryHandler(handle_patient_page, pattern="^patient_page:"),
+            
             # معالجات للمستشفيات
             CallbackQueryHandler(handle_hospital_page, pattern="^hosp_page:"),
             CallbackQueryHandler(handle_hospital_selection, pattern="^select_hospital:"),

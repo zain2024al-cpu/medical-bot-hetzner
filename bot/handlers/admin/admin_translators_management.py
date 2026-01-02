@@ -84,32 +84,64 @@ async def handle_manage_translators(update: Update, context: ContextTypes.DEFAUL
     )
 
 
-async def handle_view_translators(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """عرض جميع المترجمين"""
+async def handle_view_translators(update: Update, context: ContextTypes.DEFAULT_TYPE, page=0):
+    """عرض جميع المترجمين مع صفحات"""
     query = update.callback_query
     await query.answer()
+    
+    # استخراج رقم الصفحة من callback_data إذا موجود
+    if query.data.startswith("view_translators_page:"):
+        page = int(query.data.split(":")[1])
     
     names = get_translator_names_from_file()
     
     if not names:
         text = "📋 **قائمة المترجمين**\n\n⚠️ لا يوجد مترجمين مسجلين\n\nاستخدم '➕ إضافة مترجم جديد' أو '🔄 مزامنة من المستخدمين'"
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 رجوع", callback_data="manage_translators")]
+        ])
+        await query.edit_message_text(
+            text,
+            reply_markup=keyboard,
+            parse_mode=ParseMode.MARKDOWN
+        )
     else:
-        text = f"📋 **قائمة المترجمين**\n\n📊 **العدد:** {len(names)}\n\n"
-        for i, name in enumerate(names[:25], 1):  # أول 25 مترجم
-            text += f"{i}. 👤 {name}\n"
+        # ترتيب المترجمين أبجدياً
+        names_sorted = sorted(names, key=lambda x: x.strip())
         
-        if len(names) > 25:
-            text += f"\n... و {len(names) - 25} مترجم آخر"
-    
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔙 رجوع", callback_data="manage_translators")]
-    ])
-    
-    await query.edit_message_text(
-        text,
-        reply_markup=keyboard,
-        parse_mode=ParseMode.MARKDOWN
-    )
+        # إعدادات الصفحات
+        items_per_page = 20
+        total = len(names_sorted)
+        total_pages = max(1, (total + items_per_page - 1) // items_per_page)
+        page = max(0, min(page, total_pages - 1))
+        start_idx = page * items_per_page
+        end_idx = min(start_idx + items_per_page, total)
+        
+        text = f"📋 **قائمة المترجمين**\n\n"
+        text += f"📊 **العدد:** {total}\n"
+        text += f"📄 **الصفحة:** {page + 1} من {total_pages}\n\n"
+        
+        for i in range(start_idx, end_idx):
+            text += f"{i + 1}. 👤 {names_sorted[i]}\n"
+        
+        # أزرار التنقل
+        nav_buttons = []
+        if page > 0:
+            nav_buttons.append(InlineKeyboardButton("⬅️ السابق", callback_data=f"view_translators_page:{page - 1}"))
+        nav_buttons.append(InlineKeyboardButton(f"📄 {page + 1}/{total_pages}", callback_data="noop"))
+        if page < total_pages - 1:
+            nav_buttons.append(InlineKeyboardButton("➡️ التالي", callback_data=f"view_translators_page:{page + 1}"))
+        
+        keyboard = []
+        if nav_buttons:
+            keyboard.append(nav_buttons)
+        keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="manage_translators")])
+        
+        await query.edit_message_text(
+            text,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode=ParseMode.MARKDOWN
+        )
 
 
 async def handle_add_translator(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -189,25 +221,51 @@ async def handle_delete_translator(update: Update, context: ContextTypes.DEFAULT
         )
         return
     
-    # عرض المترجمين مع أزرار حذف (أول 10 فقط)
+    # ترتيب أبجدي
+    names_sorted = sorted(names, key=lambda x: x.strip())
+    
+    # حفظ الأسماء في context
+    context.user_data['delete_translator_names_list'] = names_sorted
+    
+    # استخراج رقم الصفحة
+    page = 0
+    if query.data.startswith("delete_trans_page:"):
+        page = int(query.data.split(":")[1])
+    
+    # إعدادات الصفحات
+    items_per_page = 10
+    total = len(names_sorted)
+    total_pages = max(1, (total + items_per_page - 1) // items_per_page)
+    page = max(0, min(page, total_pages - 1))
+    start_idx = page * items_per_page
+    end_idx = min(start_idx + items_per_page, total)
+    
+    # عرض المترجمين مع أزرار حذف
     keyboard = []
-    for i, name in enumerate(names[:10]):
+    for i in range(start_idx, end_idx):
+        display_name = names_sorted[i][:25] + "..." if len(names_sorted[i]) > 25 else names_sorted[i]
         keyboard.append([InlineKeyboardButton(
-            f"🗑️ {name}",
-            callback_data=f"confirm_delete_trans:{i}:{name}"
+            f"🗑️ {display_name}",
+            callback_data=f"confirm_delete_trans:{i}"  # index فقط
         )])
     
-    if len(names) > 10:
-        keyboard.append([InlineKeyboardButton(
-            f"⚠️ عرض {len(names) - 10} مترجم آخر...",
-            callback_data="delete_trans_page_2"
-        )])
+    # أزرار التنقل
+    nav_buttons = []
+    if page > 0:
+        nav_buttons.append(InlineKeyboardButton("⬅️ السابق", callback_data=f"delete_trans_page:{page - 1}"))
+    if total_pages > 1:
+        nav_buttons.append(InlineKeyboardButton(f"📄 {page + 1}/{total_pages}", callback_data="noop"))
+    if page < total_pages - 1:
+        nav_buttons.append(InlineKeyboardButton("➡️ التالي", callback_data=f"delete_trans_page:{page + 1}"))
+    if nav_buttons:
+        keyboard.append(nav_buttons)
     
     keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="manage_translators")])
     
     await query.edit_message_text(
         f"🗑️ **حذف مترجم**\n\n"
-        f"📊 **العدد:** {len(names)}\n\n"
+        f"📊 **العدد:** {total}\n"
+        f"📄 **الصفحة:** {page + 1} من {total_pages}\n\n"
         f"اختر المترجم المراد حذفه:",
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode=ParseMode.MARKDOWN
@@ -220,20 +278,31 @@ async def handle_confirm_delete_translator(update: Update, context: ContextTypes
     await query.answer()
     
     # استخراج البيانات
-    parts = query.data.split(':', 2)
-    if len(parts) < 3 or not parts[1].isdigit():
+    parts = query.data.split(':')
+    if len(parts) < 2 or not parts[1].isdigit():
         await query.edit_message_text("❌ خطأ: طلب حذف غير صالح.")
         return
     
     index = int(parts[1])
-    name_to_delete = parts[2]
     
-    # قراءة الأسماء
+    # استخراج الاسم من context
+    names_list = context.user_data.get('delete_translator_names_list', [])
+    if index >= len(names_list):
+        await query.edit_message_text(
+            "❌ **خطأ:** الفهرس غير صالح",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_translators")]]),
+            parse_mode=ParseMode.MARKDOWN
+        )
+        return
+    
+    name_to_delete = names_list[index]
+    
+    # قراءة الأسماء من الملف
     names = get_translator_names_from_file()
     
     # حذف الاسم
-    if index < len(names) and names[index] == name_to_delete:
-        names.pop(index)
+    if name_to_delete in names:
+        names.remove(name_to_delete)
         
         if save_translator_names_to_file(names):
             logger.info(f"✅ تم حذف المترجم '{name_to_delete}'")
@@ -273,25 +342,51 @@ async def handle_edit_translator(update: Update, context: ContextTypes.DEFAULT_T
         )
         return
     
-    # عرض المترجمين مع أزرار تعديل (أول 10 فقط)
+    # ترتيب أبجدي
+    names_sorted = sorted(names, key=lambda x: x.strip())
+    
+    # حفظ الأسماء في context
+    context.user_data['edit_translator_names_list'] = names_sorted
+    
+    # استخراج رقم الصفحة
+    page = 0
+    if query.data.startswith("edit_trans_page:"):
+        page = int(query.data.split(":")[1])
+    
+    # إعدادات الصفحات
+    items_per_page = 10
+    total = len(names_sorted)
+    total_pages = max(1, (total + items_per_page - 1) // items_per_page)
+    page = max(0, min(page, total_pages - 1))
+    start_idx = page * items_per_page
+    end_idx = min(start_idx + items_per_page, total)
+    
+    # عرض المترجمين مع أزرار تعديل
     keyboard = []
-    for i, name in enumerate(names[:10]):
+    for i in range(start_idx, end_idx):
+        display_name = names_sorted[i][:25] + "..." if len(names_sorted[i]) > 25 else names_sorted[i]
         keyboard.append([InlineKeyboardButton(
-            f"✏️ {name}",
-            callback_data=f"select_edit_trans:{i}:{name}"
+            f"✏️ {display_name}",
+            callback_data=f"select_edit_trans:{i}"  # index فقط
         )])
     
-    if len(names) > 10:
-        keyboard.append([InlineKeyboardButton(
-            f"⚠️ عرض {len(names) - 10} مترجم آخر...",
-            callback_data="edit_trans_page_2"
-        )])
+    # أزرار التنقل
+    nav_buttons = []
+    if page > 0:
+        nav_buttons.append(InlineKeyboardButton("⬅️ السابق", callback_data=f"edit_trans_page:{page - 1}"))
+    if total_pages > 1:
+        nav_buttons.append(InlineKeyboardButton(f"📄 {page + 1}/{total_pages}", callback_data="noop"))
+    if page < total_pages - 1:
+        nav_buttons.append(InlineKeyboardButton("➡️ التالي", callback_data=f"edit_trans_page:{page + 1}"))
+    if nav_buttons:
+        keyboard.append(nav_buttons)
     
     keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="manage_translators")])
     
     await query.edit_message_text(
         f"✏️ **تعديل مترجم**\n\n"
-        f"📊 **العدد:** {len(names)}\n\n"
+        f"📊 **العدد:** {total}\n"
+        f"📄 **الصفحة:** {page + 1} من {total_pages}\n\n"
         f"اختر المترجم المراد تعديله:",
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode=ParseMode.MARKDOWN
@@ -304,13 +399,24 @@ async def handle_select_edit_translator(update: Update, context: ContextTypes.DE
     await query.answer()
     
     # استخراج البيانات
-    parts = query.data.split(':', 2)
-    if len(parts) < 3 or not parts[1].isdigit():
+    parts = query.data.split(':')
+    if len(parts) < 2 or not parts[1].isdigit():
         await query.edit_message_text("❌ خطأ: طلب تعديل غير صالح.")
         return ConversationHandler.END
     
     index = int(parts[1])
-    old_name = parts[2]
+    
+    # استخراج الاسم من context
+    names_list = context.user_data.get('edit_translator_names_list', [])
+    if index >= len(names_list):
+        await query.edit_message_text(
+            "❌ **خطأ:** الفهرس غير صالح",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_translators")]]),
+            parse_mode=ParseMode.MARKDOWN
+        )
+        return ConversationHandler.END
+    
+    old_name = names_list[index]
     
     # حفظ في context
     context.user_data['edit_translator_index'] = index
@@ -464,8 +570,11 @@ def register(app):
     app.add_handler(translators_conv)
     app.add_handler(CallbackQueryHandler(handle_manage_translators, pattern="^manage_translators$"))
     app.add_handler(CallbackQueryHandler(handle_view_translators, pattern="^view_translators$"))
+    app.add_handler(CallbackQueryHandler(handle_view_translators, pattern="^view_translators_page:"))  # صفحات المترجمين
     app.add_handler(CallbackQueryHandler(handle_delete_translator, pattern="^delete_translator$"))
-    app.add_handler(CallbackQueryHandler(handle_confirm_delete_translator, pattern="^confirm_delete_trans:"))
+    app.add_handler(CallbackQueryHandler(handle_delete_translator, pattern="^delete_trans_page:"))  # صفحات الحذف
+    app.add_handler(CallbackQueryHandler(handle_confirm_delete_translator, pattern="^confirm_delete_trans:\\d+$"))  # index فقط
     app.add_handler(CallbackQueryHandler(handle_edit_translator, pattern="^edit_translator$"))
+    app.add_handler(CallbackQueryHandler(handle_edit_translator, pattern="^edit_trans_page:"))  # صفحات التعديل
     app.add_handler(CallbackQueryHandler(handle_sync_translators, pattern="^sync_translators$"))
 

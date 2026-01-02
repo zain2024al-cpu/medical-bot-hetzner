@@ -53,10 +53,14 @@ async def handle_manage_hospitals(update: Update, context: ContextTypes.DEFAULT_
         parse_mode=ParseMode.MARKDOWN
     )
 
-async def handle_view_hospitals(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """عرض جميع المستشفيات"""
+async def handle_view_hospitals(update: Update, context: ContextTypes.DEFAULT_TYPE, page=0):
+    """عرض جميع المستشفيات مع صفحات"""
     query = update.callback_query
     await query.answer()
+    
+    # استخراج رقم الصفحة من callback_data إذا موجود
+    if query.data.startswith("view_hospitals_page:"):
+        page = int(query.data.split(":")[1])
     
     # قراءة المستشفيات من قاعدة البيانات
     try:
@@ -69,23 +73,51 @@ async def handle_view_hospitals(update: Update, context: ContextTypes.DEFAULT_TY
     
     if not names:
         text = "📋 **قائمة المستشفيات**\n\n⚠️ لا توجد مستشفيات مسجلة\n\nاستخدم 'مزامنة من القائمة الثابتة' لإضافة المستشفيات الافتراضية"
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 رجوع", callback_data="manage_hospitals")]
+        ])
+        await query.edit_message_text(
+            text,
+            reply_markup=keyboard,
+            parse_mode=ParseMode.MARKDOWN
+        )
     else:
-        text = f"📋 **قائمة المستشفيات**\n\n📊 **العدد:** {len(names)}\n\n"
-        for i, name in enumerate(names[:25], 1):  # أول 25 مستشفى
-            text += f"{i}. 🏥 {name}\n"
+        # ترتيب المستشفيات أبجدياً
+        names_sorted = sorted(names, key=lambda x: x.strip())
         
-        if len(names) > 25:
-            text += f"\n... و {len(names) - 25} مستشفى آخر"
-    
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔙 رجوع", callback_data="manage_hospitals")]
-    ])
-    
-    await query.edit_message_text(
-        text,
-        reply_markup=keyboard,
-        parse_mode=ParseMode.MARKDOWN
-    )
+        # إعدادات الصفحات
+        items_per_page = 15
+        total = len(names_sorted)
+        total_pages = max(1, (total + items_per_page - 1) // items_per_page)
+        page = max(0, min(page, total_pages - 1))
+        start_idx = page * items_per_page
+        end_idx = min(start_idx + items_per_page, total)
+        
+        text = f"📋 **قائمة المستشفيات**\n\n"
+        text += f"📊 **العدد:** {total}\n"
+        text += f"📄 **الصفحة:** {page + 1} من {total_pages}\n\n"
+        
+        for i in range(start_idx, end_idx):
+            text += f"{i + 1}. 🏥 {names_sorted[i]}\n"
+        
+        # أزرار التنقل
+        nav_buttons = []
+        if page > 0:
+            nav_buttons.append(InlineKeyboardButton("⬅️ السابق", callback_data=f"view_hospitals_page:{page - 1}"))
+        nav_buttons.append(InlineKeyboardButton(f"📄 {page + 1}/{total_pages}", callback_data="noop"))
+        if page < total_pages - 1:
+            nav_buttons.append(InlineKeyboardButton("➡️ التالي", callback_data=f"view_hospitals_page:{page + 1}"))
+        
+        keyboard = []
+        if nav_buttons:
+            keyboard.append(nav_buttons)
+        keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="manage_hospitals")])
+        
+        await query.edit_message_text(
+            text,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode=ParseMode.MARKDOWN
+        )
 
 async def handle_add_hospital(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """بدء إضافة مستشفى جديد"""
@@ -174,25 +206,51 @@ async def handle_delete_hospital(update: Update, context: ContextTypes.DEFAULT_T
         )
         return
     
-    # عرض المستشفيات مع أزرار حذف (أول 10 فقط)
+    # حفظ المستشفيات في context
+    hospitals_dict = {h.id: h.name for h in hospitals}
+    context.user_data['delete_hospitals_dict'] = hospitals_dict
+    
+    # استخراج رقم الصفحة
+    page = 0
+    if query.data.startswith("delete_hosp_page:"):
+        page = int(query.data.split(":")[1])
+    
+    # إعدادات الصفحات
+    hospitals_list = list(hospitals)
+    items_per_page = 10
+    total = len(hospitals_list)
+    total_pages = max(1, (total + items_per_page - 1) // items_per_page)
+    page = max(0, min(page, total_pages - 1))
+    start_idx = page * items_per_page
+    end_idx = min(start_idx + items_per_page, total)
+    
+    # عرض المستشفيات مع أزرار حذف
     keyboard = []
-    for hospital in hospitals[:10]:
+    for i in range(start_idx, end_idx):
+        hospital = hospitals_list[i]
+        display_name = hospital.name[:30] + "..." if len(hospital.name) > 30 else hospital.name
         keyboard.append([InlineKeyboardButton(
-            f"🗑️ {hospital.name}",
-            callback_data=f"confirm_delete_hosp:{hospital.id}:{hospital.name[:30]}"
+            f"🗑️ {display_name}",
+            callback_data=f"confirm_delete_hosp:{hospital.id}"  # ID فقط
         )])
     
-    if len(hospitals) > 10:
-        keyboard.append([InlineKeyboardButton(
-            f"⚠️ عرض {len(hospitals) - 10} مستشفى آخر...",
-            callback_data="delete_hosp_page_2"
-        )])
+    # أزرار التنقل
+    nav_buttons = []
+    if page > 0:
+        nav_buttons.append(InlineKeyboardButton("⬅️ السابق", callback_data=f"delete_hosp_page:{page - 1}"))
+    if total_pages > 1:
+        nav_buttons.append(InlineKeyboardButton(f"📄 {page + 1}/{total_pages}", callback_data="noop"))
+    if page < total_pages - 1:
+        nav_buttons.append(InlineKeyboardButton("➡️ التالي", callback_data=f"delete_hosp_page:{page + 1}"))
+    if nav_buttons:
+        keyboard.append(nav_buttons)
     
     keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="manage_hospitals")])
     
     await query.edit_message_text(
         f"🗑️ **حذف مستشفى**\n\n"
-        f"📊 **العدد:** {len(hospitals)}\n\n"
+        f"📊 **العدد:** {total}\n"
+        f"📄 **الصفحة:** {page + 1} من {total_pages}\n\n"
         f"اختر المستشفى المراد حذفه:",
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode=ParseMode.MARKDOWN
@@ -205,7 +263,7 @@ async def handle_confirm_delete_hospital(update: Update, context: ContextTypes.D
     
     # استخراج البيانات
     parts = query.data.split(':', 2)
-    if len(parts) < 3:
+    if len(parts) < 2:
         await query.edit_message_text("❌ خطأ: طلب حذف غير صالح.")
         return
     
@@ -215,20 +273,19 @@ async def handle_confirm_delete_hospital(update: Update, context: ContextTypes.D
         await query.edit_message_text("❌ خطأ: معرف المستشفى غير صالح.")
         return
     
-    hospital_name = parts[2]
-    
     # حذف من قاعدة البيانات
     try:
-        with SessionLocal() as s:
-            hospital = s.query(Hospital).filter_by(id=hospital_id).first()
+        session = SessionLocal()
+        try:
+            hospital = session.query(Hospital).filter_by(id=hospital_id).first()
             if hospital:
                 full_name = hospital.name
-                s.delete(hospital)
-                s.commit()
-                logger.info(f"✅ تم حذف المستشفى '{full_name}' من قاعدة البيانات")
+                session.delete(hospital)
+                session.commit()
+                logger.info(f"✅ تم حذف المستشفى '{full_name}' من قاعدة البيانات (ID: {hospital_id})")
                 
                 # عد المستشفيات المتبقية
-                remaining = s.query(Hospital).count()
+                remaining = session.query(Hospital).count()
                 
                 await query.edit_message_text(
                     f"✅ **تم حذف المستشفى:** {full_name}\n\n"
@@ -238,10 +295,15 @@ async def handle_confirm_delete_hospital(update: Update, context: ContextTypes.D
                 )
             else:
                 await query.edit_message_text(
-                    "⚠️ **المستشفى غير موجود**",
+                    f"⚠️ **المستشفى غير موجود (ID: {hospital_id})**",
                     reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_hospitals")]]),
                     parse_mode=ParseMode.MARKDOWN
                 )
+        except Exception as e:
+            session.rollback()
+            raise e
+        finally:
+            session.close()
     except Exception as e:
         logger.error(f"❌ خطأ في حذف المستشفى: {e}")
         await query.edit_message_text(
@@ -276,25 +338,47 @@ async def handle_edit_hospital(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         return
     
-    # عرض المستشفيات مع أزرار تعديل (أول 10 فقط)
+    # استخراج رقم الصفحة
+    page = 0
+    if query.data.startswith("edit_hosp_page:"):
+        page = int(query.data.split(":")[1])
+    
+    # إعدادات الصفحات
+    hospitals_list = list(hospitals)
+    items_per_page = 10
+    total = len(hospitals_list)
+    total_pages = max(1, (total + items_per_page - 1) // items_per_page)
+    page = max(0, min(page, total_pages - 1))
+    start_idx = page * items_per_page
+    end_idx = min(start_idx + items_per_page, total)
+    
+    # عرض المستشفيات مع أزرار تعديل
     keyboard = []
-    for hospital in hospitals[:10]:
+    for i in range(start_idx, end_idx):
+        hospital = hospitals_list[i]
+        display_name = hospital.name[:30] + "..." if len(hospital.name) > 30 else hospital.name
         keyboard.append([InlineKeyboardButton(
-            f"✏️ {hospital.name}",
-            callback_data=f"select_edit_hosp:{hospital.id}:{hospital.name[:30]}"
+            f"✏️ {display_name}",
+            callback_data=f"select_edit_hosp:{hospital.id}"  # ID فقط
         )])
     
-    if len(hospitals) > 10:
-        keyboard.append([InlineKeyboardButton(
-            f"⚠️ عرض {len(hospitals) - 10} مستشفى آخر...",
-            callback_data="edit_hosp_page_2"
-        )])
+    # أزرار التنقل
+    nav_buttons = []
+    if page > 0:
+        nav_buttons.append(InlineKeyboardButton("⬅️ السابق", callback_data=f"edit_hosp_page:{page - 1}"))
+    if total_pages > 1:
+        nav_buttons.append(InlineKeyboardButton(f"📄 {page + 1}/{total_pages}", callback_data="noop"))
+    if page < total_pages - 1:
+        nav_buttons.append(InlineKeyboardButton("➡️ التالي", callback_data=f"edit_hosp_page:{page + 1}"))
+    if nav_buttons:
+        keyboard.append(nav_buttons)
     
     keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="manage_hospitals")])
     
     await query.edit_message_text(
         f"✏️ **تعديل مستشفى**\n\n"
-        f"📊 **العدد:** {len(hospitals)}\n\n"
+        f"📊 **العدد:** {total}\n"
+        f"📄 **الصفحة:** {page + 1} من {total_pages}\n\n"
         f"اختر المستشفى المراد تعديله:",
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode=ParseMode.MARKDOWN
@@ -306,8 +390,8 @@ async def handle_select_edit_hospital(update: Update, context: ContextTypes.DEFA
     await query.answer()
     
     # استخراج البيانات
-    parts = query.data.split(':', 2)
-    if len(parts) < 3:
+    parts = query.data.split(':')
+    if len(parts) < 2:
         await query.edit_message_text("❌ خطأ: طلب تعديل غير صالح.")
         return ConversationHandler.END
     
@@ -319,13 +403,16 @@ async def handle_select_edit_hospital(update: Update, context: ContextTypes.DEFA
     
     # جلب الاسم الكامل من قاعدة البيانات
     try:
-        with SessionLocal() as s:
-            hospital = s.query(Hospital).filter_by(id=hospital_id).first()
+        session = SessionLocal()
+        try:
+            hospital = session.query(Hospital).filter_by(id=hospital_id).first()
             if hospital:
                 old_name = hospital.name
             else:
                 await query.edit_message_text("❌ خطأ: المستشفى غير موجود.")
                 return ConversationHandler.END
+        finally:
+            session.close()
     except Exception as e:
         logger.error(f"❌ خطأ في جلب المستشفى: {e}")
         await query.edit_message_text("❌ خطأ في جلب بيانات المستشفى.")
@@ -503,8 +590,11 @@ def register(app):
     app.add_handler(hospitals_conv)
     app.add_handler(CallbackQueryHandler(handle_manage_hospitals, pattern="^manage_hospitals$"))
     app.add_handler(CallbackQueryHandler(handle_view_hospitals, pattern="^view_hospitals$"))
+    app.add_handler(CallbackQueryHandler(handle_view_hospitals, pattern="^view_hospitals_page:"))  # صفحات المستشفيات
     app.add_handler(CallbackQueryHandler(handle_delete_hospital, pattern="^delete_hospital$"))
-    app.add_handler(CallbackQueryHandler(handle_confirm_delete_hospital, pattern="^confirm_delete_hosp:"))
+    app.add_handler(CallbackQueryHandler(handle_delete_hospital, pattern="^delete_hosp_page:"))  # صفحات الحذف
+    app.add_handler(CallbackQueryHandler(handle_confirm_delete_hospital, pattern="^confirm_delete_hosp:\\d+$"))  # ID فقط
     app.add_handler(CallbackQueryHandler(handle_edit_hospital, pattern="^edit_hospital$"))
+    app.add_handler(CallbackQueryHandler(handle_edit_hospital, pattern="^edit_hosp_page:"))  # صفحات التعديل
     app.add_handler(CallbackQueryHandler(handle_sync_hospitals, pattern="^sync_hospitals$"))
 
