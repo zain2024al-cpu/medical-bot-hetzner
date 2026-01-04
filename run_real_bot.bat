@@ -3,3 +3,5 @@ cd /d "C:\Users\nalgu\OneDrive\Desktop\عمر\medical_reports_bot_backup_2025120
 call .\venv\Scripts\activate
 python app.py
 pause
+
+
