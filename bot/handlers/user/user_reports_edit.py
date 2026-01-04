@@ -14,9 +14,36 @@ from db.session import SessionLocal
 from db.models import Report, Translator, Patient, Hospital, Department, Doctor
 from bot.shared_auth import is_admin
 from services.inline_calendar import create_calendar_keyboard, create_quick_date_buttons, MONTHS_AR
+from sqlalchemy import or_, and_
 
 # حالات المحادثة
 SELECT_REPORT, SELECT_FIELD, EDIT_VALUE, CONFIRM_EDIT, EDIT_DATE_CALENDAR, EDIT_DATE_TIME = range(6)
+
+
+def format_time_12h(time_str):
+    """تحويل الوقت لصيغة 12 ساعة مع صباحاً/ظهراً/مساءً"""
+    if not time_str:
+        return None
+    try:
+        if ':' in str(time_str):
+            parts = str(time_str).split(':')
+            hour = int(parts[0])
+            minute = parts[1] if len(parts) > 1 else '00'
+        else:
+            hour = int(time_str)
+            minute = '00'
+        
+        if hour == 0:
+            return f"12:{minute} صباحاً"
+        elif hour < 12:
+            return f"{hour}:{minute} صباحاً"
+        elif hour == 12:
+            return f"12:{minute} ظهراً"
+        else:
+            return f"{hour-12}:{minute} مساءً"
+    except:
+        return str(time_str)
+
 
 def get_all_editable_fields():
     """إرجاع جميع الحقول القابلة للتعديل من جميع أنواع الإجراءات"""
@@ -243,12 +270,59 @@ async def start_edit_reports(update: Update, context: ContextTypes.DEFAULT_TYPE)
             today_start = datetime.combine(today, datetime.min.time())
             today_end = datetime.combine(today, datetime.max.time())
 
-            # البحث بمعرف المستخدم الذي أنشأ التقرير
-            reports = s.query(Report).filter(
-                Report.submitted_by_user_id == user.id,
-                Report.report_date >= today_start,
-                Report.report_date <= today_end
-            ).order_by(Report.report_date.desc()).all()
+            # ✅ البحث بمعرف المستخدم الذي أنشأ التقرير (submitted_by_user_id)
+            # هذا الحقل يتم حفظه عند إنشاء التقرير بغض النظر عن اسم المترجم المختار
+            # للتقارير القديمة: البحث عن translator_id الذي يطابق tg_user_id للمستخدم الحالي
+            translator = s.query(Translator).filter_by(tg_user_id=user.id).first()
+            translator_id = translator.id if translator else None
+            
+            logger.info(f"🔍 البحث عن تقارير للمستخدم:")
+            logger.info(f"   - Telegram user.id: {user.id}")
+            logger.info(f"   - translator found: {translator.full_name if translator else 'None'}")
+            logger.info(f"   - translator_id: {translator_id}")
+            logger.info(f"   - today_start: {today_start}")
+            logger.info(f"   - today_end: {today_end}")
+            
+            # ✅ البحث عن التقارير:
+            # 1. submitted_by_user_id == user.id (للتقارير الجديدة - الأفضل)
+            # 2. translator_id == translator_id AND submitted_by_user_id IS NULL (للتقارير القديمة فقط)
+            try:
+                if translator_id:
+                    reports = s.query(Report).filter(
+                        or_(
+                            Report.submitted_by_user_id == user.id,  # التقارير الجديدة
+                            and_(
+                                Report.submitted_by_user_id.is_(None),  # التقارير القديمة فقط
+                                Report.translator_id == translator_id  # المترجم يطابق المستخدم الحالي
+                            )
+                        ),
+                        Report.report_date >= today_start,
+                        Report.report_date <= today_end
+                    ).order_by(Report.report_date.desc()).all()
+                else:
+                    # إذا لم يكن المستخدم مسجلاً كـ translator، نبحث فقط عن submitted_by_user_id
+                    reports = s.query(Report).filter(
+                        Report.submitted_by_user_id == user.id,
+                        Report.report_date >= today_start,
+                        Report.report_date <= today_end
+                    ).order_by(Report.report_date.desc()).all()
+                    
+                logger.info(f"✅ تم العثور على {len(reports)} تقرير للمستخدم {user.id} (translator_id: {translator_id})")
+                
+                # طباعة تفاصيل التقارير المكتشفة
+                for r in reports:
+                    logger.info(f"   📄 Report #{r.id}: submitted_by={r.submitted_by_user_id}, translator_id={r.translator_id}")
+            except Exception as e:
+                # إذا فشل (مثلاً العمود غير موجود)، نستخدم translator_id فقط
+                logger.warning(f"⚠️ Error using submitted_by_user_id, falling back to translator_id: {e}")
+                if translator_id:
+                    reports = s.query(Report).filter(
+                        Report.translator_id == translator_id,
+                        Report.report_date >= today_start,
+                        Report.report_date <= today_end
+                    ).order_by(Report.report_date.desc()).all()
+                else:
+                    reports = []
 
             if not reports:
                 await update.message.reply_text(
@@ -336,9 +410,11 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
                 await query.edit_message_text("⚠️ **خطأ:** لم يتم العثور على التقرير")
                 return ConversationHandler.END
             
-            # التحقق من أن التقرير يخص المترجم
             # ✅ التحقق من أن المستخدم هو من أنشأ التقرير
-            if report.submitted_by_user_id != context.user_data.get('submitted_by_user_id'):
+            # السماح بالتعديل إذا كان submitted_by_user_id مطابقاً أو None (للتقارير القديمة)
+            current_user_id = context.user_data.get('submitted_by_user_id')
+            report_user_id = getattr(report, 'submitted_by_user_id', None)
+            if report_user_id is not None and report_user_id != current_user_id:
                 await query.edit_message_text("⚠️ **خطأ:** لا يمكنك تعديل هذا التقرير")
                 return ConversationHandler.END
             
@@ -387,9 +463,9 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
                             time_display = f"12:{minute} ظهراً"
                         else:
                             time_display = f"{hour_int-12}:{minute} مساءً"
-                        followup_display = f"{date_part} الساعة {time_display}"
+                        followup_display = f"{date_part} - {time_display}"
                     except:
-                        followup_display = f"{date_part} الساعة {followup_time}"
+                        followup_display = f"{date_part} - {followup_time}"
                 else:
                     followup_display = date_part
             
@@ -480,7 +556,8 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if report.followup_date:
                 followup_display = report.followup_date.strftime('%Y-%m-%d')
                 if report.followup_time:
-                    followup_display += f" الساعة {report.followup_time}"
+                    time_12h = format_time_12h(report.followup_time)
+                    followup_display += f" - {time_12h}"
             
             broadcast_data = {
                 'report_date': report.report_date.strftime('%Y-%m-%d %H:%M') if report.report_date else datetime.now().strftime('%Y-%m-%d %H:%M'),
@@ -574,23 +651,28 @@ async def handle_field_selection(update: Update, context: ContextTypes.DEFAULT_T
         field_display = field_names.get(field_name, field_name)
         current_value = context.user_data['current_report_data'].get(field_name, "لا يوجد")
         
-        # إذا كان الحقل هو التاريخ، نعرض التقويم
+        # إذا كان الحقل هو التاريخ، نعرض التقويم الكامل مباشرة
         if field_name == "followup_date":
             text = f"📅 **تعديل {field_display}**\n\n"
             if current_value and current_value != "لا يوجد":
                 followup_time = context.user_data['current_report_data'].get('followup_time', '')
                 if followup_time:
-                    text += f"**القيمة الحالية:** {current_value} الساعة {followup_time}\n\n"
+                    time_12h = format_time_12h(followup_time)
+                    text += f"**القيمة الحالية:** {current_value} - {time_12h}\n\n"
                 else:
                     text += f"**القيمة الحالية:** {current_value}\n\n"
             else:
                 text += "**القيمة الحالية:** لا يوجد موعد\n\n"
-            text += "اختر التاريخ من التقويم:"
+            text += "✅ **اختر التاريخ من التقويم أدناه:**\n"
+            text += "_(لا يمكن إدخال التاريخ يدوياً)_\n"
             
-            # عرض التقويم
-            keyboard = create_quick_date_buttons("edit_followup")
+            # عرض التقويم الكامل مباشرة
+            now = datetime.now()
+            keyboard = create_calendar_keyboard(now.year, now.month, "edit_followup", allow_future=True)
             keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="edit_back_to_fields")])
             keyboard.append([InlineKeyboardButton("❌ إلغاء", callback_data="edit_cancel")])
+            
+            text += f"\n📆 **{MONTHS_AR[now.month]} {now.year}**"
             
             await query.edit_message_text(
                 text,
@@ -598,7 +680,7 @@ async def handle_field_selection(update: Update, context: ContextTypes.DEFAULT_T
                 parse_mode=ParseMode.MARKDOWN
             )
             
-            logger.info(f"✅ تم عرض حقل التعديل: {field_name} (تاريخ)")
+            logger.info(f"✅ تم عرض حقل التعديل: {field_name} (تاريخ) - التقويم الكامل")
             return EDIT_DATE_CALENDAR
         else:
             text = f"✏️ **تعديل {field_display}**\n\n"
@@ -1139,19 +1221,55 @@ async def show_field_selection(query, context):
 
 async def start_edit_reports_from_callback(query, context):
     """إعادة عرض قائمة التقارير من callback"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     with SessionLocal() as s:
-        translator_id = context.user_data.get('translator_id')
+        # ✅ استخدام معرف المستخدم الفعلي بدلاً من translator_id
+        user_id = context.user_data.get('submitted_by_user_id')
+        if not user_id and query.from_user:
+            user_id = query.from_user.id
         
         # البحث عن تقارير اليوم فقط
         today = date.today()
         today_start = datetime.combine(today, datetime.min.time())
         today_end = datetime.combine(today, datetime.max.time())
         
-        reports = s.query(Report).filter(
-            Report.translator_id == translator_id,
-            Report.report_date >= today_start,
-            Report.report_date <= today_end
-        ).order_by(Report.report_date.desc()).all()
+        # ✅ البحث بمعرف المستخدم الذي أنشأ التقرير (نفس منطق start_edit_reports)
+        translator = s.query(Translator).filter_by(tg_user_id=user_id).first()
+        translator_id = translator.id if translator else None
+        
+        try:
+            if translator_id:
+                reports = s.query(Report).filter(
+                    or_(
+                        Report.submitted_by_user_id == user_id,  # التقارير الجديدة
+                        and_(
+                            Report.submitted_by_user_id.is_(None),  # التقارير القديمة فقط
+                            Report.translator_id == translator_id  # المترجم يطابق المستخدم الحالي
+                        )
+                    ),
+                    Report.report_date >= today_start,
+                    Report.report_date <= today_end
+                ).order_by(Report.report_date.desc()).all()
+            else:
+                reports = s.query(Report).filter(
+                    Report.submitted_by_user_id == user_id,
+                    Report.report_date >= today_start,
+                    Report.report_date <= today_end
+                ).order_by(Report.report_date.desc()).all()
+                
+            logger.info(f"✅ تم العثور على {len(reports)} تقرير للمستخدم {user_id} (translator_id: {translator_id})")
+        except Exception as e:
+            logger.warning(f"⚠️ Error using submitted_by_user_id, falling back to translator_id: {e}")
+            if translator_id:
+                reports = s.query(Report).filter(
+                    Report.translator_id == translator_id,
+                    Report.report_date >= today_start,
+                    Report.report_date <= today_end
+                ).order_by(Report.report_date.desc()).all()
+            else:
+                reports = []
         
         if not reports:
             await query.edit_message_text(
@@ -1218,7 +1336,17 @@ def register(app):
             EDIT_DATE_CALENDAR: [
                 CallbackQueryHandler(handle_date_calendar, pattern="^edit_followup:"),
                 CallbackQueryHandler(handle_date_calendar, pattern="^edit_back_to_fields$"),
-                CallbackQueryHandler(handle_date_calendar, pattern="^edit_cancel$")
+                CallbackQueryHandler(handle_date_calendar, pattern="^edit_cancel$"),
+                # منع إدخال النص - يجب استخدام التقويم فقط
+                MessageHandler(
+                    filters.TEXT & ~filters.COMMAND, 
+                    lambda u, c: u.message.reply_text(
+                        "⚠️ **لا يمكن إدخال التاريخ يدوياً**\n\n"
+                        "✅ **يرجى استخدام التقويم أعلاه لاختيار التاريخ**\n"
+                        "اضغط على التاريخ المطلوب من التقويم.",
+                        parse_mode=ParseMode.MARKDOWN
+                    )
+                )
             ],
             EDIT_DATE_TIME: [
                 CallbackQueryHandler(handle_date_time_selection, pattern="^edit_time:"),
@@ -1237,7 +1365,7 @@ def register(app):
         allow_reentry=True,
         per_chat=True,
         per_user=True,
-        per_message=False,
+        per_message=True,
     )
     
     app.add_handler(conv_handler)

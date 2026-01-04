@@ -961,24 +961,27 @@ def _query_reports(filter_type, name_val, year_val, month_val, dept_val=None):
 
         rows = []
         for r in reports:
-            p_name = None
-            h_name = None
-            dept_name = None
-            doc_name = None
-            
+            # حاول استخدام الحقول المكررة داخل التقرير أولاً (denormalized fields)
+            p_name = (r.patient_name.strip() if getattr(r, 'patient_name', None) else None) or None
+            h_name = (r.hospital_name.strip() if getattr(r, 'hospital_name', None) else None) or None
+            dept_name = (r.department.strip() if getattr(r, 'department', None) else None) or None
+            doc_name = (r.doctor_name.strip() if getattr(r, 'doctor_name', None) else None) or None
+
+            # إذا كانت الحقول المكررة غير متوفرة، حاول جلبها من الجداول المرتبطة عبر المفاتيح الخارجية
             try:
-                if r.patient_id:
+                if not p_name and r.patient_id:
                     p = s.get(Patient, r.patient_id)
-                    p_name = p.full_name if p else None
-                if r.hospital_id:
+                    p_name = p.full_name if p and p.full_name else None
+                if not h_name and r.hospital_id:
                     h = s.get(Hospital, r.hospital_id)
-                    h_name = h.name if h else None
-                if r.department_id:
+                    h_name = h.name if h and h.name else None
+                if not dept_name and r.department_id:
                     d = s.get(Department, r.department_id)
-                    dept_name = d.name if d else None
-                if r.doctor_id:
+                    dept_name = d.name if d and d.name else None
+                if not doc_name and r.doctor_id:
                     doc = s.get(Doctor, r.doctor_id)
-                    doc_name = doc.name if doc else None
+                    # Doctor model may have 'full_name' or 'name'
+                    doc_name = (doc.full_name if getattr(doc, 'full_name', None) else getattr(doc, 'name', None)) if doc else None
             except Exception:
                 pass
 
@@ -1144,35 +1147,62 @@ async def _create_reports_charts(hospitals_counter, departments_counter, actions
 
 async def _generate_reports_pdf_with_charts(pdf_data, charts_data):
     """إنشاء PDF بتصميم فريد مع الرسوم البيانية"""
-    from jinja2 import Environment, FileSystemLoader
     from datetime import datetime
     import sys
+    import os
     
     try:
-        # تحميل القالب الفريد الجديد
-        env = Environment(loader=FileSystemLoader('templates'))
-        template = env.get_template('reports_unique_design.html')
+        # إنشاء HTML مباشرة بدون قالب
+        generated_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        date_from = pdf_data.get('date_from', 'غير محدد')
+        date_to = pdf_data.get('date_to', 'غير محدد')
+        total_reports = pdf_data.get('total_reports', 0)
+        total_patients = pdf_data.get('total_patients', 0)
+        hospitals_count = pdf_data.get('hospitals_count', 0)
+        doctors_count = pdf_data.get('doctors_count', 0)
+        hospitals_data = pdf_data.get('hospitals_data', [])
+        departments_data = pdf_data.get('departments_data', [])
+        actions_data = pdf_data.get('actions_data', [])
+        charts = charts_data or {}
         
-        # دمج البيانات
-        context = {
-            'generated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'date_from': pdf_data.get('date_from', 'غير محدد'),
-            'date_to': pdf_data.get('date_to', 'غير محدد'),
-            'total_reports': pdf_data.get('total_reports', 0),
-            'total_patients': pdf_data.get('total_patients', 0),
-            'hospitals_count': pdf_data.get('hospitals_count', 0),
-            'doctors_count': pdf_data.get('doctors_count', 0),
-            'hospitals_data': pdf_data.get('hospitals_data', []),
-            'departments_data': pdf_data.get('departments_data', []),
-            'actions_data': pdf_data.get('actions_data', []),
-            'charts': charts_data
-        }
+        # بناء HTML مباشرة
+        html_content = f'''<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <title>تقرير طبي شامل</title>
+    <style>
+        body {{ font-family: Arial, Tahoma, sans-serif; direction: rtl; text-align: right; padding: 20px; }}
+        h1 {{ color: #2c3e50; }}
+        table {{ width: 100%; border-collapse: collapse; margin: 20px 0; }}
+        th, td {{ border: 1px solid #ddd; padding: 8px; text-align: right; }}
+        th {{ background-color: #3498db; color: white; }}
+    </style>
+</head>
+<body>
+    <h1>📊 التقرير الطبي الشامل</h1>
+    <p><strong>تاريخ الإنشاء:</strong> {generated_at}</p>
+    <p><strong>الفترة:</strong> {date_from} - {date_to}</p>
+    <p><strong>عدد التقارير:</strong> {total_reports}</p>
+    <p><strong>عدد المرضى:</strong> {total_patients}</p>
+    <p><strong>عدد المستشفيات:</strong> {hospitals_count}</p>
+    <p><strong>عدد الأطباء:</strong> {doctors_count}</p>
+'''
         
-        # إنشاء HTML
-        html_content = template.render(**context)
+        # إضافة الرسوم البيانية إذا كانت موجودة
+        if charts:
+            html_content += '<h2>📈 الرسوم البيانية</h2>'
+            for chart_name, chart_base64 in charts.items():
+                html_content += f'<img src="data:image/png;base64,{chart_base64}" style="max-width: 100%; margin: 10px 0;" />'
+        
+        html_content += '''
+</body>
+</html>
+'''
         
         # حفظ أو تحويل إلى PDF
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        os.makedirs("exports", exist_ok=True)
         
         if sys.platform.startswith('win'):
             # Windows: حفظ HTML
@@ -1185,12 +1215,12 @@ async def _generate_reports_pdf_with_charts(pdf_data, charts_data):
             # Linux/Cloud Run: استخدام WeasyPrint
             from weasyprint import HTML
             pdf_path = f"exports/reports_print_{timestamp}.pdf"
-            HTML(string=html_content).write_pdf(pdf_path)
+            HTML(string=html_content, base_url=os.path.dirname(os.path.abspath(pdf_path))).write_pdf(pdf_path)
             logger.info(f"✅ تم إنشاء PDF: {pdf_path}")
             return pdf_path
             
     except Exception as e:
-        logger.error(f"❌ خطأ في إنشاء PDF: {e}")
+        logger.error(f"❌ خطأ في إنشاء PDF: {e}", exc_info=True)
         raise
 
 async def confirm_export(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1202,17 +1232,16 @@ async def confirm_export(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if q.data.startswith("export:") and q.data != "export:yes" and q.data != "export:no":
             export_format = q.data.split(":")[1]
             context.user_data["export_format"] = export_format
-            # المتابعة مباشرة للتصدير
+            logger.info(f"✅ تم اختيار نوع التصدير: {export_format}")
+            # المتابعة مباشرة للتصدير - لا نستدعي confirm_export مرة أخرى
+            # سنتابع مباشرة إلى عملية التصدير
         elif q.data == "export:no":
             await q.edit_message_text("🚫 تم الإلغاء.")
             return ConversationHandler.END
-        
-        if q.data == "abort":
+        elif q.data == "abort":
             await q.edit_message_text("❌ تم إلغاء المحادثة.")
             return ConversationHandler.END
-        
-        # معالجة زر الرجوع
-        if q.data == "back:confirm":
+        elif q.data == "back:confirm":
             f_type = context.user_data.get("filter_type")
             name_val = context.user_data.get("filter_value")
             year_val = context.user_data.get("year_value")
@@ -1324,6 +1353,8 @@ async def confirm_export(update: Update, context: ContextTypes.DEFAULT_TYPE):
         format_names = {"pdf": "PDF", "excel": "Excel", "word": "Word", "html": "HTML"}
         format_name = format_names.get(export_format, "PDF")
         
+        logger.info(f"🖨️ بدء إنشاء ملف {format_name} - عدد التقارير: {len(rows)}, نوع التصدير: {export_format}")
+        
         if q:
             await q.edit_message_text(f"📝 جاري إنشاء ملف {format_name}...")
         else:
@@ -1332,18 +1363,27 @@ async def confirm_export(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # اختيار الصيغة
         file_path = None
         
-        if export_format == "excel":
-            file_path = export_to_excel(rows, f"reports_{f_type or 'all'}")
-        elif export_format == "word":
-            file_path = export_to_word(rows, f"reports_{f_type or 'all'}")
-        elif export_format == "html":
-            file_path = export_to_html(rows, f"reports_{f_type or 'all'}", filter_type=f_type)
-        else:  # pdf (default)
-            # استخدام نفس نظام التحليلات الاحترافي
-            from services.pdf_generator_enhanced import generate_data_analysis_pdf_with_tables
-            
-            # تحضير البيانات بنفس صيغة التحليلات
-            pdf_data = {
+        # using a plain block instead of nested try to keep structure simple
+        if True:
+            if export_format == "excel":
+                logger.info("📗 بدء تصدير Excel...")
+                file_path = export_to_excel(rows, f"reports_{f_type or 'all'}")
+                logger.info(f"✅ تم إنشاء Excel: {file_path}")
+            elif export_format == "word":
+                logger.info("📘 بدء تصدير Word...")
+                file_path = export_to_word(rows, f"reports_{f_type or 'all'}")
+                logger.info(f"✅ تم إنشاء Word: {file_path}")
+            elif export_format == "html":
+                logger.info("🌐 بدء تصدير HTML...")
+                file_path = export_to_html(rows, f"reports_{f_type or 'all'}", filter_type=f_type)
+                logger.info(f"✅ تم إنشاء HTML: {file_path}")
+            else:  # pdf (default)
+                logger.info("📕 بدء تصدير PDF...")
+                # استخدام نفس نظام التحليلات الاحترافي
+                from services.pdf_generator_enhanced import generate_data_analysis_pdf_with_tables
+                
+                # تحضير البيانات بنفس صيغة التحليلات
+                pdf_data = {
                 'date_from': context_data.get('filter_value', 'غير محدد'),
                 'date_to': datetime.now().strftime('%Y-%m-%d'),
                 'total_reports': len(rows),
@@ -1356,132 +1396,141 @@ async def confirm_export(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 'complaints_data': [],
                 'actions_data': [],
                 'top_patients': []
-            }
-            
-            # إحصائيات المستشفيات
-            from collections import Counter
-            hospitals_counter = Counter()
-            departments_counter = Counter()
-            doctors_counter = Counter()
-            actions_counter = Counter()
-            complaints_counter = Counter()
-            
-            for r in rows:
-                if r.get('hospital_name'):
-                    hospitals_counter[r['hospital_name']] += 1
-                if r.get('department_name'):
-                    departments_counter[r['department_name']] += 1
-                if r.get('doctor_name'):
-                    doctors_counter[r['doctor_name']] += 1
-                if r.get('medical_action'):
-                    actions_counter[r['medical_action']] += 1
-                if r.get('complaint_text'):
-                    complaints_counter[r['complaint_text'][:50]] += 1
-            
-            # تحضير البيانات بنفس التنسيق الذي يتوقعه القالب
-            pdf_data['hospitals_data'] = [
-                {
-                    'name': k, 
-                    'reports_count': v,  # القالب يتوقع reports_count
-                    'count': v,
-                    'percentage': float(f"{(v/len(rows)*100):.1f}"),  # القالب يتوقع percentage كرقم
-                    'percent': f"{(v/len(rows)*100):.1f}"
-                } 
-                for k, v in hospitals_counter.most_common(10)
-            ]
-            
-            pdf_data['departments_data'] = [
-                {
-                    'name': k, 
-                    'count': v,
-                    'percentage': float(f"{(v/len(rows)*100):.1f}"),
-                    'percent': f"{(v/len(rows)*100):.1f}"
-                } 
-                for k, v in departments_counter.most_common(10)
-            ]
-            
-            pdf_data['doctors_data'] = [
-                {
-                    'name': k, 
-                    'reports_count': v,  # القالب يتوقع reports_count
-                    'count': v,
-                    'percentage': float(f"{(v/len(rows)*100):.1f}"),
-                    'percent': f"{(v/len(rows)*100):.1f}"
-                } 
-                for k, v in doctors_counter.most_common(10)
-            ]
-            
-            pdf_data['actions_data'] = [
-                {
-                    'name': k, 
-                    'count': v,
-                    'percentage': float(f"{(v/len(rows)*100):.1f}"),
-                    'percent': f"{(v/len(rows)*100):.1f}"
-                } 
-                for k, v in actions_counter.most_common(10)
-            ]
-            
-            pdf_data['complaints_data'] = [
-                {
-                    'name': k, 
-                    'count': v,
-                    'percentage': float(f"{(v/len(rows)*100):.1f}"),
-                    'percent': f"{(v/len(rows)*100):.1f}"
-                } 
-                for k, v in complaints_counter.most_common(10)
-            ]
-            
-            # إضافة أفضل المرضى (بعدد الزيارات)
-            patients_counter = Counter()
-            patients_last_visit = {}  # تخزين آخر زيارة لكل مريض
-            for r in rows:
-                patient_name = r.get('patient_name')
-                if patient_name:
-                    patients_counter[patient_name] += 1
-                    # حفظ آخر تاريخ زيارة
-                    visit_date = r.get('report_date', 'غير محدد')
-                    if patient_name not in patients_last_visit or visit_date > patients_last_visit.get(patient_name, ''):
-                        patients_last_visit[patient_name] = visit_date
-            
-            pdf_data['top_patients'] = [
-                {
-                    'name': k, 
-                    'visits': v,
-                    'last_visit': patients_last_visit.get(k, 'غير محدد')
-                } 
-                for k, v in patients_counter.most_common(10)
-            ]
-            
-            # إنشاء الرسوم البيانية
-            charts_data = await _create_reports_charts(
-                hospitals_counter, 
-                departments_counter, 
-                actions_counter,
-                rows
-            )
-            
-            # إنشاء PDF احترافي بالقالب الجديد
-            file_path = await _generate_reports_pdf_with_charts(pdf_data, charts_data)
-        
-        if file_path and os.path.exists(file_path):
-            if q:
-                await q.get_bot().send_document(
-                    chat_id=q.message.chat_id,
-                    document=open(file_path, "rb"),
-                    caption=f"✅ {format_name} - {len(rows)} تقرير"
+                }
+                
+                # إحصائيات المستشفيات
+                from collections import Counter
+                hospitals_counter = Counter()
+                departments_counter = Counter()
+                doctors_counter = Counter()
+                actions_counter = Counter()
+                complaints_counter = Counter()
+                
+                for r in rows:
+                    if r.get('hospital_name'):
+                        hospitals_counter[r['hospital_name']] += 1
+                    if r.get('department_name'):
+                        departments_counter[r['department_name']] += 1
+                    if r.get('doctor_name'):
+                        doctors_counter[r['doctor_name']] += 1
+                    if r.get('medical_action'):
+                        actions_counter[r['medical_action']] += 1
+                    if r.get('complaint_text'):
+                        complaints_counter[r['complaint_text'][:50]] += 1
+                
+                # تحضير البيانات بنفس التنسيق الذي يتوقعه القالب
+                pdf_data['hospitals_data'] = [
+                    {
+                        'name': k, 
+                        'reports_count': v,  # القالب يتوقع reports_count
+                        'count': v,
+                        'percentage': float(f"{(v/len(rows)*100):.1f}"),  # القالب يتوقع percentage كرقم
+                        'percent': f"{(v/len(rows)*100):.1f}"
+                    } 
+                    for k, v in hospitals_counter.most_common(10)
+                ]
+                
+                pdf_data['departments_data'] = [
+                    {
+                        'name': k, 
+                        'count': v,
+                        'percentage': float(f"{(v/len(rows)*100):.1f}"),
+                        'percent': f"{(v/len(rows)*100):.1f}"
+                    } 
+                    for k, v in departments_counter.most_common(10)
+                ]
+                
+                pdf_data['doctors_data'] = [
+                    {
+                        'name': k, 
+                        'reports_count': v,  # القالب يتوقع reports_count
+                        'count': v,
+                        'percentage': float(f"{(v/len(rows)*100):.1f}"),
+                        'percent': f"{(v/len(rows)*100):.1f}"
+                    } 
+                    for k, v in doctors_counter.most_common(10)
+                ]
+                
+                pdf_data['actions_data'] = [
+                    {
+                        'name': k, 
+                        'count': v,
+                        'percentage': float(f"{(v/len(rows)*100):.1f}"),
+                        'percent': f"{(v/len(rows)*100):.1f}"
+                    } 
+                    for k, v in actions_counter.most_common(10)
+                ]
+                
+                pdf_data['complaints_data'] = [
+                    {
+                        'name': k, 
+                        'count': v,
+                        'percentage': float(f"{(v/len(rows)*100):.1f}"),
+                        'percent': f"{(v/len(rows)*100):.1f}"
+                    } 
+                    for k, v in complaints_counter.most_common(10)
+                ]
+                
+                # إضافة أفضل المرضى (بعدد الزيارات)
+                patients_counter = Counter()
+                patients_last_visit = {}  # تخزين آخر زيارة لكل مريض
+                for r in rows:
+                    patient_name = r.get('patient_name')
+                    if patient_name:
+                        patients_counter[patient_name] += 1
+                        # حفظ آخر تاريخ زيارة
+                        visit_date = r.get('report_date', 'غير محدد')
+                        if patient_name not in patients_last_visit or visit_date > patients_last_visit.get(patient_name, ''):
+                            patients_last_visit[patient_name] = visit_date
+                
+                pdf_data['top_patients'] = [
+                    {
+                        'name': k, 
+                        'visits': v,
+                        'last_visit': patients_last_visit.get(k, 'غير محدد')
+                    } 
+                    for k, v in patients_counter.most_common(10)
+                ]
+                
+                # إنشاء الرسوم البيانية
+                charts_data = await _create_reports_charts(
+                    hospitals_counter, 
+                    departments_counter, 
+                    actions_counter,
+                    rows
                 )
+                
+                # إنشاء PDF احترافي بالقالب الجديد
+                file_path = await _generate_reports_pdf_with_charts(pdf_data, charts_data)
+                logger.info(f"✅ تم إنشاء PDF: {file_path}")
+            
+            if file_path and os.path.exists(file_path):
+                if q:
+                    await q.get_bot().send_document(
+                        chat_id=q.message.chat_id,
+                        document=open(file_path, "rb"),
+                        caption=f"✅ {format_name} - {len(rows)} تقرير"
+                    )
+                else:
+                    await update.message.reply_document(
+                        document=open(file_path, "rb"),
+                        caption=f"✅ {format_name} - {len(rows)} تقرير"
+                    )
             else:
-                await update.message.reply_document(
-                    document=open(file_path, "rb"),
-                    caption=f"✅ {format_name} - {len(rows)} تقرير"
-                )
-        else:
-            raise Exception(f"فشل في إنشاء ملف {format_name}")
+                raise Exception(f"فشل في إنشاء ملف {format_name}")
             
     except Exception as e:
-        error_msg = f"❌ حدث خطأ أثناء إنشاء {format_name}: {e}"
+        tb = traceback.format_exc()
+        logger.error(f"❌ حدث خطأ أثناء إنشاء {format_name}: {e}\n{tb}")
+        # نرسل مقتطف من التتبع للمستخدم للمساعدة في التشخيص
+        short_tb = tb if len(tb) <= 1500 else tb[-1500:]
+        error_msg = f"❌ حدث خطأ أثناء إنشاء {format_name}:\n{e}\n\nTraceback (truncated):\n{short_tb}"
         if q:
-            await q.edit_message_text(error_msg)
+            try:
+                await q.edit_message_text(error_msg)
+            except Exception:
+                # إذا فشل تعديل الرسالة (مثلاً انتهت صلاحية callback) أرسل رسالة عادية
+                await q.get_bot().send_message(chat_id=q.message.chat_id, text=error_msg)
         else:
             await update.message.reply_text(error_msg)
 
@@ -2413,21 +2462,34 @@ def export_to_html(reports_data, filename="reports", filter_type=None):
     from io import BytesIO
     
     try:
-        # تحضير البيانات للجدول
+        # تحضير البيانات للجدول - ندعم كلا صيغتي الصفوف (dicts من _query_reports أو dicts من مصادر أخرى)
         html_reports = []
         for r in reports_data:
+            # دعم مفاتيح متعددة لضمان عدم فقدان البيانات
+            report_id = r.get('id', r.get('report_id', ''))
+            report_date = r.get('report_date') or r.get('date') or 'غير محدد'
+            patient_name = r.get('patient_name') or r.get('patient') or r.get('patient_full_name') or 'غير محدد'
+            hospital = r.get('hospital') or r.get('hospital_name') or 'غير محدد'
+            department = r.get('department') or r.get('department_name') or 'غير محدد'
+            doctor = r.get('doctor') or r.get('doctor_name') or r.get('doctor_full_name') or 'غير محدد'
+            action = r.get('action') or r.get('medical_action') or 'غير محدد'
+            complaint = r.get('complaint') or r.get('complaint_text') or 'لا يوجد'
+            decision = r.get('decision') or r.get('doctor_decision') or 'لا يوجد'
+            followup_date = r.get('followup_date') or ''
+            followup_reason = r.get('followup_reason') or ''
+
             html_reports.append({
-                'report_id': r.get('report_id', ''),
-                'report_date': r.get('report_date', 'غير محدد'),
-                'patient_name': r.get('patient_name', 'غير محدد'),
-                'hospital': r.get('hospital_name', 'غير محدد'),
-                'department': r.get('department_name', 'غير محدد'),
-                'doctor': r.get('doctor_name', 'غير محدد'),
-                'action': r.get('medical_action', 'غير محدد'),
-                'complaint': r.get('complaint_text', 'لا يوجد'),
-                'decision': r.get('doctor_decision', 'لا يوجد'),
-                'followup_date': r.get('followup_date', ''),
-                'followup_reason': r.get('followup_reason', '')
+                'report_id': report_id,
+                'report_date': report_date,
+                'patient_name': patient_name,
+                'hospital': hospital,
+                'department': department,
+                'doctor': doctor,
+                'action': action,
+                'complaint': complaint,
+                'decision': decision,
+                'followup_date': followup_date,
+                'followup_reason': followup_reason
             })
         
         # ═══════════════════════════════════════
@@ -2446,8 +2508,13 @@ def export_to_html(reports_data, filename="reports", filter_type=None):
         # 🎨 تحميل القالب وإنشاء HTML
         # ═══════════════════════════════════════
         
+        from jinja2 import TemplateNotFound
         env = Environment(loader=FileSystemLoader('templates'))
-        template = env.get_template('report_summary.html')
+        try:
+            template = env.get_template('report_summary.html')
+        except TemplateNotFound:
+            logger.warning("⚠️ قالب report_summary.html غير موجود في templates/ — سيتم استخدام قالب HTML افتراضي مبسّط")
+            template = None
         
         context = {
             'title': 'التقرير الطبي الشامل',
@@ -2458,7 +2525,30 @@ def export_to_html(reports_data, filename="reports", filter_type=None):
             'charts': charts
         }
         
-        html_content = template.render(**context)
+        if template:
+            html_content = template.render(**context)
+        else:
+            # قالب بديل بسيط في حال عدم وجود القالب الكامل
+            rows_html = []
+            for r in html_reports:
+                rows_html.append(
+                    f"<tr>"
+                    f"<td>{r['report_id']}</td>"
+                    f"<td>{r['report_date']}</td>"
+                    f"<td>{r['patient_name']}</td>"
+                    f"<td>{r['hospital']}</td>"
+                    f"<td>{r['department']}</td>"
+                    f"<td>{r['doctor']}</td>"
+                    f"<td>{r['action']}</td>"
+                    f"</tr>"
+                )
+            html_content = (
+                f"<html><head><meta charset=\"utf-8\"><title>{context['title']}</title></head>"
+                f"<body><h2>{context['title']}</h2><p>توليد: {context['generated_at']}</p>"
+                f"<table border=\"1\" cellpadding=\"6\" cellspacing=\"0\">"
+                f"<thead><tr><th>رقم</th><th>التاريخ</th><th>المريض</th><th>المستشفى</th><th>القسم</th><th>الطبيب</th><th>الإجراء</th></tr></thead>"
+                f"<tbody>{''.join(rows_html)}</tbody></table></body></html>"
+            )
         
         # حفظ الملف
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -2484,19 +2574,19 @@ def export_to_excel(reports_data, filename="reports"):
     from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
     
     try:
-        # تحضير البيانات
+        # تحضير البيانات - استخدام المفاتيح الصحيحة من _query_reports
         excel_data = []
         for r in reports_data:
             excel_data.append({
-                'رقم': r.get('report_id', ''),
+                'رقم': r.get('id', r.get('report_id', '')),
                 'التاريخ': r.get('report_date', ''),
                 'المريض': r.get('patient_name', ''),
-                'المستشفى': r.get('hospital_name', ''),
-                'القسم': r.get('department_name', ''),
-                'الطبيب': r.get('doctor_name', ''),
-                'الإجراء': r.get('medical_action', ''),
-                'الشكوى': r.get('complaint_text', ''),
-                'قرار الطبيب': r.get('doctor_decision', ''),
+                'المستشفى': r.get('hospital', r.get('hospital_name', '')),
+                'القسم': r.get('department', r.get('department_name', '')),
+                'الطبيب': r.get('doctor', r.get('doctor_name', '')),
+                'الإجراء': r.get('action', r.get('medical_action', '')),
+                'الشكوى': r.get('complaint', r.get('complaint_text', '')),
+                'قرار الطبيب': r.get('decision', r.get('doctor_decision', '')),
                 'موعد المراجعة': r.get('followup_date', ''),
                 'سبب المراجعة': r.get('followup_reason', '')
             })
@@ -2666,16 +2756,16 @@ def export_to_word(reports_data, filename="reports"):
             table.cell(1, 1).text = report.get('patient_name', 'غير محدد')
             
             table.cell(2, 0).text = '🏥 المستشفى'
-            table.cell(2, 1).text = report.get('hospital_name', 'غير محدد')
+            table.cell(2, 1).text = report.get('hospital', report.get('hospital_name', 'غير محدد'))
             
             table.cell(3, 0).text = '🏢 القسم'
-            table.cell(3, 1).text = report.get('department_name', 'غير محدد')
+            table.cell(3, 1).text = report.get('department', report.get('department_name', 'غير محدد'))
             
             table.cell(4, 0).text = '👨‍⚕️ الطبيب'
-            table.cell(4, 1).text = report.get('doctor_name', 'غير محدد')
+            table.cell(4, 1).text = report.get('doctor', report.get('doctor_name', 'غير محدد'))
             
             table.cell(5, 0).text = '⚕️ الإجراء'
-            table.cell(5, 1).text = report.get('medical_action', 'غير محدد')
+            table.cell(5, 1).text = report.get('action', report.get('medical_action', 'غير محدد'))
             
             # محاذاة النص لليمين - RTL
             for row in table.rows:
@@ -2693,12 +2783,12 @@ def export_to_word(reports_data, filename="reports"):
             
             # الشكوى
             doc.add_heading('📝 الشكوى:', level=2)
-            complaint_p = doc.add_paragraph(report.get('complaint_text', 'لا يوجد'))
+            complaint_p = doc.add_paragraph(report.get('complaint', report.get('complaint_text', 'لا يوجد')))
             complaint_p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
             
             # قرار الطبيب
             doc.add_heading('✅ قرار الطبيب:', level=2)
-            decision_p = doc.add_paragraph(report.get('doctor_decision', 'لا يوجد'))
+            decision_p = doc.add_paragraph(report.get('decision', report.get('doctor_decision', 'لا يوجد')))
             decision_p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
             
             # موعد المراجعة

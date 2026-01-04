@@ -413,7 +413,9 @@ MONTH_NAMES_AR = {
     9: "سبتمبر", 10: "أكتوبر", 11: "نوفمبر", 12: "ديسمبر",
 }
 
-WEEKDAYS_AR = ["س", "أ", "ث", "ر", "خ", "ج", "س"]
+# ترتيب أيام الأسبوع عندما يكون السبت أول يوم (firstweekday=5)
+# السبت، الأحد، الاثنين، الثلاثاء، الأربعاء، الخميس، الجمعة
+WEEKDAYS_AR = ["س", "ح", "ن", "ث", "ر", "خ", "ج"]
 
 
 def _chunked(seq, size):
@@ -449,6 +451,42 @@ def format_time_12h(dt: datetime) -> str:
         return f"{hour}:{minute:02d} صباحاً"
     else:
         return f"{hour-12}:{minute:02d} مساءً"
+
+
+def format_time_string_12h(time_str: str) -> str:
+    """
+    تحويل وقت من صيغة 24 ساعة (مثل "13:00") إلى صيغة 12 ساعة بالعربية
+    مثال: "13:00" -> "1 الظهر"
+    مثال: "08:00" -> "8 صباحاً"
+    مثال: "20:00" -> "8 مساءً"
+    """
+    if not time_str:
+        return ""
+    
+    try:
+        # تحليل الوقت من صيغة "HH:MM"
+        parts = time_str.split(":")
+        if len(parts) != 2:
+            return time_str
+        
+        hour = int(parts[0])
+        minute = int(parts[1])
+        
+        # تحويل إلى صيغة 12 ساعة
+        if hour == 0:
+            return f"12:{minute:02d} صباحاً"
+        elif hour == 12:
+            return f"12:{minute:02d} الظهر"
+        elif hour < 12:
+            return f"{hour}:{minute:02d} صباحاً"
+        else:
+            hour_12 = hour - 12
+            if hour_12 == 0:
+                return f"12:{minute:02d} الظهر"
+            else:
+                return f"{hour_12}:{minute:02d} مساءً"
+    except (ValueError, IndexError):
+        return time_str
 
 
 def _build_hour_keyboard():
@@ -2058,7 +2096,16 @@ def _build_patients_keyboard(page=0, search_query="", context=None):
         if nav_buttons:
             keyboard.append(nav_buttons)
 
-    # أزرار التنقل
+    # ✅ أزرار البحث والتنقل
+    # زر البحث في صف منفصل واضح
+    # استخدام switch_inline_query_current_chat مع نص افتراضي لضمان فتح البحث
+    keyboard.append([
+        InlineKeyboardButton(
+            "🔍 بحث عن مريض",
+            switch_inline_query_current_chat="بحث: "
+        )
+    ])
+    
     keyboard.append([InlineKeyboardButton(
         "❌ إلغاء", callback_data="nav:cancel")])
 
@@ -2068,7 +2115,8 @@ def _build_patients_keyboard(page=0, search_query="", context=None):
     )
     if search_query:
         text += f"\n🔍 **البحث:** {search_query}"
-    text += f"\n📄 **الصفحة:** {page + 1} من {total_pages}\n\n**اختر اسم المريض:**"
+    text += f"\n📄 **الصفحة:** {page + 1} من {total_pages}\n\n"
+    text += "**اختر اسم المريض من القائمة أو استخدم زر البحث:**"
 
     return text, InlineKeyboardMarkup(keyboard), search_query
 
@@ -2792,6 +2840,17 @@ async def handle_patient(update: Update, context: ContextTypes.DEFAULT_TYPE):
     import logging
     import sys
     logger = logging.getLogger(__name__)
+
+    # Diagnostic logging: capture incoming update and current report_tmp
+    try:
+        msg_text = update.message.text if hasattr(update, 'message') and update.message else None
+    except Exception:
+        msg_text = None
+    logger.info(f"DEBUG handle_patient called: update.message_present={hasattr(update,'message') and update.message is not None}, message_text={repr(msg_text)}, user_id={(update.effective_user.id if update.effective_user else None)}")
+    try:
+        logger.info(f"DEBUG report_tmp snapshot: {context.user_data.get('report_tmp', {})}")
+    except Exception:
+        logger.info("DEBUG report_tmp snapshot: <unavailable>")
     
     # التحقق أولاً إذا كان المريض تم اختياره بالفعل
     report_tmp = context.user_data.get("report_tmp", {})
@@ -2876,6 +2935,33 @@ async def handle_patient(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return STATE_SELECT_PATIENT
 
     # إذا لم يكن في وضع البحث ولم يتم اختيار المريض، نعيد عرض القائمة
+    # إذا المستخدم أدخل اسمًا يدوياً (نص عادي)، نقبله كمريض جديد ونمضي للخطوة التالية
+    if text:
+        try:
+            # حفظ اسم المريض بدون رقم تعريف (سيتم إنشاؤه لاحقًا عند الحفظ)
+            context.user_data.setdefault("report_tmp", {})["patient_name"] = text
+            context.user_data.setdefault("report_tmp", {})["patient_id"] = None
+            context.user_data["report_tmp"].setdefault("step_history", []).append(R_PATIENT)
+
+            try:
+                await update.message.delete()
+            except:
+                pass
+
+            await update.message.reply_text(
+                f"✅ **تم إدخال اسم المريض**\n\n"
+                f"👤 **المريض:**\n"
+                f"{text}",
+                parse_mode="Markdown"
+            )
+
+            await show_hospitals_menu(update.message, context)
+            return STATE_SELECT_HOSPITAL
+        except Exception as ex:
+            logger.error(f"handle_patient: Error handling manual patient input: {ex}", exc_info=True)
+            await show_patient_selection(update.message, context)
+            return STATE_SELECT_PATIENT
+
     logger.info("handle_patient: No patient selected, showing patient selection menu")
     await show_patient_selection(update.message, context)
     return STATE_SELECT_PATIENT
@@ -3275,19 +3361,8 @@ async def handle_department_selection(
     if "report_tmp" not in context.user_data:
         context.user_data["report_tmp"] = {}
     
-    # التحقق إذا كان القسم هو "أشعة وفحوصات"
-    if dept == "أشعة وفحوصات | Radiology":
-        context.user_data["report_tmp"]["department_name"] = dept
-        logger.info(f"✅ تم حفظ القسم (أشعة): {dept}")
-        context.user_data["report_tmp"].setdefault("step_history", []).append(R_DEPARTMENT)
-        await query.edit_message_text(
-            f"✅ **تم اختيار القسم**\n\n"
-            f"🏷️ **القسم:**\n"
-            f"{dept}"
-        )
-        # بدء مسار radiology مباشرة (بدون طبيب)
-        await start_radiology_flow(query.message, context)
-        return RADIOLOGY_TYPE
+    # ✅ تم نقل "أشعة وفحوصات" إلى قائمة أنواع الإجراءات
+    # لا حاجة لمعالج خاص هنا - يجب اختيارها من قائمة أنواع الإجراءات
 
     # التحقق إذا كان القسم المختار هو قسم رئيسي يحتوي على فروع
     if dept in PREDEFINED_DEPARTMENTS:
@@ -3772,6 +3847,11 @@ def _get_action_routing():
             "flow": start_appointment_reschedule_flow,
             "pre_process": None
         },
+        "أشعة وفحوصات": {  # ✅ تم إضافتها بعد نقلها من الأقسام إلى أنواع الإجراءات
+            "state": RADIOLOGY_TYPE,
+            "flow": start_radiology_flow,
+            "pre_process": None
+        },
     }
 
     # Logging للتحقق من المفاتيح
@@ -4180,6 +4260,8 @@ async def handle_action_type_choice(update: Update, context: ContextTypes.DEFAUL
             "عملية": "operation",
             "استشارة أخيرة": "final_consult",
             "علاج طبيعي وإعادة تأهيل": "rehab_physical",
+            "أشعة وفحوصات": "radiology",  # ✅ تم إضافتها بعد نقلها من الأقسام
+            "تأجيل موعد": "appointment_reschedule",  # ✅ تم إضافتها
         }
 
         flow_type = action_to_flow_type.get(action_name, "new_consult")
@@ -4577,44 +4659,52 @@ async def handle_new_consult_followup_date_skip(update: Update, context: Context
     return next_state
 
 
-async def handle_followup_date_admin_decide(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """اختيار 'سوف تقرر الإدارة' بدلاً من تحديد تاريخ العودة"""
-    query = update.callback_query
-    await query.answer()
-
-    # حفظ النص بدلاً من التاريخ
-    context.user_data["report_tmp"]["followup_date"] = "سوف تقرر الإدارة"
-    context.user_data["report_tmp"]["followup_time"] = None
-
-    # تحديد الحالة التالية بناءً على نوع الإجراء
+async def handle_followup_date_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة إدخال تاريخ العودة يدوياً - يقبل أي نص"""
+    text = update.message.text.strip()
+    
+    if not text or len(text) < 2:
+        await update.message.reply_text(
+            "⚠️ **يرجى إدخال نص صحيح**\n\n"
+            "أمثلة:\n"
+            "• 15/1/2026\n"
+            "• بعد أسبوع\n"
+            "• الأحد القادم\n"
+            "• 20 يناير\n\n"
+            "أو اختر من التقويم أعلاه.",
+            parse_mode="Markdown"
+        )
+        return context.user_data.get('_conversation_state')
+    
+    # حفظ النص كما هو
+    context.user_data["report_tmp"]["followup_date"] = text
+    context.user_data["report_tmp"]["followup_time"] = None  # لا يوجد وقت محدد
+    
+    # تحديد الحالة التالية - الانتقال مباشرة لسبب العودة
     current_flow = context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
-    if current_flow == "followup":
-        next_state = FOLLOWUP_REASON
-    elif current_flow == "emergency":
-        next_state = EMERGENCY_REASON
-    elif current_flow == "admission":
-        next_state = ADMISSION_FOLLOWUP_REASON
-    elif current_flow == "surgery_consult":
-        next_state = SURGERY_CONSULT_FOLLOWUP_REASON
-    elif current_flow == "operation":
-        next_state = OPERATION_FOLLOWUP_REASON
-    elif current_flow == "discharge":
-        next_state = DISCHARGE_FOLLOWUP_REASON
-    elif current_flow == "rehab_physical":
-        next_state = PHYSICAL_THERAPY_FOLLOWUP_REASON
-    elif current_flow == "device":
-        next_state = DEVICE_FOLLOWUP_REASON
-    else:
-        next_state = NEW_CONSULT_FOLLOWUP_REASON
-
-    await query.edit_message_text(
-        "✅ تم الحفظ: **سوف تقرر الإدارة**\n\n"
-        "✍️ **سبب العودة**\n\n"
-        "يرجى إدخال سبب العودة:",
+    
+    reason_state_map = {
+        "followup": FOLLOWUP_REASON,
+        "emergency": EMERGENCY_REASON,
+        "admission": ADMISSION_FOLLOWUP_REASON,
+        "surgery_consult": SURGERY_CONSULT_FOLLOWUP_REASON,
+        "operation": OPERATION_FOLLOWUP_REASON,
+        "discharge": DISCHARGE_FOLLOWUP_REASON,
+        "rehab_physical": PHYSICAL_THERAPY_FOLLOWUP_REASON,
+        "device": DEVICE_FOLLOWUP_REASON,
+    }
+    next_state = reason_state_map.get(current_flow, NEW_CONSULT_FOLLOWUP_REASON)
+    
+    await update.message.reply_text(
+        f"✅ **تم حفظ موعد العودة**\n\n"
+        f"📅 {text}\n\n"
+        f"✍️ **سبب العودة**\n\n"
+        f"يرجى إدخال سبب العودة:",
         reply_markup=_nav_buttons(show_back=True),
         parse_mode="Markdown"
     )
-
+    
+    context.user_data['_conversation_state'] = next_state
     return next_state
 
 
@@ -6674,14 +6764,10 @@ async def handle_physical_therapy_details(update: Update, context: ContextTypes.
 
     context.user_data["report_tmp"]["therapy_details"] = text
 
-    # عرض التقويم مباشرة
-    await update.message.reply_text(
-        "✅ تم الحفظ\n\n"
-        "📅 **تاريخ العودة**\n\n"
-        "يرجى اختيار تاريخ العودة من التقويم:",
-        parse_mode="Markdown"
-    )
+    # عرض رسالة تأكيد الحفظ ثم التقويم
+    await update.message.reply_text("✅ تم الحفظ", parse_mode="Markdown")
     
+    # عرض التقويم مع خيار الإدخال اليدوي
     await _render_followup_calendar(update.message, context)
 
     # ✅ تحديث الـ state للخطوة التالية
@@ -6975,18 +7061,13 @@ def _build_followup_calendar_markup(year: int, month: int):
                     row.append(InlineKeyboardButton(" ", callback_data="noop"))
         keyboard.append(row)
 
-    # زر "سوف تقرر الإدارة" لحالة عدم تحديد التاريخ
-    keyboard.append([
-        InlineKeyboardButton("📋 سوف تقرر الإدارة", callback_data="followup_date_admin_decide")
-    ])
-    
     # أزرار التنقل
     keyboard.append([
         InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
         InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
     ])
 
-    text = f"📅 **تاريخ ووقت العودة**\n\n{MONTH_NAMES_AR.get(month, str(month))} {year}\n\nاختر التاريخ من التقويم أو اضغط 'سوف تقرر الإدارة':"
+    text = f"📅 **تاريخ ووقت العودة**\n\n{MONTH_NAMES_AR.get(month, str(month))} {year}\n\n✅ اختر التاريخ من التقويم\n✅ أو اكتب يدوياً (مثال: 15/1/2026 أو بعد أسبوع)"
     return text, InlineKeyboardMarkup(keyboard)
 
 async def _render_followup_calendar(message_or_query, context, year=None, month=None):
@@ -7215,7 +7296,13 @@ async def handle_app_reschedule_reason(update: Update, context: ContextTypes.DEF
         )
         return APP_RESCHEDULE_REASON
 
+    # ✅ التأكد من وجود report_tmp
+    context.user_data.setdefault("report_tmp", {})
     context.user_data["report_tmp"]["app_reschedule_reason"] = text
+    context.user_data["report_tmp"]["current_flow"] = "appointment_reschedule"
+    context.user_data["report_tmp"]["medical_action"] = "تأجيل موعد"
+    
+    logger.info(f"💾 تم حفظ app_reschedule_reason: {text}")
 
     await update.message.reply_text("✅ تم الحفظ")
     
@@ -7992,7 +8079,8 @@ async def show_final_summary(message, context, flow_type):
         "discharge": "خروج من المستشفى",
         "rehab_physical": "علاج طبيعي",
         "rehab_device": "أجهزة تعويضية",
-        "radiology": "أشعة وفحوصات"
+        "radiology": "أشعة وفحوصات",
+        "appointment_reschedule": "تأجيل موعد"
     }
     
     # استخدام medical_action من data إذا كان موجوداً، وإلا استخدام flow_type
@@ -8021,7 +8109,8 @@ async def show_final_summary(message, context, flow_type):
                 date_str = str(followup_date)
             followup_time = data.get('followup_time', '')
             if followup_time:
-                summary += f"📅 **تاريخ العودة:** {date_str} الساعة {followup_time}\n"
+                time_display = format_time_string_12h(followup_time)
+                summary += f"📅 **تاريخ العودة:** {date_str} الساعة {time_display}\n"
             else:
                 summary += f"📅 **تاريخ العودة:** {date_str}\n"
             summary += f"✍️ **سبب العودة:** {data.get('followup_reason', 'غير محدد')}\n"
@@ -8053,7 +8142,8 @@ async def show_final_summary(message, context, flow_type):
                 date_str = str(followup_date)
             followup_time = data.get('followup_time', '')
             if followup_time:
-                summary += f"📅 **تاريخ العودة:** {date_str} الساعة {followup_time}\n"
+                time_display = format_time_string_12h(followup_time)
+                summary += f"📅 **تاريخ العودة:** {date_str} الساعة {time_display}\n"
             else:
                 summary += f"📅 **تاريخ العودة:** {date_str}\n"
             summary += f"✍️ **سبب العودة:** {data.get('followup_reason', 'غير محدد')}\n"
@@ -8075,7 +8165,8 @@ async def show_final_summary(message, context, flow_type):
                 date_str = str(followup_date)
             followup_time = data.get('followup_time', '')
             if followup_time:
-                summary += f"📅 **تاريخ العودة:** {date_str} الساعة {followup_time}\n"
+                time_display = format_time_string_12h(followup_time)
+                summary += f"📅 **تاريخ العودة:** {date_str} الساعة {time_display}\n"
             else:
                 summary += f"📅 **تاريخ العودة:** {date_str}\n"
             summary += f"✍️ **سبب العودة:** {data.get('followup_reason', 'غير محدد')}\n"
@@ -8097,7 +8188,8 @@ async def show_final_summary(message, context, flow_type):
                 date_str = str(followup_date)
             followup_time = data.get('followup_time', '')
             if followup_time:
-                summary += f"📅 **تاريخ العودة:** {date_str} الساعة {followup_time}\n"
+                time_display = format_time_string_12h(followup_time)
+                summary += f"📅 **تاريخ العودة:** {date_str} الساعة {time_display}\n"
             else:
                 summary += f"📅 **تاريخ العودة:** {date_str}\n"
             summary += f"✍️ **سبب العودة:** {data.get('followup_reason', 'غير محدد')}\n"
@@ -8114,7 +8206,8 @@ async def show_final_summary(message, context, flow_type):
                 date_str = str(followup_date)
             followup_time = data.get('followup_time', '')
             if followup_time:
-                summary += f"📅 **تاريخ العودة:** {date_str} الساعة {followup_time}\n"
+                time_display = format_time_string_12h(followup_time)
+                summary += f"📅 **تاريخ العودة:** {date_str} الساعة {time_display}\n"
             else:
                 summary += f"📅 **تاريخ العودة:** {date_str}\n"
             summary += f"✍️ **سبب العودة:** {data.get('followup_reason', 'غير محدد')}\n"
@@ -8122,7 +8215,25 @@ async def show_final_summary(message, context, flow_type):
             summary += f"📅 **تاريخ العودة:** لا يوجد\n"
     
     elif flow_type == "radiology":
-        summary += f"🔬 **نوع الأشعة والفحوصات:** {data.get('radiology_type', 'غير محدد')}\n"
+        radiology_type = data.get('radiology_type', 'غير محدد')
+        # تقسيم النص إلى أسطر إذا كان يحتوي على فواصل أو أسطر متعددة
+        if '\n' in radiology_type or ',' in radiology_type or '،' in radiology_type:
+            # تقسيم النص
+            if '\n' in radiology_type:
+                lines = [line.strip() for line in radiology_type.split('\n') if line.strip()]
+            elif ',' in radiology_type:
+                lines = [line.strip() for line in radiology_type.split(',') if line.strip()]
+            else:
+                lines = [line.strip() for line in radiology_type.split('،') if line.strip()]
+            
+            # ترقيم وتنظيم الأسطر
+            summary += "🔬 **نوع الأشعة والفحوصات:**\n"
+            for i, line in enumerate(lines, 1):
+                summary += f"{i}. {line}\n"
+        else:
+            # إذا كان نص واحد، نعرضه في سطر منفصل
+            summary += f"🔬 **نوع الأشعة والفحوصات:**\n{radiology_type}\n"
+        
         delivery_date = data.get('radiology_delivery_date') or data.get('followup_date')
         if delivery_date:
             if hasattr(delivery_date, 'strftime'):
@@ -8149,12 +8260,44 @@ async def show_final_summary(message, context, flow_type):
                 date_str = str(followup_date)
             followup_time = data.get('followup_time', '')
             if followup_time:
-                summary += f"📅 **تاريخ العودة:** {date_str} الساعة {followup_time}\n"
+                time_display = format_time_string_12h(followup_time)
+                summary += f"📅 **تاريخ العودة:** {date_str} الساعة {time_display}\n"
             else:
                 summary += f"📅 **تاريخ العودة:** {date_str}\n"
             summary += f"✍️ **سبب العودة:** {data.get('followup_reason', 'غير محدد')}\n"
         else:
             summary += f"📅 **تاريخ العودة:** لا يوجد\n"
+    
+    elif flow_type == "appointment_reschedule":
+        # سبب تأجيل الموعد
+        app_reschedule_reason = data.get('app_reschedule_reason', '')
+        if app_reschedule_reason:
+            summary += f"📅 **سبب تأجيل الموعد:** {app_reschedule_reason}\n"
+        else:
+            summary += f"📅 **سبب تأجيل الموعد:** غير محدد\n"
+        
+        # موعد العودة (تاريخ العودة الجديد)
+        return_date = data.get('app_reschedule_return_date') or data.get('followup_date')
+        if return_date:
+            if hasattr(return_date, 'strftime'):
+                date_str = return_date.strftime('%Y-%m-%d')
+            else:
+                date_str = str(return_date)
+            followup_time = data.get('followup_time', '')
+            if followup_time:
+                time_display = format_time_string_12h(followup_time)
+                summary += f"📅🕐 **موعد العودة:** {date_str} الساعة {time_display}\n"
+            else:
+                summary += f"📅 **موعد العودة:** {date_str}\n"
+        else:
+            summary += f"📅 **موعد العودة:** غير محدد\n"
+        
+        # سبب العودة
+        return_reason = data.get('app_reschedule_return_reason') or data.get('followup_reason', '')
+        if return_reason:
+            summary += f"✍️ **سبب العودة:** {return_reason}\n"
+        else:
+            summary += f"✍️ **سبب العودة:** غير محدد\n"
 
     # إضافة معلومات المترجم
     summary += f"\n👤 **المترجم:** {data.get('translator_name', 'غير محدد')}"
@@ -9356,20 +9499,45 @@ async def save_report_to_database(query, context, flow_type):
                 status = data.get("status", "")
                 decision_text += f"\n\nوضع الحالة: {status}"
 
+        # ✅ الحصول على معرف المستخدم الذي أنشأ التقرير (Telegram User ID)
+        user_id = None
+        if query and hasattr(query, 'from_user') and query.from_user:
+            user_id = query.from_user.id
+            logger.info(f"✅ User ID from query.from_user: {user_id}")
+        elif context.user_data.get('_user_id'):
+            user_id = context.user_data.get('_user_id')
+            logger.info(f"✅ User ID from context._user_id: {user_id}")
+        else:
+            logger.warning("⚠️ No user_id found! Report will have NULL submitted_by_user_id")
+        
+        logger.info(f"💾 Final submitted_by_user_id to save: {user_id}")
+        
+        # ✅ الحصول على translator_id من جدول Translator إذا كان المستخدم مسجلاً
+        # هذا يضمن إمكانية البحث عن التقارير حتى لو كان اسم المترجم مختلفاً
+        actual_translator_id = data.get("translator_id")
+        if not actual_translator_id and user_id:
+            translator_record = session.query(Translator).filter_by(tg_user_id=user_id).first()
+            if translator_record:
+                actual_translator_id = translator_record.id
+                logger.info(f"✅ Found translator_id from Translator table: {actual_translator_id} ({translator_record.full_name})")
+            else:
+                logger.info(f"ℹ️ User {user_id} not found in Translator table")
+        
         # إنشاء التقرير
         new_report = Report(
             patient_id=patient.id,
             hospital_id=hospital.id,
             department_id=department.id if department else None,
             doctor_id=doctor.id if doctor else None,
-            translator_id=data.get("translator_id"),
+            translator_id=actual_translator_id,  # ✅ استخدام translator_id الفعلي
             complaint_text=complaint_text,
             doctor_decision=decision_text,
             medical_action=final_medical_action,
             followup_date=data.get("followup_date"),
             followup_reason=data.get("followup_reason", "لا يوجد"),
             report_date=data.get("report_date", datetime.now()),
-            created_at=datetime.now()
+            created_at=datetime.now(),
+            submitted_by_user_id=user_id  # ✅ حفظ معرف المستخدم الذي أنشأ التقرير
         )
 
         session.add(new_report)
@@ -9416,6 +9584,7 @@ async def save_report_to_database(query, context, flow_type):
                     followup_display += f" الساعة {data['followup_time']}"
 
             broadcast_data = {
+                'report_id': report_id,  # ✅ إضافة معرف التقرير
                 'report_date': data.get('report_date', datetime.now()).strftime('%Y-%m-%d %H:%M'),
                 'patient_name': patient_name,
                 'hospital_name': hospital_name,
@@ -9437,6 +9606,60 @@ async def save_report_to_database(query, context, flow_type):
                 broadcast_data['success_rate'] = data.get('success_rate', '')
                 broadcast_data['benefit_rate'] = data.get('benefit_rate', '')
                 broadcast_data['tests'] = data.get('tests', 'لا يوجد')
+            
+            # ✅ إضافة الحقول الخاصة لمسار تأجيل موعد
+            if flow_type == "appointment_reschedule":
+                logger.info(f"📅 save_report_to_database: معالجة مسار appointment_reschedule")
+                
+                # إضافة سبب تأجيل الموعد
+                app_reschedule_reason = data.get('app_reschedule_reason', '')
+                if app_reschedule_reason and str(app_reschedule_reason).strip():
+                    broadcast_data['app_reschedule_reason'] = str(app_reschedule_reason).strip()
+                    logger.info(f"✅ تم إضافة app_reschedule_reason إلى broadcast_data")
+                else:
+                    # محاولة الحصول عليه من report_tmp مباشرة
+                    report_tmp = context.user_data.get("report_tmp", {})
+                    app_reschedule_reason_from_tmp = report_tmp.get('app_reschedule_reason', '')
+                    if app_reschedule_reason_from_tmp:
+                        broadcast_data['app_reschedule_reason'] = str(app_reschedule_reason_from_tmp).strip()
+                        logger.info(f"✅ تم الحصول على app_reschedule_reason من report_tmp")
+                    else:
+                        broadcast_data['app_reschedule_reason'] = ''
+                        logger.warning(f"⚠️ app_reschedule_reason غير موجود")
+                
+                # استخدام app_reschedule_return_date إذا كان موجوداً
+                return_date = data.get('app_reschedule_return_date') or data.get('followup_date')
+                if return_date:
+                    broadcast_data['app_reschedule_return_date'] = return_date
+                    broadcast_data['followup_date'] = return_date
+                
+                # استخدام app_reschedule_return_reason إذا كان موجوداً
+                return_reason = data.get('app_reschedule_return_reason') or data.get('followup_reason', 'لا يوجد')
+                broadcast_data['app_reschedule_return_reason'] = return_reason
+                broadcast_data['followup_reason'] = return_reason
+                
+                # إضافة followup_time إذا كان موجوداً
+                if data.get('followup_time'):
+                    broadcast_data['followup_time'] = data.get('followup_time')
+            
+            # ✅ إضافة الحقول الخاصة لمسار أشعة وفحوصات
+            if flow_type == "radiology":
+                logger.info(f"🔬 save_report_to_database: معالجة مسار radiology")
+                
+                # إضافة نوع الأشعة والفحوصات
+                radiology_type = data.get('radiology_type', '')
+                if radiology_type and str(radiology_type).strip():
+                    broadcast_data['radiology_type'] = str(radiology_type).strip()
+                    logger.info(f"✅ تم إضافة radiology_type إلى broadcast_data")
+                
+                # إضافة تاريخ تسليم النتائج
+                delivery_date = data.get('radiology_delivery_date') or data.get('followup_date')
+                if delivery_date:
+                    if hasattr(delivery_date, 'strftime'):
+                        broadcast_data['radiology_delivery_date'] = delivery_date.strftime('%Y-%m-%d')
+                    else:
+                        broadcast_data['radiology_delivery_date'] = str(delivery_date)
+                    logger.info(f"✅ تم إضافة radiology_delivery_date إلى broadcast_data")
 
             await broadcast_new_report(context.bot, broadcast_data)
             logger.info(f"تم بث التقرير #{report_id} لجميع المستخدمين")
@@ -9799,6 +10022,85 @@ def register(app):
 
         await update.inline_query.answer(results, cache_time=1)
 
+        async def handle_view_reschedule_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """عرض سبب تأجيل الموعد عند الضغط على الزر في مجموعة البث"""
+            try:
+                query = update.callback_query
+                if not query or not query.data:
+                    return
+                await query.answer()
+                parts = query.data.split(':', 1)
+                if len(parts) < 2:
+                    await query.message.reply_text("⚠️ لم يتم تحديد التقرير.")
+                    return
+                try:
+                    report_id = int(parts[1])
+                except:
+                    await query.message.reply_text("⚠️ معرف تقرير غير صالح.")
+                    return
+
+                # جلب التقرير من قاعدة البيانات
+                from db.session import SessionLocal
+                from db.models import Report
+
+                with SessionLocal() as s:
+                    report = s.query(Report).filter_by(id=report_id).first()
+                    if not report:
+                        await query.message.reply_text("⚠️ لم يتم العثور على التقرير.")
+                        return
+
+                    # محاولة استخراج معلومات التأجيل من الحقول المتاحة
+                    # الحقل الأساسي هو app_reschedule_reason
+                    reason = None
+                    
+                    # أولاً: التحقق من الحقل الصحيح app_reschedule_reason
+                    if getattr(report, 'app_reschedule_reason', None):
+                        reason = report.app_reschedule_reason
+                    # ثانياً: fallback إلى followup_reason
+                    elif getattr(report, 'followup_reason', None):
+                        reason = report.followup_reason
+                    # ثالثاً: fallback إلى doctor_decision إذا كان يحتوي على سبب التأجيل
+                    elif getattr(report, 'doctor_decision', None) and 'سبب تأجيل' in str(report.doctor_decision):
+                        reason = report.doctor_decision
+
+                    # إذا لم نوجد سبباً واضحاً، عرض رسالة ملائمة
+                    if not reason or not str(reason).strip():
+                        await query.message.reply_text("ℹ️ لا يوجد سبب تأجيل مسجل لهذا التقرير.")
+                        return
+
+                    # بناء رسالة شاملة
+                    text = f"📅 **سبب تأجيل الموعد للتقرير #{report_id}:**\n\n{reason}"
+                    
+                    # إضافة تاريخ العودة إذا كان موجوداً
+                    return_date = getattr(report, 'app_reschedule_return_date', None) or getattr(report, 'followup_date', None)
+                    if return_date:
+                        if hasattr(return_date, 'strftime'):
+                            text += f"\n\n📅 **موعد العودة:** {return_date.strftime('%Y-%m-%d')}"
+                        else:
+                            text += f"\n\n📅 **موعد العودة:** {return_date}"
+                    
+                    # إضافة سبب العودة إذا كان موجوداً
+                    return_reason = getattr(report, 'app_reschedule_return_reason', None)
+                    if return_reason and str(return_reason).strip():
+                        text += f"\n\n✍️ **سبب العودة:** {return_reason}"
+                    
+                    await query.message.reply_text(text, parse_mode="Markdown")
+
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).exception(f"خطأ في handle_view_reschedule_callback: {e}")
+                try:
+                    await update.callback_query.message.reply_text("⚠️ حدث خطأ أثناء جلب بيانات التأجيل.")
+                except:
+                    pass
+
+        # تسجيل معالج global للزر view_reschedule (يجب أن يكون خارج ConversationHandler)
+        try:
+            from telegram.ext import CallbackQueryHandler
+            app.add_handler(CallbackQueryHandler(handle_view_reschedule_callback, pattern="^view_reschedule:"))
+        except Exception:
+            pass
+
     async def doctor_inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handler بسيط للبحث عن الأطباء مع فلترة حسب المستشفى والقسم"""
         try:
@@ -9976,7 +10278,7 @@ def register(app):
                 CallbackQueryHandler(_get_new_consult_handler('handle_new_consult_followup_calendar_nav'), pattern="^followup_cal_(prev|next):"),
                 CallbackQueryHandler(_get_new_consult_handler('handle_new_consult_followup_calendar_day'), pattern="^followup_cal_day:"),
                 CallbackQueryHandler(_get_new_consult_handler('handle_new_consult_followup_date_skip'), pattern="^followup_date_skip"),
-                CallbackQueryHandler(handle_followup_date_admin_decide, pattern="^followup_date_admin_decide$"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_followup_date_text_input),
             ],
             NEW_CONSULT_FOLLOWUP_TIME: [
                 CallbackQueryHandler(_get_new_consult_handler('handle_new_consult_followup_time_hour'), pattern="^followup_time_hour:"),
@@ -10039,11 +10341,9 @@ def register(app):
                 CallbackQueryHandler(handle_new_consult_followup_calendar_nav, pattern="^followup_cal_(prev|next):"),
                 CallbackQueryHandler(handle_new_consult_followup_calendar_day, pattern="^followup_cal_day:"),
                 CallbackQueryHandler(handle_new_consult_followup_date_skip, pattern="^followup_date_skip"),
-                CallbackQueryHandler(handle_followup_date_admin_decide, pattern="^followup_date_admin_decide$"),
-                CallbackQueryHandler(handle_followup_date_admin_decide, pattern="^followup_date_admin_decide$"),
                 CallbackQueryHandler(handle_new_consult_followup_time_hour, pattern="^followup_time_hour:"),
                 CallbackQueryHandler(handle_new_consult_followup_time_skip, pattern="^followup_time_skip"),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, _get_surgery_consult_handler('handle_surgery_consult_followup_date_text')),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_followup_date_text_input),
             ],
             SURGERY_CONSULT_FOLLOWUP_REASON: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, _get_surgery_consult_handler('handle_surgery_consult_followup_reason')),
@@ -10099,7 +10399,7 @@ def register(app):
                 CallbackQueryHandler(handle_new_consult_followup_calendar_nav, pattern="^followup_cal_(prev|next):"),
                 CallbackQueryHandler(handle_new_consult_followup_calendar_day, pattern="^followup_cal_day:"),
                 CallbackQueryHandler(handle_new_consult_followup_date_skip, pattern="^followup_date_skip"),
-                CallbackQueryHandler(handle_followup_date_admin_decide, pattern="^followup_date_admin_decide$"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_followup_date_text_input),
                 CallbackQueryHandler(handle_new_consult_followup_time_hour, pattern="^followup_time_hour:"),
                 CallbackQueryHandler(handle_new_consult_followup_time_skip, pattern="^followup_time_skip"),
             ],
@@ -10143,7 +10443,7 @@ def register(app):
                 CallbackQueryHandler(handle_new_consult_followup_calendar_nav, pattern="^followup_cal_(prev|next):"),
                 CallbackQueryHandler(handle_new_consult_followup_calendar_day, pattern="^followup_cal_day:"),
                 CallbackQueryHandler(handle_new_consult_followup_date_skip, pattern="^followup_date_skip"),
-                CallbackQueryHandler(handle_followup_date_admin_decide, pattern="^followup_date_admin_decide$"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_followup_date_text_input),
                 CallbackQueryHandler(handle_new_consult_followup_time_hour, pattern="^followup_time_hour:"),
                 CallbackQueryHandler(handle_new_consult_followup_time_skip, pattern="^followup_time_skip"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, _get_emergency_handler('handle_emergency_date_time_text')),
@@ -10178,10 +10478,9 @@ def register(app):
                 CallbackQueryHandler(handle_new_consult_followup_calendar_nav, pattern="^followup_cal_(prev|next):"),
                 CallbackQueryHandler(handle_new_consult_followup_calendar_day, pattern="^followup_cal_day:"),
                 CallbackQueryHandler(handle_new_consult_followup_date_skip, pattern="^followup_date_skip"),
-                CallbackQueryHandler(handle_followup_date_admin_decide, pattern="^followup_date_admin_decide$"),
                 CallbackQueryHandler(handle_new_consult_followup_time_hour, pattern="^followup_time_hour:"),
                 CallbackQueryHandler(handle_new_consult_followup_time_skip, pattern="^followup_time_skip"),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, _get_operation_handler('handle_operation_followup_date_text')),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_followup_date_text_input),
             ],
             OPERATION_FOLLOWUP_REASON: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, _get_operation_handler('handle_operation_followup_reason')),
@@ -10210,7 +10509,7 @@ def register(app):
                 CallbackQueryHandler(handle_new_consult_followup_calendar_nav, pattern="^followup_cal_(prev|next):"),
                 CallbackQueryHandler(handle_new_consult_followup_calendar_day, pattern="^followup_cal_day:"),
                 CallbackQueryHandler(handle_new_consult_followup_date_skip, pattern="^followup_date_skip"),
-                CallbackQueryHandler(handle_followup_date_admin_decide, pattern="^followup_date_admin_decide$"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_followup_date_text_input),
                 CallbackQueryHandler(handle_new_consult_followup_time_hour, pattern="^followup_time_hour:"),
                 CallbackQueryHandler(handle_new_consult_followup_time_minute, pattern="^followup_time_minute:"),
                 CallbackQueryHandler(handle_new_consult_followup_time_skip, pattern="^followup_time_skip"),
@@ -10238,7 +10537,7 @@ def register(app):
                 CallbackQueryHandler(handle_new_consult_followup_calendar_nav, pattern="^followup_cal_(prev|next):"),
                 CallbackQueryHandler(handle_new_consult_followup_calendar_day, pattern="^followup_cal_day:"),
                 CallbackQueryHandler(handle_new_consult_followup_date_skip, pattern="^followup_date_skip"),
-                CallbackQueryHandler(handle_followup_date_admin_decide, pattern="^followup_date_admin_decide$"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_followup_date_text_input),
                 CallbackQueryHandler(handle_new_consult_followup_time_hour, pattern="^followup_time_hour:"),
                 CallbackQueryHandler(handle_new_consult_followup_time_minute, pattern="^followup_time_minute:"),
                 CallbackQueryHandler(handle_new_consult_followup_time_skip, pattern="^followup_time_skip"),
@@ -10300,11 +10599,10 @@ def register(app):
                 CallbackQueryHandler(handle_new_consult_followup_calendar_nav, pattern="^followup_cal_(prev|next):"),
                 CallbackQueryHandler(handle_new_consult_followup_calendar_day, pattern="^followup_cal_day:"),
                 CallbackQueryHandler(handle_new_consult_followup_date_skip, pattern="^followup_date_skip"),
-                CallbackQueryHandler(handle_followup_date_admin_decide, pattern="^followup_date_admin_decide$"),
                 CallbackQueryHandler(handle_new_consult_followup_time_hour, pattern="^followup_time_hour:"),
                 CallbackQueryHandler(handle_new_consult_followup_time_minute, pattern="^followup_time_minute:"),
                 CallbackQueryHandler(handle_new_consult_followup_time_skip, pattern="^followup_time_skip"),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, _get_admission_handler('handle_admission_followup_date_text')),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_followup_date_text_input),
             ],
             ADMISSION_FOLLOWUP_REASON: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, _get_admission_handler('handle_admission_followup_reason')),
@@ -10339,11 +10637,10 @@ def register(app):
                 CallbackQueryHandler(handle_new_consult_followup_calendar_nav, pattern="^followup_cal_(prev|next):"),
                 CallbackQueryHandler(handle_new_consult_followup_calendar_day, pattern="^followup_cal_day:"),
                 CallbackQueryHandler(handle_new_consult_followup_date_skip, pattern="^followup_date_skip"),
-                CallbackQueryHandler(handle_followup_date_admin_decide, pattern="^followup_date_admin_decide$"),
                 CallbackQueryHandler(handle_new_consult_followup_time_hour, pattern="^followup_time_hour:"),
                 CallbackQueryHandler(handle_new_consult_followup_time_minute, pattern="^followup_time_minute:"),
                 CallbackQueryHandler(handle_new_consult_followup_time_skip, pattern="^followup_time_skip"),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, _get_discharge_handler('handle_discharge_followup_date_text')),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_followup_date_text_input),
             ],
             DISCHARGE_FOLLOWUP_REASON: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, _get_discharge_handler('handle_discharge_followup_reason')),
@@ -10415,145 +10712,13 @@ def register(app):
         per_chat=True,
         per_user=True,
     )
-    # تسجيل InlineQueryHandler موحد للبحث عن المرضى والأطباء - قبل ConversationHandler
-    async def unified_inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handler موحد للبحث - يحدد النوع بناءً على علامة البحث"""
+    # ❌ تم إزالة unified_inline_query_handler - نستخدم user_patient_search_inline.py بدلاً منه
+    # ✅ user_patient_search_inline.py مسجل في handlers_registry.py قبل هذا الملف
+    # ✅ يعمل بشكل مستقل ولا يتطلب report_tmp
 
-        report_tmp = context.user_data.get("report_tmp", {})
-        search_type = context.user_data.get('_current_search_type', 'patient')
-
-
-        # إذا لم يكن هناك report_tmp، لا نعرض شيئاً
-        if not report_tmp:
-            await update.inline_query.answer([], cache_time=1)
-            return
-
-
-        # تحديد نوع البحث بناءً على العلامة
-        if search_type == 'patient':
-            await patient_inline_query_handler(update, context)
-
-        elif search_type == 'doctor':
-            await doctor_inline_query_handler(update, context)
-
-        # افتراضياً نبحث في المرضى
-        else:
-            await patient_inline_query_handler(update, context)
-
-    # دوال البحث المفقودة
-    async def patient_inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """معالج البحث عن المرضى"""
-        query = update.inline_query.query.strip()
-        from db.session import SessionLocal
-        from db.models import Patient
-
-        with SessionLocal() as s:
-            if query:
-                patients = s.query(Patient).filter(
-                    Patient.full_name.ilike(f'%{query}%')
-                ).limit(50).all()
-            else:
-                patients = s.query(Patient).limit(20).all()
-
-        results = []
-        for patient in patients:
-            results.append(
-                InlineQueryResultArticle(
-                    id=str(patient.id),
-                    title=patient.full_name,
-                    input_message_content=InputTextMessageContent(
-                        message_text=f"__PATIENT_SELECTED__:{patient.id}:{patient.full_name}"
-                    )
-                )
-            )
-
-        await update.inline_query.answer(results, cache_time=1)
-
-    async def doctor_inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """معالج البحث عن الأطباء"""
-        query = update.inline_query.query.strip()
-        from db.session import SessionLocal
-        from db.models import Doctor
-
-        with SessionLocal() as s:
-            if query:
-                doctors = s.query(Doctor).filter(
-                    Doctor.full_name.ilike(f'%{query}%')
-                ).limit(50).all()
-            else:
-                doctors = s.query(Doctor).limit(20).all()
-
-        results = []
-        for doctor in doctors:
-            results.append(
-                InlineQueryResultArticle(
-                    id=str(doctor.id),
-                    title=doctor.full_name,
-                    input_message_content=InputTextMessageContent(
-                        message_text=f"__DOCTOR_SELECTED__:{doctor.id}:{doctor.full_name}"
-                    )
-                )
-            )
-
-        await update.inline_query.answer(results, cache_time=1)
-
-    # دوال البحث المفقودة
-    async def patient_inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """معالج البحث عن المرضى"""
-        query = update.inline_query.query.strip()
-
-        with SessionLocal() as s:
-            if query:
-                patients = s.query(Patient).filter(
-                    Patient.full_name.ilike(f'%{query}%')
-                ).limit(50).all()
-            else:
-                patients = s.query(Patient).limit(20).all()
-
-        results = []
-        for patient in patients:
-            results.append(
-                InlineQueryResultArticle(
-                    id=str(patient.id),
-                    title=patient.full_name,
-                    input_message_content=InputTextMessageContent(
-                        message_text=f"__PATIENT_SELECTED__:{patient.id}:{patient.full_name}"
-                    )
-                )
-            )
-
-        await update.inline_query.answer(results, cache_time=1)
-
-    async def doctor_inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """معالج البحث عن الأطباء"""
-        query = update.inline_query.query.strip()
-
-        with SessionLocal() as s:
-            if query:
-                doctors = s.query(Doctor).filter(
-                    Doctor.full_name.ilike(f'%{query}%')
-                ).limit(50).all()
-            else:
-                doctors = s.query(Doctor).limit(20).all()
-
-        results = []
-        for doctor in doctors:
-            results.append(
-                InlineQueryResultArticle(
-                    id=str(doctor.id),
-                    title=doctor.full_name,
-                    input_message_content=InputTextMessageContent(
-                        message_text=f"__DOCTOR_SELECTED__:{doctor.id}:{doctor.full_name}"
-                    )
-                )
-            )
-
-        await update.inline_query.answer(results, cache_time=1)
-
-    # تسجيل InlineQueryHandler أولاً لضمان أنه يلتقط inline queries قبل ConversationHandler
-    app.add_handler(InlineQueryHandler(unified_inline_query_handler))
-
-    # ثم تسجيل ConversationHandler
+    # ❌ تم إزالة unified_inline_query_handler - نستخدم user_patient_search_inline.py بدلاً منه
+    # ✅ user_patient_search_inline.py مسجل في handlers_registry.py قبل هذا الملف
+    # ✅ ثم تسجيل ConversationHandler
     app.add_handler(conv_handler)
 
 

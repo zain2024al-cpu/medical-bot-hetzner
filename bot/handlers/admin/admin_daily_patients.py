@@ -223,6 +223,27 @@ async def handle_confirm_add(update: Update, context: ContextTypes.DEFAULT_TYPE)
                     saved_count += 1
             
             s.commit()
+        # بعد حفظ أسماء المرضى اليومية، نضيفها أيضاً إلى جدول المرضى العام
+        try:
+            from services.patients_service import add_patient
+            from db.patient_names_loader import sync_patient_names_to_file
+
+            for patient_data in patients_data:
+                name = patient_data.get('name')
+                if name:
+                    try:
+                        add_patient(name)
+                    except Exception:
+                        # لا نوقف العملية إذا فشل إضافة اسم إلى جدول المرضى
+                        logger.exception(f"فشل إضافة المريض '{name}' إلى جدول المرضى العام")
+
+            # تحديث ملف 'data/patient_names.txt' ليتضمن الأسماء المحدثة
+            try:
+                sync_patient_names_to_file()
+            except Exception:
+                logger.exception("فشل مزامنة أسماء المرضى إلى الملف بعد الحفظ")
+        except Exception:
+            logger.exception("تعذر استيراد خدمة المرضى لمزامنة الأسماء (ليس خطأ قاتل)")
         
         # رسالة النجاح
         text = f"✅ **تم حفظ الأسماء بنجاح!**\n\n"

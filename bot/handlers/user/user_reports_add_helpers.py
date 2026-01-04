@@ -55,11 +55,11 @@ PREDEFINED_DEPARTMENTS.update(PEDIATRICS_DEPARTMENTS)
 # 🏥 الأقسام المباشرة (بدون فروع)
 # =============================
 # الصيغة: "عربي | إنجليزي"
-# الترتيب: الأذن والأنف والحنجرة، أشعة وفحوصات، الأمراض الجلدية، النساء والتوليد، 
+# الترتيب: الأذن والأنف والحنجرة، الأمراض الجلدية، النساء والتوليد، 
 #          علاج وإدارة الألم، الطب النفسي، الطوارئ، التخدير، العناية المركزة
+# ملاحظة: تم نقل "أشعة وفحوصات" إلى قائمة أنواع الإجراءات (PREDEFINED_ACTIONS)
 DIRECT_DEPARTMENTS = [
     "الأذن والأنف والحنجرة | ENT",
-    "أشعة وفحوصات | Radiology",
     "الأمراض الجلدية | Dermatology",
     "النساء والتوليد | Obstetrics & Gynecology",
     "العلاج الطبيعي وإعادة التأهيل | Physical Therapy & Rehabilitation",
@@ -94,6 +94,7 @@ PREDEFINED_ACTIONS = [
     "علاج طبيعي وإعادة تأهيل",
     "ترقيد",
     "خروج من المستشفى",
+    "أشعة وفحوصات",  # ✅ تم نقلها من قائمة الأقسام إلى قائمة أنواع الإجراءات
     "تأجيل موعد"
 ]
 
@@ -213,6 +214,9 @@ async def save_report_to_db(query, context):
             medical_action=data_tmp.get("medical_action", ""),
             followup_date=data_tmp.get("followup_date"),
             followup_reason=data_tmp.get("followup_reason", ""),
+            app_reschedule_reason=data_tmp.get("app_reschedule_reason"),
+            app_reschedule_return_date=data_tmp.get("app_reschedule_return_date"),
+            app_reschedule_return_reason=data_tmp.get("app_reschedule_return_reason"),
             report_date=data_tmp.get("report_date") or datetime.utcnow(),
             created_at=datetime.utcnow(),
             submitted_by_user_id=submitted_by_user_id,  # ✅ حفظ معرف المستخدم

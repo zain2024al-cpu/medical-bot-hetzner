@@ -4,7 +4,7 @@
   "description": "Unified Doctors & Hospitals Database - Merged & Deduplicated",
   "statistics": {
     "total_hospitals": 34,
-    "total_doctors": 1063,
+    "total_doctors": 1066,
     "total_departments": 599
   },
   "hospitals": [
@@ -12660,6 +12660,36 @@
       "hospital_name": "Narayana Nethralaya, Rajajinagar",
       "department": "عيون - تجميل | Oculoplastic",
       "search_text": "dr rajesh narayana nethralaya, rajajinagar عيون - تجميل | oculoplastic",
+      "added_manually": true
+    },
+    {
+      "id": 1064,
+      "name": "لللتتنككك",
+      "name_normalized": "لللتتنككك",
+      "hospital_id": 30,
+      "hospital_name": "SPARSH Hospital, Hennur Road",
+      "department": "الأذن والأنف والحنجرة | ENT",
+      "search_text": "لللتتنككك sparsh hospital, hennur road الأذن والأنف والحنجرة | ent",
+      "added_manually": true
+    },
+    {
+      "id": 1065,
+      "name": "اشوك",
+      "name_normalized": "اشوك",
+      "hospital_id": 30,
+      "hospital_name": "SPARSH Hospital, Hennur Road",
+      "department": "الأذن والأنف والحنجرة | ENT",
+      "search_text": "اشوك sparsh hospital, hennur road الأذن والأنف والحنجرة | ent",
+      "added_manually": true
+    },
+    {
+      "id": 1066,
+      "name": "اشوك",
+      "name_normalized": "اشوك",
+      "hospital_id": 5,
+      "hospital_name": "Aster CMI Hospital, Bangalore",
+      "department": "الأذن والأنف والحنجرة | ENT",
+      "search_text": "اشوك aster cmi hospital, bangalore الأذن والأنف والحنجرة | ent",
       "added_manually": true
     }
   ]

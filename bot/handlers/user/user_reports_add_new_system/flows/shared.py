@@ -7,6 +7,7 @@
 import logging
 import os
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes, ConversationHandler
 
@@ -201,6 +202,31 @@ def format_field_value(value):
     if isinstance(value, (int, float)):
         return str(value)
     return str(value)
+
+
+def format_time_12h(time_str):
+    """تحويل الوقت لصيغة 12 ساعة مع صباحاً/ظهراً/مساءً"""
+    if not time_str:
+        return None
+    try:
+        if ':' in str(time_str):
+            parts = str(time_str).split(':')
+            hour = int(parts[0])
+            minute = parts[1] if len(parts) > 1 else '00'
+        else:
+            hour = int(time_str)
+            minute = '00'
+        
+        if hour == 0:
+            return f"12:{minute} صباحاً"
+        elif hour < 12:
+            return f"{hour}:{minute} صباحاً"
+        elif hour == 12:
+            return f"12:{minute} ظهراً"
+        else:
+            return f"{hour-12}:{minute} مساءً"
+    except:
+        return str(time_str)
 
 
 def get_field_display_name(field_key):
@@ -1091,7 +1117,7 @@ async def show_final_summary(message, context, flow_type):
                     date_str = str(followup_date)
                 followup_time = data.get('followup_time', '')
                 if followup_time:
-                    summary += f"📅 **تاريخ العودة:** {date_str} الساعة {followup_time}\n"
+                    summary += f"📅 **تاريخ العودة:** {date_str} - {format_time_12h(followup_time)}\n"
                 else:
                     summary += f"📅 **تاريخ العودة:** {date_str}\n"
                 followup_reason = escape_markdown_v1(str(data.get('followup_reason', 'غير محدد')))
@@ -1133,7 +1159,7 @@ async def show_final_summary(message, context, flow_type):
                     date_str = str(followup_date)
                 followup_time = data.get('followup_time', '')
                 if followup_time:
-                    summary += f"📅 **تاريخ العودة:** {date_str} الساعة {followup_time}\n"
+                    summary += f"📅 **تاريخ العودة:** {date_str} - {format_time_12h(followup_time)}\n"
                 else:
                     summary += f"📅 **تاريخ العودة:** {date_str}\n"
                 followup_reason = escape_markdown_v1(str(data.get('followup_reason', 'غير محدد')))
@@ -1169,7 +1195,7 @@ async def show_final_summary(message, context, flow_type):
                         date_str = str(followup_date)
                     followup_time = data.get('followup_time', '')
                     if followup_time:
-                        summary += f"📅 **تاريخ العودة:** {date_str} الساعة {followup_time}\n"
+                        summary += f"📅 **تاريخ العودة:** {date_str} - {format_time_12h(followup_time)}\n"
                     else:
                         summary += f"📅 **تاريخ العودة:** {date_str}\n"
                 else:
@@ -1197,7 +1223,7 @@ async def show_final_summary(message, context, flow_type):
                     date_str = str(followup_date)
                 followup_time = data.get('followup_time', '')
                 if followup_time:
-                    summary += f"📅 **تاريخ العودة:** {date_str} الساعة {followup_time}\n"
+                    summary += f"📅 **تاريخ العودة:** {date_str} - {format_time_12h(followup_time)}\n"
                 else:
                     summary += f"📅 **تاريخ العودة:** {date_str}\n"
                 followup_reason = escape_markdown_v1(str(data.get('followup_reason', 'غير محدد')))
@@ -1216,7 +1242,7 @@ async def show_final_summary(message, context, flow_type):
                     date_str = str(followup_date)
                 followup_time = data.get('followup_time', '')
                 if followup_time:
-                    summary += f"📅 **تاريخ العودة:** {date_str} الساعة {followup_time}\n"
+                    summary += f"📅 **تاريخ العودة:** {date_str} - {format_time_12h(followup_time)}\n"
                 else:
                     summary += f"📅 **تاريخ العودة:** {date_str}\n"
                 followup_reason = escape_markdown_v1(str(data.get('followup_reason', 'غير محدد')))
@@ -1271,7 +1297,7 @@ async def show_final_summary(message, context, flow_type):
                     date_str = str(followup_date)
                 followup_time = data.get('followup_time', '')
                 if followup_time:
-                    summary += f"📅 **تاريخ العودة:** {date_str} الساعة {followup_time}\n"
+                    summary += f"📅 **تاريخ العودة:** {date_str} - {format_time_12h(followup_time)}\n"
                 else:
                     summary += f"📅 **تاريخ العودة:** {date_str}\n"
                 followup_reason = escape_markdown_v1(str(data.get('followup_reason', 'غير محدد')))
@@ -1450,7 +1476,7 @@ async def save_report_to_database(query, context, flow_type):
     # التحقق من flow_type من report_tmp إذا كان flow_type غير صحيح
     current_flow = data.get("current_flow", "")
     valid_flow_types = ["new_consult", "followup", "emergency", "admission", "surgery_consult", 
-                         "operation", "final_consult", "discharge", "rehab_physical", "rehab_device", "radiology"]
+                         "operation", "final_consult", "discharge", "rehab_physical", "rehab_device", "radiology", "appointment_reschedule"]
     if flow_type not in valid_flow_types:
         if current_flow and current_flow in valid_flow_types:
             flow_type = current_flow
@@ -1526,7 +1552,8 @@ async def save_report_to_database(query, context, flow_type):
             "discharge": "خروج من المستشفى",
             "rehab_physical": "علاج طبيعي",
             "rehab_device": "أجهزة تعويضية",
-            "radiology": "أشعة وفحوصات"
+            "radiology": "أشعة وفحوصات",
+            "appointment_reschedule": "تأجيل موعد"
         }
         
         # استخدام medical_action من data إذا كان موجوداً، وإلا استخدام flow_type
@@ -1608,6 +1635,20 @@ async def save_report_to_database(query, context, flow_type):
             radiology_type = data.get("radiology_type", "")
             complaint_text = ""
             decision_text = f"نوع الأشعة والفحوصات: {radiology_type}"
+        elif flow_type == "appointment_reschedule":
+            app_reschedule_reason = data.get("app_reschedule_reason", "")
+            app_reschedule_return_reason = data.get("app_reschedule_return_reason", "")
+            return_date = data.get("app_reschedule_return_date") or data.get("followup_date")
+            complaint_text = ""
+            decision_text = f"سبب تأجيل الموعد: {app_reschedule_reason}"
+            if return_date:
+                if hasattr(return_date, 'strftime'):
+                    date_str = return_date.strftime('%Y-%m-%d')
+                else:
+                    date_str = str(return_date)
+                decision_text += f"\n\nتاريخ العودة الجديد: {date_str}"
+            if app_reschedule_return_reason:
+                decision_text += f"\n\nسبب العودة: {app_reschedule_return_reason}"
         elif flow_type in ["new_consult", "followup", "emergency"]:
             complaint_text = data.get("complaint", "")
             diagnosis = data.get("diagnosis", "")
@@ -1621,20 +1662,78 @@ async def save_report_to_database(query, context, flow_type):
                 status = data.get("status", "")
                 decision_text += f"\n\nوضع الحالة: {status}"
 
+        # تحويل datetime مع tzinfo إلى naive datetime (SQLite لا يقبل tzinfo)
+        def to_naive_datetime(dt):
+            """تحويل datetime مع tzinfo إلى naive datetime"""
+            if dt is None:
+                return None
+            if hasattr(dt, 'tzinfo') and dt.tzinfo is not None:
+                # تحويل إلى UTC ثم إزالة tzinfo
+                return dt.astimezone(ZoneInfo('UTC')).replace(tzinfo=None)
+            return dt
+        
+        # معالجة report_date
+        report_date = data.get("report_date", datetime.now())
+        report_date = to_naive_datetime(report_date)
+        
+        # معالجة followup_date
+        followup_date = data.get("followup_date")
+        followup_date = to_naive_datetime(followup_date)
+        
+        # معالجة created_at (استخدام datetime.utcnow() لضمان naive datetime)
+        created_at = datetime.utcnow()
+        
+        # الحصول على معرف المستخدم الذي أنشأ التقرير
+        user_id = None
+        if query and hasattr(query, 'from_user') and query.from_user:
+            user_id = query.from_user.id
+            logger.info(f"✅ User ID from query.from_user: {user_id}")
+        elif context.user_data.get('_user_id'):
+            user_id = context.user_data.get('_user_id')
+            logger.info(f"✅ User ID from context._user_id: {user_id}")
+        else:
+            logger.warning("⚠️ No user_id found! Report will have NULL submitted_by_user_id")
+        
+        # ✅ الحصول على translator_id من جدول Translator إذا كان المستخدم مسجلاً
+        actual_translator_id = data.get("translator_id")
+        if not actual_translator_id and user_id:
+            translator_record = session.query(Translator).filter_by(tg_user_id=user_id).first()
+            if translator_record:
+                actual_translator_id = translator_record.id
+                logger.info(f"✅ Found translator_id from Translator table: {actual_translator_id} ({translator_record.full_name})")
+        
+        # إعداد حقول تأجيل الموعد
+        app_reschedule_reason = None
+        app_reschedule_return_date = None
+        app_reschedule_return_reason = None
+        
+        if flow_type == "appointment_reschedule":
+            app_reschedule_reason = data.get("app_reschedule_reason", "")
+            app_reschedule_return_reason = data.get("app_reschedule_return_reason") or data.get("followup_reason", "")
+            app_reschedule_return_date = data.get("app_reschedule_return_date") or data.get("followup_date")
+            if app_reschedule_return_date:
+                app_reschedule_return_date = to_naive_datetime(app_reschedule_return_date)
+            logger.info(f"💾 حفظ حقول تأجيل الموعد: reason={app_reschedule_reason}, return_date={app_reschedule_return_date}, return_reason={app_reschedule_return_reason}")
+        
         # إنشاء التقرير
         new_report = Report(
             patient_id=patient.id,
             hospital_id=hospital.id,
             department_id=department.id if department else None,
             doctor_id=doctor.id if doctor else None,
-            translator_id=data.get("translator_id"),
+            translator_id=actual_translator_id,  # ✅ استخدام translator_id الفعلي
             complaint_text=complaint_text,
             doctor_decision=decision_text,
             medical_action=final_medical_action,
-            followup_date=data.get("followup_date"),
+            followup_date=followup_date,
             followup_reason=data.get("followup_reason", "لا يوجد"),
-            report_date=data.get("report_date", datetime.now()),
-            created_at=datetime.now()
+            report_date=report_date,
+            created_at=created_at,
+            submitted_by_user_id=user_id,  # ✅ حفظ معرف المستخدم الذي أنشأ التقرير
+            # ✅ حفظ حقول تأجيل الموعد في الأعمدة المخصصة
+            app_reschedule_reason=app_reschedule_reason,
+            app_reschedule_return_date=app_reschedule_return_date,
+            app_reschedule_return_reason=app_reschedule_return_reason
         )
 
         session.add(new_report)
@@ -1672,9 +1771,18 @@ async def save_report_to_database(query, context, flow_type):
             if data.get('followup_date'):
                 followup_display = data['followup_date'].strftime('%Y-%m-%d')
                 if data.get('followup_time'):
-                    followup_display += f" الساعة {data['followup_time']}"
+                    time_12h = format_time_12h(data['followup_time'])
+                    followup_display += f" - {time_12h}"
 
+            # الحصول على معرف المستخدم الذي أنشأ التقرير
+            user_id = None
+            if query and hasattr(query, 'from_user') and query.from_user:
+                user_id = query.from_user.id
+            elif context.user_data.get('_user_id'):
+                user_id = context.user_data.get('_user_id')
+            
             broadcast_data = {
+                'report_id': report_id,  # إضافة معرف التقرير لحفظ معرف الرسالة
                 'report_date': data.get('report_date', datetime.now()).strftime('%Y-%m-%d %H:%M'),
                 'patient_name': patient_name,
                 'hospital_name': hospital_name,
@@ -1684,8 +1792,11 @@ async def save_report_to_database(query, context, flow_type):
                 'complaint_text': complaint_text,
                 'doctor_decision': decision_text,
                 'followup_date': followup_display,
+                'followup_time': data.get('followup_time'),  # ✅ إضافة وقت العودة
                 'followup_reason': data.get('followup_reason', 'لا يوجد'),
-                'translator_name': translator_name
+                'translator_name': translator_name,
+                'user_id': user_id,  # إضافة معرف المستخدم
+                'translator_id': data.get("translator_id")  # إضافة معرف المترجم أيضاً
             }
             
             # إضافة الحقول الفردية لـ surgery_consult لعرضها بشكل منفصل
@@ -1696,6 +1807,52 @@ async def save_report_to_database(query, context, flow_type):
                 broadcast_data['success_rate'] = data.get('success_rate', '')
                 broadcast_data['benefit_rate'] = data.get('benefit_rate', '')
                 broadcast_data['tests'] = data.get('tests', 'لا يوجد')
+            
+            # إضافة الحقول الخاصة لمسار تأجيل موعد
+            if flow_type == "appointment_reschedule":
+                logger.info(f"📅 save_report_to_database: معالجة مسار appointment_reschedule")
+                logger.info(f"📅 save_report_to_database: data keys = {list(data.keys())}")
+                
+                # إضافة سبب تأجيل الموعد
+                app_reschedule_reason = data.get('app_reschedule_reason', '')
+                logger.info(f"📅 save_report_to_database: app_reschedule_reason من data = {repr(app_reschedule_reason)}")
+                
+                if app_reschedule_reason and str(app_reschedule_reason).strip():
+                    broadcast_data['app_reschedule_reason'] = str(app_reschedule_reason).strip()
+                    logger.info(f"✅ save_report_to_database: تم إضافة app_reschedule_reason إلى broadcast_data = {repr(broadcast_data.get('app_reschedule_reason'))}")
+                else:
+                    logger.warning(f"⚠️ save_report_to_database: app_reschedule_reason فارغ أو None في data")
+                    # محاولة الحصول عليه من report_tmp مباشرة
+                    report_tmp = context.user_data.get("report_tmp", {})
+                    app_reschedule_reason_from_tmp = report_tmp.get('app_reschedule_reason', '')
+                    if app_reschedule_reason_from_tmp:
+                        broadcast_data['app_reschedule_reason'] = str(app_reschedule_reason_from_tmp).strip()
+                        logger.info(f"✅ save_report_to_database: تم الحصول على app_reschedule_reason من report_tmp = {repr(broadcast_data.get('app_reschedule_reason'))}")
+                    else:
+                        broadcast_data['app_reschedule_reason'] = ''
+                        logger.error(f"❌ save_report_to_database: app_reschedule_reason غير موجود في data أو report_tmp")
+                
+                # استخدام app_reschedule_return_date إذا كان موجوداً
+                return_date = data.get('app_reschedule_return_date') or data.get('followup_date')
+                if return_date:
+                    if hasattr(return_date, 'strftime'):
+                        broadcast_data['app_reschedule_return_date'] = return_date
+                        broadcast_data['followup_date'] = return_date
+                    else:
+                        broadcast_data['app_reschedule_return_date'] = return_date
+                        broadcast_data['followup_date'] = return_date
+                else:
+                    broadcast_data['app_reschedule_return_date'] = None
+                    broadcast_data['followup_date'] = None
+                
+                # استخدام app_reschedule_return_reason إذا كان موجوداً
+                return_reason = data.get('app_reschedule_return_reason') or data.get('followup_reason', 'لا يوجد')
+                broadcast_data['app_reschedule_return_reason'] = return_reason
+                broadcast_data['followup_reason'] = return_reason
+                
+                # إضافة followup_time إذا كان موجوداً
+                if data.get('followup_time'):
+                    broadcast_data['followup_time'] = data.get('followup_time')
 
             await broadcast_new_report(context.bot, broadcast_data)
             logger.info(f"تم بث التقرير #{report_id} لجميع المستخدمين")

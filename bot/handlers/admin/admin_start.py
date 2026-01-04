@@ -3,7 +3,7 @@
 # 🔹 لوحة تحكم الأدمن + نظام الموافقة على المستخدمين
 # ================================================
 
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 from bot.shared_auth import is_admin
 from bot.keyboards import admin_main_kb, admin_main_inline_kb, reports_group_management_kb, admin_main_inline_kb_with_group
@@ -286,6 +286,8 @@ async def handle_group_settings(update, context):
 def register(app):
     app.add_handler(CommandHandler("admin", admin_start))
     app.add_handler(MessageHandler(filters.Regex("^ℹ️ مساعدة$"), admin_start))
+    # ✅ لا نحتاج لإضافة معالج لزر "👥 إدارة المستخدمين" هنا
+    # لأن ConversationHandler في admin_users_management.py يتعامل معه مباشرة
     app.add_handler(CallbackQueryHandler(handle_user_approval, pattern="^(approve|reject):"))
     app.add_handler(CallbackQueryHandler(handle_back_to_main, pattern="^back_to_main$"))
     app.add_handler(CallbackQueryHandler(handle_admin_buttons, pattern="^admin:"))

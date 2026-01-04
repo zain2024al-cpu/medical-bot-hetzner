@@ -1,34 +1,14 @@
 [Unit]
-Description=Medical Reports Telegram Bot
+Description=Medical Telegram Bot
 After=network.target
-Wants=network.target
 
 [Service]
-Type=simple
 User=botuser
 WorkingDirectory=/home/botuser/medical-bot
-Environment=PATH=/home/botuser/medical-bot/venv/bin
-Environment=PYTHONPATH=/home/botuser/medical-bot
+EnvironmentFile=-/home/botuser/medical-bot/config.env
 ExecStart=/home/botuser/medical-bot/venv/bin/python app.py
 Restart=always
-RestartSec=10
-StandardOutput=journal
-StandardError=journal
-SyslogIdentifier=medical-bot
-
-# Security settings
-NoNewPrivileges=yes
-PrivateTmp=yes
-ProtectSystem=strict
-ProtectHome=yes
-ReadWritePaths=/home/botuser/medical-bot /home/botuser/backups
-ProtectKernelTunables=yes
-ProtectControlGroups=yes
-
-# Resource limits
-MemoryLimit=512M
-CPUQuota=50%
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
-

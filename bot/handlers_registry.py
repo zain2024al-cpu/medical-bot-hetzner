@@ -64,9 +64,18 @@ def register_all_handlers(app):
     )
     # from bot.handlers.user.user_schedule_view import register as register_schedule_view  # تم تعطيله
     
+    # 🔍 نظام البحث عن المرضى باستخدام Inline Query (منفصل ومستقل)
+    # ✅ تسجيله قبل user_reports_add_new_system لضمان أولوية أعلى
+    from bot.handlers.user.user_patient_search_inline import register as register_patient_search_inline
+    register_patient_search_inline(app)
+    
     # 🆕 النظام الجديد - المرحلة 1 (استشارة جديدة، مراجعة، طوارئ، ترقيد)
     from bot.handlers.user import user_reports_add_new_system
     user_reports_add_new_system.register(app)
+    
+    # 🗑️ نظام حذف التقارير
+    from bot.handlers.user.user_reports_delete import register as register_user_reports_delete
+    register_user_reports_delete(app)
     
     # 🎨 النظام الجديد - Inline Menu + Command Shortcuts (معطّل - المستخدم يفضل الأزرار الثابتة)
     # from bot.handlers.user.user_inline_menu import register as register_inline_menu

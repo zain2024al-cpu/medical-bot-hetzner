@@ -90,6 +90,26 @@ async def main():
     persistence_path = os.path.join(data_dir, 'bot_persistence.pickle')
 
     # 💾 إعداد Persistence لحفظ حالة المحادثات
+    # إذا كان ملف persistence معطوباً (EOF / unpickle errors)، نؤمنه عبر أخذ نسخة احتياطية
+    if os.path.exists(persistence_path):
+        try:
+            import pickle, time
+            with open(persistence_path, 'rb') as _f:
+                # محاولة سريعة لفحص ما إذا كان الملف قابلًا للـ unpickle
+                first = _f.read(1)
+                if not first:
+                    raise EOFError("empty file")
+                _f.seek(0)
+                pickle.load(_f)
+        except Exception as ex:
+            logger.warning(f"⚠️ تم اكتشاف ملف persistence تالف: {ex}. سيتم أخذ نسخة احتياطية وإعادة إنشاء الملف.")
+            try:
+                bak = f"{persistence_path}.corrupt_{int(time.time())}"
+                os.rename(persistence_path, bak)
+                logger.info(f"✅ تم نقل الملف التالف إلى: {bak}")
+            except Exception as ren_err:
+                logger.warning(f"⚠️ فشل إدخال النسخة الاحتياطية للملف التالف: {ren_err}")
+
     persistence = PicklePersistence(
         filepath=persistence_path,
         update_interval=30  # حفظ كل 30 ثانية

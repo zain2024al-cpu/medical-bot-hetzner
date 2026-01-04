@@ -160,12 +160,17 @@ def _load_original_module():
         module_name = "bot.handlers.user.user_reports_add_new_system_original"
         spec = importlib.util.spec_from_file_location(module_name, original_file)
         module = importlib.util.module_from_spec(spec)
-        
+
         # تعيين __package__ و __file__ للسماح بـ relative imports
         module.__package__ = "bot.handlers.user"
         module.__name__ = module_name
         module.__file__ = original_file
-        
+
+        # Register the module in sys.modules so pickling/imports work later
+        # (pickle needs to import the module by name when serializing classes)
+        import sys as _sys
+        _sys.modules[module_name] = module
+
         spec.loader.exec_module(module)
         return module
     except Exception as e:

@@ -163,6 +163,10 @@ class Report(Base):
     followup_time = Column(String(50), nullable=True)
     followup_department = Column(String(255), nullable=True)
     followup_reason = Column(Text, nullable=True)
+    # حقول خاصة بتأجيل الموعد
+    app_reschedule_reason = Column(Text, nullable=True)
+    app_reschedule_return_date = Column(DateTime, nullable=True)
+    app_reschedule_return_reason = Column(Text, nullable=True)
     
     # Metadata
     status = Column(String(50), default="active", nullable=True)
@@ -171,6 +175,13 @@ class Report(Base):
     
     # ✅ معرف المستخدم الذي أنشأ التقرير (Telegram User ID)
     submitted_by_user_id = Column(Integer, nullable=True, index=True)
+    
+    # ✅ معرف الرسالة في المجموعة (لحذفها لاحقاً)
+    group_message_id = Column(Integer, nullable=True)
+    
+    # ✅ حقول الأشعة والفحوصات
+    radiology_type = Column(String(255), nullable=True)
+    radiology_delivery_date = Column(DateTime, nullable=True)
 
 
 # ================================================

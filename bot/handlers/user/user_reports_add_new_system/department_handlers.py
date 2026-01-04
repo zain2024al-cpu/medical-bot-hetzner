@@ -7,7 +7,7 @@ from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes, ConversationHandler
 import logging
 
-from .states import STATE_SELECT_DEPARTMENT, STATE_SELECT_DOCTOR, R_SUBDEPARTMENT, R_DEPARTMENT, RADIOLOGY_TYPE
+from .states import STATE_SELECT_DEPARTMENT, STATE_SELECT_DOCTOR, R_SUBDEPARTMENT, R_DEPARTMENT
 from .navigation import nav_push
 from ..user_reports_add_helpers import PREDEFINED_DEPARTMENTS, DIRECT_DEPARTMENTS
 
@@ -171,26 +171,8 @@ async def handle_department_selection(update: Update, context: ContextTypes.DEFA
     context.user_data["report_tmp"].pop("departments_search_mode", None)
     context.user_data["report_tmp"].pop("departments_list", None)
 
-    # التحقق إذا كان القسم هو "أشعة وفحوصات"
-    if dept == "أشعة وفحوصات | Radiology":
-        # ✅ بدء مسار radiology مباشرة
-        context.user_data["report_tmp"]["department_name"] = dept
-        context.user_data["report_tmp"].setdefault("step_history", []).append(R_DEPARTMENT)
-        
-        try:
-            await query.message.delete()
-        except:
-            pass
-        
-        # استيراد start_radiology_flow من flows
-        try:
-            from ..flows import start_radiology_flow
-            await start_radiology_flow(query.message, context)
-            return RADIOLOGY_TYPE
-        except ImportError as e:
-            logger.error(f"❌ خطأ في استيراد start_radiology_flow: {e}")
-            await query.edit_message_text("❌ خطأ: لا يمكن بدء مسار الأشعة")
-            return ConversationHandler.END
+    # ✅ تم نقل "أشعة وفحوصات" إلى قائمة أنواع الإجراءات
+    # لا حاجة لمعالج خاص هنا - يجب اختيارها من قائمة أنواع الإجراءات
 
     # التحقق إذا كان القسم المختار هو قسم رئيسي يحتوي على فروع
     if dept in PREDEFINED_DEPARTMENTS:

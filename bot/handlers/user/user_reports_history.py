@@ -157,6 +157,6 @@ def register(app):
         name="user_history_conv",
         per_chat=True,
         per_user=True,
-        per_message=False,
+        per_message=True,
     )
     app.add_handler(conv)

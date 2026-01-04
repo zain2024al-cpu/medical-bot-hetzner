@@ -43,71 +43,89 @@ async def patient_inline_query_handler(update: Update, context: ContextTypes.DEF
 
     results = []
 
-    # ✅ قراءة من قاعدة البيانات مباشرة
+    # ✅ قراءة من قاعدة البيانات مباشرة أو استخدام قائمة مؤقتة محفوظة في السياق كنسخة احتياطية
     try:
-        if not SessionLocal:
-            logger.error("❌ SessionLocal غير متاح")
-            raise Exception("SessionLocal غير متاح")
-        
-        if not Patient:
-            logger.error("❌ Patient model غير متاح")
-            raise Exception("Patient model غير متاح")
-        
-        logger.info("🔍 محاولة الاتصال بقاعدة البيانات...")
-        with SessionLocal() as s:
-            logger.info("✅ تم الاتصال بقاعدة البيانات")
-            
-            # ✅ إذا كان query_text فارغاً، عرض جميع الأسماء (حتى 50)
-            # ✅ إذا كان query_text موجوداً، البحث عن الأسماء التي تحتوي على النص
-            if query_text:
-                logger.info(f"🔍 البحث عن المرضى بالاستعلام: '{query_text}'")
-                patients = s.query(Patient).filter(
-                    Patient.full_name.isnot(None),
-                    Patient.full_name != "",
-                    Patient.full_name.ilike(f"%{query_text}%")
-                ).order_by(Patient.full_name).limit(50).all()
-            else:
-                # ✅ عرض جميع الأسماء عند الضغط على الزر مباشرة (بدون كتابة نص)
-                logger.info("🔍 عرض جميع المرضى (بدون استعلام)")
-                patients = s.query(Patient).filter(
-                    Patient.full_name.isnot(None),
-                    Patient.full_name != ""
-                ).order_by(Patient.full_name).limit(50).all()
-            
-            logger.info(f"✅ تم العثور على {len(patients)} مريض في قاعدة البيانات")
+        if SessionLocal and Patient:
+            logger.info("🔍 محاولة الاتصال بقاعدة البيانات...")
+            with SessionLocal() as s:
+                logger.info("✅ تم الاتصال بقاعدة البيانات")
 
-            # إنشاء النتائج
-            for patient in patients:
-                if not patient.full_name:
-                    continue
-                    
-                # ✅ عرض الاسم كاملاً في description (يسمح بـ 200 حرف)
-                # ووضع جزء منه في title (حد 64 حرف)
-                title = f"👤 {patient.full_name}"
-                if len(title) > 64:
-                    # إذا كان الاسم طويلاً، عرض جزء منه في title والكامل في description
-                    title = f"👤 {patient.full_name[:60]}..."
-                
-                result = InlineQueryResultArticle(
-                    id=f"patient_{patient.id}",
-                    title=title,
-                    description=f"👤 {patient.full_name}",  # ✅ عرض الاسم كاملاً هنا
-                    input_message_content=InputTextMessageContent(
-                        message_text=f"__PATIENT_SELECTED__:{patient.id}:{patient.full_name}"
+                if query_text:
+                    logger.info(f"🔍 البحث عن المرضى بالاستعلام: '{query_text}'")
+                    patients = s.query(Patient).filter(
+                        Patient.full_name.isnot(None),
+                        Patient.full_name != "",
+                        Patient.full_name.ilike(f"%{query_text}%")
+                    ).order_by(Patient.full_name).limit(50).all()
+                else:
+                    logger.info("🔍 عرض جميع المرضى (بدون استعلام)")
+                    patients = s.query(Patient).filter(
+                        Patient.full_name.isnot(None),
+                        Patient.full_name != ""
+                    ).order_by(Patient.full_name).limit(50).all()
+
+                logger.info(f"✅ تم العثور على {len(patients)} مريض في قاعدة البيانات")
+
+                for patient in patients:
+                    if not patient.full_name:
+                        continue
+
+                    title = f"👤 {patient.full_name}"
+                    if len(title) > 64:
+                        title = f"👤 {patient.full_name[:60]}..."
+
+                    result = InlineQueryResultArticle(
+                        id=f"patient_{patient.id}",
+                        title=title,
+                        description=f"👤 {patient.full_name}",
+                        input_message_content=InputTextMessageContent(
+                            message_text=f"__PATIENT_SELECTED__:{patient.id}:{patient.full_name}"
+                        )
                     )
-                )
-                results.append(result)
+                    results.append(result)
 
-            logger.info(f"✅ patient_inline_query_handler: تم إنشاء {len(results)} نتيجة")
-            
+                logger.info(f"✅ patient_inline_query_handler: تم إنشاء {len(results)} نتيجة من قاعدة البيانات")
+        else:
+            # سلوك احتياطي: استخدام قائمة أسماء المرضى المخزنة في context.user_data إن وجدت
+            logger.warning("⚠️ SessionLocal أو نموذج Patient غير متاح؛ استخدام قائمة مؤقتة من context.user_data إذا كانت متوفرة")
+            cached = context.user_data.get("_patient_names_list", [])
+            if cached:
+                logger.info(f"🔁 استخدام {len(cached)} اسمًا من القائمة المؤقتة")
+                # تصفية القائمة حسب الاستعلام
+                filtered = [n for n in cached if query_text.lower() in n.lower()] if query_text else cached[:50]
+
+                class SimplePatient:
+                    def __init__(self, id_, full_name):
+                        self.id = id_
+                        self.full_name = full_name
+
+                for i, name in enumerate(filtered[:50]):
+                    p = SimplePatient(i + 1, name)
+                    title = f"👤 {p.full_name}"
+                    if len(title) > 64:
+                        title = f"👤 {p.full_name[:60]}..."
+
+                    result = InlineQueryResultArticle(
+                        id=f"patient_cached_{i}",
+                        title=title,
+                        description=f"👤 {p.full_name}",
+                        input_message_content=InputTextMessageContent(
+                            message_text=f"__PATIENT_SELECTED__:{p.id}:{p.full_name}"
+                        )
+                    )
+                    results.append(result)
+                logger.info(f"✅ patient_inline_query_handler: تم إنشاء {len(results)} نتيجة من القائمة المؤقتة")
+            else:
+                logger.error("❌ لا يمكن الوصول لقاعدة البيانات ولا توجد قائمة مؤقتة في السياق")
+                raise Exception("SessionLocal أو Patient غير متاح ولا توجد قائمة مؤقتة")
+
     except Exception as db_error:
-        logger.error(f"❌ خطأ في البحث عن المرضى من قاعدة البيانات: {db_error}", exc_info=True)
+        logger.error(f"❌ خطأ في البحث عن المرضى: {db_error}", exc_info=True)
         import traceback
         traceback.print_exc()
-        # إضافة رسالة خطأ كنتيجة
         error_result = InlineQueryResultArticle(
             id="patient_db_error",
-            title="❌ خطأ في قاعدة البيانات",
+            title="❌ خطأ في البحث عن المرضى",
             description=f"حدث خطأ: {str(db_error)[:100]}",
             input_message_content=InputTextMessageContent(
                 message_text="__PATIENT_SELECTED__:0:خطأ"
@@ -144,11 +162,17 @@ async def render_patient_selection(message, context):
     
     keyboard = []
 
-    # زر عرض قائمة كاملة مع pagination
-    keyboard.append([InlineKeyboardButton(
-        "📋 عرض جميع الأسماء",
-        callback_data="patient:show_list:0"
-    )])
+    # ✅ صف الأزرار الرئيسية: عرض القائمة + البحث
+    keyboard.append([
+        InlineKeyboardButton(
+            "📋 عرض جميع الأسماء",
+            callback_data="patient:show_list:0"
+        ),
+        InlineKeyboardButton(
+                "🔍 بحث عن مريض",
+                switch_inline_query_current_chat=""
+        )
+    ])
 
     # أزرار التنقل - استخدام زر الرجوع العادي
     keyboard.append([
@@ -157,7 +181,10 @@ async def render_patient_selection(message, context):
     ])
 
     text = "👤 **اسم المريض** (الخطوة 2 من 5)\n\n"
-    text += "اضغط على زر **عرض جميع الأسماء** لعرض قائمة المرضى:"
+    text += "**اختر طريقة البحث:**\n"
+    text += "• 📋 **عرض جميع الأسماء** - لعرض قائمة كاملة\n"
+    text += "• 🔍 **بحث عن مريض** - للبحث السريع بالاسم\n\n"
+    text += "💡 **نصيحة:** استخدم زر البحث للعثور على مريض بسرعة!"
 
     await message.reply_text(
         text,

@@ -34,7 +34,18 @@ PRINT_SELECT_TYPE, PRINT_SELECT_PERIOD, PRINT_SELECT_OPTIONS, PRINT_CONFIRM = ra
 
 # المجلدات
 EXPORTS_DIR = "exports"
-os.makedirs(EXPORTS_DIR, exist_ok=True)
+try:
+    os.makedirs(EXPORTS_DIR, exist_ok=True)
+    # التأكد من أن المجلد قابل للكتابة
+    test_file = os.path.join(EXPORTS_DIR, '.test_write')
+    try:
+        with open(test_file, 'w') as f:
+            f.write('test')
+        os.remove(test_file)
+    except Exception as e:
+        print(f"⚠️ تحذير: لا يمكن الكتابة في مجلد {EXPORTS_DIR}: {e}")
+except Exception as e:
+    print(f"⚠️ تحذير: فشل إنشاء مجلد {EXPORTS_DIR}: {e}")
 
 # ================================================
 # دوال مساعدة للرسوم البيانية
@@ -290,6 +301,8 @@ async def handle_print_options(update: Update, context: ContextTypes.DEFAULT_TYP
 
 async def generate_professional_report(query, context):
     """إنشاء التقرير الاحترافي"""
+    import logging
+    logger = logging.getLogger(__name__)
     
     start_date = context.user_data.get('start_date')
     end_date = context.user_data.get('end_date')
@@ -299,6 +312,7 @@ async def generate_professional_report(query, context):
     loop = asyncio.get_running_loop()
     
     try:
+        logger.info(f"🖨️ بدء إنشاء التقرير - الفترة: {period_name}, من {start_dt} إلى {end_dt}")
         result = await loop.run_in_executor(
             None,
             _build_report_package,
@@ -306,11 +320,13 @@ async def generate_professional_report(query, context):
             end_dt,
             period_name,
         )
+        logger.info(f"✅ تم إنشاء التقرير بنجاح: {result.get('file_path', 'N/A')}")
     except Exception as exc:
         import traceback
-        traceback.print_exc()
+        error_trace = traceback.format_exc()
+        logger.error(f"❌ فشل إنشاء التقرير: {exc}\n{error_trace}")
         await query.edit_message_text(
-            f"❌ **فشل إنشاء التقرير**\n\n{exc}",
+            f"❌ **فشل إنشاء التقرير**\n\n{str(exc)}\n\nيرجى المحاولة مرة أخرى أو التواصل مع الدعم الفني.",
             parse_mode=ParseMode.MARKDOWN
         )
         return ConversationHandler.END
@@ -369,13 +385,28 @@ def _build_report_package(start_dt, end_dt, period_name):
         charts_paths = generate_charts(s, reports, start_dt, end_dt)
         cleanup_paths.extend(charts_paths)
         
-        html_content = generate_html_report(reports, stats, charts_paths, period_name)
-        unique_key = _unique_export_basename()
-        html_path = os.path.join(EXPORTS_DIR, f'report_{unique_key}.html')
-        
-        with open(html_path, 'w', encoding='utf-8') as f:
-            f.write(html_content)
-        cleanup_paths.append(html_path)
+        try:
+            html_content = generate_html_report(reports, stats, charts_paths, period_name)
+            unique_key = _unique_export_basename()
+            html_path = os.path.join(EXPORTS_DIR, f'report_{unique_key}.html')
+            
+            # التأكد من وجود المجلد
+            os.makedirs(EXPORTS_DIR, exist_ok=True)
+            
+            # كتابة ملف HTML
+            with open(html_path, 'w', encoding='utf-8') as f:
+                f.write(html_content)
+            cleanup_paths.append(html_path)
+        except Exception as html_error:
+            import traceback
+            tb = traceback.format_exc()
+            error_msg = f"فشل في إنشاء ملف HTML: {str(html_error)}\n\nTraceback (truncated):\n{tb}"
+            try:
+                logger.error(f"❌ {error_msg}")
+            except Exception:
+                print(f"❌ {error_msg}")
+            # أعادة رفع الاستثناء مع تضمين التتبع لتسهيل التشخيص في الواجهة
+            raise Exception(error_msg) from html_error
         
         pdf_created, pdf_path = _render_pdf_from_html(html_path)
         if pdf_created:
@@ -406,6 +437,10 @@ def _render_pdf_from_html(html_path):
     try:
         from weasyprint import HTML, CSS
         
+        # قراءة محتوى HTML من الملف
+        with open(html_path, 'r', encoding='utf-8') as f:
+            html_content = f.read()
+        
         rtl_css = CSS(string='''
             @page {
                 size: A4;
@@ -418,7 +453,8 @@ def _render_pdf_from_html(html_path):
             }
         ''')
         
-        HTML(filename=html_path).write_pdf(pdf_path, stylesheets=[rtl_css])
+        # استخدام string بدلاً من filename لتجنب مشكلة البحث في templates
+        HTML(string=html_content, base_url=os.path.dirname(os.path.abspath(html_path))).write_pdf(pdf_path, stylesheets=[rtl_css])
         return True, pdf_path
     except ImportError:
         # محاولة استخدام pdfkit
@@ -487,7 +523,7 @@ def generate_statistics(session, reports, start_date, end_date):
     # التقسيم حسب النوع
     report_types = {}
     for report in reports:
-        report_type = report.medical_action or 'غير محدد'
+        report_type = _infer_medical_action_from_report(report) or 'غير محدد'
         report_types[report_type] = report_types.get(report_type, 0) + 1
     stats['by_type'] = report_types
     
@@ -496,9 +532,9 @@ def generate_statistics(session, reports, start_date, end_date):
     for report in reports:
         if report.hospital_id:
             hospital_obj = session.query(Hospital).filter_by(id=report.hospital_id).first()
-            hospital = hospital_obj.name if hospital_obj else 'غير محدد'
+            hospital = hospital_obj.name if hospital_obj and hospital_obj.name else (report.hospital_name or 'غير محدد')
         else:
-            hospital = 'غير محدد'
+            hospital = report.hospital_name or 'غير محدد'
         hospitals[hospital] = hospitals.get(hospital, 0) + 1
     stats['by_hospital'] = hospitals
     
@@ -507,9 +543,9 @@ def generate_statistics(session, reports, start_date, end_date):
     for report in reports:
         if report.translator_id:
             translator_obj = session.query(Translator).filter_by(id=report.translator_id).first()
-            translator = translator_obj.full_name if translator_obj else 'غير محدد'
+            translator = translator_obj.full_name if translator_obj and translator_obj.full_name else (report.translator_name or 'غير محدد')
         else:
-            translator = 'غير محدد'
+            translator = report.translator_name or 'غير محدد'
         translators[translator] = translators.get(translator, 0) + 1
     stats['by_translator'] = translators
     
@@ -536,7 +572,7 @@ def generate_charts(session, reports, start_date, end_date):
         # 1. رسم بياني: التقارير حسب النوع
         report_types = {}
         for report in reports:
-            report_type = report.report_type or 'غير محدد'
+            report_type = _infer_medical_action_from_report(report) or 'غير محدد'
             report_types[report_type] = report_types.get(report_type, 0) + 1
         
         if report_types:
@@ -564,7 +600,11 @@ def generate_charts(session, reports, start_date, end_date):
         # 2. رسم دائري: التقارير حسب المستشفى
         hospitals = {}
         for report in reports:
-            hospital = report.hospital_name or 'غير محدد'
+            if report.hospital_id:
+                hospital_obj = session.query(Hospital).filter_by(id=report.hospital_id).first()
+                hospital = hospital_obj.name if hospital_obj and hospital_obj.name else (getattr(report, 'hospital_name', None) or 'غير محدد')
+            else:
+                hospital = getattr(report, 'hospital_name', None) or 'غير محدد'
             hospitals[hospital] = hospitals.get(hospital, 0) + 1
         
         if hospitals:
@@ -622,6 +662,37 @@ def generate_charts(session, reports, start_date, end_date):
         print(f"⚠️ خطأ في إنشاء الرسوم البيانية: {e}")
     
     return charts_paths
+
+
+def _infer_medical_action_from_report(report):
+    """حاول استخراج نوع الإجراء من الحقول المتاحة في كائن التقرير.
+    الأولوية: الحقل المكرّر `medical_action`، ثم `action` إن وجد، ثم البحث في `doctor_decision` عن كلمات مفتاحية.
+    """
+    try:
+        # حقل مكرّر
+        val = None
+        if hasattr(report, 'medical_action') and report.medical_action:
+            val = str(report.medical_action).strip()
+            if val:
+                return val
+
+        # بعض الكائنات قد تحتوي على حقل action
+        if hasattr(report, 'action') and getattr(report, 'action'):
+            val = str(getattr(report, 'action')).strip()
+            if val:
+                return val
+
+        # محاولة استنتاج من قرار الطبيب
+        if hasattr(report, 'doctor_decision') and report.doctor_decision:
+            dd = str(report.doctor_decision)
+            keywords = ['عملية', 'مراجعة', 'متابعة', 'استشارة', 'ترقيد', 'خروج', 'علاج', 'تنظير']
+            for kw in keywords:
+                if kw in dd:
+                    return kw
+
+    except Exception:
+        pass
+    return None
 
 # ================================================
 # إنشاء HTML للتقرير
@@ -944,7 +1015,7 @@ def generate_html_report(reports, stats, charts_paths, period_name):
             </tr>
 '''
     
-    html += '''
+    html += f'''
         </tbody>
     </table>
 </div>
@@ -989,7 +1060,10 @@ def generate_html_report(reports, stats, charts_paths, period_name):
         </div>
     </div>
 </div>
+'''
 
+    # إضافة الرسوم البيانية
+    html += '''
 <!-- الرسوم البيانية -->
 <div class="page-break">
     <div class="section-title">📊 الرسوم البيانية والتحليلات</div>
