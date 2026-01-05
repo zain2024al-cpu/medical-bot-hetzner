@@ -203,6 +203,32 @@ async def save_report_to_db(query, context):
         elif context.user_data.get('_user_id'):
             submitted_by_user_id = context.user_data.get('_user_id')
         
+        # ✅ تحويل التواريخ إلى naive datetime (SQLite لا يقبل tzinfo)
+        def to_naive_datetime(dt):
+            """تحويل datetime مع tzinfo إلى naive datetime"""
+            if dt is None:
+                return None
+            if isinstance(dt, str):
+                try:
+                    from dateutil import parser
+                    dt = parser.parse(dt)
+                except:
+                    return None
+            if hasattr(dt, 'year') and not hasattr(dt, 'hour'):
+                dt = datetime.combine(dt, datetime.min.time())
+            if hasattr(dt, 'tzinfo') and dt.tzinfo is not None:
+                try:
+                    from zoneinfo import ZoneInfo
+                    return dt.astimezone(ZoneInfo('UTC')).replace(tzinfo=None)
+                except:
+                    return dt.replace(tzinfo=None)
+            return dt
+        
+        # معالجة التواريخ
+        followup_date = to_naive_datetime(data_tmp.get("followup_date"))
+        report_date = to_naive_datetime(data_tmp.get("report_date")) or datetime.utcnow()
+        app_reschedule_return_date = to_naive_datetime(data_tmp.get("app_reschedule_return_date"))
+        
         new_report = Report(
             patient_id=patient.id,
             hospital_id=hospital.id,
@@ -212,12 +238,12 @@ async def save_report_to_db(query, context):
             complaint_text=data_tmp.get("complaint_text", ""),
             doctor_decision=data_tmp.get("doctor_decision", ""),
             medical_action=data_tmp.get("medical_action", ""),
-            followup_date=data_tmp.get("followup_date"),
+            followup_date=followup_date,
             followup_reason=data_tmp.get("followup_reason", ""),
             app_reschedule_reason=data_tmp.get("app_reschedule_reason"),
-            app_reschedule_return_date=data_tmp.get("app_reschedule_return_date"),
+            app_reschedule_return_date=app_reschedule_return_date,
             app_reschedule_return_reason=data_tmp.get("app_reschedule_return_reason"),
-            report_date=data_tmp.get("report_date") or datetime.utcnow(),
+            report_date=report_date,
             created_at=datetime.utcnow(),
             submitted_by_user_id=submitted_by_user_id,  # ✅ حفظ معرف المستخدم
         )

@@ -9498,6 +9498,21 @@ async def save_report_to_database(query, context, flow_type):
             elif flow_type == "emergency":
                 status = data.get("status", "")
                 decision_text += f"\n\nوضع الحالة: {status}"
+        elif flow_type == "appointment_reschedule":
+            # ✅ معالجة تأجيل المواعيد
+            app_reschedule_reason = data.get("app_reschedule_reason", "")
+            app_reschedule_return_reason = data.get("app_reschedule_return_reason", "") or data.get("followup_reason", "")
+            return_date = data.get("app_reschedule_return_date") or data.get("followup_date")
+            complaint_text = ""
+            decision_text = f"سبب تأجيل الموعد: {app_reschedule_reason}"
+            if return_date:
+                if hasattr(return_date, 'strftime'):
+                    date_str = return_date.strftime('%Y-%m-%d')
+                else:
+                    date_str = str(return_date)
+                decision_text += f"\n\nتاريخ العودة الجديد: {date_str}"
+            if app_reschedule_return_reason:
+                decision_text += f"\n\nسبب العودة: {app_reschedule_return_reason}"
 
         # ✅ الحصول على معرف المستخدم الذي أنشأ التقرير (Telegram User ID)
         user_id = None
@@ -9523,6 +9538,49 @@ async def save_report_to_database(query, context, flow_type):
             else:
                 logger.info(f"ℹ️ User {user_id} not found in Translator table")
         
+        # ✅ تحويل التواريخ إلى naive datetime (SQLite لا يقبل tzinfo)
+        def to_naive_datetime(dt):
+            """تحويل datetime مع tzinfo إلى naive datetime"""
+            if dt is None:
+                return None
+            # إذا كان string، حاول تحويله
+            if isinstance(dt, str):
+                try:
+                    from dateutil import parser
+                    dt = parser.parse(dt)
+                except:
+                    return None
+            # إذا كان date فقط (بدون time)، حوله إلى datetime
+            if hasattr(dt, 'year') and not hasattr(dt, 'hour'):
+                from datetime import datetime as dt_module
+                dt = dt_module.combine(dt, dt_module.min.time())
+            # إزالة tzinfo إذا موجود
+            if hasattr(dt, 'tzinfo') and dt.tzinfo is not None:
+                try:
+                    from zoneinfo import ZoneInfo
+                    return dt.astimezone(ZoneInfo('UTC')).replace(tzinfo=None)
+                except:
+                    return dt.replace(tzinfo=None)
+            return dt
+        
+        # معالجة التواريخ
+        followup_date = to_naive_datetime(data.get("followup_date"))
+        report_date = to_naive_datetime(data.get("report_date")) or datetime.now()
+        created_at = datetime.utcnow()
+        
+        # ✅ معالجة حقول تأجيل الموعد
+        app_reschedule_reason_val = None
+        app_reschedule_return_date_val = None
+        app_reschedule_return_reason_val = None
+        
+        if flow_type == "appointment_reschedule":
+            app_reschedule_reason_val = data.get("app_reschedule_reason", "")
+            app_reschedule_return_reason_val = data.get("app_reschedule_return_reason") or data.get("followup_reason", "")
+            return_date_raw = data.get("app_reschedule_return_date") or data.get("followup_date")
+            if return_date_raw:
+                app_reschedule_return_date_val = to_naive_datetime(return_date_raw)
+            logger.info(f"💾 حفظ حقول تأجيل الموعد: reason={app_reschedule_reason_val}, return_date={app_reschedule_return_date_val}")
+        
         # إنشاء التقرير
         new_report = Report(
             patient_id=patient.id,
@@ -9533,11 +9591,15 @@ async def save_report_to_database(query, context, flow_type):
             complaint_text=complaint_text,
             doctor_decision=decision_text,
             medical_action=final_medical_action,
-            followup_date=data.get("followup_date"),
+            followup_date=followup_date,
             followup_reason=data.get("followup_reason", "لا يوجد"),
-            report_date=data.get("report_date", datetime.now()),
-            created_at=datetime.now(),
-            submitted_by_user_id=user_id  # ✅ حفظ معرف المستخدم الذي أنشأ التقرير
+            report_date=report_date,
+            created_at=created_at,
+            submitted_by_user_id=user_id,  # ✅ حفظ معرف المستخدم الذي أنشأ التقرير
+            # ✅ حفظ حقول تأجيل الموعد
+            app_reschedule_reason=app_reschedule_reason_val,
+            app_reschedule_return_date=app_reschedule_return_date_val,
+            app_reschedule_return_reason=app_reschedule_return_reason_val
         )
 
         session.add(new_report)
