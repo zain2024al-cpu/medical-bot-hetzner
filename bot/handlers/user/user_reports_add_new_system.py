@@ -8410,6 +8410,19 @@ async def show_draft_edit_fields(message, context, editable_fields, flow_type):
         'operation_name_en': 'operation_name_en',
         'tests': 'tests',
         'translator_name': 'translator_name',  # ✅ المترجم
+        # ✅ حقول تأجيل الموعد
+        'app_reschedule_reason': 'app_reschedule_reason',
+        'app_reschedule_return_date': 'app_reschedule_return_date',
+        'app_reschedule_return_reason': 'app_reschedule_return_reason',
+        # ✅ حقول الأشعة والفحوصات
+        'radiology_type': 'radiology_type',
+        'radiology_delivery_date': 'radiology_delivery_date',
+        # ✅ حقول العلاج الطبيعي
+        'therapy_details': 'therapy_details',
+        # ✅ حقول الأجهزة التعويضية
+        'device_details': 'device_details',
+        # ✅ حقول الرقود
+        'admission_summary': 'admission_summary',
     }
 
     data = context.user_data.get("report_tmp", {})
@@ -8503,6 +8516,19 @@ async def handle_edit_draft_field(update: Update, context: ContextTypes.DEFAULT_
             'operation_name_en': 'operation_name_en',
             'tests': 'tests',
             'translator_name': 'translator_name',  # ✅ المترجم
+            # ✅ حقول تأجيل الموعد
+            'app_reschedule_reason': 'app_reschedule_reason',
+            'app_reschedule_return_date': 'app_reschedule_return_date',
+            'app_reschedule_return_reason': 'app_reschedule_return_reason',
+            # ✅ حقول الأشعة والفحوصات
+            'radiology_type': 'radiology_type',
+            'radiology_delivery_date': 'radiology_delivery_date',
+            # ✅ حقول العلاج الطبيعي
+            'therapy_details': 'therapy_details',
+            # ✅ حقول الأجهزة التعويضية
+            'device_details': 'device_details',
+            # ✅ حقول الرقود
+            'admission_summary': 'admission_summary',
         }
 
         # تحويل مفتاح التعديل إلى مفتاح report_tmp
@@ -8532,12 +8558,25 @@ async def handle_edit_draft_field(update: Update, context: ContextTypes.DEFAULT_
             'operation_name_en': 'اسم العملية بالإنجليزي',
             'tests': 'الفحوصات المطلوبة',
             'translator_name': 'المترجم',  # ✅ المترجم
+            # ✅ حقول تأجيل الموعد
+            'app_reschedule_reason': 'سبب تأجيل الموعد',
+            'app_reschedule_return_date': 'موعد العودة الجديد',
+            'app_reschedule_return_reason': 'سبب العودة',
+            # ✅ حقول الأشعة والفحوصات
+            'radiology_type': 'نوع الأشعة والفحوصات',
+            'radiology_delivery_date': 'تاريخ التسليم',
+            # ✅ حقول العلاج الطبيعي
+            'therapy_details': 'تفاصيل الجلسة',
+            # ✅ حقول الأجهزة التعويضية
+            'device_details': 'تفاصيل الجهاز',
+            # ✅ حقول الرقود
+            'admission_summary': 'ملخص الرقود',
         }
 
         field_display_name = field_names.get(edit_field_key, edit_field_key)
 
         # الحقول التي تحتاج تقويم بدلاً من إدخال نصي
-        date_fields = ['followup_date']
+        date_fields = ['followup_date', 'app_reschedule_return_date', 'radiology_delivery_date']
         
         # حقل المترجم يحتاج عرض قائمة المترجمين
         if edit_field_key == 'translator_name':

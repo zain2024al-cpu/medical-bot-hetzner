@@ -259,8 +259,8 @@ def get_editable_fields_by_action_type(medical_action):
     elif action_clean == 'تأجيل موعد':
         return [
             ('app_reschedule_reason', '📅 سبب تأجيل الموعد'),
-            ('followup_date', '📅 موعد العودة الجديد'),
-            ('followup_reason', '✍️ سبب العودة'),
+            ('app_reschedule_return_date', '📅 موعد العودة الجديد'),
+            ('app_reschedule_return_reason', '✍️ سبب العودة'),
             ('translator_name', '👤 المترجم'),
         ]
 
