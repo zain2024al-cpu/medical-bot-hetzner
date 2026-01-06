@@ -2934,35 +2934,18 @@ async def handle_patient(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await show_patient_selection(update.message, context, search_query=text)
         return STATE_SELECT_PATIENT
 
-    # إذا لم يكن في وضع البحث ولم يتم اختيار المريض، نعيد عرض القائمة
-    # إذا المستخدم أدخل اسمًا يدوياً (نص عادي)، نقبله كمريض جديد ونمضي للخطوة التالية
-    if text:
-        try:
-            # حفظ اسم المريض بدون رقم تعريف (سيتم إنشاؤه لاحقًا عند الحفظ)
-            context.user_data.setdefault("report_tmp", {})["patient_name"] = text
-            context.user_data.setdefault("report_tmp", {})["patient_id"] = None
-            context.user_data["report_tmp"].setdefault("step_history", []).append(R_PATIENT)
-
-            try:
-                await update.message.delete()
-            except:
-                pass
-
-            await update.message.reply_text(
-                f"✅ **تم إدخال اسم المريض**\n\n"
-                f"👤 **المريض:**\n"
-                f"{text}",
-                parse_mode="Markdown"
-            )
-
-            await show_hospitals_menu(update.message, context)
-            return STATE_SELECT_HOSPITAL
-        except Exception as ex:
-            logger.error(f"handle_patient: Error handling manual patient input: {ex}", exc_info=True)
-            await show_patient_selection(update.message, context)
-            return STATE_SELECT_PATIENT
-
-    logger.info("handle_patient: No patient selected, showing patient selection menu")
+    # إذا لم يكن في وضع البحث - لا نقبل إدخال نصي
+    # يجب على المستخدم اختيار المريض من القائمة أو استخدام البحث
+    try:
+        await update.message.delete()
+    except:
+        pass
+    
+    await update.message.reply_text(
+        "⚠️ **يرجى اختيار المريض من القائمة أعلاه**\n\n"
+        "💡 أو اضغط على 🔍 للبحث عن مريض",
+        parse_mode="Markdown"
+    )
     await show_patient_selection(update.message, context)
     return STATE_SELECT_PATIENT
 
@@ -3183,7 +3166,16 @@ async def handle_hospital_search(
             await update.message.reply_text(text, reply_markup=keyboard, parse_mode="Markdown")
             return STATE_SELECT_HOSPITAL
         else:
-            # إذا لم يكن في وضع البحث، تجاهل النص
+            # إذا لم يكن في وضع البحث، نعرض رسالة تنبيه
+            try:
+                await update.message.delete()
+            except:
+                pass
+            await update.message.reply_text(
+                "⚠️ **يرجى اختيار المستشفى من القائمة أعلاه**\n\n"
+                "💡 أو اضغط على 🔍 للبحث عن مستشفى",
+                parse_mode="Markdown"
+            )
             return STATE_SELECT_HOSPITAL
 
 
@@ -3423,7 +3415,16 @@ async def handle_department_search(
             await update.message.reply_text(text, reply_markup=keyboard, parse_mode="Markdown")
             return STATE_SELECT_DEPARTMENT
         else:
-            # إذا لم يكن في وضع البحث، تجاهل النص
+            # إذا لم يكن في وضع البحث، نعرض رسالة تنبيه
+            try:
+                await update.message.delete()
+            except:
+                pass
+            await update.message.reply_text(
+                "⚠️ **يرجى اختيار القسم من القائمة أعلاه**\n\n"
+                "💡 أو اضغط على 🔍 للبحث عن قسم",
+                parse_mode="Markdown"
+            )
             return STATE_SELECT_DEPARTMENT
 
 
@@ -8408,6 +8409,7 @@ async def show_draft_edit_fields(message, context, editable_fields, flow_type):
         'operation_details': 'operation_details',
         'operation_name_en': 'operation_name_en',
         'tests': 'tests',
+        'translator_name': 'translator_name',  # ✅ المترجم
     }
 
     data = context.user_data.get("report_tmp", {})
@@ -8500,6 +8502,7 @@ async def handle_edit_draft_field(update: Update, context: ContextTypes.DEFAULT_
             'operation_details': 'operation_details',
             'operation_name_en': 'operation_name_en',
             'tests': 'tests',
+            'translator_name': 'translator_name',  # ✅ المترجم
         }
 
         # تحويل مفتاح التعديل إلى مفتاح report_tmp
@@ -8528,12 +8531,17 @@ async def handle_edit_draft_field(update: Update, context: ContextTypes.DEFAULT_
             'operation_details': 'تفاصيل العملية',
             'operation_name_en': 'اسم العملية بالإنجليزي',
             'tests': 'الفحوصات المطلوبة',
+            'translator_name': 'المترجم',  # ✅ المترجم
         }
 
         field_display_name = field_names.get(edit_field_key, edit_field_key)
 
         # الحقول التي تحتاج تقويم بدلاً من إدخال نصي
         date_fields = ['followup_date']
+        
+        # حقل المترجم يحتاج عرض قائمة المترجمين
+        if edit_field_key == 'translator_name':
+            return await _render_draft_edit_translator_selection(query, context)
         
         if edit_field_key in date_fields:
             # عرض التقويم بدلاً من طلب إدخال نصي
@@ -8878,6 +8886,96 @@ async def handle_draft_edit_back_hour(update: Update, context: ContextTypes.DEFA
     
     await _show_draft_edit_hour_selection(query, context)
     return "EDIT_DRAFT_FOLLOWUP_CALENDAR"
+
+
+# =============================
+# دوال تعديل المترجم (للمسودة)
+# =============================
+
+async def _render_draft_edit_translator_selection(query, context):
+    """عرض قائمة المترجمين لتعديل المسودة"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        translator_names = load_translator_names()
+        current_translator = context.user_data.get("report_tmp", {}).get('translator_name', 'غير محدد')
+        
+        text = "👤 **تعديل المترجم**\n\n"
+        text += f"المترجم الحالي: {current_translator}\n\n"
+        text += "اختر المترجم الجديد من القائمة:"
+        
+        # تقسيم الأسماء إلى صفوف (3 أسماء لكل صف)
+        keyboard = []
+        row = []
+        
+        for i, name in enumerate(translator_names):
+            row.append(InlineKeyboardButton(name, callback_data=f"draft_edit_translator:{i}"))
+            if len(row) == 3 or i == len(translator_names) - 1:
+                keyboard.append(row)
+                row = []
+        
+        flow_type = context.user_data.get('draft_flow_type', 'unknown')
+        keyboard.append([InlineKeyboardButton("🔙 رجوع لقائمة الحقول", callback_data=f"back_to_edit_fields:{flow_type}")])
+        keyboard.append([InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")])
+        
+        await query.edit_message_text(
+            text,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown"
+        )
+        
+        return "EDIT_DRAFT_TRANSLATOR"
+        
+    except Exception as e:
+        logger.error(f"خطأ في عرض قائمة المترجمين للتعديل: {e}")
+        await query.edit_message_text("❌ حدث خطأ في تحميل قائمة المترجمين")
+        return
+
+
+async def handle_draft_edit_translator(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة اختيار المترجم الجديد للمسودة"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    query = update.callback_query
+    await query.answer()
+    
+    try:
+        # استخراج index المترجم
+        translator_index = int(query.data.replace("draft_edit_translator:", ""))
+        translator_names = load_translator_names()
+        
+        if translator_index < 0 or translator_index >= len(translator_names):
+            await query.edit_message_text("❌ اختيار غير صحيح")
+            return
+        
+        new_translator_name = translator_names[translator_index]
+        
+        # حفظ في report_tmp
+        context.user_data.setdefault("report_tmp", {})["translator_name"] = new_translator_name
+        
+        # تنظيف
+        context.user_data.pop('editing_field', None)
+        context.user_data.pop('editing_field_original', None)
+        
+        logger.info(f"✅ تم تحديث المترجم في المسودة: {new_translator_name}")
+        
+        # العودة لقائمة الحقول
+        flow_type = context.user_data.get('draft_flow_type', 'unknown')
+        
+        await query.edit_message_text(
+            f"✅ تم تحديث المترجم: {new_translator_name}\n\n"
+            "جاري العودة لقائمة الحقول...",
+            parse_mode="Markdown"
+        )
+        
+        return await handle_back_to_edit_fields_direct(update, context, flow_type)
+        
+    except Exception as e:
+        logger.error(f"خطأ في اختيار المترجم للمسودة: {e}")
+        await query.edit_message_text("❌ حدث خطأ في تحديث المترجم")
+        return
 
 
 async def handle_back_to_edit_fields_direct(update: Update, context: ContextTypes.DEFAULT_TYPE, flow_type: str):
@@ -10297,6 +10395,7 @@ def register(app):
                 CallbackQueryHandler(handle_finish_edit_draft, pattern="^finish_edit_draft:"),
                 CallbackQueryHandler(handle_back_to_summary, pattern="^back_to_summary:"),
                 CallbackQueryHandler(handle_edit_draft_field, pattern="^edit_field_draft:"),
+                CallbackQueryHandler(handle_draft_edit_translator, pattern="^draft_edit_translator:"),
                 CallbackQueryHandler(handle_back_to_edit_fields, pattern="^back_to_edit_fields"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_draft_field_input),
             ],
@@ -10316,6 +10415,11 @@ def register(app):
                 CallbackQueryHandler(handle_draft_edit_time_skip, pattern="^draft_edit_time_skip$"),
                 CallbackQueryHandler(handle_draft_edit_back_calendar, pattern="^draft_edit_back_calendar$"),
                 CallbackQueryHandler(handle_draft_edit_back_hour, pattern="^draft_edit_back_hour$"),
+                CallbackQueryHandler(handle_back_to_edit_fields, pattern="^back_to_edit_fields"),
+            ],
+            # حالة تعديل المترجم (للمسودة)
+            "EDIT_DRAFT_TRANSLATOR": [
+                CallbackQueryHandler(handle_draft_edit_translator, pattern="^draft_edit_translator:"),
                 CallbackQueryHandler(handle_back_to_edit_fields, pattern="^back_to_edit_fields"),
             ],
             # مسار استشارة مع قرار عملية (handlers من flows/surgery_consult.py)
@@ -10358,6 +10462,7 @@ def register(app):
                 CallbackQueryHandler(handle_finish_edit_draft, pattern="^finish_edit_draft:"),
                 CallbackQueryHandler(handle_back_to_summary, pattern="^back_to_summary:"),
                 CallbackQueryHandler(handle_edit_draft_field, pattern="^edit_field_draft:"),
+                CallbackQueryHandler(handle_draft_edit_translator, pattern="^draft_edit_translator:"),
                 CallbackQueryHandler(handle_back_to_edit_fields, pattern="^back_to_edit_fields"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_draft_field_input),
             ],
@@ -10381,6 +10486,7 @@ def register(app):
                 CallbackQueryHandler(handle_finish_edit_draft, pattern="^finish_edit_draft:"),
                 CallbackQueryHandler(handle_back_to_summary, pattern="^back_to_summary:"),
                 CallbackQueryHandler(handle_edit_draft_field, pattern="^edit_field_draft:"),
+                CallbackQueryHandler(handle_draft_edit_translator, pattern="^draft_edit_translator:"),
                 CallbackQueryHandler(handle_back_to_edit_fields, pattern="^back_to_edit_fields"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_draft_field_input),
             ],
@@ -10416,6 +10522,7 @@ def register(app):
                 CallbackQueryHandler(handle_finish_edit_draft, pattern="^finish_edit_draft:"),
                 CallbackQueryHandler(handle_back_to_summary, pattern="^back_to_summary:"),
                 CallbackQueryHandler(handle_edit_draft_field, pattern="^edit_field_draft:"),
+                CallbackQueryHandler(handle_draft_edit_translator, pattern="^draft_edit_translator:"),
                 CallbackQueryHandler(handle_back_to_edit_fields, pattern="^back_to_edit_fields"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_draft_field_input),
             ],
@@ -10461,6 +10568,7 @@ def register(app):
                 CallbackQueryHandler(handle_finish_edit_draft, pattern="^finish_edit_draft:"),
                 CallbackQueryHandler(handle_back_to_summary, pattern="^back_to_summary:"),
                 CallbackQueryHandler(handle_edit_draft_field, pattern="^edit_field_draft:"),
+                CallbackQueryHandler(handle_draft_edit_translator, pattern="^draft_edit_translator:"),
                 CallbackQueryHandler(handle_back_to_edit_fields, pattern="^back_to_edit_fields"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_draft_field_input),
             ],
@@ -10495,6 +10603,7 @@ def register(app):
                 CallbackQueryHandler(handle_finish_edit_draft, pattern="^finish_edit_draft:"),
                 CallbackQueryHandler(handle_back_to_summary, pattern="^back_to_summary:"),
                 CallbackQueryHandler(handle_edit_draft_field, pattern="^edit_field_draft:"),
+                CallbackQueryHandler(handle_draft_edit_translator, pattern="^draft_edit_translator:"),
                 CallbackQueryHandler(handle_back_to_edit_fields, pattern="^back_to_edit_fields"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_draft_field_input),
             ],
@@ -10527,6 +10636,7 @@ def register(app):
                 CallbackQueryHandler(handle_finish_edit_draft, pattern="^finish_edit_draft:"),
                 CallbackQueryHandler(handle_back_to_summary, pattern="^back_to_summary:"),
                 CallbackQueryHandler(handle_edit_draft_field, pattern="^edit_field_draft:"),
+                CallbackQueryHandler(handle_draft_edit_translator, pattern="^draft_edit_translator:"),
                 CallbackQueryHandler(handle_back_to_edit_fields, pattern="^back_to_edit_fields"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_draft_field_input),
             ],
@@ -10555,6 +10665,7 @@ def register(app):
                 CallbackQueryHandler(handle_finish_edit_draft, pattern="^finish_edit_draft:"),
                 CallbackQueryHandler(handle_back_to_summary, pattern="^back_to_summary:"),
                 CallbackQueryHandler(handle_edit_draft_field, pattern="^edit_field_draft:"),
+                CallbackQueryHandler(handle_draft_edit_translator, pattern="^draft_edit_translator:"),
                 CallbackQueryHandler(handle_back_to_edit_fields, pattern="^back_to_edit_fields"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_draft_field_input),
             ],
@@ -10582,6 +10693,7 @@ def register(app):
                 CallbackQueryHandler(handle_finish_edit_draft, pattern="^finish_edit_draft:"),
                 CallbackQueryHandler(handle_back_to_summary, pattern="^back_to_summary:"),
                 CallbackQueryHandler(handle_edit_draft_field, pattern="^edit_field_draft:"),
+                CallbackQueryHandler(handle_draft_edit_translator, pattern="^draft_edit_translator:"),
                 CallbackQueryHandler(handle_back_to_edit_fields, pattern="^back_to_edit_fields"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_draft_field_input),
             ],
@@ -10617,6 +10729,7 @@ def register(app):
                 CallbackQueryHandler(handle_finish_edit_draft, pattern="^finish_edit_draft:"),
                 CallbackQueryHandler(handle_back_to_summary, pattern="^back_to_summary:"),
                 CallbackQueryHandler(handle_edit_draft_field, pattern="^edit_field_draft:"),
+                CallbackQueryHandler(handle_draft_edit_translator, pattern="^draft_edit_translator:"),
                 CallbackQueryHandler(handle_back_to_edit_fields, pattern="^back_to_edit_fields"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_draft_field_input),
             ],
@@ -10655,6 +10768,7 @@ def register(app):
                 CallbackQueryHandler(handle_finish_edit_draft, pattern="^finish_edit_draft:"),
                 CallbackQueryHandler(handle_back_to_summary, pattern="^back_to_summary:"),
                 CallbackQueryHandler(handle_edit_draft_field, pattern="^edit_field_draft:"),
+                CallbackQueryHandler(handle_draft_edit_translator, pattern="^draft_edit_translator:"),
                 CallbackQueryHandler(handle_back_to_edit_fields, pattern="^back_to_edit_fields"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_draft_field_input),
             ],
@@ -10679,6 +10793,7 @@ def register(app):
                 CallbackQueryHandler(handle_finish_edit_draft, pattern="^finish_edit_draft:"),
                 CallbackQueryHandler(handle_back_to_summary, pattern="^back_to_summary:"),
                 CallbackQueryHandler(handle_edit_draft_field, pattern="^edit_field_draft:"),
+                CallbackQueryHandler(handle_draft_edit_translator, pattern="^draft_edit_translator:"),
                 CallbackQueryHandler(handle_back_to_edit_fields, pattern="^back_to_edit_fields"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_draft_field_input),
             ],

@@ -17,7 +17,7 @@ from services.inline_calendar import create_calendar_keyboard, create_quick_date
 from sqlalchemy import or_, and_
 
 # حالات المحادثة
-SELECT_REPORT, SELECT_FIELD, EDIT_VALUE, CONFIRM_EDIT, EDIT_DATE_CALENDAR, EDIT_DATE_TIME = range(6)
+SELECT_REPORT, SELECT_FIELD, EDIT_VALUE, CONFIRM_EDIT, EDIT_DATE_CALENDAR, EDIT_DATE_TIME, EDIT_TRANSLATOR = range(7)
 
 
 def format_time_12h(time_str):
@@ -106,14 +106,20 @@ def get_editable_fields_by_action_type(medical_action):
     - كل نوع إجراء له حقوله المحددة فقط
     - لا حقول إضافية أو غير ضرورية
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"🔍 get_editable_fields_by_action_type: received medical_action = {repr(medical_action)}")
+    
     if not medical_action:
         # الحد الأدنى من الحقول للحالات غير المحددة
+        logger.warning("⚠️ get_editable_fields_by_action_type: medical_action is empty!")
         return [
             ('complaint_text', '💬 شكوى المريض'),
             ('doctor_decision', '📝 قرار الطبيب'),
         ]
 
     action_clean = medical_action.strip()
+    logger.info(f"🔍 get_editable_fields_by_action_type: action_clean = {repr(action_clean)}")
 
     # ===========================================
     # 1. استشارة جديدة - الحقول الأساسية للتشخيص
@@ -126,6 +132,7 @@ def get_editable_fields_by_action_type(medical_action):
             ('notes', '🧪 الفحوصات والأشعة المطلوبة'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
+            ('translator_name', '👤 المترجم'),
         ]
 
     # ===========================================
@@ -139,6 +146,7 @@ def get_editable_fields_by_action_type(medical_action):
             ('treatment_plan', '📊 نسبة نجاح العملية'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
+            ('translator_name', '👤 المترجم'),
         ]
 
     # ===========================================
@@ -148,7 +156,8 @@ def get_editable_fields_by_action_type(medical_action):
         return [
             ('diagnosis', '🔬 التشخيص النهائي'),
             ('doctor_decision', '📝 قرار الطبيب'),
-            ('treatment_plan', '💊 التوصيات والأدوية'),
+            ('treatment_plan', '💊 التوصيات الطبية'),
+            ('translator_name', '👤 المترجم'),
         ]
 
     # ===========================================
@@ -162,6 +171,7 @@ def get_editable_fields_by_action_type(medical_action):
             ('case_status', '🚨 حالة الطوارئ (خروج/ترقيد/عملية)'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
+            ('translator_name', '👤 المترجم'),
         ]
 
     # ===========================================
@@ -175,6 +185,7 @@ def get_editable_fields_by_action_type(medical_action):
             ('notes', '🏥 رقم الغرفة والطابق'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
+            ('translator_name', '👤 المترجم'),
         ]
 
     # ===========================================
@@ -187,6 +198,7 @@ def get_editable_fields_by_action_type(medical_action):
             ('doctor_decision', '📝 قرار الطبيب'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
+            ('translator_name', '👤 المترجم'),
         ]
 
     # ===========================================
@@ -199,6 +211,7 @@ def get_editable_fields_by_action_type(medical_action):
             ('doctor_decision', '📝 ملاحظات العملية'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
+            ('translator_name', '👤 المترجم'),
         ]
 
     # ===========================================
@@ -224,28 +237,76 @@ def get_editable_fields_by_action_type(medical_action):
             ('notes', '🚪 رقم الغرفة والطابق'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
+            ('translator_name', '👤 المترجم'),
         ]
 
     # ===========================================
     # 10. خروج من المستشفى - التركيز على الخروج
     # ===========================================
-    elif action_clean == 'خروج من المستشفى':
+    elif action_clean == 'خروج من المستشفى' or action_clean == 'خروج':
         return [
-            ('diagnosis', '🔬 التشخيص النهائي'),
-            ('doctor_decision', '📝 قرار الطبيب عند الخروج'),
-            ('treatment_plan', '💊 الأدوية الموصى بها'),
-            ('notes', '📋 التعليمات والرعاية المنزلية'),
+            ('admission_summary', '📋 ملخص الرقود'),
+            ('operation_details', '⚕️ تفاصيل العملية'),
+            ('operation_name_en', '🔤 اسم العملية بالإنجليزي'),
+            ('followup_date', '📅 موعد العودة'),
+            ('followup_reason', '✍️ سبب العودة'),
+            ('translator_name', '👤 المترجم'),
+        ]
+
+    # ===========================================
+    # 11. تأجيل موعد - التركيز على سبب التأجيل
+    # ===========================================
+    elif action_clean == 'تأجيل موعد':
+        return [
+            ('app_reschedule_reason', '📅 سبب تأجيل الموعد'),
+            ('followup_date', '📅 موعد العودة الجديد'),
+            ('followup_reason', '✍️ سبب العودة'),
+            ('translator_name', '👤 المترجم'),
+        ]
+
+    # ===========================================
+    # 12. أشعة وفحوصات - التركيز على الفحوصات
+    # ===========================================
+    elif action_clean == 'أشعة وفحوصات':
+        return [
+            ('radiology_type', '🔬 نوع الأشعة والفحوصات'),
+            ('radiology_delivery_date', '📅 تاريخ التسليم'),
+            ('translator_name', '👤 المترجم'),
+        ]
+
+    # ===========================================
+    # 13. علاج طبيعي - التركيز على الجلسة
+    # ===========================================
+    elif action_clean == 'علاج طبيعي':
+        return [
+            ('therapy_details', '🏃 تفاصيل الجلسة'),
+            ('followup_date', '📅 موعد العودة'),
+            ('followup_reason', '✍️ سبب العودة'),
+            ('translator_name', '👤 المترجم'),
+        ]
+
+    # ===========================================
+    # 14. أجهزة تعويضية - التركيز على الجهاز
+    # ===========================================
+    elif action_clean == 'أجهزة تعويضية':
+        return [
+            ('device_details', '🦾 تفاصيل الجهاز'),
+            ('followup_date', '📅 موعد العودة'),
+            ('followup_reason', '✍️ سبب العودة'),
+            ('translator_name', '👤 المترجم'),
         ]
 
     # ===========================================
     # الحقول الافتراضية - للحالات غير المعروفة
     # ===========================================
     else:
+        logger.warning(f"⚠️ نوع إجراء غير معروف: '{action_clean}' - استخدام الحقول الافتراضية")
         print(f"⚠️ نوع إجراء غير معروف: '{action_clean}' - استخدام الحقول الافتراضية")
         return [
             ('complaint_text', '💬 شكوى المريض'),
             ('doctor_decision', '📝 قرار الطبيب'),
             ('followup_date', '📅 موعد العودة'),
+            ('translator_name', '👤 المترجم'),
         ]
 
 async def start_edit_reports(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -423,6 +484,7 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
             hospital = s.query(Hospital).filter_by(id=report.hospital_id).first()
             department = s.query(Department).filter_by(id=report.department_id).first() if report.department_id else None
             doctor = s.query(Doctor).filter_by(id=report.doctor_id).first() if report.doctor_id else None
+            translator = s.query(Translator).filter_by(id=report.translator_id).first() if report.translator_id else None
             
             # حفظ البيانات الحالية
             context.user_data['current_report_data'] = {
@@ -441,7 +503,9 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
                 'followup_date': report.followup_date.strftime('%Y-%m-%d') if report.followup_date else None,
                 'followup_time': report.followup_time,
                 'followup_reason': report.followup_reason or "لا يوجد",
-                'report_date': report.report_date.strftime('%Y-%m-%d %H:%M')
+                'report_date': report.report_date.strftime('%Y-%m-%d %H:%M'),
+                'translator_name': translator.full_name if translator else "غير محدد",
+                'translator_id': report.translator_id,
             }
             
             # تحويل موعد العودة إلى صيغة 12 ساعة للعرض
@@ -645,11 +709,16 @@ async def handle_field_selection(update: Update, context: ContextTypes.DEFAULT_T
             'notes': 'الملاحظات / الفحوصات',
             'case_status': 'حالة الطوارئ',
             'followup_date': 'موعد العودة',
-            'followup_reason': 'سبب العودة'
+            'followup_reason': 'سبب العودة',
+            'translator_name': 'المترجم'
         }
         
         field_display = field_names.get(field_name, field_name)
         current_value = context.user_data['current_report_data'].get(field_name, "لا يوجد")
+        
+        # إذا كان الحقل هو المترجم، نعرض قائمة المترجمين
+        if field_name == "translator_name":
+            return await show_translator_selection_for_edit(query, context)
         
         # إذا كان الحقل هو التاريخ، نعرض التقويم الكامل مباشرة
         if field_name == "followup_date":
@@ -712,6 +781,139 @@ async def handle_field_selection(update: Update, context: ContextTypes.DEFAULT_T
         except:
             pass
         return ConversationHandler.END
+
+
+def load_translator_names():
+    """قراءة أسماء المترجمين"""
+    try:
+        from services.translators_service import get_all_translator_names
+        names = get_all_translator_names()
+        if names:
+            return names
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"⚠️ فشل تحميل المترجمين: {e}")
+    
+    # قائمة احتياطية في حالة فشل التحميل
+    return ["مصطفى", "واصل", "نجم الدين", "محمد علي", "سعيد", "مهدي", "صبري", "عزي", "معتز", "ادريس", "هاشم", "ادم", "زيد", "عصام", "عزالدين", "حسن", "زين العابدين", "عبدالسلام", "ياسر", "يحيى"]
+
+
+async def show_translator_selection_for_edit(query, context):
+    """عرض قائمة المترجمين للتعديل"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        translator_names = load_translator_names()
+        current_translator = context.user_data['current_report_data'].get('translator_name', 'غير محدد')
+        
+        text = f"👤 **تعديل المترجم**\n\n"
+        text += f"**المترجم الحالي:** {current_translator}\n\n"
+        text += "اختر المترجم الجديد من القائمة:"
+        
+        # تقسيم الأسماء إلى صفوف (3 أسماء لكل صف)
+        keyboard = []
+        row = []
+        
+        for i, name in enumerate(translator_names):
+            row.append(InlineKeyboardButton(name, callback_data=f"edit_translator:{i}"))
+            if len(row) == 3 or i == len(translator_names) - 1:
+                keyboard.append(row)
+                row = []
+        
+        keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="edit_back_to_fields")])
+        keyboard.append([InlineKeyboardButton("❌ إلغاء", callback_data="edit_cancel")])
+        
+        await query.edit_message_text(
+            text,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode=ParseMode.MARKDOWN
+        )
+        
+        logger.info(f"✅ تم عرض قائمة المترجمين للتعديل")
+        return EDIT_TRANSLATOR
+        
+    except Exception as e:
+        logger.error(f"❌ خطأ في show_translator_selection_for_edit: {e}", exc_info=True)
+        await query.edit_message_text("❌ حدث خطأ أثناء تحميل قائمة المترجمين")
+        return ConversationHandler.END
+
+
+async def handle_translator_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة اختيار المترجم الجديد"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    query = update.callback_query
+    await query.answer()
+    
+    try:
+        if query.data == "edit_cancel":
+            await query.edit_message_text("❌ **تم إلغاء عملية التعديل**")
+            return ConversationHandler.END
+        
+        if query.data == "edit_back_to_fields":
+            return await show_field_selection(query, context)
+        
+        # استخراج index المترجم
+        parts = query.data.split(":")
+        if len(parts) < 2:
+            await query.edit_message_text("❌ خطأ في البيانات")
+            return ConversationHandler.END
+        
+        translator_index = int(parts[1])
+        translator_names = load_translator_names()
+        
+        if translator_index < 0 or translator_index >= len(translator_names):
+            await query.edit_message_text("❌ اختيار غير صحيح")
+            return ConversationHandler.END
+        
+        new_translator_name = translator_names[translator_index]
+        
+        # البحث عن المترجم في قاعدة البيانات
+        report_id = context.user_data.get('edit_report_id')
+        
+        with SessionLocal() as s:
+            # البحث عن المترجم أو إنشاؤه
+            translator = s.query(Translator).filter_by(full_name=new_translator_name).first()
+            if not translator:
+                translator = Translator(full_name=new_translator_name)
+                s.add(translator)
+                s.commit()
+            
+            translator_id = translator.id
+            
+            # تحديث التقرير
+            report = s.query(Report).filter_by(id=report_id).first()
+            if report:
+                report.translator_id = translator_id
+                s.commit()
+                
+                # تحديث البيانات المحفوظة
+                context.user_data['current_report_data']['translator_name'] = new_translator_name
+                context.user_data['current_report_data']['translator_id'] = translator_id
+                
+                logger.info(f"✅ تم تحديث المترجم للتقرير {report_id}: {new_translator_name}")
+                
+                await query.edit_message_text(
+                    f"✅ **تم تعديل المترجم بنجاح**\n\n"
+                    f"**المترجم الجديد:** {new_translator_name}",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+                
+                # الانتظار قليلاً ثم العودة لقائمة الحقول
+                import asyncio
+                await asyncio.sleep(1)
+                return await show_field_selection(query, context)
+            else:
+                await query.edit_message_text("❌ لم يتم العثور على التقرير")
+                return ConversationHandler.END
+                
+    except Exception as e:
+        logger.error(f"❌ خطأ في handle_translator_selection: {e}", exc_info=True)
+        await query.edit_message_text("❌ حدث خطأ أثناء تحديث المترجم")
+        return ConversationHandler.END
+
 
 async def handle_callback_during_edit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة الأزرار أثناء انتظار القيمة الجديدة"""
@@ -1316,7 +1518,7 @@ def register(app):
     
     conv_handler = ConversationHandler(
         entry_points=[
-            MessageHandler(filters.Regex("^✏️ تعديل التقارير$"), start_edit_reports)
+            MessageHandler(filters.Regex("تعديل التقارير"), start_edit_reports)
         ],
         states={
             SELECT_REPORT: [
@@ -1353,6 +1555,11 @@ def register(app):
                 CallbackQueryHandler(handle_date_time_selection, pattern="^edit_back_to_fields$"),
                 CallbackQueryHandler(handle_date_time_selection, pattern="^edit_cancel$"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_new_value)
+            ],
+            EDIT_TRANSLATOR: [
+                CallbackQueryHandler(handle_translator_selection, pattern="^edit_translator:"),
+                CallbackQueryHandler(handle_translator_selection, pattern="^edit_back_to_fields$"),
+                CallbackQueryHandler(handle_translator_selection, pattern="^edit_cancel$"),
             ],
             CONFIRM_EDIT: [
                 CallbackQueryHandler(handle_confirm_edit)

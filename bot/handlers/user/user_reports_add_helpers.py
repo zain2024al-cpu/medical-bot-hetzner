@@ -204,22 +204,36 @@ async def save_report_to_db(query, context):
             submitted_by_user_id = context.user_data.get('_user_id')
         
         new_report = Report(
+            # IDs للربط
             patient_id=patient.id,
             hospital_id=hospital.id,
             department_id=department.id,
             doctor_id=doctor.id if doctor else None,
             translator_id=translator.id if translator else None,
+            submitted_by_user_id=submitted_by_user_id,
+            
+            # ✅ الأسماء المكررة للبحث والطباعة السريعة
+            patient_name=patient.full_name if patient else data_tmp.get("patient_name"),
+            hospital_name=hospital.name if hospital else data_tmp.get("hospital_name"),
+            department=department.name if department else data_tmp.get("department_name"),
+            doctor_name=doctor.name if doctor else data_tmp.get("doctor_name"),
+            translator_name=translator.full_name if translator else None,
+            
+            # محتوى التقرير
             complaint_text=data_tmp.get("complaint_text", ""),
             doctor_decision=data_tmp.get("doctor_decision", ""),
             medical_action=data_tmp.get("medical_action", ""),
+            
+            # التواريخ
             followup_date=data_tmp.get("followup_date"),
             followup_reason=data_tmp.get("followup_reason", ""),
+            report_date=data_tmp.get("report_date") or datetime.utcnow(),
+            created_at=datetime.utcnow(),
+            
+            # حقول تأجيل الموعد
             app_reschedule_reason=data_tmp.get("app_reschedule_reason"),
             app_reschedule_return_date=data_tmp.get("app_reschedule_return_date"),
             app_reschedule_return_reason=data_tmp.get("app_reschedule_return_reason"),
-            report_date=data_tmp.get("report_date") or datetime.utcnow(),
-            created_at=datetime.utcnow(),
-            submitted_by_user_id=submitted_by_user_id,  # ✅ حفظ معرف المستخدم
         )
         session.add(new_report)
         session.commit()

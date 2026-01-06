@@ -84,6 +84,15 @@ async def main():
 
     logger.info("✅ توكن البوت موجود وصالح")
 
+    # 💾 تهيئة نظام النسخ الاحتياطي لقاعدة البيانات
+    try:
+        from services.database_backup import initialize_backup_system
+        backup_path = initialize_backup_system()
+        if backup_path:
+            logger.info(f"✅ نسخة احتياطية: {backup_path}")
+    except Exception as e:
+        logger.warning(f"⚠️ خطأ في نظام النسخ الاحتياطي: {e}")
+
     # 📁 إنشاء مجلد للبيانات المحفوظة
     data_dir = os.path.join(os.path.dirname(__file__), 'data')
     os.makedirs(data_dir, exist_ok=True)

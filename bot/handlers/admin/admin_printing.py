@@ -8,6 +8,7 @@ import os
 import io
 import uuid
 from datetime import datetime, date, timedelta, time
+import logging
 
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes, ConversationHandler, MessageHandler, CallbackQueryHandler, filters
@@ -15,6 +16,7 @@ from telegram.constants import ParseMode
 from db.session import SessionLocal
 from db.models import Report, Patient, Hospital, Department, Translator
 from bot.shared_auth import is_admin
+from bot.decorators import admin_handler
 from sqlalchemy import func, extract
 import matplotlib
 matplotlib.use('Agg')  # استخدام backend بدون GUI
@@ -46,6 +48,8 @@ try:
         print(f"⚠️ تحذير: لا يمكن الكتابة في مجلد {EXPORTS_DIR}: {e}")
 except Exception as e:
     print(f"⚠️ تحذير: فشل إنشاء مجلد {EXPORTS_DIR}: {e}")
+
+logger = logging.getLogger(__name__)
 
 # ================================================
 # دوال مساعدة للرسوم البيانية
@@ -90,6 +94,7 @@ def normalize_date_range(start_date, end_date):
 # بدء نظام الطباعة
 # ================================================
 
+@admin_handler
 async def start_professional_printing(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """بدء نظام الطباعة الاحترافي"""
     user = update.effective_user
@@ -122,6 +127,7 @@ async def start_professional_printing(update: Update, context: ContextTypes.DEFA
 # معالجة اختيار نوع التقرير
 # ================================================
 
+@admin_handler
 async def handle_print_type_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة اختيار نوع التقرير"""
     query = update.callback_query
@@ -157,6 +163,7 @@ async def handle_print_type_selection(update: Update, context: ContextTypes.DEFA
 # معالجة اختيار الفترة
 # ================================================
 
+@admin_handler
 async def handle_period_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة اختيار الفترة الزمنية"""
     query = update.callback_query
@@ -255,6 +262,7 @@ async def show_print_options(query, context):
 # معالجة الخيارات وإنشاء التقرير
 # ================================================
 
+@admin_handler
 async def handle_print_options(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة خيارات الطباعة"""
     query = update.callback_query
@@ -371,28 +379,59 @@ def _build_report_package(start_dt, end_dt, period_name):
     
     with SessionLocal() as s:
         query_reports = s.query(Report)
+        # فلترة حسب المستشفى إذا كان نوع التقرير hospital
+        print_type = None
+        try:
+            import inspect
+            frame = inspect.currentframe()
+            while frame:
+                if 'context' in frame.f_locals:
+                    print_type = frame.f_locals['context'].user_data.get('print_type')
+                    break
+                frame = frame.f_back
+        except Exception:
+            print_type = None
+        # فلترة حسب المستشفى
+        if print_type == 'hospital':
+            hospital_id = None
+            hospital_name = None
+            try:
+                if 'context' in locals():
+                    hospital_id = locals()['context'].user_data.get('hospital_id')
+                    hospital_name = locals()['context'].user_data.get('hospital_name')
+            except Exception:
+                pass
+            # إذا كنت تحتاج بيانات من جدول Hospital نفسه (مثلاً تريد استخدام hospital.name من الجدول الأصلي)
+            # استخدم join بشكل صحيح مع شرط ON
+            need_hospital_fields = False  # غيّر هذا إلى True إذا كنت تحتاج بيانات من جدول Hospital
+            if need_hospital_fields:
+                query_reports = query_reports.select_from(Report).join(Hospital, Report.hospital_id == Hospital.id)
+                if hospital_id:
+                    query_reports = query_reports.filter(Hospital.id == hospital_id)
+                elif hospital_name:
+                    query_reports = query_reports.filter(Hospital.name == hospital_name)
+            else:
+                if hospital_id:
+                    query_reports = query_reports.filter(Report.hospital_id == hospital_id)
+                elif hospital_name:
+                    query_reports = query_reports.filter(Report.hospital_name == hospital_name)
         if start_dt and end_dt:
             query_reports = query_reports.filter(
                 Report.report_date >= start_dt,
                 Report.report_date <= end_dt
             )
-        
         reports = query_reports.all()
         if not reports:
             return {"empty": True, "period_name": period_name}
-        
         stats = generate_statistics(s, reports, start_dt, end_dt)
         charts_paths = generate_charts(s, reports, start_dt, end_dt)
         cleanup_paths.extend(charts_paths)
-        
         try:
             html_content = generate_html_report(reports, stats, charts_paths, period_name)
             unique_key = _unique_export_basename()
             html_path = os.path.join(EXPORTS_DIR, f'report_{unique_key}.html')
-            
             # التأكد من وجود المجلد
             os.makedirs(EXPORTS_DIR, exist_ok=True)
-            
             # كتابة ملف HTML
             with open(html_path, 'w', encoding='utf-8') as f:
                 f.write(html_content)
@@ -407,7 +446,6 @@ def _build_report_package(start_dt, end_dt, period_name):
                 print(f"❌ {error_msg}")
             # أعادة رفع الاستثناء مع تضمين التتبع لتسهيل التشخيص في الواجهة
             raise Exception(error_msg) from html_error
-        
         pdf_created, pdf_path = _render_pdf_from_html(html_path)
         if pdf_created:
             cleanup_paths.append(pdf_path)
@@ -418,7 +456,6 @@ def _build_report_package(start_dt, end_dt, period_name):
             final_path = html_path
             file_type = "HTML"
             filename = f'تقرير_طبي_{unique_key}.html'
-        
     return {
         "empty": False,
         "report_count": len(reports),
@@ -471,8 +508,12 @@ def _render_pdf_from_html(html_path):
             }
             pdfkit.from_file(html_path, pdf_path, options=options)
             return True, pdf_path
+        except ImportError:
+            print("⚠️ مكتبة pdfkit غير مثبتة. لتصدير PDF عبر pdfkit، ثبتها بالأمر: pip install pdfkit")
+            return False, html_path
         except Exception as pdf_error:
             print(f"⚠️ فشل إنشاء PDF عبر pdfkit: {pdf_error}")
+            return False, html_path
     except Exception as e:
         print(f"⚠️ خطأ في إنشاء PDF: {e}")
     

@@ -29,7 +29,7 @@ def register_all_handlers(app):
         admin_ai,
         admin_notes,
         # admin_schedule,  # تم تعطيله - استخدم shared_schedule
-        # admin_users,  # تم تعطيله - استخدم admin_users_management بدلاً منه
+        # admin_users,  # ❌ تم حذفه - تم دمجه في admin_users_management
     )
     from bot.handlers.admin.admin_schedule_management import register as register_schedule_management
     from bot.handlers.admin.admin_evaluation import register as register_evaluation
@@ -46,10 +46,10 @@ def register_all_handlers(app):
     admin_reports.register(app)  # ✅ نظام الطباعة المحدث (مع خيار القسم)
     admin_ai.register(app)
     admin_notes.register(app)
-    # admin_users.register(app)  # تم تعطيله - استخدم admin_users_management بدلاً منه
+    # admin_users.register(app)  # ❌ تم حذفه - تم دمجه في admin_users_management
     register_schedule_management(app)
     register_evaluation(app)
-    register_users_management(app)  # ✅ النظام الجديد الكامل
+    register_users_management(app)  # ✅ النظام الجديد الكامل (يشمل القبول/الرفض + الإدارة)
     register_admin_admins(app)  # ✅ إدارة الأدمنين
     # register_admin_printing(app)  # ❌ تم تعطيله - تداخل مع admin_reports (نفس الزر)
     register_daily_patients(app)  # ✅ إدارة أسماء المرضى اليومية

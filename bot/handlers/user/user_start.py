@@ -7,6 +7,9 @@ from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 from datetime import datetime
 import hashlib
+import logging
+
+logger = logging.getLogger(__name__)
 
 from bot.shared_auth import ensure_translator_record, is_user_approved, register_pending_user
 from bot.keyboards import user_main_kb, start_persistent_kb
@@ -148,10 +151,13 @@ async def user_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
                 if not ADMIN_IDS:
                     logger.warning("⚠️ لا يوجد أدمن محدد في ADMIN_IDS!")
-                    logger.warning("لا يوجد أدمن محدد في ADMIN_IDS!")
+                    print("⚠️ لا يوجد أدمن محدد في ADMIN_IDS!")
                 else:
                     logger.info(f"📨 محاولة إرسال إشعار إلى {len(ADMIN_IDS)} أدمن...")
+                    print(f"📨 محاولة إرسال إشعار إلى {len(ADMIN_IDS)} أدمن: {ADMIN_IDS}")
                     success_count = 0
+                    failed_admins = []
+                    
                     for admin_id in ADMIN_IDS:
                         try:
                             keyboard = InlineKeyboardMarkup([
@@ -160,34 +166,69 @@ async def user_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                     InlineKeyboardButton("❌ رفض", callback_data=f"reject:{tg_id}")
                                 ]
                             ])
+                            
+                            # محاولة إرسال الإشعار
                             await context.bot.send_message(
                                 chat_id=admin_id,
-                                text=f"🔔 طلب انضمام جديد!\n\n"
-                                     f"👤 الاسم: {user.first_name or 'بدون اسم'}\n"
-                                     f"🆔 Telegram ID: {tg_id}\n"
-                                     f"📅 التاريخ: {created_at.strftime('%Y-%m-%d %H:%M') if created_at else 'الآن'}\n\n"
+                                text=f"🔔 **طلب انضمام جديد!**\n\n"
+                                     f"👤 **الاسم:** {user.first_name or 'بدون اسم'}\n"
+                                     f"🆔 **Telegram ID:** `{tg_id}`\n"
+                                     f"📅 **التاريخ:** {created_at.strftime('%Y-%m-%d %H:%M') if created_at else 'الآن'}\n\n"
                                      f"⚠️ يرجى الموافقة أو الرفض:",
-                                reply_markup=keyboard
+                                reply_markup=keyboard,
+                                parse_mode="Markdown"
                             )
                             success_count += 1
-                            logger.info(f"✅ تم إرسال تنبيه للأدمن {admin_id}")
-                            print(f"✅ تم إرسال تنبيه للأدمن {admin_id}")
+                            logger.info(f"✅ تم إرسال إشعار للأدمن {admin_id}")
+                            print(f"✅ تم إرسال إشعار للأدمن {admin_id}")
+                            
                         except Exception as e:
-                            logger.error(f"❌ فشل إرسال تنبيه للأدمن {admin_id}: {e}", exc_info=True)
-                            print(f"❌ فشل إرسال تنبيه للأدمن {admin_id}: {e}")
+                            error_msg = str(e)
+                            failed_admins.append((admin_id, error_msg))
+                            
+                            # تحليل نوع الخطأ
+                            if "bot was blocked by the user" in error_msg.lower():
+                                logger.error(f"❌ الأدمن {admin_id} قام بحظر البوت!")
+                                print(f"❌ الأدمن {admin_id} قام بحظر البوت!")
+                            elif "chat not found" in error_msg.lower():
+                                logger.error(f"❌ الأدمن {admin_id} لم يبدأ محادثة مع البوت بعد!")
+                                print(f"❌ الأدمن {admin_id} لم يبدأ محادثة مع البوت بعد! (يجب أن يضغط /start)")
+                            else:
+                                logger.error(f"❌ فشل إرسال إشعار للأدمن {admin_id}: {e}")
+                                print(f"❌ فشل إرسال إشعار للأدمن {admin_id}: {e}")
                     
+                    # تقرير نهائي
                     logger.info(f"📊 تم إرسال الإشعار بنجاح إلى {success_count} من {len(ADMIN_IDS)} أدمن")
                     print(f"📊 تم إرسال الإشعار بنجاح إلى {success_count} من {len(ADMIN_IDS)} أدمن")
+                    
+                    if failed_admins:
+                        print(f"⚠️ فشل الإرسال لـ {len(failed_admins)} أدمن:")
+                        for admin_id, error in failed_admins:
+                            print(f"   - الأدمن {admin_id}: {error[:100]}")
+                        logger.warning(f"⚠️ فشل الإرسال لـ {len(failed_admins)} أدمن")
                 
                 # إرسال رسالة للمستخدم الجديد
+                notification_status = ""
+                if success_count == len(ADMIN_IDS):
+                    notification_status = "✅ تم إشعار الإدارة بطلبك."
+                elif success_count > 0:
+                    notification_status = f"⚠️ تم إشعار بعض الإدارة ({success_count}/{len(ADMIN_IDS)})."
+                else:
+                    notification_status = "⚠️ لم يتم إرسال إشعار تلقائي.\n💡 يرجى التواصل مع الإدارة مباشرة."
+                
                 await update.message.reply_text(
                     f"👋 مرحباً {user.first_name}!\n\n"
                     f"📝 تم تسجيل طلبك بنجاح.\n\n"
+                    f"{notification_status}\n\n"
                     f"⏳ طلبك قيد المراجعة من قبل الإدارة.\n"
                     f"سيتم إشعارك فور الموافقة على طلبك.\n\n"
                     f"⏱️ الوقت المتوقع: عادة خلال 24 ساعة.\n\n"
+                    f"📋 **معلومات مهمة:**\n"
+                    f"• يمكنك متابعة حالة طلبك من زر \"المستخدمين المعلقين\"\n"
+                    f"• ستتلقى إشعاراً فورياً عند الموافقة على طلبك\n\n"
                     f"شكراً لصبرك! 🙏",
-                    reply_markup=start_persistent_kb()
+                    reply_markup=start_persistent_kb(),
+                    parse_mode="Markdown"
                 )
                 return  # إيقاف التنفيذ - المستخدم ينتظر الموافقة
                 

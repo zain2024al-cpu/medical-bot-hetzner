@@ -1634,7 +1634,8 @@ async def save_report_to_database(query, context, flow_type):
         elif flow_type == "radiology":
             radiology_type = data.get("radiology_type", "")
             complaint_text = ""
-            decision_text = f"نوع الأشعة والفحوصات: {radiology_type}"
+            # ✅ لا نضيف radiology_type هنا لأنه يُعرض بشكل منفصل في البث
+            decision_text = ""
         elif flow_type == "appointment_reschedule":
             app_reschedule_reason = data.get("app_reschedule_reason", "")
             app_reschedule_return_reason = data.get("app_reschedule_return_reason", "")
@@ -1715,22 +1716,35 @@ async def save_report_to_database(query, context, flow_type):
                 app_reschedule_return_date = to_naive_datetime(app_reschedule_return_date)
             logger.info(f"💾 حفظ حقول تأجيل الموعد: reason={app_reschedule_reason}, return_date={app_reschedule_return_date}, return_reason={app_reschedule_return_reason}")
         
-        # إنشاء التقرير
+        # إنشاء التقرير مع جميع الحقول المطلوبة
         new_report = Report(
+            # IDs للربط
             patient_id=patient.id,
             hospital_id=hospital.id,
             department_id=department.id if department else None,
             doctor_id=doctor.id if doctor else None,
-            translator_id=actual_translator_id,  # ✅ استخدام translator_id الفعلي
+            translator_id=actual_translator_id,
+            submitted_by_user_id=user_id,
+            
+            # ✅ الأسماء المكررة للبحث والطباعة السريعة
+            patient_name=patient_name,
+            hospital_name=hospital_name,
+            department=dept_name_for_display or (department.name if department else None),
+            doctor_name=doctor_name,
+            translator_name=data.get("translator_name"),
+            
+            # محتوى التقرير
             complaint_text=complaint_text,
             doctor_decision=decision_text,
             medical_action=final_medical_action,
+            
+            # التواريخ
             followup_date=followup_date,
             followup_reason=data.get("followup_reason", "لا يوجد"),
             report_date=report_date,
             created_at=created_at,
-            submitted_by_user_id=user_id,  # ✅ حفظ معرف المستخدم الذي أنشأ التقرير
-            # ✅ حفظ حقول تأجيل الموعد في الأعمدة المخصصة
+            
+            # ✅ حفظ حقول تأجيل الموعد
             app_reschedule_reason=app_reschedule_reason,
             app_reschedule_return_date=app_reschedule_return_date,
             app_reschedule_return_reason=app_reschedule_return_reason
@@ -1817,20 +1831,35 @@ async def save_report_to_database(query, context, flow_type):
                 app_reschedule_reason = data.get('app_reschedule_reason', '')
                 logger.info(f"📅 save_report_to_database: app_reschedule_reason من data = {repr(app_reschedule_reason)}")
                 
+                # ✅ إذا لم يكن موجوداً في data، محاولة الحصول عليه من report_tmp
+                if not app_reschedule_reason or not str(app_reschedule_reason).strip():
+                    logger.warning(f"⚠️ save_report_to_database: app_reschedule_reason فارغ في data، محاولة الحصول من report_tmp")
+                    report_tmp = context.user_data.get("report_tmp", {})
+                    app_reschedule_reason_from_tmp = report_tmp.get('app_reschedule_reason', '')
+                    if app_reschedule_reason_from_tmp and str(app_reschedule_reason_from_tmp).strip():
+                        app_reschedule_reason = str(app_reschedule_reason_from_tmp).strip()
+                        logger.info(f"✅ save_report_to_database: تم الحصول على app_reschedule_reason من report_tmp = {repr(app_reschedule_reason)}")
+                
+                # ✅ إذا كان موجوداً، إضافته إلى broadcast_data
                 if app_reschedule_reason and str(app_reschedule_reason).strip():
                     broadcast_data['app_reschedule_reason'] = str(app_reschedule_reason).strip()
                     logger.info(f"✅ save_report_to_database: تم إضافة app_reschedule_reason إلى broadcast_data = {repr(broadcast_data.get('app_reschedule_reason'))}")
                 else:
-                    logger.warning(f"⚠️ save_report_to_database: app_reschedule_reason فارغ أو None في data")
-                    # محاولة الحصول عليه من report_tmp مباشرة
-                    report_tmp = context.user_data.get("report_tmp", {})
-                    app_reschedule_reason_from_tmp = report_tmp.get('app_reschedule_reason', '')
-                    if app_reschedule_reason_from_tmp:
-                        broadcast_data['app_reschedule_reason'] = str(app_reschedule_reason_from_tmp).strip()
-                        logger.info(f"✅ save_report_to_database: تم الحصول على app_reschedule_reason من report_tmp = {repr(broadcast_data.get('app_reschedule_reason'))}")
+                    # ✅ محاولة استخراجه من doctor_decision إذا كان موجوداً
+                    doctor_decision = broadcast_data.get('doctor_decision', '')
+                    if doctor_decision and 'سبب تأجيل الموعد:' in str(doctor_decision):
+                        parts = str(doctor_decision).split('سبب تأجيل الموعد:', 1)
+                        if len(parts) > 1:
+                            extracted_reason = parts[1].strip()
+                            if '\n' in extracted_reason:
+                                extracted_reason = extracted_reason.split('\n')[0].strip()
+                            if extracted_reason:
+                                broadcast_data['app_reschedule_reason'] = extracted_reason
+                                logger.info(f"✅ save_report_to_database: تم استخراج app_reschedule_reason من doctor_decision = {repr(extracted_reason)}")
+                            else:
+                                logger.warning(f"⚠️ save_report_to_database: لم يتم العثور على app_reschedule_reason في doctor_decision")
                     else:
-                        broadcast_data['app_reschedule_reason'] = ''
-                        logger.error(f"❌ save_report_to_database: app_reschedule_reason غير موجود في data أو report_tmp")
+                        logger.warning(f"⚠️ save_report_to_database: app_reschedule_reason غير موجود في data أو report_tmp أو doctor_decision")
                 
                 # استخدام app_reschedule_return_date إذا كان موجوداً
                 return_date = data.get('app_reschedule_return_date') or data.get('followup_date')
@@ -1854,10 +1883,19 @@ async def save_report_to_database(query, context, flow_type):
                 if data.get('followup_time'):
                     broadcast_data['followup_time'] = data.get('followup_time')
 
-            await broadcast_new_report(context.bot, broadcast_data)
-            logger.info(f"تم بث التقرير #{report_id} لجميع المستخدمين")
+            # ✅ إضافة logging قبل البث
+            logger.info(f"📤 save_report_to_database: جاهز للبث - report_id={report_id}, flow_type={flow_type}")
+            logger.info(f"📤 save_report_to_database: broadcast_data keys = {list(broadcast_data.keys())}")
+            logger.info(f"📤 save_report_to_database: medical_action = {broadcast_data.get('medical_action')}")
+            
+            try:
+                await broadcast_new_report(context.bot, broadcast_data)
+                logger.info(f"✅ save_report_to_database: تم بث التقرير #{report_id} لجميع المستخدمين")
+            except Exception as broadcast_error:
+                logger.error(f"❌ save_report_to_database: خطأ في بث التقرير #{report_id}: {broadcast_error}", exc_info=True)
+                # ✅ لا نوقف العملية - نكمل حتى لو فشل البث
         except Exception as e:
-            logger.error(f"خطأ في بث التقرير: {e}", exc_info=True)
+            logger.error(f"❌ save_report_to_database: خطأ عام في حفظ التقرير: {e}", exc_info=True)
 
         # الرد للمستخدم
         success_message = (

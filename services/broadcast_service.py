@@ -29,11 +29,20 @@ async def broadcast_new_report(bot: Bot, report_data: dict):
         bot: كائن البوت
         report_data: بيانات التقرير كـ dictionary
     """
+    logger.info(f"📤 broadcast_new_report: بدء البث - report_id={report_data.get('report_id')}, medical_action={report_data.get('medical_action')}")
+    logger.info(f"📤 broadcast_new_report: USE_GROUP_BROADCAST={USE_GROUP_BROADCAST}, REPORTS_GROUP_ID={REPORTS_GROUP_ID}")
+    
     # تنسيق الرسالة
-    message = format_report_message(report_data)
+    try:
+        message = format_report_message(report_data)
+        logger.info(f"✅ broadcast_new_report: تم تنسيق الرسالة بنجاح (طول: {len(message)} حرف)")
+    except Exception as format_error:
+        logger.error(f"❌ broadcast_new_report: خطأ في تنسيق الرسالة: {format_error}", exc_info=True)
+        return
 
     # 🚀 الطريقة الجديدة: إرسال للمجموعة المنفصلة
     if USE_GROUP_BROADCAST and REPORTS_GROUP_ID:
+        logger.info(f"📤 broadcast_new_report: محاولة الإرسال للمجموعة {REPORTS_GROUP_ID}")
         try:
             # إرسال للمجموعة
             # إضافة زر تفاعلي لعرض سبب التأجيل إذا كان التقرير من نوع "تأجيل موعد"
@@ -70,6 +79,7 @@ async def broadcast_new_report(bot: Bot, report_data: dict):
             except Exception:
                 reply_markup = None
 
+            logger.info(f"📤 broadcast_new_report: محاولة إرسال الرسالة للمجموعة (طول الرسالة: {len(message)} حرف)")
             sent_message = await bot.send_message(
                 chat_id=REPORTS_GROUP_ID,
                 text=message,
@@ -77,7 +87,7 @@ async def broadcast_new_report(bot: Bot, report_data: dict):
                 reply_markup=reply_markup
             )
             group_message_id = sent_message.message_id
-            logger.info(f"✅ تم إرسال التقرير للمجموعة: {REPORTS_GROUP_ID}, message_id: {group_message_id}")
+            logger.info(f"✅ broadcast_new_report: تم إرسال التقرير للمجموعة: {REPORTS_GROUP_ID}, message_id: {group_message_id}")
             
             # إرجاع معرف الرسالة لحفظه في قاعدة البيانات
             report_id = report_data.get('report_id')
@@ -122,10 +132,11 @@ async def broadcast_new_report(bot: Bot, report_data: dict):
 
             # إرسال تنبيه للمستخدم عن التقرير الجديد
             await send_user_notification(bot, report_data)
+            logger.info(f"✅ broadcast_new_report: اكتمل البث للمجموعة بنجاح")
             return
 
         except Exception as e:
-            logger.error(f"❌ فشل إرسال التقرير للمجموعة: {e}")
+            logger.error(f"❌ broadcast_new_report: فشل إرسال التقرير للمجموعة: {e}", exc_info=True)
             # في حالة فشل الإرسال للمجموعة، نعود للطريقة القديمة
 
     # 🏠 الطريقة القديمة: إرسال فردي (احتياطي أو عند عدم تفعيل المجموعة)
@@ -279,23 +290,33 @@ def format_report_message(data: dict) -> str:
         logger.info(f"📅 broadcast_service: data keys = {list(data.keys())}")
         logger.info(f"📅 broadcast_service: app_reschedule_reason من data = {repr(data.get('app_reschedule_reason'))}")
         
-        # سبب تأجيل الموعد - دعم fallback إلى followup_reason أو doctor_decision
-        app_reschedule_reason = data.get('app_reschedule_reason')
+        # ✅ سبب تأجيل الموعد - استخدام app_reschedule_reason مع fallback ذكي
+        app_reschedule_reason = data.get('app_reschedule_reason', '')
+        logger.info(f"📅 broadcast_service: app_reschedule_reason من data = {repr(app_reschedule_reason)}")
+        
+        # ✅ إذا لم يكن موجوداً، محاولة استخراجه من doctor_decision
         if not app_reschedule_reason or not str(app_reschedule_reason).strip():
-            logger.warning(f"⚠️ broadcast_service: app_reschedule_reason فارغ، محاولة fallback")
-            app_reschedule_reason = data.get('followup_reason') or ''
-            if not app_reschedule_reason and data.get('doctor_decision'):
-                # حاول استخراج سطر يحتوي على سبب التأجيل من نص قرار الطبيب
-                dd = str(data.get('doctor_decision'))
-                if 'سبب تأجيل' in dd:
-                    app_reschedule_reason = dd
-
-        logger.info(f"📅 broadcast_service: resolved app_reschedule_reason = {repr(app_reschedule_reason)}")
+            logger.warning(f"⚠️ broadcast_service: app_reschedule_reason فارغ، محاولة استخراجه من doctor_decision")
+            doctor_decision = data.get('doctor_decision', '')
+            if doctor_decision:
+                # محاولة استخراج "سبب تأجيل الموعد" من نص قرار الطبيب
+                if 'سبب تأجيل الموعد:' in str(doctor_decision):
+                    # استخراج النص بعد "سبب تأجيل الموعد:"
+                    parts = str(doctor_decision).split('سبب تأجيل الموعد:', 1)
+                    if len(parts) > 1:
+                        extracted_reason = parts[1].strip()
+                        # إزالة أي نص إضافي بعد السطر الأول
+                        if '\n' in extracted_reason:
+                            extracted_reason = extracted_reason.split('\n')[0].strip()
+                        app_reschedule_reason = extracted_reason
+                        logger.info(f"✅ broadcast_service: تم استخراج app_reschedule_reason من doctor_decision = {repr(app_reschedule_reason)}")
+        
+        # ✅ التحقق من أن app_reschedule_reason موجود وليس فارغاً
         if app_reschedule_reason and str(app_reschedule_reason).strip():
-            message += f"📅 **سبب تأجيل الموعد:** {app_reschedule_reason}\n\n"
-            logger.info(f"✅ broadcast_service: تم إضافة سبب تأجيل الموعد إلى الرسالة")
+            message += f"📅 **سبب تأجيل الموعد:** {str(app_reschedule_reason).strip()}\n\n"
+            logger.info(f"✅ broadcast_service: تم إضافة سبب تأجيل الموعد إلى الرسالة = {repr(app_reschedule_reason)}")
         else:
-            logger.warning(f"⚠️ broadcast_service: سبب تأجيل الموعد فارغ، لن يظهر في الرسالة")
+            logger.warning(f"⚠️ broadcast_service: سبب تأجيل الموعد فارغ أو None، لن يظهر في الرسالة")
         
         # تاريخ العودة (موعد العودة)
         return_date = data.get('app_reschedule_return_date') or data.get('followup_date')
@@ -334,10 +355,15 @@ def format_report_message(data: dict) -> str:
             except:
                 message += f"📅 **موعد العودة:** {return_date}\n\n"
         
-        # سبب العودة
-        return_reason = data.get('app_reschedule_return_reason') or data.get('followup_reason')
-        if return_reason and return_reason.strip() and return_reason != 'لا يوجد':
-            message += f"✍️ **سبب العودة:** {return_reason}\n\n"
+        # سبب العودة - استخدام app_reschedule_return_reason فقط (لا تكرار)
+        return_reason = data.get('app_reschedule_return_reason', '')
+        if return_reason and str(return_reason).strip() and str(return_reason) != 'لا يوجد':
+            message += f"✍️ **سبب العودة:** {str(return_reason).strip()}\n\n"
+            logger.info(f"✅ broadcast_service: عرض سبب العودة = {repr(return_reason)}")
+        else:
+            logger.warning(f"⚠️ broadcast_service: سبب العودة فارغ أو مفقود")
+            logger.warning(f"   - app_reschedule_return_reason = {repr(data.get('app_reschedule_return_reason'))}")
+            logger.warning(f"   - followup_reason = {repr(data.get('followup_reason'))}")
         
         # المترجم
         if data.get('translator_name'):
@@ -451,7 +477,7 @@ def format_report_message(data: dict) -> str:
             
             # التحقق من نوع الإجراء
             medical_action = data.get('medical_action', '')
-            if medical_action in ['علاج طبيعي وإعادة تأهيل', 'علاج طبيعي', 'أجهزة تعويضية', 'أشعة وفحوصات', 'تأجيل موعد', 'خروج من المستشفى']:
+            if medical_action in ['علاج طبيعي وإعادة تأهيل', 'علاج طبيعي', 'أجهزة تعويضية', 'أشعة وفحوصات', 'تأجيل موعد', 'خروج من المستشفى', 'خروج', 'ترقيد', 'عملية جراحية', 'عملية', 'استشارة نهائية']:
                 # هذه الأنواع لا تحتوي على "قرار الطبيب" - نعرض النص مباشرة
                 message += '\n'.join(organized_lines) + '\n\n'
             else:
@@ -499,6 +525,17 @@ def format_report_message(data: dict) -> str:
         
         if data.get('radiology_delivery_date') and data.get('radiology_delivery_date') != 'لا يوجد':
             message += f"📅 تاريخ التسليم: {data['radiology_delivery_date']}\n\n"
+        
+        # ✅ لمسار الأشعة: نعرض المترجم مباشرة بدون موعد العودة وسبب العودة
+        if data.get('translator_name'):
+            message += f"👨‍⚕️ المترجم: {data['translator_name']}"
+        return message
+    
+    # ✅ لمسار "استشارة أخيرة": نعرض المترجم مباشرة بدون موعد العودة وسبب العودة
+    if data.get('medical_action') == 'استشارة أخيرة':
+        if data.get('translator_name'):
+            message += f"👨‍⚕️ المترجم: {data['translator_name']}"
+        return message
     
     # موعد العودة - تنسيق محسّن (فقط إذا كان موجوداً وليس None)
     if data.get('followup_date') and data.get('followup_date') != 'لا يوجد':

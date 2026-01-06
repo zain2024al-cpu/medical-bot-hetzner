@@ -126,11 +126,12 @@ def create_calendar_keyboard(year=None, month=None, callback_prefix="date", allo
     
     keyboard.append(nav_row)
     
-    # الصف الثاني: أيام الأسبوع
+    # الصف الثاني: أيام الأسبوع (تبدأ من الاثنين)
     keyboard.append([InlineKeyboardButton(day, callback_data="noop") for day in DAYS_AR])
     
-    # أيام الشهر
-    cal = calendar.monthcalendar(year, month)
+    # أيام الشهر - نستخدم Calendar مع firstweekday=0 (الاثنين)
+    c = calendar.Calendar(firstweekday=0)  # 0 = الاثنين
+    cal = c.monthdayscalendar(year, month)
     
     for week in cal:
         week_buttons = []

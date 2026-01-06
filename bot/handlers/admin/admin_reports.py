@@ -15,6 +15,7 @@ from db.session import SessionLocal
 from db.models import Report, Patient, Hospital, Department, Doctor
 from services.pdf_generator import generate_pdf_report, generate_pdf_reports
 from bot.shared_auth import is_admin
+from bot.decorators import admin_handler
 import os
 import io
 import base64
@@ -344,6 +345,58 @@ def create_charts(stats, filter_type=None):
 def _cancel_inline():
     return InlineKeyboardMarkup([[InlineKeyboardButton("❌ إلغاء المحادثة", callback_data="abort")]])
 
+
+def _build_patient_list_keyboard(patients_list, page=0, items_per_page=10):
+    """بناء قائمة أزرار المرضى مع صفحات"""
+    total = len(patients_list)
+    total_pages = max(1, (total + items_per_page - 1) // items_per_page)
+    page = max(0, min(page, total_pages - 1))
+    
+    start_idx = page * items_per_page
+    end_idx = min(start_idx + items_per_page, total)
+    
+    keyboard = []
+    
+    # عرض المرضى في الصفحة الحالية (اسمين في كل صف)
+    patients_page = patients_list[start_idx:end_idx]
+    for i in range(0, len(patients_page), 2):
+        row = []
+        for j in range(2):
+            if i + j >= len(patients_page):
+                break
+            patient_id, patient_name = patients_page[i + j]
+            # اختصار الاسم إذا كان طويلاً
+            display_name = patient_name[:25] + "..." if len(patient_name) > 25 else patient_name
+            row.append(InlineKeyboardButton(
+                f"👤 {display_name}",
+                callback_data=f"print_patient:{patient_id}"
+            ))
+        keyboard.append(row)
+    
+    # أزرار التنقل بين الصفحات
+    nav_buttons = []
+    if page > 0:
+        nav_buttons.append(InlineKeyboardButton("⬅️ السابق", callback_data=f"patient_page:{page-1}"))
+    nav_buttons.append(InlineKeyboardButton(f"📄 {page+1}/{total_pages}", callback_data="noop"))
+    if page < total_pages - 1:
+        nav_buttons.append(InlineKeyboardButton("➡️ التالي", callback_data=f"patient_page:{page+1}"))
+    
+    if nav_buttons:
+        keyboard.append(nav_buttons)
+    
+    # أزرار التحكم
+    keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="back:filter")])
+    keyboard.append([InlineKeyboardButton("❌ إلغاء", callback_data="abort")])
+    
+    text = (
+        f"👤 **اختر المريض من القائمة:**\n\n"
+        f"📊 إجمالي المرضى: {total}\n"
+        f"📄 الصفحة: {page + 1} من {total_pages}"
+    )
+    
+    return text, InlineKeyboardMarkup(keyboard)
+
+
 def _filters_kb():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("👤 طباعة باسم مريض", callback_data="filter:patient")],
@@ -400,6 +453,7 @@ def _confirm_kb(show_back=True):
     buttons.append([InlineKeyboardButton("❌ إلغاء", callback_data="abort")])
     return InlineKeyboardMarkup(buttons)
 
+@admin_handler
 async def start_reports_filter(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if not is_admin(user.id):
@@ -408,6 +462,7 @@ async def start_reports_filter(update: Update, context: ContextTypes.DEFAULT_TYP
     await update.message.reply_text("🖨️ اختر نوع الفلترة:", reply_markup=_filters_kb())
     return SELECT_FILTER
 
+@admin_handler
 async def handle_filter_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
@@ -415,25 +470,35 @@ async def handle_filter_choice(update: Update, context: ContextTypes.DEFAULT_TYP
     context.user_data["filter_type"] = choice
 
     if choice == "patient":
-        # ✅ استخدام البحث الفوري Inline Query
-        context.user_data["mode"] = "print_patient"  # تحديد وضع الطباعة
+        # ✅ عرض قائمة المرضى للاختيار منها
+        context.user_data["mode"] = "print_patient"
+        context.user_data["patient_page"] = 0  # الصفحة الأولى
         
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton(
-                "🔍 ابحث عن المريض", 
-                switch_inline_query_current_chat=""
-            )],
-            [InlineKeyboardButton("🔙 رجوع", callback_data="back:filter")],
-            [InlineKeyboardButton("❌ إلغاء", callback_data="abort")]
-        ])
-        await q.edit_message_text(
-            "👤 **طباعة تقارير مريض محدد**\n\n"
-            "🔍 اضغط الزر أدناه ثم ابحث عن المريض:\n\n"
-            "💡 ستظهر لك اقتراحات فورية أثناء الكتابة",
-            reply_markup=keyboard,
-            parse_mode="Markdown"
-        )
-        return SELECT_FILTER  # البقاء في نفس الحالة
+        # جلب قائمة المرضى من قاعدة البيانات
+        with SessionLocal() as session:
+            patients = session.query(Patient).filter(
+                Patient.full_name.isnot(None),
+                Patient.full_name != ""
+            ).order_by(Patient.full_name).all()
+            patients_list = [(p.id, p.full_name) for p in patients]
+        
+        if not patients_list:
+            await q.edit_message_text(
+                "⚠️ لا يوجد مرضى في قاعدة البيانات!",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🔙 رجوع", callback_data="back:filter")],
+                    [InlineKeyboardButton("❌ إلغاء", callback_data="abort")]
+                ])
+            )
+            return SELECT_FILTER
+        
+        # حفظ قائمة المرضى في السياق
+        context.user_data["patients_list"] = patients_list
+        
+        # عرض الصفحة الأولى
+        text, keyboard = _build_patient_list_keyboard(patients_list, page=0)
+        await q.edit_message_text(text, reply_markup=keyboard, parse_mode="Markdown")
+        return ENTER_NAME
     
     elif choice == "hospital":
         # ✅ جلب قائمة المستشفيات من ملف doctors.txt
@@ -920,16 +985,20 @@ def _query_reports(filter_type, name_val, year_val, month_val, dept_val=None):
         base_query = s.query(Report)
 
         if filter_type == "patient" and name_val:
-            base_query = base_query.join(Patient).filter(Patient.full_name.ilike(f"%{name_val}%"))
+            # استخدام ON clause صريح
+            base_query = base_query.join(Patient, Report.patient_id == Patient.id).filter(Patient.full_name.ilike(f"%{name_val}%"))
         elif filter_type == "hospital" and name_val:
-            base_query = base_query.join(Hospital).filter(Hospital.name.ilike(f"%{name_val}%"))
+            # استخدام ON clause صريح
+            # تطبيع اسم المستشفى للبحث المرن (استبدال الفواصل والشرطات)
+            search_name = name_val.replace(",", "%").replace(" - ", "%").replace("-", "%")
+            base_query = base_query.join(Hospital, Report.hospital_id == Hospital.id).filter(Hospital.name.ilike(f"%{search_name}%"))
             
             # إذا كان هناك فلتر قسم أيضاً
             if dept_val:
-                base_query = base_query.join(Department).filter(Department.name.ilike(f"%{dept_val}%"))
+                base_query = base_query.join(Department, Report.department_id == Department.id).filter(Department.name.ilike(f"%{dept_val}%"))
         elif filter_type == "department" and name_val:
-            # فلترة حسب القسم فقط
-            base_query = base_query.join(Department).filter(Department.name.ilike(f"%{name_val}%"))
+            # فلترة حسب القسم فقط - استخدام ON clause صريح
+            base_query = base_query.join(Department, Report.department_id == Department.id).filter(Department.name.ilike(f"%{name_val}%"))
 
         # فلترة حسب السنة والشهر
         if year_val and year_val != "all":
@@ -1223,6 +1292,7 @@ async def _generate_reports_pdf_with_charts(pdf_data, charts_data):
         logger.error(f"❌ خطأ في إنشاء PDF: {e}", exc_info=True)
         raise
 
+@admin_handler
 async def confirm_export(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     if q:
@@ -1586,6 +1656,57 @@ async def handle_hospital_selection(update: Update, context: ContextTypes.DEFAUL
     )
     
     return SELECT_DEPARTMENT_OPTION
+
+async def handle_print_patient_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة اختيار المريض من القائمة للطباعة"""
+    q = update.callback_query
+    await q.answer()
+    
+    patient_id = int(q.data.split(":", 1)[1])
+    
+    # جلب اسم المريض من قاعدة البيانات
+    with SessionLocal() as session:
+        patient = session.query(Patient).filter_by(id=patient_id).first()
+        if patient:
+            patient_name = patient.full_name
+        else:
+            await q.edit_message_text("❌ لم يتم العثور على المريض!")
+            return SELECT_FILTER
+    
+    context.user_data["filter_value"] = patient_name
+    
+    # الانتقال لاختيار السنة
+    await q.edit_message_text(
+        f"✅ **تم اختيار المريض:** {patient_name}\n\n"
+        f"📅 اختر السنة:",
+        reply_markup=_years_kb(),
+        parse_mode="Markdown"
+    )
+    return SELECT_YEAR
+
+
+async def handle_patient_page(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة التنقل بين صفحات قائمة المرضى"""
+    q = update.callback_query
+    await q.answer()
+    
+    page = int(q.data.split(":", 1)[1])
+    patients_list = context.user_data.get("patients_list", [])
+    
+    if not patients_list:
+        # إعادة جلب القائمة من قاعدة البيانات
+        with SessionLocal() as session:
+            patients = session.query(Patient).filter(
+                Patient.full_name.isnot(None),
+                Patient.full_name != ""
+            ).order_by(Patient.full_name).all()
+            patients_list = [(p.id, p.full_name) for p in patients]
+            context.user_data["patients_list"] = patients_list
+    
+    text, keyboard = _build_patient_list_keyboard(patients_list, page=page)
+    await q.edit_message_text(text, reply_markup=keyboard, parse_mode="Markdown")
+    return ENTER_NAME
+
 
 async def handle_manual_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة زر الكتابة اليدوية"""
@@ -2830,6 +2951,8 @@ def register(app):
                 MessageHandler(filters.Regex("^❌ إلغاء المحادثة$"), cancel_text),
             ],
             ENTER_NAME: [
+                CallbackQueryHandler(handle_print_patient_selection, pattern=r"^print_patient:\d+$"),
+                CallbackQueryHandler(handle_patient_page, pattern=r"^patient_page:\d+$"),
                 CallbackQueryHandler(handle_hospital_selection, pattern=r"^select_hospital:"),
                 CallbackQueryHandler(handle_department_selection, pattern=r"^select_dept:"),
                 CallbackQueryHandler(handle_manual_entry, pattern=r"^(hospital|dept):manual$"),

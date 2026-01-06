@@ -8,6 +8,7 @@ from telegram.ext import ContextTypes, ConversationHandler, MessageHandler, Call
 from db.session import SessionLocal
 from db.models import Translator, Report
 from bot.shared_auth import is_admin
+from bot.decorators import admin_handler
 from datetime import datetime
 from sqlalchemy import func
 import logging
@@ -24,7 +25,7 @@ def _escape_markdown_v2(text: str) -> str:
     From python-telegram-bot examples.
     """
     escape_chars = r'_*[]()~`>#+-=|{}.!'
-    return re.sub(r'([{}])'.format(re.escape(escape_chars)), r'\', text)
+    return re.sub(r'([{}])'.format(re.escape(escape_chars)), r'\\\1', text)
 
 async def start_user_management(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """بدء إدارة المستخدمين"""
@@ -90,6 +91,7 @@ def _user_actions_kb():
         [InlineKeyboardButton("🔙 رجوع", callback_data="um:back")]
     ])
 
+@admin_handler
 async def handle_user_management_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة جميع استدعاءات إدارة المستخدمين"""
     query = update.callback_query
@@ -131,77 +133,92 @@ async def handle_user_management_callback(update: Update, context: ContextTypes.
 
 async def _show_all_users(query, context):
     """عرض جميع المستخدمين"""
-    with SessionLocal() as s:
-        users = s.query(Translator).order_by(Translator.created_at.desc()).all()
-        
-        if not users:
-            await query.message.reply_text(
-                "📋 **لا يوجد مستخدمين مسجلين**\n\n"
-                "لم يتم تسجيل أي مستخدم بعد.\n\n"
-                "اختر خياراً آخر:",
-                reply_markup=_main_kb(),
-                parse_mode="Markdown"
-            )
-            try:
-                await query.delete_message()
-            except:
-                pass
-            return UM_START
-        
-        text = f"📋 **جميع المستخدمين ({len(users)})**\n\n"
-        text += "اختر مستخدماً لعرض التفاصيل:"
-        await query.edit_message_text(text, reply_markup=_users_kb(users), parse_mode="Markdown")
-        return UM_SELECT_USER
+    try:
+        with SessionLocal() as s:
+            users = s.query(Translator).order_by(Translator.created_at.desc()).all()
+            
+            if not users:
+                await query.message.reply_text(
+                    "📋 **لا يوجد مستخدمين مسجلين**\n\n"
+                    "لم يتم تسجيل أي مستخدم بعد.\n\n"
+                    "اختر خياراً آخر:",
+                    reply_markup=_main_kb(),
+                    parse_mode="Markdown"
+                )
+                try:
+                    await query.delete_message()
+                except:
+                    pass
+                return UM_START
+            
+            text = f"📋 **جميع المستخدمين ({len(users)})**\n\n"
+            text += "اختر مستخدماً لعرض التفاصيل:"
+            await query.edit_message_text(text, reply_markup=_users_kb(users), parse_mode="Markdown")
+            return UM_SELECT_USER
+    except Exception as e:
+        logger.error(f"Error in _show_all_users: {e}", exc_info=True)
+        await query.message.reply_text("❌ حدث خطأ. يرجى المحاولة مرة أخرى.", reply_markup=_main_kb())
+        return UM_START
 
 async def _show_pending_users(query, context):
     """عرض المستخدمين المعلقين"""
-    with SessionLocal() as s:
-        users = s.query(Translator).filter_by(is_approved=False).order_by(Translator.created_at.desc()).all()
-        
-        if not users:
-            # استخدام reply بدلاً من edit لتجنب خطأ "Message is not modified"
-            await query.message.reply_text(
-                "⏳ **لا يوجد مستخدمين معلقين**\n\n"
-                "✅ لا توجد طلبات انضمام بانتظار الموافقة.\n\n"
-                "اختر خياراً آخر:",
-                reply_markup=_main_kb(),
-                parse_mode="Markdown"
-            )
-            # حذف الرسالة القديمة
-            try:
-                await query.delete_message()
-            except:
-                pass
-            return UM_START
-        
-        text = f"⏳ **المستخدمين المعلقين ({len(users)})**\n\n"
-        text += "اختر مستخدماً لعرض التفاصيل:"
-        await query.edit_message_text(text, reply_markup=_users_kb(users), parse_mode="Markdown")
-        return UM_SELECT_USER
+    try:
+        with SessionLocal() as s:
+            users = s.query(Translator).filter_by(is_approved=False).order_by(Translator.created_at.desc()).all()
+            
+            if not users:
+                # استخدام reply بدلاً من edit لتجنب خطأ "Message is not modified"
+                await query.message.reply_text(
+                    "⏳ **لا يوجد مستخدمين معلقين**\n\n"
+                    "✅ لا توجد طلبات انضمام بانتظار الموافقة.\n\n"
+                    "اختر خياراً آخر:",
+                    reply_markup=_main_kb(),
+                    parse_mode="Markdown"
+                )
+                # حذف الرسالة القديمة
+                try:
+                    await query.delete_message()
+                except:
+                    pass
+                return UM_START
+            
+            text = f"⏳ **المستخدمين المعلقين ({len(users)})**\n\n"
+            text += "اختر مستخدماً لعرض التفاصيل:"
+            await query.edit_message_text(text, reply_markup=_users_kb(users), parse_mode="Markdown")
+            return UM_SELECT_USER
+    except Exception as e:
+        logger.error(f"Error in _show_pending_users: {e}", exc_info=True)
+        await query.message.reply_text("❌ حدث خطأ. يرجى المحاولة مرة أخرى.", reply_markup=_main_kb())
+        return UM_START
 
 async def _show_approved_users(query, context):
     """عرض المستخدمين الموافق عليهم"""
-    with SessionLocal() as s:
-        users = s.query(Translator).filter_by(is_approved=True).order_by(Translator.created_at.desc()).all()
-        
-        if not users:
-            await query.message.reply_text(
-                "✅ **لا يوجد مستخدمين نشطين**\n\n"
-                "لم يتم الموافقة على أي مستخدم بعد.\n\n"
-                "اختر خياراً آخر:",
-                reply_markup=_main_kb(),
-                parse_mode="Markdown"
-            )
-            try:
-                await query.delete_message()
-            except:
-                pass
-            return UM_START
-        
-        text = f"✅ **المستخدمين النشطين ({len(users)})**\n\n"
-        text += "اختر مستخدماً لعرض التفاصيل:"
-        await query.edit_message_text(text, reply_markup=_users_kb(users), parse_mode="Markdown")
-        return UM_SELECT_USER
+    try:
+        with SessionLocal() as s:
+            users = s.query(Translator).filter_by(is_approved=True).order_by(Translator.created_at.desc()).all()
+            
+            if not users:
+                await query.message.reply_text(
+                    "✅ **لا يوجد مستخدمين نشطين**\n\n"
+                    "لم يتم الموافقة على أي مستخدم بعد.\n\n"
+                    "اختر خياراً آخر:",
+                    reply_markup=_main_kb(),
+                    parse_mode="Markdown"
+                )
+                try:
+                    await query.delete_message()
+                except:
+                    pass
+                return UM_START
+            
+            text = f"✅ **المستخدمين النشطين ({len(users)})**\n\n"
+            text += "اختر مستخدماً لعرض التفاصيل:"
+            await query.edit_message_text(text, reply_markup=_users_kb(users), parse_mode="Markdown")
+            return UM_SELECT_USER
+    except Exception as e:
+        logger.error(f"Error in _show_approved_users: {e}", exc_info=True)
+        await query.message.reply_text("❌ حدث خطأ. يرجى المحاولة مرة أخرى.", reply_markup=_main_kb())
+        return UM_START
 
 async def _show_user_details(query, context, user_id):
     """عرض تفاصيل المستخدم"""
@@ -714,8 +731,51 @@ async def cancel_user_management(update: Update, context: ContextTypes.DEFAULT_T
     await update.message.reply_text("❌ تم إلغاء إدارة المستخدمين.")
     return ConversationHandler.END
 
+# ================================================
+# ✅ دمج وظائف القبول/الرفض من admin_users.py
+# ================================================
+async def handle_user_approval(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة القبول/الرفض للمستخدمين الجدد (من الإشعارات)"""
+    query = update.callback_query
+    await query.answer()
+
+    data = query.data
+    user_id = int(data.split(":")[1])
+
+    with SessionLocal() as s:
+        tr = s.query(Translator).filter_by(tg_user_id=user_id).first()
+
+        if not tr:
+            await query.edit_message_text("⚠️ المستخدم لم يعد موجوداً في قاعدة البيانات.")
+            return
+
+        if data.startswith("approve:"):
+            tr.is_approved = True
+            tr.updated_at = datetime.now()
+            s.commit()
+            await query.edit_message_text(f"✅ تم قبول المستخدم: {tr.full_name}")
+
+            # إخطار المستخدم بأنه تم قبوله
+            try:
+                await context.bot.send_message(
+                    chat_id=user_id,
+                    text="🎉 تم قبولك من قبل الإدارة! يمكنك الآن استخدام النظام."
+                )
+            except Exception:
+                pass
+
+        elif data.startswith("reject:"):
+            user_name = tr.full_name
+            s.delete(tr)
+            s.commit()
+            await query.edit_message_text(f"❌ تم رفض المستخدم: {user_name}")
+
 def register(app):
     """تسجيل الهاندلرز"""
+    # ✅ تسجيل معالج القبول/الرفض (من الإشعارات)
+    app.add_handler(CallbackQueryHandler(handle_user_approval, pattern="^(approve|reject):"))
+    
+    # ✅ تسجيل ConversationHandler لإدارة المستخدمين الكاملة
     conv = ConversationHandler(
         entry_points=[
             MessageHandler(filters.Regex("^👥 إدارة المستخدمين$"), start_user_management)

@@ -63,6 +63,9 @@ KNOWN_CALLBACKS = [
     # Admin
     # ===========================
     r"^admin:",
+    r"^um:",               # إدارة المستخدمين
+    r"^suspend_reason:",   # أسباب التجميد
+    r"^confirm_delete:",   # تأكيد الحذف
     r"^back_to_admin$",
     r"^back_to_main$",
     r"^back_to_schedule$",

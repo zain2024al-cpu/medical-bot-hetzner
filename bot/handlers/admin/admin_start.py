@@ -17,10 +17,46 @@ async def admin_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if not is_admin(user.id):
         return
+    
+    # مسح أي حالة عالقة
+    if context.user_data:
+        context.user_data.clear()
+    
     await update.message.reply_text(
         f"👑 أهلاً {user.first_name}! لوحة التحكم جاهزة.",
         reply_markup=admin_main_kb()
     )
+
+
+# 🔄 أمر /cancel لإعادة تعيين كل شيء
+async def cancel_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """إعادة تعيين كل الحالات والبيانات المعلقة"""
+    from telegram.ext import ConversationHandler
+    
+    # مسح بيانات المستخدم
+    if context.user_data:
+        context.user_data.clear()
+    
+    # مسح بيانات المحادثة
+    if hasattr(context, 'chat_data') and context.chat_data:
+        context.chat_data.clear()
+    
+    user = update.effective_user
+    
+    if is_admin(user.id):
+        await update.message.reply_text(
+            "✅ **تم إعادة تعيين كل الحالات**\n\n"
+            "يمكنك الآن استخدام أي زر من جديد.",
+            reply_markup=admin_main_kb(),
+            parse_mode="Markdown"
+        )
+    else:
+        await update.message.reply_text(
+            "✅ تم إعادة تعيين الحالة.\n"
+            "اضغط /start للبدء من جديد."
+        )
+    
+    return ConversationHandler.END
 
 
 # ✅ دالة لمعالجة زر القبول / الرفض للمستخدمين الجدد
@@ -285,6 +321,7 @@ async def handle_group_settings(update, context):
 # 🧩 تسجيل الهاندلرز الخاصة بلوحة التحكم
 def register(app):
     app.add_handler(CommandHandler("admin", admin_start))
+    app.add_handler(CommandHandler("cancel", cancel_all))  # ✅ أمر إعادة التعيين
     app.add_handler(MessageHandler(filters.Regex("^ℹ️ مساعدة$"), admin_start))
     # ✅ لا نحتاج لإضافة معالج لزر "👥 إدارة المستخدمين" هنا
     # لأن ConversationHandler في admin_users_management.py يتعامل معه مباشرة

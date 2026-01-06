@@ -4,7 +4,7 @@
   "description": "Unified Doctors & Hospitals Database - Merged & Deduplicated",
   "statistics": {
     "total_hospitals": 34,
-    "total_doctors": 1066,
+    "total_doctors": 1068,
     "total_departments": 599
   },
   "hospitals": [
@@ -12690,6 +12690,26 @@
       "hospital_name": "Aster CMI Hospital, Bangalore",
       "department": "الأذن والأنف والحنجرة | ENT",
       "search_text": "اشوك aster cmi hospital, bangalore الأذن والأنف والحنجرة | ent",
+      "added_manually": true
+    },
+    {
+      "id": 1067,
+      "name": "فيفاف",
+      "name_normalized": "فيفاف",
+      "hospital_id": 37,
+      "hospital_name": "Trilife Hospital, Bangalore",
+      "department": "العلاج الطبيعي وإعادة التأهيل | Physical Therapy & Rehabilitation",
+      "search_text": "فيفاف trilife hospital, bangalore العلاج الطبيعي وإعادة التأهيل | physical therapy & rehabilitation",
+      "added_manually": true
+    },
+    {
+      "id": 1068,
+      "name": "كومار",
+      "name_normalized": "كومار",
+      "hospital_id": 15,
+      "hospital_name": "KARE Prosthetics and Orthotics, Bangalore",
+      "department": "العلاج الطبيعي وإعادة التأهيل | Physical Therapy & Rehabilitation",
+      "search_text": "كومار kare prosthetics and orthotics, bangalore العلاج الطبيعي وإعادة التأهيل | physical therapy & rehabilitation",
       "added_manually": true
     }
   ]

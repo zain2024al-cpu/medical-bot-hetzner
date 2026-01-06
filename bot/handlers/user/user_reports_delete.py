@@ -464,7 +464,7 @@ def register(app):
     """تسجيل handler حذف التقارير"""
     conv_handler = ConversationHandler(
         entry_points=[
-            MessageHandler(filters.Regex("^🗑️ حذف التقارير$"), start_delete_reports)
+            MessageHandler(filters.Regex("حذف التقارير"), start_delete_reports)
         ],
         states={
             SELECT_REPORT: [
