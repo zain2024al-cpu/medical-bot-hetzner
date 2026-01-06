@@ -9077,9 +9077,26 @@ async def handle_draft_field_input(update: Update, context: ContextTypes.DEFAULT
             'operation_details': 'تفاصيل العملية',
             'operation_name_en': 'اسم العملية بالإنجليزي',
             'tests': 'الفحوصات المطلوبة',
+            'translator_name': 'المترجم',
+            # ✅ حقول تأجيل الموعد
+            'app_reschedule_reason': 'سبب تأجيل الموعد',
+            'app_reschedule_return_date': 'موعد العودة الجديد',
+            'app_reschedule_return_reason': 'سبب العودة',
+            # ✅ حقول الأشعة والفحوصات
+            'radiology_type': 'نوع الأشعة والفحوصات',
+            'radiology_delivery_date': 'تاريخ التسليم',
+            # ✅ حقول العلاج الطبيعي
+            'therapy_details': 'تفاصيل الجلسة',
+            # ✅ حقول الأجهزة التعويضية
+            'device_details': 'تفاصيل الجهاز',
+            # ✅ حقول الرقود
+            'admission_summary': 'ملخص الرقود',
         }
 
         field_display_name = field_names.get(field_key, field_key)
+        
+        # تنظيف اسم الحقل من الأحرف الخاصة لتجنب أخطاء Markdown
+        safe_field_name = field_display_name.replace('_', ' ').replace('*', '').replace('`', '')
 
         # مسح حقل التعديل
         context.user_data.pop('editing_field', None)
@@ -9094,7 +9111,7 @@ async def handle_draft_field_input(update: Update, context: ContextTypes.DEFAULT
             editable_fields = get_editable_fields_by_action_type(medical_action)
             
             # بناء قائمة الحقول مع تأكيد التحديث
-            text = f"✅ تم تحديث **{field_display_name}** بنجاح!\n\n"
+            text = f"✅ تم تحديث {safe_field_name} بنجاح!\n\n"
             text += "📝 اختر حقلاً آخر للتعديل أو اضغط انتهيت:\n"
             
             await update.message.reply_text(text, parse_mode="Markdown")
@@ -9136,6 +9153,20 @@ async def _show_edit_fields_menu(message, context, editable_fields, flow_type):
         'operation_details': 'operation_details',
         'operation_name_en': 'operation_name_en',
         'tests': 'tests',
+        'translator_name': 'translator_name',
+        # ✅ حقول تأجيل الموعد
+        'app_reschedule_reason': 'app_reschedule_reason',
+        'app_reschedule_return_date': 'app_reschedule_return_date',
+        'app_reschedule_return_reason': 'app_reschedule_return_reason',
+        # ✅ حقول الأشعة والفحوصات
+        'radiology_type': 'radiology_type',
+        'radiology_delivery_date': 'radiology_delivery_date',
+        # ✅ حقول العلاج الطبيعي
+        'therapy_details': 'therapy_details',
+        # ✅ حقول الأجهزة التعويضية
+        'device_details': 'device_details',
+        # ✅ حقول الرقود
+        'admission_summary': 'admission_summary',
     }
 
     data = context.user_data.get("report_tmp", {})
