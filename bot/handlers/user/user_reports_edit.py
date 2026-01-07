@@ -127,7 +127,9 @@ def get_editable_fields_by_action_type(medical_action):
     if action_clean == 'استشارة جديدة':
         return [
             ('complaint_text', '💬 شكوى المريض'),
-            ('doctor_decision', '📝 قرار الطبيب (التشخيص والقرار والفحوصات)'),
+            ('diagnosis', '🔬 التشخيص'),
+            ('doctor_decision', '📝 قرار الطبيب'),
+            ('notes', '🧪 الفحوصات'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
             ('translator_name', '👤 المترجم'),
@@ -139,7 +141,10 @@ def get_editable_fields_by_action_type(medical_action):
     elif action_clean == 'استشارة مع قرار عملية':
         return [
             ('complaint_text', '💬 شكوى المريض'),
-            ('doctor_decision', '📝 قرار الطبيب (التشخيص والعملية ونسبة النجاح)'),
+            ('diagnosis', '🔬 التشخيص'),
+            ('doctor_decision', '📝 قرار الطبيب'),
+            ('notes', '⚕️ اسم العملية'),
+            ('treatment_plan', '📊 نسبة النجاح'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
             ('translator_name', '👤 المترجم'),
@@ -150,7 +155,9 @@ def get_editable_fields_by_action_type(medical_action):
     # ===========================================
     elif action_clean == 'استشارة أخيرة':
         return [
-            ('doctor_decision', '📝 قرار الطبيب (التشخيص والتوصيات)'),
+            ('diagnosis', '🔬 التشخيص'),
+            ('doctor_decision', '📝 قرار الطبيب'),
+            ('treatment_plan', '📋 التوصيات'),
             ('translator_name', '👤 المترجم'),
         ]
 
@@ -160,7 +167,9 @@ def get_editable_fields_by_action_type(medical_action):
     elif action_clean == 'طوارئ':
         return [
             ('complaint_text', '💬 شكوى المريض'),
-            ('doctor_decision', '📝 قرار الطبيب (التشخيص والقرار ووضع الحالة)'),
+            ('diagnosis', '🔬 التشخيص'),
+            ('doctor_decision', '📝 قرار الطبيب'),
+            ('case_status', '🚨 وضع الحالة'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
             ('translator_name', '👤 المترجم'),
@@ -185,6 +194,7 @@ def get_editable_fields_by_action_type(medical_action):
     elif action_clean == 'مراجعة / عودة دورية':
         return [
             ('complaint_text', '💬 شكوى المريض'),
+            ('diagnosis', '🔬 التشخيص'),
             ('doctor_decision', '📝 قرار الطبيب'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
@@ -197,7 +207,8 @@ def get_editable_fields_by_action_type(medical_action):
     elif action_clean == 'عملية':
         return [
             ('complaint_text', '⚕️ تفاصيل العملية'),
-            ('doctor_decision', '📝 ملاحظات العملية'),
+            ('notes', '📝 اسم العملية بالانجليزي'),
+            ('doctor_decision', '📋 ملاحظات العملية'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
             ('translator_name', '👤 المترجم'),
@@ -221,7 +232,9 @@ def get_editable_fields_by_action_type(medical_action):
     elif action_clean == 'ترقيد':
         return [
             ('complaint_text', '🛏️ سبب الرقود'),
+            ('diagnosis', '🔬 التشخيص'),
             ('doctor_decision', '📝 قرار الطبيب'),
+            ('room_number', '🏥 رقم الغرفة'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
             ('translator_name', '👤 المترجم'),
@@ -495,6 +508,13 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
                 'report_date': report.report_date.strftime('%Y-%m-%d %H:%M'),
                 'translator_name': translator.full_name if translator else "غير محدد",
                 'translator_id': report.translator_id,
+                # حقول إضافية
+                'room_number': getattr(report, 'room_number', None) or "لا يوجد",
+                'radiology_type': getattr(report, 'radiology_type', None) or "لا يوجد",
+                'radiology_delivery_date': getattr(report, 'radiology_delivery_date', None),
+                'app_reschedule_reason': getattr(report, 'app_reschedule_reason', None) or "لا يوجد",
+                'app_reschedule_return_date': getattr(report, 'app_reschedule_return_date', None),
+                'app_reschedule_return_reason': getattr(report, 'app_reschedule_return_reason', None) or "لا يوجد",
             }
             
             # تحويل موعد العودة إلى صيغة 12 ساعة للعرض
@@ -534,15 +554,22 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
             text += f"⚕️ **نوع الإجراء:** {medical_action}\n\n"
             text += "اختر الحقل الذي تريد تعديله:\n"
             
-            # بناء الأزرار - جميع الحقول المتاحة لهذا النوع
+            # بناء الأزرار - جميع حقول هذا النوع من الإجراء (حتى الفارغة)
             keyboard = []
             all_fields = get_editable_fields_by_action_type(medical_action)
             
             for field_name, field_display in all_fields:
                 current_value = context.user_data['current_report_data'].get(field_name, "")
                 
-                # عرض جميع الحقول (حتى الفارغة)
-                button_text = f"{field_display}"
+                # عرض جميع الحقول مع قيمتها الحالية
+                if not current_value or str(current_value).strip() == "" or current_value == "لا يوجد":
+                    display_value = "⚠️ فارغ"
+                elif len(str(current_value)) > 15:
+                    display_value = str(current_value)[:12] + "..."
+                else:
+                    display_value = str(current_value)
+                
+                button_text = f"{field_display}: {display_value}"
                 keyboard.append([InlineKeyboardButton(button_text, callback_data=f"edit_field:{field_name}")])
             
             # إضافة زر إعادة النشر
@@ -596,7 +623,7 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
             doctor = s.query(Doctor).filter_by(id=report.doctor_id).first() if report.doctor_id else None
             translator = s.query(Translator).filter_by(id=report.translator_id).first() if report.translator_id else None
             
-            # تجهيز بيانات البث
+            # تجهيز بيانات البث - جميع الحقول
             followup_display = 'لا يوجد'
             if report.followup_date:
                 followup_display = report.followup_date.strftime('%Y-%m-%d')
@@ -605,16 +632,39 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     followup_display += f" - {time_12h}"
             
             broadcast_data = {
+                'report_id': report_id,
                 'report_date': report.report_date.strftime('%Y-%m-%d %H:%M') if report.report_date else datetime.now().strftime('%Y-%m-%d %H:%M'),
                 'patient_name': patient.full_name if patient else 'غير معروف',
                 'hospital_name': hospital.name if hospital else 'غير معروف',
                 'department_name': department.name if department else 'غير محدد',
                 'doctor_name': doctor.full_name if doctor else 'لم يتم التحديد',
                 'medical_action': report.medical_action or 'غير محدد',
+                # جميع الحقول النصية
                 'complaint_text': report.complaint_text or '',
+                'diagnosis': report.diagnosis or '',
                 'doctor_decision': report.doctor_decision or '',
+                'decision': report.doctor_decision or '',  # نسخة للتوافق
+                'treatment_plan': report.treatment_plan or '',
+                'notes': report.notes or '',
+                'medications': report.medications or '',
+                'case_status': report.case_status or '',
+                # موعد العودة
                 'followup_date': followup_display,
+                'followup_time': report.followup_time or '',
                 'followup_reason': report.followup_reason or 'لا يوجد',
+                # حقول خاصة
+                'room_number': getattr(report, 'room_number', '') or '',
+                'operation_name_en': getattr(report, 'operation_name_en', '') or '',
+                'success_rate': getattr(report, 'success_rate', '') or '',
+                'benefit_rate': getattr(report, 'benefit_rate', '') or '',
+                # حقول تأجيل الموعد
+                'app_reschedule_reason': getattr(report, 'app_reschedule_reason', '') or '',
+                'app_reschedule_return_date': getattr(report, 'app_reschedule_return_date', '') or '',
+                'app_reschedule_return_reason': getattr(report, 'app_reschedule_return_reason', '') or '',
+                # حقول الأشعة
+                'radiology_type': getattr(report, 'radiology_type', '') or '',
+                'radiology_delivery_date': getattr(report, 'radiology_delivery_date', '') or '',
+                # المترجم
                 'translator_name': translator.full_name if translator else 'غير محدد',
                 'is_edit': True  # علامة أن هذا تقرير معدل
             }
@@ -691,7 +741,13 @@ async def handle_field_selection(update: Update, context: ContextTypes.DEFAULT_T
             'case_status': 'حالة الطوارئ',
             'followup_date': 'موعد العودة',
             'followup_reason': 'سبب العودة',
-            'translator_name': 'المترجم'
+            'translator_name': 'المترجم',
+            'room_number': 'رقم الغرفة والطابق',
+            'radiology_type': 'نوع الأشعة والفحوصات',
+            'radiology_delivery_date': 'تاريخ التسليم',
+            'app_reschedule_reason': 'سبب تأجيل الموعد',
+            'app_reschedule_return_date': 'موعد العودة الجديد',
+            'app_reschedule_return_reason': 'سبب العودة',
         }
         
         field_display = field_names.get(field_name, field_name)
@@ -1346,6 +1402,7 @@ async def show_field_selection(query, context):
         hospital = s.query(Hospital).filter_by(id=report.hospital_id).first()
         department = s.query(Department).filter_by(id=report.department_id).first() if report.department_id else None
         doctor = s.query(Doctor).filter_by(id=report.doctor_id).first() if report.doctor_id else None
+        translator = s.query(Translator).filter_by(id=report.translator_id).first() if report.translator_id else None
         
         # تحديث البيانات المحفوظة
         context.user_data['current_report_data'].update({
@@ -1359,10 +1416,15 @@ async def show_field_selection(query, context):
             'followup_date': report.followup_date.strftime('%Y-%m-%d') if report.followup_date else None,
             'followup_time': report.followup_time,
             'followup_reason': report.followup_reason or "لا يوجد",
+            'room_number': getattr(report, 'room_number', None) or "لا يوجد",
+            'translator_name': translator.full_name if translator else "غير محدد",
+            'translator_id': report.translator_id,
         })
         
         # عرض بيانات التقرير مرة أخرى
         medical_action = context.user_data['current_report_data']['medical_action']
+        
+        # ✅ الحصول على الحقول المحددة لهذا النوع من الإجراء
         all_fields = get_editable_fields_by_action_type(medical_action)
         
         text = f"📋 **بيانات التقرير #{report_id}**\n\n"
@@ -1374,13 +1436,20 @@ async def show_field_selection(query, context):
         text += f"⚕️ **نوع الإجراء:** {medical_action}\n\n"
         text += "اختر الحقل الذي تريد تعديله:\n"
         
-        # بناء الأزرار - جميع الحقول المتاحة لهذا النوع
+        # بناء الأزرار - جميع حقول هذا النوع من الإجراء (حتى الفارغة)
         keyboard = []
         for field_name, field_display in all_fields:
             current_value = context.user_data['current_report_data'].get(field_name, "")
             
-            # عرض جميع الحقول (حتى الفارغة)
-            button_text = f"{field_display}"
+            # عرض جميع الحقول مع قيمتها الحالية
+            if not current_value or str(current_value).strip() == "" or current_value == "لا يوجد":
+                display_value = "⚠️ فارغ"
+            elif len(str(current_value)) > 15:
+                display_value = str(current_value)[:12] + "..."
+            else:
+                display_value = str(current_value)
+            
+            button_text = f"{field_display}: {display_value}"
             keyboard.append([InlineKeyboardButton(button_text, callback_data=f"edit_field:{field_name}")])
         
         # إضافة زر إعادة النشر

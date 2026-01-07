@@ -57,7 +57,9 @@ KNOWN_CALLBACKS = [
     r"^flow_",
     r"^save_report",
     r"^edit_before_save",
+    r"^edit_draft:",
     r"^edit_field:",
+    r"^draft_field:",
     r"^confirm_save",
     
     # ===========================

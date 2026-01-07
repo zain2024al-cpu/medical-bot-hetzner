@@ -7685,69 +7685,46 @@ def get_first_state(flow_type):
     return states.get(flow_type, NEW_CONSULT_COMPLAINT)
 
 def get_editable_fields_by_flow_type(flow_type):
-    """الحصول على الحقول القابلة للتعديل حسب نوع التدفق"""
+    """الحصول على الحقول القابلة للتعديل حسب نوع التدفق - فقط حقول التقرير (بدون البيانات الأساسية)"""
     fields_map = {
         "new_consult": [
-            ("report_date", "📅 التاريخ والوقت"),
-            ("patient_name", "👤 اسم المريض"),
-            ("hospital_name", "🏥 المستشفى"),
-            ("department_name", "🏷️ القسم"),
-            ("doctor_name", "👨‍⚕️ اسم الطبيب"),
             ("complaint", "💬 شكوى المريض"),
             ("diagnosis", "🔬 التشخيص الطبي"),
             ("decision", "📝 قرار الطبيب"),
             ("tests", "🧪 الفحوصات والأشعة"),
             ("followup_date", "📅 موعد العودة"),
-            ("followup_time", "⏰ وقت العودة"),
             ("followup_reason", "✍️ سبب العودة"),
+            ("translator_name", "👤 المترجم"),
         ],
         "followup": [
-            ("report_date", "📅 التاريخ والوقت"),
-            ("patient_name", "👤 اسم المريض"),
-            ("hospital_name", "🏥 المستشفى"),
-            ("department_name", "🏷️ القسم"),
-            ("doctor_name", "👨‍⚕️ اسم الطبيب"),
-            ("complaint", "💬 شكوى المريض"),
-            ("diagnosis", "🔬 التشخيص الطبي"),
-            ("decision", "📝 قرار الطبيب"),
+            ("complaint", "💬 حالة المريض اليومية"),
+            ("diagnosis", "🔬 التشخيص"),
+            ("decision", "📝 قرار الطبيب اليومي"),
+            ("room_number", "🚪 رقم الغرفة والطابق"),
             ("followup_date", "📅 موعد العودة"),
-            ("followup_time", "⏰ وقت العودة"),
             ("followup_reason", "✍️ سبب العودة"),
+            ("translator_name", "👤 المترجم"),
         ],
         "emergency": [
-            ("report_date", "📅 التاريخ والوقت"),
-            ("patient_name", "👤 اسم المريض"),
-            ("hospital_name", "🏥 المستشفى"),
-            ("department_name", "🏷️ القسم"),
-            ("doctor_name", "👨‍⚕️ اسم الطبيب"),
             ("complaint", "💬 شكوى المريض"),
-            ("diagnosis", "🔬 التشخيص الطبي"),
+            ("diagnosis", "🔬 التشخيص"),
             ("decision", "📝 قرار الطبيب وماذا تم"),
             ("status", "🏥 وضع الحالة"),
             ("admission_type", "🛏️ نوع الترقيد"),
             ("room_number", "🚪 رقم الغرفة"),
             ("followup_date", "📅 موعد العودة"),
-            ("followup_time", "⏰ وقت العودة"),
             ("followup_reason", "✍️ سبب العودة"),
+            ("translator_name", "👤 المترجم"),
         ],
         "admission": [
-            ("report_date", "📅 التاريخ والوقت"),
-            ("patient_name", "👤 اسم المريض"),
-            ("hospital_name", "🏥 المستشفى"),
-            ("department_name", "🏷️ القسم"),
-            ("doctor_name", "👨‍⚕️ اسم الطبيب"),
             ("admission_reason", "🛏️ سبب الرقود"),
             ("room_number", "🚪 رقم الغرفة"),
             ("notes", "📝 ملاحظات"),
             ("followup_date", "📅 موعد العودة"),
             ("followup_reason", "✍️ سبب العودة"),
+            ("translator_name", "👤 المترجم"),
         ],
         "surgery_consult": [
-            ("report_date", "📅 التاريخ والوقت"),
-            ("patient_name", "👤 اسم المريض"),
-            ("hospital_name", "🏥 المستشفى"),
-            ("department_name", "🏷️ القسم"),
-            ("doctor_name", "👨‍⚕️ اسم الطبيب"),
             ("diagnosis", "🔬 التشخيص"),
             ("decision", "📝 قرار الطبيب وتفاصيل العملية"),
             ("operation_name_en", "🔤 اسم العملية بالإنجليزي"),
@@ -7755,87 +7732,72 @@ def get_editable_fields_by_flow_type(flow_type):
             ("benefit_rate", "💡 نسبة الاستفادة"),
             ("tests", "🧪 الفحوصات والأشعة"),
             ("followup_date", "📅 موعد العودة"),
-            ("followup_time", "⏰ وقت العودة"),
             ("followup_reason", "✍️ سبب العودة"),
+            ("translator_name", "👤 المترجم"),
         ],
         "operation": [
-            ("report_date", "📅 التاريخ والوقت"),
-            ("patient_name", "👤 اسم المريض"),
-            ("hospital_name", "🏥 المستشفى"),
-            ("department_name", "🏷️ القسم"),
-            ("doctor_name", "👨‍⚕️ اسم الطبيب"),
             ("operation_details", "⚕️ تفاصيل العملية بالعربي"),
             ("operation_name_en", "🔤 اسم العملية بالإنجليزي"),
             ("notes", "📝 ملاحظات"),
             ("followup_date", "📅 موعد العودة"),
-            ("followup_time", "⏰ وقت العودة"),
             ("followup_reason", "✍️ سبب العودة"),
+            ("translator_name", "👤 المترجم"),
         ],
         "final_consult": [
-            ("report_date", "📅 التاريخ والوقت"),
-            ("patient_name", "👤 اسم المريض"),
-            ("hospital_name", "🏥 المستشفى"),
-            ("department_name", "🏷️ القسم"),
-            ("doctor_name", "👨‍⚕️ اسم الطبيب"),
             ("diagnosis", "🔬 التشخيص النهائي"),
             ("decision", "📝 قرار الطبيب"),
             ("recommendations", "💡 التوصيات الطبية"),
+            ("translator_name", "👤 المترجم"),
         ],
         "discharge": [
-            ("report_date", "📅 التاريخ والوقت"),
-            ("patient_name", "👤 اسم المريض"),
-            ("hospital_name", "🏥 المستشفى"),
-            ("department_name", "🏷️ القسم"),
-            ("doctor_name", "👨‍⚕️ اسم الطبيب"),
             ("discharge_type", "🚪 نوع الخروج"),
             ("admission_summary", "📋 ملخص الرقود"),
             ("operation_details", "⚕️ تفاصيل العملية"),
             ("operation_name_en", "🔤 اسم العملية بالإنجليزي"),
             ("followup_date", "📅 موعد العودة"),
             ("followup_reason", "✍️ سبب العودة"),
+            ("translator_name", "👤 المترجم"),
         ],
         "rehab_physical": [
-            ("report_date", "📅 التاريخ والوقت"),
-            ("patient_name", "👤 اسم المريض"),
-            ("hospital_name", "🏥 المستشفى"),
-            ("department_name", "🏷️ القسم"),
-            ("doctor_name", "👨‍⚕️ اسم الطبيب"),
             ("therapy_details", "🏃 تفاصيل جلسة العلاج الطبيعي"),
             ("followup_date", "📅 موعد العودة"),
-            ("followup_time", "⏰ وقت العودة"),
             ("followup_reason", "✍️ سبب العودة"),
+            ("translator_name", "👤 المترجم"),
         ],
         "rehab_device": [
-            ("report_date", "📅 التاريخ والوقت"),
-            ("patient_name", "👤 اسم المريض"),
-            ("hospital_name", "🏥 المستشفى"),
-            ("department_name", "🏷️ القسم"),
-            ("doctor_name", "👨‍⚕️ اسم الطبيب"),
             ("device_name", "🦾 اسم الجهاز والتفاصيل"),
             ("followup_date", "📅 موعد العودة"),
-            ("followup_time", "⏰ وقت العودة"),
             ("followup_reason", "✍️ سبب العودة"),
+            ("translator_name", "👤 المترجم"),
         ],
         "radiology": [
-            ("report_date", "📅 التاريخ والوقت"),
-            ("patient_name", "👤 اسم المريض"),
-            ("hospital_name", "🏥 المستشفى"),
-            ("department_name", "🏷️ القسم"),
-            ("doctor_name", "👨‍⚕️ اسم الطبيب"),
             ("radiology_type", "🔬 نوع الأشعة/الفحص"),
             ("delivery_date", "📅 تاريخ الاستلام"),
+            ("translator_name", "👤 المترجم"),
+        ],
+        "app_reschedule": [
+            ("app_reschedule_reason", "📅 سبب التأجيل"),
+            ("app_reschedule_return_date", "📅 موعد العودة الجديد"),
+            ("app_reschedule_return_reason", "✍️ سبب العودة"),
+            ("translator_name", "👤 المترجم"),
         ],
     }
     return fields_map.get(flow_type, [])
 
 async def show_edit_fields_menu(query, context, flow_type):
-    """عرض قائمة الحقول القابلة للتعديل"""
+    """عرض قائمة الحقول القابلة للتعديل - حقول نوع الإجراء فقط"""
     import logging
     logger = logging.getLogger(__name__)
     
     try:
         data = context.user_data.get("report_tmp", {})
+        
+        # ✅ الحصول على الحقول المحددة لهذا النوع من التدفق
         editable_fields = get_editable_fields_by_flow_type(flow_type)
+        
+        logger.info(f"🔍 show_edit_fields_menu: flow_type={flow_type}")
+        logger.info(f"🔍 show_edit_fields_menu: editable_fields count={len(editable_fields)}")
+        logger.info(f"🔍 show_edit_fields_menu: data keys={list(data.keys())}")
         
         if not editable_fields:
             await query.edit_message_text(
@@ -7849,36 +7811,40 @@ async def show_edit_fields_menu(query, context, flow_type):
         text += "اختر الحقل الذي تريد تعديله:\n\n"
         
         keyboard = []
-        fields_count = 0
+        buttons_created = 0
         
+        # ✅ عرض جميع حقول هذا النوع من الإجراء (حتى الفارغة)
         for field_key, field_display in editable_fields:
             # الحصول على القيمة الحالية
             current_value = data.get(field_key, "")
             
-            # ✅ عرض فقط الحقول التي لها قيم
+            # ✅ تنسيق القيمة للعرض
             if not current_value or str(current_value).strip() == "" or current_value == "غير محدد":
-                continue
+                display_value = "⚠️ فارغ"
+            elif isinstance(current_value, datetime):
+                display_value = current_value.strftime('%Y-%m-%d')
+            elif len(str(current_value)) > 15:
+                display_value = str(current_value)[:12] + "..."
+            else:
+                display_value = str(current_value)
             
-            fields_count += 1
+            # ✅ تقصير اسم الحقل إذا كان طويلاً
+            field_display_short = field_display[:20] if len(field_display) > 20 else field_display
+            button_text = f"{field_display_short}: {display_value}"
             
-            if isinstance(current_value, datetime):
-                current_value = current_value.strftime('%Y-%m-%d %H:%M')
-            elif len(str(current_value)) > 30:
-                current_value = str(current_value)[:27] + "..."
-            
-            button_text = f"{field_display}: {str(current_value)[:20]}"
-            
+            # ✅ كل زر في صف منفصل
             keyboard.append([
                 InlineKeyboardButton(
                     button_text,
-                    callback_data=f"edit_field:{flow_type}:{field_key}"
+                    callback_data=f"draft_field:{flow_type}:{field_key}"
                 )
             ])
+            buttons_created += 1
         
-        if fields_count == 0:
-            text = "⚠️ **لا توجد حقول مدخلة للتعديل**"
+        logger.info(f"✅ تم إنشاء {buttons_created} زر للتعديل")
         
-        keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data=f"save:{flow_type}")])
+        # ✅ استخدام back_to_summary بدلاً من save لتجنب النشر التلقائي
+        keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data=f"back_to_summary:{flow_type}")])
         keyboard.append([InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")])
         
         await query.edit_message_text(
@@ -7888,7 +7854,10 @@ async def show_edit_fields_menu(query, context, flow_type):
         )
         
         logger.info(f"✅ تم عرض قائمة الحقول القابلة للتعديل ({len(editable_fields)} حقل)")
-        return f"EDIT_FIELDS_{flow_type.upper()}"
+        
+        # ✅ إرجاع نفس CONFIRM state لهذا النوع من التدفق (حتى تعمل الأزرار)
+        confirm_state = get_confirm_state(flow_type)
+        return confirm_state
         
     except Exception as e:
         logger.error(f"❌ خطأ في show_edit_fields_menu: {e}", exc_info=True)
@@ -7992,19 +7961,24 @@ async def handle_edit_field_selection(update: Update, context: ContextTypes.DEFA
         context.user_data["edit_field_key"] = field_key
         context.user_data["edit_flow_type"] = flow_type
         
+        # الحصول على state التأكيد الصحيح
+        confirm_state = get_confirm_state(flow_type)
+        
         # عرض واجهة التعديل حسب نوع الحقل
         if field_key in ["report_date", "followup_date", "delivery_date"]:
             # للحقول التاريخية - عرض التقويم
             await query.edit_message_text(
                 f"📅 **تعديل {get_field_display_name(field_key)}**\n\n"
                 f"**القيمة الحالية:** {format_field_value(current_value)}\n\n"
-                f"اختر التاريخ من التقويم:",
+                f"أرسل التاريخ الجديد (مثال: 2025-01-15):",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🔙 رجوع", callback_data=f"edit_draft:{flow_type}")],
+                    [InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]
+                ]),
                 parse_mode="Markdown"
             )
-            # TODO: إضافة التقويم هنا
-            # مؤقتاً: استخدام state عام للتعديل
-            context.user_data['_conversation_state'] = "EDIT_FIELD"
-            return "EDIT_FIELD"
+            context.user_data['_conversation_state'] = confirm_state
+            return confirm_state
         else:
             # للحقول النصية - طلب إدخال جديد
             await query.edit_message_text(
@@ -8012,14 +7986,13 @@ async def handle_edit_field_selection(update: Update, context: ContextTypes.DEFA
                 f"**القيمة الحالية:**\n{format_field_value(current_value)}\n\n"
                 f"أرسل القيمة الجديدة:",
                 reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🔙 رجوع", callback_data=f"edit:{flow_type}")],
+                    [InlineKeyboardButton("🔙 رجوع", callback_data=f"edit_draft:{flow_type}")],
                     [InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]
                 ]),
                 parse_mode="Markdown"
             )
-            # استخدام state عام للتعديل
-            context.user_data['_conversation_state'] = "EDIT_FIELD"
-            return "EDIT_FIELD"
+            context.user_data['_conversation_state'] = confirm_state
+            return confirm_state
         
     except Exception as e:
         logger.error(f"❌ خطأ في handle_edit_field_selection: {e}", exc_info=True)
@@ -8041,10 +8014,30 @@ def get_field_display_name(field_key):
         "complaint": "💬 شكوى المريض",
         "diagnosis": "🔬 التشخيص",
         "decision": "📝 قرار الطبيب",
+        "recommendations": "💡 التوصيات",
         "tests": "🧪 الفحوصات",
+        "notes": "📝 ملاحظات",
         "followup_date": "📅 موعد العودة",
         "followup_time": "⏰ وقت العودة",
         "followup_reason": "✍️ سبب العودة",
+        "translator_name": "👤 المترجم",
+        "room_number": "🚪 رقم الغرفة",
+        "status": "🏥 وضع الحالة",
+        "admission_type": "🛏️ نوع الترقيد",
+        "admission_reason": "🛏️ سبب الرقود",
+        "operation_details": "⚕️ تفاصيل العملية",
+        "operation_name_en": "🔤 اسم العملية بالإنجليزي",
+        "success_rate": "📊 نسبة نجاح العملية",
+        "benefit_rate": "💡 نسبة الاستفادة",
+        "therapy_details": "🏃 تفاصيل العلاج الطبيعي",
+        "device_name": "🦾 اسم الجهاز",
+        "radiology_type": "🔬 نوع الأشعة/الفحص",
+        "delivery_date": "📅 تاريخ الاستلام",
+        "discharge_type": "🚪 نوع الخروج",
+        "admission_summary": "📋 ملخص الرقود",
+        "app_reschedule_reason": "📅 سبب التأجيل",
+        "app_reschedule_return_date": "📅 موعد العودة الجديد",
+        "app_reschedule_return_reason": "✍️ سبب العودة",
     }
     return names.get(field_key, field_key)
 
@@ -8086,7 +8079,8 @@ async def handle_edit_field_input(update: Update, context: ContextTypes.DEFAULT_
                 f"يرجى إدخال {get_field_display_name(field_key)}:",
                 parse_mode="Markdown"
             )
-            return "EDIT_FIELD"
+            # إرجاع state التأكيد الصحيح
+            return get_confirm_state(flow_type)
         
         # حفظ القيمة الجديدة
         data = context.user_data.get("report_tmp", {})
@@ -8431,7 +8425,7 @@ async def show_final_summary(message, context, flow_type):
 
 async def handle_edit_draft_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    معالجة تعديل التقرير المؤقت قبل الحفظ
+    معالجة تعديل التقرير المؤقت قبل الحفظ - استخدام نظام التعديل الجديد
     """
     import logging
     logger = logging.getLogger(__name__)
@@ -8447,46 +8441,20 @@ async def handle_edit_draft_report(update: Update, context: ContextTypes.DEFAULT
             return
 
         flow_type = callback_data.split(":", 1)[1]
+        
+        logger.info(f"✏️ handle_edit_draft_report: flow_type={flow_type}")
 
-        # الحصول على البيانات المؤقتة
-        data = context.user_data.get("report_tmp", {})
-        medical_action = data.get("medical_action", "")
-
-        if not medical_action:
-            await query.edit_message_text("❌ خطأ: نوع الإجراء غير محدد")
-            return
-
-        # استيراد دالة get_editable_fields_by_action_type من ملف التعديل
-        try:
-            from bot.handlers.user.user_reports_edit import get_editable_fields_by_action_type
-        except ImportError:
-            await query.edit_message_text("❌ خطأ في تحميل نظام التعديل")
-            return
-
-        # الحصول على الحقول القابلة للتعديل
-        editable_fields = get_editable_fields_by_action_type(medical_action)
-
-        if not editable_fields:
-            await query.edit_message_text("❌ لا توجد حقول قابلة للتعديل لهذا النوع من الإجراءات")
-            return
-
-        # حفظ معلومات التعديل في context
-        context.user_data['editing_draft'] = True
-        context.user_data['draft_flow_type'] = flow_type
-        context.user_data['draft_medical_action'] = medical_action
-        context.user_data['current_edit_field_index'] = 0
-
-        # عرض قائمة الحقول للاختيار
-        await show_draft_edit_fields(query.message, context, editable_fields, flow_type)
-
-        # إرجاع state التأكيد نفسه (لأن الـ edit handlers مسجلة فيه)
-        confirm_state = get_confirm_state(flow_type)
-        return confirm_state
+        # حفظ flow_type في report_tmp
+        context.user_data.setdefault("report_tmp", {})["current_flow"] = flow_type
+        
+        # ✅ استخدام نظام التعديل الجديد الذي يعرض جميع الحقول
+        edit_state = await show_edit_fields_menu(query, context, flow_type)
+        return edit_state
 
     except Exception as e:
-        logger.error(f"خطأ في handle_edit_draft_report: {e}")
+        logger.error(f"❌ خطأ في handle_edit_draft_report: {e}", exc_info=True)
         await query.edit_message_text("❌ حدث خطأ في بدء عملية التعديل")
-        return
+        return ConversationHandler.END
 
 async def show_draft_edit_fields(message, context, editable_fields, flow_type):
     """
@@ -8545,12 +8513,17 @@ async def show_draft_edit_fields(message, context, editable_fields, flow_type):
         
         fields_with_values += 1
         
-        if len(str(current_value)) > 20:
-            display_value = str(current_value)[:17] + "..."
+        # ✅ تقصير القيمة للعرض
+        if len(str(current_value)) > 15:
+            display_value = str(current_value)[:12] + "..."
         else:
             display_value = str(current_value)
-
-        button_text = f"{field_name}: {display_value}"
+        
+        # ✅ تقصير اسم الحقل أيضاً إذا كان طويلاً
+        field_name_short = field_name[:20] if len(field_name) > 20 else field_name
+        button_text = f"{field_name_short}: {display_value}"
+        
+        # ✅ كل زر في صف منفصل لضمان سهولة الاختيار
         keyboard_buttons.append([InlineKeyboardButton(button_text, callback_data=f"edit_field_draft:{edit_field_key}")])
     
     # إذا لم توجد حقول مدخلة
@@ -10596,6 +10569,7 @@ def register(app):
                 CallbackQueryHandler(handle_final_confirm, pattern="^save:"),
                 CallbackQueryHandler(handle_save_callback, pattern="^save:"),
                 CallbackQueryHandler(handle_edit_draft_report, pattern="^edit_draft:"),
+                CallbackQueryHandler(handle_edit_field_selection, pattern="^draft_field:"),
                 CallbackQueryHandler(handle_finish_edit_draft, pattern="^finish_edit_draft:"),
                 CallbackQueryHandler(handle_back_to_summary, pattern="^back_to_summary:"),
                 CallbackQueryHandler(handle_edit_draft_field, pattern="^edit_field_draft:"),
@@ -10664,6 +10638,7 @@ def register(app):
                 CallbackQueryHandler(handle_final_confirm, pattern="^save:"),
                 CallbackQueryHandler(handle_save_callback, pattern="^save:"),
                 CallbackQueryHandler(handle_edit_draft_report, pattern="^edit_draft:"),
+                CallbackQueryHandler(handle_edit_field_selection, pattern="^draft_field:"),
                 CallbackQueryHandler(handle_finish_edit_draft, pattern="^finish_edit_draft:"),
                 CallbackQueryHandler(handle_back_to_summary, pattern="^back_to_summary:"),
                 CallbackQueryHandler(handle_edit_draft_field, pattern="^edit_field_draft:"),
@@ -10689,6 +10664,7 @@ def register(app):
                 CallbackQueryHandler(handle_final_confirm, pattern="^save:"),
                 CallbackQueryHandler(handle_save_callback, pattern="^save:"),
                 CallbackQueryHandler(handle_edit_draft_report, pattern="^edit_draft:"),
+                CallbackQueryHandler(handle_edit_field_selection, pattern="^draft_field:"),
                 CallbackQueryHandler(handle_finish_edit_draft, pattern="^finish_edit_draft:"),
                 CallbackQueryHandler(handle_back_to_summary, pattern="^back_to_summary:"),
                 CallbackQueryHandler(handle_edit_draft_field, pattern="^edit_field_draft:"),
@@ -10728,6 +10704,7 @@ def register(app):
                 CallbackQueryHandler(handle_final_confirm, pattern="^save:"),
                 CallbackQueryHandler(handle_save_callback, pattern="^save:"),
                 CallbackQueryHandler(handle_edit_draft_report, pattern="^edit_draft:"),
+                CallbackQueryHandler(handle_edit_field_selection, pattern="^draft_field:"),
                 CallbackQueryHandler(handle_finish_edit_draft, pattern="^finish_edit_draft:"),
                 CallbackQueryHandler(handle_back_to_summary, pattern="^back_to_summary:"),
                 CallbackQueryHandler(handle_edit_draft_field, pattern="^edit_field_draft:"),
@@ -10775,6 +10752,7 @@ def register(app):
                 CallbackQueryHandler(handle_final_confirm, pattern="^save:"),
                 CallbackQueryHandler(handle_save_callback, pattern="^save:"),
                 CallbackQueryHandler(handle_edit_draft_report, pattern="^edit_draft:"),
+                CallbackQueryHandler(handle_edit_field_selection, pattern="^draft_field:"),
                 CallbackQueryHandler(handle_finish_edit_draft, pattern="^finish_edit_draft:"),
                 CallbackQueryHandler(handle_back_to_summary, pattern="^back_to_summary:"),
                 CallbackQueryHandler(handle_edit_draft_field, pattern="^edit_field_draft:"),
@@ -10811,6 +10789,7 @@ def register(app):
                 CallbackQueryHandler(handle_final_confirm, pattern="^save:"),
                 CallbackQueryHandler(handle_save_callback, pattern="^save:"),
                 CallbackQueryHandler(handle_edit_draft_report, pattern="^edit_draft:"),
+                CallbackQueryHandler(handle_edit_field_selection, pattern="^draft_field:"),
                 CallbackQueryHandler(handle_finish_edit_draft, pattern="^finish_edit_draft:"),
                 CallbackQueryHandler(handle_back_to_summary, pattern="^back_to_summary:"),
                 CallbackQueryHandler(handle_edit_draft_field, pattern="^edit_field_draft:"),
@@ -10845,6 +10824,7 @@ def register(app):
                 CallbackQueryHandler(handle_final_confirm, pattern="^save:"),
                 CallbackQueryHandler(handle_save_callback, pattern="^save:"),
                 CallbackQueryHandler(handle_edit_draft_report, pattern="^edit_draft:"),
+                CallbackQueryHandler(handle_edit_field_selection, pattern="^draft_field:"),
                 CallbackQueryHandler(handle_finish_edit_draft, pattern="^finish_edit_draft:"),
                 CallbackQueryHandler(handle_back_to_summary, pattern="^back_to_summary:"),
                 CallbackQueryHandler(handle_edit_draft_field, pattern="^edit_field_draft:"),
@@ -10875,6 +10855,7 @@ def register(app):
                 CallbackQueryHandler(handle_final_confirm, pattern="^save:"),
                 CallbackQueryHandler(handle_save_callback, pattern="^save:"),
                 CallbackQueryHandler(handle_edit_draft_report, pattern="^edit_draft:"),
+                CallbackQueryHandler(handle_edit_field_selection, pattern="^draft_field:"),
                 CallbackQueryHandler(handle_finish_edit_draft, pattern="^finish_edit_draft:"),
                 CallbackQueryHandler(handle_back_to_summary, pattern="^back_to_summary:"),
                 CallbackQueryHandler(handle_edit_draft_field, pattern="^edit_field_draft:"),
@@ -10903,6 +10884,7 @@ def register(app):
                 CallbackQueryHandler(handle_final_confirm, pattern="^save:"),
                 CallbackQueryHandler(handle_save_callback, pattern="^save:"),
                 CallbackQueryHandler(handle_edit_draft_report, pattern="^edit_draft:"),
+                CallbackQueryHandler(handle_edit_field_selection, pattern="^draft_field:"),
                 CallbackQueryHandler(handle_finish_edit_draft, pattern="^finish_edit_draft:"),
                 CallbackQueryHandler(handle_back_to_summary, pattern="^back_to_summary:"),
                 CallbackQueryHandler(handle_edit_draft_field, pattern="^edit_field_draft:"),
@@ -10940,6 +10922,7 @@ def register(app):
                 CallbackQueryHandler(handle_final_confirm, pattern="^save:"),
                 CallbackQueryHandler(handle_save_callback, pattern="^save:"),
                 CallbackQueryHandler(handle_edit_draft_report, pattern="^edit_draft:"),
+                CallbackQueryHandler(handle_edit_field_selection, pattern="^draft_field:"),
                 CallbackQueryHandler(handle_finish_edit_draft, pattern="^finish_edit_draft:"),
                 CallbackQueryHandler(handle_back_to_summary, pattern="^back_to_summary:"),
                 CallbackQueryHandler(handle_edit_draft_field, pattern="^edit_field_draft:"),
@@ -10980,6 +10963,7 @@ def register(app):
                 CallbackQueryHandler(handle_final_confirm, pattern="^save:"),
                 CallbackQueryHandler(handle_save_callback, pattern="^save:"),
                 CallbackQueryHandler(handle_edit_draft_report, pattern="^edit_draft:"),
+                CallbackQueryHandler(handle_edit_field_selection, pattern="^draft_field:"),
                 CallbackQueryHandler(handle_finish_edit_draft, pattern="^finish_edit_draft:"),
                 CallbackQueryHandler(handle_back_to_summary, pattern="^back_to_summary:"),
                 CallbackQueryHandler(handle_edit_draft_field, pattern="^edit_field_draft:"),
@@ -11006,6 +10990,7 @@ def register(app):
                 CallbackQueryHandler(handle_final_confirm, pattern="^save:"),
                 CallbackQueryHandler(handle_save_callback, pattern="^save:"),
                 CallbackQueryHandler(handle_edit_draft_report, pattern="^edit_draft:"),
+                CallbackQueryHandler(handle_edit_field_selection, pattern="^draft_field:"),
                 CallbackQueryHandler(handle_finish_edit_draft, pattern="^finish_edit_draft:"),
                 CallbackQueryHandler(handle_back_to_summary, pattern="^back_to_summary:"),
                 CallbackQueryHandler(handle_edit_draft_field, pattern="^edit_field_draft:"),
