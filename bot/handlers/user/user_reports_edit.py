@@ -127,9 +127,7 @@ def get_editable_fields_by_action_type(medical_action):
     if action_clean == 'استشارة جديدة':
         return [
             ('complaint_text', '💬 شكوى المريض'),
-            ('diagnosis', '🔬 التشخيص الطبي'),
-            ('doctor_decision', '📝 قرار الطبيب'),
-            ('notes', '🧪 الفحوصات والأشعة المطلوبة'),
+            ('doctor_decision', '📝 قرار الطبيب (التشخيص والقرار والفحوصات)'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
             ('translator_name', '👤 المترجم'),
@@ -140,10 +138,8 @@ def get_editable_fields_by_action_type(medical_action):
     # ===========================================
     elif action_clean == 'استشارة مع قرار عملية':
         return [
-            ('diagnosis', '🔬 التشخيص'),
-            ('doctor_decision', '📝 قرار الطبيب وتفاصيل العملية'),
-            ('notes', '📋 اسم العملية بالإنجليزي'),
-            ('treatment_plan', '📊 نسبة نجاح العملية'),
+            ('complaint_text', '💬 شكوى المريض'),
+            ('doctor_decision', '📝 قرار الطبيب (التشخيص والعملية ونسبة النجاح)'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
             ('translator_name', '👤 المترجم'),
@@ -154,9 +150,7 @@ def get_editable_fields_by_action_type(medical_action):
     # ===========================================
     elif action_clean == 'استشارة أخيرة':
         return [
-            ('diagnosis', '🔬 التشخيص النهائي'),
-            ('doctor_decision', '📝 قرار الطبيب'),
-            ('treatment_plan', '💊 التوصيات الطبية'),
+            ('doctor_decision', '📝 قرار الطبيب (التشخيص والتوصيات)'),
             ('translator_name', '👤 المترجم'),
         ]
 
@@ -165,10 +159,8 @@ def get_editable_fields_by_action_type(medical_action):
     # ===========================================
     elif action_clean == 'طوارئ':
         return [
-            ('complaint_text', '💬 شكوى المريض والحالة العاجلة'),
-            ('diagnosis', '🔬 التشخيص الطبي'),
-            ('doctor_decision', '📝 قرار الطبيب وماذا تم للحالة'),
-            ('case_status', '🚨 حالة الطوارئ (خروج/ترقيد/عملية)'),
+            ('complaint_text', '💬 شكوى المريض'),
+            ('doctor_decision', '📝 قرار الطبيب (التشخيص والقرار ووضع الحالة)'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
             ('translator_name', '👤 المترجم'),
@@ -180,9 +172,8 @@ def get_editable_fields_by_action_type(medical_action):
     elif action_clean == 'متابعة في الرقود':
         return [
             ('complaint_text', '🛏️ حالة المريض اليومية'),
-            ('diagnosis', '🔬 التطور في التشخيص'),
             ('doctor_decision', '📝 قرار الطبيب اليومي'),
-            ('notes', '🏥 رقم الغرفة والطابق'),
+            ('room_number', '🏥 رقم الغرفة والطابق'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
             ('translator_name', '👤 المترجم'),
@@ -193,8 +184,7 @@ def get_editable_fields_by_action_type(medical_action):
     # ===========================================
     elif action_clean == 'مراجعة / عودة دورية':
         return [
-            ('complaint_text', '💬 شكوى المريض في المتابعة'),
-            ('diagnosis', '🔬 التشخيص والتطور'),
+            ('complaint_text', '💬 شكوى المريض'),
             ('doctor_decision', '📝 قرار الطبيب'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
@@ -206,8 +196,7 @@ def get_editable_fields_by_action_type(medical_action):
     # ===========================================
     elif action_clean == 'عملية':
         return [
-            ('complaint_text', '⚕️ تفاصيل العملية بالعربي'),
-            ('notes', '🔤 اسم العملية بالإنجليزي'),
+            ('complaint_text', '⚕️ تفاصيل العملية'),
             ('doctor_decision', '📝 ملاحظات العملية'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
@@ -220,10 +209,10 @@ def get_editable_fields_by_action_type(medical_action):
     elif action_clean == 'علاج طبيعي وإعادة تأهيل':
         return [
             ('complaint_text', '🏃 تفاصيل العلاج الطبيعي'),
-            ('notes', '🦾 تفاصيل الأجهزة التعويضية'),
             ('doctor_decision', '📝 تقييم الطبيب'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
+            ('translator_name', '👤 المترجم'),
         ]
 
     # ===========================================
@@ -232,9 +221,7 @@ def get_editable_fields_by_action_type(medical_action):
     elif action_clean == 'ترقيد':
         return [
             ('complaint_text', '🛏️ سبب الرقود'),
-            ('diagnosis', '🔬 التشخيص عند الدخول'),
             ('doctor_decision', '📝 قرار الطبيب'),
-            ('notes', '🚪 رقم الغرفة والطابق'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
             ('translator_name', '👤 المترجم'),
@@ -245,9 +232,11 @@ def get_editable_fields_by_action_type(medical_action):
     # ===========================================
     elif action_clean == 'خروج من المستشفى' or action_clean == 'خروج':
         return [
-            ('admission_summary', '📋 ملخص الرقود'),
-            ('operation_details', '⚕️ تفاصيل العملية'),
-            ('operation_name_en', '🔤 اسم العملية بالإنجليزي'),
+            ('complaint_text', '📋 ملخص حالة المريض'),
+            ('diagnosis', '🔬 التشخيص النهائي'),
+            ('doctor_decision', '⚕️ قرار الطبيب والتوصيات'),
+            ('treatment_plan', '💊 خطة العلاج بعد الخروج'),
+            ('notes', '📝 ملاحظات إضافية'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
             ('translator_name', '👤 المترجم'),
@@ -279,7 +268,7 @@ def get_editable_fields_by_action_type(medical_action):
     # ===========================================
     elif action_clean == 'علاج طبيعي':
         return [
-            ('therapy_details', '🏃 تفاصيل الجلسة'),
+            ('complaint_text', '🏃 تفاصيل الجلسة'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
             ('translator_name', '👤 المترجم'),
@@ -290,7 +279,7 @@ def get_editable_fields_by_action_type(medical_action):
     # ===========================================
     elif action_clean == 'أجهزة تعويضية':
         return [
-            ('device_details', '🦾 تفاصيل الجهاز'),
+            ('complaint_text', '🦾 تفاصيل الجهاز'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
             ('translator_name', '👤 المترجم'),
@@ -544,25 +533,17 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
             text += f"👨‍⚕️ **الطبيب:** {context.user_data['current_report_data']['doctor_name']}\n"
             text += f"⚕️ **نوع الإجراء:** {medical_action}\n\n"
             text += "اختر الحقل الذي تريد تعديله:\n"
-            text += "_(يُعرض فقط الحقول التي تحتوي على قيم)_"
             
-            # بناء الأزرار - فقط الحقول التي تحتوي على قيم
+            # بناء الأزرار - جميع الحقول المتاحة لهذا النوع
             keyboard = []
             all_fields = get_editable_fields_by_action_type(medical_action)
             
             for field_name, field_display in all_fields:
                 current_value = context.user_data['current_report_data'].get(field_name, "")
                 
-                # إضافة الزر فقط إذا كان الحقل يحتوي على قيمة
-                if current_value and current_value not in ["لا يوجد", "غير محدد", "", None]:
-                    # عرض القيمة الحالية مختصرة
-                    if len(str(current_value)) > 25:
-                        display_value = str(current_value)[:22] + "..."
-                    else:
-                        display_value = str(current_value)
-                    
-                    button_text = f"{field_display}: {display_value}"
-                    keyboard.append([InlineKeyboardButton(button_text, callback_data=f"edit_field:{field_name}")])
+                # عرض جميع الحقول (حتى الفارغة)
+                button_text = f"{field_display}"
+                keyboard.append([InlineKeyboardButton(button_text, callback_data=f"edit_field:{field_name}")])
             
             # إضافة زر إعادة النشر
             keyboard.append([InlineKeyboardButton("📢 إعادة نشر التقرير", callback_data="edit_republish")])
@@ -752,9 +733,9 @@ async def handle_field_selection(update: Update, context: ContextTypes.DEFAULT_T
             logger.info(f"✅ تم عرض حقل التعديل: {field_name} (تاريخ) - التقويم الكامل")
             return EDIT_DATE_CALENDAR
         else:
-            text = f"✏️ **تعديل {field_display}**\n\n"
-            text += f"**القيمة الحالية:**\n{current_value}\n\n"
-            text += "أرسل القيمة الجديدة:"
+            text = f"✏️ **تعديل: {field_display}**\n\n"
+            text += f"**القيمة الحالية:**\n```\n{current_value}\n```\n\n"
+            text += f"📝 **أرسل القيمة الجديدة لـ ({field_display}):**"
             
             keyboard = [
                 [InlineKeyboardButton("🔙 رجوع", callback_data="edit_back_to_fields")],
@@ -794,8 +775,10 @@ def load_translator_names():
         import logging
         logging.getLogger(__name__).warning(f"⚠️ فشل تحميل المترجمين: {e}")
     
-    # قائمة احتياطية في حالة فشل التحميل
-    return ["مصطفى", "واصل", "نجم الدين", "محمد علي", "سعيد", "مهدي", "صبري", "عزي", "معتز", "ادريس", "هاشم", "ادم", "زيد", "عصام", "عزالدين", "حسن", "زين العابدين", "عبدالسلام", "ياسر", "يحيى"]
+    # قائمة احتياطية في حالة فشل التحميل - بنفس الترتيب المطلوب
+    return ["معتز", "ادم", "هاشم", "مصطفى", "حسن", "نجم الدين", "محمد علي", 
+            "صبري", "عزي", "سعيد", "عصام", "زيد", "مهدي", "ادريس", 
+            "واصل", "عزالدين", "عبدالسلام", "يحيى العنسي", "ياسر"]
 
 
 async def show_translator_selection_for_edit(query, context):
@@ -1390,23 +1373,15 @@ async def show_field_selection(query, context):
         text += f"👨‍⚕️ **الطبيب:** {context.user_data['current_report_data']['doctor_name']}\n"
         text += f"⚕️ **نوع الإجراء:** {medical_action}\n\n"
         text += "اختر الحقل الذي تريد تعديله:\n"
-        text += "_(يُعرض فقط الحقول التي تحتوي على قيم)_"
         
-        # بناء الأزرار - فقط الحقول التي تحتوي على قيم
+        # بناء الأزرار - جميع الحقول المتاحة لهذا النوع
         keyboard = []
         for field_name, field_display in all_fields:
             current_value = context.user_data['current_report_data'].get(field_name, "")
             
-            # إضافة الزر فقط إذا كان الحقل يحتوي على قيمة
-            if current_value and current_value not in ["لا يوجد", "غير محدد", "", None]:
-                # عرض القيمة الحالية مختصرة
-                if len(str(current_value)) > 25:
-                    display_value = str(current_value)[:22] + "..."
-                else:
-                    display_value = str(current_value)
-                
-                button_text = f"{field_display}: {display_value}"
-                keyboard.append([InlineKeyboardButton(button_text, callback_data=f"edit_field:{field_name}")])
+            # عرض جميع الحقول (حتى الفارغة)
+            button_text = f"{field_display}"
+            keyboard.append([InlineKeyboardButton(button_text, callback_data=f"edit_field:{field_name}")])
         
         # إضافة زر إعادة النشر
         keyboard.append([InlineKeyboardButton("📢 إعادة نشر التقرير", callback_data="edit_republish")])
@@ -1518,7 +1493,7 @@ def register(app):
     
     conv_handler = ConversationHandler(
         entry_points=[
-            MessageHandler(filters.Regex("تعديل التقارير"), start_edit_reports)
+            MessageHandler(filters.Regex("^✏️ تعديل التقارير$"), start_edit_reports)
         ],
         states={
             SELECT_REPORT: [
@@ -1572,7 +1547,7 @@ def register(app):
         allow_reentry=True,
         per_chat=True,
         per_user=True,
-        per_message=True,
+        per_message=False,  # ✅ False لأن entry point هو MessageHandler
     )
     
     app.add_handler(conv_handler)

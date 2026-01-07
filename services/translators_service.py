@@ -33,8 +33,8 @@ def get_translators_from_database() -> List[Dict]:
                 result.append({
                     'id': t.id,
                     'name': t.full_name,
-                    'telegram_id': t.telegram_id,
-                    'phone': t.phone,
+                    'telegram_id': t.tg_user_id,  # ✅ تصحيح: استخدام tg_user_id بدلاً من telegram_id
+                    'phone': t.phone_number,  # ✅ تصحيح: استخدام phone_number بدلاً من phone
                     'is_approved': t.is_approved
                 })
             
@@ -70,17 +70,41 @@ def get_translators_from_file() -> List[str]:
 
 def get_all_translator_names() -> List[str]:
     """
-    الحصول على أسماء جميع المترجمين
+    الحصول على أسماء جميع المترجمين بترتيب محدد
     يحاول من قاعدة البيانات أولاً، ثم من الملف
     """
+    # الترتيب المطلوب للصفحة الأولى
+    priority_order = [
+        "معتز", "ادم", "هاشم", "مصطفى", "حسن", "نجم الدين", "محمد علي",
+        "صبري", "عزي", "سعيد", "عصام", "زيد", "مهدي", "ادريس",
+        "واصل", "عزالدين", "عبدالسلام", "يحيى العنسي", "ياسر"
+    ]
+    
     # Try database first
     translators = get_translators_from_database()
     
     if translators:
-        return [t['name'] for t in translators]
+        all_names = [t['name'] for t in translators]
+    else:
+        # Fallback to file
+        all_names = get_translators_from_file()
     
-    # Fallback to file
-    return get_translators_from_file()
+    # ترتيب الأسماء: الأولوية أولاً ثم الباقي
+    ordered_names = []
+    remaining_names = []
+    
+    # إضافة الأسماء ذات الأولوية
+    for name in priority_order:
+        if name in all_names:
+            ordered_names.append(name)
+    
+    # إضافة الأسماء المتبقية
+    for name in all_names:
+        if name not in priority_order:
+            remaining_names.append(name)
+    
+    # دمج القوائم: الأولوية أولاً ثم الباقي
+    return ordered_names + sorted(remaining_names)
 
 
 def get_all_translators() -> List[Dict]:

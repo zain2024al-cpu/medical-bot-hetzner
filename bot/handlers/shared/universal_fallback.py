@@ -19,6 +19,7 @@ KNOWN_CALLBACKS = [
     # نظام إضافة التقارير (ConversationHandler)
     # ===========================
     r"^patient_idx:",     # اختيار المريض
+    r"^user_patient_page:", # صفحات المرضى
     r"^hospital_idx:",    # اختيار المستشفى
     r"^dept_idx:",        # اختيار القسم
     r"^subdept_idx:",     # اختيار القسم الفرعي
@@ -70,6 +71,14 @@ KNOWN_CALLBACKS = [
     r"^back_to_main$",
     r"^back_to_schedule$",
     
+    # إدارة الجدول (Admin)
+    r"^upload_schedule$",
+    r"^view_schedule$",
+    r"^track_reports$",
+    r"^send_notifications$",
+    r"^confirm_schedule$",
+    r"^cancel_upload$",
+    
     # إدارة المرضى (Admin)
     r"^manage_patients$",
     r"^view_patient_names$",
@@ -107,6 +116,24 @@ KNOWN_CALLBACKS = [
     r"^delete_trans_page:",
     r"^edit_trans_page:",
     r"^view_translators_page:",
+    
+    # ===========================
+    # نظام تعديل وحذف التقارير للمستخدمين
+    # ===========================
+    r"^edit_report:",        # تعديل تقرير محدد
+    r"^edit_field:",         # تعديل حقل محدد (مكرر لكن للتوضيح)
+    r"^edit_republish$",     # إعادة نشر التقرير
+    r"^edit_back",           # رجوع في نظام التعديل
+    r"^edit_cancel$",        # إلغاء التعديل
+    r"^edit_confirm_save$",  # تأكيد حفظ التعديل
+    r"^edit_followup:",      # تعديل موعد المتابعة
+    r"^edit_time:",          # تعديل الوقت
+    r"^edit_translator:",    # تعديل المترجم
+    r"^edit_back_to_fields$", # رجوع لقائمة الحقول
+    r"^delete_report:",      # حذف تقرير محدد
+    r"^delete_confirm$",     # تأكيد الحذف
+    r"^delete_back$",        # رجوع في نظام الحذف
+    r"^delete_cancel$",      # إلغاء الحذف
     
     # ===========================
     # واجهة المستخدم الأخرى
@@ -221,6 +248,19 @@ async def handle_any_message(update: Update, context: ContextTypes.DEFAULT_TYPE)
         message_text = update.message.text or ""
         user = update.effective_user
         
+        # ✅ السماح لأزرار ConversationHandlers بالمرور
+        # هذه الأزرار يجب أن تصل إلى handlers المخصصة لها
+        CONVERSATION_BUTTONS = [
+            "✏️ تعديل التقارير",
+            "🗑️ حذف التقارير",
+            "📝 إضافة تقرير جديد",
+            "❌ إلغاء العملية الحالية"
+        ]
+        
+        if message_text in CONVERSATION_BUTTONS:
+            # دع ConversationHandler يتعامل مع هذا
+            return
+        
         # التحقق من وجود conversation نشط - لا نتدخل
         conversation_keys = [
             'waiting_for_', 'edit_', 'add_', '_state', 'report_tmp',
@@ -270,14 +310,15 @@ def register(app):
         group=999  # آخر شيء يتم تنفيذه
     )
     
-    # 2. معالج للرسائل النصية غير المعالجة
-    app.add_handler(
-        MessageHandler(
-            filters.TEXT & ~filters.COMMAND,
-            handle_any_message
-        ),
-        group=999
-    )
+    # 2. ❌ تم تعطيل معالج الرسائل النصية لأنه يتداخل مع ConversationHandlers
+    # ConversationHandlers تحتاج أن تلتقط الرسائل النصية للأزرار
+    # app.add_handler(
+    #     MessageHandler(
+    #         filters.TEXT & ~filters.COMMAND,
+    #         handle_any_message
+    #     ),
+    #     group=999
+    # )
     
-    logger.info("✅ تم تسجيل universal fallback handlers في group 999")
+    logger.info("✅ تم تسجيل universal fallback handlers (callbacks فقط) في group 999")
 

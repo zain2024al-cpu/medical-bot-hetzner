@@ -61,11 +61,20 @@ def _main_kb():
         [InlineKeyboardButton("❌ إلغاء", callback_data="um:cancel")]
     ])
 
-def _users_kb(users, user_type="all"):
-    """لوحة مفاتيح المستخدمين"""
+def _users_kb(users, user_type="all", page=0):
+    """لوحة مفاتيح المستخدمين مع نظام الصفحات"""
     buttons = []
+    items_per_page = 10
     
-    for user in users[:10]:  # حد أقصى 10 مستخدمين
+    total = len(users)
+    total_pages = max(1, (total + items_per_page - 1) // items_per_page)
+    page = max(0, min(page, total_pages - 1))
+    
+    start_idx = page * items_per_page
+    end_idx = min(start_idx + items_per_page, total)
+    
+    # عرض المستخدمين في الصفحة الحالية
+    for user in users[start_idx:end_idx]:
         # تحديد الأيقونة بناءً على الحالة
         if getattr(user, 'is_suspended', False):
             status_icon = "🔒"
@@ -76,6 +85,19 @@ def _users_kb(users, user_type="all"):
         
         button_text = f"{status_icon} {user.full_name}"
         buttons.append([InlineKeyboardButton(button_text, callback_data=f"um:user:{user.id}")])
+    
+    # أزرار التنقل بين الصفحات
+    if total_pages > 1:
+        nav_buttons = []
+        if page > 0:
+            nav_buttons.append(InlineKeyboardButton("⬅️ السابق", callback_data=f"um:page:{user_type}:{page-1}"))
+        
+        nav_buttons.append(InlineKeyboardButton(f"📄 {page + 1}/{total_pages}", callback_data="noop"))
+        
+        if page < total_pages - 1:
+            nav_buttons.append(InlineKeyboardButton("➡️ التالي", callback_data=f"um:page:{user_type}:{page+1}"))
+        
+        buttons.append(nav_buttons)
     
     buttons.append([InlineKeyboardButton("🔙 رجوع", callback_data="um:back")])
     return InlineKeyboardMarkup(buttons)
@@ -112,6 +134,21 @@ async def handle_user_management_callback(update: Update, context: ContextTypes.
             return await _show_approved_users(query, context)
         elif data == "view_suspended":
             return await _show_suspended_users(query, context)
+        elif data.startswith("page:"):
+            # معالجة التنقل بين الصفحات: um:page:user_type:page_num
+            parts = data.split(":")
+            user_type = parts[1]
+            page_num = int(parts[2])
+            
+            # إعادة عرض القائمة بالصفحة الجديدة
+            if user_type == "all":
+                return await _show_all_users(query, context, page_num)
+            elif user_type == "pending":
+                return await _show_pending_users(query, context, page_num)
+            elif user_type == "approved":
+                return await _show_approved_users(query, context, page_num)
+            elif user_type == "suspended":
+                return await _show_suspended_users(query, context, page_num)
         elif data == "stats":
             return await _show_statistics(query, context)
         elif data == "search":
@@ -131,8 +168,8 @@ async def handle_user_management_callback(update: Update, context: ContextTypes.
         await query.edit_message_text("❌ حدث خطأ. يرجى المحاولة مرة أخرى.")
         return UM_START
 
-async def _show_all_users(query, context):
-    """عرض جميع المستخدمين"""
+async def _show_all_users(query, context, page=0):
+    """عرض جميع المستخدمين مع الصفحات"""
     try:
         with SessionLocal() as s:
             users = s.query(Translator).order_by(Translator.created_at.desc()).all()
@@ -151,23 +188,26 @@ async def _show_all_users(query, context):
                     pass
                 return UM_START
             
+            # حفظ القائمة في context للتنقل بين الصفحات
+            context.user_data['users_list'] = [u.id for u in users]
+            context.user_data['users_type'] = 'all'
+            
             text = f"📋 **جميع المستخدمين ({len(users)})**\n\n"
             text += "اختر مستخدماً لعرض التفاصيل:"
-            await query.edit_message_text(text, reply_markup=_users_kb(users), parse_mode="Markdown")
+            await query.edit_message_text(text, reply_markup=_users_kb(users, 'all', page), parse_mode="Markdown")
             return UM_SELECT_USER
     except Exception as e:
         logger.error(f"Error in _show_all_users: {e}", exc_info=True)
         await query.message.reply_text("❌ حدث خطأ. يرجى المحاولة مرة أخرى.", reply_markup=_main_kb())
         return UM_START
 
-async def _show_pending_users(query, context):
-    """عرض المستخدمين المعلقين"""
+async def _show_pending_users(query, context, page=0):
+    """عرض المستخدمين المعلقين مع الصفحات"""
     try:
         with SessionLocal() as s:
             users = s.query(Translator).filter_by(is_approved=False).order_by(Translator.created_at.desc()).all()
             
             if not users:
-                # استخدام reply بدلاً من edit لتجنب خطأ "Message is not modified"
                 await query.message.reply_text(
                     "⏳ **لا يوجد مستخدمين معلقين**\n\n"
                     "✅ لا توجد طلبات انضمام بانتظار الموافقة.\n\n"
@@ -175,24 +215,26 @@ async def _show_pending_users(query, context):
                     reply_markup=_main_kb(),
                     parse_mode="Markdown"
                 )
-                # حذف الرسالة القديمة
                 try:
                     await query.delete_message()
                 except:
                     pass
                 return UM_START
             
+            context.user_data['users_list'] = [u.id for u in users]
+            context.user_data['users_type'] = 'pending'
+            
             text = f"⏳ **المستخدمين المعلقين ({len(users)})**\n\n"
             text += "اختر مستخدماً لعرض التفاصيل:"
-            await query.edit_message_text(text, reply_markup=_users_kb(users), parse_mode="Markdown")
+            await query.edit_message_text(text, reply_markup=_users_kb(users, 'pending', page), parse_mode="Markdown")
             return UM_SELECT_USER
     except Exception as e:
         logger.error(f"Error in _show_pending_users: {e}", exc_info=True)
         await query.message.reply_text("❌ حدث خطأ. يرجى المحاولة مرة أخرى.", reply_markup=_main_kb())
         return UM_START
 
-async def _show_approved_users(query, context):
-    """عرض المستخدمين الموافق عليهم"""
+async def _show_approved_users(query, context, page=0):
+    """عرض المستخدمين الموافق عليهم مع الصفحات"""
     try:
         with SessionLocal() as s:
             users = s.query(Translator).filter_by(is_approved=True).order_by(Translator.created_at.desc()).all()
@@ -211,9 +253,12 @@ async def _show_approved_users(query, context):
                     pass
                 return UM_START
             
+            context.user_data['users_list'] = [u.id for u in users]
+            context.user_data['users_type'] = 'approved'
+            
             text = f"✅ **المستخدمين النشطين ({len(users)})**\n\n"
             text += "اختر مستخدماً لعرض التفاصيل:"
-            await query.edit_message_text(text, reply_markup=_users_kb(users), parse_mode="Markdown")
+            await query.edit_message_text(text, reply_markup=_users_kb(users, 'approved', page), parse_mode="Markdown")
             return UM_SELECT_USER
     except Exception as e:
         logger.error(f"Error in _show_approved_users: {e}", exc_info=True)
@@ -400,8 +445,8 @@ async def _handle_user_action(query, context, action):
         await query.edit_message_text(f"{message}\n\n👥 إدارة المستخدمين:", reply_markup=_main_kb(), parse_mode="Markdown")
         return UM_START
 
-async def _show_suspended_users(query, context):
-    """عرض المستخدمين المجمدين"""
+async def _show_suspended_users(query, context, page=0):
+    """عرض المستخدمين المجمدين مع الصفحات"""
     with SessionLocal() as s:
         users = s.query(Translator).filter_by(is_suspended=True).order_by(Translator.suspended_at.desc()).all()
         
@@ -419,9 +464,12 @@ async def _show_suspended_users(query, context):
                 pass
             return UM_START
         
+        context.user_data['users_list'] = [u.id for u in users]
+        context.user_data['users_type'] = 'suspended'
+        
         text = f"🔒 **المستخدمين المجمدين ({len(users)})**\n\n"
         text += "اختر مستخدماً لعرض التفاصيل:"
-        await query.edit_message_text(text, reply_markup=_users_kb(users), parse_mode="Markdown")
+        await query.edit_message_text(text, reply_markup=_users_kb(users, 'suspended', page), parse_mode="Markdown")
         return UM_SELECT_USER
 
 

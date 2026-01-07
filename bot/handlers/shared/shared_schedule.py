@@ -46,20 +46,15 @@ async def handle_schedule_button(update: Update, context: ContextTypes.DEFAULT_T
 async def show_schedule_to_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """عرض جدول اليوم للمستخدمين"""
     
-    # جلب جدول اليوم (تاريخ اليوم فقط)
-    today = date.today()
-    
+    # جلب آخر جدول تم رفعه
     with SessionLocal() as s:
-        # البحث عن جدول بتاريخ اليوم فقط (مقارنة التاريخ فقط بدون الوقت)
-        ds = s.query(DailySchedule).filter(
-            func.date(DailySchedule.date) == today
-        ).order_by(DailySchedule.date.desc()).first()
+        # البحث عن آخر جدول تم رفعه (بدلاً من البحث بتاريخ اليوم فقط)
+        ds = s.query(DailySchedule).order_by(DailySchedule.date.desc()).first()
 
     if not ds:
         await update.message.reply_text(
-            "⚠️ **لا يوجد جدول متاح لليوم**\n\n"
-            f"📅 تاريخ اليوم: {today.strftime('%Y-%m-%d')}\n\n"
-            "لم يقم الأدمن برفع جدول لليوم بعد.\n"
+            "⚠️ **لا يوجد جدول متاح**\n\n"
+            "لم يقم الأدمن برفع أي جدول بعد.\n"
             "يرجى المحاولة لاحقاً أو التواصل مع الإدارة.",
             parse_mode="Markdown"
         )

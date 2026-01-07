@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 # إعدادات المجموعة
 REPORTS_GROUP_ID = os.getenv("REPORTS_GROUP_ID", "")  # معرف المجموعة الخاصة بالتقارير
-USE_GROUP_BROADCAST = os.getenv("USE_GROUP_BROADCAST", "true").lower() == "true"  # تفعيل الإرسال للمجموعة
+USE_GROUP_BROADCAST = os.getenv("USE_GROUP_BROADCAST", "false").lower() == "true"  # ⏸️ معطل مؤقتاً للاختبار
 
 
 async def broadcast_new_report(bot: Bot, report_data: dict):
@@ -228,7 +228,11 @@ def format_report_message(data: dict) -> str:
     """
     تنسيق رسالة التقرير الجديد
     """
-    message = "🆕 **تقرير جديد**\n\n"
+    # ✅ التحقق إذا كان التقرير معدلاً
+    if data.get('is_edit'):
+        message = "✏️ **تقرير معدل**\n\n"
+    else:
+        message = "🆕 **تقرير جديد**\n\n"
     
     # التاريخ - إذا كان مُنسقاً بالفعل (من user_reports_add.py) نستخدمه كما هو
     if data.get('report_date'):
@@ -280,9 +284,10 @@ def format_report_message(data: dict) -> str:
     if data.get('doctor_name') and data.get('doctor_name') != 'لم يتم التحديد':
         message += f"👨‍⚕️ اسم الطبيب: {data['doctor_name']}\n\n"
     
-    # نوع الإجراء - في نفس السطر
+    # نوع الإجراء - مع خط فاصل
     if data.get('medical_action'):
         message += f"📌 نوع الإجراء: {data['medical_action']}\n\n"
+        message += "━━━━━━━━━━━━━━━━━━━━\n\n"
     
     # معالجة خاصة لـ "تأجيل موعد" - عرض الحقول المحددة فقط
     if data.get('medical_action') == 'تأجيل موعد':
@@ -423,75 +428,11 @@ def format_report_message(data: dict) -> str:
     else:
         # شكوى المريض - فقط إذا كانت موجودة وغير فارغة
         if data.get('complaint_text') and data.get('complaint_text').strip():
-            message += f"💬 شكوى المريض: {data['complaint_text']}\n\n"
+            message += f"💬 **شكوى المريض:**\n{data['complaint_text']}\n\n"
         
         # قرار الطبيب - التحقق من نوع المحتوى (للأنواع الأخرى)
         if data.get('doctor_decision') and data.get('doctor_decision').strip():
-            doctor_decision_text = data['doctor_decision']
-            
-            # تحليل النص وتنظيمه - تحويل من صيغة متعددة الأسطر إلى صيغة منظمة
-            lines = doctor_decision_text.split('\n')
-            organized_lines = []
-            
-            for line in lines:
-                line = line.strip()
-                if not line:
-                    continue
-                
-                # إذا كان السطر يحتوي على ":"، ننظمه
-                if ':' in line:
-                    # تقسيم السطر إلى عنوان ومحتوى
-                    parts = line.split(':', 1)
-                    if len(parts) == 2:
-                        title = parts[0].strip()
-                        content = parts[1].strip()
-                        # إزالة العلامات الزائدة مثل **
-                        title = title.replace('**', '').strip()
-                        # إضافة emoji مناسب حسب العنوان
-                        emoji_map = {
-                            'قرار الطبيب': '📝',
-                            'التشخيص': '🔬',
-                            'التشخيص النهائي': '🔬',
-                            'الفحوصات المطلوبة': '🧪',
-                            'تفاصيل العملية': '⚕️',
-                            'سبب الرقود': '🏥',
-                            'اسم العملية بالإنجليزي': '🔤',
-                            'ملاحظات': '📝',
-                            'سبب تأجيل الموعد': '📅',
-                            'تاريخ العودة الجديد': '📅',
-                            'سبب العودة': '✍️',
-                            'ملخص الرقود': '📋',
-                            'تفاصيل الجلسة': '🏃',
-                            'تفاصيل الجهاز': '🦾',
-                            'نوع الأشعة والفحوصات': '🔬',
-                            'التوصيات الطبية': '💡',
-                            'وضع الحالة': '📌'
-                        }
-                        emoji = emoji_map.get(title, '📌')
-                        organized_lines.append(f"{emoji} {title}: {content}")
-                    else:
-                        organized_lines.append(line)
-                else:
-                    # إذا كان السطر عادي، نضيفه كما هو
-                    organized_lines.append(line)
-            
-            # التحقق من نوع الإجراء
-            medical_action = data.get('medical_action', '')
-            if medical_action in ['علاج طبيعي وإعادة تأهيل', 'علاج طبيعي', 'أجهزة تعويضية', 'أشعة وفحوصات', 'تأجيل موعد', 'خروج من المستشفى', 'خروج', 'ترقيد', 'عملية جراحية', 'عملية', 'استشارة نهائية']:
-                # هذه الأنواع لا تحتوي على "قرار الطبيب" - نعرض النص مباشرة
-                message += '\n'.join(organized_lines) + '\n\n'
-            else:
-                # التحقق من وجود "قرار الطبيب" في النص
-                if not any('قرار الطبيب' in line for line in organized_lines):
-                    # إذا لم يكن موجوداً، نضيفه في البداية
-                    if organized_lines:
-                        message += f"📝 قرار الطبيب: {organized_lines[0]}\n\n"
-                        if len(organized_lines) > 1:
-                            message += '\n'.join(organized_lines[1:]) + '\n\n'
-                    else:
-                        message += f"📝 قرار الطبيب: {doctor_decision_text}\n\n"
-                else:
-                    message += '\n'.join(organized_lines) + '\n\n'
+            message += f"📝 **قرار الطبيب:**\n{data['doctor_decision']}\n\n"
     
     # حالة الحالة (إذا كانت موجودة) - فقط إذا لم تكن جزءاً من قرار الطبيب
     if data.get('case_status') and data.get('case_status') != 'لا يوجد':
@@ -539,6 +480,7 @@ def format_report_message(data: dict) -> str:
     
     # موعد العودة - تنسيق محسّن (فقط إذا كان موجوداً وليس None)
     if data.get('followup_date') and data.get('followup_date') != 'لا يوجد':
+        message += "━━━━━━━━━━━━━━━━━━━━\n\n"
         from datetime import datetime
         try:
             # دالة مساعدة لتحويل الوقت لصيغة 12 ساعة
@@ -563,21 +505,49 @@ def format_report_message(data: dict) -> str:
                 # النص قد يحتوي على التاريخ فقط أو التاريخ + الوقت
                 date_text = data['followup_date']
                 
-                # إذا كان هناك followup_time منفصل، نضيفه بصيغة 12 ساعة
-                if data.get('followup_time'):
-                    time_display = format_time_12h(data['followup_time'])
-                    if time_display:
-                        # إزالة "الساعة XX:XX" إذا كانت موجودة في النص
-                        if ' الساعة ' in date_text:
-                            date_text = date_text.split(' الساعة ')[0]
-                        message += f"📅🕐 موعد العودة: {date_text} - {time_display}\n\n"
+                # التحقق إذا كان التاريخ يحتوي على اسم اليوم بالفعل
+                if '(' in date_text and ')' in date_text:
+                    # التاريخ يحتوي بالفعل على اسم اليوم - استخدامه كما هو
+                    if ' - ' in date_text:
+                        # يحتوي على الوقت أيضاً
+                        message += f"📅 موعد العودة: {date_text}\n\n"
+                    elif data.get('followup_time'):
+                        # إضافة الوقت
+                        time_display = format_time_12h(data['followup_time'])
+                        if time_display:
+                            message += f"📅 موعد العودة: {date_text} الساعة {time_display}\n\n"
+                        else:
+                            message += f"📅 موعد العودة: {date_text}\n\n"
                     else:
                         message += f"📅 موعد العودة: {date_text}\n\n"
-                elif ' - ' in date_text:
-                    # التاريخ بصيغة: "21 نوفمبر 2025 (الجمعة) - 7:00 مساءً"
-                    message += f"📅🕐 موعد العودة: {date_text}\n\n"
                 else:
-                    message += f"📅 موعد العودة: {date_text}\n\n"
+                    # التاريخ لا يحتوي على اسم اليوم - محاولة تحليله وإضافة اليوم
+                    try:
+                        # محاولة تحليل التاريخ بصيغة YYYY-MM-DD
+                        date_obj = datetime.strptime(date_text, '%Y-%m-%d')
+                        days_ar = {0: 'الاثنين', 1: 'الثلاثاء', 2: 'الأربعاء', 3: 'الخميس', 4: 'الجمعة', 5: 'السبت', 6: 'الأحد'}
+                        MONTH_NAMES_AR = {1: "يناير", 2: "فبراير", 3: "مارس", 4: "أبريل", 5: "مايو", 6: "يونيو", 7: "يوليو", 8: "أغسطس", 9: "سبتمبر", 10: "أكتوبر", 11: "نوفمبر", 12: "ديسمبر"}
+                        day_name = days_ar.get(date_obj.weekday(), '')
+                        date_formatted = f"{date_obj.strftime('%d')} {MONTH_NAMES_AR.get(date_obj.month, date_obj.month)} {date_obj.year} ({day_name})"
+                        
+                        if data.get('followup_time'):
+                            time_display = format_time_12h(data['followup_time'])
+                            if time_display:
+                                message += f"📅 موعد العودة: {date_formatted} الساعة {time_display}\n\n"
+                            else:
+                                message += f"📅 موعد العودة: {date_formatted}\n\n"
+                        else:
+                            message += f"📅 موعد العودة: {date_formatted}\n\n"
+                    except:
+                        # فشل التحليل - استخدام النص كما هو
+                        if data.get('followup_time'):
+                            time_display = format_time_12h(data['followup_time'])
+                            if time_display:
+                                message += f"📅 موعد العودة: {date_text} الساعة {time_display}\n\n"
+                            else:
+                                message += f"📅 موعد العودة: {date_text}\n\n"
+                        else:
+                            message += f"📅 موعد العودة: {date_text}\n\n"
             else:
                 # كائن datetime
                 date_obj = data['followup_date']
@@ -589,7 +559,7 @@ def format_report_message(data: dict) -> str:
                 if data.get('followup_time'):
                     time_display = format_time_12h(data['followup_time'])
                     if time_display:
-                        message += f"📅🕐 موعد العودة: {date_str} - {time_display}\n\n"
+                        message += f"📅 موعد العودة: {date_str} الساعة {time_display}\n\n"
                     else:
                         message += f"📅 موعد العودة: {date_str}\n\n"
                 else:
@@ -599,7 +569,10 @@ def format_report_message(data: dict) -> str:
     
     # سبب العودة (فقط إذا كان موجوداً وليس None أو فارغاً)
     if data.get('followup_reason') and data.get('followup_reason') != 'لا يوجد':
-        message += f"✍️ سبب العودة: {data['followup_reason']}\n\n"
+        message += f"✍️ **سبب العودة:**\n{data['followup_reason']}\n\n"
+    
+    # خط فاصل نهائي
+    message += "━━━━━━━━━━━━━━━━━━━━\n\n"
     
     # المترجم
     if data.get('translator_name'):
@@ -664,6 +637,11 @@ async def broadcast_schedule(bot: Bot, photo_source: str, schedule_data: dict, u
         
         # إرسال للمستخدمين
         for user in approved_users:
+            # تخطي المستخدمين بدون chat_id
+            if not user.tg_user_id:
+                logger.warning(f"⚠️ تخطي {user.full_name}: لم يستخدم البوت بعد (لا يوجد chat_id)")
+                continue
+                
             try:
                 if use_file_id:
                     await bot.send_photo(

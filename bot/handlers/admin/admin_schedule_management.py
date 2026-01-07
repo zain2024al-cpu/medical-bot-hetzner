@@ -151,7 +151,7 @@ async def confirm_schedule_save(update: Update, context: ContextTypes.DEFAULT_TY
         if file_path:
             with SessionLocal() as s:
                 ds = DailySchedule(
-                    date=datetime.utcnow(),
+                    date=datetime.now(),  # استخدام التوقيت المحلي بدلاً من UTC
                     photo_path=file_path,
                     photo_file_id=context.user_data.get("photo_file_id"),
                     uploaded_by=update.effective_user.id
