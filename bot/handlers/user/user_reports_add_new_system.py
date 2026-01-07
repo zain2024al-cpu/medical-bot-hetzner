@@ -9797,13 +9797,25 @@ async def save_report_to_database(query, context, flow_type):
             doctor_id=doctor.id if doctor else None,
             translator_id=actual_translator_id,  # ✅ استخدام translator_id الفعلي
             complaint_text=complaint_text,
-            doctor_decision=decision_text,
+            doctor_decision=clean_field_value(data.get("decision", "")),  # ✅ حفظ قرار الطبيب فقط
+            diagnosis=clean_field_value(data.get("diagnosis", "")),  # ✅ حفظ التشخيص كحقل منفصل
+            notes=clean_field_value(data.get("tests", "") or data.get("notes", "")),  # ✅ حفظ الفحوصات/الملاحظات
+            treatment_plan=clean_field_value(data.get("recommendations", "") or data.get("treatment_plan", "")),  # ✅ حفظ التوصيات
+            case_status=clean_field_value(data.get("status", "")),  # ✅ حفظ وضع الحالة (للطوارئ)
             medical_action=final_medical_action,
             followup_date=data.get("followup_date"),
+            followup_time=data.get("followup_time"),  # ✅ حفظ وقت العودة
             followup_reason=data.get("followup_reason", "لا يوجد"),
             report_date=data.get("report_date", datetime.now()),
             created_at=datetime.now(),
-            submitted_by_user_id=user_id  # ✅ حفظ معرف المستخدم الذي أنشأ التقرير
+            submitted_by_user_id=user_id,  # ✅ حفظ معرف المستخدم الذي أنشأ التقرير
+            # ✅ حقول إضافية
+            room_number=clean_field_value(data.get("room_number", "")),  # رقم الغرفة/الطابق
+            radiology_type=clean_field_value(data.get("radiology_type", "")),  # نوع الأشعة
+            radiology_delivery_date=data.get("radiology_delivery_date"),  # تاريخ تسليم نتائج الأشعة
+            app_reschedule_reason=clean_field_value(data.get("app_reschedule_reason", "")),  # سبب تأجيل الموعد
+            app_reschedule_return_date=data.get("app_reschedule_return_date"),  # موعد العودة الجديد
+            app_reschedule_return_reason=clean_field_value(data.get("app_reschedule_return_reason", "")),  # سبب العودة
         )
 
         session.add(new_report)

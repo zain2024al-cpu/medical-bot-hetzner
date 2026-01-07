@@ -1177,10 +1177,11 @@ async def confirm_date_edit(message_or_query, context, selected_date, selected_t
     text += f"**الحقل:** موعد العودة\n\n"
     text += f"**القيمة القديمة:**\n{old_display}\n\n"
     text += f"**القيمة الجديدة:**\n{new_display}\n\n"
-    text += "هل تريد حفظ التعديل؟"
+    text += "هل تريد حفظ ونشر التعديل؟"
     
     keyboard = [
-        [InlineKeyboardButton("✅ تأكيد الحفظ", callback_data="edit_confirm_save")],
+        [InlineKeyboardButton("📢 حفظ ونشر", callback_data="edit_save_and_publish")],
+        [InlineKeyboardButton("💾 حفظ فقط", callback_data="edit_confirm_save")],
         [InlineKeyboardButton("🔙 رجوع", callback_data="edit_back_to_fields")],
         [InlineKeyboardButton("❌ إلغاء", callback_data="edit_cancel")]
     ]
@@ -1281,10 +1282,11 @@ async def handle_new_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text += f"**الحقل:** {field_display}\n\n"
     text += f"**القيمة القديمة:**\n{old_value}\n\n"
     text += f"**القيمة الجديدة:**\n{new_value}\n\n"
-    text += "هل تريد حفظ التعديل؟"
+    text += "هل تريد حفظ ونشر التعديل؟"
     
     keyboard = [
-        [InlineKeyboardButton("✅ تأكيد الحفظ", callback_data="edit_confirm_save")],
+        [InlineKeyboardButton("📢 حفظ ونشر", callback_data="edit_save_and_publish")],
+        [InlineKeyboardButton("💾 حفظ فقط", callback_data="edit_confirm_save")],
         [InlineKeyboardButton("🔙 رجوع", callback_data="edit_back_to_fields")],
         [InlineKeyboardButton("❌ إلغاء", callback_data="edit_cancel")]
     ]
@@ -1297,8 +1299,56 @@ async def handle_new_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     return CONFIRM_EDIT
 
+async def save_edit_to_database(query, context):
+    """حفظ التعديل في قاعدة البيانات (دالة مساعدة)"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    report_id = context.user_data.get('edit_report_id')
+    field_name = context.user_data.get('edit_field')
+    new_value = context.user_data.get('new_value')
+    
+    with SessionLocal() as s:
+        report = s.query(Report).filter_by(id=report_id).first()
+        
+        if not report:
+            return False
+        
+        # تحديث الحقل
+        if field_name == "followup_date":
+            if new_value == "لا يوجد":
+                report.followup_date = None
+                report.followup_time = None
+            else:
+                # إذا كان التاريخ يحتوي على وقت
+                if ' ' in new_value:
+                    dt = datetime.strptime(new_value, '%Y-%m-%d %H:%M')
+                    report.followup_date = dt
+                    report.followup_time = dt.strftime('%H:%M')
+                else:
+                    # تاريخ فقط بدون وقت
+                    report.followup_date = datetime.strptime(new_value, '%Y-%m-%d')
+                    # حفظ الوقت إذا كان موجوداً في context
+                    new_time = context.user_data.get('new_time')
+                    if new_time:
+                        report.followup_time = new_time
+                    else:
+                        report.followup_time = None
+        else:
+            setattr(report, field_name, new_value)
+        
+        # تحديث تاريخ التعديل
+        report.updated_at = datetime.now()
+        
+        s.commit()
+        logger.info(f"✅ تم حفظ التعديل للتقرير #{report_id} - الحقل: {field_name}")
+        return True
+
 async def handle_confirm_edit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة تأكيد الحفظ"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     query = update.callback_query
     await query.answer()
     
@@ -1308,6 +1358,13 @@ async def handle_confirm_edit(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     if query.data == "edit_back_to_fields":
         return await show_field_selection(query, context)
+    
+    # حفظ ونشر التقرير
+    if query.data == "edit_save_and_publish":
+        # أولاً نحفظ التعديل
+        await save_edit_to_database(query, context)
+        # ثم ننشر التقرير
+        return await handle_republish(update, context)
     
     if query.data == "edit_confirm_save":
         # حفظ التعديل في قاعدة البيانات
