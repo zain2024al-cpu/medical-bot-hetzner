@@ -9656,6 +9656,31 @@ async def save_report_to_database(query, context, flow_type):
         
         logger.info(f"Final medical_action to save: {repr(final_medical_action)}")
 
+        # ✅ دالة مساعدة لتنظيف القيم من النصوص التعليمية
+        def clean_field_value(value):
+            """إزالة النصوص التعليمية من القيم"""
+            if not value:
+                return ""
+            value_str = str(value)
+            # إزالة النصوص التعليمية
+            unwanted_patterns = [
+                "✏️ تعديل:",
+                "القيمة الحالية:",
+                "📝 أدخل القيمة الجديدة:",
+                "📌 القيمة الحالية:"
+            ]
+            for pattern in unwanted_patterns:
+                if pattern in value_str:
+                    # استخراج النص الفعلي بين "القيمة الحالية:" و "📝 أدخل"
+                    if "القيمة الحالية:" in value_str:
+                        parts = value_str.split("القيمة الحالية:", 1)
+                        if len(parts) > 1:
+                            actual_value = parts[1].split("📝 أدخل القيمة الجديدة:")[0].strip()
+                            return actual_value
+                    # إذا لم ينجح التنظيف، نزيل النص التعليمي فقط
+                    value_str = value_str.replace(pattern, "").strip()
+            return value_str
+
         # بناء نص التقرير بناءً على نوع المسار
         complaint_text = ""
         decision_text = ""
@@ -9728,31 +9753,7 @@ async def save_report_to_database(query, context, flow_type):
             complaint_text = ""
             decision_text = f"نوع الأشعة والفحوصات: {radiology_type}"
         elif flow_type in ["new_consult", "followup", "emergency"]:
-            # ✅ تنظيف القيم من النصوص التعليمية إذا كانت موجودة
-            def clean_field_value(value):
-                """إزالة النصوص التعليمية من القيم"""
-                if not value:
-                    return ""
-                value_str = str(value)
-                # إزالة النصوص التعليمية
-                unwanted_patterns = [
-                    "✏️ تعديل:",
-                    "القيمة الحالية:",
-                    "📝 أدخل القيمة الجديدة:",
-                    "📌 القيمة الحالية:"
-                ]
-                for pattern in unwanted_patterns:
-                    if pattern in value_str:
-                        # استخراج النص الفعلي بين "القيمة الحالية:" و "📝 أدخل"
-                        if "القيمة الحالية:" in value_str:
-                            parts = value_str.split("القيمة الحالية:", 1)
-                            if len(parts) > 1:
-                                actual_value = parts[1].split("📝 أدخل القيمة الجديدة:")[0].strip()
-                                return actual_value
-                        # إذا لم ينجح التنظيف، نزيل النص التعليمي فقط
-                        value_str = value_str.replace(pattern, "").strip()
-                return value_str
-            
+            # ✅ استخدام دالة التنظيف المعرفة أعلاه
             complaint_text = clean_field_value(data.get("complaint", ""))
             diagnosis = clean_field_value(data.get("diagnosis", ""))
             decision = clean_field_value(data.get("decision", ""))
