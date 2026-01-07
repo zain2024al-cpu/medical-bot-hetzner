@@ -45,6 +45,18 @@ def format_time_12h(time_str):
         return str(time_str)
 
 
+def escape_markdown(text):
+    """تنظيف النص من الأحرف الخاصة بـ Markdown"""
+    if not text:
+        return text
+    text = str(text)
+    # الأحرف الخاصة التي تحتاج escape في Markdown
+    special_chars = ['*', '_', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+    for char in special_chars:
+        text = text.replace(char, '\\' + char)
+    return text
+
+
 def get_all_editable_fields():
     """إرجاع جميع الحقول القابلة للتعديل من جميع أنواع الإجراءات"""
     return [
@@ -1174,10 +1186,14 @@ async def confirm_date_edit(message_or_query, context, selected_date, selected_t
     else:
         new_display = selected_date.strftime('%Y-%m-%d')
     
+    # تنظيف القيم من الأحرف الخاصة بـ Markdown
+    old_display_safe = escape_markdown(str(old_display) if old_display else "لا يوجد")
+    new_display_safe = escape_markdown(str(new_display) if new_display else "")
+    
     text = "📝 **تأكيد التعديل**\n\n"
     text += f"**الحقل:** موعد العودة\n\n"
-    text += f"**القيمة القديمة:**\n{old_display}\n\n"
-    text += f"**القيمة الجديدة:**\n{new_display}\n\n"
+    text += f"**القيمة القديمة:**\n{old_display_safe}\n\n"
+    text += f"**القيمة الجديدة:**\n{new_display_safe}\n\n"
     text += "هل تريد نشر التعديل؟"
     
     keyboard = [
@@ -1277,11 +1293,15 @@ async def handle_new_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
     field_display = field_names.get(field_name, field_name)
     old_value = context.user_data['current_report_data'].get(field_name, "لا يوجد")
     
+    # تنظيف القيم من الأحرف الخاصة بـ Markdown
+    old_value_safe = escape_markdown(str(old_value) if old_value else "لا يوجد")
+    new_value_safe = escape_markdown(str(new_value) if new_value else "")
+    
     # عرض الملخص
     text = "📝 **تأكيد التعديل**\n\n"
     text += f"**الحقل:** {field_display}\n\n"
-    text += f"**القيمة القديمة:**\n{old_value}\n\n"
-    text += f"**القيمة الجديدة:**\n{new_value}\n\n"
+    text += f"**القيمة القديمة:**\n{old_value_safe}\n\n"
+    text += f"**القيمة الجديدة:**\n{new_value_safe}\n\n"
     text += "هل تريد نشر التعديل؟"
     
     keyboard = [
