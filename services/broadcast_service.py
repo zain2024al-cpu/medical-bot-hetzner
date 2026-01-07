@@ -472,8 +472,23 @@ def format_report_message(data: dict) -> str:
             message += f"👨‍⚕️ المترجم: {data['translator_name']}"
         return message
     
-    # ✅ لمسار "استشارة أخيرة": نعرض المترجم مباشرة بدون موعد العودة وسبب العودة
+    # ✅ لمسار "استشارة أخيرة": نعرض جميع الحقول ثم المترجم بدون موعد العودة وسبب العودة
     if data.get('medical_action') == 'استشارة أخيرة':
+        # التشخيص
+        if data.get('diagnosis') and data.get('diagnosis').strip():
+            message += f"🔬 **التشخيص:**\n{data['diagnosis']}\n\n"
+        
+        # قرار الطبيب
+        decision = data.get('doctor_decision') or data.get('decision')
+        if decision and str(decision).strip():
+            message += f"📝 **قرار الطبيب:**\n{decision}\n\n"
+        
+        # التوصيات
+        recommendations = data.get('recommendations') or data.get('treatment_plan') or data.get('notes')
+        if recommendations and str(recommendations).strip():
+            message += f"💊 **التوصيات:**\n{recommendations}\n\n"
+        
+        # المترجم
         if data.get('translator_name'):
             message += f"👨‍⚕️ المترجم: {data['translator_name']}"
         return message

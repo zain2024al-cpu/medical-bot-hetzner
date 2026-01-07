@@ -645,6 +645,7 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 'doctor_decision': report.doctor_decision or '',
                 'decision': report.doctor_decision or '',  # نسخة للتوافق
                 'treatment_plan': report.treatment_plan or '',
+                'recommendations': report.treatment_plan or '',  # ✅ نسخة للتوافق مع broadcast_service
                 'notes': report.notes or '',
                 'medications': report.medications or '',
                 'case_status': report.case_status or '',
@@ -1177,11 +1178,10 @@ async def confirm_date_edit(message_or_query, context, selected_date, selected_t
     text += f"**الحقل:** موعد العودة\n\n"
     text += f"**القيمة القديمة:**\n{old_display}\n\n"
     text += f"**القيمة الجديدة:**\n{new_display}\n\n"
-    text += "هل تريد حفظ ونشر التعديل؟"
+    text += "هل تريد نشر التعديل؟"
     
     keyboard = [
-        [InlineKeyboardButton("📢 حفظ ونشر", callback_data="edit_save_and_publish")],
-        [InlineKeyboardButton("💾 حفظ فقط", callback_data="edit_confirm_save")],
+        [InlineKeyboardButton("📢 نشر التقرير", callback_data="edit_save_and_publish")],
         [InlineKeyboardButton("🔙 رجوع", callback_data="edit_back_to_fields")],
         [InlineKeyboardButton("❌ إلغاء", callback_data="edit_cancel")]
     ]
@@ -1282,11 +1282,10 @@ async def handle_new_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text += f"**الحقل:** {field_display}\n\n"
     text += f"**القيمة القديمة:**\n{old_value}\n\n"
     text += f"**القيمة الجديدة:**\n{new_value}\n\n"
-    text += "هل تريد حفظ ونشر التعديل؟"
+    text += "هل تريد نشر التعديل؟"
     
     keyboard = [
-        [InlineKeyboardButton("📢 حفظ ونشر", callback_data="edit_save_and_publish")],
-        [InlineKeyboardButton("💾 حفظ فقط", callback_data="edit_confirm_save")],
+        [InlineKeyboardButton("📢 نشر التقرير", callback_data="edit_save_and_publish")],
         [InlineKeyboardButton("🔙 رجوع", callback_data="edit_back_to_fields")],
         [InlineKeyboardButton("❌ إلغاء", callback_data="edit_cancel")]
     ]
