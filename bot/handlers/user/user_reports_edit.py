@@ -634,8 +634,12 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
             department = s.query(Department).filter_by(id=report.department_id).first() if report.department_id else None
             doctor = s.query(Doctor).filter_by(id=report.doctor_id).first() if report.doctor_id else None
             
-            # ✅ استخدام اسم المترجم المحفوظ في التقرير مباشرة (لا يتغير عند التعديل)
-            translator_name = report.translator_name or 'غير محدد'
+            # ✅ استخدام اسم المترجم المحفوظ في التقرير، وإذا لم يكن موجوداً نجلبه من جدول Translator
+            translator_name = report.translator_name
+            if not translator_name and report.translator_id:
+                translator = s.query(Translator).filter_by(id=report.translator_id).first()
+                translator_name = translator.full_name if translator else 'غير محدد'
+            translator_name = translator_name or 'غير محدد'
             
             # تجهيز بيانات البث - جميع الحقول
             followup_display = 'لا يوجد'
