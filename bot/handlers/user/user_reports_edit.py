@@ -1288,11 +1288,16 @@ async def handle_new_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
     field_names = {
         'complaint_text': 'شكوى المريض',
         'doctor_decision': 'قرار الطبيب',
+        'diagnosis': 'التشخيص الطبي',
+        'treatment_plan': 'التوصيات / خطة العلاج',
+        'notes': 'الفحوصات والأشعة',
+        'medications': 'الأدوية',
         'followup_date': 'موعد العودة',
-        'followup_reason': 'سبب العودة'
+        'followup_reason': 'سبب العودة',
+        'case_status': 'حالة الطوارئ'
     }
     
-    field_display = field_names.get(field_name, field_name)
+    field_display = field_names.get(field_name, field_name.replace('_', ' '))
     old_value = context.user_data['current_report_data'].get(field_name, "لا يوجد")
     
     # تنظيف القيم من الأحرف الخاصة بـ Markdown
