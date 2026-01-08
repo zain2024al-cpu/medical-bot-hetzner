@@ -633,7 +633,9 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
             hospital = s.query(Hospital).filter_by(id=report.hospital_id).first()
             department = s.query(Department).filter_by(id=report.department_id).first() if report.department_id else None
             doctor = s.query(Doctor).filter_by(id=report.doctor_id).first() if report.doctor_id else None
-            translator = s.query(Translator).filter_by(id=report.translator_id).first() if report.translator_id else None
+            
+            # ✅ استخدام اسم المترجم المحفوظ في التقرير مباشرة (لا يتغير عند التعديل)
+            translator_name = report.translator_name or 'غير محدد'
             
             # تجهيز بيانات البث - جميع الحقول
             followup_display = 'لا يوجد'
@@ -677,8 +679,8 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 # حقول الأشعة
                 'radiology_type': getattr(report, 'radiology_type', '') or '',
                 'radiology_delivery_date': getattr(report, 'radiology_delivery_date', '') or '',
-                # المترجم
-                'translator_name': translator.full_name if translator else 'غير محدد',
+                # المترجم - ✅ استخدام الاسم المحفوظ في التقرير
+                'translator_name': translator_name,
                 'is_edit': True  # علامة أن هذا تقرير معدل
             }
             
