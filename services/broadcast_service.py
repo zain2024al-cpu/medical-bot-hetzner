@@ -13,6 +13,19 @@ import os
 
 logger = logging.getLogger(__name__)
 
+
+def escape_markdown(text):
+    """تنظيف النص من الأحرف الخاصة بـ Markdown"""
+    if not text:
+        return text
+    text = str(text)
+    # الأحرف الخاصة التي تحتاج escape في Markdown
+    special_chars = ['*', '_', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+    for char in special_chars:
+        text = text.replace(char, '\\' + char)
+    return text
+
+
 # إعدادات المجموعة
 REPORTS_GROUP_ID = os.getenv("REPORTS_GROUP_ID", "")  # معرف المجموعة الخاصة بالتقارير
 USE_GROUP_BROADCAST = os.getenv("USE_GROUP_BROADCAST", "false").lower() == "true"  # ⏸️ معطل مؤقتاً للاختبار
@@ -428,11 +441,11 @@ def format_report_message(data: dict) -> str:
     else:
         # شكوى المريض - فقط إذا كانت موجودة وغير فارغة
         if data.get('complaint_text') and data.get('complaint_text').strip():
-            message += f"💬 **شكوى المريض:**\n{data['complaint_text']}\n\n"
+            message += f"💬 **شكوى المريض:**\n{escape_markdown(data['complaint_text'])}\n\n"
         
         # قرار الطبيب - التحقق من نوع المحتوى (للأنواع الأخرى)
         if data.get('doctor_decision') and data.get('doctor_decision').strip():
-            message += f"📝 **قرار الطبيب:**\n{data['doctor_decision']}\n\n"
+            message += f"📝 **قرار الطبيب:**\n{escape_markdown(data['doctor_decision'])}\n\n"
     
     # حالة الحالة (إذا كانت موجودة) - فقط إذا لم تكن جزءاً من قرار الطبيب
     if data.get('case_status') and data.get('case_status') != 'لا يوجد':
@@ -440,7 +453,7 @@ def format_report_message(data: dict) -> str:
         # التحقق من أن case_status ليس جزءاً من doctor_decision
         doctor_decision = data.get('doctor_decision', '')
         if not (doctor_decision and case_status_text in doctor_decision):
-            message += f"📌 الإجراء الذي تم: {case_status_text}\n\n"
+            message += f"📌 الإجراء الذي تم: {escape_markdown(case_status_text)}\n\n"
     
     # بيانات الأشعة (إذا كانت موجودة) - النص في سطر منفصل مع ترقيم
     if data.get('radiology_type') and data.get('radiology_type') != 'لا يوجد':
@@ -476,21 +489,21 @@ def format_report_message(data: dict) -> str:
     if data.get('medical_action') == 'استشارة أخيرة':
         # التشخيص
         if data.get('diagnosis') and data.get('diagnosis').strip():
-            message += f"🔬 **التشخيص:**\n{data['diagnosis']}\n\n"
+            message += f"🔬 **التشخيص:**\n{escape_markdown(data['diagnosis'])}\n\n"
         
         # قرار الطبيب
         decision = data.get('doctor_decision') or data.get('decision')
         if decision and str(decision).strip():
-            message += f"📝 **قرار الطبيب:**\n{decision}\n\n"
+            message += f"📝 **قرار الطبيب:**\n{escape_markdown(str(decision))}\n\n"
         
         # التوصيات
         recommendations = data.get('recommendations') or data.get('treatment_plan') or data.get('notes')
         if recommendations and str(recommendations).strip():
-            message += f"💊 **التوصيات:**\n{recommendations}\n\n"
+            message += f"💊 **التوصيات:**\n{escape_markdown(str(recommendations))}\n\n"
         
         # المترجم
         if data.get('translator_name'):
-            message += f"👨‍⚕️ المترجم: {data['translator_name']}"
+            message += f"👨‍⚕️ المترجم: {escape_markdown(str(data['translator_name']))}"
         return message
     
     # موعد العودة - تنسيق محسّن (فقط إذا كان موجوداً وليس None)
