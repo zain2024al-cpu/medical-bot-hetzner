@@ -268,7 +268,7 @@ async def show_subdepartment_options(message, context, main_dept, page=0):
             keyboard.append(nav_buttons)
 
     keyboard.append([InlineKeyboardButton(
-        "✏️ تعديل Back", callback_data="edit_during_entry:show_menu")])
+        "🔙 رجوع", callback_data="nav:back")])
     keyboard.append([InlineKeyboardButton(
         "❌ إلغاء", callback_data="nav:cancel")])
 

@@ -6,7 +6,7 @@
 
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, date
 from zoneinfo import ZoneInfo
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes, ConversationHandler
@@ -265,15 +265,94 @@ def get_field_display_name(field_key):
     return names.get(field_key, field_key)
 
 
+def _has_field_value(data, field_key):
+    """
+    التحقق من وجود قيمة فعلية للحقل في report_tmp
+    يعيد True فقط إذا كان للحقل قيمة حقيقية (ليست فارغة، None، أو "غير محدد")
+    
+    منطق العمل:
+    1. الحقول الأساسية (report_date, patient_name, hospital_name, department_name, doctor_name) 
+       تكون موجودة عادة، لكن يتم التحقق منها أيضاً
+    2. الحقول الأخرى يتم التحقق منها في الحقول المشتقة أولاً
+    3. إذا لم توجد في الحقول المشتقة، يتم التحقق من الحقل نفسه
+    """
+    # ✅ التحقق من الحقول المشتقة أولاً
+    field_aliases = {
+        # الحقول الأساسية
+        "report_date": ["report_date"],
+        "patient_name": ["patient_name"],
+        "hospital_name": ["hospital_name"],
+        "department_name": ["department_name"],
+        "doctor_name": ["doctor_name"],
+        
+        # الحقول المشتقة
+        "complaint": ["complaint", "complaint_text"],
+        "decision": ["decision", "doctor_decision"],
+        "diagnosis": ["diagnosis"],
+        "tests": ["tests", "notes"],  # في بعض المسارات، tests محفوظ في notes
+        "operation_details": ["operation_details", "notes"],
+        "operation_name_en": ["operation_name_en"],
+        "success_rate": ["success_rate"],
+        "benefit_rate": ["benefit_rate"],
+        "room_number": ["room_number", "room_floor"],
+        "followup_date": ["followup_date"],
+        "followup_time": ["followup_time"],
+        "followup_reason": ["followup_reason"],
+        "delivery_date": ["delivery_date", "radiology_delivery_date"],
+        "radiology_delivery_date": ["delivery_date", "radiology_delivery_date"],
+        "radiology_type": ["radiology_type"],
+        "admission_reason": ["admission_reason"],
+        "discharge_type": ["discharge_type"],
+        "admission_summary": ["admission_summary"],
+        "therapy_details": ["therapy_details"],
+        "device_name": ["device_name", "device_details"],
+        "device_details": ["device_name", "device_details"],
+        "app_reschedule_reason": ["app_reschedule_reason"],
+        "app_reschedule_return_date": ["app_reschedule_return_date", "followup_date"],
+        "app_reschedule_return_reason": ["app_reschedule_return_reason", "followup_reason"],
+        "recommendations": ["recommendations"],
+        "notes": ["notes"],
+        "status": ["status"],
+        "admission_type": ["admission_type"],
+    }
+    
+    # ✅ البحث في الحقول المشتقة
+    aliases = field_aliases.get(field_key, [field_key])
+    for alias in aliases:
+        alias_value = data.get(alias)
+        if alias_value is not None:
+            # ✅ التحقق من التواريخ
+            if isinstance(alias_value, (date, datetime)):
+                return True
+            
+            # ✅ التحقق من النصوص
+            value_str = str(alias_value).strip()
+            if value_str and value_str not in ["غير محدد", "لا يوجد", "None", "null", "", "⚠️ فارغ"]:
+                return True
+    
+    # ✅ التحقق من الحقل نفسه (fallback)
+    value = data.get(field_key)
+    if value is not None:
+        # ✅ التحقق من التواريخ
+        if isinstance(value, (date, datetime)):
+            return True
+        
+        # ✅ التحقق من النصوص
+        value_str = str(value).strip()
+        if value_str and value_str not in ["غير محدد", "لا يوجد", "None", "null", "", "⚠️ فارغ"]:
+            return True
+    
+    return False
+
+
 def get_editable_fields_by_flow_type(flow_type):
-    """الحصول على الحقول القابلة للتعديل حسب نوع التدفق - دالة ثابتة للقوائم"""
+    """الحصول على الحقول القابلة للتعديل حسب نوع التدفق - دالة ثابتة للقوائم
+    ✅ ملاحظة: تم إزالة الحقول الأساسية (report_date, patient_name, hospital_name, department_name, doctor_name)
+    لأنها تُحدد قبل بدء المسار وليست جزءاً من الإدخال اليدوي
+    """
     fields_map = {
         "new_consult": [
-            ("report_date", "📅 التاريخ والوقت"),
-            ("patient_name", "👤 اسم المريض"),
-            ("hospital_name", "🏥 المستشفى"),
-            ("department_name", "🏷️ القسم"),
-            ("doctor_name", "👨‍⚕️ اسم الطبيب"),
+            # ✅ الحقول المدخلة فقط في مسار استشارة جديدة
             ("complaint", "💬 شكوى المريض"),
             ("diagnosis", "🔬 التشخيص الطبي"),
             ("decision", "📝 قرار الطبيب"),
@@ -283,11 +362,17 @@ def get_editable_fields_by_flow_type(flow_type):
             ("followup_reason", "✍️ سبب العودة"),
         ],
         "followup": [
-            ("report_date", "📅 التاريخ والوقت"),
-            ("patient_name", "👤 اسم المريض"),
-            ("hospital_name", "🏥 المستشفى"),
-            ("department_name", "🏷️ القسم"),
-            ("doctor_name", "👨‍⚕️ اسم الطبيب"),
+            # ✅ الحقول المدخلة فقط في مسار متابعة (متابعة في الرقود)
+            ("complaint", "💬 شكوى المريض"),
+            ("diagnosis", "🔬 التشخيص الطبي"),
+            ("decision", "📝 قرار الطبيب"),
+            ("room_number", "🏥 رقم الغرفة والطابق"),
+            ("followup_date", "📅 موعد العودة"),
+            ("followup_time", "⏰ وقت العودة"),
+            ("followup_reason", "✍️ سبب العودة"),
+        ],
+        "periodic_followup": [
+            # ✅ مسار "مراجعة / عودة دورية" - بدون room_number
             ("complaint", "💬 شكوى المريض"),
             ("diagnosis", "🔬 التشخيص الطبي"),
             ("decision", "📝 قرار الطبيب"),
@@ -295,28 +380,29 @@ def get_editable_fields_by_flow_type(flow_type):
             ("followup_time", "⏰ وقت العودة"),
             ("followup_reason", "✍️ سبب العودة"),
         ],
+        "inpatient_followup": [
+            # ✅ مسار "متابعة في الرقود" - مع room_number
+            ("complaint", "💬 شكوى المريض"),
+            ("diagnosis", "🔬 التشخيص الطبي"),
+            ("decision", "📝 قرار الطبيب"),
+            ("room_number", "🏥 رقم الغرفة والطابق"),
+            ("followup_date", "📅 موعد العودة"),
+            ("followup_time", "⏰ وقت العودة"),
+            ("followup_reason", "✍️ سبب العودة"),
+        ],
         "emergency": [
-            ("report_date", "📅 التاريخ والوقت"),
-            ("patient_name", "👤 اسم المريض"),
-            ("hospital_name", "🏥 المستشفى"),
-            ("department_name", "🏷️ القسم"),
-            ("doctor_name", "👨‍⚕️ اسم الطبيب"),
+            # ✅ الحقول المدخلة فقط في مسار طوارئ
             ("complaint", "💬 شكوى المريض"),
             ("diagnosis", "🔬 التشخيص الطبي"),
             ("decision", "📝 قرار الطبيب وماذا تم"),
             ("status", "🏥 وضع الحالة"),
-            ("admission_type", "🛏️ نوع الترقيد"),
             ("room_number", "🚪 رقم الغرفة"),
             ("followup_date", "📅 موعد العودة"),
             ("followup_time", "⏰ وقت العودة"),
             ("followup_reason", "✍️ سبب العودة"),
         ],
         "admission": [
-            ("report_date", "📅 التاريخ والوقت"),
-            ("patient_name", "👤 اسم المريض"),
-            ("hospital_name", "🏥 المستشفى"),
-            ("department_name", "🏷️ القسم"),
-            ("doctor_name", "👨‍⚕️ اسم الطبيب"),
+            # ✅ الحقول المدخلة فقط في مسار ترقيد
             ("admission_reason", "🛏️ سبب الرقود"),
             ("room_number", "🚪 رقم الغرفة"),
             ("notes", "📝 ملاحظات"),
@@ -324,11 +410,7 @@ def get_editable_fields_by_flow_type(flow_type):
             ("followup_reason", "✍️ سبب العودة"),
         ],
         "surgery_consult": [
-            ("report_date", "📅 التاريخ والوقت"),
-            ("patient_name", "👤 اسم المريض"),
-            ("hospital_name", "🏥 المستشفى"),
-            ("department_name", "🏷️ القسم"),
-            ("doctor_name", "👨‍⚕️ اسم الطبيب"),
+            # ✅ الحقول المدخلة فقط في مسار استشارة مع قرار عملية
             ("diagnosis", "🔬 التشخيص"),
             ("decision", "📝 قرار الطبيب وتفاصيل العملية"),
             ("operation_name_en", "🔤 اسم العملية بالإنجليزي"),
@@ -340,11 +422,7 @@ def get_editable_fields_by_flow_type(flow_type):
             ("followup_reason", "✍️ سبب العودة"),
         ],
         "operation": [
-            ("report_date", "📅 التاريخ والوقت"),
-            ("patient_name", "👤 اسم المريض"),
-            ("hospital_name", "🏥 المستشفى"),
-            ("department_name", "🏷️ القسم"),
-            ("doctor_name", "👨‍⚕️ اسم الطبيب"),
+            # ✅ الحقول المدخلة فقط في مسار عملية
             ("operation_details", "⚕️ تفاصيل العملية بالعربي"),
             ("operation_name_en", "🔤 اسم العملية بالإنجليزي"),
             ("notes", "📝 ملاحظات"),
@@ -353,21 +431,13 @@ def get_editable_fields_by_flow_type(flow_type):
             ("followup_reason", "✍️ سبب العودة"),
         ],
         "final_consult": [
-            ("report_date", "📅 التاريخ والوقت"),
-            ("patient_name", "👤 اسم المريض"),
-            ("hospital_name", "🏥 المستشفى"),
-            ("department_name", "🏷️ القسم"),
-            ("doctor_name", "👨‍⚕️ اسم الطبيب"),
+            # ✅ الحقول المدخلة فقط في مسار استشارة أخيرة
             ("diagnosis", "🔬 التشخيص النهائي"),
             ("decision", "📝 قرار الطبيب"),
             ("recommendations", "💡 التوصيات الطبية"),
         ],
         "discharge": [
-            ("report_date", "📅 التاريخ والوقت"),
-            ("patient_name", "👤 اسم المريض"),
-            ("hospital_name", "🏥 المستشفى"),
-            ("department_name", "🏷️ القسم"),
-            ("doctor_name", "👨‍⚕️ اسم الطبيب"),
+            # ✅ الحقول المدخلة فقط في مسار خروج من المستشفى
             ("discharge_type", "🚪 نوع الخروج"),
             ("admission_summary", "📋 ملخص الرقود"),
             ("operation_details", "⚕️ تفاصيل العملية"),
@@ -376,36 +446,29 @@ def get_editable_fields_by_flow_type(flow_type):
             ("followup_reason", "✍️ سبب العودة"),
         ],
         "rehab_physical": [
-            ("report_date", "📅 التاريخ والوقت"),
-            ("patient_name", "👤 اسم المريض"),
-            ("hospital_name", "🏥 المستشفى"),
-            ("department_name", "🏷️ القسم"),
-            ("doctor_name", "👨‍⚕️ اسم الطبيب"),
+            # ✅ الحقول المدخلة فقط في مسار علاج طبيعي
             ("therapy_details", "🏃 تفاصيل جلسة العلاج الطبيعي"),
             ("followup_date", "📅 موعد العودة"),
             ("followup_time", "⏰ وقت العودة"),
             ("followup_reason", "✍️ سبب العودة"),
         ],
         "rehab_device": [
-            ("report_date", "📅 التاريخ والوقت"),
-            ("patient_name", "👤 اسم المريض"),
-            ("hospital_name", "🏥 المستشفى"),
-            ("department_name", "🏷️ القسم"),
-            ("doctor_name", "👨‍⚕️ اسم الطبيب"),
+            # ✅ الحقول المدخلة فقط في مسار أجهزة تعويضية
             ("device_name", "🦾 اسم الجهاز والتفاصيل"),
-            ("device_details", "🦾 اسم الجهاز والتفاصيل"),
             ("followup_date", "📅 موعد العودة"),
             ("followup_time", "⏰ وقت العودة"),
             ("followup_reason", "✍️ سبب العودة"),
         ],
         "radiology": [
-            ("report_date", "📅 التاريخ والوقت"),
-            ("patient_name", "👤 اسم المريض"),
-            ("hospital_name", "🏥 المستشفى"),
-            ("department_name", "🏷️ القسم"),
-            ("doctor_name", "👨‍⚕️ اسم الطبيب"),
+            # ✅ الحقول المدخلة فقط في مسار أشعة وفحوصات
             ("radiology_type", "🔬 نوع الأشعة/الفحص"),
             ("delivery_date", "📅 تاريخ الاستلام"),
+        ],
+        "appointment_reschedule": [
+            # ✅ الحقول المدخلة فقط في مسار تأجيل موعد
+            ("app_reschedule_reason", "📅 سبب تأجيل الموعد"),
+            ("app_reschedule_return_date", "📅 تاريخ العودة الجديد"),
+            ("app_reschedule_return_reason", "✍️ سبب العودة"),
         ],
     }
     return fields_map.get(flow_type, [])
@@ -629,7 +692,7 @@ async def render_translator_selection(message, context, flow_type):
         text += "يرجى إدخال اسم المترجم يدوياً:"
     
     keyboard.append([
-        InlineKeyboardButton("✏️ تعديل Back", callback_data="edit_during_entry:show_menu"),
+        InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
         InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
     ])
 
@@ -816,9 +879,14 @@ async def handle_translator_choice(update: Update, context: ContextTypes.DEFAULT
         
         if query.data.startswith("translator_idx:"):
             try:
+                if len(parts) < 3:
+                    logger.error(f"❌ callback_data missing translator_id: {query.data}")
+                    await query.answer("⚠️ خطأ في البيانات (لا يوجد رقم المترجم)", show_alert=True)
+                    flow_type = context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
+                    return get_translator_state(flow_type)
                 translator_id = int(parts[2])
                 logger.info(f"✅ Selecting translator by ID: {translator_id}")
-                
+                found_translator = False
                 if SessionLocal and Translator:
                     with SessionLocal() as s:
                         translator = s.query(Translator).filter_by(id=translator_id).first()
@@ -826,11 +894,14 @@ async def handle_translator_choice(update: Update, context: ContextTypes.DEFAULT
                             context.user_data.setdefault("report_tmp", {})["translator_name"] = translator.full_name
                             context.user_data["report_tmp"]["translator_id"] = translator.id
                             logger.info(f"✅ Translator selected: {translator.full_name}")
+                            found_translator = True
                         else:
                             context.user_data.setdefault("report_tmp", {})["translator_name"] = "غير محدد"
                             context.user_data["report_tmp"]["translator_id"] = None
-                            logger.warning(f"⚠️ Translator ID {translator_id} not found")
-                
+                            logger.warning(f"⚠️ Translator ID {translator_id} not found in DB")
+                if not found_translator:
+                    await query.answer("⚠️ لم يتم العثور على المترجم المطلوب. يرجى المحاولة مرة أخرى أو تحديث القائمة.", show_alert=True)
+                    return get_translator_state(flow_type)
                 try:
                     await query.edit_message_text("✅ تم اختيار المترجم")
                 except Exception as e:
@@ -839,7 +910,6 @@ async def handle_translator_choice(update: Update, context: ContextTypes.DEFAULT
                         await query.message.reply_text("✅ تم اختيار المترجم")
                     except:
                         pass
-                
                 try:
                     await show_final_summary(query.message, context, flow_type)
                 except Exception as e:
@@ -851,19 +921,18 @@ async def handle_translator_choice(update: Update, context: ContextTypes.DEFAULT
                     )
                     flow_type = context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
                     return get_translator_state(flow_type)
-                
                 confirm_state = get_confirm_state(flow_type)
                 context.user_data['_conversation_state'] = confirm_state
                 logger.info(f"✅ Returning confirm_state: {confirm_state}")
                 return confirm_state
             except (ValueError, IndexError) as e:
                 logger.error(f"❌ Error parsing translator ID: {e}", exc_info=True)
-                await query.answer("⚠️ خطأ في اختيار المترجم", show_alert=True)
+                await query.answer("⚠️ خطأ في رقم المترجم. يرجى المحاولة مرة أخرى.", show_alert=True)
                 flow_type = context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
                 return get_translator_state(flow_type)
             except Exception as e:
                 logger.error(f"❌ Unexpected error in translator_idx handler: {e}", exc_info=True)
-                await query.answer("⚠️ حدث خطأ غير متوقع", show_alert=True)
+                await query.answer("⚠️ حدث خطأ غير متوقع أثناء اختيار المترجم", show_alert=True)
                 flow_type = context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
                 return get_translator_state(flow_type)
         
@@ -1035,280 +1104,33 @@ async def handle_translator_text(update: Update, context: ContextTypes.DEFAULT_T
 # =============================
 
 async def show_final_summary(message, context, flow_type):
-    """عرض ملخص التقرير النهائي قبل الحفظ - يعرض جميع التفاصيل"""
+    """
+    ✅ عرض ملخص التقرير النهائي قبل الحفظ
+    - يستخدم نفس منطق format_report_message
+    - يعرض فقط الحقول المدخلة فعلياً (بدون قيم افتراضية)
+    - ما يظهر في الملخص = ما سيُنشر حرفيًا
+    """
     try:
-        data = context.user_data.get("report_tmp", {})
-
-        # بناء الملخص بناءً على نوع المسار
-        report_date = data.get("report_date")
-        if report_date and hasattr(report_date, 'strftime'):
-            days_ar = {0: 'الاثنين', 1: 'الثلاثاء', 2: 'الأربعاء', 3: 'الخميس', 
-                       4: 'الجمعة', 5: 'السبت', 6: 'الأحد'}
-            day_name = days_ar.get(report_date.weekday(), '')
-            date_str = f"{report_date.strftime('%Y-%m-%d')} ({day_name}) {report_date.strftime('%H:%M')}"
-        else:
-            date_str = str(report_date) if report_date else 'غير محدد'
-
-        # تهريب القيم المدخلة من المستخدم لتجنب أخطاء Markdown
-        patient_name = escape_markdown_v1(str(data.get('patient_name', 'غير محدد')))
-        hospital_name = escape_markdown_v1(str(data.get('hospital_name', 'غير محدد')))
-        department_name = escape_markdown_v1(str(data.get('department_name', 'غير محدد')))
-        doctor_name = escape_markdown_v1(str(data.get('doctor_name', 'غير محدد')))
-
-        summary = f"📋 **ملخص التقرير**\n\n"
-        summary += f"📅 **التاريخ:** {date_str}\n"
-        summary += f"👤 **المريض:** {patient_name}\n"
-        summary += f"🏥 **المستشفى:** {hospital_name}\n"
-        summary += f"🏷️ **القسم:** {department_name}\n"
-        summary += f"👨‍⚕️ **الطبيب:** {doctor_name}\n\n"
-
-        # نوع الإجراء
-        action_names = {
-            "new_consult": "استشارة جديدة",
-            "followup": "متابعة في الرقود",
-            "surgery_consult": "استشارة مع قرار عملية",
-            "emergency": "طوارئ",
-            "admission": "ترقيد",
-            "operation": "عملية",
-            "final_consult": "استشارة أخيرة",
-            "discharge": "خروج من المستشفى",
-            "rehab_physical": "علاج طبيعي",
-            "rehab_device": "أجهزة تعويضية",
-            "radiology": "أشعة وفحوصات",
-            "appointment_reschedule": "تأجيل موعد"
-        }
+        data = context.user_data.get("report_tmp", {}).copy()  # نسخة لتجنب التعديل على البيانات الأصلية
         
-        # استخدام medical_action من data إذا كان موجوداً، وإلا استخدام flow_type
-        medical_action_display = data.get("medical_action") or action_names.get(flow_type, 'غير محدد')
-
-        summary += f"⚕️ **نوع الإجراء:** {medical_action_display}\n\n"
-
-        # تفاصيل حسب نوع المسار
-        if flow_type in ["new_consult", "followup", "emergency"]:
-            complaint = escape_markdown_v1(str(data.get('complaint_text') or data.get('complaint', 'غير محدد')))
-            diagnosis = escape_markdown_v1(str(data.get('diagnosis', 'غير محدد')))
-            decision = escape_markdown_v1(str(data.get('doctor_decision') or data.get('decision', 'غير محدد')))
-            
-            summary += f"💬 **الشكوى:** {complaint}\n"
-            summary += f"🔬 **التشخيص:** {diagnosis}\n"
-            summary += f"📝 **قرار الطبيب:** {decision}\n"
-
-            if flow_type == "new_consult":
-                tests = escape_markdown_v1(str(data.get('tests', 'لا يوجد')))
-                summary += f"🔬 **الفحوصات المطلوبة:** {tests}\n"
-
-            if flow_type == "followup":
-                # عرض رقم الغرفة والطابق لمتابعة في الرقود
-                room_floor = data.get('room_floor') or data.get('room_number', '')
-                if room_floor:
-                    room_floor_escaped = escape_markdown_v1(str(room_floor))
-                    summary += f"🚪 **رقم الغرفة والطابق:** {room_floor_escaped}\n"
-
-            if flow_type == "emergency":
-                status = escape_markdown_v1(str(data.get('status', 'غير محدد')))
-                summary += f"🏥 **وضع الحالة:** {status}\n"
-
-            # تاريخ العودة
-            followup_date = data.get('followup_date')
-            if followup_date:
-                if hasattr(followup_date, 'strftime'):
-                    date_str = followup_date.strftime('%Y-%m-%d')
-                else:
-                    date_str = str(followup_date)
-                followup_time = data.get('followup_time', '')
-                if followup_time:
-                    summary += f"📅 **تاريخ العودة:** {date_str} - {format_time_12h(followup_time)}\n"
-                else:
-                    summary += f"📅 **تاريخ العودة:** {date_str}\n"
-                followup_reason = escape_markdown_v1(str(data.get('followup_reason', 'غير محدد')))
-                summary += f"✍️ **سبب العودة:** {followup_reason}\n"
-
-        elif flow_type == "admission":
-            admission_reason = escape_markdown_v1(str(data.get('admission_reason', 'غير محدد')))
-            room_number = escape_markdown_v1(str(data.get('room_number', 'لم يتم التحديد')))
-            notes = escape_markdown_v1(str(data.get('notes', 'لا يوجد')))
-            
-            summary += f"🛏️ **سبب الرقود:** {admission_reason}\n"
-            summary += f"🚪 **رقم الغرفة والطابق:** {room_number}\n"
-            summary += f"📝 **ملاحظات:** {notes}\n"
-            followup_date = data.get('followup_date')
-            if followup_date:
-                if hasattr(followup_date, 'strftime'):
-                    date_str = followup_date.strftime('%Y-%m-%d')
-                else:
-                    date_str = str(followup_date)
-                summary += f"📅 **تاريخ العودة:** {date_str}\n"
-                followup_reason = escape_markdown_v1(str(data.get('followup_reason', 'غير محدد')))
-                summary += f"✍️ **سبب العودة:** {followup_reason}\n"
-            else:
-                summary += f"📅 **تاريخ العودة:** لا يوجد\n"
+        # ✅ استيراد format_report_message من broadcast_service
+        try:
+            from services.broadcast_service import format_report_message
+        except ImportError:
+            logger.error("❌ Cannot import format_report_message from broadcast_service")
+            await message.reply_text("❌ حدث خطأ في عرض الملخص")
+            return
         
-        elif flow_type == "operation":
-            operation_details = escape_markdown_v1(str(data.get('operation_details', 'غير محدد')))
-            operation_name_en = escape_markdown_v1(str(data.get('operation_name_en', 'غير محدد')))
-            notes = escape_markdown_v1(str(data.get('notes', 'لا يوجد')))
-            
-            summary += f"⚕️ **تفاصيل العملية بالعربي:** {operation_details}\n"
-            summary += f"🔤 **اسم العملية بالإنجليزي:** {operation_name_en}\n"
-            summary += f"📝 **ملاحظات:** {notes}\n"
-            followup_date = data.get('followup_date')
-            if followup_date:
-                if hasattr(followup_date, 'strftime'):
-                    date_str = followup_date.strftime('%Y-%m-%d')
-                else:
-                    date_str = str(followup_date)
-                followup_time = data.get('followup_time', '')
-                if followup_time:
-                    summary += f"📅 **تاريخ العودة:** {date_str} - {format_time_12h(followup_time)}\n"
-                else:
-                    summary += f"📅 **تاريخ العودة:** {date_str}\n"
-                followup_reason = escape_markdown_v1(str(data.get('followup_reason', 'غير محدد')))
-                summary += f"✍️ **سبب العودة:** {followup_reason}\n"
-            else:
-                summary += f"📅 **تاريخ العودة:** لا يوجد\n"
+        # ✅ استخدام format_report_message لبناء الملخص (نفس منطق النشر)
+        report_message = format_report_message(data)
         
-        elif flow_type == "surgery_consult":
-            diagnosis = escape_markdown_v1(str(data.get('diagnosis', 'غير محدد')))
-            decision = escape_markdown_v1(str(data.get('doctor_decision') or data.get('decision', 'غير محدد')))
-            operation_name_en = escape_markdown_v1(str(data.get('operation_name_en', 'غير محدد')))
-            success_rate = escape_markdown_v1(str(data.get('success_rate', 'غير محدد')))
-            benefit_rate = escape_markdown_v1(str(data.get('benefit_rate', 'غير محدد')))
-            tests = escape_markdown_v1(str(data.get('tests', 'لا يوجد')))
-            
-            summary += f"🔬 **التشخيص:** {diagnosis}\n"
-            summary += f"📝 **قرار الطبيب:** {decision}\n"
-            summary += f"🔤 **اسم العملية بالإنجليزي:** {operation_name_en}\n"
-            summary += f"📊 **نسبة نجاح العملية:** {success_rate}\n"
-            summary += f"💡 **نسبة الاستفادة من العملية:** {benefit_rate}\n"
-            summary += f"🔬 **الفحوصات المطلوبة:** {tests}\n"
-            # التحقق من وجود نص تاريخ العودة أولاً
-            followup_date_text = data.get('followup_date_text')
-            if followup_date_text:
-                followup_date_text_escaped = escape_markdown_v1(str(followup_date_text))
-                summary += f"📅 **تاريخ العودة:** {followup_date_text_escaped}\n"
-            else:
-                followup_date = data.get('followup_date')
-                if followup_date:
-                    if hasattr(followup_date, 'strftime'):
-                        date_str = followup_date.strftime('%Y-%m-%d')
-                    else:
-                        date_str = str(followup_date)
-                    followup_time = data.get('followup_time', '')
-                    if followup_time:
-                        summary += f"📅 **تاريخ العودة:** {date_str} - {format_time_12h(followup_time)}\n"
-                    else:
-                        summary += f"📅 **تاريخ العودة:** {date_str}\n"
-                else:
-                    summary += f"📅 **تاريخ العودة:** لا يوجد\n"
-            followup_reason = escape_markdown_v1(str(data.get('followup_reason', 'غير محدد')))
-            summary += f"✍️ **سبب العودة:** {followup_reason}\n"
+        # ✅ استبدال "🆕 تقرير جديد" بـ "📋 ملخص التقرير"
+        if report_message.startswith("🆕 **تقرير جديد**"):
+            report_message = report_message.replace("🆕 **تقرير جديد**", "📋 **ملخص التقرير**", 1)
+        elif report_message.startswith("✏️ **تقرير معدل**"):
+            report_message = report_message.replace("✏️ **تقرير معدل**", "📋 **ملخص التقرير (معدل)**", 1)
         
-        elif flow_type == "final_consult":
-            diagnosis = escape_markdown_v1(str(data.get('diagnosis', 'غير محدد')))
-            decision = escape_markdown_v1(str(data.get('doctor_decision') or data.get('decision', 'غير محدد')))
-            recommendations = escape_markdown_v1(str(data.get('recommendations', 'غير محدد')))
-            
-            summary += f"🔬 **التشخيص النهائي:** {diagnosis}\n"
-            summary += f"📝 **قرار الطبيب:** {decision}\n"
-            summary += f"💡 **التوصيات الطبية:** {recommendations}\n"
-        
-        elif flow_type == "rehab_physical":
-            therapy_details = escape_markdown_v1(str(data.get('therapy_details', 'غير محدد')))
-            summary += f"🏃 **تفاصيل جلسة العلاج الطبيعي:** {therapy_details}\n"
-            followup_date = data.get('followup_date')
-            if followup_date:
-                if hasattr(followup_date, 'strftime'):
-                    date_str = followup_date.strftime('%Y-%m-%d')
-                else:
-                    date_str = str(followup_date)
-                followup_time = data.get('followup_time', '')
-                if followup_time:
-                    summary += f"📅 **تاريخ العودة:** {date_str} - {format_time_12h(followup_time)}\n"
-                else:
-                    summary += f"📅 **تاريخ العودة:** {date_str}\n"
-                followup_reason = escape_markdown_v1(str(data.get('followup_reason', 'غير محدد')))
-                summary += f"✍️ **سبب العودة:** {followup_reason}\n"
-            else:
-                summary += f"📅 **تاريخ العودة:** لا يوجد\n"
-        
-        elif flow_type == "rehab_device":
-            device_details = escape_markdown_v1(str(data.get('device_details', 'غير محدد')))
-            summary += f"🦾 **اسم الجهاز والتفاصيل:** {device_details}\n"
-            followup_date = data.get('followup_date')
-            if followup_date:
-                if hasattr(followup_date, 'strftime'):
-                    date_str = followup_date.strftime('%Y-%m-%d')
-                else:
-                    date_str = str(followup_date)
-                followup_time = data.get('followup_time', '')
-                if followup_time:
-                    summary += f"📅 **تاريخ العودة:** {date_str} - {format_time_12h(followup_time)}\n"
-                else:
-                    summary += f"📅 **تاريخ العودة:** {date_str}\n"
-                followup_reason = escape_markdown_v1(str(data.get('followup_reason', 'غير محدد')))
-                summary += f"✍️ **سبب العودة:** {followup_reason}\n"
-            else:
-                summary += f"📅 **تاريخ العودة:** لا يوجد\n"
-        
-        elif flow_type == "radiology":
-            radiology_type = escape_markdown_v1(str(data.get('radiology_type', 'غير محدد')))
-            summary += f"🔬 **نوع الأشعة والفحوصات:** {radiology_type}\n"
-            delivery_date = data.get('radiology_delivery_date') or data.get('followup_date')
-            if delivery_date:
-                if hasattr(delivery_date, 'strftime'):
-                    date_str = delivery_date.strftime('%Y-%m-%d')
-                else:
-                    date_str = str(delivery_date)
-                summary += f"📅 **تاريخ تسليم النتائج:** {date_str}\n"
-            else:
-                summary += f"📅 **تاريخ تسليم النتائج:** غير محدد\n"
-        elif flow_type == "appointment_reschedule":
-            app_reschedule_reason = escape_markdown_v1(str(data.get('app_reschedule_reason', 'غير محدد')))
-            app_reschedule_return_reason = escape_markdown_v1(str(data.get('app_reschedule_return_reason', 'غير محدد')))
-            
-            summary += f"📅 **سبب تأجيل الموعد:** {app_reschedule_reason}\n"
-            return_date = data.get('app_reschedule_return_date') or data.get('followup_date')
-            if return_date:
-                if hasattr(return_date, 'strftime'):
-                    date_str = return_date.strftime('%Y-%m-%d')
-                else:
-                    date_str = str(return_date)
-                summary += f"📅 **تاريخ العودة:** {date_str}\n"
-            else:
-                summary += f"📅 **تاريخ العودة:** غير محدد\n"
-            summary += f"📝 **سبب العودة:** {app_reschedule_return_reason}\n"
-        
-        elif flow_type == "discharge":
-            discharge_type = data.get("discharge_type", "")
-            if discharge_type == "admission":
-                admission_summary = escape_markdown_v1(str(data.get('admission_summary', 'غير محدد')))
-                summary += f"📋 **ملخص الرقود:** {admission_summary}\n"
-            elif discharge_type == "operation":
-                operation_details = escape_markdown_v1(str(data.get('operation_details', 'غير محدد')))
-                operation_name_en = escape_markdown_v1(str(data.get('operation_name_en', 'غير محدد')))
-                summary += f"⚕️ **تفاصيل العملية:** {operation_details}\n"
-                summary += f"🔤 **اسم العملية بالإنجليزي:** {operation_name_en}\n"
-            
-            followup_date = data.get('followup_date')
-            if followup_date:
-                if hasattr(followup_date, 'strftime'):
-                    date_str = followup_date.strftime('%Y-%m-%d')
-                else:
-                    date_str = str(followup_date)
-                followup_time = data.get('followup_time', '')
-                if followup_time:
-                    summary += f"📅 **تاريخ العودة:** {date_str} - {format_time_12h(followup_time)}\n"
-                else:
-                    summary += f"📅 **تاريخ العودة:** {date_str}\n"
-                followup_reason = escape_markdown_v1(str(data.get('followup_reason', 'غير محدد')))
-                summary += f"✍️ **سبب العودة:** {followup_reason}\n"
-            else:
-                summary += f"📅 **تاريخ العودة:** لا يوجد\n"
-
-        # إضافة معلومات المترجم
-        translator_name = escape_markdown_v1(str(data.get('translator_name', 'غير محدد')))
-        summary += f"\n👤 **المترجم:** {translator_name}"
-
+        # ✅ إرسال الملخص مع الأزرار
         keyboard = InlineKeyboardMarkup([
             [
                 InlineKeyboardButton("✏️ مراجعة وتعديل التقرير", callback_data=f"edit:{flow_type}"),
@@ -1316,40 +1138,17 @@ async def show_final_summary(message, context, flow_type):
             ],
             [InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]
         ])
-
-        # محاولة إرسال الرسالة مع Markdown
-        try:
-            await message.reply_text(
-                summary,
-                reply_markup=keyboard,
-                parse_mode="Markdown"
-            )
-        except Exception as parse_error:
-            # إذا فشل parsing Markdown، إرسال بدون Markdown
-            logger.error(f"❌ Markdown parsing error: {parse_error}", exc_info=True)
-            try:
-                # إزالة تنسيق Markdown من الملخص
-                summary_plain = summary.replace('**', '').replace('*', '')
-                await message.reply_text(
-                    summary_plain,
-                    reply_markup=keyboard
-                )
-            except Exception as fallback_error:
-                logger.error(f"❌ Error sending plain text summary: {fallback_error}", exc_info=True)
-                await message.reply_text(
-                    "❌ **حدث خطأ في عرض الملخص**\n\n"
-                    "يرجى المحاولة مرة أخرى أو التواصل مع الإدارة.",
-                    reply_markup=keyboard,
-                    parse_mode="Markdown"
-                )
+        
+        await message.reply_text(
+            report_message,
+            reply_markup=keyboard,
+            parse_mode="Markdown"
+        )
+        
     except Exception as e:
-        logger.error(f"❌ Unexpected error in show_final_summary: {e}", exc_info=True)
+        logger.error(f"❌ Error in show_final_summary: {e}", exc_info=True)
         try:
-            await message.reply_text(
-                "❌ **حدث خطأ غير متوقع**\n\n"
-                "يرجى المحاولة مرة أخرى أو التواصل مع الإدارة.",
-                parse_mode="Markdown"
-            )
+            await message.reply_text("❌ حدث خطأ في عرض الملخص")
         except:
             pass
 
@@ -1441,7 +1240,12 @@ async def handle_final_confirm(update: Update, context: ContextTypes.DEFAULT_TYP
     elif action == "edit":
         logger.info(f"✏️ Edit button clicked for flow_type: {flow_type}")
         # handle_edit_before_save is defined in this same file (below)
-        await handle_edit_before_save(query, context, flow_type)
+        edit_state = await handle_edit_before_save(query, context, flow_type)
+        # إرجاع state الذي تم إرجاعه من handle_edit_before_save (عادة FOLLOWUP_CONFIRM)
+        if edit_state:
+            return edit_state
+        # إذا لم يتم إرجاع state، نرجع confirm_state الحالي
+        return get_confirm_state(flow_type)
 
 
 # =============================
@@ -1453,10 +1257,21 @@ async def save_report_to_database(query, context, flow_type):
     """حفظ التقرير في قاعدة البيانات"""
     if not SessionLocal or not Report or not Patient or not Hospital or not Department or not Doctor:
         logger.error("❌ Database models not available")
-        await query.edit_message_text(
-            "❌ **خطأ:** لا يمكن حفظ التقرير - قاعدة البيانات غير متاحة.",
-            parse_mode="Markdown"
-        )
+        # ✅ محاولة تعديل الرسالة - مع fallback إذا فشل
+        try:
+            await query.edit_message_text(
+                "❌ **خطأ:** لا يمكن حفظ التقرير - قاعدة البيانات غير متاحة.",
+                parse_mode="Markdown"
+            )
+        except Exception as edit_err:
+            logger.warning(f"⚠️ Cannot edit message: {edit_err}")
+            try:
+                if query.message:
+                    await query.message.reply_text("❌ **خطأ:** لا يمكن حفظ التقرير - قاعدة البيانات غير متاحة.", parse_mode="Markdown")
+                else:
+                    await query.answer("❌ قاعدة البيانات غير متاحة", show_alert=True)
+            except:
+                await query.answer("❌ خطأ في قاعدة البيانات", show_alert=True)
         return
     
     logger.info("=" * 80)
@@ -1552,6 +1367,7 @@ async def save_report_to_database(query, context, flow_type):
             "discharge": "خروج من المستشفى",
             "rehab_physical": "علاج طبيعي",
             "rehab_device": "أجهزة تعويضية",
+            "device": "أجهزة تعويضية",  # ✅ إضافة "device" للتوافق مع get_confirm_state
             "radiology": "أشعة وفحوصات",
             "appointment_reschedule": "تأجيل موعد"
         }
@@ -1627,8 +1443,9 @@ async def save_report_to_database(query, context, flow_type):
             therapy_details = data.get("therapy_details", "")
             complaint_text = ""
             decision_text = f"تفاصيل الجلسة: {therapy_details}"
-        elif flow_type == "rehab_device":
-            device_details = data.get("device_details", "")
+        elif flow_type in ["rehab_device", "device"]:
+            # ✅ التعامل مع "rehab_device" و "device" بنفس الطريقة
+            device_details = data.get("device_details") or data.get("device_name", "")
             complaint_text = ""
             decision_text = f"تفاصيل الجهاز: {device_details}"
         elif flow_type == "radiology":
@@ -1716,6 +1533,13 @@ async def save_report_to_database(query, context, flow_type):
                 app_reschedule_return_date = to_naive_datetime(app_reschedule_return_date)
             logger.info(f"💾 حفظ حقول تأجيل الموعد: reason={app_reschedule_reason}, return_date={app_reschedule_return_date}, return_reason={app_reschedule_return_reason}")
         
+        # ✅ حفظ tests في medications لـ new_consult (للاسترجاع لاحقاً)
+        medications_field = None
+        if flow_type == "new_consult":
+            medications_field = data.get("tests", "")
+        elif flow_type in ["surgery_consult", "operation"]:
+            medications_field = data.get("tests", "") or data.get("medications", "")
+        
         # إنشاء التقرير مع جميع الحقول المطلوبة
         new_report = Report(
             # IDs للربط
@@ -1737,9 +1561,21 @@ async def save_report_to_database(query, context, flow_type):
             complaint_text=complaint_text,
             doctor_decision=decision_text,
             medical_action=final_medical_action,
+            diagnosis=data.get("diagnosis", ""),  # ✅ حفظ التشخيص بشكل منفصل
+            medications=medications_field,  # ✅ حفظ tests في medications لـ new_consult
+            notes=data.get("notes", ""),  # ✅ حفظ notes
+            treatment_plan=data.get("treatment_plan", ""),  # ✅ حفظ treatment_plan
+            case_status=data.get("status", ""),  # ✅ حفظ حالة الطوارئ
+            
+            # ✅ حقول خاصة
+            room_number=data.get("room_number", "") or None,  # ✅ حفظ room_number
+            
+            # ✅ ملاحظة: operation_name_en, success_rate, benefit_rate غير موجودة في نموذج Report
+            # سيتم إرسالها من data مباشرة في broadcast_data عند البث (انظر السطر 1638-1640)
             
             # التواريخ
             followup_date=followup_date,
+            followup_time=data.get("followup_time", ""),  # ✅ حفظ وقت العودة
             followup_reason=data.get("followup_reason", "لا يوجد"),
             report_date=report_date,
             created_at=created_at,
@@ -1747,7 +1583,11 @@ async def save_report_to_database(query, context, flow_type):
             # ✅ حفظ حقول تأجيل الموعد
             app_reschedule_reason=app_reschedule_reason,
             app_reschedule_return_date=app_reschedule_return_date,
-            app_reschedule_return_reason=app_reschedule_return_reason
+            app_reschedule_return_reason=app_reschedule_return_reason,
+            
+            # ✅ حقول الأشعة
+            radiology_type=data.get("radiology_type", "") or None,
+            radiology_delivery_date=to_naive_datetime(data.get("radiology_delivery_date")) if data.get("radiology_delivery_date") else None,
         )
 
         session.add(new_report)
@@ -1813,14 +1653,34 @@ async def save_report_to_database(query, context, flow_type):
                 'translator_id': data.get("translator_id")  # إضافة معرف المترجم أيضاً
             }
             
+            # ✅ إضافة التشخيص لجميع المسارات التي تحتاجه
+            if flow_type in ["new_consult", "followup", "emergency", "surgery_consult", "final_consult"]:
+                broadcast_data['diagnosis'] = data.get('diagnosis', '')
+            
+            # ✅ إضافة decision مباشرة لمسار followup و new_consult و emergency
+            if flow_type in ["new_consult", "followup", "emergency"]:
+                broadcast_data['decision'] = data.get('decision', '')
+            
+            # ✅ إضافة tests لمسار new_consult
+            if flow_type == "new_consult":
+                broadcast_data['tests'] = data.get('tests', '')
+            
             # إضافة الحقول الفردية لـ surgery_consult لعرضها بشكل منفصل
             if flow_type == "surgery_consult":
-                broadcast_data['diagnosis'] = data.get('diagnosis', '')
                 broadcast_data['decision'] = data.get('decision', '')
                 broadcast_data['operation_name_en'] = data.get('operation_name_en', '')
                 broadcast_data['success_rate'] = data.get('success_rate', '')
                 broadcast_data['benefit_rate'] = data.get('benefit_rate', '')
-                broadcast_data['tests'] = data.get('tests', 'لا يوجد')
+                broadcast_data['tests'] = data.get('tests', '')
+            
+            # ✅ إضافة decision لمسار final_consult (منع التكرار)
+            if flow_type == "final_consult":
+                broadcast_data['decision'] = data.get('decision', '')
+                broadcast_data['recommendations'] = data.get('recommendations', '') or data.get('treatment_plan', '') or data.get('notes', '')
+            
+            # ✅ إضافة room_number لمسار "متابعة في الرقود" إذا كان موجوداً
+            if data.get('room_number'):
+                broadcast_data['room_number'] = data.get('room_number')
             
             # إضافة الحقول الخاصة لمسار تأجيل موعد
             if flow_type == "appointment_reschedule":
@@ -1882,11 +1742,63 @@ async def save_report_to_database(query, context, flow_type):
                 # إضافة followup_time إذا كان موجوداً
                 if data.get('followup_time'):
                     broadcast_data['followup_time'] = data.get('followup_time')
+            
+            # ✅ إضافة حقول الأشعة والفحوصات لمسار radiology
+            if flow_type == "radiology":
+                logger.info(f"🔬 save_report_to_database: معالجة مسار radiology")
+                logger.info(f"🔬 save_report_to_database: data keys = {list(data.keys())}")
+                
+                # إضافة نوع الأشعة والفحوصات
+                radiology_type = data.get("radiology_type", "")
+                logger.info(f"🔬 save_report_to_database: radiology_type من data = {repr(radiology_type)}")
+                
+                # ✅ إذا لم يكن موجوداً في data، محاولة الحصول عليه من report_tmp
+                if not radiology_type or not str(radiology_type).strip():
+                    logger.warning(f"⚠️ save_report_to_database: radiology_type فارغ في data، محاولة الحصول من report_tmp")
+                    report_tmp = context.user_data.get("report_tmp", {})
+                    radiology_type_from_tmp = report_tmp.get('radiology_type', '')
+                    if radiology_type_from_tmp and str(radiology_type_from_tmp).strip():
+                        radiology_type = str(radiology_type_from_tmp).strip()
+                        logger.info(f"✅ save_report_to_database: تم الحصول على radiology_type من report_tmp = {repr(radiology_type)}")
+                
+                # ✅ إضافة radiology_type إلى broadcast_data
+                if radiology_type and str(radiology_type).strip():
+                    broadcast_data['radiology_type'] = str(radiology_type).strip()
+                    logger.info(f"✅ save_report_to_database: تم إضافة radiology_type إلى broadcast_data = {repr(broadcast_data.get('radiology_type'))}")
+                else:
+                    logger.warning(f"⚠️ save_report_to_database: radiology_type غير موجود في data أو report_tmp")
+                
+                # إضافة تاريخ التسليم (radiology_delivery_date)
+                radiology_delivery_date = data.get("radiology_delivery_date") or data.get("delivery_date")
+                logger.info(f"🔬 save_report_to_database: radiology_delivery_date من data = {repr(radiology_delivery_date)}")
+                
+                # ✅ إذا لم يكن موجوداً في data، محاولة الحصول عليه من report_tmp
+                if not radiology_delivery_date:
+                    logger.warning(f"⚠️ save_report_to_database: radiology_delivery_date فارغ في data، محاولة الحصول من report_tmp")
+                    report_tmp = context.user_data.get("report_tmp", {})
+                    delivery_date_from_tmp = report_tmp.get('radiology_delivery_date') or report_tmp.get('delivery_date')
+                    if delivery_date_from_tmp:
+                        radiology_delivery_date = delivery_date_from_tmp
+                        logger.info(f"✅ save_report_to_database: تم الحصول على radiology_delivery_date من report_tmp = {repr(radiology_delivery_date)}")
+                
+                # ✅ إضافة radiology_delivery_date إلى broadcast_data
+                if radiology_delivery_date:
+                    # تحويل التاريخ إلى string إذا كان datetime/date object
+                    if hasattr(radiology_delivery_date, 'strftime'):
+                        broadcast_data['radiology_delivery_date'] = radiology_delivery_date.strftime('%Y-%m-%d')
+                    else:
+                        broadcast_data['radiology_delivery_date'] = str(radiology_delivery_date)
+                    logger.info(f"✅ save_report_to_database: تم إضافة radiology_delivery_date إلى broadcast_data = {repr(broadcast_data.get('radiology_delivery_date'))}")
+                else:
+                    logger.warning(f"⚠️ save_report_to_database: radiology_delivery_date غير موجود في data أو report_tmp")
 
             # ✅ إضافة logging قبل البث
             logger.info(f"📤 save_report_to_database: جاهز للبث - report_id={report_id}, flow_type={flow_type}")
             logger.info(f"📤 save_report_to_database: broadcast_data keys = {list(broadcast_data.keys())}")
             logger.info(f"📤 save_report_to_database: medical_action = {broadcast_data.get('medical_action')}")
+            if flow_type == "radiology":
+                logger.info(f"🔬 save_report_to_database: radiology_type في broadcast_data = {repr(broadcast_data.get('radiology_type'))}")
+                logger.info(f"🔬 save_report_to_database: radiology_delivery_date في broadcast_data = {repr(broadcast_data.get('radiology_delivery_date'))}")
             
             try:
                 await broadcast_new_report(context.bot, broadcast_data)
@@ -1911,10 +1823,27 @@ async def save_report_to_database(query, context, flow_type):
         
         success_message += f"\nتم إرسال التقرير لجميع المستخدمين."
         
-        await query.edit_message_text(
-            success_message,
-            parse_mode="Markdown"
-        )
+        # ✅ محاولة تعديل الرسالة - مع fallback إذا فشل
+        try:
+            await query.edit_message_text(
+                success_message,
+                parse_mode="Markdown"
+            )
+        except Exception as edit_err:
+            logger.warning(f"⚠️ Cannot edit message (may be from reply_text): {edit_err}")
+            # ✅ Fallback: إرسال رسالة جديدة
+            try:
+                if query.message:
+                    await query.message.reply_text(
+                        success_message,
+                        parse_mode="Markdown"
+                    )
+                else:
+                    # ✅ Fallback: استخدام answer
+                    await query.answer(success_message[:200], show_alert=True)
+            except Exception as fallback_err:
+                logger.error(f"❌ Error in fallback message: {fallback_err}")
+                await query.answer("✅ تم حفظ التقرير بنجاح", show_alert=True)
 
         # مسح البيانات المؤقتة
         context.user_data.pop("report_tmp", None)
@@ -1931,12 +1860,31 @@ async def save_report_to_database(query, context, flow_type):
         except Exception:
             pass
 
-        await query.edit_message_text(
-            f"❌ **حدث خطأ أثناء الحفظ**\n\n"
-            f"الخطأ: {str(e)}\n\n"
-            f"يرجى المحاولة مرة أخرى.",
-            parse_mode="Markdown"
-        )
+        # ✅ محاولة تعديل الرسالة - مع fallback إذا فشل
+        try:
+            await query.edit_message_text(
+                f"❌ **حدث خطأ أثناء الحفظ**\n\n"
+                f"الخطأ: {str(e)}\n\n"
+                f"يرجى المحاولة مرة أخرى.",
+                parse_mode="Markdown"
+            )
+        except Exception as edit_err:
+            logger.warning(f"⚠️ Cannot edit message (may be from reply_text): {edit_err}")
+            # ✅ Fallback: إرسال رسالة جديدة
+            try:
+                if query.message:
+                    await query.message.reply_text(
+                        f"❌ **حدث خطأ أثناء الحفظ**\n\n"
+                        f"الخطأ: {str(e)}\n\n"
+                        f"يرجى المحاولة مرة أخرى.",
+                        parse_mode="Markdown"
+                    )
+                else:
+                    # ✅ Fallback: استخدام answer
+                    await query.answer(f"❌ خطأ: {str(e)[:100]}", show_alert=True)
+            except Exception as fallback_err:
+                logger.error(f"❌ Error in fallback error message: {fallback_err}")
+                await query.answer("❌ حدث خطأ أثناء الحفظ", show_alert=True)
 
 
 # =============================
@@ -1951,11 +1899,84 @@ async def show_edit_fields_menu(query, context, flow_type):
     """عرض قائمة الحقول القابلة للتعديل"""
     try:
         data = context.user_data.get("report_tmp", {})
+        medical_action = data.get("medical_action", "")
+        
+        logger.info(f"🔍 [EDIT_MENU] show_edit_fields_menu: flow_type={flow_type}, medical_action={medical_action}")
+        logger.info(f"🔍 [EDIT_MENU] report_tmp keys: {list(data.keys())}")
+        
         editable_fields = get_editable_fields_by_flow_type(flow_type)
+        logger.info(f"🔍 [EDIT_MENU] editable_fields before processing: {[fk for fk, _ in editable_fields]}")
+        
+        # ✅ إضافة room_number لمسار "متابعة في الرقود" ديناميكياً
+        # استخدام strip() لضمان تطابق النص
+        action_clean = medical_action.strip() if medical_action else ""
+        # ✅ تحسين التحقق: استخدام in بدلاً من == للتعامل مع المسافات أو الاختلافات البسيطة
+        is_inpatient_followup = (flow_type == "followup" and "متابعة في الرقود" in action_clean)
+        
+        # ✅ أو إذا كان room_number موجوداً بالفعل في البيانات (بغض النظر عن medical_action)
+        has_room_data = _has_field_value(data, "room_number")
+        
+        if is_inpatient_followup or has_room_data:
+            logger.info("✅ [EDIT_MENU] مسار 'متابعة في الرقود' أو يوجد بيانات - إضافة room_number")
+            # ✅ التحقق من وجود room_number في القائمة
+            has_room_number = any(fk == "room_number" for fk, _ in editable_fields)
+            logger.info(f"🔍 [EDIT_MENU] has_room_number: {has_room_number}")
+            
+            if not has_room_number:
+                # ✅ البحث عن موضع إدراج room_number (بعد decision وقبل followup_date)
+                room_field = ("room_number", "🏥 رقم الغرفة والطابق")
+                decision_index = None
+                followup_date_index = None
+                
+                for i, (field_key, _) in enumerate(editable_fields):
+                    if field_key == "decision":
+                        decision_index = i
+                        logger.info(f"🔍 [EDIT_MENU] Found decision at index: {decision_index}")
+                    elif field_key == "followup_date" and followup_date_index is None:
+                        followup_date_index = i
+                        logger.info(f"🔍 [EDIT_MENU] Found followup_date at index: {followup_date_index}")
+                
+                # ✅ إدراج room_number بعد decision مباشرة، أو قبل followup_date، أو في النهاية
+                if decision_index is not None:
+                    editable_fields.insert(decision_index + 1, room_field)
+                    logger.info(f"✅ [EDIT_MENU] تم إضافة room_number بعد decision (index: {decision_index + 1})")
+                elif followup_date_index is not None:
+                    editable_fields.insert(followup_date_index, room_field)
+                    logger.info(f"✅ [EDIT_MENU] تم إضافة room_number قبل followup_date (index: {followup_date_index})")
+                else:
+                    editable_fields.append(room_field)
+                    logger.info(f"✅ [EDIT_MENU] تم إضافة room_number في النهاية")
+        else:
+            logger.info(f"⚠️ [EDIT_MENU] لا يتم إضافة room_number: flow_type={flow_type}, medical_action={medical_action}")
+        
+        # ✅ إزالة room_number من مسار "مراجعة / عودة دورية" إذا كان موجوداً
+        # تحسين التحقق ليشمل المسافات والاختلافات البسيطة
+        # ✅ أيضاً إزالة room_number إذا كان flow_type == "periodic_followup"
+        is_periodic_followup = (
+            flow_type == "periodic_followup" or
+            (flow_type == "followup" and "مراجعة / عودة دورية" in (medical_action or ""))
+        )
+        if is_periodic_followup:
+            logger.info("✅ [EDIT_MENU] مسار 'عودة دورية' - إزالة room_number إذا كان موجوداً")
+            editable_fields = [(fk, fd) for fk, fd in editable_fields if fk != "room_number"]
+            logger.info(f"✅ [EDIT_MENU] تم إزالة room_number من القائمة")
+        
+        logger.info(f"🔍 [EDIT_MENU] editable_fields after processing: {[fk for fk, _ in editable_fields]}")
+        
+        # ✅ تصفية الحقول: عرض جميع الحقول (تم تعطيل التصفية بناءً على طلب المستخدم)
+        fields_with_values = []
+        for field_key, field_display in editable_fields:
+            # عرض جميع الحقول سواء كانت فارغة أم لا
+            fields_with_values.append((field_key, field_display))
+            logger.info(f"✅ [EDIT_MENU] إضافة حقل '{field_key}' للقائمة")
+        
+        editable_fields = fields_with_values
+        logger.info(f"✅ [EDIT_MENU] الحقول النهائية بعد التصفية: {[fk for fk, _ in editable_fields]}")
         
         if not editable_fields:
             await query.edit_message_text(
-                "⚠️ **لا توجد حقول قابلة للتعديل**\n\n"
+                "⚠️ **لا توجد حقول مدخلة للتعديل**\n\n"
+                "لم يتم إدخال أي بيانات بعد.\n"
                 "يرجى استخدام زر '🔙 رجوع' للرجوع إلى الخطوات السابقة.",
                 parse_mode="Markdown"
             )
@@ -1966,12 +1987,40 @@ async def show_edit_fields_menu(query, context, flow_type):
         
         keyboard = []
         for field_key, field_display in editable_fields:
-            # الحصول على القيمة الحالية
-            current_value = data.get(field_key, "غير محدد")
+            # الحصول على القيمة الحالية (مع التحقق من الحقول المشتقة)
+            current_value = data.get(field_key)
+            
+            # ✅ البحث في الحقول المشتقة إذا لم توجد قيمة مباشرة
+            if not current_value:
+                field_aliases = {
+                    "complaint": ["complaint_text", "complaint"],
+                    "decision": ["doctor_decision", "decision"],
+                    "tests": ["notes", "tests"],
+                    "operation_details": ["notes", "operation_details"],
+                    "delivery_date": ["radiology_delivery_date", "delivery_date"],
+                    "radiology_delivery_date": ["delivery_date", "radiology_delivery_date"],
+                    "room_number": ["room_floor", "room_number"],
+                    "device_name": ["device_details", "device_name"],
+                    "device_details": ["device_name", "device_details"],
+                    "app_reschedule_return_date": ["followup_date", "app_reschedule_return_date"],
+                    "app_reschedule_return_reason": ["followup_reason", "app_reschedule_return_reason"],
+                }
+                aliases = field_aliases.get(field_key, [])
+                for alias in aliases:
+                    alias_value = data.get(alias)
+                    if alias_value and str(alias_value).strip() and str(alias_value).strip() not in ["غير محدد", "لا يوجد", "None", "null", ""]:
+                        current_value = alias_value
+                        break
+            
+            # ✅ تنسيق القيمة للعرض
             if isinstance(current_value, datetime):
                 current_value = current_value.strftime('%Y-%m-%d %H:%M')
-            elif current_value and len(str(current_value)) > 30:
-                current_value = str(current_value)[:27] + "..."
+            elif current_value:
+                current_value_str = str(current_value).strip()
+                if len(current_value_str) > 30:
+                    current_value = current_value_str[:27] + "..."
+                else:
+                    current_value = current_value_str
             
             button_text = f"{field_display}"
             if current_value and current_value != "غير محدد":
@@ -1984,7 +2033,7 @@ async def show_edit_fields_menu(query, context, flow_type):
                 )
             ])
         
-        keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data=f"save:{flow_type}")])
+        keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data=f"back_to_summary:{flow_type}")])
         keyboard.append([InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")])
         
         await query.edit_message_text(
@@ -1994,7 +2043,10 @@ async def show_edit_fields_menu(query, context, flow_type):
         )
         
         logger.info(f"✅ تم عرض قائمة الحقول القابلة للتعديل ({len(editable_fields)} حقل)")
-        return f"EDIT_FIELDS_{flow_type.upper()}"
+        # ✅ إرجاع state التأكيد - سيتم التعامل مع edit_field callback عبر router
+        confirm_state = get_confirm_state(flow_type)
+        context.user_data['_conversation_state'] = confirm_state
+        return confirm_state
         
     except Exception as e:
         logger.error(f"❌ خطأ في show_edit_fields_menu: {e}", exc_info=True)
@@ -2009,6 +2061,12 @@ async def show_edit_fields_menu(query, context, flow_type):
 async def handle_edit_before_save(query, context, flow_type=None):
     """معالجة التعديل قبل الحفظ - عرض قائمة الحقول القابلة للتعديل"""
     try:
+        # ✅ التأكد من حفظ medical_action في report_tmp إذا كان مفقوداً
+        data = context.user_data.setdefault("report_tmp", {})
+
+        # ✅ استخدام current_flow من report_tmp إذا كان موجوداً (الأولوية له)
+        stored_flow_type = data.get("current_flow")
+
         # إذا لم يتم تمرير flow_type، نحاول استخراجه من callback_data أو report_tmp
         if flow_type is None:
             if hasattr(query, 'data') and query.data:
@@ -2016,10 +2074,22 @@ async def handle_edit_before_save(query, context, flow_type=None):
                 if query.data.startswith("edit:"):
                     flow_type = query.data.split(":")[1]
                 else:
-                    flow_type = context.user_data.get("report_tmp", {}).get("current_flow")
+                    flow_type = stored_flow_type
             else:
-                flow_type = context.user_data.get("report_tmp", {}).get("current_flow")
-        
+                flow_type = stored_flow_type
+
+        # ✅ إذا كان stored_flow_type موجوداً ويختلف عن flow_type، استخدم stored_flow_type
+        # هذا لضمان احترام current_flow الأصلي (مثل periodic_followup)
+        if stored_flow_type and stored_flow_type != flow_type:
+            # ✅ إذا كان flow_type == "followup" و stored_flow_type == "periodic_followup"، استخدم periodic_followup
+            if flow_type == "followup" and stored_flow_type == "periodic_followup":
+                flow_type = "periodic_followup"
+                logger.info(f"✅ [EDIT_BEFORE_SAVE] استخدام current_flow المحفوظ: {flow_type}")
+            # ✅ إذا كان flow_type == "followup" و stored_flow_type == "inpatient_followup"، استخدم inpatient_followup
+            elif flow_type == "followup" and stored_flow_type == "inpatient_followup":
+                flow_type = "inpatient_followup"
+                logger.info(f"✅ [EDIT_BEFORE_SAVE] استخدام current_flow المحفوظ: {flow_type}")
+
         if not flow_type:
             logger.error("❌ لم يتم العثور على flow_type")
             await query.edit_message_text(
@@ -2028,12 +2098,31 @@ async def handle_edit_before_save(query, context, flow_type=None):
                 parse_mode="Markdown"
             )
             return ConversationHandler.END
-        
-        logger.info(f"✏️ handle_edit_before_save: flow_type={flow_type}")
-        
+
+        medical_action = data.get("medical_action", "")
+
+        # ✅ إذا كان flow_type == "followup" و medical_action مفقود، نحاول تحديده بناءً على الحقول الموجودة
+        if flow_type == "followup" and not medical_action:
+            # ✅ التحقق من وجود room_number في report_tmp لتحديد نوع المسار
+            if data.get("room_number"):
+                medical_action = "متابعة في الرقود"
+                data["medical_action"] = medical_action
+                logger.info(f"✅ [EDIT_BEFORE_SAVE] تم تعيين medical_action='متابعة في الرقود' بناءً على وجود room_number")
+            else:
+                # ✅ افتراض أنه "مراجعة / عودة دورية" إذا لم يكن room_number موجوداً
+                medical_action = "مراجعة / عودة دورية"
+                data["medical_action"] = medical_action
+                # ✅ تحديث flow_type إلى periodic_followup
+                flow_type = "periodic_followup"
+                logger.info(f"✅ [EDIT_BEFORE_SAVE] تم تعيين medical_action='مراجعة / عودة دورية' و flow_type='periodic_followup'")
+
+        logger.info(f"✏️ [EDIT_BEFORE_SAVE] handle_edit_before_save: flow_type={flow_type}, medical_action={medical_action}")
+        logger.info(f"✏️ [EDIT_BEFORE_SAVE] report_tmp keys: {list(data.keys())}")
+
         # حفظ flow_type في report_tmp
-        context.user_data.setdefault("report_tmp", {})["current_flow"] = flow_type
-        
+        data["current_flow"] = flow_type
+
+        # ✅ استخدام النظام الموحد للتعديل (مثل draft editing)
         # عرض قائمة الحقول القابلة للتعديل
         edit_state = await show_edit_fields_menu(query, context, flow_type)
         return edit_state

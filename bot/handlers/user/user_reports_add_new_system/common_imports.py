@@ -35,7 +35,7 @@ except ImportError:
 try:
     from config.settings import TIMEZONE
 except ImportError:
-    TIMEZONE = 'Asia/Riyadh'
+    TIMEZONE = 'Asia/Kolkata'  # توقيت الهند (IST = UTC+5:30)
 
 from ..user_reports_add_helpers import (
     PREDEFINED_HOSPITALS, PREDEFINED_DEPARTMENTS, DIRECT_DEPARTMENTS,

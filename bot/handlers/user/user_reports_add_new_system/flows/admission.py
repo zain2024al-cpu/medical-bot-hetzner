@@ -117,7 +117,33 @@ async def handle_admission_notes(update: Update, context: ContextTypes.DEFAULT_T
 
     context.user_data["report_tmp"]["notes"] = text
 
-    # عرض تقويم تاريخ العودة (اختياري)
+    # بعد الملاحظات: طلب رقم الغرفة والطابق
+    await update.message.reply_text(
+        "🚪 **رقم الغرفة والطابق**\n\n"
+        "يرجى إدخال رقم الغرفة والطابق (مثال: غرفة 205 - الطابق الثاني):",
+        reply_markup=_nav_buttons(show_back=True),
+        parse_mode="Markdown"
+    )
+    return ADMISSION_ROOM
+
+
+# إعادة handler رقم الغرفة والطابق لمسار الترقيد بعد الملاحظات
+async def handle_admission_room(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """الحقل: رقم الغرفة والطابق (بعد الملاحظات)"""
+    text = update.message.text.strip()
+    if not text or len(text) < 1 or len(text) > 50:
+        await update.message.reply_text(
+            "⚠️ **خطأ في الإدخال**\n\n"
+            "يرجى إدخال رقم الغرفة والطابق (مثال: غرفة 205 - الطابق الثاني):",
+            reply_markup=_nav_buttons(show_back=True),
+            parse_mode="Markdown"
+        )
+        return ADMISSION_ROOM
+    context.user_data["report_tmp"]["room_number"] = text
+    await update.message.reply_text("✅ تم الحفظ")
+    # بعد رقم الغرفة: عرض تقويم تاريخ العودة
+    await _render_followup_calendar(update.message, context)
+    return ADMISSION_FOLLOWUP_DATE
     await _render_followup_calendar(update.message, context)
 
     return ADMISSION_FOLLOWUP_DATE

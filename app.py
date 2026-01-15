@@ -1,198 +1,154 @@
 # ================================================
-# app.py - البوت الطبي الكامل مع جميع التحديثات
-# ✅ نسخة محسّنة للعمل بدون توقف
+# Medical Reports Bot - Full Working Version
 # ================================================
 
-# Fix Unicode encoding on Windows
 import sys
 import os
+
+# Windows encoding fix
 if sys.platform == 'win32':
-    # Set console encoding to UTF-8
-    if hasattr(sys.stdout, 'reconfigure'):
-        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-    if hasattr(sys.stderr, 'reconfigure'):
-        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
-    # Set environment variable for Python
+    os.system('chcp 65001 >nul')
     os.environ['PYTHONIOENCODING'] = 'utf-8'
 
 import asyncio
-import nest_asyncio
 import logging
-import os
+import warnings
 from telegram import Update
-from telegram.ext import Application, PicklePersistence, Defaults
-from telegram.constants import ParseMode
+from telegram.ext import Application, CommandHandler, MessageHandler, filters
 from config.settings import BOT_TOKEN
 
-# 🔧 استيراد نظام تسجيل الهاندلرز الجديد
-from bot.handlers_registry import register_all_handlers
+# Disable warnings
+warnings.filterwarnings("ignore", category=UserWarning, message=".*per_.*settings.*")
 
-# 🔧 تكوين نظام Logging الشامل
+# Simple logging
 logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-# تقليل ضوضاء logging للمكتبات الخارجية
-logging.getLogger("telegram").setLevel(logging.WARNING)
-logging.getLogger("httpx").setLevel(logging.WARNING)
-logging.getLogger("httpcore").setLevel(logging.WARNING)
-
-logger.info("نظام مراقبة الأخطاء مفعّل")
-
 # ================================================
-# 🛡️ معالج الأخطاء العام - يمنع توقف البوت
+# Basic Handlers (fallback)
 # ================================================
+
+async def start(update: Update, context) -> None:
+    """Handle /start command"""
+    await update.message.reply_text(
+        "Medical Reports Bot is working!\n\n"
+        "Available commands:\n"
+        "/start - Show this message\n"
+        "/help - Show help\n"
+        "/status - Check bot status\n\n"
+        "Send any message and I'll reply!"
+    )
+
+async def help_command(update: Update, context) -> None:
+    """Handle /help command"""
+    await update.message.reply_text(
+        "Medical Reports Bot Help\n\n"
+        "Commands:\n"
+        "/start - Start the bot\n"
+        "/help - Show this help\n"
+        "/status - Check status\n\n"
+        "This bot manages medical reports, patients, hospitals, and more."
+    )
+
+async def status_command(update: Update, context) -> None:
+    """Handle /status command"""
+    await update.message.reply_text("Bot is running normally!")
+
+async def unknown_command(update: Update, context) -> None:
+    """Handle unknown commands"""
+    await update.message.reply_text(
+        "المعذرة، لم أفهم طلبك.\n"
+        "استخدم /start لبدء استخدام النظام."
+    )
+
 async def error_handler(update: object, context) -> None:
-    """معالج الأخطاء - يسجل الخطأ ويمنع توقف البوت"""
-    import traceback
-    
-    # تجاهل أخطاء الشبكة المؤقتة
-    error_str = str(context.error).lower()
-    network_errors = ['timed out', 'network', 'connection', 'read error', 'write error', 'httpx']
-    
-    if any(err in error_str for err in network_errors):
-        logger.warning(f"⚠️ خطأ شبكة مؤقت (متجاهل): {context.error}")
-        return
-    
-    # تسجيل الأخطاء الأخرى
-    logger.error(f"❌ خطأ: {context.error}")
-    
-    # محاولة إرسال رسالة للمستخدم
-    if update and hasattr(update, 'effective_message') and update.effective_message:
-        try:
-            await update.effective_message.reply_text(
-                "⚠️ حدث خطأ مؤقت، يرجى المحاولة مرة أخرى.\n"
-                "إذا استمرت المشكلة، اضغط /start للبدء من جديد."
-            )
-        except:
-            pass  # تجاهل إذا فشل الإرسال
+    """Error handler"""
+    logger.error(f"Error: {context.error}")
 
 # ================================================
-# 🚀 التشغيل الرئيسي
+# Main
 # ================================================
+
 async def main():
-    logger.info("="*60)
-    logger.info("Starting Medical Reports Bot - Enhanced Version...")
-    logger.info("="*60)
-
-    # 🔐 التحقق من توكن البوت
-    if not BOT_TOKEN:
-        logger.error("❌ BOT_TOKEN غير موجود!")
-        return
-
-    logger.info("✅ توكن البوت موجود وصالح")
-
-    # 💾 تهيئة نظام النسخ الاحتياطي لقاعدة البيانات
-    try:
-        from services.database_backup import initialize_backup_system
-        backup_path = initialize_backup_system()
-        if backup_path:
-            logger.info(f"✅ نسخة احتياطية: {backup_path}")
-    except Exception as e:
-        logger.warning(f"⚠️ خطأ في نظام النسخ الاحتياطي: {e}")
-
-    # 📁 إنشاء مجلد للبيانات المحفوظة
-    data_dir = os.path.join(os.path.dirname(__file__), 'data')
-    os.makedirs(data_dir, exist_ok=True)
-    persistence_path = os.path.join(data_dir, 'bot_persistence.pickle')
-
-    # 💾 إعداد Persistence لحفظ حالة المحادثات
-    # إذا كان ملف persistence معطوباً (EOF / unpickle errors)، نؤمنه عبر أخذ نسخة احتياطية
-    if os.path.exists(persistence_path):
-        try:
-            import pickle, time
-            with open(persistence_path, 'rb') as _f:
-                # محاولة سريعة لفحص ما إذا كان الملف قابلًا للـ unpickle
-                first = _f.read(1)
-                if not first:
-                    raise EOFError("empty file")
-                _f.seek(0)
-                pickle.load(_f)
-        except Exception as ex:
-            logger.warning(f"⚠️ تم اكتشاف ملف persistence تالف: {ex}. سيتم أخذ نسخة احتياطية وإعادة إنشاء الملف.")
-            try:
-                bak = f"{persistence_path}.corrupt_{int(time.time())}"
-                os.rename(persistence_path, bak)
-                logger.info(f"✅ تم نقل الملف التالف إلى: {bak}")
-            except Exception as ren_err:
-                logger.warning(f"⚠️ فشل إدخال النسخة الاحتياطية للملف التالف: {ren_err}")
-
-    persistence = PicklePersistence(
-        filepath=persistence_path,
-        update_interval=30  # حفظ كل 30 ثانية
-    )
-    logger.info(f"💾 Persistence مفعّل: {persistence_path}")
-
-    # ⚙️ إعدادات افتراضية للبوت
-    defaults = Defaults(
-        parse_mode=ParseMode.MARKDOWN,
-        link_preview_options=None,  # تعطيل معاينة الروابط
-        block=False  # عدم حظر الـ handlers - للاستجابة السريعة
-    )
-
-    # 🚀 إعداد request محسّن للأداء العالي والاستقرار
-    from telegram.request import HTTPXRequest
-    request = HTTPXRequest(
-        connection_pool_size=100,  # زيادة حجم الـ pool
-        read_timeout=60.0,
-        write_timeout=60.0,
-        connect_timeout=30.0,
-        pool_timeout=30.0,
-        media_write_timeout=120.0
-    )
-
-    # 🏗️ بناء التطبيق مع جميع التحسينات
-    app = (
-        Application.builder()
-        .token(BOT_TOKEN)
-        .request(request)
-        .persistence(persistence)
-        .defaults(defaults)
-        .concurrent_updates(True)  # معالجة متعددة للتحديثات
-        .build()
-    )
-
-    # 🛡️ إضافة معالج الأخطاء
-    app.add_error_handler(error_handler)
-
-    # 📌 تسجيل جميع الهاندلرز المحدثة
-    logger.info("📋 تسجيل الهاندلرز المحدثة...")
-    register_all_handlers(app)
-    logger.info("✅ تم تسجيل جميع الهاندلرز")
-
-    # 🖥️ POLLING MODE مع إعدادات محسّنة للاستقرار
-    logger.info("💻 Running in POLLING mode (Enhanced)")
-    logger.info("="*60)
-
-    await app.run_polling(
-        allowed_updates=Update.ALL_TYPES,
-        drop_pending_updates=True,
-        poll_interval=0.3,  # استجابة أسرع
-        timeout=60,  # timeout أقل لاكتشاف المشاكل أسرع
-    )
-
-# ================================================
-# 🧠 نقطة التشغيل الرئيسية
-# ================================================
-if __name__ == "__main__":
-    # ⚙️ السماح بـ nested event loops
-    nest_asyncio.apply()
-
-    # 🖥️ Local mode
-    logger.info("💻 Starting in local polling mode (Enhanced)")
+    logger.info("=" * 50)
+    logger.info("Starting Medical Bot...")
+    logger.info("=" * 50)
     
-    while True:  # حلقة لإعادة التشغيل التلقائي
-        try:
-            loop = asyncio.get_event_loop()
-            loop.run_until_complete(main())
-        except KeyboardInterrupt:
-            logger.info("⚠️ Bot stopped manually")
-            break
-        except Exception as e:
-            logger.error(f"❌ Fatal error: {e}", exc_info=True)
-            logger.info("🔄 إعادة تشغيل البوت خلال 5 ثواني...")
+    if not BOT_TOKEN:
+        logger.error("ERROR: No BOT_TOKEN!")
+        return
+    
+    logger.info("Token found")
+    
+    # Create application
+    app = Application.builder().token(BOT_TOKEN).build()
+    app.add_error_handler(error_handler)
+    
+    # Try to add advanced handlers
+    try:
+        logger.info("Loading advanced handlers...")
+        from bot.handlers_registry import register_all_handlers
+        register_all_handlers(app)
+        logger.info("Advanced handlers loaded successfully!")
+    except Exception as e:
+        logger.warning(f"Could not load advanced handlers: {e}")
+        logger.info("Using basic handlers only")
+        # Add basic handlers only if advanced handlers failed
+        app.add_handler(CommandHandler("start", start))
+        app.add_handler(CommandHandler("help", help_command))
+        app.add_handler(CommandHandler("status", status_command))
+    
+    logger.info("Starting bot...")
+    await app.initialize()
+    await app.start()
+    await app.updater.start_polling(drop_pending_updates=True)
+    logger.info("=" * 50)
+    logger.info("Bot is running!")
+    logger.info(f"Bot: @med_reports_bot")
+    logger.info("=" * 50)
+    
+    # Keep running
+    last_maintenance = 0
+    try:
+        while True:
+            await asyncio.sleep(30)
+            
+            # Run maintenance every 24 hours (86400 seconds)
             import time
-            time.sleep(5)
-            continue  # إعادة المحاولة
+            current_time = time.time()
+            # Initial run after 1 minute if not run yet (for testing), then every 24 hours
+            # But let's stick to simple logic: run if > 24h
+            # To ensure it runs on startup/restart after a bit, we can check if last_maintenance == 0
+            if last_maintenance == 0:
+                 # Don't run immediately on startup to allow bot to initialize fully
+                 last_maintenance = current_time - 86000 # Run in ~400 seconds (approx 6 mins)
+            
+            if current_time - last_maintenance > 86400:
+                logger.info("⏰ Running daily scheduled maintenance...")
+                try:
+                    from db.maintenance import run_scheduled_maintenance
+                    # Run in thread to avoid blocking the event loop
+                    await asyncio.to_thread(run_scheduled_maintenance)
+                    last_maintenance = current_time
+                    logger.info("✅ Daily maintenance completed")
+                except Exception as e:
+                    logger.error(f"❌ Maintenance failed: {e}")
+            
+            logger.info("Bot alive...")
+    except asyncio.CancelledError:
+        await app.updater.stop()
+        await app.stop()
+        await app.shutdown()
+        logger.info("Bot stopped")
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("Stopped by user")
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        sys.exit(1)

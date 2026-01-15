@@ -264,51 +264,31 @@ async def broadcast_report(query_bot, data_tmp, translator):
     """إرسال التقرير لجميع المستخدمين"""
     try:
         from services.broadcast_service import broadcast_new_report
-        
-        report_date_obj = data_tmp.get('report_date')
-        
-        followup_display = 'لا يوجد'
-        if data_tmp.get('followup_date_text'):
-            followup_display = data_tmp.get('followup_date_text')
-        elif data_tmp.get('followup_date'):
-            followup_display = data_tmp.get('followup_date').strftime('%Y-%m-%d')
-            if data_tmp.get('followup_time'):
-                # تحويل الوقت من صيغة 24 ساعة (HH:MM) إلى صيغة 12 ساعة
-                time_str = data_tmp.get('followup_time')
-                try:
-                    hour, minute = time_str.split(':')
-                    hour_int = int(hour)
-                    if hour_int == 0:
-                        time_display = f"12:{minute} صباحاً"
-                    elif hour_int < 12:
-                        time_display = f"{hour_int}:{minute} صباحاً"
-                    elif hour_int == 12:
-                        time_display = f"12:{minute} ظهراً"
-                    else:
-                        time_display = f"{hour_int-12}:{minute} مساءً"
-                    followup_display += f" الساعة {time_display}"
-                except:
-                    # في حالة الخطأ، استخدم الصيغة الأصلية
-                    followup_display += f" الساعة {time_str}"
-        
-        broadcast_data = {
-            'report_date': report_date_obj.strftime('%Y-%m-%d %H:%M') if report_date_obj and hasattr(report_date_obj, 'strftime') else 'غير محدد',
-            'patient_name': data_tmp.get('patient_name', 'غير محدد'),
-            'hospital_name': data_tmp.get('hospital_name', 'غير محدد'),
-            'department_name': data_tmp.get('department_name', 'غير محدد'),
-            'doctor_name': data_tmp.get('doctor_name', 'لم يتم التحديد'),
-            'medical_action': data_tmp.get('medical_action', 'غير محدد'),
-            'radiology_type': data_tmp.get('radiology_type', 'لا يوجد'),
-            'radiology_delivery_date': data_tmp.get('radiology_delivery_date').strftime('%Y-%m-%d') if data_tmp.get('radiology_delivery_date') else 'لا يوجد',
-            'complaint_text': data_tmp.get('complaint_text', 'غير محدد'),
-            'doctor_decision': data_tmp.get('doctor_decision', 'غير محدد'),
-            'case_status': data_tmp.get('case_status', 'لا يوجد'),
-            'followup_date': followup_display,
-            'followup_reason': data_tmp.get('followup_reason', 'لا يوجد'),
-            'translator_name': data_tmp.get('translator_name') or (translator.full_name if translator else "غير محدد"),
-        }
-        
-        await broadcast_new_report(query_bot, broadcast_data)
+        from db.session import SessionLocal
+        from db.models import Report
+
+        # الحصول على report_id من البيانات المؤقتة بعد الحفظ
+        report_id = data_tmp.get('report_id')
+        if not report_id:
+            print("❌ لا يوجد report_id في البيانات المؤقتة!")
+            return
+
+        # قراءة التقرير من قاعدة البيانات
+        session = SessionLocal()
+        report_obj = session.query(Report).filter(Report.id == report_id).first()
+        if not report_obj:
+            print(f"❌ لم يتم العثور على التقرير في قاعدة البيانات: {report_id}")
+            session.close()
+            return
+
+        # تحويل كائن التقرير إلى dict (للتوافق مع broadcast_new_report)
+        report_data = {c.name: getattr(report_obj, c.name) for c in report_obj.__table__.columns}
+        # إضافة اسم المترجم إذا لم يكن موجودًا
+        if not report_data.get('translator_name') and translator:
+            report_data['translator_name'] = translator.full_name
+
+        await broadcast_new_report(query_bot, report_data)
+        session.close()
     except Exception as e:
         print(f"خطأ في بث التقرير: {e}")
 

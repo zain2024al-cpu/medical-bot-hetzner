@@ -3,8 +3,8 @@
   "created_at": "2025-12-31T03:04:21.460776",
   "description": "Unified Doctors & Hospitals Database - Merged & Deduplicated",
   "statistics": {
-    "total_hospitals": 34,
-    "total_doctors": 1068,
+    "total_hospitals": 36,
+    "total_doctors": 1082,
     "total_departments": 599
   },
   "hospitals": [
@@ -3087,6 +3087,20 @@
       "id": 38,
       "name": "Narayana Nethralaya, Rajajinagar",
       "name_normalized": "narayana nethralaya, rajajinagar",
+      "departments": [],
+      "doctor_count": 0
+    },
+    {
+      "id": 39,
+      "name": "Annaswamy Mudaliar General Hospital",
+      "name_normalized": "annaswamy mudaliar general hospital",
+      "departments": [],
+      "doctor_count": 0
+    },
+    {
+      "id": 40,
+      "name": "Rainbow children’s Hospital, Delhi",
+      "name_normalized": "rainbow children’s hospital, delhi",
       "departments": [],
       "doctor_count": 0
     }
@@ -12710,6 +12724,146 @@
       "hospital_name": "KARE Prosthetics and Orthotics, Bangalore",
       "department": "العلاج الطبيعي وإعادة التأهيل | Physical Therapy & Rehabilitation",
       "search_text": "كومار kare prosthetics and orthotics, bangalore العلاج الطبيعي وإعادة التأهيل | physical therapy & rehabilitation",
+      "added_manually": true
+    },
+    {
+      "id": 1069,
+      "name": "سودير",
+      "name_normalized": "سودير",
+      "hospital_id": 11,
+      "hospital_name": "Fortis Hospital BG Road, Bangalore",
+      "department": "الأذن والأنف والحنجرة | ENT",
+      "search_text": "سودير fortis hospital bg road, bangalore الأذن والأنف والحنجرة | ent",
+      "added_manually": true
+    },
+    {
+      "id": 1070,
+      "name": "شرين",
+      "name_normalized": "شرين",
+      "hospital_id": 6,
+      "hospital_name": "Aster RV Hospital, Bangalore",
+      "department": "الأمراض الجلدية | Dermatology",
+      "search_text": "شرين aster rv hospital, bangalore الأمراض الجلدية | dermatology",
+      "added_manually": true
+    },
+    {
+      "id": 1071,
+      "name": "Dr. Bharat",
+      "name_normalized": "dr. bharat",
+      "hospital_id": 36,
+      "hospital_name": "St. John's Medical College Hospital, Bangalore",
+      "department": "العلاج الطبيعي وإعادة التأهيل | Physical Therapy & Rehabilitation",
+      "search_text": "dr. bharat st. john's medical college hospital, bangalore العلاج الطبيعي وإعادة التأهيل | physical therapy & rehabilitation",
+      "added_manually": true
+    },
+    {
+      "id": 1072,
+      "name": "Praveen kumar",
+      "name_normalized": "praveen kumar",
+      "hospital_id": 26,
+      "hospital_name": "Narayana Hospital, Bommasandra Bangalore",
+      "department": "جراحة القلب | Cardiac Surgery",
+      "search_text": "praveen kumar narayana hospital, bommasandra bangalore جراحة القلب | cardiac surgery",
+      "added_manually": true
+    },
+    {
+      "id": 1073,
+      "name": "DR PRASANNA",
+      "name_normalized": "dr prasanna",
+      "hospital_id": 23,
+      "hospital_name": "Manipal Hospital, Old Airport Road",
+      "department": "باطنية الجهاز الهضمي | Gastroenterology",
+      "search_text": "dr prasanna manipal hospital, old airport road باطنية الجهاز الهضمي | gastroenterology",
+      "added_manually": true
+    },
+    {
+      "id": 1074,
+      "name": "Dr. Sreedhar",
+      "name_normalized": "dr. sreedhar",
+      "hospital_id": 36,
+      "hospital_name": "St. John's Medical College Hospital, Bangalore",
+      "department": "باطنية الأورام | Medical Oncology",
+      "search_text": "dr. sreedhar st. john's medical college hospital, bangalore باطنية الأورام | medical oncology",
+      "added_manually": true
+    },
+    {
+      "id": 1075,
+      "name": "DR NEHA MISHRA",
+      "name_normalized": "dr neha mishra",
+      "hospital_id": 23,
+      "hospital_name": "Manipal Hospital, Old Airport Road",
+      "department": "الأمراض المعدية | Infectious Diseases",
+      "search_text": "dr neha mishra manipal hospital, old airport road الأمراض المعدية | infectious diseases",
+      "added_manually": true
+    },
+    {
+      "id": 1076,
+      "name": "موهان",
+      "name_normalized": "موهان",
+      "hospital_id": 11,
+      "hospital_name": "Fortis Hospital BG Road, Bangalore",
+      "department": "جراحة العظام | Orthopedics",
+      "search_text": "موهان fortis hospital bg road, bangalore جراحة العظام | orthopedics",
+      "added_manually": true
+    },
+    {
+      "id": 1077,
+      "name": "Dr. Sundar",
+      "name_normalized": "dr. sundar",
+      "hospital_id": 36,
+      "hospital_name": "St. John's Medical College Hospital, Bangalore",
+      "department": "جراحة التجميل | Plastic Surgery",
+      "search_text": "dr. sundar st. john's medical college hospital, bangalore جراحة التجميل | plastic surgery",
+      "added_manually": true
+    },
+    {
+      "id": 1078,
+      "name": "Joti",
+      "name_normalized": "joti",
+      "hospital_id": 15,
+      "hospital_name": "KARE Prosthetics and Orthotics, Bangalore",
+      "department": "العلاج الطبيعي وإعادة التأهيل | Physical Therapy & Rehabilitation",
+      "search_text": "joti kare prosthetics and orthotics, bangalore العلاج الطبيعي وإعادة التأهيل | physical therapy & rehabilitation",
+      "added_manually": true
+    },
+    {
+      "id": 1079,
+      "name": "كوفارادهان",
+      "name_normalized": "كوفارادهان",
+      "hospital_id": 32,
+      "hospital_name": "Sakra World Hospital, Bangalore",
+      "department": "جراحة المسالك البولية | Urology",
+      "search_text": "كوفارادهان sakra world hospital, bangalore جراحة المسالك البولية | urology",
+      "added_manually": true
+    },
+    {
+      "id": 1080,
+      "name": "Chandera shekar",
+      "name_normalized": "chandera shekar",
+      "hospital_id": 40,
+      "hospital_name": "Rainbow children’s Hospital, Delhi",
+      "department": "جراحة الصدر | Thoracic Surgery",
+      "search_text": "chandera shekar rainbow children’s hospital, delhi جراحة الصدر | thoracic surgery",
+      "added_manually": true
+    },
+    {
+      "id": 1081,
+      "name": "لايوجد",
+      "name_normalized": "لايوجد",
+      "hospital_id": 34,
+      "hospital_name": "Silverline Diagnostics Kalyan Nagar",
+      "department": "الغدد الصمّاء والسكري | Endocrinology & Diabetes",
+      "search_text": "لايوجد silverline diagnostics kalyan nagar الغدد الصمّاء والسكري | endocrinology & diabetes",
+      "added_manually": true
+    },
+    {
+      "id": 1082,
+      "name": "لا",
+      "name_normalized": "لا",
+      "hospital_id": 37,
+      "hospital_name": "Trilife Hospital, Bangalore",
+      "department": "جراحة العظام | Orthopedics",
+      "search_text": "لا trilife hospital, bangalore جراحة العظام | orthopedics",
       "added_manually": true
     }
   ]

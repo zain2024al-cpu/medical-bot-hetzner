@@ -29,15 +29,15 @@ engine = create_engine(
     echo=False,  # Set to True for SQL debugging
     connect_args={
         "check_same_thread": False,  # Allow multi-threading
-        "timeout": 300,  # زيادة timeout إلى 5 دقائق للعمليات الطويلة
+        "timeout": 60,  # 60 seconds timeout (better than 300 for fail-fast)
         "isolation_level": None  # Enable autocommit for WAL mode
     },
     pool_pre_ping=True,  # Verify connections before using
-    pool_recycle=1800,  # Recycle connections after 30 minutes (أسرع من 1 ساعة)
-    pool_size=100,  # زيادة pool size إلى 100 للمستخدمين الكثيرين
-    max_overflow=50,  # زيادة max overflow إلى 50 للذروة
+    pool_recycle=1800,  # Recycle connections after 30 minutes
+    pool_size=20,  # Reduced from 100 to 20 to prevent locking contention
+    max_overflow=30,  # Max overflow
     # إعدادات إضافية للأداء العالي
-    pool_timeout=120,  # زيادة timeout للحصول على connection إلى 2 دقائق
+    pool_timeout=60,  # Wait up to 60s for a connection
 )
 
 # Create session factory
@@ -71,8 +71,15 @@ def init_database():
                 conn.execute(text("PRAGMA synchronous=NORMAL"))
                 conn.execute(text("PRAGMA cache_size=-64000"))  # 64MB cache
                 conn.execute(text("PRAGMA temp_store=MEMORY"))
+                conn.execute(text("PRAGMA foreign_keys=ON"))  # Ensure FK consistency
+                conn.execute(text("PRAGMA busy_timeout=5000")) # 5s busy timeout
                 conn.commit()
             logger.info(f"✅ WAL mode enabled for optimal concurrency")
+            
+            # Run startup health check
+            from db.maintenance import DatabaseMaintenance
+            DatabaseMaintenance.check_db_health_startup()
+            
         except Exception as pragma_error:
             logger.warning(f"⚠️ Could not set PRAGMA settings: {pragma_error}")
             # Continue anyway - database will work without optimizations

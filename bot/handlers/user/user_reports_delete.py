@@ -9,7 +9,7 @@ from telegram.ext import (
     CallbackQueryHandler, filters
 )
 from telegram.constants import ParseMode
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from db.session import SessionLocal
 from db.models import Report, Translator, Patient, Hospital, Department, Doctor
 from bot.shared_auth import is_admin
@@ -57,10 +57,15 @@ async def start_delete_reports(update: Update, context: ContextTypes.DEFAULT_TYP
             return ConversationHandler.END
         
         with SessionLocal() as s:
-            # ✅ البحث عن تقارير اليوم المقدمة من هذا المستخدم
+            # ✅ البحث عن تقارير اليوم للمستخدم
             today = date.today()
-            today_start = datetime.combine(today, datetime.min.time())
-            today_end = datetime.combine(today, datetime.max.time())
+            
+            # ✅ إصلاح مشكلة التوقيت: توسيع النطاق ليشمل 24 ساعة الماضية + 12 ساعة قادمة
+            now_utc = datetime.utcnow()
+            today_start = now_utc - timedelta(hours=24)
+            today_end = now_utc + timedelta(hours=12)
+            
+            logger.info(f"🔍 نطاق الحذف (UTC - Expanded): من {today_start} إلى {today_end}")
 
             # ✅ البحث بمعرف المستخدم الذي أنشأ التقرير (submitted_by_user_id)
             # هذا الحقل يتم حفظه عند إنشاء التقرير بغض النظر عن اسم المترجم المختار
@@ -68,7 +73,7 @@ async def start_delete_reports(update: Update, context: ContextTypes.DEFAULT_TYP
             translator = s.query(Translator).filter_by(tg_user_id=user.id).first()
             translator_id = translator.id if translator else None
             
-            logger.info(f"🔍 البحث عن تقارير للحذف:")
+            logger.info(f"🔍 البحث عن تقارير للحذف (اليوم):")
             logger.info(f"   - Telegram user.id: {user.id}")
             logger.info(f"   - translator found: {translator.full_name if translator else 'None'}")
             logger.info(f"   - translator_id: {translator_id}")
@@ -104,9 +109,8 @@ async def start_delete_reports(update: Update, context: ContextTypes.DEFAULT_TYP
 
             if not reports:
                 await update.message.reply_text(
-                    "📋 **لا توجد تقارير لليوم**\n\n"
-                    f"📅 **التاريخ:** {today.strftime('%Y-%m-%d')}\n\n"
-                    "لم تقم بإضافة أي تقارير اليوم.\n"
+                    "📋 **لا توجد تقارير متاحة**\n\n"
+                    "لم يتم العثور على أي تقارير قمت بنشرها.\n"
                     "استخدم زر '📝 إضافة تقرير جديد' لإضافة تقرير.",
                     parse_mode=ParseMode.MARKDOWN
                 )
@@ -116,10 +120,10 @@ async def start_delete_reports(update: Update, context: ContextTypes.DEFAULT_TYP
             context.user_data['submitted_by_user_id'] = user.id
 
             # إنشاء قائمة بالتقارير
-            text = "🗑️ **حذف التقارير - اليوم**\n\n"
-            text += f"📅 **{today.strftime('%Y-%m-%d')}** ({len(reports)} تقرير)\n\n"
+            text = "🗑️ **حذف التقارير**\n\n"
+            text += f"عرض آخر {len(reports)} تقرير قمت بنشره:\n\n"
             text += "⚠️ **تحذير:** سيتم حذف التقرير من المجموعة وقاعدة البيانات.\n\n"
-            text += "اختر التقرير الذي تريد حذفه:\n\n"
+            text += "اختر التقرير الذي تريد حذفه من القائمة أدناه 👇\n"
             
             keyboard = []
             for report in reports:
@@ -131,21 +135,13 @@ async def start_delete_reports(update: Update, context: ContextTypes.DEFAULT_TYP
                 hospital = s.query(Hospital).filter_by(id=report.hospital_id).first()
                 hospital_name = hospital.name if hospital else "غير معروف"
                 
-                # جلب بيانات القسم
-                department = s.query(Department).filter_by(id=report.department_id).first() if report.department_id else None
-                department_name = department.name if department else "غير محدد"
-                
-                # جلب بيانات الطبيب
-                doctor = s.query(Doctor).filter_by(id=report.doctor_id).first() if report.doctor_id else None
-                doctor_name = doctor.full_name if doctor else "لم يتم التحديد"
-                
                 # تنسيق الوقت
                 time_str = ""
                 if report.report_date:
                     time_str = report.report_date.strftime("%H:%M")
                 
-                # نص الزر
-                button_text = f"📋 {patient_name} - {hospital_name}"
+                # نص الزر - مختصر
+                button_text = f"#{report.id} {patient_name} ({time_str})"
                 if len(button_text) > 50:
                     button_text = button_text[:47] + "..."
                 
@@ -155,13 +151,6 @@ async def start_delete_reports(update: Update, context: ContextTypes.DEFAULT_TYP
                         callback_data=f"delete_report:{report.id}"
                     )
                 ])
-                
-                # إضافة تفاصيل التقرير في النص
-                text += f"📋 **{patient_name}**\n"
-                text += f"🏥 {hospital_name} | {department_name}\n"
-                text += f"👨‍⚕️ {doctor_name}\n"
-                text += f"⚕️ {report.medical_action or 'غير محدد'}\n"
-                text += f"🕐 {time_str}\n\n"
             
             keyboard.append([InlineKeyboardButton("❌ إلغاء", callback_data="delete_cancel")])
             

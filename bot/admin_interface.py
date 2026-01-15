@@ -7,6 +7,16 @@ from telegram import Update
 from telegram.ext import ContextTypes, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 from bot.shared_auth import is_admin
 from bot.keyboards import admin_main_kb
+from bot.broadcast_control import toggle_broadcast, is_broadcast_enabled
+# زر تفعيل/إيقاف إرسال التقارير
+async def handle_toggle_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if not is_admin(user.id):
+        await update.message.reply_text("🚫 هذه الخاصية مخصصة للإدمن فقط.")
+        return
+    new_status = toggle_broadcast()
+    status_text = "🟢 تم تفعيل إرسال التقارير للمجموعة" if new_status else "🔴 تم إيقاف إرسال التقارير للمجموعة"
+    await update.message.reply_text(status_text, reply_markup=admin_main_kb())
 from db.session import SessionLocal
 from db.models import Translator
 
@@ -102,6 +112,6 @@ async def admin_refresh(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # 🧩 تسجيل الهاندلرز الخاصة بلوحة التحكم
 def register_admin_handlers(app):
     app.add_handler(CommandHandler("admin", admin_start))
-    # تم إزالة handler تحديث الصفحة للأدمن - سيتم التعامل معه في user_help.py
+    app.add_handler(MessageHandler(filters.Regex(r"^(🟢 تفعيل إرسال التقارير|🔴 إيقاف إرسال التقارير)$"), handle_toggle_broadcast))
     app.add_handler(CallbackQueryHandler(handle_user_approval, pattern="^(approve|reject):"))
     app.add_handler(CallbackQueryHandler(handle_back_to_main, pattern="^back_to_main$"))

@@ -24,7 +24,8 @@ from telegram.ext import ContextTypes
 # Import states
 from ..states import (
     EMERGENCY_COMPLAINT, EMERGENCY_DIAGNOSIS, EMERGENCY_DECISION,
-    EMERGENCY_STATUS, EMERGENCY_ADMISSION_TYPE, EMERGENCY_ROOM_NUMBER,
+    EMERGENCY_STATUS, EMERGENCY_ADMISSION_NOTES, EMERGENCY_OPERATION_DETAILS,
+    EMERGENCY_ADMISSION_TYPE, EMERGENCY_ROOM_NUMBER,
     EMERGENCY_DATE_TIME, EMERGENCY_REASON, EMERGENCY_TRANSLATOR
 )
 
@@ -158,12 +159,11 @@ async def handle_emergency_decision(update: Update, context: ContextTypes.DEFAUL
 
     context.user_data["report_tmp"]["decision"] = text
 
-    # أزرار سريعة لوضع الحالة (نبقيها - مفيدة!)
+    # أزرار سريعة لوضع الحالة 
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("🏠 تم الخروج من الطوارئ", callback_data="emerg_status:discharged")],
         [InlineKeyboardButton("🛏️ تم الترقيد", callback_data="emerg_status:admitted")],
         [InlineKeyboardButton("⚕️ تم إجراء عملية", callback_data="emerg_status:operation")],
-        [InlineKeyboardButton("✍️ إدخال يدوي", callback_data="emerg_status:manual")],
         [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back")],
         [InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]
     ])
@@ -186,14 +186,6 @@ async def handle_emergency_status_choice(update: Update, context: ContextTypes.D
 
     data = query.data.split(":", 1)[1]
 
-    if data == "manual":
-        await query.edit_message_text(
-            "🏥 **وضع الحالة**\n\n"
-            "يرجى إدخال وضع الحالة:",
-            parse_mode="Markdown"
-        )
-        return EMERGENCY_STATUS
-
     # تحديد النص بناءً على الاختيار
     status_text = {
         "discharged": "تم الخروج من الطوارئ",
@@ -203,28 +195,92 @@ async def handle_emergency_status_choice(update: Update, context: ContextTypes.D
 
     context.user_data["report_tmp"]["status"] = status_text
 
-    # إذا اختار "تم الترقيد"، نعرض خيارات إضافية
+    # إذا اختار "تم الترقيد"، نطلب الملاحظات أولاً
     if data == "admitted":
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🏥 العناية المركزة", callback_data="emerg_admission:icu")],
-            [InlineKeyboardButton("🛏️ الرقود", callback_data="emerg_admission:ward")],
-            [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back")],
-            [InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]
-        ])
-        
         await query.edit_message_text(
             f"✅ تم اختيار: {status_text}\n\n"
-            "أين تم الترقيد؟",
-            reply_markup=keyboard,
+            "📝 **ملاحظات الرقود**\n\n"
+            "يرجى توضيح ماذا تم وما هي خطة الرقود:",
+            reply_markup=_nav_buttons(show_back=True),
             parse_mode="Markdown"
         )
-        return EMERGENCY_ADMISSION_TYPE
+        return EMERGENCY_ADMISSION_NOTES
     
-    # للخيارات الأخرى (discharged, operation)، نكمل مباشرة
+    # إذا اختار "تم إجراء عملية"، نطلب تفاصيل العملية
+    elif data == "operation":
+        await query.edit_message_text(
+            f"✅ تم اختيار: {status_text}\n\n"
+            "⚕️ **تفاصيل العملية**\n\n"
+            "يرجى إدخال ماهي العملية التي تمت للحالة:",
+            reply_markup=_nav_buttons(show_back=True),
+            parse_mode="Markdown"
+        )
+        return EMERGENCY_OPERATION_DETAILS
+    
+    # للخروج من الطوارئ، نكمل مباشرة
     await query.edit_message_text(f"✅ تم اختيار: {status_text}")
 
     # عرض تقويم تاريخ العودة (اختياري)
     await _render_followup_calendar(query.message, context)
+
+    return EMERGENCY_DATE_TIME
+
+
+
+async def handle_emergency_admission_notes(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة ملاحظات الرقود"""
+    text = update.message.text.strip()
+    valid, msg = validate_text_input(text, min_length=3)
+
+    if not valid:
+        await update.message.reply_text(
+            f"⚠️ **خطأ: {msg}**\n\n"
+            f"يرجى توضيح ماذا تم وما هي خطة الرقود:",
+            reply_markup=_nav_buttons(show_back=True),
+            parse_mode="Markdown"
+        )
+        return EMERGENCY_ADMISSION_NOTES
+
+    context.user_data["report_tmp"]["admission_notes"] = text
+
+    # خيار نوع الترقيد
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🏥 العناية المركزة", callback_data="emerg_admission:icu")],
+        [InlineKeyboardButton("🛏️ الرقود", callback_data="emerg_admission:ward")],
+        [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back")],
+        [InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]
+    ])
+
+    await update.message.reply_text(
+        "✅ تم حفظ الملاحظات\n\n"
+        "أين تم الترقيد؟",
+        reply_markup=keyboard,
+        parse_mode="Markdown"
+    )
+
+    return EMERGENCY_ADMISSION_TYPE
+
+
+async def handle_emergency_operation_details(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة تفاصيل العملية"""
+    text = update.message.text.strip()
+    valid, msg = validate_text_input(text, min_length=3)
+
+    if not valid:
+        await update.message.reply_text(
+            f"⚠️ **خطأ: {msg}**\n\n"
+            f"يرجى إدخال ماهي العملية التي تمت للحالة:",
+            reply_markup=_nav_buttons(show_back=True),
+            parse_mode="Markdown"
+        )
+        return EMERGENCY_OPERATION_DETAILS
+
+    context.user_data["report_tmp"]["operation_details"] = text
+
+    await update.message.reply_text("✅ تم الحفظ")
+
+    # عرض تقويم تاريخ العودة (اختياري)
+    await _render_followup_calendar(update.message, context)
 
     return EMERGENCY_DATE_TIME
 
@@ -260,7 +316,7 @@ async def handle_emergency_status_text(update: Update, context: ContextTypes.DEF
 
 
 async def handle_emergency_admission_type_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """معالجة اختيار نوع الترقيد (العناية المركزة أو الرقود)"""
+    """معالجة اختيار نوع الترقيد (العناية المركزة أو الرقود) - بعد الملاحظات"""
     query = update.callback_query
     await query.answer()
 
@@ -273,18 +329,18 @@ async def handle_emergency_admission_type_choice(update: Update, context: Contex
 
     context.user_data["report_tmp"]["admission_type"] = admission_type_text
 
-    # إذا اختار "الرقود"، نطلب رقم الغرفة
+    # إذا اختار "الرقود"، نطلب رقم الغرفة والطابق
     if data == "ward":
         await query.edit_message_text(
             f"✅ تم اختيار: {admission_type_text}\n\n"
-            "🛏️ **رقم الغرفة**\n\n"
-            "يرجى إدخال رقم الغرفة:",
+            "🛏️ **رقم الغرفة والطابق**\n\n"
+            "يرجى إدخال رقم الغرفة والطابق:",
             reply_markup=_nav_buttons(show_back=True),
             parse_mode="Markdown"
         )
         return EMERGENCY_ROOM_NUMBER
-    
-    # إذا اختار "العناية المركزة"، نكمل مباشرة
+
+    # إذا اختار "العناية المركزة"، نكمل مباشرة للتاريخ
     await query.edit_message_text(f"✅ تم اختيار: {admission_type_text}")
 
     # عرض تقويم تاريخ العودة (اختياري)
@@ -301,7 +357,7 @@ async def handle_emergency_room_number(update: Update, context: ContextTypes.DEF
     if not valid:
         await update.message.reply_text(
             f"⚠️ **خطأ: {msg}**\n\n"
-            f"يرجى إدخال رقم الغرفة:",
+            f"يرجى إدخال رقم الغرفة والطابق:",
             reply_markup=_nav_buttons(show_back=True),
             parse_mode="Markdown"
         )
@@ -309,7 +365,7 @@ async def handle_emergency_room_number(update: Update, context: ContextTypes.DEF
 
     context.user_data["report_tmp"]["room_number"] = text
 
-    await update.message.reply_text(f"✅ تم الحفظ: رقم الغرفة {text}")
+    await update.message.reply_text(f"✅ تم الحفظ: رقم الغرفة والطابق {text}")
 
     # عرض تقويم تاريخ العودة (اختياري)
     await _render_followup_calendar(update.message, context)

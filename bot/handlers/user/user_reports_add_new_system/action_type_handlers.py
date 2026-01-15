@@ -280,7 +280,7 @@ async def handle_action_type_choice(update: Update, context: ContextTypes.DEFAUL
         action_to_flow_type = {
             "استشارة جديدة": "new_consult",
             "متابعة في الرقود": "followup",
-            "مراجعة / عودة دورية": "followup",
+            "مراجعة / عودة دورية": "periodic_followup",
             "استشارة مع قرار عملية": "surgery_consult",
             "طوارئ": "emergency",
             "عملية": "operation",

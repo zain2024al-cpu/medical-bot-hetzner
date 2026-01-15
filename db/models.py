@@ -163,7 +163,6 @@ class Report(Base):
     followup_time = Column(String(50), nullable=True)
     followup_department = Column(String(255), nullable=True)
     followup_reason = Column(Text, nullable=True)
-    room_number = Column(String(100), nullable=True)  # ✅ رقم الغرفة/الطابق
     # حقول خاصة بتأجيل الموعد
     app_reschedule_reason = Column(Text, nullable=True)
     app_reschedule_return_date = Column(DateTime, nullable=True)
@@ -183,6 +182,9 @@ class Report(Base):
     # ✅ حقول الأشعة والفحوصات
     radiology_type = Column(String(255), nullable=True)
     radiology_delivery_date = Column(DateTime, nullable=True)
+    
+    # ✅ حقل رقم الغرفة والطابق
+    room_number = Column(String(255), nullable=True)
 
 
 # ================================================

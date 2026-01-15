@@ -81,14 +81,63 @@ async def handle_user_approval(update: Update, context: ContextTypes.DEFAULT_TYP
             s.commit()
             await query.edit_message_text(f"✅ تم قبول المستخدم: {translator.full_name}")
 
-            # إرسال إشعار للمستخدم المقبول
+            # إرسال إشعار للمستخدم المقبول مع القائمة الرئيسية
             try:
+                from bot.keyboards import user_main_kb
+                from datetime import datetime
+                import hashlib
+                
+                # الحصول على رسالة ترحيبية
+                now = datetime.now()
+                days_ar = ["الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت", "الأحد"]
+                months_ar = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+                            "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"]
+                day_name = days_ar[now.weekday()]
+                month_name = months_ar[now.month - 1]
+                
+                hour = now.hour
+                minute = now.strftime("%M")
+                if 5 <= hour < 12:
+                    greeting = "صباح الخير"
+                else:
+                    greeting = "مساء الخير"
+                
+                date_str = f"{day_name}، {now.day} {month_name} {now.year}"
+                time_str = f"{hour}:{minute}"
+                
+                welcome_message = f"""╔════════════════════╗
+  🌟 {greeting} {translator.full_name}
+╚════════════════════╝
+
+✅ **تم قبولك بنجاح!**
+
+يمكنك الآن استخدام النظام بالكامل.
+
+📅 {date_str}
+⏰ {time_str}
+
+━━━━━━━━━━━━━━━━━━━━
+
+👇 اختر العملية المطلوبة:"""
+                
                 await context.bot.send_message(
                     chat_id=user_id,
-                    text="✅ تم قبولك! يمكنك الآن استخدام النظام."
+                    text=welcome_message,
+                    reply_markup=user_main_kb(),
+                    parse_mode="Markdown"
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"❌ خطأ في إرسال القائمة بعد الموافقة: {e}", exc_info=True)
+                # إرسال رسالة بسيطة كـ fallback
+                try:
+                    await context.bot.send_message(
+                        chat_id=user_id,
+                        text="✅ تم قبولك! اضغط /start للبدء."
+                    )
+                except:
+                    pass
 
         elif action == "reject":
             # حذف من SQLite
@@ -296,25 +345,109 @@ async def handle_group_management(update, context):
 
 async def handle_group_settings(update, context):
     """معالجة إعدادات المجموعة"""
-    query = update.callback_query
-    await query.answer()
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        query = update.callback_query
+        if not query:
+            logger.error("❌ handle_group_settings: No callback_query found")
+            return
+        
+        await query.answer()
+        
+        logger.info(f"🔧 handle_group_settings: callback_data = {query.data}")
+        
+        action = query.data.replace("settings:", "")
+        logger.info(f"🔧 handle_group_settings: action = {action}")
 
-    action = query.data.replace("settings:", "")
+        if action in ["enable_group", "disable_group"]:
+            # ✅ استخدام broadcast_control لتغيير الحالة فعلياً
+            from bot.broadcast_control import is_broadcast_enabled, set_broadcast_enabled
+            
+            # الحالة قبل التغيير
+            old_state = is_broadcast_enabled()
+            logger.info(f"🔧 handle_group_settings: الحالة قبل التغيير = {old_state}")
+            
+            if action == "enable_group":
+                # تفعيل البث
+                set_broadcast_enabled(True)
+                status_text = "✅ مفعل"
+                logger.info("🔧 handle_group_settings: تم تفعيل البث")
+            else:  # disable_group
+                # إيقاف البث
+                set_broadcast_enabled(False)
+                status_text = "❌ معطل"
+                logger.info("🔧 handle_group_settings: تم إيقاف البث")
+            
+            # التحقق من الحالة الجديدة
+            final_state = is_broadcast_enabled()
+            logger.info(f"🔧 handle_group_settings: الحالة بعد التغيير = {final_state}")
+            
+            await query.edit_message_text(
+                f"⚙️ **تم تحديث الإعدادات**\n\n"
+                f"البث للمجموعة: {status_text}\n\n"
+                f"📊 **الحالة الحالية:** {'✅ مفعل' if final_state else '❌ معطل'}\n\n"
+                f"💡 التغيير فعال فوراً - لا حاجة لإعادة تشغيل البوت",
+                reply_markup=reports_group_management_kb(),
+                parse_mode="Markdown"
+            )
+            logger.info("✅ handle_group_settings: تم تحديث الرسالة بنجاح")
+        else:
+            logger.warning(f"⚠️ handle_group_settings: action غير معروف: {action}")
+            
+    except Exception as e:
+        logger.error(f"❌ خطأ في handle_group_settings: {e}", exc_info=True)
+        try:
+            if query:
+                await query.answer(f"❌ حدث خطأ: {str(e)[:50]}", show_alert=True)
+        except:
+            pass
 
-    if action in ["enable_group", "disable_group"]:
-        new_value = "true" if action == "enable_group" else "false"
 
-        # في بيئة الإنتاج، يجب تحديث متغير البيئة أو ملف التكوين
-        # هنا سنعرض رسالة توضيحية
-        status_text = "✅ مفعل" if new_value == "true" else "❌ معطل"
-
-        await query.edit_message_text(
-            f"⚙️ **تم تحديث الإعدادات**\n\n"
-            f"البث للمجموعة: {status_text}\n\n"
-            f"💡 **ملاحظة:** لتطبيق التغيير، أعد تشغيل البوت مع المتغير:\n"
-            f"`USE_GROUP_BROADCAST={new_value}`",
-            reply_markup=reports_group_management_kb(),
+# ✅ معالج زر إيقاف/تفعيل إرسال التقارير من لوحة المفاتيح
+async def handle_toggle_broadcast_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة زر إيقاف/تفعيل إرسال التقارير من لوحة المفاتيح الرئيسية"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    user = update.effective_user
+    if not is_admin(user.id):
+        await update.message.reply_text("🚫 هذه الخاصية مخصصة للإدمن فقط.")
+        return
+    
+    try:
+        from bot.broadcast_control import is_broadcast_enabled, set_broadcast_enabled
+        
+        # الحالة الحالية
+        current_state = is_broadcast_enabled()
+        logger.info(f"🔧 handle_toggle_broadcast_button: الحالة الحالية = {current_state}")
+        
+        # تبديل الحالة
+        new_state = not current_state
+        set_broadcast_enabled(new_state)
+        
+        # التحقق من الحالة الجديدة
+        final_state = is_broadcast_enabled()
+        logger.info(f"🔧 handle_toggle_broadcast_button: الحالة الجديدة = {final_state}")
+        
+        # تحديث لوحة المفاتيح
+        status_text = "🟢 تم تفعيل إرسال التقارير للمجموعة" if final_state else "🔴 تم إيقاف إرسال التقارير للمجموعة"
+        
+        await update.message.reply_text(
+            f"{status_text}\n\n"
+            f"📊 **الحالة الحالية:** {'✅ مفعل' if final_state else '❌ معطل'}\n\n"
+            f"💡 التغيير فعال فوراً - لا حاجة لإعادة تشغيل البوت",
+            reply_markup=admin_main_kb(),
             parse_mode="Markdown"
+        )
+        logger.info("✅ handle_toggle_broadcast_button: تم التحديث بنجاح")
+        
+    except Exception as e:
+        logger.error(f"❌ خطأ في handle_toggle_broadcast_button: {e}", exc_info=True)
+        await update.message.reply_text(
+            f"❌ حدث خطأ: {str(e)[:100]}",
+            reply_markup=admin_main_kb()
         )
 
 
@@ -323,6 +456,8 @@ def register(app):
     app.add_handler(CommandHandler("admin", admin_start))
     app.add_handler(CommandHandler("cancel", cancel_all))  # ✅ أمر إعادة التعيين
     app.add_handler(MessageHandler(filters.Regex("^ℹ️ مساعدة$"), admin_start))
+    # ✅ معالج زر إيقاف/تفعيل إرسال التقارير من لوحة المفاتيح
+    app.add_handler(MessageHandler(filters.Regex(r"^(🟢 تفعيل إرسال التقارير|🔴 إيقاف إرسال التقارير)$"), handle_toggle_broadcast_button))
     # ✅ لا نحتاج لإضافة معالج لزر "👥 إدارة المستخدمين" هنا
     # لأن ConversationHandler في admin_users_management.py يتعامل معه مباشرة
     app.add_handler(CallbackQueryHandler(handle_user_approval, pattern="^(approve|reject):"))

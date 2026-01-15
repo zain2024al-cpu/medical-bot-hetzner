@@ -155,7 +155,7 @@ def _build_hour_keyboard():
     
     keyboard.append([InlineKeyboardButton("⏭️ بدون وقت", callback_data="time_skip")])
     keyboard.append([
-        InlineKeyboardButton("✏️ تعديل Back", callback_data="edit_during_entry:show_menu"),
+        InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
         InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel"),
     ])
     return InlineKeyboardMarkup(keyboard)
@@ -195,7 +195,7 @@ def _build_minute_keyboard(hour: str):
         "⏭️ بدون وقت", callback_data="time_skip")])
     keyboard.append([
         InlineKeyboardButton("🔙 تغيير الساعة", callback_data="time_back_hour"),
-        InlineKeyboardButton("✏️ تعديل Back", callback_data="edit_during_entry:show_menu"),
+        InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
     ])
     keyboard.append([InlineKeyboardButton(
         "❌ إلغاء", callback_data="nav:cancel")])
@@ -245,9 +245,9 @@ def _nav_buttons(show_back=True, previous_state_name=None, current_state=None, c
                 use_edit_button = False
         
         if use_edit_button:
-            # ✅ استخدام زر التعديل (بعد نوع الإجراء)
+            # ✅ استخدام زر الرجوع العادي (نفس منطق بقية المسارات)
             buttons.append([InlineKeyboardButton(
-                "✏️ تعديل Back", callback_data="edit_during_entry:show_menu")])
+                "🔙 رجوع", callback_data="nav:back")])
         else:
             # ✅ استخدام زر الرجوع العادي (من المستشفى إلى الطبيب)
             if previous_state_name:

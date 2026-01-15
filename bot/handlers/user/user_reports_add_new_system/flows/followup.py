@@ -4,12 +4,12 @@ Followup Flow Handlers
 مسار المتابعة / عودة دورية
 
 يحتوي على:
-- start_followup_flow: بدء مسار متابعة في الرقود
-- start_periodic_followup_flow: بدء مسار مراجعة / عودة دورية
+- start_followup_flow: بدء مسار "متابعة في الرقود" (مع رقم الغرفة)
+- start_periodic_followup_flow: بدء مسار "مراجعة / عودة دورية" (بدون رقم الغرفة)
 - handle_followup_complaint: معالجة شكوى المريض
 - handle_followup_diagnosis: معالجة التشخيص
-- handle_followup_decision: معالجة قرار الطبيب
-- handle_followup_room_floor: معالجة رقم الغرفة والطابق
+- handle_followup_decision: معالجة قرار الطبيب (يفحص نوع المسار ويرسل إما لرقم الغرفة أو تاريخ العودة)
+- handle_followup_room_floor: معالجة رقم الغرفة والطابق (فقط لمسار "متابعة في الرقود")
 - handle_followup_reason: معالجة سبب العودة
 """
 
@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 # =============================
 
 async def start_followup_flow(message, context):
-    """بدء مسار مراجعة/عودة دورية - الحقل 1: شكوى المريض"""
+    """بدء مسار متابعة في الرقود - الحقل 1: شكوى المريض (مع رقم الغرفة)"""
     medical_action = context.user_data.get('report_tmp', {}).get('medical_action', 'NOT SET')
     current_flow = context.user_data.get('report_tmp', {}).get('current_flow', 'NOT SET')
     logger.debug(f"start_followup_flow CALLED! medical_action={repr(medical_action)}, current_flow={repr(current_flow)}, state={FOLLOWUP_COMPLAINT}")
@@ -59,12 +59,11 @@ async def start_followup_flow(message, context):
     context.user_data['_conversation_state'] = FOLLOWUP_COMPLAINT
     
     await message.reply_text(
-        "💬 **شكوى المريض**\n\n"
-        "يرجى إدخال شكوى المريض:",
+        "💬 **متابعة في الرقود**\n\n"
+        "أدخل شكوى المريض:",
         reply_markup=_nav_buttons(show_back=True),
         parse_mode="Markdown"
     )
-    
     return FOLLOWUP_COMPLAINT
 
 
@@ -82,17 +81,16 @@ async def start_periodic_followup_flow(message, context):
     
     # التأكد من حفظ medical_action
     context.user_data.setdefault("report_tmp", {})["medical_action"] = "مراجعة / عودة دورية"
-    context.user_data["report_tmp"]["current_flow"] = "followup"  # نفس التدفق
+    context.user_data["report_tmp"]["current_flow"] = "periodic_followup"
     # حفظ الحالة يدوياً في user_data للمساعدة في التتبع
     context.user_data['_conversation_state'] = FOLLOWUP_COMPLAINT
     
     await message.reply_text(
-        "💬 **شكوى المريض**\n\n"
-        "يرجى إدخال شكوى المريض:",
+        "💬 **مراجعة / عودة دورية**\n\n"
+        "أدخل شكوى المريض:",
         reply_markup=_nav_buttons(show_back=True),
         parse_mode="Markdown"
     )
-    
     return FOLLOWUP_COMPLAINT
 
 
@@ -106,7 +104,19 @@ async def handle_followup_complaint(update: Update, context: ContextTypes.DEFAUL
     context.user_data['_conversation_state'] = FOLLOWUP_COMPLAINT
     
     # التأكد من وجود report_tmp
-    context.user_data.setdefault("report_tmp", {})
+    data = context.user_data.setdefault("report_tmp", {})
+    
+    # ✅ التأكد من حفظ medical_action و current_flow
+    if not data.get("medical_action"):
+        # ✅ افتراض أنه "متابعة في الرقود" إذا لم يتم تحديده مسبقاً
+        data["medical_action"] = "متابعة في الرقود"
+        logger.info(f"✅ [FOLLOWUP_COMPLAINT] تم استعادة medical_action='متابعة في الرقود' (الافتراضي)")
+    
+    # تحديث current_flow بناءً على medical_action إذا لم يكن مضبوطاً
+    if data.get("medical_action") == "مراجعة / عودة دورية":
+        data["current_flow"] = "periodic_followup"
+    elif not data.get("current_flow"):
+        data["current_flow"] = "followup"
     
     text = update.message.text.strip()
     valid, msg = validate_text_input(text, min_length=3)
@@ -120,23 +130,43 @@ async def handle_followup_complaint(update: Update, context: ContextTypes.DEFAUL
         )
         return FOLLOWUP_COMPLAINT
 
-    context.user_data["report_tmp"]["complaint"] = text
+    data["complaint"] = text
 
-    await update.message.reply_text(
-        "✅ تم الحفظ\n\n"
-        "🔬 **التشخيص الطبي**\n\n"
-        "يرجى إدخال التشخيص:",
-        reply_markup=_nav_buttons(show_back=True),
-        parse_mode="Markdown"
-    )
-
+    if data.get("medical_action") == "متابعة في الرقود":
+        await update.message.reply_text(
+            f"✅ تم الحفظ\n\n"
+            f"🔬 **متابعة في الرقود: التشخيص**\n\n"
+            f"أدخل التشخيص:",
+            reply_markup=_nav_buttons(show_back=True),
+            parse_mode="Markdown"
+        )
+    else:
+        await update.message.reply_text(
+            f"✅ تم الحفظ\n\n"
+            f"🔬 **مراجعة / عودة دورية: التشخيص**\n\n"
+            f"أدخل التشخيص:",
+            reply_markup=_nav_buttons(show_back=True),
+            parse_mode="Markdown"
+        )
     return FOLLOWUP_DIAGNOSIS
 
 
 async def handle_followup_diagnosis(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """الحقل 2: التشخيص"""
     # التأكد من وجود report_tmp
-    context.user_data.setdefault("report_tmp", {})
+    data = context.user_data.setdefault("report_tmp", {})
+    
+    # ✅ التأكد من حفظ medical_action و current_flow
+    if not data.get("medical_action"):
+        # ✅ افتراض أنه "متابعة في الرقود" إذا لم يتم تحديده مسبقاً
+        data["medical_action"] = "متابعة في الرقود"
+        logger.info(f"✅ [FOLLOWUP_DIAGNOSIS] تم استعادة medical_action='متابعة في الرقود' (الافتراضي)")
+    
+    # تحديث current_flow بناءً على medical_action إذا لم يكن مضبوطاً
+    if data.get("medical_action") == "مراجعة / عودة دورية":
+        data["current_flow"] = "periodic_followup"
+    elif not data.get("current_flow"):
+        data["current_flow"] = "followup"
     
     text = update.message.text.strip()
     valid, msg = validate_text_input(text, min_length=3)
@@ -150,24 +180,39 @@ async def handle_followup_diagnosis(update: Update, context: ContextTypes.DEFAUL
         )
         return FOLLOWUP_DIAGNOSIS
 
-    context.user_data["report_tmp"]["diagnosis"] = text
+    data["diagnosis"] = text
 
-    await update.message.reply_text(
-        "✅ تم الحفظ\n\n"
-        "📝 **قرار الطبيب**\n\n"
-        "يرجى إدخال قرار الطبيب:",
-        reply_markup=_nav_buttons(show_back=True),
-        parse_mode="Markdown"
-    )
-
+    if data.get("medical_action") == "متابعة في الرقود":
+        await update.message.reply_text(
+            f"✅ تم الحفظ\n\n"
+            f"📝 **متابعة في الرقود: قرار الطبيب**\n\n"
+            f"أدخل قرار الطبيب:",
+            reply_markup=_nav_buttons(show_back=True),
+            parse_mode="Markdown"
+        )
+    else:
+        await update.message.reply_text(
+            f"✅ تم الحفظ\n\n"
+            f"📝 **مراجعة / عودة دورية: قرار الطبيب**\n\n"
+            f"أدخل قرار الطبيب:",
+            reply_markup=_nav_buttons(show_back=True),
+            parse_mode="Markdown"
+        )
     return FOLLOWUP_DECISION
 
 
 async def handle_followup_decision(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """الحقل 3: قرار الطبيب"""
     # التأكد من وجود report_tmp
-    context.user_data.setdefault("report_tmp", {})
-    
+    data = context.user_data.setdefault("report_tmp", {})
+
+    # تحديث current_flow بناءً على medical_action إذا لم يكن مضبوطاً
+    if data.get("medical_action") == "مراجعة / عودة دورية":
+        data["current_flow"] = "periodic_followup"
+    elif not data.get("current_flow") or not data.get("medical_action"):
+        data["medical_action"] = "متابعة في الرقود"
+        data["current_flow"] = "followup"
+
     text = update.message.text.strip()
     valid, msg = validate_text_input(text, min_length=3)
 
@@ -180,41 +225,53 @@ async def handle_followup_decision(update: Update, context: ContextTypes.DEFAULT
         )
         return FOLLOWUP_DECISION
 
-    context.user_data["report_tmp"]["decision"] = text
+    data["decision"] = text
 
-    await update.message.reply_text(
-        "✅ تم الحفظ\n\n"
-        "🏥 **رقم الغرفة والطابق**\n\n"
-        "يرجى إدخال رقم الغرفة والطابق:",
-        reply_markup=_nav_buttons(show_back=True),
-        parse_mode="Markdown"
-    )
+    logger.info(f"🔍 [FOLLOWUP_DECISION] medical_action={data.get('medical_action')}, report_tmp keys: {list(data.keys())}")
 
-    return FOLLOWUP_ROOM_FLOOR
+    # التحقق من نوع المسار لتحديد الخطوة التالية
+    if data.get("current_flow") == "followup":
+        # مسار متابعة في الرقود: طلب رقم الغرفة والطابق
+        logger.info(f"✅ [FOLLOWUP_DECISION] تم حفظ قرار الطبيب، مسار 'متابعة في الرقود' - طلب رقم الغرفة")
+        logger.info(f"✅ [FOLLOWUP_DECISION] العودة إلى FOLLOWUP_ROOM_FLOOR state")
+        await update.message.reply_text(
+            f"✅ تم الحفظ\n\n"
+            f"🏥 **متابعة في الرقود: رقم الغرفة والطابق**\n\n"
+            f"أدخل رقم الغرفة والطابق (مثال: غرفة 205 - الطابق الثاني):",
+            reply_markup=_nav_buttons(show_back=True),
+            parse_mode="Markdown"
+        )
+        context.user_data['_conversation_state'] = FOLLOWUP_ROOM_FLOOR
+        return FOLLOWUP_ROOM_FLOOR
+    else:
+        # مسار مراجعة / عودة دورية: تخطي رقم الغرفة والذهاب للتقويم مباشرة
+        logger.info(f"✅ [FOLLOWUP_DECISION] تم حفظ قرار الطبيب، مسار 'مراجعة / عودة دورية' - تخطي رقم الغرفة")
+        await update.message.reply_text("✅ تم الحفظ")
+        # عرض تقويم اختيار تاريخ ووقت العودة
+        await _render_followup_calendar(update.message, context)
+        context.user_data['_conversation_state'] = FOLLOWUP_DATE_TIME
+        return FOLLOWUP_DATE_TIME
 
 
 async def handle_followup_room_floor(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """الحقل 4: رقم الغرفة والطابق"""
-    # التأكد من وجود report_tmp
-    context.user_data.setdefault("report_tmp", {})
-
+    data = context.user_data.setdefault("report_tmp", {})
     text = update.message.text.strip()
-
-    # التحقق من صحة الإدخال (يمكن أن يكون رقم غرفة أو طابق أو كليهما)
-    if not text or len(text) < 1 or len(text) > 50:
+    valid, msg = validate_text_input(text, min_length=1)
+    if not valid:
+        from telegram import ReplyKeyboardMarkup
+        skip_keyboard = ReplyKeyboardMarkup([["تخطي"]], resize_keyboard=True)
         await update.message.reply_text(
-            "⚠️ **خطأ في الإدخال**\n\n"
-            "يرجى إدخال رقم الغرفة والطابق (مثال: غرفة 205 - الطابق 2):",
-            reply_markup=_nav_buttons(show_back=True),
+            f"⚠️ **خطأ: {msg}**\n\n"
+            f"يرجى إدخال رقم الغرفة والطابق أو اضغط تخطي:",
+            reply_markup=skip_keyboard,
             parse_mode="Markdown"
         )
         return FOLLOWUP_ROOM_FLOOR
-
-    context.user_data["report_tmp"]["room_floor"] = text
-
-    # عرض تقويم تاريخ العودة (اختياري)
+    data["room_number"] = text
+    await update.message.reply_text("✅ تم الحفظ")
     await _render_followup_calendar(update.message, context)
-
+    context.user_data["report_tmp"]["current_flow"] = data.get("current_flow")
     return FOLLOWUP_DATE_TIME
 
 
@@ -235,6 +292,9 @@ async def handle_followup_reason(update: Update, context: ContextTypes.DEFAULT_T
     context.user_data["report_tmp"]["followup_reason"] = text
 
     await update.message.reply_text("✅ تم الحفظ")
-    await show_translator_selection(update.message, context, "followup")
+
+    # ✅ استخدام current_flow الصحيح (periodic_followup أو followup)
+    current_flow = context.user_data.get("report_tmp", {}).get("current_flow", "followup")
+    await show_translator_selection(update.message, context, current_flow)
 
     return FOLLOWUP_TRANSLATOR

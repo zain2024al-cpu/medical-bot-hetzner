@@ -408,26 +408,35 @@ async def handle_new_consult_followup_calendar_nav(update: Update, context: Cont
             month = 1
             year += 1
 
-    # تحديد الحالة الحالية بناءً على نوع الإجراء
-    current_flow = context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
-    if current_flow == "followup":
-        current_state = FOLLOWUP_DATE_TIME
-    elif current_flow == "emergency":
-        current_state = EMERGENCY_DATE_TIME
-    elif current_flow == "admission":
-        current_state = ADMISSION_FOLLOWUP_DATE
-    elif current_flow == "surgery_consult":
-        current_state = SURGERY_CONSULT_FOLLOWUP_DATE
-    elif current_flow == "operation":
-        current_state = OPERATION_FOLLOWUP_DATE
-    elif current_flow == "discharge":
-        current_state = DISCHARGE_FOLLOWUP_DATE
-    elif current_flow == "rehab_physical":
-        current_state = PHYSICAL_THERAPY_FOLLOWUP_DATE
-    elif current_flow == "device":
-        current_state = DEVICE_FOLLOWUP_DATE
+    # ✅ التحقق من حالة التعديل
+    edit_field_key = context.user_data.get("edit_field_key")
+    edit_flow_type = context.user_data.get("edit_flow_type")
+    
+    if edit_field_key and edit_flow_type:
+        # ✅ حالة التعديل: استخدام confirm state
+        from .shared import get_confirm_state
+        current_state = get_confirm_state(edit_flow_type)
     else:
-        current_state = NEW_CONSULT_FOLLOWUP_DATE
+        # ✅ حالة الإدخال العادي: تحديد الحالة بناءً على نوع الإجراء
+        current_flow = context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
+        if current_flow == "followup":
+            current_state = FOLLOWUP_DATE_TIME
+        elif current_flow == "emergency":
+            current_state = EMERGENCY_DATE_TIME
+        elif current_flow == "admission":
+            current_state = ADMISSION_FOLLOWUP_DATE
+        elif current_flow == "surgery_consult":
+            current_state = SURGERY_CONSULT_FOLLOWUP_DATE
+        elif current_flow == "operation":
+            current_state = OPERATION_FOLLOWUP_DATE
+        elif current_flow == "discharge":
+            current_state = DISCHARGE_FOLLOWUP_DATE
+        elif current_flow == "rehab_physical":
+            current_state = PHYSICAL_THERAPY_FOLLOWUP_DATE
+        elif current_flow == "device":
+            current_state = DEVICE_FOLLOWUP_DATE
+        else:
+            current_state = NEW_CONSULT_FOLLOWUP_DATE
 
     await _render_followup_calendar(query, context, year, month)
     return current_state
@@ -441,7 +450,43 @@ async def handle_new_consult_followup_calendar_day(update: Update, context: Cont
     date_str = query.data.split(":", 1)[1]
     try:
         dt = datetime.strptime(date_str, "%Y-%m-%d")
-        context.user_data["report_tmp"]["_pending_followup_date"] = dt.date()
+        date_value = dt.date()
+        
+        # ✅ التحقق من حالة التعديل
+        edit_field_key = context.user_data.get("edit_field_key")
+        edit_flow_type = context.user_data.get("edit_flow_type")
+        
+        if edit_field_key:
+            # ✅ حالة التعديل: حفظ التاريخ مباشرة في الحقل المحدد
+            data = context.user_data.setdefault("report_tmp", {})
+            data[edit_field_key] = date_str
+            # مسح معلومات التعديل
+            context.user_data.pop("edit_field_key", None)
+            context.user_data.pop("edit_flow_type", None)
+            
+            # ✅ إعادة عرض الملخص
+            from .shared import show_final_summary, get_confirm_state
+            try:
+                await show_final_summary(query.message, context, edit_flow_type)
+                confirm_state = get_confirm_state(edit_flow_type)
+                context.user_data['_conversation_state'] = confirm_state
+                logger.info(f"✅ [CALENDAR_EDIT] تم حفظ التاريخ {date_str} في {edit_field_key} للـ flow_type={edit_flow_type}")
+                return confirm_state
+            except Exception as e:
+                logger.error(f"❌ [CALENDAR_EDIT] خطأ في عرض الملخص بعد حفظ التاريخ: {e}", exc_info=True)
+                await query.edit_message_text(
+                    f"✅ **تم حفظ التاريخ:** {date_str}\n\n"
+                    f"يرجى استخدام زر '🔙 رجوع' للرجوع إلى الملخص.",
+                    parse_mode="Markdown"
+                )
+                confirm_state = get_confirm_state(edit_flow_type) if edit_flow_type else None
+                if confirm_state:
+                    context.user_data['_conversation_state'] = confirm_state
+                    return confirm_state
+                return ConversationHandler.END
+        
+        # ✅ حالة الإدخال العادي: حفظ في _pending_followup_date
+        context.user_data["report_tmp"]["_pending_followup_date"] = date_value
 
         # بناء لوحة مفاتيح الساعات مع callback_data صحيح
         keyboard = []

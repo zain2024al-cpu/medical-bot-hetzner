@@ -357,11 +357,17 @@ async def show_today_reports(query, user_id):
             await query.edit_message_text("❌ لم يتم العثور على بياناتك")
             return
         
-        today = datetime.now().date()
+        # today = datetime.now().date()
         
+        # ✅ إصلاح مشكلة التوقيت: توسيع النطاق ليشمل 24 ساعة الماضية + 12 ساعة قادمة
+        now_utc = datetime.utcnow()
+        today_start = now_utc - timedelta(hours=24)
+        today_end = now_utc + timedelta(hours=12)
+
         reports = s.query(Report).filter(
             Report.translator_id == translator.id,
-            func.date(Report.report_date) == today
+            Report.report_date >= today_start,
+            Report.report_date <= today_end
         ).order_by(Report.report_date.desc()).all()
         
         if not reports:

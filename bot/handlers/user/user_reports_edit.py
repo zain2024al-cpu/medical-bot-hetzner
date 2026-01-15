@@ -9,7 +9,7 @@ from telegram.ext import (
     CallbackQueryHandler, filters
 )
 from telegram.constants import ParseMode
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from db.session import SessionLocal
 from db.models import Report, Translator, Patient, Hospital, Department, Doctor
 from bot.shared_auth import is_admin
@@ -112,6 +112,77 @@ def test_editable_fields_mapping():
 
     return all_passed
 
+def _has_field_value_in_report(report, current_report_data, field_name):
+    """
+    التحقق من وجود قيمة فعلية للحقل في التقرير المنشور
+    يعيد True فقط إذا كان للحقل قيمة حقيقية (ليست فارغة، None، أو "لا يوجد")
+    
+    منطق العمل:
+    1. الحقول الأساسية (report_date, patient_name, hospital_name, department_name, doctor_name) تكون دائماً موجودة
+    2. الحقول الأخرى يتم التحقق منها في current_report_data أولاً
+    3. إذا لم توجد في current_report_data، يتم التحقق من report مباشرة
+    4. يتم التحقق من الحقول المشتقة (مثل complaint_text مقابل complaint)
+    """
+    # ✅ الحقول الأساسية تكون دائماً موجودة (لا نعرضها في قائمة التعديل لأنها غير قابلة للتعديل)
+    # لكن إذا كانت في القائمة، نتحقق من وجودها
+    
+    # ✅ التحقق من current_report_data أولاً (البيانات المحملة)
+    value = current_report_data.get(field_name)
+    
+    # ✅ التحقق من الحقول المشتقة
+    field_aliases = {
+        # الحقول الأساسية (عادة موجودة، لكن نتحقق منها)
+        "report_date": ["report_date"],
+        "patient_name": ["patient_name"],
+        "hospital_name": ["hospital_name"],
+        "department_name": ["department_name"],
+        "doctor_name": ["doctor_name"],
+        
+        # الحقول المشتقة
+        "complaint_text": ["complaint_text", "complaint"],
+        "diagnosis": ["diagnosis"],
+        "doctor_decision": ["doctor_decision", "decision"],
+        "notes": ["notes", "tests"],  # في بعض المسارات، tests محفوظ في notes
+        "treatment_plan": ["treatment_plan"],
+        "medications": ["medications", "tests"],  # في استشارة جديدة، tests محفوظ في medications
+        "followup_date": ["followup_date", "app_reschedule_return_date"],
+        "followup_time": ["followup_time"],
+        "followup_reason": ["followup_reason", "app_reschedule_return_reason"],
+        "case_status": ["case_status"],
+        "room_number": ["room_number", "room_floor"],
+        "radiology_type": ["radiology_type"],
+        "radiology_delivery_date": ["radiology_delivery_date", "delivery_date"],
+        "app_reschedule_reason": ["app_reschedule_reason"],
+        "app_reschedule_return_date": ["app_reschedule_return_date", "followup_date"],
+        "app_reschedule_return_reason": ["app_reschedule_return_reason", "followup_reason"],
+        "translator_name": ["translator_name"],
+    }
+    
+    # ✅ البحث في الحقول المشتقة
+    aliases = field_aliases.get(field_name, [field_name])
+    for alias in aliases:
+        alias_value = current_report_data.get(alias)
+        if alias_value is not None:
+            if isinstance(alias_value, (date, datetime)):
+                return True  # التاريخ موجود
+            value_str = str(alias_value).strip()
+            if value_str and value_str not in ["غير محدد", "لا يوجد", "None", "null", "", "⚠️ فارغ"]:
+                return True
+    
+    # ✅ التحقق من التقرير نفسه مباشرة (fallback)
+    if report:
+        if hasattr(report, field_name):
+            attr_value = getattr(report, field_name, None)
+            if attr_value is not None:
+                if isinstance(attr_value, (date, datetime)):
+                    return True
+                value_str = str(attr_value).strip()
+                if value_str and value_str not in ["غير محدد", "لا يوجد", "None", "null", "", "⚠️ فارغ"]:
+                    return True
+    
+    return False
+
+
 def get_editable_fields_by_action_type(medical_action):
     """
     تحديد الحقول القابلة للتعديل حسب نوع الإجراء بدقة عالية
@@ -190,7 +261,7 @@ def get_editable_fields_by_action_type(medical_action):
     # ===========================================
     # 5. متابعة في الرقود - التركيز على المتابعة اليومية
     # ===========================================
-    elif action_clean == 'متابعة في الرقود':
+    elif 'متابعة في الرقود' in action_clean:
         return [
             ('complaint_text', '🛏️ حالة المريض اليومية'),
             ('doctor_decision', '📝 قرار الطبيب اليومي'),
@@ -246,7 +317,7 @@ def get_editable_fields_by_action_type(medical_action):
             ('complaint_text', '🛏️ سبب الرقود'),
             ('diagnosis', '🔬 التشخيص'),
             ('doctor_decision', '📝 قرار الطبيب'),
-            ('room_number', '🏥 رقم الغرفة'),
+            ('room_number', '🏥 رقم الغرفة والطابق'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
             ('translator_name', '👤 المترجم'),
@@ -342,8 +413,14 @@ async def start_edit_reports(update: Update, context: ContextTypes.DEFAULT_TYPE)
         with SessionLocal() as s:
             # ✅ البحث عن تقارير اليوم المقدمة من هذا المستخدم (بغض النظر عن اسم المترجم)
             today = date.today()
-            today_start = datetime.combine(today, datetime.min.time())
-            today_end = datetime.combine(today, datetime.max.time())
+            
+            # ✅ إصلاح مشكلة التوقيت: توسيع النطاق ليشمل 24 ساعة الماضية + 12 ساعة قادمة
+            # هذا يضمن ظهور التقارير حتى لو كان هناك فرق كبير في التوقيت
+            now_utc = datetime.utcnow()
+            today_start = now_utc - timedelta(hours=24)
+            today_end = now_utc + timedelta(hours=12)
+            
+            logger.info(f"🔍 نطاق البحث (UTC - Expanded): من {today_start} إلى {today_end}")
 
             # ✅ البحث بمعرف المستخدم الذي أنشأ التقرير (submitted_by_user_id)
             # هذا الحقل يتم حفظه عند إنشاء التقرير بغض النظر عن اسم المترجم المختار
@@ -351,7 +428,7 @@ async def start_edit_reports(update: Update, context: ContextTypes.DEFAULT_TYPE)
             translator = s.query(Translator).filter_by(tg_user_id=user.id).first()
             translator_id = translator.id if translator else None
             
-            logger.info(f"🔍 البحث عن تقارير للمستخدم:")
+            logger.info(f"🔍 البحث عن تقارير للمستخدم (اليوم):")
             logger.info(f"   - Telegram user.id: {user.id}")
             logger.info(f"   - translator found: {translator.full_name if translator else 'None'}")
             logger.info(f"   - translator_id: {translator_id}")
@@ -500,6 +577,25 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
             doctor = s.query(Doctor).filter_by(id=report.doctor_id).first() if report.doctor_id else None
             translator = s.query(Translator).filter_by(id=report.translator_id).first() if report.translator_id else None
             
+            # ✅ استخدام اسم المترجم المحفوظ في التقرير أولاً، وإذا لم يكن موجوداً نجلبه من جدول Translator
+            translator_name = report.translator_name
+            if not translator_name and report.translator_id:
+                translator = s.query(Translator).filter_by(id=report.translator_id).first()
+                translator_name = translator.full_name if translator else "غير محدد"
+            translator_name = translator_name or "غير محدد"
+            
+            # ✅ تحميل notes و medications - للتأكد من عرض القيمة الصحيحة
+            # ✅ لحقل "استشارة جديدة": notes و medications يجب أن يكونا متطابقين (tests)
+            notes_value = report.notes or "لا يوجد"
+            medications_value = report.medications or "لا يوجد"
+            if report.medical_action == 'استشارة جديدة':
+                # ✅ إذا كان notes فارغاً و medications موجوداً، استخدم medications
+                if (not notes_value or notes_value == "لا يوجد") and medications_value and medications_value != "لا يوجد":
+                    notes_value = medications_value
+                # ✅ إذا كان medications فارغاً و notes موجوداً، استخدم notes (للتطابق بعد التعديل)
+                elif (not medications_value or medications_value == "لا يوجد") and notes_value and notes_value != "لا يوجد":
+                    medications_value = notes_value
+            
             # حفظ البيانات الحالية
             context.user_data['current_report_data'] = {
                 'patient_name': patient.full_name if patient else "غير معروف",
@@ -511,14 +607,14 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
                 'doctor_decision': report.doctor_decision or "لا يوجد",
                 'diagnosis': report.diagnosis or "لا يوجد",
                 'treatment_plan': report.treatment_plan or "لا يوجد",
-                'medications': report.medications or "لا يوجد",
-                'notes': report.notes or "لا يوجد",
+                'medications': medications_value,  # ✅ استخدام القيمة المحسّنة
+                'notes': notes_value,  # ✅ استخدام القيمة المحسّنة (الفحوصات لـ استشارة جديدة)
                 'case_status': report.case_status or "لا يوجد",
                 'followup_date': report.followup_date.strftime('%Y-%m-%d') if report.followup_date else None,
                 'followup_time': report.followup_time,
                 'followup_reason': report.followup_reason or "لا يوجد",
                 'report_date': report.report_date.strftime('%Y-%m-%d %H:%M'),
-                'translator_name': translator.full_name if translator else "غير محدد",
+                'translator_name': translator_name,  # ✅ استخدام الاسم المحفوظ في التقرير
                 'translator_id': report.translator_id,
                 # حقول إضافية
                 'room_number': getattr(report, 'room_number', None) or "لا يوجد",
@@ -564,22 +660,49 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
             text += f"🏷️ **القسم:** {context.user_data['current_report_data']['department_name']}\n"
             text += f"👨‍⚕️ **الطبيب:** {context.user_data['current_report_data']['doctor_name']}\n"
             text += f"⚕️ **نوع الإجراء:** {medical_action}\n\n"
-            text += "اختر الحقل الذي تريد تعديله:\n"
             
-            # بناء الأزرار - جميع حقول هذا النوع من الإجراء (حتى الفارغة)
+            # ✅ بناء الأزرار - عرض فقط الحقول التي لها قيمة فعلية
             keyboard = []
             all_fields = get_editable_fields_by_action_type(medical_action)
+            logger.info(f"🔍 [EDIT_DEBUG] medical_action: '{medical_action}'")
+            logger.info(f"🔍 [EDIT_DEBUG] fields found: {[f[0] for f in all_fields]}")
             
+            fields_with_values = []
             for field_name, field_display in all_fields:
+                # ✅ التحقق من وجود قيمة فعلية للحقل
+                if _has_field_value_in_report(report, context.user_data['current_report_data'], field_name):
+                    fields_with_values.append((field_name, field_display))
+                    logger.info(f"✅ [EDIT_AFTER_PUBLISH] إضافة حقل '{field_name}' للقائمة (له قيمة)")
+                else:
+                    logger.info(f"⏭️ [EDIT_AFTER_PUBLISH] تخطي حقل '{field_name}' (لا توجد قيمة)")
+            
+            # ✅ التحقق من وجود حقول مدخلة
+            if not fields_with_values:
+                await query.edit_message_text(
+                    "⚠️ **لا توجد حقول مدخلة للتعديل**\n\n"
+                    f"📋 **رقم التقرير:** #{report_id}\n"
+                    f"⚕️ **نوع الإجراء:** {medical_action}\n\n"
+                    "لم يتم إدخال أي بيانات في هذا التقرير.\n"
+                    "يرجى استخدام زر '🔙 رجوع' للرجوع إلى قائمة التقارير.",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+                return SELECT_REPORT
+            
+            text += "اختر الحقل الذي تريد تعديله:\n"
+            
+            # ✅ عرض فقط الحقول التي لها قيمة
+            for field_name, field_display in fields_with_values:
                 current_value = context.user_data['current_report_data'].get(field_name, "")
                 
-                # عرض جميع الحقول مع قيمتها الحالية
-                if not current_value or str(current_value).strip() == "" or current_value == "لا يوجد":
-                    display_value = "⚠️ فارغ"
-                elif len(str(current_value)) > 15:
+                # ✅ تنسيق القيمة للعرض
+                if isinstance(current_value, date):
+                    display_value = current_value.strftime('%Y-%m-%d')
+                elif isinstance(current_value, datetime):
+                    display_value = current_value.strftime('%Y-%m-%d')
+                elif current_value and len(str(current_value)) > 15:
                     display_value = str(current_value)[:12] + "..."
                 else:
-                    display_value = str(current_value)
+                    display_value = str(current_value) if current_value else ""
                 
                 button_text = f"{field_display}: {display_value}"
                 keyboard.append([InlineKeyboardButton(button_text, callback_data=f"edit_field:{field_name}")])
@@ -649,6 +772,36 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     time_12h = format_time_12h(report.followup_time)
                     followup_display += f" - {time_12h}"
             
+            # ✅ استخراج tests من medications أو notes إذا كان medical_action = "استشارة جديدة"
+            # ✅ أو من doctor_decision إذا كان يحتوي على "الفحوصات المطلوبة"
+            tests_value = ''
+            if report.medical_action == 'استشارة جديدة':
+                # ✅ محاولة استخراج من medications أولاً (حيث يتم حفظ tests لـ new_consult عند الإنشاء)
+                if report.medications and str(report.medications).strip():
+                    tests_value = str(report.medications).strip()
+                # ✅ محاولة استخراج من notes (حيث يتم حفظ tests عند التعديل بعد النشر)
+                elif report.notes and str(report.notes).strip():
+                    tests_value = str(report.notes).strip()
+                # ✅ محاولة استخراج من doctor_decision إذا لم يكن موجوداً في medications أو notes
+                elif report.doctor_decision and 'الفحوصات المطلوبة:' in str(report.doctor_decision):
+                    try:
+                        parts = str(report.doctor_decision).split('الفحوصات المطلوبة:', 1)
+                        if len(parts) > 1:
+                            tests_value = parts[1].strip()
+                    except:
+                        pass
+                logger.info(f"✅ استخراج tests لتقرير 'استشارة جديدة' #{report_id}: tests_value='{tests_value[:50] if tests_value else 'فارغ'}...'")
+            elif report.medical_action == 'استشارة مع قرار عملية':
+                # محاولة استخراج من doctor_decision
+                if report.doctor_decision and 'الفحوصات المطلوبة:' in str(report.doctor_decision):
+                    try:
+                        parts = str(report.doctor_decision).split('الفحوصات المطلوبة:', 1)
+                        if len(parts) > 1:
+                            tests_value = parts[1].strip()
+                    except:
+                        pass
+            
+            # ✅ بناء broadcast_data مع جميع الحقول المطلوبة
             broadcast_data = {
                 'report_id': report_id,
                 'report_date': report.report_date.strftime('%Y-%m-%d %H:%M') if report.report_date else datetime.now().strftime('%Y-%m-%d %H:%M'),
@@ -657,8 +810,9 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 'department_name': department.name if department else 'غير محدد',
                 'doctor_name': doctor.full_name if doctor else 'لم يتم التحديد',
                 'medical_action': report.medical_action or 'غير محدد',
-                # جميع الحقول النصية
+                # ✅ جميع الحقول النصية (فقط القيم غير الفارغة)
                 'complaint_text': report.complaint_text or '',
+                'complaint': report.complaint_text or '',  # نسخة للتوافق
                 'diagnosis': report.diagnosis or '',
                 'doctor_decision': report.doctor_decision or '',
                 'decision': report.doctor_decision or '',  # نسخة للتوافق
@@ -667,40 +821,66 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 'notes': report.notes or '',
                 'medications': report.medications or '',
                 'case_status': report.case_status or '',
-                # موعد العودة
-                'followup_date': followup_display,
+                # ✅ موعد العودة
+                'followup_date': followup_display if followup_display and followup_display != 'لا يوجد' else '',
                 'followup_time': report.followup_time or '',
-                'followup_reason': report.followup_reason or 'لا يوجد',
-                # حقول خاصة
+                'followup_reason': report.followup_reason or '',
+                # ✅ حقول خاصة
                 'room_number': getattr(report, 'room_number', '') or '',
                 'operation_name_en': getattr(report, 'operation_name_en', '') or '',
+                'operation_details': getattr(report, 'operation_details', '') or '',
                 'success_rate': getattr(report, 'success_rate', '') or '',
                 'benefit_rate': getattr(report, 'benefit_rate', '') or '',
-                # حقول تأجيل الموعد
+                # ✅ حقول الفحوصات (مهمة لاستشارة جديدة)
+                'tests': tests_value,
+                # ✅ حقول تأجيل الموعد
                 'app_reschedule_reason': getattr(report, 'app_reschedule_reason', '') or '',
                 'app_reschedule_return_date': getattr(report, 'app_reschedule_return_date', '') or '',
                 'app_reschedule_return_reason': getattr(report, 'app_reschedule_return_reason', '') or '',
-                # حقول الأشعة
+                # ✅ حقول الأشعة
                 'radiology_type': getattr(report, 'radiology_type', '') or '',
                 'radiology_delivery_date': getattr(report, 'radiology_delivery_date', '') or '',
-                # المترجم - ✅ استخدام الاسم المحفوظ في التقرير
+                # ✅ حقول العلاج الطبيعي
+                'therapy_details': getattr(report, 'therapy_details', '') or '',
+                # ✅ حقول الأجهزة التعويضية
+                'device_details': getattr(report, 'device_details', '') or '',
+                # ✅ حقول الخروج
+                'discharge_type': getattr(report, 'discharge_type', '') or '',
+                'admission_summary': getattr(report, 'admission_summary', '') or '',
+                # ✅ المترجم - استخدام الاسم المحفوظ في التقرير
                 'translator_name': translator_name,
                 'is_edit': True  # علامة أن هذا تقرير معدل
             }
             
             # بث التقرير
             try:
-                from services.broadcast_service import broadcast_new_report
+                from services.broadcast_service import broadcast_new_report, format_report_message
                 await broadcast_new_report(context.bot, broadcast_data)
                 
-                await query.edit_message_text(
-                    f"✅ **تم إعادة نشر التقرير بنجاح!**\n\n"
-                    f"📋 **رقم التقرير:** #{report_id}\n"
-                    f"👤 **المريض:** {patient.full_name if patient else 'غير معروف'}\n"
-                    f"📅 **وقت النشر:** {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n"
-                    f"تم إرسال التقرير المعدل لجميع المستخدمين.",
-                    parse_mode=ParseMode.MARKDOWN
-                )
+                # ✅ عرض التقرير الكامل للمستخدم بعد التعديل
+                try:
+                    full_report = format_report_message(broadcast_data)
+                    success_header = (
+                        f"✅ **تم إعادة نشر التقرير بنجاح!**\n\n"
+                        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+                    )
+                    full_message = success_header + full_report
+                    
+                    await query.edit_message_text(
+                        full_message,
+                        parse_mode=ParseMode.MARKDOWN
+                    )
+                except Exception as format_err:
+                    logger.warning(f"⚠️ فشل عرض التقرير الكامل: {format_err}")
+                    # fallback to simple message
+                    await query.edit_message_text(
+                        f"✅ **تم إعادة نشر التقرير بنجاح!**\n\n"
+                        f"📋 **رقم التقرير:** #{report_id}\n"
+                        f"👤 **المريض:** {patient.full_name if patient else 'غير معروف'}\n"
+                        f"📅 **وقت النشر:** {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n"
+                        f"تم إرسال التقرير المعدل.",
+                        parse_mode=ParseMode.MARKDOWN
+                    )
                 
                 logger.info(f"✅ تم إعادة نشر التقرير #{report_id}")
                 
@@ -945,6 +1125,7 @@ async def handle_translator_selection(update: Update, context: ContextTypes.DEFA
             report = s.query(Report).filter_by(id=report_id).first()
             if report:
                 report.translator_id = translator_id
+                report.translator_name = new_translator_name  # Always update the name field as well
                 s.commit()
                 
                 # تحديث البيانات المحفوظة
@@ -1364,6 +1545,11 @@ async def save_edit_to_database(query, context):
                         report.followup_time = new_time
                     else:
                         report.followup_time = None
+        elif field_name == "notes" and report.medical_action == "استشارة جديدة":
+            # ✅ لحقل "استشارة جديدة": حفظ notes في medications أيضاً (لتوافق مع save_report_to_database)
+            report.notes = new_value
+            report.medications = new_value  # ✅ حفظ في medications لاسترجاع tests لاحقاً
+            logger.info(f"✅ تم حفظ notes في medications أيضاً للتقرير #{report_id} (استشارة جديدة)")
         else:
             setattr(report, field_name, new_value)
         
@@ -1434,6 +1620,11 @@ async def handle_confirm_edit(update: Update, context: ContextTypes.DEFAULT_TYPE
                             report.followup_time = new_time
                         else:
                             report.followup_time = None
+            elif field_name == "notes" and report.medical_action == "استشارة جديدة":
+                # ✅ لحقل "استشارة جديدة": حفظ notes في medications أيضاً (لتوافق مع save_report_to_database)
+                report.notes = new_value
+                report.medications = new_value  # ✅ حفظ في medications لاسترجاع tests لاحقاً
+                logger.info(f"✅ تم حفظ notes في medications أيضاً للتقرير #{report_id} (استشارة جديدة)")
             else:
                 setattr(report, field_name, new_value)
             
@@ -1491,8 +1682,14 @@ async def show_field_selection(query, context):
         doctor = s.query(Doctor).filter_by(id=report.doctor_id).first() if report.doctor_id else None
         translator = s.query(Translator).filter_by(id=report.translator_id).first() if report.translator_id else None
         
-        # تحديث البيانات المحفوظة
-        context.user_data['current_report_data'].update({
+        # ✅ تحديث البيانات المحفوظة - تحديث شامل لجميع الحقول المحتملة
+        current_data = context.user_data.get('current_report_data', {})
+        current_data.update({
+            'patient_name': patient.full_name if patient else "غير معروف",
+            'hospital_name': hospital.name if hospital else "غير معروف",
+            'department_name': department.name if department else "غير محدد",
+            'doctor_name': doctor.full_name if doctor else "لم يتم التحديد",
+            'medical_action': report.medical_action or "غير محدد",
             'complaint_text': report.complaint_text or "لا يوجد",
             'doctor_decision': report.doctor_decision or "لا يوجد",
             'diagnosis': report.diagnosis or "لا يوجد",
@@ -1504,37 +1701,86 @@ async def show_field_selection(query, context):
             'followup_time': report.followup_time,
             'followup_reason': report.followup_reason or "لا يوجد",
             'room_number': getattr(report, 'room_number', None) or "لا يوجد",
+            'radiology_type': getattr(report, 'radiology_type', None) or "لا يوجد",
+            'radiology_delivery_date': getattr(report, 'radiology_delivery_date', None),
+            'app_reschedule_reason': getattr(report, 'app_reschedule_reason', None) or "لا يوجد",
+            'app_reschedule_return_date': getattr(report, 'app_reschedule_return_date', None),
+            'app_reschedule_return_reason': getattr(report, 'app_reschedule_return_reason', None) or "لا يوجد",
             'translator_name': translator.full_name if translator else "غير محدد",
             'translator_id': report.translator_id,
         })
+        context.user_data['current_report_data'] = current_data
         
         # عرض بيانات التقرير مرة أخرى
-        medical_action = context.user_data['current_report_data']['medical_action']
+        medical_action = current_data.get('medical_action', report.medical_action or "غير محدد")
         
         # ✅ الحصول على الحقول المحددة لهذا النوع من الإجراء
         all_fields = get_editable_fields_by_action_type(medical_action)
         
+        # ✅ بناء الأزرار - عرض فقط الحقول التي لها قيمة فعلية
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        fields_with_values = []
+        for field_name, field_display in all_fields:
+            # ✅ التحقق من وجود قيمة فعلية للحقل
+            if _has_field_value_in_report(report, current_data, field_name):
+                fields_with_values.append((field_name, field_display))
+                logger.info(f"✅ [EDIT_AFTER_PUBLISH] إضافة حقل '{field_name}' للقائمة (له قيمة)")
+            else:
+                logger.info(f"⏭️ [EDIT_AFTER_PUBLISH] تخطي حقل '{field_name}' (لا توجد قيمة)")
+        
+        # ✅ حماية صارمة: إذا كان نوع الإجراء مراجعة / عودة دورية وتمت محاولة عرض زر رقم الغرفة، أظهر Exception واضح
+        if _has_field_value_in_report(report, current_data, 'room_number'):
+            has_room = any(f == 'room_number' for f, _ in fields_with_values)
+            if not has_room:
+                if medical_action and 'مراجعة / عودة دورية' in medical_action:
+                    raise Exception(f"[SECURITY] محاولة عرض زر رقم الغرفة لمسار مراجعة / عودة دورية! report_id={report_id} room_number={current_data.get('room_number')}")
+                # إدراجه في موقع منطقي (مثلاً قبل followup_date إذا وجد، أو في النهاية)
+                room_entry = ('room_number', '🏥 رقم الغرفة والطابق')
+                inserted = False
+                for i, (fname, _) in enumerate(fields_with_values):
+                    if fname == 'followup_date':
+                        fields_with_values.insert(i, room_entry)
+                        inserted = True
+                        break
+                if not inserted:
+                    fields_with_values.append(room_entry)
+                logger.info(f"✅ [EDIT_AFTER_PUBLISH] تم فرض إضافة 'room_number' لوجود قيمة له")
+        
+        # ✅ التحقق من وجود حقول مدخلة
+        if not fields_with_values:
+            await query.edit_message_text(
+                "⚠️ **لا توجد حقول مدخلة للتعديل**\n\n"
+                f"📋 **رقم التقرير:** #{report_id}\n"
+                f"⚕️ **نوع الإجراء:** {medical_action}\n\n"
+                "لم يتم إدخال أي بيانات في هذا التقرير.\n"
+                "يرجى استخدام زر '🔙 رجوع' للرجوع إلى قائمة التقارير.",
+                parse_mode=ParseMode.MARKDOWN
+            )
+            return SELECT_REPORT
+        
         text = f"📋 **بيانات التقرير #{report_id}**\n\n"
-        text += f"📅 **تاريخ التقرير:** {context.user_data['current_report_data']['report_date']}\n"
-        text += f"👤 **اسم المريض:** {context.user_data['current_report_data']['patient_name']}\n"
-        text += f"🏥 **المستشفى:** {context.user_data['current_report_data']['hospital_name']}\n"
-        text += f"🏷️ **القسم:** {context.user_data['current_report_data']['department_name']}\n"
-        text += f"👨‍⚕️ **الطبيب:** {context.user_data['current_report_data']['doctor_name']}\n"
+        text += f"📅 **تاريخ التقرير:** {current_data.get('report_date', 'غير محدد')}\n"
+        text += f"👤 **اسم المريض:** {current_data.get('patient_name', 'غير معروف')}\n"
+        text += f"🏥 **المستشفى:** {current_data.get('hospital_name', 'غير معروف')}\n"
+        text += f"🏷️ **القسم:** {current_data.get('department_name', 'غير محدد')}\n"
+        text += f"👨‍⚕️ **الطبيب:** {current_data.get('doctor_name', 'لم يتم التحديد')}\n"
         text += f"⚕️ **نوع الإجراء:** {medical_action}\n\n"
         text += "اختر الحقل الذي تريد تعديله:\n"
         
-        # بناء الأزرار - جميع حقول هذا النوع من الإجراء (حتى الفارغة)
         keyboard = []
-        for field_name, field_display in all_fields:
-            current_value = context.user_data['current_report_data'].get(field_name, "")
+        # ✅ عرض فقط الحقول التي لها قيمة
+        for field_name, field_display in fields_with_values:
+            current_value = current_data.get(field_name, "")
             
-            # عرض جميع الحقول مع قيمتها الحالية
-            if not current_value or str(current_value).strip() == "" or current_value == "لا يوجد":
-                display_value = "⚠️ فارغ"
-            elif len(str(current_value)) > 15:
+            # ✅ تنسيق القيمة للعرض
+            if isinstance(current_value, (date, datetime)):
+                display_value = current_value.strftime('%Y-%m-%d') if isinstance(current_value, date) else current_value.strftime('%Y-%m-%d %H:%M')
+            elif current_value and len(str(current_value)) > 15:
                 display_value = str(current_value)[:12] + "..."
             else:
-                display_value = str(current_value)
+                display_value = str(current_value) if current_value else ""
             
             button_text = f"{field_display}: {display_value}"
             keyboard.append([InlineKeyboardButton(button_text, callback_data=f"edit_field:{field_name}")])
@@ -1565,8 +1811,13 @@ async def start_edit_reports_from_callback(query, context):
         
         # البحث عن تقارير اليوم فقط
         today = date.today()
-        today_start = datetime.combine(today, datetime.min.time())
-        today_end = datetime.combine(today, datetime.max.time())
+        
+        # ✅ إصلاح مشكلة التوقيت: توسيع النطاق ليشمل 24 ساعة الماضية + 12 ساعة قادمة
+        now_utc = datetime.utcnow()
+        today_start = now_utc - timedelta(hours=24)
+        today_end = now_utc + timedelta(hours=12)
+        
+        logger.info(f"🔍 نطاق البحث (UTC - Expanded): من {today_start} إلى {today_end}")
         
         # ✅ البحث بمعرف المستخدم الذي أنشأ التقرير (نفس منطق start_edit_reports)
         translator = s.query(Translator).filter_by(tg_user_id=user_id).first()

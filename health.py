@@ -26,11 +26,12 @@ class HealthChecker:
         """فحص قاعدة البيانات"""
         try:
             from db.session import SessionLocal
+            from sqlalchemy import text
             start_time = time.time()
 
             with SessionLocal() as session:
                 # استعلام بسيط للتحقق من الاتصال
-                result = session.execute("SELECT 1").scalar()
+                result = session.execute(text("SELECT 1")).scalar()
 
             response_time = time.time() - start_time
 
@@ -45,54 +46,6 @@ class HealthChecker:
                 "status": "unhealthy",
                 "error": str(e),
                 "message": "Database connection failed"
-            }
-
-    async def check_cache_system(self) -> Dict[str, Any]:
-        """فحص نظام التخزين المؤقت"""
-        try:
-            from services.caching import get_cache_stats
-            stats = get_cache_stats()
-
-            return {
-                "status": "healthy",
-                "cache_items": stats["total_items"],
-                "default_ttl": stats["default_ttl"],
-                "cleanup_active": stats["cleanup_task_active"]
-            }
-        except Exception as e:
-            logger.error(f"Cache system health check failed: {e}")
-            return {
-                "status": "unhealthy",
-                "error": str(e)
-            }
-
-    async def check_performance(self) -> Dict[str, Any]:
-        """فحص الأداء"""
-        try:
-            from services.performance_utils import get_performance_stats
-            stats = get_performance_stats()
-
-            # تقييم حالة الأداء
-            if stats["avg_response_time"] > 10.0:  # أكثر من 10 ثوان
-                status = "degraded"
-                message = "High response time detected"
-            elif stats["error_rate"] > 5.0:  # أكثر من 5% أخطاء
-                status = "degraded"
-                message = "High error rate detected"
-            else:
-                status = "healthy"
-                message = "Performance within acceptable limits"
-
-            return {
-                "status": status,
-                "message": message,
-                **stats
-            }
-        except Exception as e:
-            logger.error(f"Performance health check failed: {e}")
-            return {
-                "status": "unhealthy",
-                "error": str(e)
             }
 
     async def check_system_resources(self) -> Dict[str, Any]:
@@ -138,83 +91,36 @@ class HealthChecker:
                 "error": str(e)
             }
 
-    async def comprehensive_health_check(self) -> Dict[str, Any]:
-        """فحص شامل لجميع المكونات"""
-        self.last_health_check = time.time()
-
-        # تشغيل جميع الفحوصات بالتوازي
-        tasks = [
-            self.check_database(),
-            self.check_cache_system(),
-            self.check_performance(),
-            self.check_system_resources()
-        ]
-
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        # تجميع النتائج
-        health_data = {
-            "timestamp": time.time(),
-            "uptime_seconds": time.time() - self.start_time,
-            "service": "Medical Reports Bot",
-            "version": "2.0.0-High-Performance",
-            "checks": {
-                "database": results[0] if not isinstance(results[0], Exception) else {"status": "error", "error": str(results[0])},
-                "cache_system": results[1] if not isinstance(results[1], Exception) else {"status": "error", "error": str(results[1])},
-                "performance": results[2] if not isinstance(results[2], Exception) else {"status": "error", "error": str(results[2])},
-                "system_resources": results[3] if not isinstance(results[3], Exception) else {"status": "error", "error": str(results[3])}
-            }
-        }
-
-        # تحديد الحالة العامة
-        statuses = [check.get("status", "unknown") for check in health_data["checks"].values()]
-
-        if "critical" in statuses:
-            overall_status = "critical"
-        elif "unhealthy" in statuses or "error" in statuses:
-            overall_status = "unhealthy"
-        elif "degraded" in statuses or "warning" in statuses:
-            overall_status = "degraded"
-        else:
-            overall_status = "healthy"
-
-        health_data["status"] = overall_status
-        health_data["last_check_duration"] = time.time() - self.last_health_check
-
-        logger.info(f"🏥 Health check completed: {overall_status}")
-        return health_data
-
 # إنشاء instance عالمي
 health_checker = HealthChecker()
-
-# دوال مساعدة للاستخدام السريع
-async def get_health_status() -> Dict[str, Any]:
-    """إرجاع حالة النظام الصحية"""
-    return await health_checker.comprehensive_health_check()
 
 def health_check():
     """Simple health check for backward compatibility"""
     try:
+        # Load environment variables
+        from dotenv import load_dotenv
+        load_dotenv("config.env")
+        
         # Check if bot token exists (basic validation)
         bot_token = os.getenv("BOT_TOKEN")
         if not bot_token:
             return {
                 "status": "error",
                 "message": "BOT_TOKEN not configured",
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now().isoformat()
             }
 
         return {
             "status": "healthy",
             "message": "Medical Reports Bot is running (High-Performance Mode)",
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now().isoformat(),
             "version": "2.0.0-High-Performance"
         }
     except Exception as e:
         return {
             "status": "error",
             "message": str(e),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now().isoformat()
         }
 
 if __name__ == "__main__":
