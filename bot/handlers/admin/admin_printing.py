@@ -32,7 +32,7 @@ except ImportError:
     print("⚠️ مكتبات العربية غير متوفرة - سيعمل النظام بدونها")
 
 # حالات المحادثة
-PRINT_SELECT_TYPE, PRINT_SELECT_PERIOD, PRINT_SELECT_OPTIONS, PRINT_CONFIRM = range(4)
+PRINT_SELECT_TYPE, PRINT_SELECT_PERIOD, PRINT_SELECT_OPTIONS, PRINT_CONFIRM, PRINT_SELECT_PATIENT = range(5)
 
 # المجلدات
 EXPORTS_DIR = "exports"
@@ -115,6 +115,7 @@ async def start_professional_printing(update: Update, context: ContextTypes.DEFA
         [InlineKeyboardButton("📈 تقرير رسوم بيانية فقط", callback_data="print_type:charts_only")],
         [InlineKeyboardButton("📋 تقرير تفصيلي للتقارير", callback_data="print_type:detailed")],
         [InlineKeyboardButton("👤 تقرير مريض محدد", callback_data="print_type:patient")],
+        [InlineKeyboardButton("🖨️ طباعة حسب المريض", callback_data="print_type:patient_text")],
         [InlineKeyboardButton("🏥 تقرير مستشفى محدد", callback_data="print_type:hospital")],
         [InlineKeyboardButton("👨‍⚕️ تقرير مترجم محدد", callback_data="print_type:translator")],
         [InlineKeyboardButton("❌ إلغاء", callback_data="print:cancel")]
@@ -139,6 +140,10 @@ async def handle_print_type_selection(update: Update, context: ContextTypes.DEFA
     
     print_type = query.data.split(":")[1]
     context.user_data['print_type'] = print_type
+    
+    # ✅ إذا كان النوع هو patient_text، نعرض قائمة المرضى مباشرة
+    if print_type == "patient_text":
+        return await show_patient_selection_for_print(query, context)
     
     # عرض خيارات الفترة الزمنية
     period_text = """
@@ -182,6 +187,7 @@ async def handle_period_selection(update: Update, context: ContextTypes.DEFAULT_
             [InlineKeyboardButton("📈 تقرير رسوم بيانية فقط", callback_data="print_type:charts_only")],
             [InlineKeyboardButton("📋 تقرير تفصيلي للتقارير", callback_data="print_type:detailed")],
             [InlineKeyboardButton("👤 تقرير مريض محدد", callback_data="print_type:patient")],
+            [InlineKeyboardButton("🖨️ طباعة حسب المريض", callback_data="print_type:patient_text")],
             [InlineKeyboardButton("🏥 تقرير مستشفى محدد", callback_data="print_type:hospital")],
             [InlineKeyboardButton("👨‍⚕️ تقرير مترجم محدد", callback_data="print_type:translator")],
             [InlineKeyboardButton("❌ إلغاء", callback_data="print:cancel")]
@@ -1253,6 +1259,368 @@ def generate_html_report(reports, stats, charts_paths, period_name):
     return html
 
 # ================================================
+# طباعة حسب المريض - نظام جديد
+# ================================================
+
+async def show_patient_selection_for_print(query, context):
+    """عرض قائمة المرضى لاختيار مريض للطباعة"""
+    try:
+        from services.patients_service import get_all_patients
+        
+        patients = get_all_patients()
+        
+        if not patients:
+            await query.edit_message_text(
+                "⚠️ **لا توجد مرضى في قاعدة البيانات**\n\n"
+                "يرجى إضافة مرضى أولاً.",
+                parse_mode=ParseMode.MARKDOWN
+            )
+            return ConversationHandler.END
+        
+        # ترتيب المرضى أبجدياً
+        patients_sorted = sorted(patients, key=lambda x: x.get('name', ''))
+        
+        # تقسيم المرضى إلى صفحات (10 لكل صفحة)
+        page = context.user_data.get('patient_page', 0)
+        items_per_page = 10
+        start_idx = page * items_per_page
+        end_idx = start_idx + items_per_page
+        patients_page = patients_sorted[start_idx:end_idx]
+        
+        keyboard_buttons = []
+        
+        # أزرار المرضى
+        for patient in patients_page:
+            patient_name = patient.get('name', 'غير محدد')
+            patient_id = patient.get('id')
+            keyboard_buttons.append([
+                InlineKeyboardButton(
+                    f"👤 {patient_name}",
+                    callback_data=f"print_patient:{patient_id}"
+                )
+            ])
+        
+        # أزرار التنقل
+        nav_buttons = []
+        if page > 0:
+            nav_buttons.append(InlineKeyboardButton("◀️ السابق", callback_data="patient_page:prev"))
+        if end_idx < len(patients_sorted):
+            nav_buttons.append(InlineKeyboardButton("التالي ▶️", callback_data="patient_page:next"))
+        if nav_buttons:
+            keyboard_buttons.append(nav_buttons)
+        
+        # أزرار الإلغاء والرجوع
+        # نتحقق من السياق لتحديد نوع الزر (admin_printing أو admin_reports)
+        back_callback = "back:type"  # افتراضي لـ admin_printing
+        if context.user_data.get("from_admin_reports"):
+            back_callback = "back:filter"
+        
+        keyboard_buttons.append([
+            InlineKeyboardButton("🔙 رجوع", callback_data=back_callback),
+            InlineKeyboardButton("❌ إلغاء", callback_data="print:cancel")
+        ])
+        
+        keyboard = InlineKeyboardMarkup(keyboard_buttons)
+        
+        text = f"""
+🖨️ **طباعة حسب المريض**
+
+اختر المريض المطلوب:
+📊 إجمالي المرضى: {len(patients_sorted)}
+📄 الصفحة: {page + 1} من {(len(patients_sorted) + items_per_page - 1) // items_per_page}
+"""
+        
+        await query.edit_message_text(text, reply_markup=keyboard, parse_mode=ParseMode.MARKDOWN)
+        return PRINT_SELECT_PATIENT
+        
+    except Exception as e:
+        logger.error(f"❌ خطأ في عرض قائمة المرضى: {e}", exc_info=True)
+        await query.edit_message_text(
+            f"❌ **حدث خطأ**\n\n{str(e)}",
+            parse_mode=ParseMode.MARKDOWN
+        )
+        return ConversationHandler.END
+
+
+@admin_handler
+async def handle_patient_selection_for_print(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة اختيار المريض للطباعة"""
+    query = update.callback_query
+    await query.answer()
+    
+    if query.data == "back:type":
+        # العودة لاختيار النوع (admin_printing)
+        welcome_text = """
+🖨️ **نظام الطباعة الاحترافي**
+
+اختر نوع التقرير المطلوب:
+"""
+        
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📊 تقرير شامل مع إحصائيات", callback_data="print_type:full_stats")],
+            [InlineKeyboardButton("📈 تقرير رسوم بيانية فقط", callback_data="print_type:charts_only")],
+            [InlineKeyboardButton("📋 تقرير تفصيلي للتقارير", callback_data="print_type:detailed")],
+            [InlineKeyboardButton("👤 تقرير مريض محدد", callback_data="print_type:patient")],
+            [InlineKeyboardButton("🖨️ طباعة حسب المريض", callback_data="print_type:patient_text")],
+            [InlineKeyboardButton("🏥 تقرير مستشفى محدد", callback_data="print_type:hospital")],
+            [InlineKeyboardButton("👨‍⚕️ تقرير مترجم محدد", callback_data="print_type:translator")],
+            [InlineKeyboardButton("❌ إلغاء", callback_data="print:cancel")]
+        ])
+
+        await query.edit_message_text(welcome_text, reply_markup=keyboard, parse_mode=ParseMode.MARKDOWN)
+        return PRINT_SELECT_TYPE
+    
+    if query.data == "back:filter":
+        # العودة لاختيار النوع (admin_reports)
+        from bot.handlers.admin.admin_reports import _filters_kb
+        await query.edit_message_text("🖨️ اختر نوع الفلترة:", reply_markup=_filters_kb())
+        # نستخدم ConversationHandler.END لأن admin_reports سيتعامل مع الحالة
+        return ConversationHandler.END
+    
+    if query.data == "print:cancel":
+        await query.edit_message_text("❌ تم إلغاء الطباعة")
+        return ConversationHandler.END
+    
+    if query.data.startswith("patient_page:"):
+        # التنقل بين الصفحات
+        direction = query.data.split(":")[1]
+        current_page = context.user_data.get('patient_page', 0)
+        if direction == "next":
+            context.user_data['patient_page'] = current_page + 1
+        elif direction == "prev":
+            context.user_data['patient_page'] = max(0, current_page - 1)
+        return await show_patient_selection_for_print(query, context)
+    
+    if query.data.startswith("print_patient:"):
+        # اختيار المريض
+        patient_id = int(query.data.split(":")[1])
+        context.user_data['selected_patient_id'] = patient_id
+        
+        await query.edit_message_text("⏳ **جاري تحضير التقرير...**\n\nقد يستغرق هذا بضع ثوانٍ...")
+        
+        # طباعة تقارير المريض
+        return await print_patient_reports_as_text(query, context, patient_id)
+    
+    return PRINT_SELECT_PATIENT
+
+
+async def print_patient_reports_as_text(query, context, patient_id):
+    """طباعة تقارير المريض كنص منسق داخل Telegram"""
+    try:
+        with SessionLocal() as session:
+            # الحصول على بيانات المريض
+            patient = session.query(Patient).filter_by(id=patient_id).first()
+            if not patient:
+                await query.edit_message_text(
+                    "❌ **المريض غير موجود**\n\n"
+                    "يرجى المحاولة مرة أخرى.",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+                return ConversationHandler.END
+            
+            patient_name = patient.full_name or "غير محدد"
+            patient_file_number = getattr(patient, 'file_number', None) or getattr(patient, 'file_id', None)
+            
+            # الحصول على جميع تقارير المريض
+            reports = session.query(Report).filter_by(patient_id=patient_id).order_by(Report.report_date.desc()).all()
+            
+            if not reports:
+                await query.edit_message_text(
+                    f"⚠️ **لا توجد تقارير**\n\n"
+                    f"لا توجد تقارير للمريض: {patient_name}",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+                return ConversationHandler.END
+            
+            # حساب الإحصائيات
+            total_reports = len(reports)
+            
+            # الفترة الزمنية
+            dates = [r.report_date for r in reports if r.report_date]
+            if dates:
+                first_date = min(dates)
+                last_date = max(dates)
+                period_text = f"من {first_date.strftime('%d-%m-%Y')} إلى {last_date.strftime('%d-%m-%Y')}"
+            else:
+                period_text = "غير محدد"
+            
+            # إحصائيات حسب نوع الإجراء
+            action_stats = {}
+            for report in reports:
+                action = report.medical_action or "غير محدد"
+                action_stats[action] = action_stats.get(action, 0) + 1
+            
+            # بناء النص
+            text_parts = []
+            
+            # 1. رأس التقرير
+            header = f"""
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🖨️ **تقرير شامل للمريض**
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+👤 **اسم المريض:** {patient_name}
+"""
+            if patient_file_number:
+                header += f"📁 **رقم الملف:** {patient_file_number}\n"
+            
+            header += f"""
+📊 **عدد التقارير الكلي:** {total_reports}
+📅 **الفترة الزمنية:** {period_text}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+"""
+            text_parts.append(header)
+            
+            # 2. إحصائيات سريعة
+            stats_text = "📈 **إحصائيات سريعة:**\n\n"
+            for action, count in sorted(action_stats.items(), key=lambda x: x[1], reverse=True):
+                stats_text += f"• {action}: {count}\n"
+            stats_text += "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            text_parts.append(stats_text)
+            
+            # 3. تفاصيل التقارير (مرتبة زمنياً - الأحدث أولاً)
+            text_parts.append("📋 **تفاصيل التقارير:**\n\n")
+            
+            for idx, report in enumerate(reports, 1):
+                report_text = format_report_as_text(report, idx, total_reports)
+                text_parts.append(report_text)
+                text_parts.append("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n")
+            
+            # دمج النصوص وإرسالها
+            full_text = "".join(text_parts)
+            
+            # تقسيم النص إذا كان طويلاً (Telegram limit: 4096 chars)
+            max_length = 4000  # ترك هامش للأمان
+            
+            if len(full_text) <= max_length:
+                await query.edit_message_text(full_text, parse_mode=ParseMode.MARKDOWN)
+            else:
+                # إرسال الرأس والإحصائيات أولاً
+                header_and_stats = header + stats_text
+                await query.edit_message_text(header_and_stats, parse_mode=ParseMode.MARKDOWN)
+                
+                # إرسال التقارير في رسائل منفصلة
+                current_text = "📋 **تفاصيل التقارير:**\n\n"
+                
+                for idx, report in enumerate(reports, 1):
+                    report_text = format_report_as_text(report, idx, total_reports)
+                    
+                    # إذا كان النص الحالي + التقرير الجديد > الحد الأقصى، أرسل النص الحالي وابدأ جديد
+                    if len(current_text) + len(report_text) + 50 > max_length:
+                        await query.message.reply_text(current_text, parse_mode=ParseMode.MARKDOWN)
+                        current_text = report_text + "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                    else:
+                        current_text += report_text + "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                
+                # إرسال آخر جزء
+                if current_text.strip():
+                    await query.message.reply_text(current_text, parse_mode=ParseMode.MARKDOWN)
+            
+            return ConversationHandler.END
+            
+    except Exception as e:
+        logger.error(f"❌ خطأ في طباعة تقارير المريض: {e}", exc_info=True)
+        await query.edit_message_text(
+            f"❌ **حدث خطأ**\n\n{str(e)}",
+            parse_mode=ParseMode.MARKDOWN
+        )
+        return ConversationHandler.END
+
+
+def format_report_as_text(report, index, total):
+    """تنسيق تقرير واحد كنص حسب نوع الإجراء - يعرض فقط الحقول المتاحة"""
+    text = f"📌 **تقرير #{index} من {total}**\n\n"
+    
+    # نوع الإجراء
+    medical_action = report.medical_action or "غير محدد"
+    text += f"📌 **نوع الإجراء:** {medical_action}\n"
+    
+    # التاريخ
+    if report.report_date:
+        text += f"📅 **التاريخ:** {report.report_date.strftime('%d-%m-%Y %H:%M')}\n"
+    
+    # المستشفى
+    if report.hospital_name:
+        text += f"🏥 **المستشفى:** {report.hospital_name}\n"
+    
+    # القسم
+    if report.department:
+        text += f"🏢 **القسم:** {report.department}\n"
+    
+    # الطبيب
+    if report.doctor_name:
+        text += f"👨‍⚕️ **الطبيب:** {report.doctor_name}\n"
+    
+    # الحقول المشتركة لجميع أنواع الإجراءات
+    if report.complaint_text:
+        text += f"💬 **شكوى المريض:** {report.complaint_text}\n"
+    
+    if report.diagnosis:
+        text += f"🔬 **التشخيص:** {report.diagnosis}\n"
+    
+    if report.doctor_decision:
+        text += f"📝 **قرار الطبيب:** {report.doctor_decision}\n"
+    
+    # الحقول الخاصة حسب نوع الإجراء
+    action = medical_action
+    
+    # متابعة في الرقود - رقم الغرفة
+    if action == "متابعة في الرقود" and report.room_number:
+        text += f"🚪 **رقم الغرفة والطابق:** {report.room_number}\n"
+    
+    # طوارئ - رقم الغرفة
+    if action == "طوارئ" and report.room_number:
+        text += f"🚪 **رقم الغرفة:** {report.room_number}\n"
+    
+    # حالة المريض (من case_status)
+    if report.case_status:
+        text += f"📊 **حالة المريض:** {report.case_status}\n"
+    
+    # خطة العلاج
+    if report.treatment_plan:
+        text += f"💊 **خطة العلاج:** {report.treatment_plan}\n"
+    
+    # الأدوية
+    if report.medications:
+        text += f"💉 **الأدوية:** {report.medications}\n"
+    
+    # ملاحظات عامة
+    if report.notes:
+        text += f"📋 **ملاحظات:** {report.notes}\n"
+    
+    # موعد المتابعة (لجميع الأنواع)
+    if report.followup_date:
+        text += f"📅 **موعد العودة:** {report.followup_date.strftime('%d-%m-%Y')}\n"
+        if report.followup_time:
+            text += f"🕐 **وقت العودة:** {report.followup_time}\n"
+    
+    if report.followup_reason:
+        text += f"✍️ **سبب العودة:** {report.followup_reason}\n"
+    
+    # حقول الأشعة والفحوصات
+    if action == "أشعة وفحوصات":
+        if report.radiology_type:
+            text += f"🔬 **نوع الأشعة:** {report.radiology_type}\n"
+        if report.radiology_delivery_date:
+            text += f"📅 **تاريخ الاستلام:** {report.radiology_delivery_date.strftime('%d-%m-%Y')}\n"
+    
+    # حقول تأجيل الموعد
+    if action == "تأجيل موعد":
+        if report.app_reschedule_reason:
+            text += f"📝 **سبب التأجيل:** {report.app_reschedule_reason}\n"
+        if report.app_reschedule_return_date:
+            text += f"📅 **موعد العودة الجديد:** {report.app_reschedule_return_date.strftime('%d-%m-%Y')}\n"
+        if report.app_reschedule_return_reason:
+            text += f"✍️ **سبب العودة:** {report.app_reschedule_return_reason}\n"
+    
+    # المترجم
+    if report.translator_name:
+        text += f"👤 **المترجم:** {report.translator_name}\n"
+    
+    return text
+
+# ================================================
 # التسجيل
 # ================================================
 
@@ -1272,6 +1640,9 @@ def register(app):
             ],
             PRINT_SELECT_OPTIONS: [
                 CallbackQueryHandler(handle_print_options, pattern="^opt:|^generate:now|^back:period|^print:cancel$")
+            ],
+            PRINT_SELECT_PATIENT: [
+                CallbackQueryHandler(handle_patient_selection_for_print, pattern="^print_patient:|^patient_page:|^back:type|^print:cancel$")
             ],
         },
         fallbacks=[

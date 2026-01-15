@@ -35,7 +35,7 @@ try:
 except ImportError:
     ARABIC_SUPPORT = False
 
-SELECT_FILTER, ENTER_NAME, SELECT_DEPARTMENT_OPTION, ENTER_DEPARTMENT, SELECT_YEAR, SELECT_MONTH, CONFIRM_EXPORT = range(620, 627)
+SELECT_FILTER, ENTER_NAME, SELECT_DEPARTMENT_OPTION, ENTER_DEPARTMENT, SELECT_YEAR, SELECT_MONTH, CONFIRM_EXPORT, PRINT_SELECT_PATIENT = range(620, 628)
 
 
 # ================================================
@@ -400,6 +400,7 @@ def _build_patient_list_keyboard(patients_list, page=0, items_per_page=10):
 def _filters_kb():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("👤 طباعة باسم مريض", callback_data="filter:patient")],
+        [InlineKeyboardButton("🖨️ طباعة حسب المريض", callback_data="filter:patient_text")],
         [InlineKeyboardButton("🏥 طباعة باسم مستشفى", callback_data="filter:hospital")],
         [InlineKeyboardButton("🏢 طباعة حسب القسم", callback_data="filter:department")],
         [InlineKeyboardButton("📅 طباعة حسب التاريخ", callback_data="filter:date")],
@@ -499,6 +500,11 @@ async def handle_filter_choice(update: Update, context: ContextTypes.DEFAULT_TYP
         text, keyboard = _build_patient_list_keyboard(patients_list, page=0)
         await q.edit_message_text(text, reply_markup=keyboard, parse_mode="Markdown")
         return ENTER_NAME
+    
+    elif choice == "patient_text":
+        # ✅ طباعة حسب المريض (نص داخل Telegram)
+        context.user_data["patient_page"] = 0  # إعادة تعيين الصفحة
+        return await show_patient_selection_for_print_local(q, context)
     
     elif choice == "hospital":
         # ✅ جلب قائمة المستشفيات من ملف doctors.txt
@@ -2937,6 +2943,127 @@ def export_to_word(reports_data, filename="reports"):
         logger.error(f"❌ خطأ في تصدير Word: {e}")
         return None
 
+# ================================================
+# معالجات طباعة حسب المريض (نص داخل Telegram)
+# ================================================
+
+async def show_patient_selection_for_print_local(query, context):
+    """عرض قائمة المرضى لاختيار مريض للطباعة (نسخة محلية لـ admin_reports)"""
+    try:
+        from services.patients_service import get_all_patients
+        from telegram.constants import ParseMode
+        
+        patients = get_all_patients()
+        
+        if not patients:
+            await query.edit_message_text(
+                "⚠️ **لا توجد مرضى في قاعدة البيانات**\n\n"
+                "يرجى إضافة مرضى أولاً.",
+                parse_mode=ParseMode.MARKDOWN
+            )
+            return ConversationHandler.END
+        
+        # ترتيب المرضى أبجدياً
+        patients_sorted = sorted(patients, key=lambda x: x.get('name', ''))
+        
+        # تقسيم المرضى إلى صفحات (10 لكل صفحة)
+        page = context.user_data.get('patient_page', 0)
+        items_per_page = 10
+        start_idx = page * items_per_page
+        end_idx = start_idx + items_per_page
+        patients_page = patients_sorted[start_idx:end_idx]
+        
+        keyboard_buttons = []
+        
+        # أزرار المرضى
+        for patient in patients_page:
+            patient_name = patient.get('name', 'غير محدد')
+            patient_id = patient.get('id')
+            keyboard_buttons.append([
+                InlineKeyboardButton(
+                    f"👤 {patient_name}",
+                    callback_data=f"print_patient:{patient_id}"
+                )
+            ])
+        
+        # أزرار التنقل
+        nav_buttons = []
+        if page > 0:
+            nav_buttons.append(InlineKeyboardButton("◀️ السابق", callback_data="patient_page:prev"))
+        if end_idx < len(patients_sorted):
+            nav_buttons.append(InlineKeyboardButton("التالي ▶️", callback_data="patient_page:next"))
+        if nav_buttons:
+            keyboard_buttons.append(nav_buttons)
+        
+        # أزرار الإلغاء والرجوع
+        keyboard_buttons.append([
+            InlineKeyboardButton("🔙 رجوع", callback_data="back:filter"),
+            InlineKeyboardButton("❌ إلغاء", callback_data="abort")
+        ])
+        
+        keyboard = InlineKeyboardMarkup(keyboard_buttons)
+        
+        text = f"""
+🖨️ **طباعة حسب المريض**
+
+اختر المريض المطلوب:
+📊 إجمالي المرضى: {len(patients_sorted)}
+📄 الصفحة: {page + 1} من {(len(patients_sorted) + items_per_page - 1) // items_per_page}
+"""
+        
+        await query.edit_message_text(text, reply_markup=keyboard, parse_mode=ParseMode.MARKDOWN)
+        return PRINT_SELECT_PATIENT
+        
+    except Exception as e:
+        logger.error(f"❌ خطأ في عرض قائمة المرضى: {e}", exc_info=True)
+        await query.edit_message_text(
+            f"❌ **حدث خطأ**\n\n{str(e)}",
+            parse_mode=ParseMode.MARKDOWN
+        )
+        return ConversationHandler.END
+
+
+async def handle_patient_text_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة اختيار المريض للطباعة كنص"""
+    query = update.callback_query
+    await query.answer()
+    
+    if query.data == "back:filter":
+        await query.edit_message_text("🖨️ اختر نوع الفلترة:", reply_markup=_filters_kb())
+        return SELECT_FILTER
+    
+    if query.data == "abort" or query.data == "print:cancel":
+        await query.edit_message_text("❌ تم إلغاء الطباعة")
+        return ConversationHandler.END
+    
+    if query.data.startswith("patient_page:"):
+        # التنقل بين الصفحات
+        direction = query.data.split(":")[1]
+        current_page = context.user_data.get('patient_page', 0)
+        if direction == "next":
+            context.user_data['patient_page'] = current_page + 1
+        elif direction == "prev":
+            context.user_data['patient_page'] = max(0, current_page - 1)
+        return await show_patient_selection_for_print_local(query, context)
+    
+    if query.data.startswith("print_patient:"):
+        # اختيار المريض
+        patient_id = int(query.data.split(":")[1])
+        context.user_data['selected_patient_id'] = patient_id
+        
+        await query.edit_message_text("⏳ **جاري تحضير التقرير...**\n\nقد يستغرق هذا بضع ثوانٍ...")
+        
+        # طباعة تقارير المريض
+        from bot.handlers.admin.admin_printing import print_patient_reports_as_text
+        return await print_patient_reports_as_text(query, context, patient_id)
+    
+    return PRINT_SELECT_PATIENT
+
+
+async def handle_patient_text_page(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة التنقل بين صفحات المرضى"""
+    return await handle_patient_text_selection(update, context)
+
 def register(app):
     conv = ConversationHandler(
        entry_points=[
@@ -2944,10 +3071,15 @@ def register(app):
            ],
         states={
             SELECT_FILTER: [
-                CallbackQueryHandler(handle_filter_choice, pattern=r"^filter:(patient|hospital|department|date|all)$"),
+                CallbackQueryHandler(handle_filter_choice, pattern=r"^filter:(patient|patient_text|hospital|department|date|all)$"),
                 CallbackQueryHandler(handle_print_patient_options, pattern=r"^print_patient_(all|period)$"),
+                # معالجات لطباعة حسب المريض (نص داخل Telegram)
+                CallbackQueryHandler(handle_patient_text_selection, pattern=r"^print_patient:\d+$"),
+                CallbackQueryHandler(handle_patient_text_page, pattern=r"^patient_page:(next|prev)$"),
+                CallbackQueryHandler(handle_back_to_filter, pattern=r"^back:type$"),
                 CallbackQueryHandler(handle_back_to_filter, pattern=r"^back:filter$"),
                 CallbackQueryHandler(confirm_export, pattern=r"^abort$"),
+                CallbackQueryHandler(confirm_export, pattern=r"^print:cancel$"),
                 MessageHandler(filters.Regex("^❌ إلغاء المحادثة$"), cancel_text),
             ],
             ENTER_NAME: [
@@ -2987,6 +3119,14 @@ def register(app):
             ],
             CONFIRM_EXPORT: [
                 CallbackQueryHandler(confirm_export, pattern=r"^(export:(yes|no|pdf|excel|word|html)|abort|back:confirm)$"),
+                MessageHandler(filters.Regex("^❌ إلغاء المحادثة$"), cancel_text),
+            ],
+            PRINT_SELECT_PATIENT: [
+                CallbackQueryHandler(handle_patient_text_selection, pattern=r"^print_patient:\d+$"),
+                CallbackQueryHandler(handle_patient_text_page, pattern=r"^patient_page:(next|prev)$"),
+                CallbackQueryHandler(handle_back_to_filter, pattern=r"^back:filter$"),
+                CallbackQueryHandler(confirm_export, pattern=r"^print:cancel$"),
+                CallbackQueryHandler(confirm_export, pattern=r"^abort$"),
                 MessageHandler(filters.Regex("^❌ إلغاء المحادثة$"), cancel_text),
             ],
         },
