@@ -154,6 +154,8 @@ KNOWN_CALLBACKS = [
     # أخرى
     r"^cancel",
     r"^save:",
+    r"^publish:",
+    r"^edit:",
     r"^um:",
     r"^back_",
     r"^approve:",

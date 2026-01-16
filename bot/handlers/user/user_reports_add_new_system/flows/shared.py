@@ -590,9 +590,9 @@ async def handle_simple_translator_choice(update: Update, context: ContextTypes.
                 return ConversationHandler.END
 
         # حفظ اسم المترجم
-        context.user_data.setdefault("report_tmp", {})
-        context.user_data["report_tmp"]["translator_name"] = translator_name
-        context.user_data["report_tmp"]["translator_id"] = translator_id
+        report_tmp = context.user_data.setdefault("report_tmp", {})
+        report_tmp["translator_name"] = translator_name
+        report_tmp["translator_id"] = translator_id
 
         # المتابعة للتأكيد النهائي
         await query.edit_message_text(f"✅ تم اختيار المترجم: **{translator_name}**")
@@ -892,12 +892,14 @@ async def handle_translator_choice(update: Update, context: ContextTypes.DEFAULT
                         translator = s.query(Translator).filter_by(id=translator_id).first()
                         if translator:
                             context.user_data.setdefault("report_tmp", {})["translator_name"] = translator.full_name
-                            context.user_data["report_tmp"]["translator_id"] = translator.id
+                            report_tmp = context.user_data.setdefault("report_tmp", {})
+                            report_tmp["translator_id"] = translator.id
                             logger.info(f"✅ Translator selected: {translator.full_name}")
                             found_translator = True
                         else:
-                            context.user_data.setdefault("report_tmp", {})["translator_name"] = "غير محدد"
-                            context.user_data["report_tmp"]["translator_id"] = None
+                            report_tmp = context.user_data.setdefault("report_tmp", {})
+                            report_tmp["translator_name"] = "غير محدد"
+                            report_tmp["translator_id"] = None
                             logger.warning(f"⚠️ Translator ID {translator_id} not found in DB")
                 if not found_translator:
                     await query.answer("⚠️ لم يتم العثور على المترجم المطلوب. يرجى المحاولة مرة أخرى أو تحديث القائمة.", show_alert=True)
@@ -993,12 +995,13 @@ async def handle_translator_inline_selection(update: Update, context: ContextTyp
             if SessionLocal and Translator:
                 with SessionLocal() as s:
                     translator = s.query(Translator).filter_by(id=translator_id).first()
+                    report_tmp = context.user_data.setdefault("report_tmp", {})
                     if translator:
-                        context.user_data.setdefault("report_tmp", {})["translator_name"] = translator.full_name
-                        context.user_data["report_tmp"]["translator_id"] = translator.id
+                        report_tmp["translator_name"] = translator.full_name
+                        report_tmp["translator_id"] = translator.id
                     else:
-                        context.user_data.setdefault("report_tmp", {})["translator_name"] = translator_name or "غير محدد"
-                        context.user_data["report_tmp"]["translator_id"] = None
+                        report_tmp["translator_name"] = translator_name or "غير محدد"
+                        report_tmp["translator_id"] = None
             
             await update.message.reply_text("✅ تم اختيار المترجم")
             await show_final_summary(update.message, context, flow_type)
@@ -1030,7 +1033,7 @@ async def handle_translator_text(update: Update, context: ContextTypes.DEFAULT_T
     if not validate_text_input:
         logger.error("❌ validate_text_input not available")
         await update.message.reply_text("❌ خطأ في النظام")
-        flow_type = context.user_data["report_tmp"].get("current_flow", "new_consult")
+        flow_type = context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
         return get_translator_state(flow_type)
     
     valid, msg = validate_text_input(text, min_length=2, max_length=100)
@@ -1042,10 +1045,10 @@ async def handle_translator_text(update: Update, context: ContextTypes.DEFAULT_T
             reply_markup=_nav_buttons(show_back=True, previous_state_name="new_consult_complaint", context=context),
             parse_mode="Markdown"
         )
-        flow_type = context.user_data["report_tmp"].get("current_flow", "new_consult")
+        flow_type = context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
         return get_translator_state(flow_type)
 
-    flow_type = context.user_data["report_tmp"].get("current_flow", "new_consult")
+    flow_type = context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
     
     # show_final_summary is defined in this same file (below)
     
@@ -1057,9 +1060,10 @@ async def handle_translator_text(update: Update, context: ContextTypes.DEFAULT_T
                         Translator.full_name.ilike(text)
                     ).first()
                     
+                    report_tmp = context.user_data.setdefault("report_tmp", {})
                     if existing_translator:
-                        context.user_data.setdefault("report_tmp", {})["translator_name"] = existing_translator.full_name
-                        context.user_data["report_tmp"]["translator_id"] = existing_translator.id
+                        report_tmp["translator_name"] = existing_translator.full_name
+                        report_tmp["translator_id"] = existing_translator.id
                         await update.message.reply_text(f"✅ تم استخدام المترجم الموجود: {existing_translator.full_name}")
                     else:
                         new_translator = Translator(
@@ -1073,11 +1077,11 @@ async def handle_translator_text(update: Update, context: ContextTypes.DEFAULT_T
                         s.commit()
                         s.refresh(new_translator)
                         
-                        context.user_data.setdefault("report_tmp", {})["translator_name"] = new_translator.full_name
-                        context.user_data["report_tmp"]["translator_id"] = new_translator.id
+                        report_tmp["translator_name"] = new_translator.full_name
+                        report_tmp["translator_id"] = new_translator.id
                         await update.message.reply_text(f"✅ تم إضافة المترجم الجديد: {text}")
                     
-                    context.user_data["report_tmp"].pop("translator_add_new", None)
+                    report_tmp.pop("translator_add_new", None)
         except Exception as e:
             logger.error(f"❌ Error adding new translator: {e}", exc_info=True)
             await update.message.reply_text(
@@ -1085,12 +1089,14 @@ async def handle_translator_text(update: Update, context: ContextTypes.DEFAULT_T
                 "حدث خطأ أثناء إضافة المترجم. سيتم استخدام الاسم فقط في التقرير.",
                 parse_mode="Markdown"
             )
-            context.user_data.setdefault("report_tmp", {})["translator_name"] = text
-            context.user_data["report_tmp"]["translator_id"] = None
-            context.user_data["report_tmp"].pop("translator_add_new", None)
+            report_tmp = context.user_data.setdefault("report_tmp", {})
+            report_tmp["translator_name"] = text
+            report_tmp["translator_id"] = None
+            report_tmp.pop("translator_add_new", None)
     else:
-        context.user_data.setdefault("report_tmp", {})["translator_name"] = text
-        context.user_data["report_tmp"]["translator_id"] = None
+        report_tmp = context.user_data.setdefault("report_tmp", {})
+        report_tmp["translator_name"] = text
+        report_tmp["translator_id"] = None
 
     await show_final_summary(update.message, context, flow_type)
 

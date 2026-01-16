@@ -153,7 +153,7 @@ async def handle_department_selection(update: Update, context: ContextTypes.DEFA
                 [[InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]]),
             parse_mode="Markdown"
         )
-        context.user_data["report_tmp"]["departments_search_mode"] = True
+        context.user_data.setdefault("report_tmp", {})["departments_search_mode"] = True
         return STATE_SELECT_DEPARTMENT
 
     # استخدام index بدلاً من الاسم الكامل
@@ -167,16 +167,17 @@ async def handle_department_selection(update: Update, context: ContextTypes.DEFA
     else:
         dept = query.data.split(":", 1)[1]
 
-    context.user_data["report_tmp"].pop("departments_search", None)
-    context.user_data["report_tmp"].pop("departments_search_mode", None)
-    context.user_data["report_tmp"].pop("departments_list", None)
+    report_tmp = context.user_data.setdefault("report_tmp", {})
+    report_tmp.pop("departments_search", None)
+    report_tmp.pop("departments_search_mode", None)
+    report_tmp.pop("departments_list", None)
 
     # ✅ تم نقل "أشعة وفحوصات" إلى قائمة أنواع الإجراءات
     # لا حاجة لمعالج خاص هنا - يجب اختيارها من قائمة أنواع الإجراءات
 
     # التحقق إذا كان القسم المختار هو قسم رئيسي يحتوي على فروع
     if dept in PREDEFINED_DEPARTMENTS:
-        context.user_data["report_tmp"]["main_department"] = dept
+        context.user_data.setdefault("report_tmp", {})["main_department"] = dept
         await query.edit_message_text(
             f"✅ **تم اختيار القسم الرئيسي**\n\n"
             f"🏷️ **القسم:**\n"
@@ -187,8 +188,9 @@ async def handle_department_selection(update: Update, context: ContextTypes.DEFA
         return R_SUBDEPARTMENT
     else:
         from .doctor_handlers import show_doctor_input
-        context.user_data["report_tmp"]["department_name"] = dept
-        context.user_data["report_tmp"].setdefault("step_history", []).append(R_DEPARTMENT)
+        report_tmp = context.user_data.setdefault("report_tmp", {})
+        report_tmp["department_name"] = dept
+        report_tmp.setdefault("step_history", []).append(R_DEPARTMENT)
         
         # ✅ تحديث state إلى STATE_SELECT_DOCTOR قبل الانتقال
         nav_push(context, STATE_SELECT_DOCTOR)
@@ -220,8 +222,9 @@ async def handle_department_search(update: Update, context: ContextTypes.DEFAULT
         search_mode = context.user_data.get("report_tmp", {}).get("departments_search_mode", False)
         if search_mode:
             search_query = update.message.text.strip()
-            context.user_data["report_tmp"]["departments_search"] = search_query
-            context.user_data["report_tmp"]["departments_search_mode"] = False
+            report_tmp = context.user_data.setdefault("report_tmp", {})
+            report_tmp["departments_search"] = search_query
+            report_tmp["departments_search_mode"] = False
             text, keyboard, _ = _build_departments_keyboard(0, search_query, context)
             await update.message.reply_text(text, reply_markup=keyboard, parse_mode="Markdown")
             return STATE_SELECT_DEPARTMENT
@@ -241,8 +244,9 @@ async def show_subdepartment_options(message, context, main_dept, page=0):
     total_pages = (total + items_per_page - 1) // items_per_page
     page = max(0, min(page, total_pages - 1))
 
-    context.user_data["report_tmp"]["subdepartments_list"] = subdepts
-    context.user_data["report_tmp"]["main_department"] = main_dept
+    report_tmp = context.user_data.setdefault("report_tmp", {})
+    report_tmp["subdepartments_list"] = subdepts
+    report_tmp["main_department"] = main_dept
 
     start_idx = page * items_per_page
     end_idx = min(start_idx + items_per_page, total)
@@ -319,8 +323,9 @@ async def handle_subdepartment_choice(update: Update, context: ContextTypes.DEFA
             await query.answer("⚠️ خطأ في الفهرس", show_alert=True)
             return R_SUBDEPARTMENT
 
-    context.user_data["report_tmp"]["department_name"] = choice
-    context.user_data["report_tmp"].setdefault("step_history", []).append(R_SUBDEPARTMENT)
+    report_tmp = context.user_data.setdefault("report_tmp", {})
+    report_tmp["department_name"] = choice
+    report_tmp.setdefault("step_history", []).append(R_SUBDEPARTMENT)
 
     context.user_data['last_valid_state'] = 'search_doctor_screen'
     context.user_data['_conversation_state'] = STATE_SELECT_DOCTOR
@@ -337,7 +342,7 @@ async def handle_subdepartment_page(update: Update, context: ContextTypes.DEFAUL
     await query.answer()
 
     page = int(query.data.split(":", 1)[1])
-    main_dept = context.user_data["report_tmp"].get("main_department", "")
+    main_dept = context.user_data.get("report_tmp", {}).get("main_department", "")
     await query.message.delete()
     await show_subdepartment_options(query.message, context, main_dept, page)
     return R_SUBDEPARTMENT
