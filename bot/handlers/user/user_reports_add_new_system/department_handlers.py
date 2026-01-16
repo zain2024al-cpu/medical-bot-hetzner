@@ -122,7 +122,7 @@ def _build_departments_keyboard(page=0, search_query="", context=None):
 async def render_department_selection(message, context):
     """عرض شاشة اختيار القسم - rendering فقط"""
     text, keyboard, search = _build_departments_keyboard(0, "", context)
-    context.user_data["report_tmp"]["departments_search"] = search
+    context.user_data.setdefault("report_tmp", {})["departments_search"] = search
 
     try:
         if hasattr(message, 'delete') and message.chat_id:
