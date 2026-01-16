@@ -58,6 +58,13 @@ from .user_reports_add_helpers import (
     PREDEFINED_ACTIONS, validate_text_input, validate_english_only, save_report_to_db,
     broadcast_report, create_evaluation
 )
+
+# استيراد handle_final_confirm من flows/shared.py
+try:
+    from .flows.shared import handle_final_confirm
+except ImportError:
+    logger.warning("⚠️ Cannot import handle_final_confirm from flows/shared.py")
+    handle_final_confirm = None
 from services.error_monitoring import error_monitor
 from services.doctors_smart_search import search_doctors
 from services.smart_cancel_manager import SmartCancelManager
