@@ -50,75 +50,27 @@ logger = logging.getLogger(__name__)
 
 def load_translator_names():
     """
-    قراءة أسماء المترجمين من الملف
-    دالة ثابتة للقوائم - تقرأ من ملف translator_names.txt
+    قراءة أسماء المترجمين من الخدمة الموحدة
+    ✅ تم إصلاح: استخدام translators_service لضمان نفس الترتيب في جميع الأماكن
     """
     try:
-        # البحث عن الملف في عدة مسارات محتملة
-        current_file = os.path.abspath(__file__)
-        # flows/shared.py -> flows/ -> user_reports_add_new_system/ -> user/ -> handlers/ -> bot/ -> workspace root
-        workspace_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(current_file))))))
-        
-        possible_paths = [
-            os.path.join(workspace_root, 'data', 'translator_names.txt'),
-            os.path.join(os.path.dirname(current_file), '..', '..', '..', 'data', 'translator_names.txt'),
-            os.path.join(os.path.dirname(current_file), '..', '..', '..', '..', 'data', 'translator_names.txt'),
-            'data/translator_names.txt',
-            '../data/translator_names.txt',
-            '../../data/translator_names.txt'
-        ]
-
-        translator_file = None
-        for path in possible_paths:
-            if os.path.exists(path):
-                translator_file = path
-                break
-
-        if not translator_file:
-            raise FileNotFoundError(f"لم يتم العثور على ملف translator_names.txt في أي من المسارات: {possible_paths}")
-
-        logger.info(f"📁 تم العثور على ملف المترجمين: {translator_file}")
-
-        # محاولة قراءة الملف بطرق مختلفة
-        try:
-            # محاولة أولى: utf-8 مع BOM
-            with open(translator_file, 'r', encoding='utf-8-sig') as f:
-                content = f.read()
-                lines = content.split('\n')
-                names = [line.strip() for line in lines[1:] if line.strip()]
-                if names and any('م' in name for name in names):
-                    logger.info(f"✅ تم قراءة {len(names)} مترجم باستخدام utf-8-sig")
-                    return names
-        except Exception:
-            pass
-
-        # محاولة ثانية: قراءة كـ bytes ثم decode
-        try:
-            with open(translator_file, 'rb') as f:
-                content = f.read()
-                # محاولة decode بترميز مختلف
-                for encoding in ['utf-8', 'cp1256', 'windows-1256']:
-                    try:
-                        text = content.decode(encoding)
-                        lines = text.split('\n')
-                        names = [line.strip() for line in lines[1:] if line.strip()]
-                        if names and any('م' in name for name in names):
-                            logger.info(f"✅ تم قراءة {len(names)} مترجم باستخدام {encoding} (binary)")
-                            return names
-                    except UnicodeDecodeError:
-                        continue
-        except Exception:
-            pass
-
-        # إذا فشل جميع encodings
-        raise Exception("فشل في قراءة الملف بجميع encodings المحاولة")
-
+        # ✅ استخدام الخدمة الموحدة للحصول على ترتيب موحد
+        from services.translators_service import get_all_translator_names
+        names = get_all_translator_names()
+        if names:
+            logger.info(f"✅ تم تحميل {len(names)} مترجم من الخدمة الموحدة")
+            return names
     except Exception as e:
-        logger.error(f"❌ خطأ في قراءة ملف المترجمين: {e}")
-        # قائمة احتياطية في حالة فشل قراءة الملف
-        fallback_names = ["مصطفى", "واصل", "نجم الدين", "محمد علي", "سعيد", "مهدي", "صبري", "عزي", "معتز", "ادريس", "هاشم", "ادم", "زيد", "عصام", "عزالدين", "حسن", "زين العابدين", "عبدالسلام", "ياسر", "يحيى"]
-        logger.warning(f"⚠️ استخدام القائمة الاحتياطية: {len(fallback_names)} مترجم")
-        return fallback_names
+        logger.warning(f"⚠️ فشل تحميل المترجمين من الخدمة: {e}")
+
+    # ✅ قائمة احتياطية بنفس الترتيب المستخدم في translators_service
+    fallback_names = [
+        "معتز", "ادم", "هاشم", "مصطفى", "حسن", "نجم الدين", "محمد علي",
+        "صبري", "عزي", "سعيد", "عصام", "زيد", "مهدي", "ادريس",
+        "واصل", "عزالدين", "عبدالسلام", "يحيى العنسي", "ياسر"
+    ]
+    logger.warning(f"⚠️ استخدام القائمة الاحتياطية: {len(fallback_names)} مترجم")
+    return fallback_names
 
 
 def ensure_default_translators():
@@ -204,19 +156,45 @@ def format_field_value(value):
     return str(value)
 
 
-def format_time_12h(time_str):
-    """تحويل الوقت لصيغة 12 ساعة مع صباحاً/ظهراً/مساءً"""
-    if not time_str:
+def format_time_12h(time_input):
+    """
+    تحويل الوقت لصيغة 12 ساعة مع صباحاً/ظهراً/مساءً
+    ✅ النسخة الموحدة - تدعم datetime objects و strings
+
+    Args:
+        time_input: يمكن أن يكون:
+            - datetime object
+            - string بصيغة "HH:MM" أو "HH"
+            - int (الساعة فقط)
+
+    Returns:
+        string بصيغة "X:XX صباحاً/ظهراً/مساءً" أو None إذا كان الإدخال فارغاً
+    """
+    if not time_input:
         return None
+
     try:
-        if ':' in str(time_str):
-            parts = str(time_str).split(':')
-            hour = int(parts[0])
-            minute = parts[1] if len(parts) > 1 else '00'
-        else:
-            hour = int(time_str)
+        # ✅ التعامل مع datetime object
+        if isinstance(time_input, datetime):
+            hour = time_input.hour
+            minute = f"{time_input.minute:02d}"
+        # ✅ التعامل مع string
+        elif isinstance(time_input, str):
+            if ':' in time_input:
+                parts = time_input.split(':')
+                hour = int(parts[0])
+                minute = parts[1] if len(parts) > 1 else '00'
+            else:
+                hour = int(time_input)
+                minute = '00'
+        # ✅ التعامل مع int
+        elif isinstance(time_input, int):
+            hour = time_input
             minute = '00'
-        
+        else:
+            return str(time_input)
+
+        # تحويل لصيغة 12 ساعة
         if hour == 0:
             return f"12:{minute} صباحاً"
         elif hour < 12:
@@ -226,7 +204,109 @@ def format_time_12h(time_str):
         else:
             return f"{hour-12}:{minute} مساءً"
     except:
-        return str(time_str)
+        return str(time_input)
+
+
+def _chunked(lst, n):
+    """تقسيم قائمة إلى أجزاء بحجم n"""
+    for i in range(0, len(lst), n):
+        yield lst[i:i + n]
+
+
+def _build_hour_keyboard():
+    """
+    بناء لوحة اختيار الساعات بصيغة 12 ساعة
+    ✅ النسخة الموحدة
+    """
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    keyboard = []
+    
+    # أوقات شائعة أولاً (صباحاً)
+    common_morning = [
+        ("🌅 8:00 صباحاً", "08"),
+        ("🌅 9:00 صباحاً", "09"),
+        ("🌅 10:00 صباحاً", "10"),
+        ("🌅 11:00 صباحاً", "11"),
+    ]
+    keyboard.append([InlineKeyboardButton(label, callback_data=f"time_hour:{val}") for label, val in common_morning])
+    
+    # الظهر
+    keyboard.append([
+        InlineKeyboardButton("☀️ 12:00 ظهراً", callback_data="time_hour:12")
+    ])
+    
+    # بعد الظهر
+    common_afternoon = [
+        ("🌆 1:00 مساءً", "13"),
+        ("🌆 2:00 مساءً", "14"),
+        ("🌆 3:00 مساءً", "15"),
+        ("🌆 4:00 مساءً", "16"),
+    ]
+    keyboard.append([InlineKeyboardButton(label, callback_data=f"time_hour:{val}") for label, val in common_afternoon])
+    
+    # مساءً
+    common_evening = [
+        ("🌃 5:00 مساءً", "17"),
+        ("🌃 6:00 مساءً", "18"),
+        ("🌃 7:00 مساءً", "19"),
+        ("🌃 8:00 مساءً", "20"),
+    ]
+    keyboard.append([InlineKeyboardButton(label, callback_data=f"time_hour:{val}") for label, val in common_evening])
+    
+    # زر "أوقات أخرى"
+    keyboard.append([InlineKeyboardButton("🕐 أوقات أخرى", callback_data="time_hour:more")])
+    
+    keyboard.append([InlineKeyboardButton("⏭️ بدون وقت", callback_data="time_skip")])
+    keyboard.append([
+        InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
+        InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel"),
+    ])
+    return InlineKeyboardMarkup(keyboard)
+
+
+def _build_minute_keyboard(hour: str):
+    """
+    بناء لوحة اختيار الدقائق مع عرض الوقت بصيغة 12 ساعة
+    ✅ النسخة الموحدة
+    """
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    minute_options = ["00", "15", "30", "45"]
+    keyboard = []
+
+    # تحويل الساعة إلى صيغة 12 ساعة للعرض
+    hour_int = int(hour)
+    if hour_int == 0:
+        hour_display = "12"
+        period = "صباحاً"
+    elif hour_int < 12:
+        hour_display = str(hour_int)
+        period = "صباحاً"
+    elif hour_int == 12:
+        hour_display = "12"
+        period = "ظهراً"
+    else:
+        hour_display = str(hour_int - 12)
+        period = "مساءً"
+
+    for chunk in _chunked(minute_options, 2):
+        row = []
+        for m in chunk:
+            label = f"{hour_display}:{m} {period}"
+            row.append(
+                InlineKeyboardButton(
+                    label,
+                    callback_data=f"time_minute:{hour}:{m}"))
+        keyboard.append(row)
+
+    keyboard.append([InlineKeyboardButton(
+        "⏭️ بدون وقت", callback_data="time_skip")])
+    keyboard.append([
+        InlineKeyboardButton("🔙 تغيير الساعة", callback_data="time_back_hour"),
+        InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
+    ])
+    keyboard.append([InlineKeyboardButton(
+        "❌ إلغاء", callback_data="nav:cancel")])
+    return InlineKeyboardMarkup(keyboard)
 
 
 def get_field_display_name(field_key):
@@ -346,71 +426,68 @@ def _has_field_value(data, field_key):
 
 
 def get_editable_fields_by_flow_type(flow_type):
-    """الحصول على الحقول القابلة للتعديل حسب نوع التدفق - دالة ثابتة للقوائم
+    """الحصول على الحقول القابلة للتعديل حسب نوع التدفق - النسخة الموحدة
     ✅ ملاحظة: تم إزالة الحقول الأساسية (report_date, patient_name, hospital_name, department_name, doctor_name)
     لأنها تُحدد قبل بدء المسار وليست جزءاً من الإدخال اليدوي
+    ✅ تتضمن translator_name للسماح بتعديل المترجم
     """
     fields_map = {
         "new_consult": [
-            # ✅ الحقول المدخلة فقط في مسار استشارة جديدة
             ("complaint", "💬 شكوى المريض"),
             ("diagnosis", "🔬 التشخيص الطبي"),
             ("decision", "📝 قرار الطبيب"),
             ("tests", "🧪 الفحوصات والأشعة"),
             ("followup_date", "📅 موعد العودة"),
-            ("followup_time", "⏰ وقت العودة"),
             ("followup_reason", "✍️ سبب العودة"),
+            ("translator_name", "👤 المترجم"),
         ],
         "followup": [
-            # ✅ الحقول المدخلة فقط في مسار متابعة (متابعة في الرقود)
-            ("complaint", "💬 شكوى المريض"),
-            ("diagnosis", "🔬 التشخيص الطبي"),
-            ("decision", "📝 قرار الطبيب"),
-            ("room_number", "🏥 رقم الغرفة والطابق"),
+            ("complaint", "💬 حالة المريض اليومية"),
+            ("diagnosis", "🔬 التشخيص"),
+            ("decision", "📝 قرار الطبيب اليومي"),
+            ("room_number", "🚪 رقم الغرفة والطابق"),
             ("followup_date", "📅 موعد العودة"),
-            ("followup_time", "⏰ وقت العودة"),
             ("followup_reason", "✍️ سبب العودة"),
+            ("translator_name", "👤 المترجم"),
         ],
         "periodic_followup": [
             # ✅ مسار "مراجعة / عودة دورية" - بدون room_number
             ("complaint", "💬 شكوى المريض"),
-            ("diagnosis", "🔬 التشخيص الطبي"),
+            ("diagnosis", "🔬 التشخيص"),
             ("decision", "📝 قرار الطبيب"),
             ("followup_date", "📅 موعد العودة"),
-            ("followup_time", "⏰ وقت العودة"),
             ("followup_reason", "✍️ سبب العودة"),
+            ("translator_name", "👤 المترجم"),
         ],
         "inpatient_followup": [
             # ✅ مسار "متابعة في الرقود" - مع room_number
-            ("complaint", "💬 شكوى المريض"),
-            ("diagnosis", "🔬 التشخيص الطبي"),
-            ("decision", "📝 قرار الطبيب"),
-            ("room_number", "🏥 رقم الغرفة والطابق"),
+            ("complaint", "💬 حالة المريض اليومية"),
+            ("diagnosis", "🔬 التشخيص"),
+            ("decision", "📝 قرار الطبيب اليومي"),
+            ("room_number", "🚪 رقم الغرفة والطابق"),
             ("followup_date", "📅 موعد العودة"),
-            ("followup_time", "⏰ وقت العودة"),
             ("followup_reason", "✍️ سبب العودة"),
+            ("translator_name", "👤 المترجم"),
         ],
         "emergency": [
-            # ✅ الحقول المدخلة فقط في مسار طوارئ
             ("complaint", "💬 شكوى المريض"),
-            ("diagnosis", "🔬 التشخيص الطبي"),
+            ("diagnosis", "🔬 التشخيص"),
             ("decision", "📝 قرار الطبيب وماذا تم"),
             ("status", "🏥 وضع الحالة"),
-            ("room_number", "🚪 رقم الغرفة"),
+            ("admission_type", "🛏️ نوع الترقيد"),
             ("followup_date", "📅 موعد العودة"),
-            ("followup_time", "⏰ وقت العودة"),
             ("followup_reason", "✍️ سبب العودة"),
+            ("translator_name", "👤 المترجم"),
         ],
         "admission": [
-            # ✅ الحقول المدخلة فقط في مسار ترقيد
             ("admission_reason", "🛏️ سبب الرقود"),
             ("room_number", "🚪 رقم الغرفة"),
             ("notes", "📝 ملاحظات"),
             ("followup_date", "📅 موعد العودة"),
             ("followup_reason", "✍️ سبب العودة"),
+            ("translator_name", "👤 المترجم"),
         ],
         "surgery_consult": [
-            # ✅ الحقول المدخلة فقط في مسار استشارة مع قرار عملية
             ("diagnosis", "🔬 التشخيص"),
             ("decision", "📝 قرار الطبيب وتفاصيل العملية"),
             ("operation_name_en", "🔤 اسم العملية بالإنجليزي"),
@@ -418,57 +495,61 @@ def get_editable_fields_by_flow_type(flow_type):
             ("benefit_rate", "💡 نسبة الاستفادة"),
             ("tests", "🧪 الفحوصات والأشعة"),
             ("followup_date", "📅 موعد العودة"),
-            ("followup_time", "⏰ وقت العودة"),
             ("followup_reason", "✍️ سبب العودة"),
+            ("translator_name", "👤 المترجم"),
         ],
         "operation": [
-            # ✅ الحقول المدخلة فقط في مسار عملية
             ("operation_details", "⚕️ تفاصيل العملية بالعربي"),
             ("operation_name_en", "🔤 اسم العملية بالإنجليزي"),
             ("notes", "📝 ملاحظات"),
             ("followup_date", "📅 موعد العودة"),
-            ("followup_time", "⏰ وقت العودة"),
             ("followup_reason", "✍️ سبب العودة"),
+            ("translator_name", "👤 المترجم"),
         ],
         "final_consult": [
-            # ✅ الحقول المدخلة فقط في مسار استشارة أخيرة
             ("diagnosis", "🔬 التشخيص النهائي"),
             ("decision", "📝 قرار الطبيب"),
             ("recommendations", "💡 التوصيات الطبية"),
+            ("translator_name", "👤 المترجم"),
         ],
         "discharge": [
-            # ✅ الحقول المدخلة فقط في مسار خروج من المستشفى
             ("discharge_type", "🚪 نوع الخروج"),
             ("admission_summary", "📋 ملخص الرقود"),
             ("operation_details", "⚕️ تفاصيل العملية"),
             ("operation_name_en", "🔤 اسم العملية بالإنجليزي"),
             ("followup_date", "📅 موعد العودة"),
             ("followup_reason", "✍️ سبب العودة"),
+            ("translator_name", "👤 المترجم"),
         ],
         "rehab_physical": [
-            # ✅ الحقول المدخلة فقط في مسار علاج طبيعي
             ("therapy_details", "🏃 تفاصيل جلسة العلاج الطبيعي"),
             ("followup_date", "📅 موعد العودة"),
-            ("followup_time", "⏰ وقت العودة"),
             ("followup_reason", "✍️ سبب العودة"),
+            ("translator_name", "👤 المترجم"),
         ],
         "rehab_device": [
-            # ✅ الحقول المدخلة فقط في مسار أجهزة تعويضية
             ("device_name", "🦾 اسم الجهاز والتفاصيل"),
             ("followup_date", "📅 موعد العودة"),
-            ("followup_time", "⏰ وقت العودة"),
             ("followup_reason", "✍️ سبب العودة"),
+            ("translator_name", "👤 المترجم"),
         ],
         "radiology": [
-            # ✅ الحقول المدخلة فقط في مسار أشعة وفحوصات
             ("radiology_type", "🔬 نوع الأشعة/الفحص"),
             ("delivery_date", "📅 تاريخ الاستلام"),
+            ("translator_name", "👤 المترجم"),
         ],
         "appointment_reschedule": [
-            # ✅ الحقول المدخلة فقط في مسار تأجيل موعد
-            ("app_reschedule_reason", "📅 سبب تأجيل الموعد"),
-            ("app_reschedule_return_date", "📅 تاريخ العودة الجديد"),
+            ("app_reschedule_reason", "📅 سبب التأجيل"),
+            ("app_reschedule_return_date", "📅 موعد العودة الجديد"),
             ("app_reschedule_return_reason", "✍️ سبب العودة"),
+            ("translator_name", "👤 المترجم"),
+        ],
+        # ✅ أضف أسماء بديلة للتوافق
+        "app_reschedule": [
+            ("app_reschedule_reason", "📅 سبب التأجيل"),
+            ("app_reschedule_return_date", "📅 موعد العودة الجديد"),
+            ("app_reschedule_return_reason", "✍️ سبب العودة"),
+            ("translator_name", "👤 المترجم"),
         ],
     }
     return fields_map.get(flow_type, [])
@@ -516,10 +597,10 @@ def get_confirm_state(flow_type):
 # Translator Functions
 # =============================
 
-async def show_translator_selection(message, context, flow_type):
+async def show_translator_selection(message, context, flow_type, page=1):
     """
-    عرض قائمة المترجمين للاختيار (من ملف translator_names.txt)
-    دالة ثابتة للقوائم
+    ✅ عرض قائمة المترجمين للاختيار مع صفحات (الدالة الموحدة)
+    تم دمج: pagination من الملف الرئيسي + زر تخطي
     """
     translator_names = load_translator_names()
 
@@ -531,26 +612,53 @@ async def show_translator_selection(message, context, flow_type):
         context.user_data['_conversation_state'] = confirm_state
         return confirm_state
 
+    # تقسيم إلى صفحتين: الصفحة الأولى 18 مترجم، الباقي في الصفحة الثانية
+    FIRST_PAGE_COUNT = 18
+
+    if page == 1:
+        page_names = translator_names[:FIRST_PAGE_COUNT]
+    else:
+        page_names = translator_names[FIRST_PAGE_COUNT:]
+
     # تقسيم الأسماء إلى صفوف (3 أسماء لكل صف)
     keyboard_buttons = []
     row = []
 
-    for i, name in enumerate(translator_names):
-        row.append(InlineKeyboardButton(name, callback_data=f"simple_translator:{flow_type}:{i}"))
-        if len(row) == 3 or i == len(translator_names) - 1:
+    for name in page_names:
+        # الحصول على الـ index الحقيقي من القائمة الأصلية
+        real_index = translator_names.index(name)
+        row.append(InlineKeyboardButton(name, callback_data=f"simple_translator:{flow_type}:{real_index}"))
+        if len(row) == 3:
             keyboard_buttons.append(row)
             row = []
 
-    # إضافة زر تخطي (اختياري)
+    # إضافة الصف الأخير إذا كان غير مكتمل
+    if row:
+        keyboard_buttons.append(row)
+
+    # أزرار التنقل بين الصفحات
+    nav_buttons = []
+    if page == 1 and len(translator_names) > FIRST_PAGE_COUNT:
+        nav_buttons.append(InlineKeyboardButton("⬅️ الصفحة التالية", callback_data=f"translator_page:{flow_type}:2"))
+    elif page == 2:
+        nav_buttons.append(InlineKeyboardButton("➡️ الصفحة السابقة", callback_data=f"translator_page:{flow_type}:1"))
+
+    if nav_buttons:
+        keyboard_buttons.append(nav_buttons)
+
+    # إضافة زر تخطي + رجوع + إلغاء
     keyboard_buttons.append([
-        InlineKeyboardButton("⏭️ تخطي (بدون مترجم)", callback_data=f"simple_translator:{flow_type}:skip"),
+        InlineKeyboardButton("⏭️ تخطي", callback_data=f"simple_translator:{flow_type}:skip"),
+        InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
         InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
     ])
 
     keyboard = InlineKeyboardMarkup(keyboard_buttons)
 
+    page_text = f"(الصفحة {page} من 2)" if len(translator_names) > FIRST_PAGE_COUNT else ""
+
     await message.reply_text(
-        f"👤 **اختر اسم المترجم**\n\n"
+        f"👤 **اختر اسم المترجم** {page_text}\n\n"
         f"المترجم مسؤول عن ترجمة التقرير إلى اللغة المطلوبة.\n"
         f"اختر من القائمة أدناه:",
         reply_markup=keyboard,
@@ -561,6 +669,7 @@ async def show_translator_selection(message, context, flow_type):
 async def handle_simple_translator_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     معالجة اختيار المترجم البسيط (من قائمة ثابتة)
+    ✅ النسخة الموحدة مع معالجة أخطاء قوية
     """
     query = update.callback_query
     await query.answer()
@@ -590,21 +699,80 @@ async def handle_simple_translator_choice(update: Update, context: ContextTypes.
                 return ConversationHandler.END
 
         # حفظ اسم المترجم
-        report_tmp = context.user_data.setdefault("report_tmp", {})
-        report_tmp["translator_name"] = translator_name
-        report_tmp["translator_id"] = translator_id
+        context.user_data.setdefault("report_tmp", {})
+        context.user_data["report_tmp"]["translator_name"] = translator_name
+        context.user_data["report_tmp"]["translator_id"] = translator_id
+
+        # ✅ التحقق من flow_type مع fallback
+        valid_flow_types = ["new_consult", "followup", "periodic_followup", "emergency", "admission",
+                          "surgery_consult", "operation", "final_consult", "discharge",
+                          "rehab_physical", "rehab_device", "radiology", "appointment_reschedule"]
+
+        if not flow_type or flow_type not in valid_flow_types:
+            # محاولة الحصول على flow_type من report_tmp
+            current_flow = context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
+            if current_flow in valid_flow_types:
+                flow_type = current_flow
+            else:
+                flow_type = "new_consult"  # القيمة الافتراضية
 
         # المتابعة للتأكيد النهائي
-        await query.edit_message_text(f"✅ تم اختيار المترجم: **{translator_name}**")
-        await show_final_summary(query.message, context, flow_type)
+        message_to_use = None
 
-        confirm_state = get_confirm_state(flow_type)
-        context.user_data['_conversation_state'] = confirm_state
-        return confirm_state
+        # محاولة تعديل الرسالة أولاً
+        try:
+            await query.edit_message_text(f"✅ تم اختيار المترجم: **{translator_name}**", parse_mode="Markdown")
+            message_to_use = query.message
+        except Exception as e:
+            logger.warning(f"⚠️ فشل تعديل رسالة المترجم: {e}")
+            message_to_use = query.message
+
+        # محاولة إرسال الملخص
+        try:
+            if message_to_use:
+                await show_final_summary(message_to_use, context, flow_type)
+            elif update.effective_message:
+                await show_final_summary(update.effective_message, context, flow_type)
+            else:
+                # كحل أخير، أرسل رسالة جديدة
+                bot = context.bot
+                new_message = await bot.send_message(
+                    chat_id=query.from_user.id,
+                    text="✅ تم اختيار المترجم"
+                )
+                await show_final_summary(new_message, context, flow_type)
+        except Exception as e:
+            logger.error(f"❌ خطأ في show_final_summary: {e}", exc_info=True)
+            # حتى لو فشل show_final_summary، نكمل العملية
+            try:
+                if not message_to_use and update.effective_message:
+                    await update.effective_message.reply_text(
+                        f"✅ تم اختيار المترجم: {translator_name}\n\n"
+                        f"اضغط على زر '📢 نشر التقرير' للمتابعة."
+                    )
+            except:
+                pass
+
+        try:
+            if get_confirm_state is None:
+                logger.error("❌ get_confirm_state is None - cannot proceed")
+                context.user_data['_conversation_state'] = NEW_CONSULT_CONFIRM
+                return NEW_CONSULT_CONFIRM
+            confirm_state = get_confirm_state(flow_type)
+            context.user_data['_conversation_state'] = confirm_state
+            return confirm_state
+        except Exception as e:
+            logger.error(f"❌ خطأ في get_confirm_state: {e}", exc_info=True)
+            # إرجاع state افتراضي
+            context.user_data['_conversation_state'] = NEW_CONSULT_CONFIRM
+            return NEW_CONSULT_CONFIRM
 
     except Exception as e:
-        logger.error(f"❌ خطأ في معالجة اختيار المترجم: {e}", exc_info=True)
-        await query.edit_message_text("❌ حدث خطأ في معالجة الاختيار")
+        logger.error(f"❌ خطأ في handle_simple_translator_choice: {e}", exc_info=True)
+        try:
+            await query.edit_message_text("❌ حدث خطأ في معالجة الاختيار")
+        except:
+            pass
         return ConversationHandler.END
 
 
@@ -1486,14 +1654,59 @@ async def save_report_to_database(query, context, flow_type):
                 status = data.get("status", "")
                 decision_text += f"\n\nوضع الحالة: {status}"
 
-        # تحويل datetime مع tzinfo إلى naive datetime (SQLite لا يقبل tzinfo)
+        # تحويل datetime/string إلى naive datetime (SQLite لا يقبل tzinfo أو نصوص)
         def to_naive_datetime(dt):
-            """تحويل datetime مع tzinfo إلى naive datetime"""
+            """تحويل datetime مع tzinfo أو نص إلى naive datetime"""
             if dt is None:
                 return None
+            
+            # ✅ إذا كان نصاً، حاول تحويله إلى datetime
+            if isinstance(dt, str):
+                if not dt or dt.strip() == "":
+                    return None
+                try:
+                    # محاولة تحليل الصيغ الشائعة
+                    from datetime import datetime as dt_module
+                    # صيغة: YYYY-MM-DD HH:MM:SS أو YYYY-MM-DD HH:MM
+                    if ' ' in dt:
+                        try:
+                            return dt_module.strptime(dt, '%Y-%m-%d %H:%M:%S')
+                        except ValueError:
+                            try:
+                                return dt_module.strptime(dt, '%Y-%m-%d %H:%M')
+                            except ValueError:
+                                pass
+                    # صيغة: YYYY-MM-DD
+                    try:
+                        return dt_module.strptime(dt, '%Y-%m-%d')
+                    except ValueError:
+                        pass
+                    # صيغة: DD/MM/YYYY
+                    try:
+                        return dt_module.strptime(dt, '%d/%m/%Y')
+                    except ValueError:
+                        pass
+                    # صيغة: DD-MM-YYYY
+                    try:
+                        return dt_module.strptime(dt, '%d-%m-%Y')
+                    except ValueError:
+                        pass
+                    logger.warning(f"⚠️ Could not parse date string: {dt}")
+                    return None
+                except Exception as e:
+                    logger.error(f"❌ Error parsing date string '{dt}': {e}")
+                    return None
+            
+            # ✅ إذا كان date (وليس datetime)، حوله إلى datetime
+            if hasattr(dt, 'year') and not hasattr(dt, 'hour'):
+                from datetime import datetime as dt_module
+                return dt_module.combine(dt, dt_module.min.time())
+            
+            # ✅ إذا كان datetime مع tzinfo، أزل tzinfo
             if hasattr(dt, 'tzinfo') and dt.tzinfo is not None:
                 # تحويل إلى UTC ثم إزالة tzinfo
                 return dt.astimezone(ZoneInfo('UTC')).replace(tzinfo=None)
+            
             return dt
         
         # معالجة report_date

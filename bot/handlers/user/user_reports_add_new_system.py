@@ -11655,6 +11655,12 @@ async def handle_translator_page_navigation(update: Update, context: ContextType
         flow_type = parts[1]
         page = int(parts[2])
         
+        # ✅ التحقق من أن load_translator_names ليست None
+        if load_translator_names is None:
+            logger.error("❌ load_translator_names is None - cannot proceed")
+            await query.edit_message_text("⚠️ خطأ في النظام - يرجى المحاولة مرة أخرى")
+            return ConversationHandler.END
+        
         translator_names = load_translator_names()
         FIRST_PAGE_COUNT = 19
         
