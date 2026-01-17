@@ -511,6 +511,15 @@ if _nav_buttons is None:
             "❌ إلغاء العملية", callback_data="nav:cancel")])
         return InlineKeyboardMarkup(buttons)
 
+# ✅ Wrapper function للتحقق من None قبل استدعاء show_translator_selection
+async def safe_show_translator_selection(message, context, flow_type):
+    """استدعاء آمن لـ show_translator_selection مع التحقق من None"""
+    if show_translator_selection is None:
+        logger.error("❌ show_translator_selection is None - cannot proceed")
+        await message.reply_text("⚠️ خطأ في النظام - يرجى المحاولة مرة أخرى")
+        return ConversationHandler.END
+    return await show_translator_selection(message, context, flow_type)
+
 
 # ✅ تم نقل format_time_12h إلى flows/shared.py - النسخة الموحدة تدعم datetime و strings
 # استخدم: from .flows.shared import format_time_12h
