@@ -59,12 +59,47 @@ from .user_reports_add_helpers import (
     broadcast_report, create_evaluation
 )
 
-# استيراد handle_final_confirm من flows/shared.py
+# استيراد handle_final_confirm و دوال الحالات من flows/shared.py
 try:
-    from .flows.shared import handle_final_confirm
+    from .flows.shared import (
+        handle_final_confirm,
+        get_translator_state,
+        get_confirm_state,
+        format_field_value,
+        get_field_display_name,
+        show_translator_selection,
+        handle_simple_translator_choice,
+        load_translator_names,
+        get_editable_fields_by_flow_type,
+        format_time_12h,
+        _build_hour_keyboard,
+        _build_minute_keyboard,
+        _chunked
+    )
 except ImportError:
-    logger.warning("⚠️ Cannot import handle_final_confirm from flows/shared.py")
+    logger.warning("⚠️ Cannot import from flows/shared.py")
     handle_final_confirm = None
+    get_translator_state = None
+    get_confirm_state = None
+    format_field_value = None
+    get_field_display_name = None
+    show_translator_selection = None
+    handle_simple_translator_choice = None
+    load_translator_names = None
+    get_editable_fields_by_flow_type = None
+    format_time_12h = None
+    _build_hour_keyboard = None
+    _build_minute_keyboard = None
+    _chunked = None
+
+# ✅ استيراد الأدوات المشتركة من utils.py (توحيد الكود)
+try:
+    from .utils import _chunked, _cancel_kb, _nav_buttons
+except ImportError:
+    logger.warning("⚠️ Cannot import utilities from utils.py - using local definitions")
+    _chunked = None
+    _cancel_kb = None
+    _nav_buttons = None
 from services.error_monitoring import error_monitor
 from services.doctors_smart_search import search_doctors
 from services.smart_cancel_manager import SmartCancelManager
@@ -449,39 +484,36 @@ MONTH_NAMES_AR = {
 WEEKDAYS_AR = ["س", "ح", "ن", "ث", "ر", "خ", "ج"]
 
 
-def _chunked(seq, size):
-    return [seq[i: i + size] for i in range(0, len(seq), size)]
+# ✅ تم نقل _chunked و _cancel_kb إلى utils.py (توحيد الكود)
+# الاستيراد في أعلى الملف: from .utils import _chunked, _cancel_kb
+# إذا فشل الاستيراد، نستخدم تعريفات محلية كـ fallback
+if _chunked is None:
+    def _chunked(seq, size):
+        return [seq[i: i + size] for i in range(0, len(seq), size)]
+
+if _cancel_kb is None:
+    def _cancel_kb():
+        return InlineKeyboardMarkup(
+            [[InlineKeyboardButton("❌ إلغاء العملية", callback_data="nav:cancel")]])
 
 
-def _cancel_kb():
-    return InlineKeyboardMarkup(
-        [[InlineKeyboardButton("❌ إلغاء العملية", callback_data="nav:cancel")]])
-
-
-def _nav_buttons(show_back=True):
-    """أزرار التنقل الأساسية"""
-    buttons = []
-
-    if show_back:
+# ✅ تم نقل _nav_buttons إلى utils.py (توحيد الكود)
+# الاستيراد في أعلى الملف: from .utils import _nav_buttons
+# إذا فشل الاستيراد، نستخدم تعريف محلي كـ fallback
+if _nav_buttons is None:
+    def _nav_buttons(show_back=True):
+        """أزرار التنقل الأساسية"""
+        buttons = []
+        if show_back:
+            buttons.append([InlineKeyboardButton(
+                "🔙 رجوع", callback_data="nav:back")])
         buttons.append([InlineKeyboardButton(
-            "🔙 رجوع", callback_data="nav:back")])
-
-    buttons.append([InlineKeyboardButton(
-        "❌ إلغاء العملية", callback_data="nav:cancel")])
-
-    return InlineKeyboardMarkup(buttons)
+            "❌ إلغاء العملية", callback_data="nav:cancel")])
+        return InlineKeyboardMarkup(buttons)
 
 
-def format_time_12h(dt: datetime) -> str:
-    """تحويل الوقت إلى صيغة 12 ساعة مع التمييز بين صباح/مساء"""
-    hour = dt.hour
-    minute = dt.minute
-    if hour == 0:
-        return f"12:{minute:02d} صباحاً"
-    elif hour < 12:
-        return f"{hour}:{minute:02d} صباحاً"
-    else:
-        return f"{hour-12}:{minute:02d} مساءً"
+# ✅ تم نقل format_time_12h إلى flows/shared.py - النسخة الموحدة تدعم datetime و strings
+# استخدم: from .flows.shared import format_time_12h
 
 
 def format_time_string_12h(time_str: str) -> str:
@@ -520,101 +552,9 @@ def format_time_string_12h(time_str: str) -> str:
         return time_str
 
 
-def _build_hour_keyboard():
-    """بناء لوحة اختيار الساعات بصيغة 12 ساعة"""
-    keyboard = []
-    
-    # أوقات شائعة أولاً (صباحاً)
-    common_morning = [
-        ("🌅 8:00 صباحاً", "08"),
-        ("🌅 9:00 صباحاً", "09"),
-        ("🌅 10:00 صباحاً", "10"),
-        ("🌅 11:00 صباحاً", "11"),
-    ]
-    keyboard.append([InlineKeyboardButton(label, callback_data=f"time_hour:{val}") for label, val in common_morning])
-    
-    # الظهر
-    keyboard.append([
-        InlineKeyboardButton("☀️ 12:00 ظهراً", callback_data="time_hour:12")
-    ])
-    
-    # بعد الظهر
-    common_afternoon = [
-        ("🌆 1:00 مساءً", "13"),
-        ("🌆 2:00 مساءً", "14"),
-        ("🌆 3:00 مساءً", "15"),
-        ("🌆 4:00 مساءً", "16"),
-    ]
-    keyboard.append([InlineKeyboardButton(label, callback_data=f"time_hour:{val}") for label, val in common_afternoon])
-    
-    # مساءً
-    common_evening = [
-        ("🌃 5:00 مساءً", "17"),
-        ("🌃 6:00 مساءً", "18"),
-        ("🌃 7:00 مساءً", "19"),
-        ("🌃 8:00 مساءً", "20"),
-    ]
-    keyboard.append([InlineKeyboardButton(label, callback_data=f"time_hour:{val}") for label, val in common_evening])
-    
-    # زر "أوقات أخرى"
-    keyboard.append([InlineKeyboardButton("🕐 أوقات أخرى", callback_data="time_hour:more")])
-    
-    keyboard.append([InlineKeyboardButton("⏭️ بدون وقت", callback_data="time_skip")])
-    keyboard.append([
-        InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
-        InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel"),
-    ])
-    return InlineKeyboardMarkup(keyboard)
+# ✅ تم نقل _build_hour_keyboard و _build_minute_keyboard إلى flows/shared.py
+# استخدم: from .flows.shared import _build_hour_keyboard, _build_minute_keyboard
 
-
-def _build_minute_keyboard(hour: str):
-    # دالة بناء لوحة دقائق للمتابعة (لمنع الخطأ)
-    def _build_followup_minute_keyboard(hour: str):
-        # بناء لوحة مفاتيح الدقائق (0، 15، 30، 45)
-        minute_options = ["00", "15", "30", "45"]
-        keyboard = [
-            [InlineKeyboardButton(f"{hour}:{m}", callback_data=f"followup_time_minute:{hour}:{m}") for m in minute_options],
-            [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"), InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]
-        ]
-        return InlineKeyboardMarkup(keyboard)
-    """بناء لوحة اختيار الدقائق مع عرض الوقت بصيغة 12 ساعة"""
-    minute_options = ["00", "15", "30", "45"]
-    keyboard = []
-
-    # تحويل الساعة إلى صيغة 12 ساعة للعرض
-    hour_int = int(hour)
-    if hour_int == 0:
-        hour_display = "12"
-        period = "صباحاً"
-    elif hour_int < 12:
-        hour_display = str(hour_int)
-        period = "صباحاً"
-    elif hour_int == 12:
-        hour_display = "12"
-        period = "ظهراً"
-    else:
-        hour_display = str(hour_int - 12)
-        period = "مساءً"
-
-    for chunk in _chunked(minute_options, 2):
-        row = []
-        for m in chunk:
-            label = f"{hour_display}:{m} {period}"
-            row.append(
-    InlineKeyboardButton(
-        label,
-         callback_data=f"time_minute:{hour}:{m}"))
-        keyboard.append(row)
-
-    keyboard.append([InlineKeyboardButton(
-        "⏭️ بدون وقت", callback_data="time_skip")])
-    keyboard.append([
-        InlineKeyboardButton("🔙 تغيير الساعة", callback_data="time_back_hour"),
-        InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
-    ])
-    keyboard.append([InlineKeyboardButton(
-        "❌ إلغاء", callback_data="nav:cancel")])
-    return InlineKeyboardMarkup(keyboard)
 
 # =============================
 # دوال الرجوع الذكي
@@ -737,6 +677,9 @@ async def cancel_draft_edit(update, context):
     flow_type = context.user_data.get('report_tmp', {}).get('current_flow')
     await show_final_summary(query.message if query else update.message, context, flow_type)
 
+    if get_confirm_state is None:
+        logger.error("❌ get_confirm_state is None - cannot proceed")
+        return ConversationHandler.END
     confirm_state = get_confirm_state(flow_type)
     context.user_data['_conversation_state'] = confirm_state
     return confirm_state
@@ -1429,24 +1372,8 @@ class SmartNavigationManager:
 # إنشاء instance واحد من SmartNavigationManager
 smart_nav_manager = SmartNavigationManager()
 
-def get_translator_state(flow_type):
-    """
-    الحصول على حالة المترجم المناسبة حسب نوع التدفق
-    """
-    translator_states = {
-        'new_consult': 'FOLLOWUP_TRANSLATOR',
-        'followup': 'FOLLOWUP_TRANSLATOR',
-        'periodic_followup': 'FOLLOWUP_TRANSLATOR',
-        'emergency': 'EMERGENCY_TRANSLATOR',
-        'operation': 'OPERATION_TRANSLATOR',
-        'diagnosis': 'DIAGNOSIS_TRANSLATOR',
-        'discharge': 'DISCHARGE_TRANSLATOR',
-        'radiology': 'RADIOLOGY_TRANSLATOR',
-        'physical_therapy': 'PHYSICAL_THERAPY_TRANSLATOR',
-        'device': 'DEVICE_TRANSLATOR'
-    }
-
-    return translator_states.get(flow_type, 'FOLLOWUP_TRANSLATOR')
+# ✅ تم حذف get_translator_state المكررة (كانت ترجع strings بدلاً من constants)
+# النسخة الصحيحة موجودة أدناه في السطر ~7802
 
 class SmartStateRenderer:
     """
@@ -1532,6 +1459,9 @@ class SmartStateRenderer:
             context.user_data['report_tmp'].pop('translator_id', None)
 
         # تحديث الحالة بدقة
+        if get_translator_state is None:
+            logger.error("❌ get_translator_state is None - cannot proceed")
+            return ConversationHandler.END
         translator_state = get_translator_state(flow_type)
         context.user_data['_conversation_state'] = translator_state
 
@@ -1544,6 +1474,9 @@ class SmartStateRenderer:
 
         logger.info("✅ Translator selection fully refreshed and ready")
         # عرض شاشة المترجم
+        if show_translator_selection is None:
+            logger.error("❌ show_translator_selection is None - cannot proceed")
+            return ConversationHandler.END
         await show_translator_selection(message, context, flow_type)
 
     @staticmethod
@@ -2813,7 +2746,10 @@ async def handle_date_choice(
         day_name = days_ar.get(now.weekday(), '')
 
         # استخدام format_time_12h لعرض الوقت بصيغة 12 ساعة بتوقيت الهند
-        time_str = format_time_12h(now)
+        if format_time_12h is None:
+            time_str = now.strftime('%H:%M')
+        else:
+            time_str = format_time_12h(now)
         date_str = now.strftime('%Y-%m-%d')
 
         await query.edit_message_text(
@@ -2894,7 +2830,7 @@ async def handle_main_calendar_day(
             f"{date_str}\n\n"
             f"🕐 **الوقت**\n\n"
             f"اختر الساعة:",
-            reply_markup=_build_hour_keyboard(),
+            reply_markup=_build_hour_keyboard() if _build_hour_keyboard is not None else InlineKeyboardMarkup([]),
             parse_mode="Markdown"
         )
         return R_DATE_TIME
@@ -2952,6 +2888,10 @@ async def handle_date_time_hour(
         return R_DATE_TIME
 
     context.user_data.setdefault("report_tmp", {})["_pending_date_hour"] = hour
+    if _build_minute_keyboard is None:
+        logger.error("❌ _build_minute_keyboard is None - cannot proceed")
+        await query.answer("⚠️ خطأ في النظام - يرجى المحاولة مرة أخرى", show_alert=True)
+        return ConversationHandler.END
     await query.edit_message_text(
         f"🕐 اختر الدقائق للساعة {hour}:",
         reply_markup=_build_minute_keyboard(hour),
@@ -7785,39 +7725,44 @@ async def handle_translator_text(update: Update, context: ContextTypes.DEFAULT_T
     context.user_data['_conversation_state'] = confirm_state
     return confirm_state
 
-def get_translator_state(flow_type):
-    """الحصول على state المترجم المناسب"""
-    states = {
-        "new_consult": NEW_CONSULT_TRANSLATOR,
-        "followup": FOLLOWUP_TRANSLATOR,
-        "surgery_consult": SURGERY_CONSULT_TRANSLATOR,
-        "emergency": EMERGENCY_TRANSLATOR,
-        "admission": ADMISSION_TRANSLATOR,
-        "operation": OPERATION_TRANSLATOR,
-        "final_consult": FINAL_CONSULT_TRANSLATOR,
-        "discharge": DISCHARGE_TRANSLATOR,
-        "rehab_physical": PHYSICAL_THERAPY_TRANSLATOR,
-        "rehab_device": DEVICE_TRANSLATOR,
-        "radiology": RADIOLOGY_TRANSLATOR
-    }
-    return states.get(flow_type, NEW_CONSULT_TRANSLATOR)
+# ✅ تم نقل get_translator_state و get_confirm_state إلى flows/shared.py (توحيد الكود)
+# الاستيراد في أعلى الملف: from .flows.shared import get_translator_state, get_confirm_state
+# إذا فشل الاستيراد، نستخدم تعريفات محلية كـ fallback
+if get_translator_state is None:
+    def get_translator_state(flow_type):
+        """الحصول على state المترجم المناسب"""
+        states = {
+            "new_consult": NEW_CONSULT_TRANSLATOR,
+            "followup": FOLLOWUP_TRANSLATOR,
+            "surgery_consult": SURGERY_CONSULT_TRANSLATOR,
+            "emergency": EMERGENCY_TRANSLATOR,
+            "admission": ADMISSION_TRANSLATOR,
+            "operation": OPERATION_TRANSLATOR,
+            "final_consult": FINAL_CONSULT_TRANSLATOR,
+            "discharge": DISCHARGE_TRANSLATOR,
+            "rehab_physical": PHYSICAL_THERAPY_TRANSLATOR,
+            "rehab_device": DEVICE_TRANSLATOR,
+            "radiology": RADIOLOGY_TRANSLATOR
+        }
+        return states.get(flow_type, NEW_CONSULT_TRANSLATOR)
 
-def get_confirm_state(flow_type):
-    """الحصول على state التأكيد المناسب"""
-    states = {
-        "new_consult": NEW_CONSULT_CONFIRM,
-        "followup": FOLLOWUP_CONFIRM,
-        "surgery_consult": SURGERY_CONSULT_CONFIRM,
-        "emergency": EMERGENCY_CONFIRM,
-        "admission": ADMISSION_CONFIRM,
-        "operation": OPERATION_CONFIRM,
-        "final_consult": FINAL_CONSULT_CONFIRM,
-        "discharge": DISCHARGE_CONFIRM,
-        "rehab_physical": PHYSICAL_THERAPY_CONFIRM,
-        "device": DEVICE_CONFIRM,
-        "radiology": RADIOLOGY_CONFIRM
-    }
-    return states.get(flow_type, NEW_CONSULT_CONFIRM)
+if get_confirm_state is None:
+    def get_confirm_state(flow_type):
+        """الحصول على state التأكيد المناسب"""
+        states = {
+            "new_consult": NEW_CONSULT_CONFIRM,
+            "followup": FOLLOWUP_CONFIRM,
+            "surgery_consult": SURGERY_CONSULT_CONFIRM,
+            "emergency": EMERGENCY_CONFIRM,
+            "admission": ADMISSION_CONFIRM,
+            "operation": OPERATION_CONFIRM,
+            "final_consult": FINAL_CONSULT_CONFIRM,
+            "discharge": DISCHARGE_CONFIRM,
+            "rehab_physical": PHYSICAL_THERAPY_CONFIRM,
+            "device": DEVICE_CONFIRM,
+            "radiology": RADIOLOGY_CONFIRM
+        }
+        return states.get(flow_type, NEW_CONSULT_CONFIRM)
 
 def get_first_state(flow_type):
     """الحصول على state الخطوة الأولى من التدفق"""
@@ -7836,125 +7781,22 @@ def get_first_state(flow_type):
     }
     return states.get(flow_type, NEW_CONSULT_COMPLAINT)
 
-def get_editable_fields_by_flow_type(flow_type):
-    """الحصول على الحقول القابلة للتعديل حسب نوع التدفق - فقط حقول التقرير (بدون البيانات الأساسية)"""
-    fields_map = {
-        "new_consult": [
-            ("complaint", "💬 شكوى المريض"),
-            ("diagnosis", "🔬 التشخيص الطبي"),
-            ("decision", "📝 قرار الطبيب"),
-            ("tests", "🧪 الفحوصات والأشعة"),
-            ("followup_date", "📅 موعد العودة"),
-            ("followup_reason", "✍️ سبب العودة"),
-            ("translator_name", "👤 المترجم"),
-        ],
-        "followup": [
-            ("complaint", "💬 حالة المريض اليومية"),
-            ("diagnosis", "🔬 التشخيص"),
-            ("decision", "📝 قرار الطبيب اليومي"),
-            ("room_number", "🚪 رقم الغرفة والطابق"),
-            ("followup_date", "📅 موعد العودة"),
-            ("followup_reason", "✍️ سبب العودة"),
-            ("translator_name", "👤 المترجم"),
-        ],
-        "periodic_followup": [
-            # ✅ مسار "مراجعة / عودة دورية" - بدون room_number
-            ("complaint", "💬 شكوى المريض"),
-            ("diagnosis", "🔬 التشخيص"),
-            ("decision", "📝 قرار الطبيب"),
-            ("followup_date", "📅 موعد العودة"),
-            ("followup_reason", "✍️ سبب العودة"),
-            ("translator_name", "👤 المترجم"),
-        ],
-        "inpatient_followup": [
-            # ✅ مسار "متابعة في الرقود" - مع room_number
-            ("complaint", "💬 حالة المريض اليومية"),
-            ("diagnosis", "🔬 التشخيص"),
-            ("decision", "📝 قرار الطبيب اليومي"),
-            ("room_number", "🚪 رقم الغرفة والطابق"),
-            ("followup_date", "📅 موعد العودة"),
-            ("followup_reason", "✍️ سبب العودة"),
-            ("translator_name", "👤 المترجم"),
-        ],
-        "emergency": [
-            ("complaint", "💬 شكوى المريض"),
-            ("diagnosis", "🔬 التشخيص"),
-            ("decision", "📝 قرار الطبيب وماذا تم"),
-            ("status", "🏥 وضع الحالة"),
-            ("admission_type", "🛏️ نوع الترقيد"),
-            # لا تضف room_number هنا إلا إذا كان flow_type == 'followup' أو 'inpatient_followup'
-            # (يتم التحكم في ذلك عبر منطق بناء الأزرار)
-            ("followup_date", "📅 موعد العودة"),
-            ("followup_reason", "✍️ سبب العودة"),
-            ("translator_name", "👤 المترجم"),
-        ],
-        "admission": [
-            ("admission_reason", "🛏️ سبب الرقود"),
-            ("room_number", "🚪 رقم الغرفة"),
-            ("notes", "📝 ملاحظات"),
-            ("followup_date", "📅 موعد العودة"),
-            ("followup_reason", "✍️ سبب العودة"),
-            ("translator_name", "👤 المترجم"),
-        ],
-        "surgery_consult": [
-            ("diagnosis", "🔬 التشخيص"),
-            ("decision", "📝 قرار الطبيب وتفاصيل العملية"),
-            ("operation_name_en", "🔤 اسم العملية بالإنجليزي"),
-            ("success_rate", "📊 نسبة نجاح العملية"),
-            ("benefit_rate", "💡 نسبة الاستفادة"),
-            ("tests", "🧪 الفحوصات والأشعة"),
-            ("followup_date", "📅 موعد العودة"),
-            ("followup_reason", "✍️ سبب العودة"),
-            ("translator_name", "👤 المترجم"),
-        ],
-        "operation": [
-            ("operation_details", "⚕️ تفاصيل العملية بالعربي"),
-            ("operation_name_en", "🔤 اسم العملية بالإنجليزي"),
-            ("notes", "📝 ملاحظات"),
-            ("followup_date", "📅 موعد العودة"),
-            ("followup_reason", "✍️ سبب العودة"),
-            ("translator_name", "👤 المترجم"),
-        ],
-        "final_consult": [
-            ("diagnosis", "🔬 التشخيص النهائي"),
-            ("decision", "📝 قرار الطبيب"),
-            ("recommendations", "💡 التوصيات الطبية"),
-            ("translator_name", "👤 المترجم"),
-        ],
-        "discharge": [
-            ("discharge_type", "🚪 نوع الخروج"),
-            ("admission_summary", "📋 ملخص الرقود"),
-            ("operation_details", "⚕️ تفاصيل العملية"),
-            ("operation_name_en", "🔤 اسم العملية بالإنجليزي"),
-            ("followup_date", "📅 موعد العودة"),
-            ("followup_reason", "✍️ سبب العودة"),
-            ("translator_name", "👤 المترجم"),
-        ],
-        "rehab_physical": [
-            ("therapy_details", "🏃 تفاصيل جلسة العلاج الطبيعي"),
-            ("followup_date", "📅 موعد العودة"),
-            ("followup_reason", "✍️ سبب العودة"),
-            ("translator_name", "👤 المترجم"),
-        ],
-        "rehab_device": [
-            ("device_name", "🦾 اسم الجهاز والتفاصيل"),
-            ("followup_date", "📅 موعد العودة"),
-            ("followup_reason", "✍️ سبب العودة"),
-            ("translator_name", "👤 المترجم"),
-        ],
-        "radiology": [
-            ("radiology_type", "🔬 نوع الأشعة/الفحص"),
-            ("delivery_date", "📅 تاريخ الاستلام"),
-            ("translator_name", "👤 المترجم"),
-        ],
-        "app_reschedule": [
-            ("app_reschedule_reason", "📅 سبب التأجيل"),
-            ("app_reschedule_return_date", "📅 موعد العودة الجديد"),
-            ("app_reschedule_return_reason", "✍️ سبب العودة"),
-            ("translator_name", "👤 المترجم"),
-        ],
-    }
-    return fields_map.get(flow_type, [])
+# ✅ تم نقل get_editable_fields_by_flow_type إلى flows/shared.py
+# الاستيراد في أعلى الملف: from .flows.shared import get_editable_fields_by_flow_type
+
+# ✅ Fallback في حالة فشل الاستيراد
+if get_editable_fields_by_flow_type is None:
+    def get_editable_fields_by_flow_type(flow_type):
+        """الحصول على الحقول القابلة للتعديل - Fallback"""
+        fields_map = {
+            "new_consult": [
+                ("complaint", "💬 شكوى المريض"),
+                ("diagnosis", "🔬 التشخيص الطبي"),
+                ("decision", "📝 قرار الطبيب"),
+                ("translator_name", "👤 المترجم"),
+            ],
+        }
+        return fields_map.get(flow_type, [])
 
 async def show_edit_fields_menu(query, context, flow_type):
     """عرض قائمة الحقول القابلة للتعديل - حقول نوع الإجراء فقط"""
@@ -7966,6 +7808,14 @@ async def show_edit_fields_menu(query, context, flow_type):
         medical_action = data.get("medical_action", "غير محدد")
 
         # ✅ الحصول على الحقول المحددة لهذا النوع من التدفق
+        if get_editable_fields_by_flow_type is None:
+            logger.error("❌ get_editable_fields_by_flow_type is None - cannot proceed")
+            await query.edit_message_text(
+                "⚠️ **خطأ في النظام**\n\n"
+                "يرجى المحاولة مرة أخرى أو إلغاء العملية.",
+                parse_mode="Markdown"
+            )
+            return ConversationHandler.END
         editable_fields = get_editable_fields_by_flow_type(flow_type)
 
         # ✅ منع ظهور room_number إلا إذا كان flow_type == 'followup' أو 'inpatient_followup'
@@ -8258,18 +8108,25 @@ async def handle_edit_field_selection(update: Update, context: ContextTypes.DEFA
         context.user_data["editing_field"] = field_key
         
         # الحصول على state التأكيد الصحيح
+        if get_confirm_state is None:
+            logger.error("❌ get_confirm_state is None - cannot proceed")
+            return ConversationHandler.END
         confirm_state = get_confirm_state(flow_type)
         
         # ✅ تنظيف القيمة الحالية من نصوص التعليمات
-        current_value_display = format_field_value(current_value)
+        if format_field_value is None:
+            current_value_display = str(current_value) if current_value else "غير محدد"
+        else:
+            current_value_display = format_field_value(current_value)
         if current_value_display and len(str(current_value_display)) > 200:
             current_value_display = str(current_value_display)[:200] + "..."
         
         # عرض واجهة التعديل حسب نوع الحقل
         if field_key in ["report_date", "followup_date", "delivery_date"]:
             # للحقول التاريخية - طلب إدخال نصي
+            field_display = get_field_display_name(field_key) if get_field_display_name is not None else field_key
             await query.edit_message_text(
-                f"📅 **تعديل {get_field_display_name(field_key)}**\n\n"
+                f"📅 **تعديل {field_display}**\n\n"
                 f"**القيمة الحالية:** {current_value_display}\n\n"
                 f"📝 أرسل التاريخ الجديد (مثال: 2025-01-15 أو 2025-01-15 14:30):",
                 reply_markup=InlineKeyboardMarkup([
@@ -8284,7 +8141,7 @@ async def handle_edit_field_selection(update: Update, context: ContextTypes.DEFA
         else:
             # للحقول النصية - طلب إدخال جديد
             await query.edit_message_text(
-                f"✏️ **تعديل {get_field_display_name(field_key)}**\n\n"
+                f"✏️ **تعديل {get_field_display_name(field_key) if get_field_display_name is not None else field_key}**\n\n"
                 f"**القيمة الحالية:**\n{current_value_display}\n\n"
                 f"📝 أرسل القيمة الجديدة:",
                 reply_markup=InlineKeyboardMarkup([
@@ -8306,42 +8163,33 @@ async def handle_edit_field_selection(update: Update, context: ContextTypes.DEFA
         )
         return ConversationHandler.END
 
-def get_field_display_name(field_key):
-    """الحصول على اسم الحقل للعرض"""
-    # استيراد الحقول الخاصة بكل مسار من الملفات المنفصلة
-    from bot.handlers.user.user_reports_flows.followup_in_admission import FOLLOWUP_FIELDS
-    from bot.handlers.user.user_reports_flows.periodic_review import PERIODIC_REVIEW_FIELDS
-    fields_map = {
-        "followup": FOLLOWUP_FIELDS,
-        "periodic_followup": PERIODIC_REVIEW_FIELDS,
-        # ... أضف بقية المسارات الأخرى إذا لزم ...
-    }
-    field_names = {
-        "complaint": "💬 حالة المريض اليومية",
-        "diagnosis": "🔬 التشخيص",
-        "decision": "📝 قرار الطبيب اليومي",
-        "room_number": "🚪 رقم الغرفة والطابق",
-        "followup_date": "📅 موعد العودة",
-        "followup_reason": "✍️ سبب العودة",
-        "translator_name": "👤 المترجم",
-        "delivery_date": "📅 تاريخ الاستلام",
-        "discharge_type": "🚪 نوع الخروج",
-        "admission_summary": "📋 ملخص الرقود",
-        "app_reschedule_reason": "📅 سبب التأجيل",
-        "app_reschedule_return_date": "📅 موعد العودة الجديد",
-        "app_reschedule_return_reason": "✍️ سبب العودة",
-    }
-    return field_names.get(field_key, field_key)
+# ✅ تم نقل get_field_display_name و format_field_value إلى flows/shared.py (توحيد الكود)
+# الاستيراد في أعلى الملف: from .flows.shared import format_field_value, get_field_display_name
+# إذا فشل الاستيراد، نستخدم تعريفات محلية كـ fallback
+if get_field_display_name is None:
+    def get_field_display_name(field_key):
+        """الحصول على اسم الحقل للعرض"""
+        field_names = {
+            "complaint": "💬 حالة المريض اليومية",
+            "diagnosis": "🔬 التشخيص",
+            "decision": "📝 قرار الطبيب اليومي",
+            "room_number": "🚪 رقم الغرفة والطابق",
+            "followup_date": "📅 موعد العودة",
+            "followup_reason": "✍️ سبب العودة",
+            "translator_name": "👤 المترجم",
+        }
+        return field_names.get(field_key, field_key)
 
-def format_field_value(value):
-    """تنسيق قيمة الحقل للعرض"""
-    if value is None or value == "":
-        return "غير محدد"
-    if isinstance(value, datetime):
-        return value.strftime('%Y-%m-%d %H:%M')
-    if isinstance(value, (int, float)):
+if format_field_value is None:
+    def format_field_value(value):
+        """تنسيق قيمة الحقل للعرض"""
+        if value is None or value == "":
+            return "غير محدد"
+        if isinstance(value, datetime):
+            return value.strftime('%Y-%m-%d %H:%M')
+        if isinstance(value, (int, float)):
+            return str(value)
         return str(value)
-    return str(value)
 
 async def handle_unified_edit_field_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -8382,7 +8230,7 @@ async def handle_unified_edit_field_input(update: Update, context: ContextTypes.
         if not text or len(text) < 1:
             await update.message.reply_text(
                 "⚠️ **خطأ:** النص فارغ\n\n"
-                f"يرجى إدخال {get_field_display_name(field_key)}:",
+                f"يرجى إدخال {get_field_display_name(field_key) if get_field_display_name is not None else field_key}:",
                 parse_mode="Markdown"
             )
             confirm_state = get_confirm_state(flow_type)
@@ -11723,93 +11571,25 @@ def register(app):
 # 🆕 نظام المترجمين الجديد - مبسط وسريع
 # ================================================
 
-def load_translator_names():
-    """
-    قراءة أسماء المترجمين من الخدمة الموحدة
-    """
-    try:
-        from services.translators_service import get_all_translator_names
-        names = get_all_translator_names()
-        if names:
-            return names
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning(f"⚠️ فشل تحميل المترجمين: {e}")
-    
-    # قائمة احتياطية في حالة فشل التحميل - بنفس الترتيب المطلوب
-    return ["معتز", "ادم", "هاشم", "مصطفى", "حسن", "نجم الدين", "محمد علي", 
-            "صبري", "عزي", "سعيد", "عصام", "زيد", "مهدي", "ادريس", 
-            "واصل", "عزالدين", "عبدالسلام", "يحيى العنسي", "ياسر"]
+# ✅ تم نقل load_translator_names إلى flows/shared.py (توحيد الكود)
+# الاستيراد في أعلى الملف: from .flows.shared import load_translator_names
 
-async def show_translator_selection(message, context, flow_type, page=1):
-    """
-    عرض قائمة المترجمين للاختيار مع صفحات
-    """
-    translator_names = load_translator_names()
+# ✅ Fallback في حالة فشل الاستيراد
+if load_translator_names is None:
+    def load_translator_names():
+        """قراءة أسماء المترجمين - Fallback"""
+        try:
+            from services.translators_service import get_all_translator_names
+            names = get_all_translator_names()
+            if names:
+                return names
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"⚠️ فشل تحميل المترجمين: {e}")
+        return ["معتز", "ادم", "هاشم", "مصطفى", "حسن", "نجم الدين", "محمد علي"]
 
-    if not translator_names:
-        await message.reply_text("❌ خطأ: لا توجد أسماء مترجمين متاحة")
-        # المتابعة بدون مترجم
-        await show_final_summary(message, context, flow_type)
-        confirm_state = get_confirm_state(flow_type)
-        context.user_data['_conversation_state'] = confirm_state
-        return confirm_state
-
-    # تقسيم إلى صفحتين: الصفحة الأولى 19 مترجم، الباقي في الصفحة الثانية
-    FIRST_PAGE_COUNT = 19
-    
-    if page == 1:
-        # الصفحة الأولى - أول 19 مترجم
-        page_names = translator_names[:FIRST_PAGE_COUNT]
-    else:
-        # الصفحة الثانية - الباقي
-        page_names = translator_names[FIRST_PAGE_COUNT:]
-    
-    # تقسيم الأسماء إلى صفوف (3 أسماء لكل صف)
-    keyboard_buttons = []
-    row = []
-
-    for name in page_names:
-        # الحصول على الـ index الحقيقي من القائمة الأصلية
-        real_index = translator_names.index(name)
-        row.append(InlineKeyboardButton(name, callback_data=f"simple_translator:{flow_type}:{real_index}"))
-        if len(row) == 3:
-            keyboard_buttons.append(row)
-            row = []
-    
-    # إضافة الصف الأخير إذا كان غير مكتمل
-    if row:
-        keyboard_buttons.append(row)
-
-    # أزرار التنقل بين الصفحات
-    nav_buttons = []
-    if page == 1 and len(translator_names) > FIRST_PAGE_COUNT:
-        # الصفحة الأولى - إضافة زر "الصفحة التالية"
-        nav_buttons.append(InlineKeyboardButton("⬅️ الصفحة التالية", callback_data=f"translator_page:{flow_type}:2"))
-    elif page == 2:
-        # الصفحة الثانية - إضافة زر "الصفحة السابقة"
-        nav_buttons.append(InlineKeyboardButton("➡️ الصفحة السابقة", callback_data=f"translator_page:{flow_type}:1"))
-    
-    if nav_buttons:
-        keyboard_buttons.append(nav_buttons)
-
-    # إضافة زر الرجوع وإلغاء
-    keyboard_buttons.append([
-        InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
-        InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
-    ])
-
-    keyboard = InlineKeyboardMarkup(keyboard_buttons)
-    
-    page_text = f"(الصفحة {page} من 2)" if len(translator_names) > FIRST_PAGE_COUNT else ""
-
-    await message.reply_text(
-        f"👤 **اختر اسم المترجم** {page_text}\n\n"
-        f"المترجم مسؤول عن ترجمة التقرير إلى اللغة المطلوبة.\n"
-        f"اختر من القائمة أدناه:",
-        reply_markup=keyboard,
-        parse_mode="Markdown"
-    )
+# ✅ تم نقل show_translator_selection إلى flows/shared.py (توحيد الكود)
+# الاستيراد في أعلى الملف: from .flows.shared import show_translator_selection
 
 async def handle_translator_page_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -11877,113 +11657,5 @@ async def handle_translator_page_navigation(update: Update, context: ContextType
         import logging
         logging.getLogger(__name__).error(f"Error in handle_translator_page_navigation: {e}")
 
-async def handle_simple_translator_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    معالجة اختيار المترجم البسيط
-    """
-    query = update.callback_query
-    await query.answer()
-
-    try:
-        parts = query.data.split(":")
-        if len(parts) < 3:
-            await query.edit_message_text("❌ خطأ في البيانات")
-            return
-
-        flow_type = parts[1]
-        choice = parts[2]
-
-        if choice == "skip":
-            # تخطي المترجم
-            translator_name = "غير محدد"
-            translator_id = None
-        else:
-            # اختيار مترجم من القائمة
-            translator_names = load_translator_names()
-            try:
-                index = int(choice)
-                translator_name = translator_names[index]
-                translator_id = None  # لا نحتاج id للمترجمين الثابتين
-            except (IndexError, ValueError):
-                await query.edit_message_text("❌ اختيار غير صحيح")
-                return
-
-        # حفظ اسم المترجم
-        context.user_data.setdefault("report_tmp", {})
-        context.user_data["report_tmp"]["translator_name"] = translator_name
-        context.user_data["report_tmp"]["translator_id"] = translator_id
-
-        # التحقق من flow_type
-        if not flow_type or flow_type not in ["new_consult", "followup", "emergency", "admission", "surgery_consult", 
-                                               "operation", "final_consult", "discharge", "rehab_physical", "rehab_device", 
-                                               "radiology", "appointment_reschedule"]:
-            # محاولة الحصول على flow_type من report_tmp
-            current_flow = context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
-            if current_flow in ["new_consult", "followup", "emergency", "admission", "surgery_consult", 
-                               "operation", "final_consult", "discharge", "rehab_physical", "rehab_device", 
-                               "radiology", "appointment_reschedule"]:
-                flow_type = current_flow
-            else:
-                flow_type = "new_consult"  # القيمة الافتراضية
-
-        # المتابعة للتأكيد النهائي
-        message_to_use = None
-        
-        # محاولة تعديل الرسالة أولاً
-        try:
-            await query.edit_message_text(f"✅ تم اختيار المترجم: **{translator_name}**", parse_mode="Markdown")
-            # بعد تعديل الرسالة، query.message قد لا يكون متاحاً، لذا نحفظ chat_id
-            message_to_use = query.message
-        except Exception as e:
-            # إذا فشل تعديل الرسالة، نستخدم query.message الأصلي
-            message_to_use = query.message
-        
-        # محاولة إرسال الملخص
-        try:
-            if message_to_use:
-                await show_final_summary(message_to_use, context, flow_type)
-            elif update.effective_message:
-                await show_final_summary(update.effective_message, context, flow_type)
-            else:
-                # كحل أخير، أرسل رسالة جديدة
-                bot = context.bot
-                new_message = await bot.send_message(
-                    chat_id=query.from_user.id,
-                    text="✅ تم اختيار المترجم"
-                )
-                await show_final_summary(new_message, context, flow_type)
-        except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"❌ خطأ في show_final_summary: {e}", exc_info=True)
-            # حتى لو فشل show_final_summary، نكمل العملية
-            try:
-                if not message_to_use and update.effective_message:
-                    await update.effective_message.reply_text(
-                        f"✅ تم اختيار المترجم: {translator_name}\n\n"
-                        f"اضغط على زر '📢 نشر التقرير' للمتابعة."
-                    )
-            except:
-                pass
-
-        try:
-            confirm_state = get_confirm_state(flow_type)
-            context.user_data['_conversation_state'] = confirm_state
-            return confirm_state
-        except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"❌ خطأ في get_confirm_state: {e}", exc_info=True)
-            # إرجاع state افتراضي
-            context.user_data['_conversation_state'] = NEW_CONSULT_CONFIRM
-            return NEW_CONSULT_CONFIRM
-
-    except Exception as e:
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.error(f"❌ خطأ في handle_simple_translator_choice: {e}", exc_info=True)
-        try:
-            await query.edit_message_text("❌ حدث خطأ في معالجة الاختيار")
-        except:
-            pass
-        return
+# ✅ تم نقل handle_simple_translator_choice إلى flows/shared.py
+# يتم استيرادها من هناك في بداية الملف
