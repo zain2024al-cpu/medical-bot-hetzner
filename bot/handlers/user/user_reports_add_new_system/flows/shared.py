@@ -689,6 +689,10 @@ async def handle_simple_translator_choice(update: Update, context: ContextTypes.
             translator_id = None
         else:
             # اختيار مترجم من القائمة
+            if load_translator_names is None:
+                logger.error("❌ load_translator_names is None - cannot proceed")
+                await query.edit_message_text("⚠️ خطأ في النظام - يرجى المحاولة مرة أخرى")
+                return ConversationHandler.END
             translator_names = load_translator_names()
             try:
                 index = int(choice)
