@@ -102,104 +102,96 @@ def _cancel_kb():
         [[InlineKeyboardButton("❌ إلغاء العملية", callback_data="nav:cancel")]])
 
 
-def format_time_12h(dt: datetime) -> str:
-    """تحويل الوقت إلى صيغة 12 ساعة مع التمييز بين صباح/مساء"""
-    hour = dt.hour
-    minute = dt.minute
-    if hour == 0:
-        return f"12:{minute:02d} صباحاً"
-    elif hour < 12:
-        return f"{hour}:{minute:02d} صباحاً"
+# ✅ تم نقل format_time_12h إلى flows/shared.py - النسخة الموحدة تدعم datetime و strings
+# ⚠️ لا نستورد من flows/shared.py هنا لتجنب circular import
+# flows/shared.py يستورد من utils.py، لذلك لا يمكننا استيراد منه هنا
+# الدالة موجودة محلياً كـ fallback
+try:
+    # محاولة الاستيراد فقط إذا لم يكن هناك circular import
+    import sys
+    if 'bot.handlers.user.user_reports_add_new_system.flows.shared' not in sys.modules:
+        from .flows.shared import format_time_12h
     else:
-        return f"{hour-12}:{minute:02d} مساءً"
+        raise ImportError("Circular import detected")
+except (ImportError, AttributeError):
+    # fallback للتوافق
+    def format_time_12h(dt):
+        """تحويل الوقت إلى صيغة 12 ساعة مع التمييز بين صباح/مساء"""
+        if hasattr(dt, 'hour'):
+            hour = dt.hour
+            minute = dt.minute
+        else:
+            return str(dt)
+        if hour == 0:
+            return f"12:{minute:02d} صباحاً"
+        elif hour < 12:
+            return f"{hour}:{minute:02d} صباحاً"
+        else:
+            return f"{hour-12}:{minute:02d} مساءً"
 
 
-def _build_hour_keyboard():
-    """بناء لوحة اختيار الساعات بصيغة 12 ساعة"""
-    keyboard = []
-    
-    # أوقات شائعة أولاً (صباحاً)
-    common_morning = [
-        ("🌅 8:00 صباحاً", "08"),
-        ("🌅 9:00 صباحاً", "09"),
-        ("🌅 10:00 صباحاً", "10"),
-        ("🌅 11:00 صباحاً", "11"),
-    ]
-    keyboard.append([InlineKeyboardButton(label, callback_data=f"time_hour:{val}") for label, val in common_morning])
-    
-    # الظهر
-    keyboard.append([
-        InlineKeyboardButton("☀️ 12:00 ظهراً", callback_data="time_hour:12")
-    ])
-    
-    # بعد الظهر
-    common_afternoon = [
-        ("🌆 1:00 مساءً", "13"),
-        ("🌆 2:00 مساءً", "14"),
-        ("🌆 3:00 مساءً", "15"),
-        ("🌆 4:00 مساءً", "16"),
-    ]
-    keyboard.append([InlineKeyboardButton(label, callback_data=f"time_hour:{val}") for label, val in common_afternoon])
-    
-    # مساءً
-    common_evening = [
-        ("🌃 5:00 مساءً", "17"),
-        ("🌃 6:00 مساءً", "18"),
-        ("🌃 7:00 مساءً", "19"),
-        ("🌃 8:00 مساءً", "20"),
-    ]
-    keyboard.append([InlineKeyboardButton(label, callback_data=f"time_hour:{val}") for label, val in common_evening])
-    
-    # زر "أوقات أخرى"
-    keyboard.append([InlineKeyboardButton("🕐 أوقات أخرى", callback_data="time_hour:more")])
-    
-    keyboard.append([InlineKeyboardButton("⏭️ بدون وقت", callback_data="time_skip")])
-    keyboard.append([
-        InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
-        InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel"),
-    ])
-    return InlineKeyboardMarkup(keyboard)
-
-
-def _build_minute_keyboard(hour: str):
-    """بناء لوحة اختيار الدقائق مع عرض الوقت بصيغة 12 ساعة"""
-    minute_options = ["00", "15", "30", "45"]
-    keyboard = []
-
-    # تحويل الساعة إلى صيغة 12 ساعة للعرض
-    hour_int = int(hour)
-    if hour_int == 0:
-        hour_display = "12"
-        period = "صباحاً"
-    elif hour_int < 12:
-        hour_display = str(hour_int)
-        period = "صباحاً"
-    elif hour_int == 12:
-        hour_display = "12"
-        period = "ظهراً"
+# ✅ تم نقل _build_hour_keyboard و _build_minute_keyboard إلى flows/shared.py
+# ⚠️ لا نستورد من flows/shared.py هنا لتجنب circular import
+# flows/shared.py يستورد من utils.py، لذلك لا يمكننا استيراد منه هنا
+# الدوال موجودة محلياً كـ fallback
+try:
+    # محاولة الاستيراد فقط إذا لم يكن هناك circular import
+    import sys
+    if 'bot.handlers.user.user_reports_add_new_system.flows.shared' not in sys.modules:
+        from .flows.shared import _build_hour_keyboard, _build_minute_keyboard, _chunked
     else:
-        hour_display = str(hour_int - 12)
-        period = "مساءً"
+        raise ImportError("Circular import detected")
+except (ImportError, AttributeError):
+    # fallback للتوافق
+    def _chunked(lst, n):
+        """تقسيم قائمة إلى أجزاء بحجم n"""
+        for i in range(0, len(lst), n):
+            yield lst[i:i + n]
+    
+    def _build_hour_keyboard():
+        """بناء لوحة اختيار الساعات بصيغة 12 ساعة"""
+        keyboard = []
+        common_morning = [
+            ("🌅 8:00 صباحاً", "08"), ("🌅 9:00 صباحاً", "09"),
+            ("🌅 10:00 صباحاً", "10"), ("🌅 11:00 صباحاً", "11"),
+        ]
+        keyboard.append([InlineKeyboardButton(label, callback_data=f"time_hour:{val}") for label, val in common_morning])
+        keyboard.append([InlineKeyboardButton("☀️ 12:00 ظهراً", callback_data="time_hour:12")])
+        common_afternoon = [
+            ("🌆 1:00 مساءً", "13"), ("🌆 2:00 مساءً", "14"),
+            ("🌆 3:00 مساءً", "15"), ("🌆 4:00 مساءً", "16"),
+        ]
+        keyboard.append([InlineKeyboardButton(label, callback_data=f"time_hour:{val}") for label, val in common_afternoon])
+        common_evening = [
+            ("🌃 5:00 مساءً", "17"), ("🌃 6:00 مساءً", "18"),
+            ("🌃 7:00 مساءً", "19"), ("🌃 8:00 مساءً", "20"),
+        ]
+        keyboard.append([InlineKeyboardButton(label, callback_data=f"time_hour:{val}") for label, val in common_evening])
+        keyboard.append([InlineKeyboardButton("🕐 أوقات أخرى", callback_data="time_hour:more")])
+        keyboard.append([InlineKeyboardButton("⏭️ بدون وقت", callback_data="time_skip")])
+        keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"), InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")])
+        return InlineKeyboardMarkup(keyboard)
 
-    for chunk in _chunked(minute_options, 2):
-        row = []
-        for m in chunk:
-            label = f"{hour_display}:{m} {period}"
-            row.append(
-                InlineKeyboardButton(
-                    label,
-                    callback_data=f"time_minute:{hour}:{m}"))
-        keyboard.append(row)
-
-    keyboard.append([InlineKeyboardButton(
-        "⏭️ بدون وقت", callback_data="time_skip")])
-    keyboard.append([
-        InlineKeyboardButton("🔙 تغيير الساعة", callback_data="time_back_hour"),
-        InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
-    ])
-    keyboard.append([InlineKeyboardButton(
-        "❌ إلغاء", callback_data="nav:cancel")])
-    return InlineKeyboardMarkup(keyboard)
+    def _build_minute_keyboard(hour: str):
+        """بناء لوحة اختيار الدقائق مع عرض الوقت بصيغة 12 ساعة"""
+        minute_options = ["00", "15", "30", "45"]
+        keyboard = []
+        hour_int = int(hour)
+        if hour_int == 0:
+            hour_display, period = "12", "صباحاً"
+        elif hour_int < 12:
+            hour_display, period = str(hour_int), "صباحاً"
+        elif hour_int == 12:
+            hour_display, period = "12", "ظهراً"
+        else:
+            hour_display, period = str(hour_int - 12), "مساءً"
+        for chunk in _chunked(minute_options, 2):
+            row = [InlineKeyboardButton(f"{hour_display}:{m} {period}", callback_data=f"time_minute:{hour}:{m}") for m in chunk]
+            keyboard.append(row)
+        keyboard.append([InlineKeyboardButton("⏭️ بدون وقت", callback_data="time_skip")])
+        keyboard.append([InlineKeyboardButton("🔙 تغيير الساعة", callback_data="time_back_hour"), InlineKeyboardButton("🔙 رجوع", callback_data="nav:back")])
+        keyboard.append([InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")])
+        return InlineKeyboardMarkup(keyboard)
 
 
 def get_back_button(previous_state_name):
@@ -258,6 +250,23 @@ def _nav_buttons(show_back=True, previous_state_name=None, current_state=None, c
 
     buttons.append([InlineKeyboardButton(
         "❌ إلغاء العملية", callback_data="nav:cancel")])
-    
+
     return InlineKeyboardMarkup(buttons)
+
+
+# =============================
+# تصدير الدوال
+# =============================
+__all__ = [
+    '_chunked',
+    '_cancel_kb',
+    '_nav_buttons',
+    '_build_hour_keyboard',
+    '_build_minute_keyboard',
+    'format_time_12h',
+    'MONTH_NAMES_AR',
+    'WEEKDAYS_AR',
+    'FLOW_QUESTIONS',
+    'get_step_question',
+]
 
