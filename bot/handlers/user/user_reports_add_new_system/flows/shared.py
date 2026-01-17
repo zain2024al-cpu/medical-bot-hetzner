@@ -608,6 +608,10 @@ async def show_translator_selection(message, context, flow_type, page=1):
         await message.reply_text("❌ خطأ: لا توجد أسماء مترجمين متاحة")
         # المتابعة بدون مترجم
         await show_final_summary(message, context, flow_type)
+        if get_confirm_state is None:
+            logger.error("❌ get_confirm_state is None - cannot proceed")
+            context.user_data['_conversation_state'] = NEW_CONSULT_CONFIRM
+            return NEW_CONSULT_CONFIRM
         confirm_state = get_confirm_state(flow_type)
         context.user_data['_conversation_state'] = confirm_state
         return confirm_state
@@ -911,6 +915,9 @@ async def show_translator_list(update: Update, context: ContextTypes.DEFAULT_TYP
             logger.error("❌ SessionLocal or Translator not available")
             if query:
                 await query.edit_message_text("❌ خطأ في الاتصال بقاعدة البيانات")
+            if get_translator_state is None:
+                logger.error("❌ get_translator_state is None - cannot proceed")
+                return NEW_CONSULT_TRANSLATOR
             return get_translator_state(flow_type)
         
         with SessionLocal() as s:

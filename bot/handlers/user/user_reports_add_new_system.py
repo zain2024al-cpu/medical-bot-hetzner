@@ -5602,6 +5602,10 @@ async def handle_new_consult_followup_reason(update: Update, context: ContextTyp
     context.user_data["report_tmp"]["followup_reason"] = text
 
     await update.message.reply_text("✅ تم الحفظ")
+    if show_translator_selection is None:
+        logger.error("❌ show_translator_selection is None - cannot proceed")
+        await update.message.reply_text("⚠️ خطأ في النظام - يرجى المحاولة مرة أخرى")
+        return ConversationHandler.END
     await show_translator_selection(update.message, context, "new_consult")
 
     # ✅ تحديث الـ state للخطوة التالية
@@ -7740,6 +7744,10 @@ async def handle_translator_choice(update: Update, context: ContextTypes.DEFAULT
         context.user_data.setdefault("report_tmp", {})["current_flow"] = flow_type
 
         # إرجاع state المترجم المناسب
+        if get_translator_state is None:
+            logger.error("❌ get_translator_state is None - cannot proceed")
+            context.user_data['_conversation_state'] = NEW_CONSULT_TRANSLATOR
+            return NEW_CONSULT_TRANSLATOR
         translator_state = get_translator_state(flow_type)
         # حفظ الحالة يدوياً في user_data للمساعدة في التتبع
         context.user_data['_conversation_state'] = translator_state
@@ -7759,6 +7767,10 @@ async def handle_translator_text(update: Update, context: ContextTypes.DEFAULT_T
         )
         # إرجاع نفس state المترجم
         flow_type = context.user_data["report_tmp"].get("current_flow", "new_consult")
+        if get_translator_state is None:
+            logger.error("❌ get_translator_state is None - cannot proceed")
+            context.user_data['_conversation_state'] = NEW_CONSULT_TRANSLATOR
+            return NEW_CONSULT_TRANSLATOR
         return get_translator_state(flow_type)
 
     context.user_data.setdefault("report_tmp", {})["translator_name"] = text
