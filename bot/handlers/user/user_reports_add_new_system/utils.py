@@ -102,32 +102,34 @@ def _cancel_kb():
         [[InlineKeyboardButton("❌ إلغاء العملية", callback_data="nav:cancel")]])
 
 
-# ✅ تم نقل format_time_12h إلى flows/shared.py - النسخة الموحدة تدعم datetime و strings
+# ✅ تم نقل format_time_12h إلى flows/shared.py
 # ⚠️ لا نستورد من flows/shared.py هنا لتجنب circular import
 # flows/shared.py يستورد من utils.py، لذلك لا يمكننا استيراد منه هنا
-# الدالة موجودة محلياً كـ fallback
-try:
-    # محاولة الاستيراد فقط إذا لم يكن هناك circular import
-    import sys
-    if 'bot.handlers.user.user_reports_add_new_system.flows.shared' not in sys.modules:
-        from .flows.shared import format_time_12h
-    else:
-        raise ImportError("Circular import detected")
-except (ImportError, AttributeError):
-    # fallback للتوافق
-    def format_time_12h(dt):
-        """تحويل الوقت إلى صيغة 12 ساعة مع التمييز بين صباح/مساء"""
+# نستخدم النسخة المحلية فقط
+def format_time_12h(dt):
+    """تحويل الوقت إلى صيغة 12 ساعة مع التمييز بين صباح/مساء"""
+    if not dt:
+        return None
+    try:
         if hasattr(dt, 'hour'):
             hour = dt.hour
             minute = dt.minute
+        elif isinstance(dt, str) and ':' in dt:
+            parts = dt.split(':')
+            hour = int(parts[0])
+            minute = int(parts[1]) if len(parts) > 1 else 0
         else:
             return str(dt)
         if hour == 0:
             return f"12:{minute:02d} صباحاً"
         elif hour < 12:
             return f"{hour}:{minute:02d} صباحاً"
+        elif hour == 12:
+            return f"12:{minute:02d} ظهراً"
         else:
             return f"{hour-12}:{minute:02d} مساءً"
+    except:
+        return str(dt)
 
 
 # ✅ تم نقل _build_hour_keyboard و _build_minute_keyboard إلى flows/shared.py
