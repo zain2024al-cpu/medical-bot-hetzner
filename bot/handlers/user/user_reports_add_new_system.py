@@ -60,46 +60,86 @@ from .user_reports_add_helpers import (
 )
 
 # استيراد handle_final_confirm و دوال الحالات من flows/shared.py
-try:
-    from .flows.shared import (
-        handle_final_confirm,
-        get_translator_state,
-        get_confirm_state,
-        format_field_value,
-        get_field_display_name,
-        show_translator_selection,
-        handle_simple_translator_choice,
-        load_translator_names,
-        get_editable_fields_by_flow_type,
-        format_time_12h,
-        _build_hour_keyboard,
-        _build_minute_keyboard,
-        _chunked
-    )
-except ImportError:
-    logger.warning("⚠️ Cannot import from flows/shared.py")
-    handle_final_confirm = None
-    get_translator_state = None
-    get_confirm_state = None
-    format_field_value = None
-    get_field_display_name = None
-    show_translator_selection = None
-    handle_simple_translator_choice = None
-    load_translator_names = None
-    get_editable_fields_by_flow_type = None
-    format_time_12h = None
-    _build_hour_keyboard = None
-    _build_minute_keyboard = None
-    _chunked = None
+# ⚠️ نستخدم استيراد متأخر (lazy import) لتجنب circular import
+# flows/shared.py يستورد من utils.py، لذلك يجب أن نستورد flows/shared.py بعد utils.py
+_shared_imports_loaded = False
+
+def _load_shared_imports():
+    """استيراد متأخر من flows/shared.py لتجنب circular import"""
+    global _shared_imports_loaded, handle_final_confirm, get_translator_state, get_confirm_state
+    global format_field_value, get_field_display_name, show_translator_selection
+    global handle_simple_translator_choice, load_translator_names, get_editable_fields_by_flow_type
+    global format_time_12h, _build_hour_keyboard, _build_minute_keyboard, _chunked
+    
+    if _shared_imports_loaded:
+        return
+    
+    try:
+        from .flows.shared import (
+            handle_final_confirm,
+            get_translator_state,
+            get_confirm_state,
+            format_field_value,
+            get_field_display_name,
+            show_translator_selection,
+            handle_simple_translator_choice,
+            load_translator_names,
+            get_editable_fields_by_flow_type,
+            format_time_12h,
+            _build_hour_keyboard,
+            _build_minute_keyboard,
+            _chunked
+        )
+        _shared_imports_loaded = True
+        logger.info("✅ تم استيراد flows/shared.py بنجاح")
+    except ImportError as e:
+        logger.warning(f"⚠️ Cannot import from flows/shared.py: {e}")
+        handle_final_confirm = None
+        get_translator_state = None
+        get_confirm_state = None
+        format_field_value = None
+        get_field_display_name = None
+        show_translator_selection = None
+        handle_simple_translator_choice = None
+        load_translator_names = None
+        get_editable_fields_by_flow_type = None
+        format_time_12h = None
+        _build_hour_keyboard = None
+        _build_minute_keyboard = None
+        _chunked = None
+        _shared_imports_loaded = True  # Mark as loaded even if failed
+
+# تهيئة القيم الافتراضية
+handle_final_confirm = None
+get_translator_state = None
+get_confirm_state = None
+format_field_value = None
+get_field_display_name = None
+show_translator_selection = None
+handle_simple_translator_choice = None
+load_translator_names = None
+get_editable_fields_by_flow_type = None
+format_time_12h = None
+_build_hour_keyboard = None
+_build_minute_keyboard = None
+_chunked = None
 
 # ✅ استيراد الأدوات المشتركة من utils.py (توحيد الكود)
+# ⚠️ يجب أن يكون هذا قبل استيراد flows/shared.py لتجنب circular import
 try:
-    from .utils import _chunked, _cancel_kb, _nav_buttons
-except ImportError:
-    logger.warning("⚠️ Cannot import utilities from utils.py - using local definitions")
-    _chunked = None
+    from .utils import _chunked as _chunked_utils, _cancel_kb, _nav_buttons
+    # إذا نجح الاستيراد من utils.py، نستخدمه (يأخذ الأولوية)
+    if _chunked_utils is not None:
+        _chunked = _chunked_utils
+    logger.info("✅ تم استيراد utils.py بنجاح")
+except ImportError as e:
+    logger.warning(f"⚠️ Cannot import utilities from utils.py: {e} - using local definitions")
+    _chunked_utils = None
     _cancel_kb = None
     _nav_buttons = None
+
+# ✅ الآن بعد استيراد utils.py، يمكننا استيراد flows/shared.py
+_load_shared_imports()
 from services.error_monitoring import error_monitor
 from services.doctors_smart_search import search_doctors
 from services.smart_cancel_manager import SmartCancelManager
