@@ -559,11 +559,21 @@ if _nav_buttons is None:
             "❌ إلغاء العملية", callback_data="nav:cancel")])
         return InlineKeyboardMarkup(buttons)
 
+# ✅ Helper function للتحقق من show_translator_selection وإعادة التحميل إذا لزم الأمر
+def _ensure_show_translator_selection_loaded():
+    """التأكد من أن show_translator_selection محملة، وإعادة التحميل إذا لزم الأمر"""
+    if show_translator_selection is None:
+        logger.warning("⚠️ show_translator_selection is None - attempting to reload imports")
+        _load_shared_imports(force_reload=True)
+        if show_translator_selection is None:
+            logger.error("❌ show_translator_selection is still None after reload")
+            return False
+    return True
+
 # ✅ Wrapper function للتحقق من None قبل استدعاء show_translator_selection
 async def safe_show_translator_selection(message, context, flow_type):
-    """استدعاء آمن لـ show_translator_selection مع التحقق من None"""
-    if show_translator_selection is None:
-        logger.error("❌ show_translator_selection is None - cannot proceed")
+    """استدعاء آمن لـ show_translator_selection مع التحقق من None وإعادة التحميل"""
+    if not _ensure_show_translator_selection_loaded():
         await message.reply_text("⚠️ خطأ في النظام - يرجى المحاولة مرة أخرى")
         return ConversationHandler.END
     return await show_translator_selection(message, context, flow_type)
@@ -1531,8 +1541,7 @@ class SmartStateRenderer:
 
         logger.info("✅ Translator selection fully refreshed and ready")
         # عرض شاشة المترجم
-        if show_translator_selection is None:
-            logger.error("❌ show_translator_selection is None - cannot proceed")
+        if not _ensure_show_translator_selection_loaded():
             return ConversationHandler.END
         await show_translator_selection(message, context, flow_type)
 
@@ -5610,8 +5619,7 @@ async def handle_new_consult_followup_reason(update: Update, context: ContextTyp
     context.user_data["report_tmp"]["followup_reason"] = text
 
     await update.message.reply_text("✅ تم الحفظ")
-    if show_translator_selection is None:
-        logger.error("❌ show_translator_selection is None - cannot proceed")
+    if not _ensure_show_translator_selection_loaded():
         await update.message.reply_text("⚠️ خطأ في النظام - يرجى المحاولة مرة أخرى")
         return ConversationHandler.END
     await show_translator_selection(update.message, context, "new_consult")
