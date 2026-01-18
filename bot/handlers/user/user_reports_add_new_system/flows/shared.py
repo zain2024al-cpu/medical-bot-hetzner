@@ -602,6 +602,10 @@ async def show_translator_selection(message, context, flow_type, page=1):
     ✅ عرض قائمة المترجمين للاختيار مع صفحات (الدالة الموحدة)
     تم دمج: pagination من الملف الرئيسي + زر تخطي
     """
+    if load_translator_names is None:
+        logger.error("❌ load_translator_names is None - cannot proceed")
+        await message.reply_text("⚠️ خطأ في النظام - يرجى المحاولة مرة أخرى")
+        return ConversationHandler.END
     translator_names = load_translator_names()
 
     if not translator_names:
