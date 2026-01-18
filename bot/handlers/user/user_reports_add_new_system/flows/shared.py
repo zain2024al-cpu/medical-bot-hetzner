@@ -741,18 +741,29 @@ async def handle_simple_translator_choice(update: Update, context: ContextTypes.
 
         # محاولة إرسال الملخص
         try:
-            if message_to_use:
-                await show_final_summary(message_to_use, context, flow_type)
-            elif update.effective_message:
-                await show_final_summary(update.effective_message, context, flow_type)
+            # ✅ show_final_summary معرفة محلياً في نفس الملف، لكن نتحقق من الأمان
+            # (قد تكون None إذا كان هناك مشكلة في الاستيراد)
+            if show_final_summary is not None:
+                if message_to_use:
+                    await show_final_summary(message_to_use, context, flow_type)
+                elif update.effective_message:
+                    await show_final_summary(update.effective_message, context, flow_type)
+                else:
+                    # كحل أخير، أرسل رسالة جديدة
+                    bot = context.bot
+                    new_message = await bot.send_message(
+                        chat_id=query.from_user.id,
+                        text="✅ تم اختيار المترجم"
+                    )
+                    await show_final_summary(new_message, context, flow_type)
             else:
-                # كحل أخير، أرسل رسالة جديدة
-                bot = context.bot
-                new_message = await bot.send_message(
-                    chat_id=query.from_user.id,
-                    text="✅ تم اختيار المترجم"
-                )
-                await show_final_summary(new_message, context, flow_type)
+                # ✅ fallback إذا كانت show_final_summary None
+                logger.warning("⚠️ show_final_summary is None - using fallback message")
+                fallback_text = f"✅ تم اختيار المترجم: {translator_name}\n\nاضغط على زر '📢 نشر التقرير' للمتابعة."
+                if message_to_use:
+                    await message_to_use.reply_text(fallback_text)
+                elif update.effective_message:
+                    await update.effective_message.reply_text(fallback_text)
         except Exception as e:
             logger.error(f"❌ خطأ في show_final_summary: {e}", exc_info=True)
             # حتى لو فشل show_final_summary، نكمل العملية
