@@ -64,15 +64,20 @@ from .user_reports_add_helpers import (
 # flows/shared.py يستورد من utils.py، لذلك يجب أن نستورد flows/shared.py بعد utils.py
 _shared_imports_loaded = False
 
-def _load_shared_imports():
+def _load_shared_imports(force_reload=False):
     """استيراد متأخر من flows/shared.py لتجنب circular import"""
     global _shared_imports_loaded, handle_final_confirm, get_translator_state, get_confirm_state
     global format_field_value, get_field_display_name, show_translator_selection
     global handle_simple_translator_choice, load_translator_names, get_editable_fields_by_flow_type
     global format_time_12h, _build_hour_keyboard, _build_minute_keyboard, _chunked
     
-    if _shared_imports_loaded:
-        return
+    if _shared_imports_loaded and not force_reload:
+        # ✅ إذا كانت الواردات محملة بالفعل، تحقق من أنها ليست None
+        if show_translator_selection is not None:
+            return
+        # ✅ إذا كانت None، حاول إعادة التحميل
+        logger.warning("⚠️ show_translator_selection is None - attempting to reload imports")
+        force_reload = True
     
     try:
         from .flows.shared import (
@@ -93,7 +98,7 @@ def _load_shared_imports():
         _shared_imports_loaded = True
         logger.info("✅ تم استيراد flows/shared.py بنجاح")
     except ImportError as e:
-        logger.warning(f"⚠️ Cannot import from flows/shared.py: {e}")
+        logger.error(f"❌ Cannot import from flows/shared.py: {e}", exc_info=True)
         handle_final_confirm = None
         get_translator_state = None
         get_confirm_state = None
@@ -107,7 +112,10 @@ def _load_shared_imports():
         _build_hour_keyboard = None
         _build_minute_keyboard = None
         _chunked = None
-        _shared_imports_loaded = True  # Mark as loaded even if failed
+        # ✅ لا نضع _shared_imports_loaded = True إذا فشل الاستيراد
+        # حتى نتمكن من المحاولة مرة أخرى
+        if not force_reload:
+            _shared_imports_loaded = True  # Mark as loaded only on first attempt
 
 # تهيئة القيم الافتراضية
 handle_final_confirm = None
