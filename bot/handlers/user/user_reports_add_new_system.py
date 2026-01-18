@@ -125,6 +125,31 @@ format_field_value = None
 get_field_display_name = None
 show_translator_selection = None
 handle_simple_translator_choice = None
+load_translator_names = None
+get_editable_fields_by_flow_type = None
+format_time_12h = None
+_build_hour_keyboard = None
+_build_minute_keyboard = None
+_chunked = None
+_cancel_kb = None
+_nav_buttons = None
+
+# ✅ استيراد الأدوات المشتركة من utils.py أولاً
+try:
+    from .utils import _chunked as _chunked_utils, _cancel_kb, _nav_buttons
+    # إذا نجح الاستيراد من utils.py، نستخدمه (يأخذ الأولوية)
+    if _chunked_utils is not None:
+        _chunked = _chunked_utils
+    logger.info("✅ تم استيراد utils.py بنجاح")
+except ImportError as e:
+    logger.warning(f"⚠️ Cannot import utilities from utils.py: {e} - using local definitions")
+    _chunked_utils = None
+    _cancel_kb = None
+    _nav_buttons = None
+
+# ✅ الآن بعد استيراد utils.py، يمكننا استيراد flows/shared.py
+_load_shared_imports()
+
 from services.error_monitoring import error_monitor
 from services.doctors_smart_search import search_doctors
 from services.smart_cancel_manager import SmartCancelManager
