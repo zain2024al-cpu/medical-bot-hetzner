@@ -125,29 +125,6 @@ format_field_value = None
 get_field_display_name = None
 show_translator_selection = None
 handle_simple_translator_choice = None
-load_translator_names = None
-get_editable_fields_by_flow_type = None
-format_time_12h = None
-_build_hour_keyboard = None
-_build_minute_keyboard = None
-_chunked = None
-
-# ✅ استيراد الأدوات المشتركة من utils.py (توحيد الكود)
-# ⚠️ يجب أن يكون هذا قبل استيراد flows/shared.py لتجنب circular import
-try:
-    from .utils import _chunked as _chunked_utils, _cancel_kb, _nav_buttons
-    # إذا نجح الاستيراد من utils.py، نستخدمه (يأخذ الأولوية)
-    if _chunked_utils is not None:
-        _chunked = _chunked_utils
-    logger.info("✅ تم استيراد utils.py بنجاح")
-except ImportError as e:
-    logger.warning(f"⚠️ Cannot import utilities from utils.py: {e} - using local definitions")
-    _chunked_utils = None
-    _cancel_kb = None
-    _nav_buttons = None
-
-# ✅ الآن بعد استيراد utils.py، يمكننا استيراد flows/shared.py
-_load_shared_imports()
 from services.error_monitoring import error_monitor
 from services.doctors_smart_search import search_doctors
 from services.smart_cancel_manager import SmartCancelManager
@@ -6034,8 +6011,7 @@ async def handle_emergency_reason(update: Update, context: ContextTypes.DEFAULT_
     context.user_data["report_tmp"]["followup_reason"] = text
 
     await update.message.reply_text("✅ تم الحفظ")
-    if show_translator_selection is None:
-        logger.error("❌ show_translator_selection is None - cannot proceed")
+    if not _ensure_show_translator_selection_loaded():
         await update.message.reply_text("⚠️ خطأ في النظام - يرجى المحاولة مرة أخرى")
         return ConversationHandler.END
     await show_translator_selection(update.message, context, "emergency")
@@ -6177,8 +6153,7 @@ async def handle_admission_followup_reason(update: Update, context: ContextTypes
     context.user_data["report_tmp"]["followup_reason"] = text
 
     await update.message.reply_text("✅ تم الحفظ")
-    if show_translator_selection is None:
-        logger.error("❌ show_translator_selection is None - cannot proceed")
+    if not _ensure_show_translator_selection_loaded():
         await update.message.reply_text("⚠️ خطأ في النظام - يرجى المحاولة مرة أخرى")
         return ConversationHandler.END
     await show_translator_selection(update.message, context, "admission")
@@ -6451,8 +6426,7 @@ async def handle_surgery_consult_followup_reason(update: Update, context: Contex
     context.user_data["report_tmp"]["followup_reason"] = text
 
     await update.message.reply_text("✅ تم الحفظ")
-    if show_translator_selection is None:
-        logger.error("❌ show_translator_selection is None - cannot proceed")
+    if not _ensure_show_translator_selection_loaded():
         await update.message.reply_text("⚠️ خطأ في النظام - يرجى المحاولة مرة أخرى")
         return ConversationHandler.END
     await show_translator_selection(update.message, context, "surgery_consult")
@@ -6624,8 +6598,7 @@ async def handle_operation_followup_reason(update: Update, context: ContextTypes
     context.user_data["report_tmp"]["followup_reason"] = text
 
     await update.message.reply_text("✅ تم الحفظ")
-    if show_translator_selection is None:
-        logger.error("❌ show_translator_selection is None - cannot proceed")
+    if not _ensure_show_translator_selection_loaded():
         await update.message.reply_text("⚠️ خطأ في النظام - يرجى المحاولة مرة أخرى")
         return ConversationHandler.END
     await show_translator_selection(update.message, context, "operation")
@@ -6754,8 +6727,7 @@ async def handle_final_consult_recommendations(update: Update, context: ContextT
     context.user_data["report_tmp"]["followup_reason"] = "استشارة أخيرة - لا يوجد عودة"
 
     await update.message.reply_text("✅ تم الحفظ")
-    if show_translator_selection is None:
-        logger.error("❌ show_translator_selection is None - cannot proceed")
+    if not _ensure_show_translator_selection_loaded():
         await update.message.reply_text("⚠️ خطأ في النظام - يرجى المحاولة مرة أخرى")
         return ConversationHandler.END
     await show_translator_selection(update.message, context, "final_consult")
@@ -6947,8 +6919,7 @@ async def handle_discharge_followup_reason(update: Update, context: ContextTypes
     context.user_data["report_tmp"]["followup_reason"] = text
 
     await update.message.reply_text("✅ تم الحفظ")
-    if show_translator_selection is None:
-        logger.error("❌ show_translator_selection is None - cannot proceed")
+    if not _ensure_show_translator_selection_loaded():
         await update.message.reply_text("⚠️ خطأ في النظام - يرجى المحاولة مرة أخرى")
         return ConversationHandler.END
     await show_translator_selection(update.message, context, "discharge")
@@ -7070,8 +7041,7 @@ async def handle_physical_therapy_followup_date_choice(update: Update, context: 
         context.user_data["report_tmp"]["followup_reason"] = "لا يوجد"
 
         await query.edit_message_text("✅ لا يوجد تاريخ عودة")
-        if show_translator_selection is None:
-            logger.error("❌ show_translator_selection is None - cannot proceed")
+        if not _ensure_show_translator_selection_loaded():
             await query.edit_message_text("⚠️ خطأ في النظام - يرجى المحاولة مرة أخرى")
             return ConversationHandler.END
         await show_translator_selection(query.message, context, "rehab_physical")
@@ -7133,8 +7103,7 @@ async def handle_physical_therapy_followup_reason(update: Update, context: Conte
     context.user_data["report_tmp"]["followup_reason"] = text
 
     await update.message.reply_text("✅ تم الحفظ")
-    if show_translator_selection is None:
-        logger.error("❌ show_translator_selection is None - cannot proceed")
+    if not _ensure_show_translator_selection_loaded():
         await update.message.reply_text("⚠️ خطأ في النظام - يرجى المحاولة مرة أخرى")
         return ConversationHandler.END
     await show_translator_selection(update.message, context, "rehab_physical")
@@ -7215,8 +7184,7 @@ async def handle_device_followup_reason(update: Update, context: ContextTypes.DE
     context.user_data["report_tmp"]["followup_reason"] = text
 
     await update.message.reply_text("✅ تم الحفظ")
-    if show_translator_selection is None:
-        logger.error("❌ show_translator_selection is None - cannot proceed")
+    if not _ensure_show_translator_selection_loaded():
         await update.message.reply_text("⚠️ خطأ في النظام - يرجى المحاولة مرة أخرى")
         return ConversationHandler.END
     await show_translator_selection(update.message, context, "rehab_device")
@@ -7549,8 +7517,7 @@ async def handle_radiology_calendar_day(update: Update, context: ContextTypes.DE
             f"📅 **تاريخ التسليم:**\n"
             f"{date_display}"
         )
-        if show_translator_selection is None:
-            logger.error("❌ show_translator_selection is None - cannot proceed")
+        if not _ensure_show_translator_selection_loaded():
             await query.edit_message_text("⚠️ خطأ في النظام - يرجى المحاولة مرة أخرى")
             return ConversationHandler.END
         await show_translator_selection(query.message, context, "radiology")
@@ -7723,8 +7690,7 @@ async def handle_app_reschedule_return_reason(update: Update, context: ContextTy
     context.user_data["report_tmp"]["followup_reason"] = text
 
     await update.message.reply_text("✅ تم الحفظ")
-    if show_translator_selection is None:
-        logger.error("❌ show_translator_selection is None - cannot proceed")
+    if not _ensure_show_translator_selection_loaded():
         await update.message.reply_text("⚠️ خطأ في النظام - يرجى المحاولة مرة أخرى")
         return ConversationHandler.END
     await show_translator_selection(update.message, context, "appointment_reschedule")
@@ -10480,8 +10446,7 @@ async def debug_unhandled_message(update: Update, context: ContextTypes.DEFAULT_
         elif not followup_reason:
             return await handle_new_consult_followup_reason(update, context)
         elif not translator_name:
-            if show_translator_selection is None:
-                logger.error("❌ show_translator_selection is None - cannot proceed")
+            if not _ensure_show_translator_selection_loaded():
                 await update.message.reply_text("⚠️ خطأ في النظام - يرجى المحاولة مرة أخرى")
                 return ConversationHandler.END
             await show_translator_selection(update.message, context, "new_consult")
