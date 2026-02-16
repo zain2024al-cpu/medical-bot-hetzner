@@ -508,6 +508,9 @@ async def handle_filter_choice(update: Update, context: ContextTypes.DEFAULT_TYP
         # ✅ عرض قائمة المرضى للاختيار منها
         context.user_data["mode"] = "print_patient"
         context.user_data["patient_page"] = 0  # الصفحة الأولى
+        # ✅ مسح أي بيانات قديمة متعلقة بالفلترة
+        context.user_data.pop("filter_value", None)
+        context.user_data.pop("action_type", None)
         
         # جلب قائمة المرضى من قاعدة البيانات
         with SessionLocal() as session:
@@ -1660,6 +1663,7 @@ async def confirm_export(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 raise Exception(f"فشل في إنشاء ملف {format_name}")
             
     except Exception as e:
+        import traceback
         tb = traceback.format_exc()
         logger.error(f"❌ حدث خطأ أثناء إنشاء {format_name}: {e}\n{tb}")
         # نرسل مقتطف من التتبع للمستخدم للمساعدة في التشخيص
@@ -1779,6 +1783,9 @@ async def handle_patient_page(update: Update, context: ContextTypes.DEFAULT_TYPE
     await q.answer()
     
     page = int(q.data.split(":", 1)[1])
+    # ✅ حفظ رقم الصفحة الحالية في context
+    context.user_data["patient_page"] = page
+    
     patients_list = context.user_data.get("patients_list", [])
     
     if not patients_list:
@@ -1886,6 +1893,13 @@ async def handle_back_from_enter_name(update: Update, context: ContextTypes.DEFA
     """معالجة زر الرجوع من إدخال الاسم"""
     q = update.callback_query
     await q.answer()
+    
+    # ✅ مسح البيانات المؤقتة عند الرجوع
+    context.user_data.pop("mode", None)
+    context.user_data.pop("patients_list", None)
+    context.user_data.pop("patient_page", None)
+    context.user_data.pop("filter_value", None)
+    context.user_data.pop("action_type", None)
     
     await q.edit_message_text("🖨️ اختر نوع الفلترة:", reply_markup=_filters_kb())
     return SELECT_FILTER
