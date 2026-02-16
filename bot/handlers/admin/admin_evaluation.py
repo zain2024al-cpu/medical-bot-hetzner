@@ -219,11 +219,8 @@ def _generate_pdf(results, period_label, year, month):
         info_table = Table(
             [
                 [str(item["total_reports"]), r("إجمالي التقارير")],
-                [str(item["work_days"]), r("أيام العمل الرسمية")],
-                [str(item["attendance_days"]), r("أيام الحضور")],
-                [str(item["absent_days"]), r("أيام الغياب")],
+                [str(item["work_days"]), r("أيام العمل")],
                 [str(item["late_reports"]), r("تقارير بعد 8 مساءً")],
-                [f"{item['level']} ({item['final_score']}%)", r("نسبة الأداء")]
             ],
             colWidths=[140, 270]
         )
@@ -271,8 +268,8 @@ def _generate_html_fallback(results, period_label, year, month, start_date_str, 
             pct = (count / item['total_reports'] * 100) if item['total_reports'] > 0 else 0
             color = "" if count > 0 else ' style="color:#bbb;"'
             actions_rows += f'<tr{color}><td style="text-align:right;padding:5px 10px;">{action_name}</td><td style="text-align:center;padding:5px 10px;">{count}</td><td style="text-align:center;padding:5px 10px;">{pct:.0f}%</td></tr>'
-        translator_pages += f'''<div style="page-break-before:always;"><h2>{_medal(i)} {item["translator_name"]} - {item["level"]} {item["stars"]}</h2>
-        <p>إجمالي التقارير: <b>{item["total_reports"]}</b> | أيام العمل: <b>{item["work_days"]}</b> | أيام الحضور: <b>{item["attendance_days"]}</b> | الغياب: <b>{item["absent_days"]}</b> | بعد 8 مساءً: <b>{item["late_reports"]}</b> | الأداء: <b>{item["final_score"]}%</b></p>
+        translator_pages += f'''<div style="page-break-before:always;"><h2>{_medal(i)} {item["translator_name"]}</h2>
+        <p>إجمالي التقارير: <b>{item["total_reports"]}</b> | أيام العمل: <b>{item["work_days"]}</b> | بعد 8 مساءً: <b>{item["late_reports"]}</b></p>
         <table border="1" cellpadding="5"><tr><th>نوع الإجراء</th><th>العدد</th><th>النسبة</th></tr>{actions_rows}</table></div>'''
 
     html = f'<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8"></head><body><h1>تقرير تقييم المترجمين</h1><p>{period_label} | مترجمين: {len(results)} | تقارير: {total_reports} | بعد 8 مساءً: {total_late}</p>{translator_pages}</body></html>'
@@ -316,17 +313,17 @@ def _generate_excel(results, period_label, year, month):
         'ضعيف': PatternFill(start_color='FFEBEE', end_color='FFEBEE', fill_type='solid'),
     }
 
-    ws.merge_cells('A1:I1')
+    ws.merge_cells('A1:E1')
     ws['A1'] = f"تقرير تقييم أداء المترجمين - {period_label}"
     ws['A1'].font = title_font
     ws['A1'].alignment = center_align
 
-    ws.merge_cells('A2:I2')
+    ws.merge_cells('A2:E2')
     ws['A2'] = f"تاريخ الإصدار: {datetime.now().strftime('%Y-%m-%d %H:%M')}"
     ws['A2'].font = Font(name='Arial', size=10, color='777777')
     ws['A2'].alignment = center_align
 
-    headers = ['الترتيب', 'المترجم', 'إجمالي التقارير', 'أيام العمل', 'أيام الحضور', 'أيام الغياب', 'بعد 8 مساءً', 'نسبة الأداء', 'التقييم']
+    headers = ['الترتيب', 'المترجم', 'إجمالي التقارير', 'أيام العمل', 'بعد 8 مساءً']
 
     row = 4
     for col, header in enumerate(headers, 1):
@@ -348,22 +345,16 @@ def _generate_excel(results, period_label, year, month):
             f"{medal}{item['translator_name']}",
             item['total_reports'],
             item['work_days'],
-            item['attendance_days'],
-            item['absent_days'],
             item['late_reports'],
-            f"{item['final_score']}%",
-            f"{item['stars']} {item['level']}",
         ]
 
-        fill = level_fills.get(item['level'], PatternFill())
         for col, val in enumerate(values, 1):
             cell = ws.cell(row=row, column=col, value=val)
-            cell.font = bold_font if col in [2, 8] else normal_font
+            cell.font = bold_font if col == 2 else normal_font
             cell.alignment = center_align if col != 2 else right_align
-            cell.fill = fill
             cell.border = thin_border
 
-    col_widths = [8, 25, 15, 12, 12, 12, 14, 14, 18]
+    col_widths = [8, 25, 15, 12, 14]
     for i, w in enumerate(col_widths, 1):
         ws.column_dimensions[get_column_letter(i)].width = w
 
@@ -397,12 +388,10 @@ def _generate_excel(results, period_label, year, month):
         values.append(item['total_reports'])
         values.append(item['late_reports'])
 
-        fill = level_fills.get(item['level'], PatternFill())
         for col, val in enumerate(values, 1):
             cell = ws2.cell(row=row, column=col, value=val)
             cell.font = normal_font
             cell.alignment = center_align if col != 1 else right_align
-            cell.fill = fill
             cell.border = thin_border
 
     ws2.column_dimensions['A'].width = 25
@@ -619,11 +608,9 @@ async def handle_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # إرسال تفاصيل كل مترجم
             for i, item in enumerate(results, 1):
                 medal = _medal(i)
-                detail = f"{medal} **{item['translator_name']}** — {item['stars']} {item['level']} ({item['final_score']}%)\n"
+                detail = f"{medal} **{item['translator_name']}**\n"
                 detail += f"├ 📄 إجمالي التقارير: **{item['total_reports']}**\n"
-                detail += f"├ 📅 أيام العمل الرسمية: **{item['work_days']}** يوم\n"
-                detail += f"├ ✅ أيام الحضور: **{item['attendance_days']}** يوم\n"
-                detail += f"├ ❌ أيام الغياب: **{item['absent_days']}** يوم\n"
+                detail += f"├ 📅 أيام العمل: **{item['work_days']}** يوم\n"
                 detail += f"├ 🕐 بعد 8 مساءً: **{item['late_reports']}**\n"
 
                 # تفصيل الإجراءات (غير الصفرية فقط)

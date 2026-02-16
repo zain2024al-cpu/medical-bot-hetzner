@@ -1740,13 +1740,25 @@ async def save_report_to_database(query, context, flow_type):
         
         # ✅ الحصول على translator_id من جدول TranslatorDirectory إذا كان المستخدم مسجلاً
         actual_translator_id = data.get("translator_id")
-        if not actual_translator_id and user_id:
+        actual_translator_name = data.get("translator_name")
+        
+        # إذا كان translator_id موجوداً، استخدم الاسم من TranslatorDirectory دائماً
+        if actual_translator_id:
+            translator_record = session.query(TranslatorDirectory).filter_by(translator_id=actual_translator_id).first()
+            if translator_record:
+                actual_translator_name = translator_record.name
+                logger.info(f"✅ Using translator name from TranslatorDirectory: {actual_translator_name} (ID: {actual_translator_id})")
+        elif user_id:
+            # إذا لم يكن translator_id موجوداً، جرب البحث باستخدام user_id
             translator_record = session.query(TranslatorDirectory).filter_by(translator_id=user_id).first()
             if translator_record:
                 actual_translator_id = translator_record.translator_id
-                if not data.get("translator_name"):
-                    data["translator_name"] = translator_record.name
+                actual_translator_name = translator_record.name
                 logger.info(f"✅ Found translator_id from TranslatorDirectory: {actual_translator_id} ({translator_record.name})")
+        
+        # إذا لم يكن هناك اسم بعد، استخدم الاسم من data
+        if not actual_translator_name:
+            actual_translator_name = data.get("translator_name")
         
         # إعداد حقول تأجيل الموعد
         app_reschedule_reason = None
@@ -1790,7 +1802,7 @@ async def save_report_to_database(query, context, flow_type):
             hospital_name=hospital_name,
             department=dept_name_for_display or (department.name if department else None),
             doctor_name=doctor_name,
-            translator_name=data.get("translator_name"),
+            translator_name=actual_translator_name,  # ✅ استخدام الاسم الموحد من TranslatorDirectory
             
             # محتوى التقرير
             complaint_text=complaint_text,

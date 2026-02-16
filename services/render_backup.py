@@ -58,7 +58,8 @@ def _checkpoint_wal(db_file: str):
     try:
         conn = sqlite3.connect(db_file, timeout=30)
         cur = conn.cursor()
-        cur.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        # PASSIVE avoids forcing a heavy lock during active bot traffic.
+        cur.execute("PRAGMA wal_checkpoint(PASSIVE)")
         conn.commit()
         conn.close()
     except Exception as e:
@@ -67,11 +68,11 @@ def _checkpoint_wal(db_file: str):
 
 def _sqlite_backup_copy(src_db: str, dst_db: str):
     """نسخ آمن باستخدام SQLite backup API بدل copy2 المباشر."""
-    src_conn = sqlite3.connect(src_db, timeout=60)
+    src_conn = sqlite3.connect(f"file:{src_db}?mode=ro", uri=True, timeout=60)
     try:
         dst_conn = sqlite3.connect(dst_db, timeout=60)
         try:
-            src_conn.backup(dst_conn)
+            src_conn.backup(dst_conn, pages=1000, sleep=0.01)
             dst_conn.commit()
         finally:
             dst_conn.close()

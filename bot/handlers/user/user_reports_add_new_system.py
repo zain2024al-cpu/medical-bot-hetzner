@@ -11083,6 +11083,8 @@ def register(app):
         entry_points=[
             # دعم الأزرار (CallbackQuery) - مهم للعمل بعد الإلغاء
             CallbackQueryHandler(start_report, pattern="^start_report$"),
+            CallbackQueryHandler(start_report, pattern="^user_action:add_report$"),
+            CallbackQueryHandler(start_report, pattern="^add_report$"),
             # دعم النص
             MessageHandler(filters.Regex(r"^📝\s*إضافة\s*تقرير\s*جديد\s*$"), start_report),
             MessageHandler(filters.Regex(r"^📝\s*إضافة تقرير جديد\s*$"), start_report),

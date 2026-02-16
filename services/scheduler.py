@@ -113,7 +113,7 @@ async def _sqlite_quick_backup_job():
     try:
         # النسخة المحلية الآمنة أولاً (SQLite backup API + integrity_check)
         from services.render_backup import create_local_backup
-        backup_path = create_local_backup(prefix="quick")
+        backup_path = await asyncio.to_thread(create_local_backup, "quick")
         if backup_path:
             print(f"Local quick backup completed: {backup_path}")
         else:
@@ -123,7 +123,7 @@ async def _sqlite_quick_backup_job():
         try:
             from services.sqlite_backup import get_backup_service
             backup_service = get_backup_service()
-            backup_service.quick_backup()
+            await asyncio.to_thread(backup_service.quick_backup)
             print("SQLite quick backup to GCS completed.")
         except Exception as gcs_error:
             print(f"GCS quick backup skipped: {gcs_error}")
@@ -137,7 +137,7 @@ async def _sqlite_daily_backup_job():
         from services.render_backup import create_local_backup, create_monthly_archive
 
         # النسخة المحلية الآمنة اليومية
-        backup_path = create_local_backup(prefix="daily")
+        backup_path = await asyncio.to_thread(create_local_backup, "daily")
         if backup_path:
             print(f"Local daily backup completed: {backup_path}")
         else:
@@ -146,7 +146,7 @@ async def _sqlite_daily_backup_job():
         # في أول يوم من الشهر: أنشئ أرشيف الشهر السابق
         now = datetime.utcnow()
         if now.day == 1:
-            archive_path = create_monthly_archive()
+            archive_path = await asyncio.to_thread(create_monthly_archive)
             if archive_path:
                 print(f"Monthly archive completed: {archive_path}")
             else:
@@ -156,7 +156,7 @@ async def _sqlite_daily_backup_job():
         try:
             from services.sqlite_backup import get_backup_service
             backup_service = get_backup_service()
-            backup_service.backup_database(backup_type="daily")
+            await asyncio.to_thread(lambda: backup_service.backup_database(backup_type="daily"))
             print("SQLite daily backup to GCS completed.")
         except Exception as gcs_error:
             print(f"GCS daily backup skipped: {gcs_error}")
@@ -238,7 +238,9 @@ def start_scheduler(app=None):
         scheduler.add_job(
             _sqlite_quick_backup_job,
             trigger=IntervalTrigger(minutes=10),
-            id='sqlite_quick_backup'
+            id='sqlite_quick_backup',
+            max_instances=1,
+            coalesce=True
         )
         try:
             print("✅ SQLite quick backup: Every 10 minutes")
@@ -249,7 +251,9 @@ def start_scheduler(app=None):
         scheduler.add_job(
             _sqlite_daily_backup_job,
             trigger=CronTrigger(hour=3, minute=0, timezone='UTC'),  # 3:00 AM
-            id='sqlite_daily_backup'
+            id='sqlite_daily_backup',
+            max_instances=1,
+            coalesce=True
         )
         try:
             print("✅ SQLite daily backup: Daily at 3:00 AM")

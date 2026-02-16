@@ -76,6 +76,7 @@ def seed_translators_directory() -> int:
 
 
 def sync_reports_translator_ids() -> int:
+    """تحديث translator_id في reports بناءً على translator_name"""
     try:
         from db.session import SessionLocal
         from sqlalchemy import text
@@ -95,6 +96,40 @@ def sync_reports_translator_ids() -> int:
             return result.rowcount or 0
     except Exception as e:
         logger.error(f"Error syncing report translator ids: {e}")
+        return 0
+
+
+def sync_reports_translator_names() -> int:
+    """
+    توحيد أسماء المترجمين في جدول reports بناءً على translator_id من TranslatorDirectory.
+    هذه الدالة تضمن أن translator_name في reports يطابق الاسم في TranslatorDirectory.
+    """
+    try:
+        from db.session import SessionLocal
+        from sqlalchemy import text
+
+        with SessionLocal() as session:
+            result = session.execute(text("""
+                UPDATE reports
+                SET translator_name = (
+                    SELECT translators.name
+                    FROM translators
+                    WHERE translators.translator_id = reports.translator_id
+                )
+                WHERE translator_id IS NOT NULL
+                  AND translator_id != 0
+                  AND EXISTS (
+                      SELECT 1 FROM translators
+                      WHERE translators.translator_id = reports.translator_id
+                  )
+            """))
+            session.commit()
+            updated_count = result.rowcount or 0
+            if updated_count > 0:
+                logger.info(f"✅ تم توحيد أسماء {updated_count} مترجم في جدول reports")
+            return updated_count
+    except Exception as e:
+        logger.error(f"❌ خطأ في توحيد أسماء المترجمين: {e}")
         return 0
 
 

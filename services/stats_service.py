@@ -9,8 +9,8 @@
 #
 # التعريف الرسمي:
 #   - إجمالي التقارير: COUNT(*) WHERE status='active' AND translator_id IS NOT NULL
-#   - أيام الحضور (attendance_days): COUNT(DISTINCT DATE(report_date)) - الأيام التي رفع فيها تقارير
-#   - أيام العمل الرسمية (work_days): أيام الفترة بدون الجمعة
+#   - أيام الحضور (attendance_days): COUNT(DISTINCT DATE(created_at)) - الأيام التي رفع فيها تقارير
+#   - أيام العمل (work_days): نفس أيام الحضور (كل يوم نُشر فيه تقرير = يوم دوام)
 #   - التقارير المتأخرة: created_at hour >= 20
 # ================================================
 
@@ -21,19 +21,6 @@ from sqlalchemy import text
 from db.session import DATABASE_PATH
 
 logger = logging.getLogger(__name__)
-
-
-def _count_work_days(start_date_str: str, end_date_str: str) -> int:
-    """حساب أيام العمل الرسمية (بدون الجمعة) في فترة معينة"""
-    start = datetime.strptime(start_date_str, "%Y-%m-%d").date()
-    end = datetime.strptime(end_date_str, "%Y-%m-%d").date()
-    count = 0
-    d = start
-    while d < end:
-        if d.weekday() != 4:  # 4 = Friday
-            count += 1
-        d += timedelta(days=1)
-    return count
 
 
 def _parse_datetime(value):
@@ -79,18 +66,19 @@ def _run_translator_query(session, start_date_str: str, end_date_str: str):
     """
     try:
         # ═══ الاستعلام الرسمي الوحيد ═══
+        # ✅ استخدام TranslatorDirectory كمرجع أساسي لتوحيد الأسماء
         sql = text("""
             SELECT
                 r.translator_id,
-                COALESCE(u.full_name, r.translator_name, 'مترجم #' || r.translator_id) as translator_name,
+                COALESCE(td.name, r.translator_name, 'مترجم #' || r.translator_id) as translator_name,
                 COUNT(*) as total_reports,
-                COUNT(DISTINCT DATE(r.report_date)) as work_days,
+                COUNT(DISTINCT DATE(COALESCE(r.created_at, r.report_date))) as attendance_days,
                 SUM(
                     CASE WHEN CAST(strftime('%H', r.created_at) AS INTEGER) >= 20
                     THEN 1 ELSE 0 END
                 ) as late_reports
             FROM reports r
-            LEFT JOIN users u ON r.translator_id = u.id
+            LEFT JOIN translators td ON r.translator_id = td.translator_id
             WHERE r.report_date >= :start
             AND r.report_date < :end
             AND r.status = 'active'
@@ -127,9 +115,6 @@ def _run_translator_query(session, start_date_str: str, end_date_str: str):
                 action_map[tid] = {}
             action_map[tid][action_type] = count
 
-        # حساب أيام العمل الرسمية (بدون الجمعة)
-        period_work_days = _count_work_days(start_date_str, end_date_str)
-
         # بناء النتيجة النهائية
         results = []
         for row in rows:
@@ -138,6 +123,7 @@ def _run_translator_query(session, start_date_str: str, end_date_str: str):
             total = row[2]
             attendance_days = row[3]  # الأيام التي رفع فيها تقارير فعلاً
             late = row[4] or 0
+            work_days = attendance_days
 
             # بناء action_breakdown مع ضمان وجود كل الأنواع الـ 13
             raw_actions = action_map.get(tid, {})
@@ -153,9 +139,9 @@ def _run_translator_query(session, start_date_str: str, end_date_str: str):
                 "translator_id": tid,
                 "translator_name": name,
                 "total_reports": total,
-                "work_days": period_work_days,       # أيام العمل الرسمية في الفترة (بدون الجمعة)
+                "work_days": work_days,              # كل يوم نُشر فيه تقرير يُحسب يوم دوام
                 "attendance_days": attendance_days,    # أيام الحضور الفعلي (فيها تقارير)
-                "absent_days": max(period_work_days - attendance_days, 0),  # أيام الغياب
+                "absent_days": 0,                      # وفق القاعدة الجديدة: يوم نشر = يوم دوام
                 "late_reports": late,
                 "action_breakdown": action_breakdown,
                 "start_date": start_date_str,
@@ -184,7 +170,6 @@ def _run_translator_query_resilient(start_date_str: str, end_date_str: str):
     if not start_dt or not end_dt:
         return []
 
-    period_work_days = _count_work_days(start_date_str, end_date_str)
     results_map = {}
     unreadable_rows = 0
     users_name_cache = {}
@@ -232,7 +217,8 @@ def _run_translator_query_resilient(start_date_str: str, end_date_str: str):
         tid = int(translator_id)
         if tid not in users_name_cache:
             try:
-                cur.execute("SELECT full_name FROM users WHERE id = ?", (tid,))
+                # ✅ استخدام TranslatorDirectory بدلاً من users
+                cur.execute("SELECT name FROM translators WHERE translator_id = ?", (tid,))
                 urow = cur.fetchone()
                 users_name_cache[tid] = (urow[0] if urow and urow[0] else None)
             except Exception:
@@ -273,9 +259,9 @@ def _run_translator_query_resilient(start_date_str: str, end_date_str: str):
             "translator_id": item["translator_id"],
             "translator_name": item["translator_name"],
             "total_reports": item["total_reports"],
-            "work_days": period_work_days,
+            "work_days": attendance_days,
             "attendance_days": attendance_days,
-            "absent_days": max(period_work_days - attendance_days, 0),
+            "absent_days": 0,
             "late_reports": item["late_reports"],
             "action_breakdown": item["action_breakdown"],
             "start_date": start_date_str,

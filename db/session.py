@@ -7,7 +7,7 @@ import os
 import logging
 from contextlib import contextmanager
 from typing import Generator
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import sessionmaker, Session
 from db.models import Base
 
@@ -39,6 +39,21 @@ engine = create_engine(
     # إعدادات إضافية للأداء العالي
     pool_timeout=60,  # Wait up to 60s for a connection
 )
+
+
+@event.listens_for(engine, "connect")
+def _set_sqlite_pragmas(dbapi_connection, connection_record):
+    """
+    Enforce SQLite PRAGMAs on every new connection to avoid drift.
+    """
+    cursor = dbapi_connection.cursor()
+    try:
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA synchronous=NORMAL")
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA busy_timeout=5000")
+    finally:
+        cursor.close()
 
 # Create session factory
 SessionLocal = sessionmaker(
@@ -74,7 +89,6 @@ def init_database():
         
         # Enable WAL mode for better concurrency
         try:
-            from sqlalchemy import text
             with engine.connect() as conn:
                 conn.execute(text("PRAGMA journal_mode=WAL"))
                 conn.execute(text("PRAGMA synchronous=NORMAL"))

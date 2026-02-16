@@ -4,6 +4,7 @@
 
 import sys
 import os
+import atexit
 
 # Windows encoding fix
 if sys.platform == 'win32':
@@ -26,6 +27,61 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+_instance_lock_handle = None
+
+
+def _acquire_single_instance_lock() -> bool:
+    """
+    Prevent multiple running bot instances on the same host.
+    """
+    global _instance_lock_handle
+    lock_path = os.getenv("BOT_INSTANCE_LOCKFILE", "/tmp/medbot_single_instance.lock")
+    try:
+        lock_file = open(lock_path, "a+")
+    except Exception as e:
+        logger.error(f"Could not open lock file: {e}")
+        return False
+
+    try:
+        if os.name == "nt":
+            import msvcrt
+            msvcrt.locking(lock_file.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        lock_file.seek(0)
+        lock_file.truncate(0)
+        lock_file.write(str(os.getpid()))
+        lock_file.flush()
+    except Exception:
+        logger.error("Another bot instance appears to be running. Exiting.")
+        try:
+            lock_file.close()
+        except Exception:
+            pass
+        return False
+
+    _instance_lock_handle = lock_file
+    atexit.register(_release_single_instance_lock)
+    return True
+
+
+def _release_single_instance_lock():
+    global _instance_lock_handle
+    if not _instance_lock_handle:
+        return
+    try:
+        if os.name != "nt":
+            import fcntl
+            fcntl.flock(_instance_lock_handle.fileno(), fcntl.LOCK_UN)
+    except Exception:
+        pass
+    try:
+        _instance_lock_handle.close()
+    except Exception:
+        pass
+    _instance_lock_handle = None
 
 # ================================================
 # Basic Handlers (fallback)
@@ -90,6 +146,9 @@ async def error_handler(update: object, context) -> None:
 
 async def main():
     logger.info("=" * 50)
+
+    if not _acquire_single_instance_lock():
+        return
     logger.info("Starting Medical Bot...")
     logger.info("=" * 50)
     

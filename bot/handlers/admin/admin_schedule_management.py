@@ -551,7 +551,7 @@ async def handle_view_patient_names(update: Update, context: ContextTypes.DEFAUL
     
     # استخراج رقم الصفحة من callback_data
     page = 0
-    if query.data.startswith("patient_page:"):
+    if query.data.startswith("sched_patient_page:"):
         try:
             page = int(query.data.split(":")[1])
         except:
@@ -581,9 +581,9 @@ async def handle_view_patient_names(update: Update, context: ContextTypes.DEFAUL
     # أزرار التنقل
     nav_buttons = []
     if page > 0:
-        nav_buttons.append(InlineKeyboardButton("◀️ السابق", callback_data=f"patient_page:{page - 1}"))
+        nav_buttons.append(InlineKeyboardButton("◀️ السابق", callback_data=f"sched_patient_page:{page - 1}"))
     if page < total_pages - 1:
-        nav_buttons.append(InlineKeyboardButton("التالي ▶️", callback_data=f"patient_page:{page + 1}"))
+        nav_buttons.append(InlineKeyboardButton("التالي ▶️", callback_data=f"sched_patient_page:{page + 1}"))
     
     keyboard = []
     if nav_buttons:
@@ -1431,7 +1431,7 @@ def register(app):
     app.add_handler(CallbackQueryHandler(handle_manage_patients, pattern="^manage_patients$"))
     # عرض المرضى مع التصفح بالصفحات
     app.add_handler(CallbackQueryHandler(handle_view_patient_names, pattern="^view_patient_names$"))
-    app.add_handler(CallbackQueryHandler(handle_view_patient_names, pattern="^patient_page:\\d+$"))
+    app.add_handler(CallbackQueryHandler(handle_view_patient_names, pattern="^sched_patient_page:\\d+$"))
     # حذف المرضى مع التصفح
     app.add_handler(CallbackQueryHandler(handle_delete_patient_name, pattern="^delete_patient_name$"))
     app.add_handler(CallbackQueryHandler(handle_delete_patient_name, pattern="^delete_patient_page:\\d+$"))

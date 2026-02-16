@@ -109,11 +109,27 @@ async def send_pm2_logs(update: Update, context: ContextTypes.DEFAULT_TYPE):
         send_name = os.path.basename(log_path)
         size_bytes = os.path.getsize(log_path)
 
+        # Telegram rejects empty documents; fallback to error log if available.
+        if size_bytes == 0:
+            error_log_path = log_path.replace("-out.log", "-error.log")
+            if error_log_path != log_path and os.path.exists(error_log_path) and os.path.getsize(error_log_path) > 0:
+                send_path = error_log_path
+                send_name = os.path.basename(error_log_path)
+                size_bytes = os.path.getsize(error_log_path)
+            else:
+                await message.reply_text("⚠️ Log file is currently empty.")
+                return
+
         # If file is too large, send a tail snapshot to avoid Telegram size failure.
         if size_bytes > MAX_DIRECT_LOG_SEND_BYTES:
             temp_tail = await asyncio.to_thread(_build_logs_tail_file, log_path)
             send_path = temp_tail
             send_name = f"{os.path.splitext(os.path.basename(log_path))[0]}_tail.log"
+
+        # Guard against an empty tail snapshot
+        if os.path.getsize(send_path) == 0:
+            await message.reply_text("⚠️ Log file is currently empty.")
+            return
 
         with open(send_path, "rb") as f:
             await message.reply_document(document=f, filename=send_name)
@@ -130,8 +146,31 @@ async def send_pm2_logs(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 pass
 
 
+async def sync_translator_names(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin command: /sync_names - توحيد أسماء المترجمين في جدول reports بناءً على TranslatorDirectory."""
+    user = update.effective_user
+    message = update.effective_message
+    if not user or not message or not is_admin(user.id):
+        return
+
+    await message.reply_text("🔄 جاري توحيد أسماء المترجمين...")
+
+    try:
+        from services.translators_service import sync_reports_translator_names
+        
+        updated_count = await asyncio.to_thread(sync_reports_translator_names)
+        
+        if updated_count > 0:
+            await message.reply_text(f"✅ تم توحيد أسماء {updated_count} مترجم في جدول reports")
+        else:
+            await message.reply_text("ℹ️ لا توجد أسماء تحتاج توحيد (جميع الأسماء موحدة بالفعل)")
+    except Exception as e:
+        await message.reply_text(f"❌ فشل توحيد الأسماء: {str(e)[:250]}")
+
+
 def register(app):
     """Register admin utility commands."""
     app.add_handler(CommandHandler("backup", backup_db))
     app.add_handler(CommandHandler("logs", send_pm2_logs))
+    app.add_handler(CommandHandler("sync_names", sync_translator_names))
 

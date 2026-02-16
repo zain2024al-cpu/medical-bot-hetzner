@@ -89,6 +89,7 @@ KNOWN_CALLBACKS = [
     r"^delete_patient_name$",
     r"^confirm_delete:\d+$",
     r"^select_edit:\d+$",
+    r"^sched_patient_page:",
     r"^delete_patient_page:",
     r"^edit_patient_page:",
     r"^view_patients_page:",
@@ -144,6 +145,8 @@ KNOWN_CALLBACKS = [
     # واجهة المستخدم الأخرى
     # ===========================
     r"^start_report$",
+    r"^user_action:add_report$",
+    r"^add_report$",
     r"^edit_reports$",
     r"^start_main_menu$",
     
