@@ -39,7 +39,7 @@ async def _monthly_evaluation_job():
     try:
         from services.evaluation_service import evaluation_service
         from db.session import SessionLocal
-        from db.models import DailyReportTracking
+        from db.models import DailyReportTracking, TranslatorDirectory
         from datetime import date
         
         # تشغيل في أول يوم من كل شهر
@@ -49,20 +49,27 @@ async def _monthly_evaluation_job():
             
             # جلب جميع المترجمين
             with SessionLocal() as s:
-                translators = s.query(DailyReportTracking).distinct(DailyReportTracking.translator_name).all()
+                translators = s.query(
+                    DailyReportTracking.translator_id,
+                    DailyReportTracking.translator_name
+                ).distinct().all()
                 
-                for translator_record in translators:
-                    translator_name = translator_record.translator_name
+                for translator_id, translator_name in translators:
+                    resolved_name = translator_name
+                    if translator_id and not resolved_name:
+                        translator = s.query(TranslatorDirectory).filter_by(translator_id=translator_id).first()
+                        resolved_name = translator.name if translator else None
                     
-                    # توليد التقييم الشهري
                     monthly_eval = evaluation_service.generate_monthly_evaluation(
-                        translator_name, 
-                        current_date.year, 
-                        current_date.month - 1  # الشهر السابق
+                        translator_id,
+                        resolved_name,
+                        current_date.year,
+                        current_date.month - 1
                     )
                     
                     if monthly_eval:
-                        print(f"Generated monthly evaluation for {translator_name}")
+                        display_name = resolved_name or "غير محدد"
+                        print(f"Generated monthly evaluation for {display_name}")
             
             print("Monthly evaluation completed.")
         
@@ -104,42 +111,55 @@ async def _daily_followups_job(app):
 async def _sqlite_quick_backup_job():
     """مهمة النسخ الاحتياطي السريع كل 10 دقائق"""
     try:
-        # محاولة النسخ الاحتياطي إلى Google Cloud Storage (إذا كان متاحاً)
+        # النسخة المحلية الآمنة أولاً (SQLite backup API + integrity_check)
+        from services.render_backup import create_local_backup
+        backup_path = create_local_backup(prefix="quick")
+        if backup_path:
+            print(f"Local quick backup completed: {backup_path}")
+        else:
+            print("Local quick backup failed")
+
+        # محاولة رفع نسخة إلى GCS (اختياري)
         try:
             from services.sqlite_backup import get_backup_service
             backup_service = get_backup_service()
             backup_service.quick_backup()
             print("SQLite quick backup to GCS completed.")
         except Exception as gcs_error:
-            # Fallback: النسخ الاحتياطي المحلي (لـ Render)
-            print(f"GCS backup not available, using local backup: {gcs_error}")
-            from services.render_backup import create_local_backup
-            backup_path = create_local_backup()
-            if backup_path:
-                print(f"Local backup completed: {backup_path}")
-            else:
-                print("Local backup failed")
+            print(f"GCS quick backup skipped: {gcs_error}")
     except Exception as e:
         print(f"Error in quick backup: {e}")
 
 async def _sqlite_daily_backup_job():
     """مهمة النسخ الاحتياطي اليومي"""
     try:
-        # محاولة النسخ الاحتياطي إلى Google Cloud Storage (إذا كان متاحاً)
+        from datetime import datetime
+        from services.render_backup import create_local_backup, create_monthly_archive
+
+        # النسخة المحلية الآمنة اليومية
+        backup_path = create_local_backup(prefix="daily")
+        if backup_path:
+            print(f"Local daily backup completed: {backup_path}")
+        else:
+            print("Local daily backup failed")
+
+        # في أول يوم من الشهر: أنشئ أرشيف الشهر السابق
+        now = datetime.utcnow()
+        if now.day == 1:
+            archive_path = create_monthly_archive()
+            if archive_path:
+                print(f"Monthly archive completed: {archive_path}")
+            else:
+                print("Monthly archive failed")
+
+        # محاولة رفع النسخة إلى GCS (اختياري)
         try:
             from services.sqlite_backup import get_backup_service
             backup_service = get_backup_service()
             backup_service.backup_database(backup_type="daily")
             print("SQLite daily backup to GCS completed.")
         except Exception as gcs_error:
-            # Fallback: النسخ الاحتياطي المحلي (لـ Render)
-            print(f"GCS backup not available, using local backup: {gcs_error}")
-            from services.render_backup import create_local_backup
-            backup_path = create_local_backup()
-            if backup_path:
-                print(f"Local daily backup completed: {backup_path}")
-            else:
-                print("Local daily backup failed")
+            print(f"GCS daily backup skipped: {gcs_error}")
     except Exception as e:
         print(f"Error in daily backup: {e}")
 

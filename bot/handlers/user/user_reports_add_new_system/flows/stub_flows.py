@@ -21,10 +21,14 @@ try:
     from .rehab import start_rehab_flow
     from .radiology import start_radiology_flow
     from .app_reschedule import start_appointment_reschedule_flow as start_reschedule_flow
+    from .radiation_therapy import start_radiation_therapy_flow
     
     logger.debug("✅ Successfully imported all flow functions from flows/ modules")
+    logger.debug(f"✅ start_radiation_therapy_flow imported: {start_radiation_therapy_flow}")
 except ImportError as e:
     logger.error(f"❌ Error importing flow functions from flows/ modules: {e}")
+    import traceback
+    traceback.print_exc()
     
     # Fallback: استيراد من الملفات الفردية (التي تستخدم importlib)
     # لا حاجة لاستيراد مباشر من الملف الأصلي هنا لأن الملفات الفردية تفعل ذلك
@@ -42,7 +46,8 @@ except ImportError as e:
         start_new_consultation_flow = start_followup_flow = start_periodic_followup_flow = \
         start_emergency_flow = start_admission_flow = start_operation_flow = \
         start_surgery_consult_flow = start_final_consult_flow = start_discharge_flow = \
-        start_rehab_flow = start_radiology_flow = start_reschedule_flow = stub_flow
+        start_rehab_flow = start_radiology_flow = start_reschedule_flow = \
+        start_radiation_therapy_flow = stub_flow
 
 __all__ = [
     'start_new_consultation_flow',
@@ -57,4 +62,5 @@ __all__ = [
     'start_rehab_flow',
     'start_radiology_flow',
     'start_reschedule_flow',
+    'start_radiation_therapy_flow',
 ]

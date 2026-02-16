@@ -13,6 +13,7 @@ from datetime import datetime, date, timedelta
 from db.session import SessionLocal
 from db.models import Report, Translator, Patient, Hospital, Department, Doctor
 from bot.shared_auth import is_admin
+from bot.keyboards import user_main_kb
 from sqlalchemy import or_, and_
 import logging
 import os
@@ -112,6 +113,7 @@ async def start_delete_reports(update: Update, context: ContextTypes.DEFAULT_TYP
                     "📋 **لا توجد تقارير متاحة**\n\n"
                     "لم يتم العثور على أي تقارير قمت بنشرها.\n"
                     "استخدم زر '📝 إضافة تقرير جديد' لإضافة تقرير.",
+                    reply_markup=user_main_kb(),
                     parse_mode=ParseMode.MARKDOWN
                 )
                 return ConversationHandler.END
@@ -182,7 +184,15 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
         await query.answer()
         
         if query.data == "delete_cancel":
-            await query.edit_message_text("❌ **تم إلغاء عملية الحذف**")
+            await query.edit_message_text(
+                "❌ **تم إلغاء عملية الحذف**\n\n"
+                "يمكنك البدء من جديد من القائمة الرئيسية.",
+                parse_mode=ParseMode.MARKDOWN
+            )
+            await query.message.reply_text(
+                "📋 اختر العملية المطلوبة:",
+                reply_markup=user_main_kb()
+            )
             return ConversationHandler.END
         
         # استخراج رقم التقرير
@@ -271,7 +281,15 @@ async def handle_confirm_delete(update: Update, context: ContextTypes.DEFAULT_TY
         await query.answer()
         
         if query.data == "delete_cancel":
-            await query.edit_message_text("❌ **تم إلغاء عملية الحذف**")
+            await query.edit_message_text(
+                "❌ **تم إلغاء عملية الحذف**\n\n"
+                "يمكنك البدء من جديد من القائمة الرئيسية.",
+                parse_mode=ParseMode.MARKDOWN
+            )
+            await query.message.reply_text(
+                "📋 اختر العملية المطلوبة:",
+                reply_markup=user_main_kb()
+            )
             return ConversationHandler.END
         
         if query.data == "delete_back":
@@ -435,10 +453,23 @@ async def cancel_delete(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """إلغاء عملية الحذف"""
     try:
         if update.message:
-            await update.message.reply_text("❌ **تم إلغاء عملية الحذف**")
+            await update.message.reply_text(
+                "❌ **تم إلغاء عملية الحذف**\n\n"
+                "يمكنك البدء من جديد من القائمة الرئيسية.",
+                reply_markup=user_main_kb(),
+                parse_mode=ParseMode.MARKDOWN
+            )
         elif update.callback_query:
             await update.callback_query.answer("تم الإلغاء")
-            await update.callback_query.edit_message_text("❌ **تم إلغاء عملية الحذف**")
+            await update.callback_query.edit_message_text(
+                "❌ **تم إلغاء عملية الحذف**\n\n"
+                "يمكنك البدء من جديد من القائمة الرئيسية.",
+                parse_mode=ParseMode.MARKDOWN
+            )
+            await update.callback_query.message.reply_text(
+                "📋 اختر العملية المطلوبة:",
+                reply_markup=user_main_kb()
+            )
     except:
         pass
     
@@ -477,4 +508,3 @@ def register(app):
     )
     
     app.add_handler(conv_handler)
-

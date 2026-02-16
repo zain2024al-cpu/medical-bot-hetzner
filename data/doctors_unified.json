@@ -3,8 +3,8 @@
   "created_at": "2025-12-31T03:04:21.460776",
   "description": "Unified Doctors & Hospitals Database - Merged & Deduplicated",
   "statistics": {
-    "total_hospitals": 36,
-    "total_doctors": 1082,
+    "total_hospitals": 37,
+    "total_doctors": 1088,
     "total_departments": 599
   },
   "hospitals": [
@@ -3101,6 +3101,13 @@
       "id": 40,
       "name": "Rainbow children’s Hospital, Delhi",
       "name_normalized": "rainbow children’s hospital, delhi",
+      "departments": [],
+      "doctor_count": 0
+    },
+    {
+      "id": 41,
+      "name": "📅 إدارة الجدول",
+      "name_normalized": "📅 إدارة الجدول",
       "departments": [],
       "doctor_count": 0
     }
@@ -12864,6 +12871,66 @@
       "hospital_name": "Trilife Hospital, Bangalore",
       "department": "جراحة العظام | Orthopedics",
       "search_text": "لا trilife hospital, bangalore جراحة العظام | orthopedics",
+      "added_manually": true
+    },
+    {
+      "id": 1083,
+      "name": "علي صالح",
+      "name_normalized": "علي صالح",
+      "hospital_id": 11,
+      "hospital_name": "Fortis Hospital BG Road, Bangalore",
+      "department": "عيون - العصب البصري | Optic Nerve",
+      "search_text": "علي صالح fortis hospital bg road, bangalore عيون - العصب البصري | optic nerve",
+      "added_manually": true
+    },
+    {
+      "id": 1084,
+      "name": "مرينا",
+      "name_normalized": "مرينا",
+      "hospital_id": 32,
+      "hospital_name": "Sakra World Hospital, Bangalore",
+      "department": "النساء والتوليد | Obstetrics & Gynecology",
+      "search_text": "مرينا sakra world hospital, bangalore النساء والتوليد | obstetrics & gynecology",
+      "added_manually": true
+    },
+    {
+      "id": 1085,
+      "name": "ومكمن",
+      "name_normalized": "ومكمن",
+      "hospital_id": 32,
+      "hospital_name": "Sakra World Hospital, Bangalore",
+      "department": "الأمراض الجلدية | Dermatology",
+      "search_text": "ومكمن sakra world hospital, bangalore الأمراض الجلدية | dermatology",
+      "added_manually": true
+    },
+    {
+      "id": 1086,
+      "name": "د سبت",
+      "name_normalized": "د سبت",
+      "hospital_id": 5,
+      "hospital_name": "Aster CMI Hospital, Bangalore",
+      "department": "النساء والتوليد | Obstetrics & Gynecology",
+      "search_text": "د سبت aster cmi hospital, bangalore النساء والتوليد | obstetrics & gynecology",
+      "added_manually": true
+    },
+    {
+      "id": 1087,
+      "name": "هاري",
+      "name_normalized": "هاري",
+      "hospital_id": 6,
+      "hospital_name": "Aster RV Hospital, Bangalore",
+      "department": "العلاج الإشعاعي | The radiation Therapy",
+      "search_text": "هاري aster rv hospital, bangalore العلاج الإشعاعي | the radiation therapy",
+      "added_manually": true
+    },
+    {
+      "id": 1088,
+      "name": "نوعيت",
+      "name_normalized": "نوعيت",
+      "hospital_id": 5,
+      "hospital_name": "Aster CMI Hospital, Bangalore",
+      "department": "العلاج الإشعاعي | The radiation Therapy",
+      "search_text": "نوعيت aster cmi hospital, bangalore العلاج الإشعاعي | the radiation therapy",
       "added_manually": true
     }
   ]

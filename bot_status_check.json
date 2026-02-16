@@ -1,0 +1,32 @@
+{
+  "timestamp": "2026-02-05 14:11:34",
+  "bot_token": "8309645711...",
+  "checks": {
+    "getMe": {
+      "status": "نجح",
+      "bot_username": "med_reports_bot",
+      "bot_id": 8309645711,
+      "bot_name": "Medical Reports Bot",
+      "can_join_groups": true,
+      "can_read_all_group_messages": true,
+      "supports_inline_queries": false
+    },
+    "getUpdates": {
+      "status": "❌ فشل",
+      "error": "Conflict: terminated by other getUpdates request; make sure that only one bot instance is running"
+    },
+    "webhook": {
+      "status": "نجح",
+      "url": "غير محدد",
+      "has_custom_certificate": false,
+      "pending_update_count": 0,
+      "last_error_date": null,
+      "last_error_message": null,
+      "max_connections": null
+    },
+    "database": {
+      "status": "نجح",
+      "message": "قاعدة البيانات متصلة وتعمل بشكل صحيح"
+    }
+  }
+}

@@ -66,7 +66,23 @@ async def unknown_command(update: Update, context) -> None:
 
 async def error_handler(update: object, context) -> None:
     """Error handler"""
-    logger.error(f"Error: {context.error}")
+    error = context.error
+    error_str = str(error).lower()
+    
+    # تجاهل أخطاء التعارض (Conflict) - تحدث عندما يعمل أكثر من نسخة من البوت
+    if "Conflict" in str(error) or "terminated by other getUpdates" in error_str:
+        logger.warning(f"⚠️ Conflict detected - another bot instance may be running: {error}")
+        logger.warning("💡 Make sure only one bot instance is running!")
+        return  # تجاهل الخطأ ولا نوقف البوت
+    
+    # تجاهل أخطاء الشبكة المؤقتة
+    network_errors = ['timed out', 'network', 'connection', 'read error', 'write error', 'httpx']
+    if any(err in error_str for err in network_errors):
+        logger.warning(f"Network error (ignored): {error}")
+        return
+    
+    # تسجيل الأخطاء الأخرى
+    logger.error(f"Error: {error}", exc_info=True)
 
 # ================================================
 # Main
@@ -83,8 +99,17 @@ async def main():
     
     logger.info("Token found")
     
-    # Create application
-    app = Application.builder().token(BOT_TOKEN).build()
+    # Create application with increased timeouts
+    from telegram.ext import ApplicationBuilder
+    app = (
+        ApplicationBuilder()
+        .token(BOT_TOKEN)
+        .connect_timeout(30.0)
+        .read_timeout(30.0)
+        .write_timeout(30.0)
+        .pool_timeout(30.0)
+        .build()
+    )
     app.add_error_handler(error_handler)
     
     # Try to add advanced handlers
@@ -102,9 +127,24 @@ async def main():
         app.add_handler(CommandHandler("status", status_command))
     
     logger.info("Starting bot...")
+
+    # حذف webhook أولاً قبل أي شيء لتجنب التعارض
+    try:
+        from telegram import Bot
+        temp_bot = Bot(token=BOT_TOKEN)
+        await temp_bot.delete_webhook(drop_pending_updates=True)
+        logger.info("✅ Webhook deleted before initialization")
+    except Exception as e:
+        logger.warning(f"⚠️ Could not delete webhook: {e}")
+
     await app.initialize()
     await app.start()
-    await app.updater.start_polling(drop_pending_updates=True)
+    
+    # ✅ إضافة allowed_updates للتأكد من استقبال inline_query
+    await app.updater.start_polling(
+        drop_pending_updates=True,
+        allowed_updates=["message", "callback_query", "inline_query", "chosen_inline_result", "edited_message"]
+    )
     logger.info("=" * 50)
     logger.info("Bot is running!")
     logger.info(f"Bot: @med_reports_bot")

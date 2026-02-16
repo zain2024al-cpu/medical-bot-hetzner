@@ -16,26 +16,34 @@ logger = logging.getLogger(__name__)
 def _get_action_routing():
     """الحصول على ربط أنواع الإجراءات بالمسارات - يتم استدعاؤه بعد تعريف الدوال"""
     # استيراد من stub_flows.py (الذي يستورد من الملف الأصلي مؤقتاً)
-    from .flows.stub_flows import (
-        start_new_consultation_flow,
-        start_followup_flow,
-        start_periodic_followup_flow,
-        start_emergency_flow,
-        start_admission_flow,
-        start_operation_flow,
-        start_surgery_consult_flow,
-        start_final_consult_flow,
-        start_discharge_flow,
-        start_rehab_flow,
-        start_radiology_flow,
-        start_reschedule_flow,
-    )
+    try:
+        from .flows.stub_flows import (
+            start_new_consultation_flow,
+            start_followup_flow,
+            start_periodic_followup_flow,
+            start_emergency_flow,
+            start_admission_flow,
+            start_operation_flow,
+            start_surgery_consult_flow,
+            start_final_consult_flow,
+            start_discharge_flow,
+            start_rehab_flow,
+            start_radiology_flow,
+            start_reschedule_flow,
+            start_radiation_therapy_flow,
+        )
+        logger.debug(f"✅ start_radiation_therapy_flow imported successfully: {start_radiation_therapy_flow}")
+    except ImportError as e:
+        logger.error(f"❌ Error importing flow functions: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
     
     from .states import (
         NEW_CONSULT_COMPLAINT, FOLLOWUP_COMPLAINT, EMERGENCY_COMPLAINT,
         ADMISSION_REASON, OPERATION_DETAILS_AR, SURGERY_CONSULT_DIAGNOSIS,
         FINAL_CONSULT_DIAGNOSIS, DISCHARGE_TYPE, REHAB_TYPE, RADIOLOGY_TYPE,
-        APP_RESCHEDULE_REASON
+        APP_RESCHEDULE_REASON, RADIATION_THERAPY_TYPE
     )
     
     routing_dict = {
@@ -97,6 +105,11 @@ def _get_action_routing():
         "تأجيل موعد": {
             "state": APP_RESCHEDULE_REASON,
             "flow": start_reschedule_flow,
+            "pre_process": None
+        },
+        "جلسة إشعاعي": {
+            "state": RADIATION_THERAPY_TYPE,
+            "flow": start_radiation_therapy_flow,
             "pre_process": None
         },
     }
@@ -290,6 +303,7 @@ async def handle_action_type_choice(update: Update, context: ContextTypes.DEFAUL
             "خروج من المستشفى": "discharge",
             "أشعة وفحوصات": "radiology",
             "تأجيل موعد": "appointment_reschedule",
+            "جلسة إشعاعي": "radiation_therapy",
         }
 
         flow_type = action_to_flow_type.get(action_name, "new_consult")
@@ -304,15 +318,20 @@ async def handle_action_type_choice(update: Update, context: ContextTypes.DEFAUL
 
         # البحث عن المسار المناسب
         action_routing = _get_action_routing()
+        logger.info(f"ACTION_TYPE_CHOICE: Available actions in routing: {list(action_routing.keys())}")
         routing = action_routing.get(action_name)
         
         if not routing:
-            logger.warning(f"ACTION_TYPE_CHOICE: Unknown action type: '{action_name}', using default flow")
+            logger.error(f"ACTION_TYPE_CHOICE: Unknown action type: '{action_name}'")
+            logger.error(f"ACTION_TYPE_CHOICE: Available actions: {list(action_routing.keys())}")
+            logger.warning(f"ACTION_TYPE_CHOICE: Using default flow (استشارة جديدة)")
             routing = action_routing.get("استشارة جديدة")
             if not routing:
                 logger.error("ACTION_TYPE_CHOICE: CRITICAL - Default routing also not found!")
                 await query.answer("خطأ: نوع الإجراء غير مدعوم", show_alert=True)
                 return R_ACTION_TYPE
+        else:
+            logger.info(f"ACTION_TYPE_CHOICE: Found routing for '{action_name}': state={routing.get('state')}, flow={routing.get('flow')}")
 
         # تنفيذ pre_process إذا كان موجوداً
         if routing.get("pre_process"):

@@ -92,6 +92,7 @@ async def handle_rehab_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if rehab_type == "physical_therapy":
         await query.edit_message_text("✅ اخترت: علاج طبيعي")
         context.user_data["report_tmp"]["current_flow"] = "rehab_physical"
+        context.user_data["report_tmp"]["medical_action"] = "علاج طبيعي"
         context.user_data['_conversation_state'] = PHYSICAL_THERAPY_DETAILS
         await query.message.reply_text(
             "🏃 **تفاصيل جلسة العلاج الطبيعي**\n\n"
@@ -104,6 +105,7 @@ async def handle_rehab_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif rehab_type == "device":
         await query.edit_message_text("✅ اخترت: أجهزة تعويضية")
         context.user_data["report_tmp"]["current_flow"] = "rehab_device"
+        context.user_data["report_tmp"]["medical_action"] = "أجهزة تعويضية"
         context.user_data['_conversation_state'] = DEVICE_NAME_DETAILS
         await query.message.reply_text(
             "🦾 **اسم الجهاز الذي تم توفيره مع التفاصيل**\n\n"

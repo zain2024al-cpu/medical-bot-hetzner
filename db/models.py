@@ -45,6 +45,13 @@ class User(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
 
 
+class TranslatorDirectory(Base):
+    __tablename__ = "translators"
+    
+    translator_id = Column(Integer, primary_key=True)
+    name = Column(String(255), nullable=True, index=True)
+
+
 # ================================================
 # Patient Model
 # ================================================
@@ -182,6 +189,16 @@ class Report(Base):
     # ✅ حقول الأشعة والفحوصات
     radiology_type = Column(String(255), nullable=True)
     radiology_delivery_date = Column(DateTime, nullable=True)
+    
+    # ✅ حقول العلاج الإشعاعي
+    radiation_therapy_type = Column(String(255), nullable=True)
+    radiation_therapy_session_number = Column(String(100), nullable=True)
+    radiation_therapy_remaining = Column(String(100), nullable=True)
+    radiation_therapy_recommendations = Column(Text, nullable=True)  # ملاحظات أو توصيات
+    radiation_therapy_return_date = Column(DateTime, nullable=True)
+    radiation_therapy_return_reason = Column(Text, nullable=True)
+    radiation_therapy_final_notes = Column(Text, nullable=True)
+    radiation_therapy_completed = Column(Boolean, default=False, nullable=True)
     
     # ✅ حقل رقم الغرفة والطابق
     room_number = Column(String(255), nullable=True)
@@ -398,27 +415,44 @@ class TranslatorEvaluation(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     translator_id = Column(Integer, nullable=True)
     translator_name = Column(String(255), nullable=True)
-    evaluation_period = Column(String(100), nullable=True)
-    total_reports = Column(Integer, default=0, nullable=True)
-    quality_score = Column(Float, default=0.0, nullable=True)
-    performance_score = Column(Float, default=0.0, nullable=True)
-    feedback = Column(Text, nullable=True)
+    report_id = Column(Integer, nullable=True)
+    evaluation_date = Column(DateTime, nullable=True)
+    timing_score = Column(Integer, nullable=True)
+    quality_score = Column(Integer, nullable=True)
+    regularity_score = Column(Integer, nullable=True)
+    total_score = Column(Integer, nullable=True)
+    timing_notes = Column(Text, nullable=True)
+    quality_notes = Column(Text, nullable=True)
+    general_notes = Column(Text, nullable=True)
+    evaluator_id = Column(Integer, nullable=True)
+    is_manual = Column(Boolean, default=False, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=True)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
 
 
 class MonthlyEvaluation(Base):
     """Monthly evaluation tracking"""
     __tablename__ = "monthly_evaluations"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     translator_id = Column(Integer, nullable=True)
     translator_name = Column(String(255), nullable=True)
     month = Column(Integer, nullable=True)
     year = Column(Integer, nullable=True)
     total_reports = Column(Integer, default=0, nullable=True)
-    average_quality = Column(Float, default=0.0, nullable=True)
+    work_days = Column(Integer, default=0, nullable=True)
+    # حقول التقييم التفصيلية
+    on_time_reports = Column(Integer, default=0, nullable=True)
+    late_reports = Column(Integer, default=0, nullable=True)
+    timing_points = Column(Float, default=0.0, nullable=True)
+    quality_points = Column(Float, default=0.0, nullable=True)
+    regularity_points = Column(Float, default=0.0, nullable=True)
+    total_points = Column(Float, default=0.0, nullable=True)
+    final_rating = Column(Integer, default=0, nullable=True)
+    performance_level = Column(String(50), nullable=True)
+    monthly_notes = Column(Text, nullable=True)
+    recommendations = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
 
 
 class FollowupTracking(Base):
@@ -455,6 +489,7 @@ __all__ = [
     'Base',
     'User',
     'Translator',
+    'TranslatorDirectory',
     'Patient',
     'Hospital',
     'Department',

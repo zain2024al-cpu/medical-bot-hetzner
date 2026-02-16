@@ -149,10 +149,15 @@ async def handle_add_translator(update: Update, context: ContextTypes.DEFAULT_TY
     query = update.callback_query
     await query.answer()
     
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("❌ إلغاء", callback_data="cancel_translator_input")]
+    ])
+
     await query.edit_message_text(
         "➕ **إضافة مترجم جديد**\n\n"
         "📝 اكتب اسم المترجم:\n"
         "مثال: أحمد محمد",
+        reply_markup=keyboard,
         parse_mode=ParseMode.MARKDOWN
     )
     return "ADD_TRANSLATOR_NAME"
@@ -163,9 +168,13 @@ async def handle_translator_name_input(update: Update, context: ContextTypes.DEF
     name = update.message.text.strip()
     
     if not name or len(name) < 2:
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("❌ إلغاء", callback_data="cancel_translator_input")]
+        ])
         await update.message.reply_text(
             "⚠️ **خطأ:** الاسم قصير جداً\n\n"
             "يرجى إدخال اسم صحيح:",
+            reply_markup=keyboard,
             parse_mode=ParseMode.MARKDOWN
         )
         return "ADD_TRANSLATOR_NAME"
@@ -422,13 +431,18 @@ async def handle_select_edit_translator(update: Update, context: ContextTypes.DE
     context.user_data['edit_translator_index'] = index
     context.user_data['edit_translator_old_name'] = old_name
     
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("❌ إلغاء", callback_data="cancel_translator_input")]
+    ])
+
     await query.edit_message_text(
         f"✏️ **تعديل اسم المترجم**\n\n"
         f"👤 **الاسم الحالي:** {old_name}\n\n"
         f"اكتب الاسم الجديد:",
+        reply_markup=keyboard,
         parse_mode=ParseMode.MARKDOWN
     )
-    
+
     return "EDIT_TRANSLATOR_INPUT"
 
 
@@ -437,9 +451,13 @@ async def handle_edit_translator_input(update: Update, context: ContextTypes.DEF
     new_name = update.message.text.strip()
     
     if not new_name or len(new_name) < 2:
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("❌ إلغاء", callback_data="cancel_translator_input")]
+        ])
         await update.message.reply_text(
             "⚠️ **خطأ:** الاسم قصير جداً\n\n"
             "يرجى إدخال اسم صحيح:",
+            reply_markup=keyboard,
             parse_mode=ParseMode.MARKDOWN
         )
         return "EDIT_TRANSLATOR_INPUT"
@@ -540,9 +558,41 @@ async def handle_sync_translators(update: Update, context: ContextTypes.DEFAULT_
         )
 
 
+async def handle_cancel_translator_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """إلغاء عملية إضافة/تعديل مترجم"""
+    query = update.callback_query
+    await query.answer()
+
+    # مسح البيانات المؤقتة
+    context.user_data.pop('edit_translator_index', None)
+    context.user_data.pop('edit_translator_old_name', None)
+    context.user_data.pop('edit_translator_names_list', None)
+
+    names = get_translator_names_from_file()
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("➕ إضافة مترجم جديد", callback_data="add_translator")],
+        [InlineKeyboardButton("📋 عرض جميع المترجمين", callback_data="view_translators")],
+        [InlineKeyboardButton("✏️ تعديل مترجم", callback_data="edit_translator")],
+        [InlineKeyboardButton("🗑️ حذف مترجم", callback_data="delete_translator")],
+        [InlineKeyboardButton("🔄 مزامنة من القائمة الثابتة", callback_data="sync_translators")],
+        [InlineKeyboardButton("🔙 رجوع", callback_data="back_to_schedule")]
+    ])
+
+    await query.edit_message_text(
+        f"❌ **تم إلغاء العملية**\n\n"
+        f"👥 **إدارة المترجمين**\n"
+        f"📊 **عدد المترجمين:** {len(names)}\n\n"
+        f"اختر العملية:",
+        reply_markup=keyboard,
+        parse_mode=ParseMode.MARKDOWN
+    )
+    return ConversationHandler.END
+
+
 def register(app):
     """تسجيل الهاندلرز"""
-    
+
     # ConversationHandler لإدارة المترجمين (إضافة وتعديل)
     translators_conv = ConversationHandler(
         entry_points=[
@@ -551,18 +601,22 @@ def register(app):
         ],
         states={
             "EDIT_TRANSLATOR_INPUT": [
+                CallbackQueryHandler(handle_cancel_translator_input, pattern="^cancel_translator_input$"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_edit_translator_input)
             ],
             "ADD_TRANSLATOR_NAME": [
+                CallbackQueryHandler(handle_cancel_translator_input, pattern="^cancel_translator_input$"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_translator_name_input)
             ]
         },
         fallbacks=[
+            CallbackQueryHandler(handle_cancel_translator_input, pattern="^cancel_translator_input$"),
             CallbackQueryHandler(handle_manage_translators, pattern="^manage_translators$")
         ],
         per_chat=True,
         per_user=True,
         per_message=False,
+        allow_reentry=True,
         name="translators_conv"
     )
     

@@ -7,7 +7,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler, MessageHandler, CallbackQueryHandler, filters
 from telegram.constants import ParseMode
 import logging
-from db.session import SessionLocal
+from db.session import SessionLocal, get_db
 from db.models import Hospital
 from bot.shared_auth import is_admin
 
@@ -29,7 +29,7 @@ async def handle_manage_hospitals(update: Update, context: ContextTypes.DEFAULT_
     
     # قراءة المستشفيات من قاعدة البيانات
     try:
-        with SessionLocal() as s:
+        with get_db() as s:
             hospitals = s.query(Hospital).order_by(Hospital.name).all()
             hospitals_count = len(hospitals)
     except Exception as e:
@@ -64,7 +64,7 @@ async def handle_view_hospitals(update: Update, context: ContextTypes.DEFAULT_TY
     
     # قراءة المستشفيات من قاعدة البيانات
     try:
-        with SessionLocal() as s:
+        with get_db() as s:
             hospitals = s.query(Hospital).order_by(Hospital.name).all()
             names = [h.name for h in hospitals if h.name]
     except Exception as e:
@@ -123,11 +123,16 @@ async def handle_add_hospital(update: Update, context: ContextTypes.DEFAULT_TYPE
     """بدء إضافة مستشفى جديد"""
     query = update.callback_query
     await query.answer()
-    
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("❌ إلغاء", callback_data="cancel_hospital_input")]
+    ])
+
     await query.edit_message_text(
         "➕ **إضافة مستشفى جديد**\n\n"
         "📝 اكتب اسم المستشفى:\n"
         "مثال: Manipal Hospital - Whitefield",
+        reply_markup=keyboard,
         parse_mode=ParseMode.MARKDOWN
     )
     return "ADD_HOSPITAL_NAME"
@@ -137,16 +142,20 @@ async def handle_hospital_name_input(update: Update, context: ContextTypes.DEFAU
     name = update.message.text.strip()
     
     if not name or len(name) < 3:
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("❌ إلغاء", callback_data="cancel_hospital_input")]
+        ])
         await update.message.reply_text(
             "⚠️ **خطأ:** الاسم قصير جداً\n\n"
             "يرجى إدخال اسم صحيح (3 حروف على الأقل):",
+            reply_markup=keyboard,
             parse_mode=ParseMode.MARKDOWN
         )
         return "ADD_HOSPITAL_NAME"
     
     # إضافة المستشفى لقاعدة البيانات
     try:
-        with SessionLocal() as s:
+        with get_db() as s:
             # التحقق من وجود المستشفى مسبقاً
             existing = s.query(Hospital).filter_by(name=name).first()
             if existing:
@@ -160,7 +169,7 @@ async def handle_hospital_name_input(update: Update, context: ContextTypes.DEFAU
             
             new_hospital = Hospital(name=name)
             s.add(new_hospital)
-            s.commit()
+            # get_db() context manager يقوم بالـ commit تلقائياً عند الخروج
             logger.info(f"✅ تم إضافة المستشفى '{name}' إلى قاعدة البيانات")
         
         keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_hospitals")]])
@@ -174,6 +183,8 @@ async def handle_hospital_name_input(update: Update, context: ContextTypes.DEFAU
         return ConversationHandler.END
     except Exception as e:
         logger.error(f"❌ خطأ في إضافة المستشفى: {e}")
+        import traceback
+        traceback.print_exc()
         await update.message.reply_text(
             f"❌ **خطأ في الحفظ:** {str(e)}",
             parse_mode=ParseMode.MARKDOWN
@@ -187,7 +198,7 @@ async def handle_delete_hospital(update: Update, context: ContextTypes.DEFAULT_T
     
     # قراءة المستشفيات من قاعدة البيانات
     try:
-        with SessionLocal() as s:
+        with get_db() as s:
             hospitals = s.query(Hospital).order_by(Hospital.name).all()
     except Exception as e:
         logger.error(f"❌ خطأ في تحميل المستشفيات: {e}")
@@ -319,7 +330,7 @@ async def handle_edit_hospital(update: Update, context: ContextTypes.DEFAULT_TYP
     
     # قراءة المستشفيات من قاعدة البيانات
     try:
-        with SessionLocal() as s:
+        with get_db() as s:
             hospitals = s.query(Hospital).order_by(Hospital.name).all()
     except Exception as e:
         logger.error(f"❌ خطأ في تحميل المستشفيات: {e}")
@@ -422,13 +433,18 @@ async def handle_select_edit_hospital(update: Update, context: ContextTypes.DEFA
     context.user_data['edit_hospital_id'] = hospital_id
     context.user_data['edit_hospital_old_name'] = old_name
     
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("❌ إلغاء", callback_data="cancel_hospital_input")]
+    ])
+
     await query.edit_message_text(
         f"✏️ **تعديل اسم المستشفى**\n\n"
         f"🏥 **الاسم الحالي:** {old_name}\n\n"
         f"اكتب الاسم الجديد:",
+        reply_markup=keyboard,
         parse_mode=ParseMode.MARKDOWN
     )
-    
+
     return "EDIT_HOSPITAL_INPUT"
 
 async def handle_edit_hospital_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -436,9 +452,13 @@ async def handle_edit_hospital_input(update: Update, context: ContextTypes.DEFAU
     new_name = update.message.text.strip()
     
     if not new_name or len(new_name) < 3:
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("❌ إلغاء", callback_data="cancel_hospital_input")]
+        ])
         await update.message.reply_text(
             "⚠️ **خطأ:** الاسم قصير جداً\n\n"
             "يرجى إدخال اسم صحيح (3 حروف على الأقل):",
+            reply_markup=keyboard,
             parse_mode=ParseMode.MARKDOWN
         )
         return "EDIT_HOSPITAL_INPUT"
@@ -453,11 +473,11 @@ async def handle_edit_hospital_input(update: Update, context: ContextTypes.DEFAU
     
     # تعديل في قاعدة البيانات
     try:
-        with SessionLocal() as s:
+        with get_db() as s:
             hospital = s.query(Hospital).filter_by(id=hospital_id).first()
             if hospital:
                 hospital.name = new_name
-                s.commit()
+                # get_db() context manager يقوم بالـ commit تلقائياً عند الخروج
                 logger.info(f"✅ تم تعديل اسم المستشفى من '{old_name}' إلى '{new_name}'")
         
         # مسح البيانات المحفوظة
@@ -476,6 +496,8 @@ async def handle_edit_hospital_input(update: Update, context: ContextTypes.DEFAU
         return ConversationHandler.END
     except Exception as e:
         logger.error(f"❌ خطأ في تعديل المستشفى: {e}")
+        import traceback
+        traceback.print_exc()
         await update.message.reply_text(
             f"❌ **خطأ في الحفظ:** {str(e)}",
             parse_mode=ParseMode.MARKDOWN
@@ -528,7 +550,7 @@ async def handle_sync_hospitals(update: Update, context: ContextTypes.DEFAULT_TY
     
     try:
         added_count = 0
-        with SessionLocal() as s:
+        with get_db() as s:
             for name in PREDEFINED_HOSPITALS:
                 # التحقق من وجود المستشفى
                 existing = s.query(Hospital).filter_by(name=name).first()
@@ -537,7 +559,7 @@ async def handle_sync_hospitals(update: Update, context: ContextTypes.DEFAULT_TY
                     s.add(new_hospital)
                     added_count += 1
             
-            s.commit()
+            # get_db() context manager يقوم بالـ commit تلقائياً عند الخروج
             total = s.query(Hospital).count()
         
         logger.info(f"✅ تم مزامنة {added_count} مستشفى جديد إلى قاعدة البيانات")
@@ -560,9 +582,44 @@ async def handle_sync_hospitals(update: Update, context: ContextTypes.DEFAULT_TY
         )
 
 
+async def handle_cancel_hospital_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """إلغاء عملية إضافة/تعديل مستشفى"""
+    query = update.callback_query
+    await query.answer()
+
+    # مسح البيانات المؤقتة
+    context.user_data.pop('edit_hospital_id', None)
+    context.user_data.pop('edit_hospital_old_name', None)
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("➕ إضافة مستشفى جديد", callback_data="add_hospital")],
+        [InlineKeyboardButton("📋 عرض جميع المستشفيات", callback_data="view_hospitals")],
+        [InlineKeyboardButton("✏️ تعديل مستشفى", callback_data="edit_hospital")],
+        [InlineKeyboardButton("🗑️ حذف مستشفى", callback_data="delete_hospital")],
+        [InlineKeyboardButton("🔄 مزامنة من القائمة الثابتة", callback_data="sync_hospitals")],
+        [InlineKeyboardButton("🔙 رجوع", callback_data="back_to_schedule")]
+    ])
+
+    try:
+        with get_db() as s:
+            hospitals_count = s.query(Hospital).count()
+    except Exception:
+        hospitals_count = 0
+
+    await query.edit_message_text(
+        f"❌ **تم إلغاء العملية**\n\n"
+        f"🏥 **إدارة المستشفيات**\n"
+        f"📊 **عدد المستشفيات:** {hospitals_count}\n\n"
+        f"اختر العملية:",
+        reply_markup=keyboard,
+        parse_mode=ParseMode.MARKDOWN
+    )
+    return ConversationHandler.END
+
+
 def register(app):
     """تسجيل الهاندلرز"""
-    
+
     # ConversationHandler لإدارة المستشفيات (إضافة وتعديل)
     hospitals_conv = ConversationHandler(
         entry_points=[
@@ -571,18 +628,22 @@ def register(app):
         ],
         states={
             "EDIT_HOSPITAL_INPUT": [
+                CallbackQueryHandler(handle_cancel_hospital_input, pattern="^cancel_hospital_input$"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_edit_hospital_input)
             ],
             "ADD_HOSPITAL_NAME": [
+                CallbackQueryHandler(handle_cancel_hospital_input, pattern="^cancel_hospital_input$"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_hospital_name_input)
             ]
         },
         fallbacks=[
+            CallbackQueryHandler(handle_cancel_hospital_input, pattern="^cancel_hospital_input$"),
             CallbackQueryHandler(handle_manage_hospitals, pattern="^manage_hospitals$")
         ],
         per_chat=True,
         per_user=True,
         per_message=False,
+        allow_reentry=True,
         name="hospitals_conv"
     )
     

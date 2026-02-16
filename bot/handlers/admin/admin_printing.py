@@ -14,10 +14,10 @@ from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes, ConversationHandler, MessageHandler, CallbackQueryHandler, filters
 from telegram.constants import ParseMode
 from db.session import SessionLocal
-from db.models import Report, Patient, Hospital, Department, Translator
+from db.models import Report, Patient, Hospital, Department, Translator, TranslatorDirectory
 from bot.shared_auth import is_admin
 from bot.decorators import admin_handler
-from sqlalchemy import func, extract
+from sqlalchemy import func, extract, or_
 import matplotlib
 matplotlib.use('Agg')  # استخدام backend بدون GUI
 import matplotlib.pyplot as plt
@@ -118,6 +118,8 @@ async def start_professional_printing(update: Update, context: ContextTypes.DEFA
         [InlineKeyboardButton("🖨️ طباعة حسب المريض", callback_data="print_type:patient_text")],
         [InlineKeyboardButton("🏥 تقرير مستشفى محدد", callback_data="print_type:hospital")],
         [InlineKeyboardButton("👨‍⚕️ تقرير مترجم محدد", callback_data="print_type:translator")],
+        [InlineKeyboardButton("📊 تقرير أداء المترجمين", callback_data="print_type:translator_performance")],
+        [InlineKeyboardButton("📅 تقرير المواعيد القادمة", callback_data="print_type:upcoming_appointments")],
         [InlineKeyboardButton("❌ إلغاء", callback_data="print:cancel")]
     ])
 
@@ -140,11 +142,19 @@ async def handle_print_type_selection(update: Update, context: ContextTypes.DEFA
     
     print_type = query.data.split(":")[1]
     context.user_data['print_type'] = print_type
-    
+
     # ✅ إذا كان النوع هو patient_text، نعرض قائمة المرضى مباشرة
     if print_type == "patient_text":
         return await show_patient_selection_for_print(query, context)
-    
+
+    # ✅ تقرير أداء المترجمين - ينتقل مباشرة لاختيار الفترة ثم يعرض التقرير
+    if print_type == "translator_performance":
+        return await show_translator_performance_period(query, context)
+
+    # ✅ تقرير المواعيد القادمة - يعرض مباشرة
+    if print_type == "upcoming_appointments":
+        return await generate_upcoming_appointments_report(query, context)
+
     # عرض خيارات الفترة الزمنية
     period_text = """
 📅 **اختر الفترة الزمنية:**
@@ -487,12 +497,31 @@ def _render_pdf_from_html(html_path):
         rtl_css = CSS(string='''
             @page {
                 size: A4;
-                margin: 1.5cm;
+                margin: 1.5cm 2cm 1.5cm 2cm;
+            }
+            * {
+                direction: rtl;
+                text-align: right;
             }
             body {
                 direction: rtl;
-                font-family: 'Arial', 'Tahoma', sans-serif;
+                font-family: 'Arial', 'Tahoma', 'Segoe UI', sans-serif;
                 text-align: right;
+            }
+            table {
+                direction: rtl;
+                text-align: right;
+            }
+            th, td {
+                text-align: right;
+                direction: rtl;
+            }
+            .stats-grid, .summary-grid {
+                direction: rtl;
+            }
+            .stat-card, .summary-item {
+                text-align: right;
+                direction: rtl;
             }
         ''')
         
@@ -787,6 +816,11 @@ def generate_html_report(reports, stats, charts_paths, period_name):
             }}
         }}
         
+        * {{
+            direction: rtl;
+            unicode-bidi: embed;
+        }}
+        
         body {{
             font-family: 'Arial', 'Tahoma', 'Amiri', sans-serif;
             direction: rtl;
@@ -795,6 +829,7 @@ def generate_html_report(reports, stats, charts_paths, period_name):
             line-height: 1.8;
             margin: 0;
             padding: 0;
+            unicode-bidi: embed;
         }}
         
         /* صفحة الغلاف */
@@ -854,6 +889,8 @@ def generate_html_report(reports, stats, charts_paths, period_name):
         .section {{
             margin: 30px 0;
             page-break-inside: avoid;
+            direction: rtl;
+            text-align: right;
         }}
         
         .section-title {{
@@ -861,9 +898,13 @@ def generate_html_report(reports, stats, charts_paths, period_name):
             font-weight: bold;
             color: #2c3e50;
             border-right: 6px solid #3498db;
+            border-left: none;
             padding-right: 15px;
+            padding-left: 0;
             margin: 30px 0 20px 0;
             page-break-after: avoid;
+            text-align: right;
+            direction: rtl;
         }}
         
         /* الإحصائيات */
@@ -873,6 +914,8 @@ def generate_html_report(reports, stats, charts_paths, period_name):
             border-radius: 8px;
             margin: 20px 0;
             border: 2px solid #e8e8e8;
+            direction: rtl;
+            text-align: right;
         }}
         
         .stats-grid {{
@@ -880,6 +923,7 @@ def generate_html_report(reports, stats, charts_paths, period_name):
             grid-template-columns: repeat(2, 1fr);
             gap: 20px;
             margin: 20px 0;
+            direction: rtl;
         }}
         
         .stat-card {{
@@ -887,7 +931,10 @@ def generate_html_report(reports, stats, charts_paths, period_name):
             padding: 20px;
             border-radius: 8px;
             border-right: 5px solid #3498db;
+            border-left: none;
             box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            text-align: right;
+            direction: rtl;
         }}
         
         .stat-card h3 {{
@@ -895,6 +942,8 @@ def generate_html_report(reports, stats, charts_paths, period_name):
             color: #7f8c8d;
             font-size: 12pt;
             font-weight: normal;
+            text-align: right;
+            direction: rtl;
         }}
         
         .stat-card .number {{
@@ -902,6 +951,8 @@ def generate_html_report(reports, stats, charts_paths, period_name):
             font-weight: bold;
             color: #2c3e50;
             margin: 0;
+            text-align: right;
+            direction: rtl;
         }}
         
         /* الجداول */
@@ -913,6 +964,7 @@ def generate_html_report(reports, stats, charts_paths, period_name):
             box-shadow: 0 2px 8px rgba(0,0,0,0.08);
             border-radius: 8px;
             overflow: hidden;
+            direction: rtl;
         }}
         
         th {{
@@ -921,6 +973,7 @@ def generate_html_report(reports, stats, charts_paths, period_name):
             padding: 15px 12px;
             font-weight: bold;
             text-align: right;
+            direction: rtl;
             font-size: 11pt;
             border-bottom: 3px solid #2980b9;
         }}
@@ -929,6 +982,7 @@ def generate_html_report(reports, stats, charts_paths, period_name):
             padding: 12px;
             border-bottom: 1px solid #ecf0f1;
             text-align: right;
+            direction: rtl;
             font-size: 10pt;
         }}
         
@@ -949,6 +1003,7 @@ def generate_html_report(reports, stats, charts_paths, period_name):
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            direction: rtl;
         }}
         
         .chart-title {{
@@ -957,6 +1012,7 @@ def generate_html_report(reports, stats, charts_paths, period_name):
             color: #2c3e50;
             margin-bottom: 20px;
             text-align: center;
+            direction: rtl;
         }}
         
         .chart-container img {{
@@ -972,6 +1028,8 @@ def generate_html_report(reports, stats, charts_paths, period_name):
             border-radius: 10px;
             border: 2px solid #3498db;
             margin: 30px 0;
+            direction: rtl;
+            text-align: right;
         }}
         
         .summary-box h3 {{
@@ -979,12 +1037,14 @@ def generate_html_report(reports, stats, charts_paths, period_name):
             font-size: 18pt;
             margin: 0 0 20px 0;
             text-align: center;
+            direction: rtl;
         }}
         
         .summary-grid {{
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 15px;
+            direction: rtl;
         }}
         
         .summary-item {{
@@ -992,18 +1052,25 @@ def generate_html_report(reports, stats, charts_paths, period_name):
             padding: 15px;
             border-radius: 6px;
             border-right: 4px solid #3498db;
+            border-left: none;
+            text-align: right;
+            direction: rtl;
         }}
         
         .summary-item .label {{
             font-size: 10pt;
             color: #7f8c8d;
             margin-bottom: 5px;
+            text-align: right;
+            direction: rtl;
         }}
         
         .summary-item .value {{
             font-size: 24pt;
             font-weight: bold;
             color: #2c3e50;
+            text-align: right;
+            direction: rtl;
         }}
         
         /* تحسينات الطباعة */
@@ -1421,8 +1488,26 @@ async def print_patient_reports_as_text(query, context, patient_id):
             patient_name = patient.full_name or "غير محدد"
             patient_file_number = getattr(patient, 'file_number', None) or getattr(patient, 'file_id', None)
             
-            # الحصول على جميع تقارير المريض
-            reports = session.query(Report).filter_by(patient_id=patient_id).order_by(Report.report_date.desc()).all()
+            # ✅ الحصول على جميع تقارير المريض - بحث شامل بـ patient_id أو patient_name
+            # بعض التقارير قد تحتوي على patient_name فقط بدون patient_id والعكس
+            filters_list = [Report.patient_id == patient_id]
+            if patient_name and patient_name != "غير محدد":
+                # بحث بالاسم الدقيق + بحث بتجاهل المسافات الزائدة
+                filters_list.append(Report.patient_name == patient_name)
+                filters_list.append(func.trim(Report.patient_name) == patient_name.strip())
+            
+            reports = session.query(Report).filter(
+                or_(*filters_list)
+            ).order_by(Report.report_date.desc()).all()
+            
+            # إزالة التكرار (في حال تطابق أكثر من فلتر لنفس التقرير)
+            seen_ids = set()
+            unique_reports = []
+            for r in reports:
+                if r.id not in seen_ids:
+                    seen_ids.add(r.id)
+                    unique_reports.append(r)
+            reports = unique_reports
             
             if not reports:
                 await query.edit_message_text(
@@ -1452,31 +1537,43 @@ async def print_patient_reports_as_text(query, context, patient_id):
             
             # بناء النص
             text_parts = []
-            
-            # 1. رأس التقرير
-            header = f"""
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🖨️ **تقرير شامل للمريض**
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-👤 **اسم المريض:** {patient_name}
+            # 1. رأس التقرير الاحترافي
+            header = f"""
+╔══════════════════════════════════════╗
+        🏥 **التقرير الطبي الشامل**
+╚══════════════════════════════════════╝
+
+┌──────── 👤 بيانات المريض ────────┐
+│
+│  📛 **الاسم:** {patient_name}
 """
             if patient_file_number:
-                header += f"📁 **رقم الملف:** {patient_file_number}\n"
-            
-            header += f"""
-📊 **عدد التقارير الكلي:** {total_reports}
-📅 **الفترة الزمنية:** {period_text}
+                header += f"│  📁 **رقم الملف:** {patient_file_number}\n"
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            header += f"""│
+│  📊 **إجمالي التقارير:** {total_reports} تقرير
+│  📅 **الفترة:** {period_text}
+│
+└─────────────────────────────────────┘
 """
             text_parts.append(header)
-            
-            # 2. إحصائيات سريعة
-            stats_text = "📈 **إحصائيات سريعة:**\n\n"
+
+            # 2. إحصائيات سريعة بشكل احترافي
+            stats_text = """
+┌──────── 📈 إحصائيات سريعة ────────┐
+│
+"""
             for action, count in sorted(action_stats.items(), key=lambda x: x[1], reverse=True):
-                stats_text += f"• {action}: {count}\n"
-            stats_text += "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                # إضافة شريط تقدم بسيط
+                bar_length = min(count, 10)
+                bar = "▓" * bar_length + "░" * (10 - bar_length)
+                stats_text += f"│  {bar} {action}: **{count}**\n"
+
+            stats_text += """│
+└─────────────────────────────────────┘
+
+"""
             text_parts.append(stats_text)
             
             # 3. تفاصيل التقارير (مرتبة زمنياً - الأحدث أولاً)
@@ -1529,96 +1626,526 @@ async def print_patient_reports_as_text(query, context, patient_id):
 
 
 def format_report_as_text(report, index, total):
-    """تنسيق تقرير واحد كنص حسب نوع الإجراء - يعرض فقط الحقول المتاحة"""
-    text = f"📌 **تقرير #{index} من {total}**\n\n"
-    
-    # نوع الإجراء
+    """تنسيق تقرير واحد كنص احترافي حسب نوع الإجراء - يعرض فقط الحقول المتاحة"""
+
+    # نوع الإجراء مع شارة ملونة
     medical_action = report.medical_action or "غير محدد"
-    text += f"📌 **نوع الإجراء:** {medical_action}\n"
+
+    # اختيار الأيقونة حسب نوع الإجراء
+    action_icons = {
+        "استشارة جديدة": "🆕",
+        "متابعة في الرقود": "🏥",
+        "مراجعة / عودة دورية": "🔄",
+        "طوارئ": "🚨",
+        "عملية": "⚕️",
+        "ترقيد": "🛏️",
+        "خروج من المستشفى": "🚪",
+        "أشعة وفحوصات": "🔬",
+        "تأجيل موعد": "📅",
+        "علاج طبيعي": "💪",
+        "أجهزة تعويضية": "🦿",
+    }
+    action_icon = action_icons.get(medical_action, "📋")
+
+    # بناء الرأس المميز
+    text = f"""
+╔══════════════════════════════════════╗
+       {action_icon} **تقرير #{index} من {total}**
+╚══════════════════════════════════════╝
+
+"""
+
+    # القسم الأول: المعلومات الأساسية
+    text += "📌 **المعلومات الأساسية:**\n"
+    text += "┌─────────────────────────────────┐\n"
     
-    # التاريخ
+    # ✅ اسم المريض - مباشرة من حقل patient_name في التقرير
+    if report.patient_name:
+        text += f"│ 👤 **اسم المريض:** {report.patient_name}\n"
+    
+    text += f"│ 📋 **نوع الإجراء:** {medical_action}\n"
+
     if report.report_date:
-        text += f"📅 **التاريخ:** {report.report_date.strftime('%d-%m-%Y %H:%M')}\n"
-    
-    # المستشفى
+        text += f"│ 📅 **التاريخ:** {report.report_date.strftime('%d-%m-%Y')} الساعة {report.report_date.strftime('%H:%M')}\n"
+
     if report.hospital_name:
-        text += f"🏥 **المستشفى:** {report.hospital_name}\n"
-    
-    # القسم
+        text += f"│ 🏥 **المستشفى:** {report.hospital_name}\n"
+
     if report.department:
-        text += f"🏢 **القسم:** {report.department}\n"
-    
-    # الطبيب
+        text += f"│ 🏢 **القسم:** {report.department}\n"
+
     if report.doctor_name:
-        text += f"👨‍⚕️ **الطبيب:** {report.doctor_name}\n"
-    
-    # الحقول المشتركة لجميع أنواع الإجراءات
-    if report.complaint_text:
-        text += f"💬 **شكوى المريض:** {report.complaint_text}\n"
-    
-    if report.diagnosis:
-        text += f"🔬 **التشخيص:** {report.diagnosis}\n"
-    
-    if report.doctor_decision:
-        text += f"📝 **قرار الطبيب:** {report.doctor_decision}\n"
-    
-    # الحقول الخاصة حسب نوع الإجراء
+        text += f"│ 👨‍⚕️ **الطبيب:** {report.doctor_name}\n"
+
+    text += "└─────────────────────────────────┘\n\n"
+
+    # القسم الثاني: التفاصيل الطبية
+    has_medical_details = (report.complaint_text or report.diagnosis or report.doctor_decision)
+    if has_medical_details:
+        text += "🩺 **التفاصيل الطبية:**\n"
+        text += "┌─────────────────────────────────┐\n"
+
+        if report.complaint_text:
+            text += f"│ 💬 **الشكوى:**\n│    {report.complaint_text}\n│\n"
+
+        if report.diagnosis:
+            text += f"│ 🔬 **التشخيص:**\n│    {report.diagnosis}\n│\n"
+
+        if report.doctor_decision:
+            text += f"│ 📝 **قرار الطبيب:**\n│    {report.doctor_decision}\n"
+
+        text += "└─────────────────────────────────┘\n\n"
+
+    # القسم الثالث: معلومات إضافية حسب نوع الإجراء
     action = medical_action
-    
+    has_extra = False
+    extra_text = ""
+
     # متابعة في الرقود - رقم الغرفة
-    if action == "متابعة في الرقود" and report.room_number:
-        text += f"🚪 **رقم الغرفة والطابق:** {report.room_number}\n"
-    
+    if "متابعة" in action and report.room_number:
+        extra_text += f"│ 🚪 **رقم الغرفة/الطابق:** {report.room_number}\n"
+        has_extra = True
+
     # طوارئ - رقم الغرفة
-    if action == "طوارئ" and report.room_number:
-        text += f"🚪 **رقم الغرفة:** {report.room_number}\n"
-    
-    # حالة المريض (من case_status)
+    if "طوارئ" in action and report.room_number:
+        extra_text += f"│ 🚪 **رقم غرفة الطوارئ:** {report.room_number}\n"
+        has_extra = True
+
+    # حالة المريض
     if report.case_status:
-        text += f"📊 **حالة المريض:** {report.case_status}\n"
-    
+        extra_text += f"│ 📊 **حالة المريض:** {report.case_status}\n"
+        has_extra = True
+
     # خطة العلاج
     if report.treatment_plan:
-        text += f"💊 **خطة العلاج:** {report.treatment_plan}\n"
-    
+        extra_text += f"│ 💊 **خطة العلاج:**\n│    {report.treatment_plan}\n"
+        has_extra = True
+
     # الأدوية
     if report.medications:
-        text += f"💉 **الأدوية:** {report.medications}\n"
-    
+        extra_text += f"│ 💉 **الأدوية:**\n│    {report.medications}\n"
+        has_extra = True
+
     # ملاحظات عامة
     if report.notes:
-        text += f"📋 **ملاحظات:** {report.notes}\n"
-    
-    # موعد المتابعة (لجميع الأنواع)
-    if report.followup_date:
-        text += f"📅 **موعد العودة:** {report.followup_date.strftime('%d-%m-%Y')}\n"
-        if report.followup_time:
-            text += f"🕐 **وقت العودة:** {report.followup_time}\n"
-    
-    if report.followup_reason:
-        text += f"✍️ **سبب العودة:** {report.followup_reason}\n"
-    
+        extra_text += f"│ 📋 **ملاحظات:**\n│    {report.notes}\n"
+        has_extra = True
+
     # حقول الأشعة والفحوصات
-    if action == "أشعة وفحوصات":
+    if "أشعة" in action or "فحوصات" in action:
         if report.radiology_type:
-            text += f"🔬 **نوع الأشعة:** {report.radiology_type}\n"
+            extra_text += f"│ 🔬 **نوع الأشعة:** {report.radiology_type}\n"
+            has_extra = True
         if report.radiology_delivery_date:
-            text += f"📅 **تاريخ الاستلام:** {report.radiology_delivery_date.strftime('%d-%m-%Y')}\n"
-    
+            extra_text += f"│ 📅 **تاريخ الاستلام:** {report.radiology_delivery_date.strftime('%d-%m-%Y')}\n"
+            has_extra = True
+
     # حقول تأجيل الموعد
-    if action == "تأجيل موعد":
+    if "تأجيل" in action:
         if report.app_reschedule_reason:
-            text += f"📝 **سبب التأجيل:** {report.app_reschedule_reason}\n"
+            extra_text += f"│ 📝 **سبب التأجيل:** {report.app_reschedule_reason}\n"
+            has_extra = True
         if report.app_reschedule_return_date:
-            text += f"📅 **موعد العودة الجديد:** {report.app_reschedule_return_date.strftime('%d-%m-%Y')}\n"
+            extra_text += f"│ 📅 **الموعد الجديد:** {report.app_reschedule_return_date.strftime('%d-%m-%Y')}\n"
+            has_extra = True
         if report.app_reschedule_return_reason:
-            text += f"✍️ **سبب العودة:** {report.app_reschedule_return_reason}\n"
-    
-    # المترجم
+            extra_text += f"│ ✍️ **سبب العودة:** {report.app_reschedule_return_reason}\n"
+            has_extra = True
+
+    if has_extra:
+        text += "ℹ️ **معلومات إضافية:**\n"
+        text += "┌─────────────────────────────────┐\n"
+        text += extra_text
+        text += "└─────────────────────────────────┘\n\n"
+
+    # القسم الرابع: موعد المتابعة
+    if report.followup_date or report.followup_reason:
+        text += "📆 **موعد المتابعة:**\n"
+        text += "┌─────────────────────────────────┐\n"
+
+        if report.followup_date:
+            text += f"│ 📅 **تاريخ العودة:** {report.followup_date.strftime('%d-%m-%Y')}\n"
+            if report.followup_time:
+                text += f"│ 🕐 **الوقت:** {report.followup_time}\n"
+
+        if report.followup_reason:
+            text += f"│ ✍️ **السبب:** {report.followup_reason}\n"
+
+        text += "└─────────────────────────────────┘\n\n"
+
+    # القسم الأخير: المترجم
     if report.translator_name:
-        text += f"👤 **المترجم:** {report.translator_name}\n"
-    
+        text += f"👤 **المترجم المسؤول:** {report.translator_name}\n"
+
     return text
+
+
+# ================================================
+# 📊 تقرير أداء المترجمين
+# ================================================
+
+PRINT_TRANSLATOR_PERFORMANCE_PERIOD = 10  # حالة جديدة
+
+async def show_translator_performance_period(query, context):
+    """عرض خيارات الفترة الزمنية لتقرير أداء المترجمين"""
+    period_text = """
+📊 **تقرير أداء المترجمين**
+
+اختر الفترة الزمنية للتقرير:
+"""
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📅 اليوم", callback_data="perf_period:today")],
+        [InlineKeyboardButton("📅 هذا الأسبوع", callback_data="perf_period:week")],
+        [InlineKeyboardButton("📅 هذا الشهر", callback_data="perf_period:month")],
+        [InlineKeyboardButton("📅 آخر 3 أشهر", callback_data="perf_period:3months")],
+        [InlineKeyboardButton("📅 هذه السنة", callback_data="perf_period:year")],
+        [InlineKeyboardButton("📅 الكل", callback_data="perf_period:all")],
+        [InlineKeyboardButton("🔙 رجوع", callback_data="back:type")],
+        [InlineKeyboardButton("❌ إلغاء", callback_data="print:cancel")]
+    ])
+
+    await query.edit_message_text(period_text, reply_markup=keyboard, parse_mode=ParseMode.MARKDOWN)
+    return PRINT_TRANSLATOR_PERFORMANCE_PERIOD
+
+
+@admin_handler
+async def handle_translator_performance_period(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة اختيار فترة تقرير أداء المترجمين"""
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == "print:cancel":
+        await query.edit_message_text("❌ تم إلغاء الطباعة")
+        return ConversationHandler.END
+
+    if query.data == "back:type":
+        # العودة للقائمة الرئيسية
+        welcome_text = """
+🖨️ **نظام الطباعة الاحترافي**
+
+اختر نوع التقرير المطلوب:
+"""
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📊 تقرير شامل مع إحصائيات", callback_data="print_type:full_stats")],
+            [InlineKeyboardButton("📈 تقرير رسوم بيانية فقط", callback_data="print_type:charts_only")],
+            [InlineKeyboardButton("📋 تقرير تفصيلي للتقارير", callback_data="print_type:detailed")],
+            [InlineKeyboardButton("👤 تقرير مريض محدد", callback_data="print_type:patient")],
+            [InlineKeyboardButton("🖨️ طباعة حسب المريض", callback_data="print_type:patient_text")],
+            [InlineKeyboardButton("🏥 تقرير مستشفى محدد", callback_data="print_type:hospital")],
+            [InlineKeyboardButton("👨‍⚕️ تقرير مترجم محدد", callback_data="print_type:translator")],
+            [InlineKeyboardButton("📊 تقرير أداء المترجمين", callback_data="print_type:translator_performance")],
+            [InlineKeyboardButton("📅 تقرير المواعيد القادمة", callback_data="print_type:upcoming_appointments")],
+            [InlineKeyboardButton("❌ إلغاء", callback_data="print:cancel")]
+        ])
+        await query.edit_message_text(welcome_text, reply_markup=keyboard, parse_mode=ParseMode.MARKDOWN)
+        return PRINT_SELECT_TYPE
+
+    # تحديد الفترة الزمنية
+    period = query.data.split(":")[1]
+    today = date.today()
+
+    if period == "today":
+        start_date = today
+        end_date = today
+        period_name = "اليوم"
+    elif period == "week":
+        start_date = today - timedelta(days=today.weekday())
+        end_date = today
+        period_name = "هذا الأسبوع"
+    elif period == "month":
+        start_date = today.replace(day=1)
+        end_date = today
+        period_name = "هذا الشهر"
+    elif period == "3months":
+        start_date = today - timedelta(days=90)
+        end_date = today
+        period_name = "آخر 3 أشهر"
+    elif period == "year":
+        start_date = today.replace(month=1, day=1)
+        end_date = today
+        period_name = "هذه السنة"
+    else:  # all
+        start_date = None
+        end_date = None
+        period_name = "جميع الفترات"
+
+    await query.edit_message_text("⏳ **جاري إنشاء تقرير أداء المترجمين...**")
+
+    # إنشاء التقرير
+    return await generate_translator_performance_report(query, context, start_date, end_date, period_name)
+
+
+async def generate_translator_performance_report(query, context, start_date, end_date, period_name):
+    """إنشاء تقرير أداء المترجمين - يستخدم stats_service كمصدر وحيد"""
+    try:
+        from services.stats_service import get_translator_stats
+
+        with SessionLocal() as session:
+            # ═══ المصدر الوحيد: stats_service ═══
+            if start_date and end_date:
+                stats_results = get_translator_stats(session, start_date, end_date)
+            else:
+                # كل الفترات
+                from datetime import datetime as dt
+                stats_results = get_translator_stats(session, dt(2020, 1, 1).date(), date.today())
+
+            if not stats_results:
+                await query.edit_message_text(
+                    f"⚠️ **لا توجد تقارير**\n\n"
+                    f"لا توجد تقارير في الفترة: {period_name}",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+                return ConversationHandler.END
+
+            total_reports = sum(s['total_reports'] for s in stats_results)
+            total_late = sum(s['late_reports'] for s in stats_results)
+
+            header = f"""
+╔══════════════════════════════════════╗
+     📊 **تقرير أداء المترجمين**
+╚══════════════════════════════════════╝
+
+📅 **الفترة:** {period_name}
+📄 **إجمالي التقارير:** {total_reports}
+🕐 **تقارير بعد 8 مساءً:** {total_late}
+👥 **عدد المترجمين:** {len(stats_results)}
+
+"""
+
+            details = ""
+            for rank, s in enumerate(stats_results, 1):
+                percentage = (s['total_reports'] / total_reports * 100) if total_reports > 0 else 0
+                bar_length = int(percentage / 10)
+                bar = "█" * bar_length + "░" * (10 - bar_length)
+
+                # أكثر نوع إجراء
+                non_zero_actions = {k: v for k, v in s.get('action_breakdown', {}).items() if v > 0}
+                top_action = max(non_zero_actions.items(), key=lambda x: x[1])[0] if non_zero_actions else "—"
+
+                if rank == 1: medal = "🥇"
+                elif rank == 2: medal = "🥈"
+                elif rank == 3: medal = "🥉"
+                else: medal = f"#{rank}"
+
+                details += f"""
+┌──────────────────────────────────────
+│ {medal} **{s['translator_name']}**
+├──────────────────────────────────────
+│ 📊 التقارير: **{s['total_reports']}** ({percentage:.1f}%)
+│ {bar}
+│
+│ 📋 أكثر إجراء: {top_action}
+│ 📅 أيام الحضور: {s['attendance_days']}/{s['work_days']} يوم
+│ 🕐 بعد 8 مساءً: {s['late_reports']}
+└──────────────────────────────────────
+
+"""
+
+            full_report = header + details
+            max_length = 4000
+
+            if len(full_report) <= max_length:
+                await query.edit_message_text(full_report, parse_mode=ParseMode.MARKDOWN)
+            else:
+                await query.edit_message_text(header, parse_mode=ParseMode.MARKDOWN)
+
+                current_text = ""
+                for rank, s in enumerate(stats_results, 1):
+                    percentage = (s['total_reports'] / total_reports * 100) if total_reports > 0 else 0
+                    bar_length = int(percentage / 10)
+                    bar = "█" * bar_length + "░" * (10 - bar_length)
+                    non_zero_actions = {k: v for k, v in s.get('action_breakdown', {}).items() if v > 0}
+                    top_action = max(non_zero_actions.items(), key=lambda x: x[1])[0] if non_zero_actions else "—"
+
+                    translator_text = f"""
+┌──────────────────────────────────────
+│ **{s['translator_name']}**
+│ 📊 التقارير: **{s['total_reports']}** ({percentage:.1f}%)
+│ {bar}
+│ 📋 أكثر إجراء: {top_action}
+│ 📅 أيام الحضور: {s['attendance_days']}/{s['work_days']} يوم
+│ 🕐 بعد 8 مساءً: {s['late_reports']}
+└──────────────────────────────────────
+
+"""
+                    if len(current_text) + len(translator_text) > max_length:
+                        await query.message.reply_text(current_text, parse_mode=ParseMode.MARKDOWN)
+                        current_text = translator_text
+                    else:
+                        current_text += translator_text
+
+                if current_text.strip():
+                    await query.message.reply_text(current_text, parse_mode=ParseMode.MARKDOWN)
+
+            return ConversationHandler.END
+
+    except Exception as e:
+        logger.error(f"❌ خطأ في تقرير أداء المترجمين: {e}", exc_info=True)
+        await query.edit_message_text(
+            f"❌ **حدث خطأ**\n\n{str(e)}",
+            parse_mode=ParseMode.MARKDOWN
+        )
+        return ConversationHandler.END
+
+
+# ================================================
+# 📅 تقرير المواعيد القادمة
+# ================================================
+
+async def generate_upcoming_appointments_report(query, context):
+    """إنشاء تقرير المواعيد القادمة"""
+    try:
+        await query.edit_message_text("⏳ **جاري جلب المواعيد القادمة...**")
+
+        with SessionLocal() as session:
+            today = date.today()
+            next_30_days = today + timedelta(days=30)
+
+            # جلب التقارير التي لها مواعيد متابعة قادمة
+            reports = session.query(Report).filter(
+                Report.followup_date.isnot(None),
+                Report.followup_date >= today,
+                Report.followup_date <= next_30_days
+            ).order_by(Report.followup_date.asc()).all()
+
+            if not reports:
+                await query.edit_message_text(
+                    "⚠️ **لا توجد مواعيد قادمة**\n\n"
+                    "لا توجد مواعيد متابعة في الـ 30 يوم القادمة.",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+                return ConversationHandler.END
+
+            # تجميع المواعيد حسب التاريخ
+            appointments_by_date = {}
+            for report in reports:
+                date_key = report.followup_date.strftime('%Y-%m-%d')
+                if date_key not in appointments_by_date:
+                    appointments_by_date[date_key] = []
+                appointments_by_date[date_key].append(report)
+
+            # بناء نص التقرير
+            header = f"""
+╔══════════════════════════════════════╗
+      📅 **المواعيد القادمة**
+╚══════════════════════════════════════╝
+
+📊 **إجمالي المواعيد:** {len(reports)} موعد
+📆 **الفترة:** من اليوم حتى {next_30_days.strftime('%d-%m-%Y')}
+
+"""
+
+            details = ""
+
+            for date_str, day_reports in sorted(appointments_by_date.items()):
+                appointment_date = datetime.strptime(date_str, '%Y-%m-%d')
+                day_name = ["الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت", "الأحد"][appointment_date.weekday()]
+
+                # حساب عدد الأيام المتبقية
+                days_remaining = (appointment_date.date() - today).days
+
+                if days_remaining == 0:
+                    remaining_text = "🔴 اليوم"
+                elif days_remaining == 1:
+                    remaining_text = "🟠 غداً"
+                elif days_remaining <= 3:
+                    remaining_text = f"🟡 بعد {days_remaining} أيام"
+                else:
+                    remaining_text = f"🟢 بعد {days_remaining} يوم"
+
+                details += f"""
+┌──────── 📅 {day_name} {appointment_date.strftime('%d-%m-%Y')} ────────
+│ {remaining_text} - {len(day_reports)} موعد
+├─────────────────────────────────────
+"""
+
+                for report in day_reports:
+                    patient_name = "غير محدد"
+                    if report.patient_id:
+                        patient = session.query(Patient).filter_by(id=report.patient_id).first()
+                        if patient:
+                            patient_name = patient.full_name or "غير محدد"
+
+                    time_str = report.followup_time or "—"
+                    hospital = report.hospital_name or "—"
+                    reason = report.followup_reason or "—"
+
+                    details += f"""│ 👤 {patient_name}
+│    🕐 {time_str} | 🏥 {hospital}
+│    ✍️ {reason[:50]}{'...' if len(reason) > 50 else ''}
+│
+"""
+
+                details += "└─────────────────────────────────────\n"
+
+            # دمج التقرير
+            full_report = header + details
+
+            # تقسيم الرسالة إذا كانت طويلة
+            max_length = 4000
+
+            if len(full_report) <= max_length:
+                await query.edit_message_text(full_report, parse_mode=ParseMode.MARKDOWN)
+            else:
+                await query.edit_message_text(header, parse_mode=ParseMode.MARKDOWN)
+
+                current_text = ""
+                for date_str, day_reports in sorted(appointments_by_date.items()):
+                    appointment_date = datetime.strptime(date_str, '%Y-%m-%d')
+                    day_name = ["الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت", "الأحد"][appointment_date.weekday()]
+                    days_remaining = (appointment_date.date() - today).days
+
+                    if days_remaining == 0:
+                        remaining_text = "🔴 اليوم"
+                    elif days_remaining == 1:
+                        remaining_text = "🟠 غداً"
+                    elif days_remaining <= 3:
+                        remaining_text = f"🟡 بعد {days_remaining} أيام"
+                    else:
+                        remaining_text = f"🟢 بعد {days_remaining} يوم"
+
+                    day_text = f"""
+┌──────── 📅 {day_name} {appointment_date.strftime('%d-%m-%Y')} ────────
+│ {remaining_text} - {len(day_reports)} موعد
+├─────────────────────────────────────
+"""
+                    for report in day_reports:
+                        patient_name = "غير محدد"
+                        if report.patient_id:
+                            patient = session.query(Patient).filter_by(id=report.patient_id).first()
+                            if patient:
+                                patient_name = patient.full_name or "غير محدد"
+
+                        time_str = report.followup_time or "—"
+                        hospital = report.hospital_name or "—"
+                        reason = report.followup_reason or "—"
+
+                        day_text += f"""│ 👤 {patient_name}
+│    🕐 {time_str} | 🏥 {hospital}
+│    ✍️ {reason[:50]}{'...' if len(reason) > 50 else ''}
+│
+"""
+                    day_text += "└─────────────────────────────────────\n"
+
+                    if len(current_text) + len(day_text) > max_length:
+                        await query.message.reply_text(current_text, parse_mode=ParseMode.MARKDOWN)
+                        current_text = day_text
+                    else:
+                        current_text += day_text
+
+                if current_text.strip():
+                    await query.message.reply_text(current_text, parse_mode=ParseMode.MARKDOWN)
+
+            return ConversationHandler.END
+
+    except Exception as e:
+        logger.error(f"❌ خطأ في تقرير المواعيد القادمة: {e}", exc_info=True)
+        await query.edit_message_text(
+            f"❌ **حدث خطأ**\n\n{str(e)}",
+            parse_mode=ParseMode.MARKDOWN
+        )
+        return ConversationHandler.END
+
 
 # ================================================
 # التسجيل
@@ -1626,7 +2153,7 @@ def format_report_as_text(report, index, total):
 
 def register(app):
     """تسجيل معالج الطباعة الاحترافي"""
-    
+
     conv = ConversationHandler(
         entry_points=[
             MessageHandler(filters.Regex("^🖨️ طباعة التقارير$"), start_professional_printing)
@@ -1644,6 +2171,10 @@ def register(app):
             PRINT_SELECT_PATIENT: [
                 CallbackQueryHandler(handle_patient_selection_for_print, pattern="^print_patient:|^patient_page:|^back:type|^print:cancel$")
             ],
+            # ✅ حالة تقرير أداء المترجمين
+            PRINT_TRANSLATOR_PERFORMANCE_PERIOD: [
+                CallbackQueryHandler(handle_translator_performance_period, pattern="^perf_period:|^back:type|^print:cancel$")
+            ],
         },
         fallbacks=[
             CallbackQueryHandler(handle_print_options, pattern="^print:cancel$")
@@ -1652,6 +2183,5 @@ def register(app):
         per_chat=True,
         per_user=True,
     )
-    
-    app.add_handler(conv)
 
+    app.add_handler(conv)

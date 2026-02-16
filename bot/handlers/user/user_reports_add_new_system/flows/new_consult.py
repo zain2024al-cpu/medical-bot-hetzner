@@ -342,7 +342,7 @@ async def handle_new_consult_followup_date_skip(update: Update, context: Context
 
     # تحديد الحالة التالية بناءً على نوع الإجراء
     current_flow = context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
-    if current_flow == "followup":
+    if current_flow in ["followup", "periodic_followup", "inpatient_followup"]:
         next_state = FOLLOWUP_REASON
     elif current_flow == "emergency":
         next_state = EMERGENCY_REASON
@@ -419,7 +419,7 @@ async def handle_new_consult_followup_calendar_nav(update: Update, context: Cont
     else:
         # ✅ حالة الإدخال العادي: تحديد الحالة بناءً على نوع الإجراء
         current_flow = context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
-        if current_flow == "followup":
+        if current_flow in ["followup", "periodic_followup", "inpatient_followup"]:
             current_state = FOLLOWUP_DATE_TIME
         elif current_flow == "emergency":
             current_state = EMERGENCY_DATE_TIME
@@ -521,7 +521,7 @@ async def handle_new_consult_followup_calendar_day(update: Update, context: Cont
 
         # تحديد الحالة التالية بناءً على نوع الإجراء
         current_flow = context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
-        if current_flow == "followup":
+        if current_flow in ["followup", "periodic_followup", "inpatient_followup"]:
             next_state = FOLLOWUP_DATE_TIME
         elif current_flow == "emergency":
             next_state = EMERGENCY_DATE_TIME
@@ -553,7 +553,7 @@ async def handle_new_consult_followup_calendar_day(update: Update, context: Cont
     except ValueError:
         # تحديد الحالة الحالية بناءً على نوع الإجراء
         current_flow = context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
-        if current_flow == "followup":
+        if current_flow in ["followup", "periodic_followup", "inpatient_followup"]:
             current_state = FOLLOWUP_DATE_TIME
         elif current_flow == "emergency":
             current_state = EMERGENCY_DATE_TIME
@@ -617,7 +617,7 @@ async def handle_new_consult_followup_time_hour(update: Update, context: Context
         
         # تحديد الحالة التالية بناءً على نوع الإجراء
         current_flow = context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
-        if current_flow == "followup":
+        if current_flow in ["followup", "periodic_followup", "inpatient_followup"]:
             next_state = FOLLOWUP_DATE_TIME
         elif current_flow == "emergency":
             next_state = EMERGENCY_DATE_TIME
@@ -635,7 +635,7 @@ async def handle_new_consult_followup_time_hour(update: Update, context: Context
             next_state = DEVICE_FOLLOWUP_DATE
         else:
             next_state = NEW_CONSULT_FOLLOWUP_TIME
-        
+
         await query.edit_message_text(
             "🕐 **اختيار الساعة**\n\nاختر الساعة من القائمة:",
             reply_markup=InlineKeyboardMarkup(keyboard),
@@ -689,10 +689,10 @@ async def handle_new_consult_followup_time_hour(update: Update, context: Context
             f"{time_display}",
             parse_mode="Markdown"
         )
-        
+
         # تحديد الحالة التالية بناءً على نوع الإجراء
         current_flow = context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
-        if current_flow == "followup":
+        if current_flow in ["followup", "periodic_followup", "inpatient_followup"]:
             next_state = FOLLOWUP_REASON
         elif current_flow == "emergency":
             next_state = EMERGENCY_REASON
@@ -710,7 +710,7 @@ async def handle_new_consult_followup_time_hour(update: Update, context: Context
             next_state = DEVICE_FOLLOWUP_REASON
         else:
             next_state = NEW_CONSULT_FOLLOWUP_REASON
-        
+
         # الانتقال إلى خطوة سبب العودة
         await query.message.reply_text(
             "✅ تم الحفظ\n\n"
@@ -719,10 +719,10 @@ async def handle_new_consult_followup_time_hour(update: Update, context: Context
             reply_markup=_nav_buttons(show_back=True),
             parse_mode="Markdown"
         )
-        
+
         # حفظ الحالة يدوياً في user_data للمساعدة في التتبع
         context.user_data['_conversation_state'] = next_state
-        
+
         return next_state
     else:
         # إذا لم يكن هناك تاريخ معلق، نعود إلى اختيار التاريخ
@@ -733,7 +733,7 @@ async def handle_new_consult_followup_time_hour(update: Update, context: Context
         )
         # تحديد الحالة التالية بناءً على نوع الإجراء
         current_flow = context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
-        if current_flow == "followup":
+        if current_flow in ["followup", "periodic_followup", "inpatient_followup"]:
             return FOLLOWUP_DATE_TIME
         elif current_flow == "emergency":
             return EMERGENCY_DATE_TIME
@@ -801,10 +801,10 @@ async def handle_new_consult_followup_time_minute(update: Update, context: Conte
             f"{time_display}",
             parse_mode="Markdown"
         )
-        
+
         # تحديد الحالة التالية بناءً على نوع الإجراء
         current_flow = context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
-        if current_flow == "followup":
+        if current_flow in ["followup", "periodic_followup", "inpatient_followup"]:
             next_state = FOLLOWUP_REASON
         elif current_flow == "emergency":
             next_state = EMERGENCY_REASON
@@ -822,7 +822,7 @@ async def handle_new_consult_followup_time_minute(update: Update, context: Conte
             next_state = DEVICE_FOLLOWUP_REASON
         else:
             next_state = NEW_CONSULT_FOLLOWUP_REASON
-        
+
         # الانتقال إلى خطوة سبب العودة
         await query.message.reply_text(
             "✍️ **سبب العودة**\n\n"
@@ -834,7 +834,7 @@ async def handle_new_consult_followup_time_minute(update: Update, context: Conte
 
     # تحديد الحالة الحالية بناءً على نوع الإجراء
     current_flow = context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
-    if current_flow == "followup":
+    if current_flow in ["followup", "periodic_followup", "inpatient_followup"]:
         current_state = FOLLOWUP_DATE_TIME
     elif current_flow == "emergency":
         current_state = EMERGENCY_DATE_TIME
@@ -852,7 +852,7 @@ async def handle_new_consult_followup_time_minute(update: Update, context: Conte
         current_state = DEVICE_FOLLOWUP_DATE
     else:
         current_state = NEW_CONSULT_FOLLOWUP_TIME
-    
+
     await query.answer("خطأ: لم يتم تحديد التاريخ", show_alert=True)
     return current_state
 
@@ -886,10 +886,10 @@ async def handle_new_consult_followup_time_skip(update: Update, context: Context
             f"📅 **التاريخ:**\n"
             f"{pending_date.strftime('%d')} {MONTH_NAMES_AR.get(pending_date.month, pending_date.month)} {pending_date.year} ({day_name})"
         )
-        
+
         # تحديد الحالة التالية بناءً على نوع الإجراء
         current_flow = data_tmp.get("current_flow", "new_consult")
-        if current_flow == "followup":
+        if current_flow in ["followup", "periodic_followup", "inpatient_followup"]:
             next_state = FOLLOWUP_REASON
         elif current_flow == "emergency":
             next_state = EMERGENCY_REASON
@@ -907,7 +907,7 @@ async def handle_new_consult_followup_time_skip(update: Update, context: Context
             next_state = DEVICE_FOLLOWUP_REASON
         else:
             next_state = NEW_CONSULT_FOLLOWUP_REASON
-        
+
         # الانتقال إلى خطوة سبب العودة
         await query.message.reply_text(
             "✍️ **سبب العودة**\n\n"
@@ -916,10 +916,10 @@ async def handle_new_consult_followup_time_skip(update: Update, context: Context
             parse_mode="Markdown"
         )
         return next_state
-    
+
     # تحديد الحالة الحالية بناءً على نوع الإجراء
     current_flow = data_tmp.get("current_flow", "new_consult")
-    if current_flow == "followup":
+    if current_flow in ["followup", "periodic_followup", "inpatient_followup"]:
         current_state = FOLLOWUP_DATE_TIME
     elif current_flow == "emergency":
         current_state = EMERGENCY_DATE_TIME

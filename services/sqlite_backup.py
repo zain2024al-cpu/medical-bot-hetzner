@@ -81,6 +81,17 @@ class SQLiteBackupService:
             if not os.path.exists(self.database_path):
                 logger.error(f"❌ Database not found: {self.database_path}")
                 return False
+
+            # أنشئ نسخة محلية متسقة أولاً (SQLite backup API + integrity_check)
+            local_backup_path = None
+            try:
+                from services.render_backup import create_local_backup
+                local_backup_path = create_local_backup(prefix=f"gcs_{backup_type}")
+            except Exception as local_backup_error:
+                logger.warning(f"⚠️ Could not create safe local backup before GCS upload: {local_backup_error}")
+                local_backup_path = None
+
+            upload_source = local_backup_path if local_backup_path and os.path.exists(local_backup_path) else self.database_path
             
             # Generate timestamp
             timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
@@ -90,20 +101,20 @@ class SQLiteBackupService:
             blob_path = f"backups/{backup_filename}"
             
             logger.info(f"☁️ Starting {backup_type} database backup...")
-            logger.info(f"   Database: {self.database_path}")
-            logger.info(f"   Size: {os.path.getsize(self.database_path) / 1024:.2f} KB")
+            logger.info(f"   Database source: {upload_source}")
+            logger.info(f"   Size: {os.path.getsize(upload_source) / 1024:.2f} KB")
             
             # Upload to GCS
             blob = self.bucket.blob(blob_path)
-            blob.upload_from_filename(self.database_path)
+            blob.upload_from_filename(upload_source)
             
             # Also save as "latest" for easy recovery
             latest_blob = self.bucket.blob(f"backups/latest_{backup_type}.db")
-            latest_blob.upload_from_filename(self.database_path)
+            latest_blob.upload_from_filename(upload_source)
             
             # Save as persistent database (for automatic restore on redeploy)
             persistent_blob = self.bucket.blob("persistent/medical_reports.db")
-            persistent_blob.upload_from_filename(self.database_path)
+            persistent_blob.upload_from_filename(upload_source)
             
             logger.info(f"✅ Backup completed successfully!")
             logger.info(f"   📁 File: gs://{BUCKET_NAME}/{blob_path}")

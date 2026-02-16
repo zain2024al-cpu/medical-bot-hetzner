@@ -21,7 +21,13 @@ async def start_admin_management(update: Update, context: ContextTypes.DEFAULT_T
     user = update.effective_user
 
     if not is_admin(user.id):
-        await update.message.reply_text("🚫 هذه الخاصية مخصصة للإدمن فقط.")
+        if update.message:
+            await update.message.reply_text("🚫 هذه الخاصية مخصصة للإدمن فقط.")
+        elif update.callback_query:
+            try:
+                await update.callback_query.answer("🚫 هذه الخاصية مخصصة للإدمن فقط.", show_alert=True)
+            except Exception:
+                pass
         return ConversationHandler.END
 
     # لوحة إدارة الأدمنين
@@ -32,12 +38,40 @@ async def start_admin_management(update: Update, context: ContextTypes.DEFAULT_T
         [InlineKeyboardButton("🔙 رجوع", callback_data="aa:back")]
     ])
 
-    await update.message.reply_text(
-        "👑 **إدارة الأدمنين**\n\n"
-        "اختر العملية المطلوبة:",
-        reply_markup=keyboard,
-        parse_mode="Markdown"
-    )
+    # معالجة callback query إذا كان موجوداً
+    if update.callback_query:
+        query = update.callback_query
+        try:
+            await query.answer()
+        except Exception:
+            pass
+        try:
+            await query.edit_message_text(
+                "👑 **إدارة الأدمنين**\n\n"
+                "اختر العملية المطلوبة:",
+                reply_markup=keyboard,
+                parse_mode="Markdown"
+            )
+        except Exception:
+            # إذا فشل التعديل، أرسل رسالة جديدة
+            try:
+                if query.message:
+                    await query.message.reply_text(
+                        "👑 **إدارة الأدمنين**\n\n"
+                        "اختر العملية المطلوبة:",
+                        reply_markup=keyboard,
+                        parse_mode="Markdown"
+                    )
+            except Exception:
+                pass
+    elif update.message:
+        await update.message.reply_text(
+            "👑 **إدارة الأدمنين**\n\n"
+            "اختر العملية المطلوبة:",
+            reply_markup=keyboard,
+            parse_mode="Markdown"
+        )
+    
     return AA_START
 
 async def handle_admin_actions(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -281,11 +315,40 @@ def _save_admin_ids_to_env():
         logger.error(f"❌ فشل حفظ معرفات الأدمنين: {e}")
         raise
 
+async def handle_admin_callback_outside_conv(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة callbacks إدارة الأدمنين خارج المحادثة"""
+    query = update.callback_query
+    if not query:
+        return
+    
+    try:
+        await query.answer()
+    except Exception:
+        pass
+    
+    # إذا كان callback لإدارة الأدمنين، نبدأ المحادثة
+    if query.data.startswith("aa:"):
+        # مسح أي بيانات قديمة
+        context.user_data.clear()
+        # بدء المحادثة
+        return await start_admin_management(update, context)
+    
+    return ConversationHandler.END
+
+
 def register(app):
     """تسجيل المعالجات"""
+    # ✅ إضافة معالج خارجي لالتقاط callbacks حتى خارج المحادثة
+    app.add_handler(CallbackQueryHandler(
+        handle_admin_callback_outside_conv,
+        pattern=r"^aa:"
+    ))
+    
     conv = ConversationHandler(
         entry_points=[
-            MessageHandler(filters.Regex("^👑 إدارة الأدمنين$"), start_admin_management)
+            MessageHandler(filters.Regex("^👑 إدارة الأدمنين$"), start_admin_management),
+            # ✅ إضافة callback كـ entry point أيضاً
+            CallbackQueryHandler(start_admin_management, pattern=r"^aa:(add|remove|list|back)$")
         ],
         states={
             AA_START: [
@@ -302,10 +365,13 @@ def register(app):
             ]
         },
         fallbacks=[
-            CallbackQueryHandler(handle_admin_actions, pattern=r"^aa:back$")
+            CallbackQueryHandler(handle_admin_actions, pattern=r"^aa:back$"),
+            # ✅ السماح بإعادة الضغط على الأزرار
+            CallbackQueryHandler(handle_admin_actions, pattern=r"^aa:(add|remove|list)$")
         ],
         name="admin_management_conv",
         per_chat=True,
-        per_user=True
+        per_user=True,
+        allow_reentry=True  # ✅ السماح بإعادة الدخول
     )
     app.add_handler(conv)

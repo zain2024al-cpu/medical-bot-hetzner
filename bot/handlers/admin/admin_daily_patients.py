@@ -144,9 +144,13 @@ async def handle_patients_input(update: Update, context: ContextTypes.DEFAULT_TY
             })
     
     if not patients_data:
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("❌ إلغاء", callback_data="dp_cancel")]
+        ])
         await update.message.reply_text(
             "⚠️ لم يتم العثور على أسماء صحيحة.\n\n"
-            "حاول مرة أخرى أو اكتب 'إلغاء'"
+            "حاول مرة أخرى:",
+            reply_markup=keyboard
         )
         return ADD_PATIENTS
     
@@ -378,11 +382,10 @@ async def handle_dp_add_from_schedule(update: Update, context: ContextTypes.DEFA
     text += "**الطريقة 2:** أرسل الأسماء مفصولة بفاصلة\n"
     text += "```\nمحمد أحمد, فاطمة حسن, أحمد سالم\n```\n\n"
     text += "💡 يمكنك إضافة معلومات إضافية بعد الاسم:\n"
-    text += "```\nمحمد أحمد | مستشفى الأطفال | د.أحمد\n```\n\n"
-    text += "أو اكتب **'إلغاء'** للإلغاء"
-    
+    text += "```\nمحمد أحمد | مستشفى الأطفال | د.أحمد\n```"
+
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔙 العودة لإدارة الجدول", callback_data="back_to_schedule")]
+        [InlineKeyboardButton("❌ إلغاء", callback_data="back_to_schedule")]
     ])
     
     await query.edit_message_text(
@@ -553,9 +556,13 @@ async def handle_text_input_for_patients(update: Update, context: ContextTypes.D
             })
     
     if not patients_data:
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("❌ إلغاء", callback_data="back_to_schedule")]
+        ])
         await update.message.reply_text(
             "⚠️ لم يتم العثور على أسماء صحيحة.\n\n"
-            "حاول مرة أخرى أو اكتب 'إلغاء'"
+            "حاول مرة أخرى:",
+            reply_markup=keyboard
         )
         return
     

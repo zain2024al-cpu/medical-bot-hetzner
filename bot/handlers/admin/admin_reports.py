@@ -35,7 +35,7 @@ try:
 except ImportError:
     ARABIC_SUPPORT = False
 
-SELECT_FILTER, ENTER_NAME, SELECT_DEPARTMENT_OPTION, ENTER_DEPARTMENT, SELECT_YEAR, SELECT_MONTH, CONFIRM_EXPORT, PRINT_SELECT_PATIENT = range(620, 628)
+SELECT_FILTER, ENTER_NAME, SELECT_DEPARTMENT_OPTION, ENTER_DEPARTMENT, SELECT_YEAR, SELECT_MONTH, CONFIRM_EXPORT, PRINT_SELECT_PATIENT, SELECT_ACTION_TYPE = range(620, 629)
 
 
 # ================================================
@@ -399,8 +399,7 @@ def _build_patient_list_keyboard(patients_list, page=0, items_per_page=10):
 
 def _filters_kb():
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("👤 طباعة باسم مريض", callback_data="filter:patient")],
-        [InlineKeyboardButton("🖨️ طباعة حسب المريض", callback_data="filter:patient_text")],
+        [InlineKeyboardButton("👤 طباعة باسم مريض (إجراء + مدة)", callback_data="filter:patient")],
         [InlineKeyboardButton("🏥 طباعة باسم مستشفى", callback_data="filter:hospital")],
         [InlineKeyboardButton("🏢 طباعة حسب القسم", callback_data="filter:department")],
         [InlineKeyboardButton("📅 طباعة حسب التاريخ", callback_data="filter:date")],
@@ -453,6 +452,41 @@ def _confirm_kb(show_back=True):
         buttons.append([InlineKeyboardButton("🔙 رجوع", callback_data="back:confirm")])
     buttons.append([InlineKeyboardButton("❌ إلغاء", callback_data="abort")])
     return InlineKeyboardMarkup(buttons)
+
+
+def _action_types_kb():
+    """لوحة اختيار نوع الإجراء الطبي"""
+    actions = [
+        ("📋 كل الإجراءات", "action_type:all"),
+        ("🆕 استشارة جديدة", "action_type:استشارة جديدة"),
+        ("⚕️ استشارة مع قرار عملية", "action_type:استشارة مع قرار عملية"),
+        ("🏁 استشارة أخيرة", "action_type:استشارة أخيرة"),
+        ("🚨 طوارئ", "action_type:طوارئ"),
+        ("🏥 متابعة في الرقود", "action_type:متابعة في الرقود"),
+        ("🔄 مراجعة / عودة دورية", "action_type:مراجعة / عودة دورية"),
+        ("🔪 عملية", "action_type:عملية"),
+        ("💪 علاج طبيعي", "action_type:علاج طبيعي وإعادة تأهيل"),
+        ("🛏️ ترقيد", "action_type:ترقيد"),
+        ("🚪 خروج من المستشفى", "action_type:خروج من المستشفى"),
+        ("🔬 أشعة وفحوصات", "action_type:أشعة وفحوصات"),
+        ("📅 تأجيل موعد", "action_type:تأجيل موعد"),
+        ("☢️ جلسة إشعاعي", "action_type:جلسة إشعاعي"),
+    ]
+
+    keyboard = []
+    # "كل الإجراءات" في صف منفصل
+    keyboard.append([InlineKeyboardButton(actions[0][0], callback_data=actions[0][1])])
+    # باقي الإجراءات: زرين في كل صف
+    for i in range(1, len(actions), 2):
+        row = [InlineKeyboardButton(actions[i][0], callback_data=actions[i][1])]
+        if i + 1 < len(actions):
+            row.append(InlineKeyboardButton(actions[i + 1][0], callback_data=actions[i + 1][1]))
+        keyboard.append(row)
+
+    keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="back:patient_list")])
+    keyboard.append([InlineKeyboardButton("❌ إلغاء", callback_data="abort")])
+    return InlineKeyboardMarkup(keyboard)
+
 
 @admin_handler
 async def start_reports_filter(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -814,7 +848,18 @@ async def handle_year_choice(update: Update, context: ContextTypes.DEFAULT_TYPE)
         # الرجوع لاختيار نوع الفلترة
         await q.edit_message_text("🖨️ اختر نوع الفلترة:", reply_markup=_filters_kb())
         return SELECT_FILTER
-    
+
+    # الرجوع لاختيار نوع الإجراء (من خطوة التاريخ)
+    if q.data == "back:action_type":
+        patient_name = context.user_data.get("filter_value", "—")
+        await q.edit_message_text(
+            f"👤 **المريض:** {patient_name}\n\n"
+            f"📌 **اختر نوع الإجراء الطبي:**",
+            reply_markup=_action_types_kb(),
+            parse_mode="Markdown"
+        )
+        return SELECT_ACTION_TYPE
+
     # معالجة زر الرجوع لخيار القسم
     if q.data == "back:dept_option":
         hospital_name = context.user_data.get("filter_value")
@@ -889,12 +934,14 @@ async def handle_year_choice(update: Update, context: ContextTypes.DEFAULT_TYPE)
             # طباعة مباشرة بدون فلترة تاريخ
             context.user_data["year_value"] = None
             context.user_data["month_value"] = None
-            
+
             filter_type = context.user_data.get("filter_type")
             filter_value = context.user_data.get("filter_value")
-            
+            act_type = context.user_data.get("action_type")
+            act_label = "كل الإجراءات" if (not act_type or act_type == "all") else act_type
+
             if filter_type == "patient":
-                confirm_msg = f"👤 **المريض:** {filter_value}\n📅 **التاريخ:** كل التواريخ\n\n📋 اختر صيغة التصدير:"
+                confirm_msg = f"👤 **المريض:** {filter_value}\n📌 **الإجراء:** {act_label}\n📅 **التاريخ:** كل التواريخ\n\n📋 اختر صيغة التصدير:"
             elif filter_type == "hospital":
                 dept_value = context.user_data.get("department_value")
                 if dept_value:
@@ -917,12 +964,14 @@ async def handle_year_choice(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if year_choice == "all":
         # إذا اختار "الكل" للسنة، انتقل مباشرة للتأكيد
         context.user_data["month_value"] = None
-        
+
         filter_type = context.user_data.get("filter_type")
         filter_value = context.user_data.get("filter_value")
-        
+        act_type = context.user_data.get("action_type")
+        act_label = "كل الإجراءات" if (not act_type or act_type == "all") else act_type
+
         if filter_type == "patient":
-            confirm_msg = f"👤 **المريض:** {filter_value}\n📅 **التاريخ:** كل السنوات\n\n📋 اختر صيغة التصدير:"
+            confirm_msg = f"👤 **المريض:** {filter_value}\n📌 **الإجراء:** {act_label}\n📅 **التاريخ:** كل السنوات\n\n📋 اختر صيغة التصدير:"
         elif filter_type == "hospital":
             dept_value = context.user_data.get("department_value")
             if dept_value:
@@ -972,8 +1021,11 @@ async def handle_month_choice(update: Update, context: ContextTypes.DEFAULT_TYPE
         month_text = month_names.get(month_choice, month_choice)
     
     # بناء رسالة التأكيد
+    act_type = context.user_data.get("action_type")
+    act_label = "كل الإجراءات" if (not act_type or act_type == "all") else act_type
+
     if filter_type == "patient" and filter_value:
-        confirm_msg = f"👤 **المريض:** {filter_value}\n📅 **التاريخ:** {year} - {month_text}\n\n📋 اختر صيغة التصدير:"
+        confirm_msg = f"👤 **المريض:** {filter_value}\n📌 **الإجراء:** {act_label}\n📅 **التاريخ:** {year} - {month_text}\n\n📋 اختر صيغة التصدير:"
     elif filter_type == "hospital" and filter_value:
         dept_value = context.user_data.get("department_value")
         if dept_value:
@@ -986,7 +1038,7 @@ async def handle_month_choice(update: Update, context: ContextTypes.DEFAULT_TYPE
     await q.edit_message_text(confirm_msg, reply_markup=_confirm_kb(), parse_mode="Markdown")
     return CONFIRM_EXPORT
 
-def _query_reports(filter_type, name_val, year_val, month_val, dept_val=None):
+def _query_reports(filter_type, name_val, year_val, month_val, dept_val=None, action_type=None):
     with SessionLocal() as s:
         base_query = s.query(Report)
 
@@ -1005,6 +1057,10 @@ def _query_reports(filter_type, name_val, year_val, month_val, dept_val=None):
         elif filter_type == "department" and name_val:
             # فلترة حسب القسم فقط - استخدام ON clause صريح
             base_query = base_query.join(Department, Report.department_id == Department.id).filter(Department.name.ilike(f"%{name_val}%"))
+
+        # فلترة حسب نوع الإجراء الطبي
+        if action_type and action_type != "all":
+            base_query = base_query.filter(Report.medical_action == action_type)
 
         # فلترة حسب السنة والشهر
         if year_val and year_val != "all":
@@ -1352,7 +1408,8 @@ async def confirm_export(update: Update, context: ContextTypes.DEFAULT_TYPE):
     month_val = context.user_data.get("month_value")
 
     dept_val = context.user_data.get("department_value")
-    fmt_err, rows, stats, charts = _query_reports(f_type, name_val, year_val, month_val, dept_val)
+    action_type = context.user_data.get("action_type")
+    fmt_err, rows, stats, charts = _query_reports(f_type, name_val, year_val, month_val, dept_val, action_type)
     if fmt_err == "FORMAT_ERR":
         if q:
             await q.edit_message_text("⚠️ تنسيق الشهر غير صحيح. أرسل مثل: 2025-10 أو 'الكل'")
@@ -1381,9 +1438,16 @@ async def confirm_export(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
 
     # بناء عنوان التقرير والبيانات
+    action_label = None
+    if action_type and action_type != "all":
+        action_label = action_type
+
     if f_type == "patient":
         title = f"تقارير المريض: {name_val}"
         filter_desc = f"المريض: {name_val}"
+        if action_label:
+            title += f" ({action_label})"
+            filter_desc += f" | الإجراء: {action_label}"
     elif f_type == "hospital":
         title = f"تقارير المستشفى: {name_val}"
         filter_desc = f"المستشفى: {name_val}"
@@ -1393,7 +1457,7 @@ async def confirm_export(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         title = "تقارير طبية شاملة"
         filter_desc = "جميع التقارير"
-    
+
     # إضافة معلومات التاريخ إذا وجدت
     if year_val and year_val != "all":
         if month_val and month_val != "all":
@@ -1451,7 +1515,7 @@ async def confirm_export(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logger.info(f"✅ تم إنشاء Word: {file_path}")
             elif export_format == "html":
                 logger.info("🌐 بدء تصدير HTML...")
-                file_path = export_to_html(rows, f"reports_{f_type or 'all'}", filter_type=f_type)
+                file_path = export_to_html(rows, f"reports_{f_type or 'all'}", filter_type=f_type, title=title, filter_desc=filter_desc)
                 logger.info(f"✅ تم إنشاء HTML: {file_path}")
             else:  # pdf (default)
                 logger.info("📕 بدء تصدير PDF...")
@@ -1680,15 +1744,33 @@ async def handle_print_patient_selection(update: Update, context: ContextTypes.D
             return SELECT_FILTER
     
     context.user_data["filter_value"] = patient_name
-    
-    # الانتقال لاختيار السنة
+    context.user_data["filter_type"] = "patient"
+
+    # ✅ حساب عدد التقارير لكل نوع إجراء لهذا المريض
+    with SessionLocal() as session:
+        from sqlalchemy import func as sqlfunc
+        action_counts = session.query(
+            Report.medical_action, sqlfunc.count(Report.id)
+        ).filter(
+            Report.patient_id == patient_id
+        ).group_by(Report.medical_action).all()
+
+        total = sum(c for _, c in action_counts)
+        action_summary = "\n".join(
+            f"  • {action or 'غير محدد'}: {count}"
+            for action, count in sorted(action_counts, key=lambda x: x[1], reverse=True)
+        )
+
+    # ✅ الانتقال لاختيار نوع الإجراء الطبي (الخطوة الجديدة)
     await q.edit_message_text(
-        f"✅ **تم اختيار المريض:** {patient_name}\n\n"
-        f"📅 اختر السنة:",
-        reply_markup=_years_kb(),
+        f"✅ **تم اختيار المريض:** {patient_name}\n"
+        f"📊 **إجمالي التقارير:** {total}\n\n"
+        f"📌 **التقارير حسب الإجراء:**\n{action_summary}\n\n"
+        f"🔽 **اختر نوع الإجراء:**",
+        reply_markup=_action_types_kb(),
         parse_mode="Markdown"
     )
-    return SELECT_YEAR
+    return SELECT_ACTION_TYPE
 
 
 async def handle_patient_page(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1712,6 +1794,73 @@ async def handle_patient_page(update: Update, context: ContextTypes.DEFAULT_TYPE
     text, keyboard = _build_patient_list_keyboard(patients_list, page=page)
     await q.edit_message_text(text, reply_markup=keyboard, parse_mode="Markdown")
     return ENTER_NAME
+
+
+async def handle_action_type_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """✅ معالجة اختيار نوع الإجراء الطبي (خطوة جديدة)"""
+    q = update.callback_query
+    await q.answer()
+
+    data = q.data
+
+    # زر الرجوع لقائمة المرضى
+    if data == "back:patient_list":
+        patients_list = context.user_data.get("patients_list", [])
+        if not patients_list:
+            with SessionLocal() as session:
+                patients = session.query(Patient).filter(
+                    Patient.full_name.isnot(None),
+                    Patient.full_name != ""
+                ).order_by(Patient.full_name).all()
+                patients_list = [(p.id, p.full_name) for p in patients]
+                context.user_data["patients_list"] = patients_list
+
+        page = context.user_data.get("patient_page", 0)
+        text, keyboard = _build_patient_list_keyboard(patients_list, page=page)
+        await q.edit_message_text(text, reply_markup=keyboard, parse_mode="Markdown")
+        return ENTER_NAME
+
+    # زر الإلغاء
+    if data == "abort":
+        await q.edit_message_text("❌ تم إلغاء الطباعة.")
+        return ConversationHandler.END
+
+    # استخراج نوع الإجراء
+    action_type = data.split(":", 1)[1]  # "all" أو اسم الإجراء
+    context.user_data["action_type"] = action_type
+
+    patient_name = context.user_data.get("filter_value", "—")
+    action_label = "كل الإجراءات" if action_type == "all" else action_type
+
+    # ✅ حساب عدد التقارير المتوقعة بعد الفلترة
+    with SessionLocal() as session:
+        count_query = session.query(Report).join(
+            Patient, Report.patient_id == Patient.id
+        ).filter(Patient.full_name.ilike(f"%{patient_name}%"))
+
+        if action_type != "all":
+            count_query = count_query.filter(Report.medical_action == action_type)
+
+        preview_count = count_query.count()
+
+    # عرض خيارات التاريخ مع ملخص
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📅 إضافة فلترة حسب التاريخ", callback_data="add_date_filter:yes")],
+        [InlineKeyboardButton(f"✅ طباعة مباشرة ({preview_count} تقرير)", callback_data="add_date_filter:no")],
+        [InlineKeyboardButton("🔙 رجوع", callback_data="back:action_type")],
+        [InlineKeyboardButton("❌ إلغاء", callback_data="abort")],
+    ])
+
+    await q.edit_message_text(
+        f"✅ **ملخص الاختيار:**\n\n"
+        f"👤 **المريض:** {patient_name}\n"
+        f"📌 **نوع الإجراء:** {action_label}\n"
+        f"📊 **التقارير المتاحة:** {preview_count} تقرير\n\n"
+        f"🔽 **هل تريد فلترة حسب التاريخ؟**",
+        reply_markup=keyboard,
+        parse_mode="Markdown"
+    )
+    return SELECT_YEAR
 
 
 async def handle_manual_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1918,18 +2067,20 @@ def export_to_pdf_windows(reports_data, filename="reports"):
         elements.append(Paragraph(ar('نظام التقارير الطبية الذكي'), subtitle_style))
         
         # معلومات التقرير - جدول جميل
+        # ✅ ترتيب RTL - القيمة ثم العنوان
         info_data = [
-            [ar('📅 تاريخ الإنشاء'), datetime.now().strftime("%Y-%m-%d %H:%M")],
-            [ar('📊 عدد التقارير'), str(len(reports_data))],
-            [ar('🏥 النظام'), ar('نظام التقارير الطبية المتكامل')]
+            [datetime.now().strftime("%Y-%m-%d %H:%M"), ar('📅 تاريخ الإنشاء')],
+            [str(len(reports_data)), ar('📊 عدد التقارير')],
+            [ar('نظام التقارير الطبية المتكامل'), ar('🏥 النظام')]
         ]
-        
-        info_table = Table(info_data, colWidths=[8*cm, 12*cm])
+
+        info_table = Table(info_data, colWidths=[12*cm, 8*cm])
         info_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#3498db')),
-            ('BACKGROUND', (1, 0), (1, -1), colors.HexColor('#ecf0f1')),
-            ('TEXTCOLOR', (0, 0), (0, -1), colors.white),
-            ('TEXTCOLOR', (1, 0), (1, -1), colors.HexColor('#2c3e50')),
+            # ✅ RTL: العنوان يمين (العمود الأخير) والقيمة يسار
+            ('BACKGROUND', (1, 0), (1, -1), colors.HexColor('#3498db')),
+            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#ecf0f1')),
+            ('TEXTCOLOR', (1, 0), (1, -1), colors.white),
+            ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#2c3e50')),
             ('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
             ('FONTNAME', (0, 0), (-1, -1), arabic_font),
             ('FONTSIZE', (0, 0), (-1, -1), 12),
@@ -1961,46 +2112,46 @@ def export_to_pdf_windows(reports_data, filename="reports"):
         elements.append(Paragraph(ar('جدول التقارير التفصيلي'), section_title))
         elements.append(Spacer(1, 5*mm))
         
-        # هيدر الجدول
+        # هيدر الجدول - ✅ ترتيب RTL (من اليمين لليسار)
         table_data = [[
-            ar('م'),
-            ar('التاريخ'),
-            ar('المريض'),
-            ar('المستشفى'),
-            ar('القسم'),
-            ar('الطبيب'),
+            ar('الشكوى'),
             ar('الإجراء'),
-            ar('الشكوى')
+            ar('الطبيب'),
+            ar('القسم'),
+            ar('المستشفى'),
+            ar('المريض'),
+            ar('التاريخ'),
+            ar('م')
         ]]
-        
-        # البيانات
+
+        # البيانات - ✅ ترتيب RTL
         for idx, r in enumerate(reports_data, 1):
             complaint = r.get('complaint_text', '')
             if len(complaint) > 60:
                 complaint = complaint[:57] + '...'
-            
+
             row = [
-                str(idx),
-                r.get('report_date', '')[:10] if r.get('report_date') else '',
-                ar(r.get('patient_name', 'غير محدد')[:25]),
-                ar(r.get('hospital_name', 'غير محدد')[:25]),
-                ar(r.get('department_name', 'غير محدد')[:20]),
-                ar(r.get('doctor_name', 'غير محدد')[:20]),
+                ar(complaint),
                 ar(r.get('medical_action', 'غير محدد')[:20]),
-                ar(complaint)
+                ar(r.get('doctor_name', 'غير محدد')[:20]),
+                ar(r.get('department_name', 'غير محدد')[:20]),
+                ar(r.get('hospital_name', 'غير محدد')[:25]),
+                ar(r.get('patient_name', 'غير محدد')[:25]),
+                r.get('report_date', '')[:10] if r.get('report_date') else '',
+                str(idx)
             ]
             table_data.append(row)
-        
-        # إنشاء الجدول مع عرض مناسب
+
+        # إنشاء الجدول - ✅ ترتيب RTL
         reports_table = Table(table_data, colWidths=[
-            1.5*cm,  # م
-            2.5*cm,  # التاريخ
-            3.5*cm,  # المريض
-            4*cm,    # المستشفى
-            3*cm,    # القسم
-            3*cm,    # الطبيب
+            5*cm,    # الشكوى
             3*cm,    # الإجراء
-            5*cm     # الشكوى
+            3*cm,    # الطبيب
+            3*cm,    # القسم
+            4*cm,    # المستشفى
+            3.5*cm,  # المريض
+            2.5*cm,  # التاريخ
+            1.5*cm   # م
         ])
         
         # تنسيق احترافي للجدول مع خط عربي
@@ -2015,12 +2166,12 @@ def export_to_pdf_windows(reports_data, filename="reports"):
             ('TOPPADDING', (0, 0), (-1, 0), 12),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
             
-            # البيانات
+            # البيانات - ✅ ترتيب RTL
             ('FONTNAME', (0, 1), (-1, -1), arabic_font),
             ('FONTSIZE', (0, 1), (-1, -1), 9),
-            ('ALIGN', (0, 1), (0, -1), 'CENTER'),  # رقم التقرير
-            ('ALIGN', (1, 1), (1, -1), 'CENTER'),  # التاريخ
-            ('ALIGN', (2, 1), (-1, -1), 'RIGHT'),  # باقي الأعمدة من اليمين
+            ('ALIGN', (-1, 1), (-1, -1), 'CENTER'),  # م (الأخير = يمين في RTL)
+            ('ALIGN', (-2, 1), (-2, -1), 'CENTER'),  # التاريخ
+            ('ALIGN', (0, 1), (-3, -1), 'RIGHT'),    # باقي الأعمدة من اليمين
             ('VALIGN', (0, 1), (-1, -1), 'TOP'),
             ('TOPPADDING', (0, 1), (-1, -1), 8),
             ('BOTTOMPADDING', (0, 1), (-1, -1), 8),
@@ -2670,9 +2821,20 @@ def export_to_html(reports_data, filename="reports", filter_type=None):
                     f"</tr>"
                 )
             html_content = (
-                f"<html><head><meta charset=\"utf-8\"><title>{context['title']}</title></head>"
+                f"<html lang=\"ar\" dir=\"rtl\"><head><meta charset=\"utf-8\"><title>{context['title']}</title>"
+                f"<style>"
+                f"* {{ direction: rtl; unicode-bidi: embed; }}"
+                f"body {{ font-family: 'Segoe UI', Tahoma, Arial, sans-serif; direction: rtl; text-align: right; padding: 20px; color: #2c3e50; }}"
+                f"h2 {{ text-align: center; color: #2c3e50; margin-bottom: 20px; }}"
+                f"p {{ text-align: right; }}"
+                f"table {{ width: 100%; border-collapse: collapse; direction: rtl; }}"
+                f"th {{ background: #3498db; color: #fff; padding: 10px; text-align: right; }}"
+                f"td {{ padding: 8px; text-align: right; border-bottom: 1px solid #ddd; }}"
+                f"tr:nth-child(even) {{ background: #f8f9fa; }}"
+                f"</style>"
+                f"</head>"
                 f"<body><h2>{context['title']}</h2><p>توليد: {context['generated_at']}</p>"
-                f"<table border=\"1\" cellpadding=\"6\" cellspacing=\"0\">"
+                f"<table>"
                 f"<thead><tr><th>رقم</th><th>التاريخ</th><th>المريض</th><th>المستشفى</th><th>القسم</th><th>الطبيب</th><th>الإجراء</th></tr></thead>"
                 f"<tbody>{''.join(rows_html)}</tbody></table></body></html>"
             )
@@ -2828,12 +2990,27 @@ def export_to_word(reports_data, filename="reports"):
     
     try:
         doc = Document()
-        
+
+        # ✅ إعداد RTL على مستوى المستند بالكامل
+        from docx.oxml import OxmlElement
+        # جعل كل الأقسام RTL
+        for section in doc.sections:
+            sectPr = section._sectPr
+            bidi_elem = OxmlElement('w:bidi')
+            bidi_elem.set(qn('w:val'), '1')
+            sectPr.append(bidi_elem)
+
         # إعداد الخط العربي والـ RTL
         doc.styles['Normal'].font.name = 'Arial'
         doc.styles['Normal'].font.size = Pt(11)
         doc.styles['Normal']._element.rPr.rFonts.set(qn('w:eastAsia'), 'Arial')
         doc.styles['Normal'].paragraph_format.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+
+        # ✅ تفعيل RTL على مستوى الفقرة الافتراضية
+        pPr = doc.styles['Normal']._element.get_or_add_pPr()
+        bidi = OxmlElement('w:bidi')
+        bidi.set(qn('w:val'), '1')
+        pPr.append(bidi)
         
         # صفحة الغلاف
         title = doc.add_heading('بسم الله الرحمن الرحيم', 0)
@@ -2899,8 +3076,18 @@ def export_to_word(reports_data, filename="reports"):
                 for cell in row.cells:
                     for paragraph in cell.paragraphs:
                         paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                        # ✅ تفعيل RTL على كل فقرة داخل الجدول
+                        pPr = paragraph._element.get_or_add_pPr()
+                        bidi = OxmlElement('w:bidi')
+                        bidi.set(qn('w:val'), '1')
+                        pPr.append(bidi)
                         for run in paragraph.runs:
                             run.font.name = 'Arial'
+                            # ✅ تفعيل RTL على مستوى الـ run
+                            rPr = run._element.get_or_add_rPr()
+                            rtl = OxmlElement('w:rtl')
+                            rtl.set(qn('w:val'), '1')
+                            rPr.append(rtl)
                     # العمود الأول bold
                     if cell == row.cells[0]:
                         cell.paragraphs[0].runs[0].font.bold = True
@@ -2908,23 +3095,34 @@ def export_to_word(reports_data, filename="reports"):
             
             doc.add_paragraph()
             
+            # دالة مساعدة لتفعيل RTL على فقرة
+            def _set_paragraph_rtl(p):
+                p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                pPr = p._element.get_or_add_pPr()
+                bidi = OxmlElement('w:bidi')
+                bidi.set(qn('w:val'), '1')
+                pPr.append(bidi)
+
             # الشكوى
-            doc.add_heading('📝 الشكوى:', level=2)
+            h_complaint = doc.add_heading('📝 الشكوى:', level=2)
+            _set_paragraph_rtl(h_complaint)
             complaint_p = doc.add_paragraph(report.get('complaint', report.get('complaint_text', 'لا يوجد')))
-            complaint_p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-            
+            _set_paragraph_rtl(complaint_p)
+
             # قرار الطبيب
-            doc.add_heading('✅ قرار الطبيب:', level=2)
+            h_decision = doc.add_heading('✅ قرار الطبيب:', level=2)
+            _set_paragraph_rtl(h_decision)
             decision_p = doc.add_paragraph(report.get('decision', report.get('doctor_decision', 'لا يوجد')))
-            decision_p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-            
+            _set_paragraph_rtl(decision_p)
+
             # موعد المراجعة
             if report.get('followup_date'):
-                doc.add_heading('📅 موعد المراجعة:', level=2)
+                h_followup = doc.add_heading('📅 موعد المراجعة:', level=2)
+                _set_paragraph_rtl(h_followup)
                 followup_p = doc.add_paragraph()
                 followup_p.add_run(f"التاريخ: {report.get('followup_date', '')}\n").bold = True
                 followup_p.add_run(f"السبب: {report.get('followup_reason', '')}")
-                followup_p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                _set_paragraph_rtl(followup_p)
             
             # فاصل
             if idx < len(reports_data):
@@ -3107,8 +3305,14 @@ def register(app):
                 CallbackQueryHandler(confirm_export, pattern=r"^abort$"),
                 MessageHandler(filters.Regex("^❌ إلغاء المحادثة$"), cancel_text),
             ],
+            SELECT_ACTION_TYPE: [
+                CallbackQueryHandler(handle_action_type_choice, pattern=r"^action_type:"),
+                CallbackQueryHandler(handle_action_type_choice, pattern=r"^back:patient_list$"),
+                CallbackQueryHandler(confirm_export, pattern=r"^abort$"),
+                MessageHandler(filters.Regex("^❌ إلغاء المحادثة$"), cancel_text),
+            ],
             SELECT_YEAR: [
-                CallbackQueryHandler(handle_year_choice, pattern=r"^(year:|add_date_filter:|back:filter|back:dept_option|back:dept_list)"),
+                CallbackQueryHandler(handle_year_choice, pattern=r"^(year:|add_date_filter:|back:filter|back:dept_option|back:dept_list|back:action_type)"),
                 CallbackQueryHandler(confirm_export, pattern=r"^abort$"),
                 MessageHandler(filters.Regex("^❌ إلغاء المحادثة$"), cancel_text),
             ],

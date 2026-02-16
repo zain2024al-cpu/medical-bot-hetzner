@@ -6,3 +6,6 @@ requests
 pytz
 alembic
 apscheduler
+reportlab
+arabic-reshaper
+python-bidi

@@ -102,3 +102,14 @@ R_ACTION_TYPE = STATE_SELECT_ACTION_TYPE
     APP_RESCHEDULE_TRANSLATOR, APP_RESCHEDULE_CONFIRM
 ) = range(88, 93)
 
+# مسار 12: جلسة إشعاعي (93-101)
+(
+    RADIATION_THERAPY_TYPE,           # نوع الإشعاعي
+    RADIATION_THERAPY_SESSION_NUMBER, # رقم الجلسة
+    RADIATION_THERAPY_REMAINING,      # الجلسات المتبقية
+    RADIATION_THERAPY_NOTES,          # ملاحظات أو توصيات
+    RADIATION_THERAPY_RETURN_DATE,    # تاريخ العودة والوقت
+    RADIATION_THERAPY_RETURN_REASON,  # سبب العودة
+    RADIATION_THERAPY_TRANSLATOR,     # اسم المترجم
+    RADIATION_THERAPY_CONFIRM          # تأكيد
+) = range(93, 101)

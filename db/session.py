@@ -62,6 +62,15 @@ def init_database():
         # Create all tables first
         Base.metadata.create_all(bind=engine)
         logger.info(f"✅ Database tables created: {DATABASE_PATH}")
+
+        try:
+            from services.translators_service import seed_translators_directory, sync_reports_translator_ids
+            seeded = seed_translators_directory()
+            synced = sync_reports_translator_ids()
+            if seeded or synced:
+                logger.info(f"✅ Translators seeded/updated: {seeded}, Reports synced: {synced}")
+        except Exception as seed_error:
+            logger.warning(f"⚠️ Seed/sync translators skipped: {seed_error}")
         
         # Enable WAL mode for better concurrency
         try:

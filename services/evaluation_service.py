@@ -4,10 +4,11 @@
 # ================================================
 
 from datetime import datetime, date, time
+from sqlalchemy import func
 from db.session import SessionLocal
 from db.models import (
     DailyReportTracking, TranslatorEvaluation, MonthlyEvaluation, 
-    Translator, Report
+    TranslatorDirectory, Report
 )
 
 class EvaluationService:
@@ -75,14 +76,25 @@ class EvaluationService:
             'notes': quality_notes
         }
     
-    def evaluate_translator_regularity(self, translator_name: str, target_date: date) -> dict:
+    def _resolve_translator_name(self, session, translator_id: int, translator_name: str) -> str:
+        if translator_name:
+            return translator_name
+        if translator_id:
+            translator = session.query(TranslatorDirectory).filter_by(translator_id=translator_id).first()
+            if translator and translator.name:
+                return translator.name
+        return "غير محدد"
+
+    def evaluate_translator_regularity(self, translator_id: int, translator_name: str, target_date: date) -> dict:
         """تقييم انتظام المترجم"""
         with SessionLocal() as s:
             # جلب سجل التتبع للمترجم في اليوم
-            tracking_record = s.query(DailyReportTracking).filter_by(
-                translator_name=translator_name,
-                date=target_date
-            ).first()
+            resolved_name = self._resolve_translator_name(s, translator_id, translator_name)
+            tracking_query = s.query(DailyReportTracking).filter_by(date=target_date)
+            if translator_id:
+                tracking_record = tracking_query.filter_by(translator_id=translator_id).first()
+            else:
+                tracking_record = tracking_query.filter_by(translator_name=resolved_name).first()
             
             if not tracking_record:
                 return {
@@ -122,9 +134,10 @@ class EvaluationService:
                 'notes': regularity_notes
             }
     
-    def create_daily_evaluation(self, report: Report, translator_name: str) -> TranslatorEvaluation:
+    def create_daily_evaluation(self, report: Report, translator_id: int, translator_name: str) -> TranslatorEvaluation:
         """إنشاء تقييم يومي للتقرير"""
         with SessionLocal() as s:
+            resolved_name = self._resolve_translator_name(s, translator_id, translator_name)
             # تقييم التوقيت
             timing_eval = self.evaluate_report_timing(report.report_date)
             
@@ -132,15 +145,17 @@ class EvaluationService:
             quality_eval = self.evaluate_report_quality(report)
             
             # تقييم الانتظام
-            regularity_eval = self.evaluate_translator_regularity(translator_name, report.report_date.date())
+            regularity_eval = self.evaluate_translator_regularity(translator_id, resolved_name, report.report_date.date())
             
             # حساب النقاط الإجمالية
             total_score = timing_eval['score'] + quality_eval['score'] + regularity_eval['score']
             
             # إنشاء التقييم
             evaluation = TranslatorEvaluation(
-                translator_name=translator_name,
+                translator_id=translator_id,
+                translator_name=resolved_name,
                 report_id=report.id,
+                evaluation_date=report.report_date,
                 timing_score=timing_eval['score'],
                 quality_score=quality_eval['score'],
                 regularity_score=regularity_eval['score'],
@@ -157,63 +172,71 @@ class EvaluationService:
             
             return evaluation
     
-    def generate_monthly_evaluation(self, translator_name: str, year: int, month: int) -> MonthlyEvaluation:
-        """توليد التقييم الشهري للمترجم"""
+    def generate_monthly_evaluation(self, translator_id: int, translator_name: str, year: int, month: int) -> MonthlyEvaluation:
+        """توليد التقييم الشهري للمترجم - يستخدم stats_service كمصدر وحيد"""
+        from services.stats_service import get_monthly_stats
+
         with SessionLocal() as s:
-            # جلب جميع التقييمات اليومية للشهر
-            daily_evaluations = s.query(TranslatorEvaluation).filter(
-                TranslatorEvaluation.translator_name == translator_name,
-                TranslatorEvaluation.evaluation_date >= datetime(year, month, 1),
-                TranslatorEvaluation.evaluation_date < datetime(year, month + 1, 1) if month < 12 else datetime(year + 1, 1, 1)
-            ).all()
-            
-            if not daily_evaluations:
+            # ═══ المصدر الوحيد: stats_service ═══
+            all_stats = get_monthly_stats(s, year, month)
+
+            # البحث عن المترجم المحدد
+            translator_stat = None
+            for stat in all_stats:
+                if translator_id and stat['translator_id'] == translator_id:
+                    translator_stat = stat
+                    break
+
+            if not translator_stat:
                 return None
-            
-            # حساب المتوسطات
-            avg_timing = sum(e.timing_score for e in daily_evaluations) / len(daily_evaluations)
-            avg_quality = sum(e.quality_score for e in daily_evaluations) / len(daily_evaluations)
-            avg_regularity = sum(e.regularity_score for e in daily_evaluations) / len(daily_evaluations)
-            avg_total = sum(e.total_score for e in daily_evaluations) / len(daily_evaluations)
-            
-            # جلب إحصائيات التتبع
-            tracking_records = s.query(DailyReportTracking).filter(
-                DailyReportTracking.translator_name == translator_name,
-                DailyReportTracking.date >= date(year, month, 1),
-                DailyReportTracking.date < date(year, month + 1, 1) if month < 12 else date(year + 1, 1, 1)
-            ).all()
-            
-            total_reports = len(tracking_records)
-            on_time_reports = sum(1 for r in tracking_records if r.is_completed and not r.reminder_sent)
-            late_reports = total_reports - on_time_reports
-            
-            # تحديد التقييم النهائي
-            if avg_total >= 27:
-                final_rating = 5
-                performance_level = "ممتاز"
-            elif avg_total >= 24:
-                final_rating = 4
-                performance_level = "جيد جداً"
-            elif avg_total >= 21:
-                final_rating = 3
-                performance_level = "جيد"
-            elif avg_total >= 18:
-                final_rating = 2
-                performance_level = "مقبول"
+
+            total_reports = translator_stat['total_reports']
+            work_days = translator_stat['work_days']
+            late_reports = translator_stat['late_reports']
+            on_time_reports = max(total_reports - late_reports, 0)
+            resolved_name = translator_stat['translator_name']
+
+            # تحديد التقييم النهائي بناءً على النقاط اليومية (إن وجدت)
+            daily_evaluations_query = s.query(TranslatorEvaluation).filter(
+                TranslatorEvaluation.evaluation_date >= datetime(year, month, 1),
+                TranslatorEvaluation.evaluation_date < (datetime(year, month + 1, 1) if month < 12 else datetime(year + 1, 1, 1))
+            )
+            if translator_id:
+                daily_evaluations_query = daily_evaluations_query.filter(TranslatorEvaluation.translator_id == translator_id)
+            daily_evaluations = daily_evaluations_query.all()
+
+            if daily_evaluations:
+                avg_timing = sum(e.timing_score for e in daily_evaluations) / len(daily_evaluations)
+                avg_quality = sum(e.quality_score for e in daily_evaluations) / len(daily_evaluations)
+                avg_regularity = sum(e.regularity_score for e in daily_evaluations) / len(daily_evaluations)
+                avg_total = sum(e.total_score for e in daily_evaluations) / len(daily_evaluations)
             else:
-                final_rating = 1
-                performance_level = "ضعيف"
-            
+                avg_timing = avg_quality = avg_regularity = avg_total = 0
+
+            if avg_total >= 27:
+                final_rating, performance_level = 5, "ممتاز"
+            elif avg_total >= 24:
+                final_rating, performance_level = 4, "جيد جداً"
+            elif avg_total >= 21:
+                final_rating, performance_level = 3, "جيد"
+            elif avg_total >= 18:
+                final_rating, performance_level = 2, "مقبول"
+            else:
+                final_rating, performance_level = 1, "ضعيف"
+
             # إنشاء أو تحديث التقييم الشهري
-            monthly_eval = s.query(MonthlyEvaluation).filter_by(
-                translator_name=translator_name,
-                year=year,
-                month=month
-            ).first()
-            
+            monthly_query = s.query(MonthlyEvaluation).filter_by(year=year, month=month)
+            if translator_id:
+                monthly_query = monthly_query.filter_by(translator_id=translator_id)
+            else:
+                monthly_query = monthly_query.filter_by(translator_name=resolved_name)
+            monthly_eval = monthly_query.first()
+
             if monthly_eval:
-                # تحديث التقييم الموجود
+                monthly_eval.translator_id = translator_id
+                monthly_eval.translator_name = resolved_name
                 monthly_eval.total_reports = total_reports
+                monthly_eval.work_days = work_days
                 monthly_eval.on_time_reports = on_time_reports
                 monthly_eval.late_reports = late_reports
                 monthly_eval.timing_points = round(avg_timing, 1)
@@ -224,12 +247,13 @@ class EvaluationService:
                 monthly_eval.performance_level = performance_level
                 monthly_eval.updated_at = datetime.now()
             else:
-                # إنشاء تقييم جديد
                 monthly_eval = MonthlyEvaluation(
-                    translator_name=translator_name,
+                    translator_id=translator_id,
+                    translator_name=resolved_name,
                     year=year,
                     month=month,
                     total_reports=total_reports,
+                    work_days=work_days,
                     on_time_reports=on_time_reports,
                     late_reports=late_reports,
                     timing_points=round(avg_timing, 1),
@@ -240,10 +264,10 @@ class EvaluationService:
                     performance_level=performance_level
                 )
                 s.add(monthly_eval)
-            
+
             s.commit()
             s.refresh(monthly_eval)
-            
+
             return monthly_eval
 
 # إنشاء مثيل عام للخدمة

@@ -14,6 +14,12 @@ def register_all_handlers(app):
     register_shared_refresh(app)
     register_shared_schedule(app)
     
+    # 🔸 تسجيل handlers الأدمن المتخصصة (يجب تسجيل ConversationHandlers قبل admin_start)
+    from bot.handlers.admin.admin_schedule_management import register as register_schedule_management
+    from bot.handlers.admin.admin_evaluation import register as register_evaluation
+    register_schedule_management(app)
+    register_evaluation(app)  # ✅ تسجيل ConversationHandler قبل admin_start
+    
     # 🔸 تسجيل واجهة الأدمن
     from bot.handlers.admin.admin_start import register as register_admin_start
     register_admin_start(app)  # ✅ واجهة الأدمن (أمر /admin والموافقات)
@@ -31,15 +37,14 @@ def register_all_handlers(app):
         # admin_schedule,  # تم تعطيله - استخدم shared_schedule
         # admin_users,  # ❌ تم حذفه - تم دمجه في admin_users_management
     )
-    from bot.handlers.admin.admin_schedule_management import register as register_schedule_management
-    from bot.handlers.admin.admin_evaluation import register as register_evaluation
     from bot.handlers.admin.admin_users_management import register as register_users_management
     from bot.handlers.admin.admin_admins import register as register_admin_admins
-    # from bot.handlers.admin.admin_printing import register as register_admin_printing  # تم تعطيله - تداخل
+    from bot.handlers.admin.admin_printing import register as register_admin_printing  # ✅ معالج الطباعة
     from bot.handlers.admin.admin_daily_patients import register as register_daily_patients
     from bot.handlers.admin.admin_data_analysis import register as register_data_analysis
     from bot.handlers.admin.admin_hospitals_management import register as register_hospitals_management
     from bot.handlers.admin.admin_translators_management import register as register_translators_management
+    from bot.handlers.admin.admin_delete_reports import register as register_admin_delete_reports
     # تم حذف admin_patient_management
     
     admin_initial_case.register(app)
@@ -47,15 +52,16 @@ def register_all_handlers(app):
     admin_ai.register(app)
     admin_notes.register(app)
     # admin_users.register(app)  # ❌ تم حذفه - تم دمجه في admin_users_management
-    register_schedule_management(app)
-    register_evaluation(app)
+    # register_schedule_management(app)  # ✅ تم تسجيله أعلاه
+    # register_evaluation(app)  # ✅ تم تسجيله أعلاه
     register_users_management(app)  # ✅ النظام الجديد الكامل (يشمل القبول/الرفض + الإدارة)
     register_admin_admins(app)  # ✅ إدارة الأدمنين
-    # register_admin_printing(app)  # ❌ تم تعطيله - تداخل مع admin_reports (نفس الزر)
+    register_admin_printing(app)  # ✅ نظام الطباعة الاحترافي
     register_daily_patients(app)  # ✅ إدارة أسماء المرضى اليومية
     register_data_analysis(app)  # ✅ نظام تحليل البيانات الشامل
     register_hospitals_management(app)  # ✅ إدارة المستشفيات
     register_translators_management(app)  # ✅ إدارة المترجمين
+    register_admin_delete_reports(app)  # ✅ حذف التقارير للأدمن
     # تم حذف register_patient_management - نظام بسيط
 
     # 🔹 تسجيل handlers المستخدم المتخصصة

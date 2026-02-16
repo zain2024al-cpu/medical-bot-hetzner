@@ -67,7 +67,8 @@ DIRECT_DEPARTMENTS = [
     "الطب النفسي | Psychiatry",
     "الطوارئ | Emergency",
     "التخدير | Anesthesia",
-    "العناية المركزة | Critical Care / ICU"
+    "العناية المركزة | Critical Care / ICU",
+    "العلاج الإشعاعي | The radiation Therapy"
 ]
 
 
@@ -95,7 +96,8 @@ PREDEFINED_ACTIONS = [
     "ترقيد",
     "خروج من المستشفى",
     "أشعة وفحوصات",  # ✅ تم نقلها من قائمة الأقسام إلى قائمة أنواع الإجراءات
-    "تأجيل موعد"
+    "تأجيل موعد",
+    "جلسة إشعاعي"  # ✅ مسار جديد للعلاج الإشعاعي
 ]
 
 
@@ -193,6 +195,13 @@ async def save_report_to_db(query, context):
         translator = None
         if query.from_user:
             translator = session.query(Translator).filter_by(tg_user_id=query.from_user.id).first()
+
+        translator_id_value = data_tmp.get("translator_id")
+        translator_name_value = data_tmp.get("translator_name")
+        if not translator_id_value and translator:
+            translator_id_value = translator.tg_user_id or None
+        if not translator_name_value and translator:
+            translator_name_value = translator.full_name
         
         # إنشاء التقرير
         print("📝 إنشاء التقرير...")
@@ -209,7 +218,7 @@ async def save_report_to_db(query, context):
             hospital_id=hospital.id,
             department_id=department.id,
             doctor_id=doctor.id if doctor else None,
-            translator_id=translator.id if translator else None,
+            translator_id=translator_id_value,
             submitted_by_user_id=submitted_by_user_id,
             
             # ✅ الأسماء المكررة للبحث والطباعة السريعة
@@ -217,7 +226,7 @@ async def save_report_to_db(query, context):
             hospital_name=hospital.name if hospital else data_tmp.get("hospital_name"),
             department=department.name if department else data_tmp.get("department_name"),
             doctor_name=doctor.name if doctor else data_tmp.get("doctor_name"),
-            translator_name=translator.full_name if translator else None,
+            translator_name=translator_name_value,
             
             # محتوى التقرير
             complaint_text=data_tmp.get("complaint_text", ""),
@@ -243,8 +252,8 @@ async def save_report_to_db(query, context):
         
         # حفظ الـ IDs قبل إغلاق الـ session
         report_id = new_report.id
-        translator_id = translator.id if translator else None
-        translator_name = translator.full_name if translator else None
+        translator_id = translator_id_value
+        translator_name = translator_name_value
         
         return (report_id, translator_id, translator_name)
         
@@ -297,8 +306,8 @@ async def create_evaluation(new_report, data_tmp, translator):
     """إنشاء تقييم يومي"""
     try:
         from services.evaluation_service import evaluation_service
+        translator_id = data_tmp.get("translator_id") or (translator.tg_user_id if translator else None)
         translator_name = data_tmp.get("translator_name") or (translator.full_name if translator else "غير محدد")
-        evaluation_service.create_daily_evaluation(new_report, translator_name)
+        evaluation_service.create_daily_evaluation(new_report, translator_id, translator_name)
     except Exception as e:
         print(f"خطأ في التقييم: {e}")
-

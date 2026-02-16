@@ -69,6 +69,10 @@ try:
         handle_rehab_device_edit_field_selection,
         handle_rehab_device_edit_field_input,
     )
+    from .radiation_therapy_edit import (
+        handle_radiation_therapy_edit_field_selection,
+        handle_radiation_therapy_edit_field_input,
+    )
 except ImportError as e:
     logger.error(f"❌ Cannot import edit handlers: {e}")
     handle_new_consult_edit_field_selection = None
@@ -99,6 +103,8 @@ except ImportError as e:
     handle_rehab_physical_edit_field_input = None
     handle_rehab_device_edit_field_selection = None
     handle_rehab_device_edit_field_input = None
+    handle_radiation_therapy_edit_field_selection = None
+    handle_radiation_therapy_edit_field_input = None
 
 
 # =============================
@@ -132,6 +138,24 @@ async def route_edit_field_selection(update: Update, context: ContextTypes.DEFAU
                 return await handle_new_consult_edit_field_selection(update, context)
             else:
                 logger.error("❌ [ROUTER] handle_new_consult_edit_field_selection غير متوفر")
+                await query.edit_message_text("❌ **خطأ**\n\nمعالج التعديل غير متوفر.")
+                return ConversationHandler.END
+        elif flow_type == "periodic_followup":
+            # ✅ مسار "مراجعة / عودة دورية" - handler منفصل
+            logger.info("🔀 [ROUTER] التوجيه إلى periodic_followup مباشرة")
+            if handle_periodic_followup_edit_field_selection:
+                return await handle_periodic_followup_edit_field_selection(update, context)
+            else:
+                logger.error("❌ [ROUTER] handle_periodic_followup_edit_field_selection غير متوفر")
+                await query.edit_message_text("❌ **خطأ**\n\nمعالج التعديل غير متوفر.")
+                return ConversationHandler.END
+        elif flow_type == "inpatient_followup":
+            # ✅ مسار "متابعة في الرقود" - handler منفصل
+            logger.info("🔀 [ROUTER] التوجيه إلى inpatient_followup مباشرة")
+            if handle_inpatient_followup_edit_field_selection:
+                return await handle_inpatient_followup_edit_field_selection(update, context)
+            else:
+                logger.error("❌ [ROUTER] handle_inpatient_followup_edit_field_selection غير متوفر")
                 await query.edit_message_text("❌ **خطأ**\n\nمعالج التعديل غير متوفر.")
                 return ConversationHandler.END
         elif flow_type == "followup":
@@ -246,6 +270,14 @@ async def route_edit_field_selection(update: Update, context: ContextTypes.DEFAU
                 logger.error("❌ [ROUTER] handle_rehab_device_edit_field_selection غير متوفر")
                 await query.edit_message_text("❌ **خطأ**\n\nمعالج التعديل غير متوفر.")
                 return ConversationHandler.END
+        elif flow_type == "radiation_therapy":
+            # ✅ Handlers منفصلة لـ radiation_therapy (جلسة إشعاعي)
+            if handle_radiation_therapy_edit_field_selection:
+                return await handle_radiation_therapy_edit_field_selection(update, context)
+            else:
+                logger.error("❌ [ROUTER] handle_radiation_therapy_edit_field_selection غير متوفر")
+                await query.edit_message_text("❌ **خطأ**\n\nمعالج التعديل غير متوفر.")
+                return ConversationHandler.END
         else:
             logger.warning(f"⚠️ [ROUTER] flow_type={flow_type} - handlers غير متوفرة بعد")
             await query.edit_message_text("⚠️ **قيد التطوير**\n\nمعالجة التعديل لهذا المسار قيد التطوير.")
@@ -303,7 +335,8 @@ async def route_edit_field_input(update: Update, context: ContextTypes.DEFAULT_T
                     "أشعة وفحوصات": "radiology",
                     "تأجيل موعد": "appointment_reschedule",
                     "علاج طبيعي": "rehab_physical",
-                    "أجهزة تعويضية": "rehab_device"
+                    "أجهزة تعويضية": "rehab_device",
+                    "جلسة إشعاعي": "radiation_therapy"
                 }
                 flow_type = action_to_flow.get(medical_action)
                 if flow_type:
@@ -455,6 +488,13 @@ async def route_edit_field_input(update: Update, context: ContextTypes.DEFAULT_T
                 return await handle_rehab_device_edit_field_input(update, context)
             else:
                 logger.error("❌ [ROUTER] handle_rehab_device_edit_field_input غير متوفر")
+                return ConversationHandler.END
+        elif flow_type == "radiation_therapy":
+            # ✅ Handlers منفصلة لـ radiation_therapy (جلسة إشعاعي)
+            if handle_radiation_therapy_edit_field_input:
+                return await handle_radiation_therapy_edit_field_input(update, context)
+            else:
+                logger.error("❌ [ROUTER] handle_radiation_therapy_edit_field_input غير متوفر")
                 return ConversationHandler.END
         else:
             logger.warning(f"⚠️ [ROUTER] flow_type={flow_type} غير معروف - تجاهل")

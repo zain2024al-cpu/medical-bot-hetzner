@@ -1,0 +1,1272 @@
+﻿# ================================================
+# bot/handlers/admin/admin_evaluation.py
+# 📊 نظام تقييم المترجمين - النسخة الاحترافية
+# ─ خيار واحد مبسط: سنة → شهر → PDF/Excel
+# ─ تقييم ذكي شامل من بيانات التقارير
+# ================================================
+
+import logging
+import io
+import os
+import tempfile
+from datetime import datetime, date, timedelta
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import (
+    ContextTypes, ConversationHandler, MessageHandler,
+    CallbackQueryHandler, filters
+)
+from telegram.constants import ParseMode
+from sqlalchemy import func as sqlfunc
+from db.session import SessionLocal
+from db.models import Report, DailyReportTracking, MonthlyEvaluation
+from bot.shared_auth import is_admin
+
+logger = logging.getLogger(__name__)
+
+# ════════════════════════════════════════
+# حالات المحادثة
+# ════════════════════════════════════════
+(
+    EVAL_SELECT_YEAR,
+    EVAL_SELECT_MONTH,
+    EVAL_SELECT_FORMAT,
+) = range(3)
+
+MONTH_NAMES = {
+    1: "يناير", 2: "فبراير", 3: "مارس", 4: "أبريل",
+    5: "مايو", 6: "يونيو", 7: "يوليو", 8: "أغسطس",
+    9: "سبتمبر", 10: "أكتوبر", 11: "نوفمبر", 12: "ديسمبر"
+}
+
+
+# ════════════════════════════════════════
+# أدوات مساعدة
+# ════════════════════════════════════════
+
+def _rating_label(percentage):
+    """تحديد مستوى الأداء من النسبة المئوية (0-100)"""
+    if percentage >= 90:
+        return "ممتاز", "🟢", "⭐⭐⭐⭐⭐"
+    elif percentage >= 80:
+        return "جيد جداً", "🔵", "⭐⭐⭐⭐"
+    elif percentage >= 70:
+        return "جيد", "🟡", "⭐⭐⭐"
+    elif percentage >= 60:
+        return "مقبول", "🟠", "⭐⭐"
+    else:
+        return "ضعيف", "🔴", "⭐"
+
+
+def _medal(rank):
+    if rank == 1: return "🥇"
+    elif rank == 2: return "🥈"
+    elif rank == 3: return "🥉"
+    return f"#{rank}"
+
+
+# ════════════════════════════════════════
+# محرك التقييم الذكي
+# ════════════════════════════════════════
+
+def _compute_smart_evaluation(session, year, month):
+    """
+    محرك تقييم ذكي وشامل يقيّم المترجمين بناءً على 6 معايير:
+    
+    1. الإنتاجية (25%) - عدد التقارير مقارنة بالمتوسط
+    2. الالتزام بالوقت (20%) - تسليم التقارير في الوقت
+    3. اكتمال التقارير (20%) - مدى ملء جميع حقول التقرير
+    4. الانتظام في العمل (15%) - عدد أيام العمل الفعلية
+    5. تنوع الإجراءات (10%) - أنواع مختلفة من الإجراءات الطبية
+    6. تغطية المستشفيات (10%) - مستشفيات مختلفة تمت تغطيتها
+    """
+    if month == "all":
+        start_dt = datetime(year, 1, 1)
+        end_dt = datetime(year + 1, 1, 1)
+        period_days = (end_dt - start_dt).days
+    else:
+        month = int(month)
+        start_dt = datetime(year, month, 1)
+        if month == 12:
+            end_dt = datetime(year + 1, 1, 1)
+        else:
+            end_dt = datetime(year, month + 1, 1)
+        period_days = (end_dt - start_dt).days
+
+    # جلب التقارير
+    reports = session.query(Report).filter(
+        Report.report_date >= start_dt,
+        Report.report_date < end_dt,
+        Report.translator_name.isnot(None),
+        Report.translator_name != "",
+    ).all()
+
+    if not reports:
+        return [], start_dt, end_dt
+
+    # تجميع البيانات حسب المترجم
+    translator_data = {}
+    for r in reports:
+        name = (r.translator_name or "").strip()
+        if not name:
+            continue
+        if name not in translator_data:
+            translator_data[name] = {
+                'reports': [],
+                'actions': set(),
+                'hospitals': set(),
+                'dates': set(),
+            }
+        translator_data[name]['reports'].append(r)
+        if r.medical_action:
+            translator_data[name]['actions'].add(r.medical_action)
+        if r.hospital_name:
+            translator_data[name]['hospitals'].add(r.hospital_name)
+        if r.report_date:
+            translator_data[name]['dates'].add(r.report_date.date())
+
+    # حساب المتوسط العام
+    all_counts = [len(d['reports']) for d in translator_data.values()]
+    avg_reports = sum(all_counts) / len(all_counts) if all_counts else 1
+    max_reports = max(all_counts) if all_counts else 1
+
+    # حساب عدد أيام العمل المتوقعة (22 يوم عمل/شهر تقريباً)
+    expected_work_days = int(period_days * 22 / 30)
+
+    # جميع أنواع الإجراءات والمستشفيات الفريدة
+    all_actions = set()
+    all_hospitals = set()
+    for d in translator_data.values():
+        all_actions.update(d['actions'])
+        all_hospitals.update(d['hospitals'])
+
+    results = []
+    for name, data in translator_data.items():
+        total = len(data['reports'])
+        unique_actions = len(data['actions'])
+        unique_hospitals = len(data['hospitals'])
+        unique_days = len(data['dates'])
+
+        # ═══ 1. الإنتاجية (25%) ═══
+        if avg_reports > 0:
+            prod_ratio = total / avg_reports
+        else:
+            prod_ratio = 0
+        productivity_score = min(prod_ratio * 80, 100)  # 80% من المتوسط = 80 نقطة
+        if prod_ratio >= 1.5:
+            productivity_score = 100
+        elif prod_ratio >= 1.2:
+            productivity_score = 95
+        elif prod_ratio >= 1.0:
+            productivity_score = 85
+
+        # ═══ 2. الالتزام بالوقت (20%) ═══
+        timing_score = 75  # افتراضي
+        try:
+            tracking_records = session.query(DailyReportTracking).filter(
+                DailyReportTracking.translator_name == name,
+                DailyReportTracking.date >= start_dt.date() if hasattr(start_dt, 'date') else start_dt,
+                DailyReportTracking.date < end_dt.date() if hasattr(end_dt, 'date') else end_dt,
+            ).all()
+            if tracking_records:
+                on_time = sum(1 for t in tracking_records if t.is_completed and not t.reminder_sent)
+                late = sum(1 for t in tracking_records if t.is_completed and t.reminder_sent)
+                total_tracked = len(tracking_records)
+                if total_tracked > 0:
+                    timing_score = (on_time / total_tracked) * 100
+        except Exception:
+            pass
+
+        # ═══ 3. اكتمال التقارير (20%) ═══
+        completeness_scores = []
+        for r in data['reports']:
+            fields_filled = 0
+            total_fields = 9  # الحقول الأساسية
+
+            if r.patient_name and r.patient_name.strip(): fields_filled += 1
+            if r.hospital_name and r.hospital_name.strip(): fields_filled += 1
+            if r.doctor_name and r.doctor_name.strip(): fields_filled += 1
+            if r.department and r.department.strip(): fields_filled += 1
+            if r.medical_action and r.medical_action.strip(): fields_filled += 1
+            if r.doctor_decision and r.doctor_decision.strip(): fields_filled += 1
+            if r.followup_date: fields_filled += 1
+            if r.followup_reason and r.followup_reason.strip(): fields_filled += 1
+            if r.translator_name and r.translator_name.strip(): fields_filled += 1
+
+            completeness_scores.append((fields_filled / total_fields) * 100)
+
+        completeness_score = sum(completeness_scores) / len(completeness_scores) if completeness_scores else 0
+
+        # ═══ 4. الانتظام في العمل (15%) ═══
+        if expected_work_days > 0:
+            regularity_ratio = unique_days / expected_work_days
+        else:
+            regularity_ratio = 0
+        regularity_score = min(regularity_ratio * 100, 100)
+
+        # ═══ 5. تنوع الإجراءات (10%) ═══
+        max_possible_actions = len(all_actions) if all_actions else 1
+        diversity_score = min((unique_actions / max_possible_actions) * 100, 100)
+        # منحنى أفضل: 3+ أنواع = جيد
+        if unique_actions >= 6:
+            diversity_score = 100
+        elif unique_actions >= 4:
+            diversity_score = max(diversity_score, 85)
+        elif unique_actions >= 3:
+            diversity_score = max(diversity_score, 70)
+
+        # ═══ 6. تغطية المستشفيات (10%) ═══
+        max_possible_hospitals = len(all_hospitals) if all_hospitals else 1
+        coverage_score = min((unique_hospitals / max_possible_hospitals) * 100, 100)
+        if unique_hospitals >= 5:
+            coverage_score = 100
+        elif unique_hospitals >= 3:
+            coverage_score = max(coverage_score, 80)
+
+        # ═══ النتيجة النهائية (مرجّحة) ═══
+        final_score = (
+            productivity_score * 0.25 +
+            timing_score * 0.20 +
+            completeness_score * 0.20 +
+            regularity_score * 0.15 +
+            diversity_score * 0.10 +
+            coverage_score * 0.10
+        )
+
+        level, color, stars = _rating_label(final_score)
+
+        # أكثر إجراء ومستشفى
+        top_action = "—"
+        top_hospital = "—"
+        if data['actions']:
+            top_action = max(data['actions'],
+                             key=lambda a: sum(1 for r in data['reports'] if r.medical_action == a))
+        if data['hospitals']:
+            top_hospital = max(data['hospitals'],
+                               key=lambda h: sum(1 for r in data['reports'] if r.hospital_name == h))
+
+        # توزيع الإجراءات
+        action_dist = {}
+        for r in data['reports']:
+            a = r.medical_action or "أخرى"
+            action_dist[a] = action_dist.get(a, 0) + 1
+
+        # توزيع المستشفيات
+        hospital_dist = {}
+        for r in data['reports']:
+            h = r.hospital_name or "غير محدد"
+            hospital_dist[h] = hospital_dist.get(h, 0) + 1
+
+        results.append({
+            'name': name,
+            'total_reports': total,
+            'unique_actions': unique_actions,
+            'unique_hospitals': unique_hospitals,
+            'unique_days': unique_days,
+            'productivity_score': round(productivity_score, 1),
+            'timing_score': round(timing_score, 1),
+            'completeness_score': round(completeness_score, 1),
+            'regularity_score': round(regularity_score, 1),
+            'diversity_score': round(diversity_score, 1),
+            'coverage_score': round(coverage_score, 1),
+            'final_score': round(final_score, 1),
+            'level': level,
+            'color': color,
+            'stars': stars,
+            'top_action': top_action,
+            'top_hospital': top_hospital,
+            'action_distribution': action_dist,
+            'hospital_distribution': hospital_dist,
+        })
+
+    results.sort(key=lambda x: x['final_score'], reverse=True)
+    return results, start_dt, end_dt
+
+
+# ════════════════════════════════════════
+# توليد ملف PDF
+# ════════════════════════════════════════
+
+def _generate_pdf(results, period_label, year, month):
+    """توليد تقرير PDF احترافي"""
+    from weasyprint import HTML
+
+    total_reports = sum(r['total_reports'] for r in results)
+    excellent = sum(1 for r in results if r['final_score'] >= 90)
+    very_good = sum(1 for r in results if 80 <= r['final_score'] < 90)
+    good = sum(1 for r in results if 70 <= r['final_score'] < 80)
+    acceptable = sum(1 for r in results if 60 <= r['final_score'] < 70)
+    weak = sum(1 for r in results if r['final_score'] < 60)
+
+    # بناء صفوف الجدول
+    table_rows = ""
+    for i, r in enumerate(results, 1):
+        medal = ""
+        if i == 1: medal = "🥇"
+        elif i == 2: medal = "🥈"
+        elif i == 3: medal = "🥉"
+        else: medal = f"#{i}"
+
+        # لون الصف حسب المستوى
+        if r['final_score'] >= 90:
+            row_color = "#e8f5e9"
+        elif r['final_score'] >= 80:
+            row_color = "#e3f2fd"
+        elif r['final_score'] >= 70:
+            row_color = "#fff8e1"
+        elif r['final_score'] >= 60:
+            row_color = "#fff3e0"
+        else:
+            row_color = "#ffebee"
+
+        table_rows += f"""
+        <tr style="background-color: {row_color};">
+            <td style="text-align:center;font-weight:bold;">{medal}</td>
+            <td style="font-weight:bold;">{r['name']}</td>
+            <td style="text-align:center;">{r['total_reports']}</td>
+            <td style="text-align:center;">{r['productivity_score']}%</td>
+            <td style="text-align:center;">{r['timing_score']}%</td>
+            <td style="text-align:center;">{r['completeness_score']}%</td>
+            <td style="text-align:center;">{r['regularity_score']}%</td>
+            <td style="text-align:center;">{r['diversity_score']}%</td>
+            <td style="text-align:center;">{r['coverage_score']}%</td>
+            <td style="text-align:center;font-weight:bold;font-size:16px;">{r['final_score']}%</td>
+            <td style="text-align:center;">{r['stars']}<br><small>{r['level']}</small></td>
+        </tr>
+        """
+
+    # بناء بطاقات تفصيلية لكل مترجم
+    detail_cards = ""
+    for i, r in enumerate(results, 1):
+        medal = _medal(i)
+
+        # شريط تقدم
+        bar_width = r['final_score']
+        if r['final_score'] >= 90:
+            bar_color = "#4caf50"
+        elif r['final_score'] >= 80:
+            bar_color = "#2196f3"
+        elif r['final_score'] >= 70:
+            bar_color = "#ffc107"
+        elif r['final_score'] >= 60:
+            bar_color = "#ff9800"
+        else:
+            bar_color = "#f44336"
+
+        # توزيع الإجراءات
+        actions_html = ""
+        for action, count in sorted(r['action_distribution'].items(), key=lambda x: x[1], reverse=True)[:5]:
+            pct = (count / r['total_reports'] * 100) if r['total_reports'] > 0 else 0
+            actions_html += f"<div class='dist-item'><span>{action}</span><span>{count} ({pct:.0f}%)</span></div>"
+
+        # توزيع المستشفيات
+        hospitals_html = ""
+        for hosp, count in sorted(r['hospital_distribution'].items(), key=lambda x: x[1], reverse=True)[:5]:
+            pct = (count / r['total_reports'] * 100) if r['total_reports'] > 0 else 0
+            hospitals_html += f"<div class='dist-item'><span>{hosp}</span><span>{count} ({pct:.0f}%)</span></div>"
+
+        detail_cards += f"""
+        <div class="card" style="page-break-inside: avoid;">
+            <div class="card-header" style="background: linear-gradient(135deg, {bar_color}22, {bar_color}11);">
+                <div class="card-title">{medal} {r['name']}</div>
+                <div class="card-score" style="color: {bar_color};">{r['final_score']}%</div>
+            </div>
+            <div class="card-body">
+                <div class="score-bar-container">
+                    <div class="score-bar" style="width: {bar_width}%; background: {bar_color};"></div>
+                </div>
+                <div class="stars-line">{r['stars']} {r['level']}</div>
+
+                <div class="criteria-grid">
+                    <div class="criteria-item">
+                        <div class="criteria-label">📊 الإنتاجية (25%)</div>
+                        <div class="criteria-value">{r['productivity_score']}%</div>
+                        <div class="criteria-detail">{r['total_reports']} تقرير</div>
+                    </div>
+                    <div class="criteria-item">
+                        <div class="criteria-label">⏰ الالتزام بالوقت (20%)</div>
+                        <div class="criteria-value">{r['timing_score']}%</div>
+                    </div>
+                    <div class="criteria-item">
+                        <div class="criteria-label">📝 اكتمال التقارير (20%)</div>
+                        <div class="criteria-value">{r['completeness_score']}%</div>
+                    </div>
+                    <div class="criteria-item">
+                        <div class="criteria-label">📅 الانتظام (15%)</div>
+                        <div class="criteria-value">{r['regularity_score']}%</div>
+                        <div class="criteria-detail">{r['unique_days']} يوم عمل</div>
+                    </div>
+                    <div class="criteria-item">
+                        <div class="criteria-label">🔀 تنوع الإجراءات (10%)</div>
+                        <div class="criteria-value">{r['diversity_score']}%</div>
+                        <div class="criteria-detail">{r['unique_actions']} نوع</div>
+                    </div>
+                    <div class="criteria-item">
+                        <div class="criteria-label">🏥 تغطية المستشفيات (10%)</div>
+                        <div class="criteria-value">{r['coverage_score']}%</div>
+                        <div class="criteria-detail">{r['unique_hospitals']} مستشفى</div>
+                    </div>
+                </div>
+
+                <div class="distribution-section">
+                    <div class="dist-col">
+                        <h4>📋 توزيع الإجراءات</h4>
+                        {actions_html}
+                    </div>
+                    <div class="dist-col">
+                        <h4>🏥 توزيع المستشفيات</h4>
+                        {hospitals_html}
+                    </div>
+                </div>
+            </div>
+        </div>
+        """
+
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    html = f"""<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="UTF-8">
+<style>
+    @page {{
+        size: A4 landscape;
+        margin: 1.5cm;
+    }}
+    * {{
+        direction: rtl;
+        unicode-bidi: embed;
+        font-family: 'Noto Sans Arabic', 'Arial', 'Tahoma', sans-serif;
+    }}
+    body {{
+        font-size: 12px;
+        color: #333;
+        line-height: 1.6;
+    }}
+
+    /* صفحة الغلاف */
+    .cover {{
+        text-align: center;
+        padding: 60px 20px;
+        page-break-after: always;
+    }}
+    .cover h1 {{
+        font-size: 28px;
+        color: #1a237e;
+        margin-bottom: 10px;
+    }}
+    .cover h2 {{
+        font-size: 20px;
+        color: #555;
+        margin-bottom: 30px;
+    }}
+    .cover .period {{
+        font-size: 22px;
+        color: #1565c0;
+        background: #e3f2fd;
+        padding: 12px 30px;
+        border-radius: 8px;
+        display: inline-block;
+        margin-bottom: 30px;
+    }}
+    .summary-boxes {{
+        display: flex;
+        justify-content: center;
+        gap: 15px;
+        flex-wrap: wrap;
+        margin-top: 30px;
+    }}
+    .summary-box {{
+        background: #f5f5f5;
+        border-radius: 10px;
+        padding: 15px 25px;
+        text-align: center;
+        min-width: 120px;
+    }}
+    .summary-box .number {{
+        font-size: 28px;
+        font-weight: bold;
+        color: #1565c0;
+    }}
+    .summary-box .label {{
+        font-size: 11px;
+        color: #777;
+    }}
+    .level-summary {{
+        margin-top: 25px;
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }}
+    .level-badge {{
+        padding: 6px 16px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: bold;
+    }}
+
+    /* الجدول الرئيسي */
+    .section-title {{
+        font-size: 18px;
+        color: #1a237e;
+        border-bottom: 3px solid #1565c0;
+        padding-bottom: 8px;
+        margin: 20px 0 15px 0;
+    }}
+    table {{
+        width: 100%;
+        border-collapse: collapse;
+        margin: 15px 0;
+        font-size: 11px;
+    }}
+    th {{
+        background: #1a237e;
+        color: white;
+        padding: 10px 6px;
+        text-align: center;
+        font-size: 10px;
+    }}
+    td {{
+        padding: 8px 6px;
+        border-bottom: 1px solid #e0e0e0;
+        text-align: right;
+    }}
+    tr:hover {{
+        background-color: #f5f5f5 !important;
+    }}
+
+    /* البطاقات التفصيلية */
+    .card {{
+        border: 1px solid #e0e0e0;
+        border-radius: 12px;
+        margin: 15px 0;
+        overflow: hidden;
+    }}
+    .card-header {{
+        padding: 15px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }}
+    .card-title {{
+        font-size: 18px;
+        font-weight: bold;
+        color: #333;
+    }}
+    .card-score {{
+        font-size: 28px;
+        font-weight: bold;
+    }}
+    .card-body {{
+        padding: 15px 20px;
+    }}
+    .score-bar-container {{
+        background: #e0e0e0;
+        border-radius: 10px;
+        height: 12px;
+        margin: 10px 0;
+        overflow: hidden;
+    }}
+    .score-bar {{
+        height: 100%;
+        border-radius: 10px;
+        transition: width 0.3s;
+    }}
+    .stars-line {{
+        text-align: center;
+        font-size: 16px;
+        margin: 10px 0;
+        color: #555;
+    }}
+    .criteria-grid {{
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        margin: 15px 0;
+    }}
+    .criteria-item {{
+        background: #fafafa;
+        border-radius: 8px;
+        padding: 10px;
+        text-align: center;
+    }}
+    .criteria-label {{
+        font-size: 10px;
+        color: #777;
+        margin-bottom: 4px;
+    }}
+    .criteria-value {{
+        font-size: 18px;
+        font-weight: bold;
+        color: #1565c0;
+    }}
+    .criteria-detail {{
+        font-size: 9px;
+        color: #999;
+        margin-top: 2px;
+    }}
+    .distribution-section {{
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+        margin-top: 15px;
+    }}
+    .dist-col h4 {{
+        font-size: 12px;
+        color: #1a237e;
+        margin-bottom: 8px;
+        border-bottom: 1px solid #e0e0e0;
+        padding-bottom: 4px;
+    }}
+    .dist-item {{
+        display: flex;
+        justify-content: space-between;
+        padding: 3px 0;
+        font-size: 10px;
+        color: #555;
+        border-bottom: 1px dashed #eee;
+    }}
+
+    /* شرح المعايير */
+    .criteria-explanation {{
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 20px;
+        margin: 20px 0;
+    }}
+    .criteria-explanation h3 {{
+        color: #1a237e;
+        margin-bottom: 10px;
+    }}
+    .criteria-explanation .item {{
+        display: flex;
+        gap: 10px;
+        margin: 8px 0;
+        align-items: flex-start;
+    }}
+    .criteria-explanation .pct {{
+        background: #1565c0;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 10px;
+        font-weight: bold;
+        min-width: 35px;
+        text-align: center;
+    }}
+
+    .footer {{
+        text-align: center;
+        margin-top: 30px;
+        padding-top: 15px;
+        border-top: 2px solid #e0e0e0;
+        color: #999;
+        font-size: 10px;
+    }}
+</style>
+</head>
+<body>
+
+<!-- صفحة الغلاف -->
+<div class="cover">
+    <h1>📊 تقرير تقييم أداء المترجمين</h1>
+    <h2>نظام التقارير الطبية</h2>
+    <div class="period">📅 {period_label}</div>
+
+    <div class="summary-boxes">
+        <div class="summary-box">
+            <div class="number">{len(results)}</div>
+            <div class="label">عدد المترجمين</div>
+        </div>
+        <div class="summary-box">
+            <div class="number">{total_reports}</div>
+            <div class="label">إجمالي التقارير</div>
+        </div>
+        <div class="summary-box">
+            <div class="number">{round(total_reports / len(results), 1) if results else 0}</div>
+            <div class="label">متوسط التقارير</div>
+        </div>
+        <div class="summary-box">
+            <div class="number">{results[0]['final_score'] if results else 0}%</div>
+            <div class="label">أعلى تقييم</div>
+        </div>
+    </div>
+
+    <div class="level-summary">
+        <span class="level-badge" style="background:#e8f5e9;color:#2e7d32;">🟢 ممتاز: {excellent}</span>
+        <span class="level-badge" style="background:#e3f2fd;color:#1565c0;">🔵 جيد جداً: {very_good}</span>
+        <span class="level-badge" style="background:#fff8e1;color:#f57f17;">🟡 جيد: {good}</span>
+        <span class="level-badge" style="background:#fff3e0;color:#e65100;">🟠 مقبول: {acceptable}</span>
+        <span class="level-badge" style="background:#ffebee;color:#c62828;">🔴 ضعيف: {weak}</span>
+    </div>
+</div>
+
+<!-- جدول الملخص -->
+<h2 class="section-title">📊 جدول ملخص التقييمات</h2>
+<table>
+    <thead>
+        <tr>
+            <th>#</th>
+            <th>المترجم</th>
+            <th>التقارير</th>
+            <th>الإنتاجية<br>25%</th>
+            <th>التوقيت<br>20%</th>
+            <th>الاكتمال<br>20%</th>
+            <th>الانتظام<br>15%</th>
+            <th>التنوع<br>10%</th>
+            <th>التغطية<br>10%</th>
+            <th>النتيجة<br>النهائية</th>
+            <th>التقييم</th>
+        </tr>
+    </thead>
+    <tbody>
+        {table_rows}
+    </tbody>
+</table>
+
+<!-- شرح المعايير -->
+<div class="criteria-explanation" style="page-break-before: always;">
+    <h3>📌 شرح معايير التقييم</h3>
+    <div class="item">
+        <span class="pct">25%</span>
+        <div><strong>الإنتاجية:</strong> عدد التقارير المنجزة مقارنة بمتوسط الفريق. كلما زاد العدد زادت النقاط.</div>
+    </div>
+    <div class="item">
+        <span class="pct">20%</span>
+        <div><strong>الالتزام بالوقت:</strong> نسبة التقارير المسلّمة في الوقت المحدد بدون تأخير أو تذكيرات.</div>
+    </div>
+    <div class="item">
+        <span class="pct">20%</span>
+        <div><strong>اكتمال التقارير:</strong> مدى ملء جميع الحقول المطلوبة (اسم المريض، المستشفى، الطبيب، التشخيص، موعد المتابعة...).</div>
+    </div>
+    <div class="item">
+        <span class="pct">15%</span>
+        <div><strong>الانتظام في العمل:</strong> عدد أيام العمل الفعلية التي تم فيها تقديم تقارير.</div>
+    </div>
+    <div class="item">
+        <span class="pct">10%</span>
+        <div><strong>تنوع الإجراءات:</strong> أنواع مختلفة من الإجراءات الطبية (استشارة، مراجعة، طوارئ، عملية...).</div>
+    </div>
+    <div class="item">
+        <span class="pct">10%</span>
+        <div><strong>تغطية المستشفيات:</strong> عدد المستشفيات المختلفة التي تمت تغطيتها.</div>
+    </div>
+</div>
+
+<!-- التفاصيل لكل مترجم -->
+<h2 class="section-title" style="page-break-before: always;">📋 تقييم تفصيلي لكل مترجم</h2>
+{detail_cards}
+
+<div class="footer">
+    📊 تقرير تقييم أداء المترجمين | {period_label} | تاريخ الإصدار: {now}
+</div>
+
+</body>
+</html>"""
+
+    # توليد PDF
+    pdf_bytes = HTML(string=html).write_pdf()
+    return pdf_bytes
+
+
+# ════════════════════════════════════════
+# توليد ملف Excel
+# ════════════════════════════════════════
+
+def _generate_excel(results, period_label, year, month):
+    """توليد تقرير Excel احترافي"""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    wb = Workbook()
+
+    # ─── الورقة 1: ملخص التقييمات ───
+    ws = wb.active
+    ws.title = "ملخص التقييمات"
+    ws.sheet_view.rightToLeft = True
+
+    # الأنماط
+    header_font = Font(name='Arial', bold=True, color='FFFFFF', size=11)
+    header_fill = PatternFill(start_color='1A237E', end_color='1A237E', fill_type='solid')
+    title_font = Font(name='Arial', bold=True, size=14, color='1A237E')
+    bold_font = Font(name='Arial', bold=True, size=11)
+    normal_font = Font(name='Arial', size=11)
+    center_align = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    right_align = Alignment(horizontal='right', vertical='center', wrap_text=True)
+    thin_border = Border(
+        left=Side(style='thin', color='CCCCCC'),
+        right=Side(style='thin', color='CCCCCC'),
+        top=Side(style='thin', color='CCCCCC'),
+        bottom=Side(style='thin', color='CCCCCC'),
+    )
+
+    # ألوان المستويات
+    level_fills = {
+        'ممتاز': PatternFill(start_color='E8F5E9', end_color='E8F5E9', fill_type='solid'),
+        'جيد جداً': PatternFill(start_color='E3F2FD', end_color='E3F2FD', fill_type='solid'),
+        'جيد': PatternFill(start_color='FFF8E1', end_color='FFF8E1', fill_type='solid'),
+        'مقبول': PatternFill(start_color='FFF3E0', end_color='FFF3E0', fill_type='solid'),
+        'ضعيف': PatternFill(start_color='FFEBEE', end_color='FFEBEE', fill_type='solid'),
+    }
+
+    # العنوان
+    ws.merge_cells('A1:L1')
+    ws['A1'] = f"📊 تقرير تقييم أداء المترجمين - {period_label}"
+    ws['A1'].font = title_font
+    ws['A1'].alignment = center_align
+
+    ws.merge_cells('A2:L2')
+    ws['A2'] = f"تاريخ الإصدار: {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+    ws['A2'].font = Font(name='Arial', size=10, color='777777')
+    ws['A2'].alignment = center_align
+
+    # الرؤوس
+    headers = [
+        'الترتيب', 'المترجم', 'التقارير', 'أيام العمل',
+        'الإنتاجية\n(25%)', 'التوقيت\n(20%)', 'الاكتمال\n(20%)',
+        'الانتظام\n(15%)', 'التنوع\n(10%)', 'التغطية\n(10%)',
+        'النتيجة النهائية', 'التقييم'
+    ]
+
+    row = 4
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=row, column=col, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = center_align
+        cell.border = thin_border
+
+    # البيانات
+    for i, r in enumerate(results, 1):
+        row = i + 4
+        medal = ""
+        if i == 1: medal = "🥇 "
+        elif i == 2: medal = "🥈 "
+        elif i == 3: medal = "🥉 "
+
+        values = [
+            i,
+            f"{medal}{r['name']}",
+            r['total_reports'],
+            r['unique_days'],
+            f"{r['productivity_score']}%",
+            f"{r['timing_score']}%",
+            f"{r['completeness_score']}%",
+            f"{r['regularity_score']}%",
+            f"{r['diversity_score']}%",
+            f"{r['coverage_score']}%",
+            f"{r['final_score']}%",
+            f"{r['stars']} {r['level']}",
+        ]
+
+        fill = level_fills.get(r['level'], PatternFill())
+        for col, val in enumerate(values, 1):
+            cell = ws.cell(row=row, column=col, value=val)
+            cell.font = bold_font if col in [2, 11] else normal_font
+            cell.alignment = center_align if col != 2 else right_align
+            cell.fill = fill
+            cell.border = thin_border
+
+    # عرض الأعمدة
+    col_widths = [8, 25, 10, 12, 12, 12, 12, 12, 12, 12, 14, 18]
+    for i, w in enumerate(col_widths, 1):
+        ws.column_dimensions[get_column_letter(i)].width = w
+
+    # ─── الورقة 2: التفاصيل ───
+    ws2 = wb.create_sheet("التفاصيل")
+    ws2.sheet_view.rightToLeft = True
+
+    ws2.merge_cells('A1:H1')
+    ws2['A1'] = f"📋 التفاصيل التشغيلية - {period_label}"
+    ws2['A1'].font = title_font
+    ws2['A1'].alignment = center_align
+
+    detail_headers = [
+        'المترجم', 'أكثر إجراء', 'أكثر مستشفى',
+        'عدد أنواع الإجراءات', 'عدد المستشفيات',
+        'عدد أيام العمل', 'إجمالي التقارير', 'النتيجة'
+    ]
+
+    row = 3
+    for col, header in enumerate(detail_headers, 1):
+        cell = ws2.cell(row=row, column=col, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = center_align
+        cell.border = thin_border
+
+    for i, r in enumerate(results, 1):
+        row = i + 3
+        values = [
+            r['name'], r['top_action'], r['top_hospital'],
+            r['unique_actions'], r['unique_hospitals'],
+            r['unique_days'], r['total_reports'], f"{r['final_score']}%"
+        ]
+        fill = level_fills.get(r['level'], PatternFill())
+        for col, val in enumerate(values, 1):
+            cell = ws2.cell(row=row, column=col, value=val)
+            cell.font = normal_font
+            cell.alignment = center_align if col != 1 else right_align
+            cell.fill = fill
+            cell.border = thin_border
+
+    detail_widths = [25, 20, 25, 18, 18, 15, 15, 12]
+    for i, w in enumerate(detail_widths, 1):
+        ws2.column_dimensions[get_column_letter(i)].width = w
+
+    # ─── الورقة 3: شرح المعايير ───
+    ws3 = wb.create_sheet("شرح المعايير")
+    ws3.sheet_view.rightToLeft = True
+
+    ws3.merge_cells('A1:C1')
+    ws3['A1'] = "📌 شرح معايير التقييم"
+    ws3['A1'].font = title_font
+    ws3['A1'].alignment = center_align
+
+    criteria_data = [
+        ['المعيار', 'الوزن', 'الشرح'],
+        ['الإنتاجية', '25%', 'عدد التقارير المنجزة مقارنة بمتوسط الفريق'],
+        ['الالتزام بالوقت', '20%', 'نسبة التقارير المسلّمة في الوقت المحدد'],
+        ['اكتمال التقارير', '20%', 'مدى ملء جميع الحقول المطلوبة في التقرير'],
+        ['الانتظام في العمل', '15%', 'عدد أيام العمل الفعلية'],
+        ['تنوع الإجراءات', '10%', 'أنواع الإجراءات الطبية المختلفة'],
+        ['تغطية المستشفيات', '10%', 'عدد المستشفيات المختلفة التي تمت تغطيتها'],
+    ]
+
+    for i, row_data in enumerate(criteria_data):
+        row = i + 3
+        for col, val in enumerate(row_data, 1):
+            cell = ws3.cell(row=row, column=col, value=val)
+            if i == 0:
+                cell.font = header_font
+                cell.fill = header_fill
+            else:
+                cell.font = normal_font
+            cell.alignment = center_align if col == 2 else right_align
+            cell.border = thin_border
+
+    ws3.column_dimensions['A'].width = 25
+    ws3.column_dimensions['B'].width = 10
+    ws3.column_dimensions['C'].width = 50
+
+    # حفظ
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return output.getvalue()
+
+
+# ════════════════════════════════════════
+# Handlers
+# ════════════════════════════════════════
+
+async def start_evaluation(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نقطة الدخول - اختيار السنة مباشرة"""
+    user = update.effective_user
+    if not is_admin(user.id):
+        await update.message.reply_text("🚫 هذه الخاصية مخصصة للأدمن فقط.")
+        return ConversationHandler.END
+
+    context.user_data.pop('eval_data', None)
+
+    current_year = date.today().year
+    keyboard = [
+        [InlineKeyboardButton(f"📅 {current_year}", callback_data=f"eval:year:{current_year}")],
+        [InlineKeyboardButton(f"📅 {current_year - 1}", callback_data=f"eval:year:{current_year - 1}")],
+        [InlineKeyboardButton("❌ إلغاء", callback_data="eval:cancel")],
+    ]
+
+    await update.message.reply_text(
+        "╔══════════════════════════════════╗\n"
+        "     📊 **تقييم أداء المترجمين**\n"
+        "╚══════════════════════════════════╝\n\n"
+        "📌 **معايير التقييم:**\n"
+        "├ 📊 الإنتاجية (25%)\n"
+        "├ ⏰ الالتزام بالوقت (20%)\n"
+        "├ 📝 اكتمال التقارير (20%)\n"
+        "├ 📅 الانتظام في العمل (15%)\n"
+        "├ 🔀 تنوع الإجراءات (10%)\n"
+        "└ 🏥 تغطية المستشفيات (10%)\n\n"
+        "اختر السنة:",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode=ParseMode.MARKDOWN,
+        )
+    return EVAL_SELECT_YEAR
+
+
+async def handle_year(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """اختيار السنة → عرض الأشهر"""
+    q = update.callback_query
+    await q.answer()
+
+    if q.data == "eval:cancel":
+        await q.edit_message_text("✅ تم إلغاء التقييم.")
+        return ConversationHandler.END
+
+    year = int(q.data.split(":")[2])
+    context.user_data.setdefault('eval_data', {})['year'] = year
+
+    keyboard = []
+    for i in range(0, 12, 3):
+        row = []
+        for j in range(3):
+            m = i + j + 1
+            row.append(InlineKeyboardButton(
+                MONTH_NAMES[m], callback_data=f"eval:month:{m}"
+            ))
+        keyboard.append(row)
+
+    keyboard.append([InlineKeyboardButton("📄 كل الشهور", callback_data="eval:month:all")])
+    keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="eval:back_year")])
+    keyboard.append([InlineKeyboardButton("❌ إلغاء", callback_data="eval:cancel")])
+
+    await q.edit_message_text(
+        f"📊 **تقييم أداء المترجمين**\n\n"
+        f"📅 السنة: **{year}**\n\n"
+        f"اختر الشهر:",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode=ParseMode.MARKDOWN,
+    )
+    return EVAL_SELECT_MONTH
+
+
+async def handle_month(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """اختيار الشهر → اختيار التنسيق"""
+    q = update.callback_query
+    await q.answer()
+
+    if q.data == "eval:cancel":
+        await q.edit_message_text("✅ تم إلغاء التقييم.")
+        return ConversationHandler.END
+
+    if q.data == "eval:back_year":
+        # رجوع لاختيار السنة
+        current_year = date.today().year
+        keyboard = [
+            [InlineKeyboardButton(f"📅 {current_year}", callback_data=f"eval:year:{current_year}")],
+            [InlineKeyboardButton(f"📅 {current_year - 1}", callback_data=f"eval:year:{current_year - 1}")],
+            [InlineKeyboardButton("❌ إلغاء", callback_data="eval:cancel")],
+        ]
+        await q.edit_message_text(
+            "📊 **تقييم أداء المترجمين**\n\naختر السنة:",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        return EVAL_SELECT_YEAR
+
+    month = q.data.split(":")[2]
+    context.user_data.setdefault('eval_data', {})['month'] = month
+
+    year = context.user_data.get('eval_data', {}).get('year', date.today().year)
+    month_label = "كل الشهور" if month == "all" else MONTH_NAMES.get(int(month), month)
+
+    keyboard = [
+        [InlineKeyboardButton("📄 PDF", callback_data="eval:format:pdf")],
+        [InlineKeyboardButton("📊 Excel", callback_data="eval:format:excel")],
+        [InlineKeyboardButton("📄 PDF + 📊 Excel", callback_data="eval:format:both")],
+        [InlineKeyboardButton("🔙 رجوع", callback_data="eval:back_month")],
+        [InlineKeyboardButton("❌ إلغاء", callback_data="eval:cancel")],
+    ]
+
+    await q.edit_message_text(
+        f"📊 **تقييم أداء المترجمين**\n\n"
+        f"📅 الفترة: **{month_label} {year}**\n\n"
+        f"اختر صيغة الملف:",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode=ParseMode.MARKDOWN,
+    )
+    return EVAL_SELECT_FORMAT
+
+
+async def handle_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """اختيار التنسيق → توليد الملف"""
+    q = update.callback_query
+    await q.answer()
+
+    if q.data == "eval:cancel":
+        await q.edit_message_text("✅ تم إلغاء التقييم.")
+        return ConversationHandler.END
+
+    if q.data == "eval:back_month":
+        # رجوع لاختيار الشهر
+        year = context.user_data.get('eval_data', {}).get('year', date.today().year)
+        keyboard = []
+        for i in range(0, 12, 3):
+            row = []
+            for j in range(3):
+                m = i + j + 1
+                row.append(InlineKeyboardButton(
+                    MONTH_NAMES[m], callback_data=f"eval:month:{m}"
+                ))
+            keyboard.append(row)
+        keyboard.append([InlineKeyboardButton("📄 كل الشهور", callback_data="eval:month:all")])
+        keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="eval:back_year")])
+        keyboard.append([InlineKeyboardButton("❌ إلغاء", callback_data="eval:cancel")])
+
+        await q.edit_message_text(
+            f"📊 **تقييم أداء المترجمين**\n\n📅 السنة: **{year}**\n\nاختر الشهر:",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode=ParseMode.MARKDOWN,
+    )
+        return EVAL_SELECT_MONTH
+
+    fmt = q.data.split(":")[2]  # pdf, excel, both
+    data = context.user_data.get('eval_data', {})
+    year = data.get('year', date.today().year)
+    month = data.get('month', 'all')
+
+    month_label = "كل الشهور" if month == "all" else MONTH_NAMES.get(int(month), month)
+    period_label = f"{month_label} {year}"
+
+    await q.edit_message_text(
+        f"⏳ **جاري إعداد تقرير التقييم...**\n\n"
+        f"📅 الفترة: {period_label}\n"
+        f"📄 الصيغة: {'PDF' if fmt == 'pdf' else 'Excel' if fmt == 'excel' else 'PDF + Excel'}",
+        parse_mode=ParseMode.MARKDOWN,
+    )
+
+    try:
+        with SessionLocal() as session:
+            result = _compute_smart_evaluation(session, year, month)
+            results, start_dt, end_dt = result
+
+            if not results:
+                await q.edit_message_text(
+                    f"⚠️ **لا توجد تقارير في الفترة:** {period_label}\n\n"
+                    "لا يمكن إنشاء تقييم بدون تقارير.",
+                    parse_mode=ParseMode.MARKDOWN,
+                )
+                return ConversationHandler.END
+
+            # حفظ في قاعدة البيانات
+            _save_evaluations_to_db(session, results, year, month)
+
+            # إرسال ملخص نصي سريع
+            total_reports = sum(r['total_reports'] for r in results)
+            summary = (
+                    f"╔══════════════════════════════════╗\n"
+                f"  ✅ **تم إعداد تقرير التقييم**\n"
+                    f"╚══════════════════════════════════╝\n\n"
+                f"📅 الفترة: **{period_label}**\n"
+                f"👥 المترجمين: **{len(results)}**\n"
+                f"📄 إجمالي التقارير: **{total_reports}**\n\n"
+            )
+
+            for i, r in enumerate(results, 1):
+                medal = _medal(i)
+                summary += f"{medal} **{r['name']}** — {r['final_score']}% {r['stars']} {r['level']}\n"
+
+            await q.message.reply_text(summary, parse_mode=ParseMode.MARKDOWN)
+
+            # توليد وإرسال الملفات
+            file_prefix = f"تقييم_المترجمين_{year}"
+        if month != "all":
+                file_prefix += f"_{month}"
+
+            if fmt in ('pdf', 'both'):
+                try:
+                    pdf_bytes = _generate_pdf(results, period_label, year, month)
+                    pdf_file = io.BytesIO(pdf_bytes)
+                    pdf_file.name = f"{file_prefix}.pdf"
+                    await q.message.reply_document(
+                        document=pdf_file,
+                        caption=f"📄 تقرير تقييم المترجمين - {period_label}",
+                    )
+                except Exception as e:
+                    logger.error(f"❌ خطأ في PDF: {e}", exc_info=True)
+                    await q.message.reply_text(f"⚠️ خطأ في إنشاء PDF: {str(e)[:200]}")
+
+            if fmt in ('excel', 'both'):
+                try:
+                    excel_bytes = _generate_excel(results, period_label, year, month)
+                    excel_file = io.BytesIO(excel_bytes)
+                    excel_file.name = f"{file_prefix}.xlsx"
+                    await q.message.reply_document(
+                        document=excel_file,
+                        caption=f"📊 تقرير تقييم المترجمين - {period_label}",
+                    )
+                except Exception as e:
+                    logger.error(f"❌ خطأ في Excel: {e}", exc_info=True)
+                    await q.message.reply_text(f"⚠️ خطأ في إنشاء Excel: {str(e)[:200]}")
+
+    except Exception as e:
+        logger.error(f"❌ خطأ في التقييم: {e}", exc_info=True)
+        await q.message.reply_text(
+            f"❌ **حدث خطأ:** {str(e)[:300]}",
+                parse_mode=ParseMode.MARKDOWN,
+            )
+
+    return ConversationHandler.END
+
+
+def _save_evaluations_to_db(session, results, year, month):
+    """حفظ نتائج التقييم في قاعدة البيانات"""
+    month_int = 0 if month == "all" else int(month)
+    for res in results:
+        existing = session.query(MonthlyEvaluation).filter_by(
+            translator_name=res['name'],
+            year=year,
+            month=month_int,
+        ).first()
+
+        if existing:
+            existing.total_reports = res['total_reports']
+            existing.timing_points = res['timing_score']
+            existing.quality_points = res['completeness_score']
+            existing.regularity_points = res['regularity_score']
+            existing.total_points = res['final_score']
+            existing.final_rating = int(res['final_score'] / 20)  # 1-5
+            existing.performance_level = res['level']
+            existing.updated_at = datetime.utcnow()
+        else:
+            ev = MonthlyEvaluation(
+                translator_name=res['name'],
+                year=year,
+                month=month_int,
+                total_reports=res['total_reports'],
+                timing_points=res['timing_score'],
+                quality_points=res['completeness_score'],
+                regularity_points=res['regularity_score'],
+                total_points=res['final_score'],
+                final_rating=int(res['final_score'] / 20),
+                performance_level=res['level'],
+            )
+            session.add(ev)
+    session.commit()
+
+
+# ════════════════════════════════════════
+# تسجيل الهاندلرز
+# ════════════════════════════════════════
+
+def register(app):
+    """تسجيل نظام تقييم المترجمين"""
+    conv = ConversationHandler(
+        entry_points=[
+            MessageHandler(filters.Regex("^📊 تقييم المترجمين$"), start_evaluation),
+        ],
+        states={
+            EVAL_SELECT_YEAR: [
+                CallbackQueryHandler(handle_year, pattern=r"^eval:"),
+            ],
+            EVAL_SELECT_MONTH: [
+                CallbackQueryHandler(handle_month, pattern=r"^eval:"),
+            ],
+            EVAL_SELECT_FORMAT: [
+                CallbackQueryHandler(handle_format, pattern=r"^eval:"),
+            ],
+        },
+        fallbacks=[
+            CallbackQueryHandler(
+                lambda u, c: (u.callback_query.answer(), u.callback_query.edit_message_text("✅ تم إلغاء التقييم."), ConversationHandler.END)[-1],
+                pattern=r"^eval:cancel$"
+            ),
+        ],
+        name="translator_evaluation_conv",
+        per_chat=True,
+        per_user=True,
+        per_message=False,
+    )
+    app.add_handler(conv)
+    logger.info("✅ تم تسجيل نظام تقييم المترجمين (النسخة الاحترافية)")

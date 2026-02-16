@@ -118,7 +118,9 @@ KNOWN_CALLBACKS = [
     r"^delete_trans_page:",
     r"^edit_trans_page:",
     r"^view_translators_page:",
-    
+    r"^cancel_translator_input$",
+    r"^cancel_hospital_input$",
+
     # ===========================
     # نظام تعديل وحذف التقارير للمستخدمين
     # ===========================
@@ -128,6 +130,7 @@ KNOWN_CALLBACKS = [
     r"^edit_back",           # رجوع في نظام التعديل
     r"^edit_cancel$",        # إلغاء التعديل
     r"^edit_confirm_save$",  # تأكيد حفظ التعديل
+    r"^edit_save_and_publish$",  # حفظ ونشر التقرير بعد التعديل
     r"^edit_followup:",      # تعديل موعد المتابعة
     r"^edit_time:",          # تعديل الوقت
     r"^edit_translator:",    # تعديل المترجم

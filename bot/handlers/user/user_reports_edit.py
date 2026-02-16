@@ -74,19 +74,25 @@ def get_all_editable_fields():
 def test_editable_fields_mapping():
     """
     دالة اختبار للتأكد من أن كل نوع إجراء يحصل على الحقول الصحيحة
+    ✅ تم تحديث عدد الحقول ليتطابق مع get_editable_fields_by_action_type
     """
     test_cases = [
-        ('استشارة جديدة', 6),  # 6 حقول
-        ('استشارة مع قرار عملية', 6),  # 6 حقول
-        ('استشارة أخيرة', 3),  # 3 حقول
-        ('طوارئ', 6),  # 6 حقول
-        ('متابعة في الرقود', 6),  # 6 حقول
-        ('مراجعة / عودة دورية', 5),  # 5 حقول (بدون رقم غرفة)
-        ('عملية', 5),  # 5 حقول
-        ('علاج طبيعي وإعادة تأهيل', 5),  # 5 حقول
-        ('ترقيد', 6),  # 6 حقول
-        ('خروج من المستشفى', 4),  # 4 حقول
-        ('نوع غير معروف', 3),  # 3 حقول افتراضية
+        ('استشارة جديدة', 7),  # 7 حقول (complaint, diagnosis, decision, notes, followup_date, followup_reason, translator)
+        ('استشارة مع قرار عملية', 10),  # 10 حقول
+        ('استشارة أخيرة', 4),  # 4 حقول (diagnosis, decision, treatment_plan, translator)
+        ('طوارئ', 7),  # 7 حقول (complaint, diagnosis, decision, case_status, followup_date, followup_reason, translator)
+        ('متابعة في الرقود', 6),  # 6 حقول (complaint, decision, room, followup_date, followup_reason, translator)
+        ('مراجعة / عودة دورية', 6),  # 6 حقول (complaint, diagnosis, decision, followup_date, followup_reason, translator)
+        ('عملية', 6),  # 6 حقول (operation_details, operation_name_en, notes, followup_date, followup_reason, translator)
+        ('علاج طبيعي وإعادة تأهيل', 4),  # 4 حقول (therapy_details, followup_date, followup_reason, translator)
+        ('علاج طبيعي', 4),  # 4 حقول
+        ('أجهزة تعويضية', 4),  # 4 حقول
+        ('ترقيد', 6),  # 6 حقول (admission_reason, room, notes, followup_date, followup_reason, translator)
+        ('خروج من المستشفى', 6),  # 6 حقول
+        ('تأجيل موعد', 4),  # 4 حقول
+        ('أشعة وفحوصات', 3),  # 3 حقول
+        ('جلسة إشعاعي', 6),  # 6 حقول
+        ('نوع غير معروف', 4),  # 4 حقول افتراضية
     ]
 
     print("🧪 اختبار تعيين الحقول القابلة للتعديل:")
@@ -156,6 +162,23 @@ def _has_field_value_in_report(report, current_report_data, field_name):
         "app_reschedule_return_date": ["app_reschedule_return_date", "followup_date"],
         "app_reschedule_return_reason": ["app_reschedule_return_reason", "followup_reason"],
         "translator_name": ["translator_name"],
+        # ✅ حقول المسارات الخاصة
+        "operation_details": ["operation_details", "notes", "doctor_decision"],
+        "operation_name_en": ["operation_name_en", "notes"],
+        "admission_reason": ["admission_reason", "complaint_text", "complaint"],
+        "admission_summary": ["admission_summary", "notes"],
+        "therapy_details": ["therapy_details", "complaint_text", "notes"],
+        "device_details": ["device_details", "device_name", "complaint_text", "notes"],
+        # ✅ حقول استشارة مع قرار عملية
+        "decision": ["decision", "doctor_decision"],
+        "success_rate": ["success_rate"],
+        "benefit_rate": ["benefit_rate"],
+        "tests": ["tests", "medications", "notes"],
+        # ✅ حقول العلاج الإشعاعي
+        "radiation_therapy_type": ["radiation_therapy_type"],
+        "radiation_therapy_session_number": ["radiation_therapy_session_number"],
+        "radiation_therapy_remaining": ["radiation_therapy_remaining"],
+        "radiation_therapy_recommendations": ["radiation_therapy_recommendations", "notes"],
     }
     
     # ✅ البحث في الحقول المشتقة
@@ -225,9 +248,11 @@ def get_editable_fields_by_action_type(medical_action):
         return [
             ('complaint_text', '💬 شكوى المريض'),
             ('diagnosis', '🔬 التشخيص'),
-            ('doctor_decision', '📝 قرار الطبيب'),
-            ('notes', '⚕️ اسم العملية'),
-            ('treatment_plan', '📊 نسبة النجاح'),
+            ('decision', '📝 قرار الطبيب'),
+            ('operation_name_en', '🔤 اسم العملية بالإنجليزي'),
+            ('success_rate', '📊 نسبة نجاح العملية'),
+            ('benefit_rate', '💡 نسبة الاستفادة'),
+            ('tests', '🧪 الفحوصات والأشعة'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
             ('translator_name', '👤 المترجم'),
@@ -286,12 +311,13 @@ def get_editable_fields_by_action_type(medical_action):
 
     # ===========================================
     # 7. عملية - التركيز على تفاصيل العملية
+    # ✅ لا يوجد قرار طبيب في هذا المسار
     # ===========================================
     elif action_clean == 'عملية':
         return [
-            ('complaint_text', '⚕️ تفاصيل العملية'),
-            ('notes', '📝 اسم العملية بالانجليزي'),
-            ('doctor_decision', '📋 ملاحظات العملية'),
+            ('operation_details', '⚕️ تفاصيل العملية'),
+            ('operation_name_en', '🔤 اسم العملية بالإنجليزي'),
+            ('notes', '📝 ملاحظات'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
             ('translator_name', '👤 المترجم'),
@@ -299,11 +325,11 @@ def get_editable_fields_by_action_type(medical_action):
 
     # ===========================================
     # 8. علاج طبيعي وإعادة تأهيل - التركيز على العلاج
+    # ✅ لا يوجد قرار طبيب في هذا المسار
     # ===========================================
     elif action_clean == 'علاج طبيعي وإعادة تأهيل':
         return [
-            ('complaint_text', '🏃 تفاصيل العلاج الطبيعي'),
-            ('doctor_decision', '📝 تقييم الطبيب'),
+            ('therapy_details', '🏃 تفاصيل جلسة العلاج الطبيعي'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
             ('translator_name', '👤 المترجم'),
@@ -311,13 +337,13 @@ def get_editable_fields_by_action_type(medical_action):
 
     # ===========================================
     # 9. ترقيد - التركيز على أسباب الرقود
+    # ✅ لا يوجد قرار طبيب في هذا المسار
     # ===========================================
     elif action_clean == 'ترقيد':
         return [
-            ('complaint_text', '🛏️ سبب الرقود'),
-            ('diagnosis', '🔬 التشخيص'),
-            ('doctor_decision', '📝 قرار الطبيب'),
+            ('admission_reason', '🛏️ سبب الرقود'),
             ('room_number', '🏥 رقم الغرفة والطابق'),
+            ('notes', '📝 ملاحظات'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
             ('translator_name', '👤 المترجم'),
@@ -325,14 +351,13 @@ def get_editable_fields_by_action_type(medical_action):
 
     # ===========================================
     # 10. خروج من المستشفى - التركيز على الخروج
+    # ✅ لا يوجد قرار طبيب في هذا المسار
     # ===========================================
     elif action_clean == 'خروج من المستشفى' or action_clean == 'خروج':
         return [
-            ('complaint_text', '📋 ملخص حالة المريض'),
-            ('diagnosis', '🔬 التشخيص النهائي'),
-            ('doctor_decision', '⚕️ قرار الطبيب والتوصيات'),
-            ('treatment_plan', '💊 خطة العلاج بعد الخروج'),
-            ('notes', '📝 ملاحظات إضافية'),
+            ('admission_summary', '📋 ملخص الرقود'),
+            ('operation_details', '⚕️ تفاصيل العملية'),
+            ('operation_name_en', '🔤 اسم العملية بالإنجليزي'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
             ('translator_name', '👤 المترجم'),
@@ -361,10 +386,11 @@ def get_editable_fields_by_action_type(medical_action):
 
     # ===========================================
     # 13. علاج طبيعي - التركيز على الجلسة
+    # ✅ لا يوجد قرار طبيب في هذا المسار
     # ===========================================
     elif action_clean == 'علاج طبيعي':
         return [
-            ('complaint_text', '🏃 تفاصيل الجلسة'),
+            ('therapy_details', '🏃 تفاصيل الجلسة'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
             ('translator_name', '👤 المترجم'),
@@ -372,10 +398,25 @@ def get_editable_fields_by_action_type(medical_action):
 
     # ===========================================
     # 14. أجهزة تعويضية - التركيز على الجهاز
+    # ✅ لا يوجد قرار طبيب في هذا المسار
     # ===========================================
     elif action_clean == 'أجهزة تعويضية':
         return [
-            ('complaint_text', '🦾 تفاصيل الجهاز'),
+            ('device_details', '🦾 تفاصيل الجهاز'),
+            ('followup_date', '📅 موعد العودة'),
+            ('followup_reason', '✍️ سبب العودة'),
+            ('translator_name', '👤 المترجم'),
+        ]
+
+    # ===========================================
+    # 15. جلسة إشعاعي - التركيز على العلاج الإشعاعي
+    # ===========================================
+    elif action_clean == 'جلسة إشعاعي':
+        return [
+            ('radiation_therapy_type', '☢️ نوع الإشعاعي'),
+            ('radiation_therapy_session_number', '🔢 رقم الجلسة'),
+            ('radiation_therapy_remaining', '📊 الجلسات المتبقية'),
+            ('radiation_therapy_recommendations', '📝 ملاحظات / توصيات'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
             ('translator_name', '👤 المترجم'),
@@ -597,6 +638,136 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
                     medications_value = notes_value
             
             # حفظ البيانات الحالية
+            # ✅ استخراج الحقول المحددة من doctor_decision حسب نوع الإجراء
+            doctor_decision_text = report.doctor_decision or ""
+            extracted_operation_details = "لا يوجد"
+            extracted_operation_name_en = "لا يوجد"
+            extracted_notes = notes_value
+            extracted_therapy_details = "لا يوجد"
+            extracted_device_details = "لا يوجد"
+            extracted_admission_reason = "لا يوجد"
+            extracted_admission_summary = "لا يوجد"
+            # ✅ حقول استشارة مع قرار عملية
+            extracted_decision = "لا يوجد"
+            extracted_success_rate = "لا يوجد"
+            extracted_benefit_rate = "لا يوجد"
+            extracted_tests = "لا يوجد"
+
+            medical_action_for_extraction = report.medical_action or ""
+
+            # ✅ استخراج حقول مسار العملية
+            if medical_action_for_extraction == 'عملية':
+                if 'تفاصيل العملية:' in doctor_decision_text:
+                    try:
+                        parts = doctor_decision_text.split('تفاصيل العملية:', 1)
+                        if len(parts) > 1:
+                            rest = parts[1]
+                            if 'اسم العملية بالإنجليزي:' in rest:
+                                extracted_operation_details = rest.split('اسم العملية بالإنجليزي:')[0].strip()
+                                rest2 = rest.split('اسم العملية بالإنجليزي:', 1)[1]
+                                if 'ملاحظات:' in rest2:
+                                    extracted_operation_name_en = rest2.split('ملاحظات:')[0].strip()
+                                    extracted_notes = rest2.split('ملاحظات:', 1)[1].strip()
+                                else:
+                                    extracted_operation_name_en = rest2.strip()
+                            else:
+                                extracted_operation_details = rest.strip()
+                    except Exception as e:
+                        logger.warning(f"⚠️ فشل استخراج حقول العملية: {e}")
+                elif doctor_decision_text and doctor_decision_text != "لا يوجد":
+                    # ✅ إذا لم يكن هناك تنسيق، استخدم doctor_decision كـ operation_details
+                    extracted_operation_details = doctor_decision_text
+
+            # ✅ استخراج حقول مسار خروج من المستشفى
+            elif medical_action_for_extraction in ['خروج من المستشفى', 'خروج']:
+                if 'ملخص الرقود:' in doctor_decision_text:
+                    try:
+                        parts = doctor_decision_text.split('ملخص الرقود:', 1)
+                        if len(parts) > 1:
+                            rest = parts[1]
+                            if 'تفاصيل العملية:' in rest:
+                                extracted_admission_summary = rest.split('تفاصيل العملية:')[0].strip()
+                                rest2 = rest.split('تفاصيل العملية:', 1)[1]
+                                if 'اسم العملية بالإنجليزي:' in rest2:
+                                    extracted_operation_details = rest2.split('اسم العملية بالإنجليزي:')[0].strip()
+                                    extracted_operation_name_en = rest2.split('اسم العملية بالإنجليزي:', 1)[1].strip()
+                                else:
+                                    extracted_operation_details = rest2.strip()
+                            else:
+                                extracted_admission_summary = rest.strip()
+                    except Exception as e:
+                        logger.warning(f"⚠️ فشل استخراج حقول الخروج: {e}")
+
+            # ✅ استخراج حقول مسار علاج طبيعي
+            elif medical_action_for_extraction in ['علاج طبيعي', 'علاج طبيعي وإعادة تأهيل']:
+                if 'تفاصيل جلسة العلاج الطبيعي:' in doctor_decision_text:
+                    try:
+                        extracted_therapy_details = doctor_decision_text.split('تفاصيل جلسة العلاج الطبيعي:', 1)[1].strip()
+                    except:
+                        pass
+                elif 'تفاصيل الجلسة:' in doctor_decision_text:
+                    try:
+                        extracted_therapy_details = doctor_decision_text.split('تفاصيل الجلسة:', 1)[1].strip()
+                    except:
+                        pass
+                elif doctor_decision_text and doctor_decision_text != "لا يوجد":
+                    extracted_therapy_details = doctor_decision_text
+
+            # ✅ استخراج حقول مسار أجهزة تعويضية
+            elif medical_action_for_extraction == 'أجهزة تعويضية':
+                if 'تفاصيل الجهاز:' in doctor_decision_text:
+                    try:
+                        extracted_device_details = doctor_decision_text.split('تفاصيل الجهاز:', 1)[1].strip()
+                    except:
+                        pass
+                elif doctor_decision_text and doctor_decision_text != "لا يوجد":
+                    extracted_device_details = doctor_decision_text
+
+            # ✅ استخراج حقول مسار ترقيد
+            elif medical_action_for_extraction == 'ترقيد':
+                if 'سبب الرقود:' in doctor_decision_text:
+                    try:
+                        parts = doctor_decision_text.split('سبب الرقود:', 1)
+                        if len(parts) > 1:
+                            rest = parts[1]
+                            if 'ملاحظات:' in rest:
+                                extracted_admission_reason = rest.split('ملاحظات:')[0].strip()
+                                extracted_notes = rest.split('ملاحظات:', 1)[1].strip()
+                            else:
+                                extracted_admission_reason = rest.strip()
+                    except:
+                        pass
+                elif doctor_decision_text and doctor_decision_text != "لا يوجد":
+                    extracted_admission_reason = doctor_decision_text
+
+            # ✅ أيضاً استخدام complaint_text كـ fallback لـ admission_reason
+            if extracted_admission_reason == "لا يوجد" and medical_action_for_extraction == 'ترقيد':
+                if report.complaint_text and report.complaint_text != "لا يوجد":
+                    extracted_admission_reason = report.complaint_text
+
+            # ✅ استخراج حقول مسار استشارة مع قرار عملية
+            elif medical_action_for_extraction == 'استشارة مع قرار عملية':
+                try:
+                    sections = doctor_decision_text.split('\n\n')
+                    for section in sections:
+                        section = section.strip()
+                        if section.startswith('قرار الطبيب:'):
+                            extracted_decision = section.replace('قرار الطبيب:', '', 1).strip()
+                        elif section.startswith('اسم العملية بالإنجليزي:'):
+                            extracted_operation_name_en = section.replace('اسم العملية بالإنجليزي:', '', 1).strip()
+                        elif section.startswith('نسبة نجاح العملية:'):
+                            extracted_success_rate = section.replace('نسبة نجاح العملية:', '', 1).strip()
+                        elif section.startswith('نسبة الاستفادة من العملية:'):
+                            extracted_benefit_rate = section.replace('نسبة الاستفادة من العملية:', '', 1).strip()
+                        elif section.startswith('الفحوصات المطلوبة:'):
+                            extracted_tests = section.replace('الفحوصات المطلوبة:', '', 1).strip()
+                except Exception as e:
+                    logger.warning(f"⚠️ فشل استخراج حقول استشارة مع قرار عملية: {e}")
+
+            logger.info(f"✅ [EDIT] استخراج الحقول - medical_action: {medical_action_for_extraction}")
+            logger.info(f"✅ [EDIT] operation_details: {extracted_operation_details[:50] if extracted_operation_details else 'None'}...")
+            logger.info(f"✅ [EDIT] therapy_details: {extracted_therapy_details[:50] if extracted_therapy_details else 'None'}...")
+
             context.user_data['current_report_data'] = {
                 'patient_name': patient.full_name if patient else "غير معروف",
                 'hospital_name': hospital.name if hospital else "غير معروف",
@@ -608,7 +779,7 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
                 'diagnosis': report.diagnosis or "لا يوجد",
                 'treatment_plan': report.treatment_plan or "لا يوجد",
                 'medications': medications_value,  # ✅ استخدام القيمة المحسّنة
-                'notes': notes_value,  # ✅ استخدام القيمة المحسّنة (الفحوصات لـ استشارة جديدة)
+                'notes': extracted_notes,  # ✅ استخدام القيمة المستخرجة
                 'case_status': report.case_status or "لا يوجد",
                 'followup_date': report.followup_date.strftime('%Y-%m-%d') if report.followup_date else None,
                 'followup_time': report.followup_time,
@@ -623,6 +794,26 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
                 'app_reschedule_reason': getattr(report, 'app_reschedule_reason', None) or "لا يوجد",
                 'app_reschedule_return_date': getattr(report, 'app_reschedule_return_date', None),
                 'app_reschedule_return_reason': getattr(report, 'app_reschedule_return_reason', None) or "لا يوجد",
+                # ✅ حقول مستخرجة من doctor_decision
+                'operation_details': extracted_operation_details,
+                'operation_name_en': extracted_operation_name_en,
+                'therapy_details': extracted_therapy_details,
+                'device_details': extracted_device_details,
+                'admission_reason': extracted_admission_reason,
+                'admission_summary': extracted_admission_summary,
+                # ✅ حقول استشارة مع قرار عملية (مستخرجة من doctor_decision)
+                'decision': extracted_decision,
+                'success_rate': extracted_success_rate,
+                'benefit_rate': extracted_benefit_rate,
+                'tests': extracted_tests,
+                # ✅ حقول العلاج الإشعاعي
+                'radiation_therapy_type': getattr(report, 'radiation_therapy_type', None) or "لا يوجد",
+                'radiation_therapy_session_number': getattr(report, 'radiation_therapy_session_number', None) or "لا يوجد",
+                'radiation_therapy_remaining': getattr(report, 'radiation_therapy_remaining', None) or "لا يوجد",
+                'radiation_therapy_recommendations': getattr(report, 'radiation_therapy_recommendations', None) or getattr(report, 'notes', None) or "",
+                'radiation_therapy_return_reason': getattr(report, 'radiation_therapy_return_reason', None) or "لا يوجد",
+                'radiation_therapy_final_notes': getattr(report, 'radiation_therapy_final_notes', None) or "",
+                'radiation_therapy_completed': getattr(report, 'radiation_therapy_completed', False) or False,
             }
             
             # تحويل موعد العودة إلى صيغة 12 ساعة للعرض
@@ -800,7 +991,126 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             tests_value = parts[1].strip()
                     except:
                         pass
-            
+
+            # ✅ استخراج الحقول الخاصة من doctor_decision بناءً على نوع الإجراء
+            operation_details = ''
+            operation_name_en = ''
+            therapy_details = ''
+            device_details = ''
+            admission_reason = ''
+            admission_summary = ''
+            success_rate = ''
+            benefit_rate = ''
+            extracted_notes = report.notes or ''
+
+            doctor_decision_text = report.doctor_decision or ''
+
+            if report.medical_action == 'عملية':
+                # استخراج تفاصيل العملية واسم العملية والملاحظات
+                if 'تفاصيل العملية:' in doctor_decision_text:
+                    try:
+                        parts = doctor_decision_text.split('تفاصيل العملية:', 1)
+                        if len(parts) > 1:
+                            rest = parts[1]
+                            if 'اسم العملية بالإنجليزي:' in rest:
+                                operation_details = rest.split('اسم العملية بالإنجليزي:')[0].strip()
+                                rest2 = rest.split('اسم العملية بالإنجليزي:', 1)[1]
+                                if 'ملاحظات:' in rest2:
+                                    operation_name_en = rest2.split('ملاحظات:')[0].strip()
+                                    extracted_notes = rest2.split('ملاحظات:', 1)[1].strip()
+                                else:
+                                    operation_name_en = rest2.strip()
+                            else:
+                                operation_details = rest.strip()
+                    except:
+                        pass
+
+            elif report.medical_action in ['علاج طبيعي', 'علاج طبيعي وإعادة تأهيل']:
+                # استخراج تفاصيل الجلسة - يدعم عدة صيغ
+                if 'تفاصيل جلسة العلاج الطبيعي:' in doctor_decision_text:
+                    try:
+                        therapy_details = doctor_decision_text.split('تفاصيل جلسة العلاج الطبيعي:', 1)[1].strip()
+                    except:
+                        pass
+                elif 'تفاصيل الجلسة:' in doctor_decision_text:
+                    try:
+                        therapy_details = doctor_decision_text.split('تفاصيل الجلسة:', 1)[1].strip()
+                    except:
+                        pass
+                elif doctor_decision_text and doctor_decision_text.strip():
+                    # إذا لم يكن هناك تنسيق، استخدم القيمة كاملة
+                    therapy_details = doctor_decision_text.strip()
+
+            elif report.medical_action == 'أجهزة تعويضية':
+                # استخراج تفاصيل الجهاز
+                if 'تفاصيل الجهاز:' in doctor_decision_text:
+                    try:
+                        device_details = doctor_decision_text.split('تفاصيل الجهاز:', 1)[1].strip()
+                    except:
+                        pass
+
+            elif report.medical_action == 'ترقيد':
+                # استخراج سبب الرقود
+                if 'سبب الرقود:' in doctor_decision_text:
+                    try:
+                        parts = doctor_decision_text.split('سبب الرقود:', 1)
+                        if len(parts) > 1:
+                            rest = parts[1]
+                            if 'رقم الغرفة:' in rest:
+                                admission_reason = rest.split('رقم الغرفة:')[0].strip()
+                            elif 'ملاحظات:' in rest:
+                                admission_reason = rest.split('ملاحظات:')[0].strip()
+                            else:
+                                admission_reason = rest.strip()
+                    except:
+                        pass
+
+            elif report.medical_action == 'خروج من المستشفى':
+                # استخراج ملخص الرقود أو تفاصيل العملية
+                if 'ملخص الرقود:' in doctor_decision_text:
+                    try:
+                        admission_summary = doctor_decision_text.split('ملخص الرقود:', 1)[1].strip()
+                    except:
+                        pass
+                elif 'تفاصيل العملية:' in doctor_decision_text:
+                    try:
+                        parts = doctor_decision_text.split('تفاصيل العملية:', 1)
+                        if len(parts) > 1:
+                            rest = parts[1]
+                            if 'اسم العملية بالإنجليزي:' in rest:
+                                operation_details = rest.split('اسم العملية بالإنجليزي:')[0].strip()
+                                operation_name_en = rest.split('اسم العملية بالإنجليزي:', 1)[1].strip()
+                            else:
+                                operation_details = rest.strip()
+                    except:
+                        pass
+
+            # ✅ استخراج حقول استشارة مع قرار عملية
+            elif report.medical_action == 'استشارة مع قرار عملية':
+                success_rate = ''
+                benefit_rate = ''
+                try:
+                    sections = doctor_decision_text.split('\n\n')
+                    for section in sections:
+                        section = section.strip()
+                        if section.startswith('اسم العملية بالإنجليزي:'):
+                            operation_name_en = section.replace('اسم العملية بالإنجليزي:', '', 1).strip()
+                        elif section.startswith('نسبة نجاح العملية:'):
+                            success_rate = section.replace('نسبة نجاح العملية:', '', 1).strip()
+                        elif section.startswith('نسبة الاستفادة من العملية:'):
+                            benefit_rate = section.replace('نسبة الاستفادة من العملية:', '', 1).strip()
+                except Exception as e:
+                    logger.warning(f"⚠️ فشل استخراج حقول استشارة مع قرار عملية (republish): {e}")
+
+            # ✅ المسارات التي تحفظ البيانات مباشرة في الحقول (لا تحتاج استخراج)
+            # - استشارة جديدة (new_consult): complaint_text, diagnosis, decision
+            # - متابعة (followup): complaint_text, diagnosis, decision
+            # - طوارئ (emergency): complaint_text, diagnosis, decision, case_status
+            # - استشارة مع قرار عملية (surgery_consult): diagnosis, decision (في doctor_decision)
+            # - استشارة أخيرة (final_consult): diagnosis, decision, recommendations
+            # - تأجيل موعد (appointment_reschedule): app_reschedule_reason (حقل مباشر)
+            # - أشعة وفحوصات (radiology): radiology_type, radiology_delivery_date (حقول مباشرة)
+
             # ✅ بناء broadcast_data مع جميع الحقول المطلوبة
             broadcast_data = {
                 'report_id': report_id,
@@ -815,7 +1125,7 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 'complaint': report.complaint_text or '',  # نسخة للتوافق
                 'diagnosis': report.diagnosis or '',
                 'doctor_decision': report.doctor_decision or '',
-                'decision': report.doctor_decision or '',  # نسخة للتوافق
+                'decision': '',  # ✅ يتم استخراجه تلقائياً من doctor_decision في broadcast_service لمنع التكرار
                 'treatment_plan': report.treatment_plan or '',
                 'recommendations': report.treatment_plan or '',  # ✅ نسخة للتوافق مع broadcast_service
                 'notes': report.notes or '',
@@ -825,12 +1135,12 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 'followup_date': followup_display if followup_display and followup_display != 'لا يوجد' else '',
                 'followup_time': report.followup_time or '',
                 'followup_reason': report.followup_reason or '',
-                # ✅ حقول خاصة
+                # ✅ حقول خاصة - استخدام القيم المستخرجة من doctor_decision
                 'room_number': getattr(report, 'room_number', '') or '',
-                'operation_name_en': getattr(report, 'operation_name_en', '') or '',
-                'operation_details': getattr(report, 'operation_details', '') or '',
-                'success_rate': getattr(report, 'success_rate', '') or '',
-                'benefit_rate': getattr(report, 'benefit_rate', '') or '',
+                'operation_name_en': operation_name_en or getattr(report, 'operation_name_en', '') or '',
+                'operation_details': operation_details or getattr(report, 'operation_details', '') or '',
+                'success_rate': (success_rate if report.medical_action == 'استشارة مع قرار عملية' else '') or getattr(report, 'success_rate', '') or '',
+                'benefit_rate': (benefit_rate if report.medical_action == 'استشارة مع قرار عملية' else '') or getattr(report, 'benefit_rate', '') or '',
                 # ✅ حقول الفحوصات (مهمة لاستشارة جديدة)
                 'tests': tests_value,
                 # ✅ حقول تأجيل الموعد
@@ -840,13 +1150,24 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 # ✅ حقول الأشعة
                 'radiology_type': getattr(report, 'radiology_type', '') or '',
                 'radiology_delivery_date': getattr(report, 'radiology_delivery_date', '') or '',
-                # ✅ حقول العلاج الطبيعي
-                'therapy_details': getattr(report, 'therapy_details', '') or '',
-                # ✅ حقول الأجهزة التعويضية
-                'device_details': getattr(report, 'device_details', '') or '',
-                # ✅ حقول الخروج
+                # ✅ حقول العلاج الطبيعي - استخدام القيمة المستخرجة
+                'therapy_details': therapy_details or getattr(report, 'therapy_details', '') or '',
+                # ✅ حقول الأجهزة التعويضية - استخدام القيمة المستخرجة
+                'device_details': device_details or getattr(report, 'device_details', '') or '',
+                # ✅ حقول الخروج - استخدام القيم المستخرجة
                 'discharge_type': getattr(report, 'discharge_type', '') or '',
-                'admission_summary': getattr(report, 'admission_summary', '') or '',
+                'admission_summary': admission_summary or getattr(report, 'admission_summary', '') or '',
+                # ✅ حقول الترقيد - استخدام القيمة المستخرجة
+                'admission_reason': admission_reason or getattr(report, 'admission_reason', '') or '',
+                # ✅ حقول العلاج الإشعاعي
+                'radiation_therapy_type': getattr(report, 'radiation_therapy_type', '') or '',
+                'radiation_therapy_session_number': getattr(report, 'radiation_therapy_session_number', '') or '',
+                'radiation_therapy_remaining': getattr(report, 'radiation_therapy_remaining', '') or '',
+                'radiation_therapy_recommendations': getattr(report, 'radiation_therapy_recommendations', '') or getattr(report, 'notes', '') or '',
+                'radiation_therapy_return_date': getattr(report, 'radiation_therapy_return_date', '') or '',
+                'radiation_therapy_return_reason': getattr(report, 'radiation_therapy_return_reason', '') or '',
+                'radiation_therapy_final_notes': getattr(report, 'radiation_therapy_final_notes', '') or '',
+                'radiation_therapy_completed': getattr(report, 'radiation_therapy_completed', False) or False,
                 # ✅ المترجم - استخدام الاسم المحفوظ في التقرير
                 'translator_name': translator_name,
                 'is_edit': True  # علامة أن هذا تقرير معدل
@@ -947,6 +1268,23 @@ async def handle_field_selection(update: Update, context: ContextTypes.DEFAULT_T
             'app_reschedule_reason': 'سبب تأجيل الموعد',
             'app_reschedule_return_date': 'موعد العودة الجديد',
             'app_reschedule_return_reason': 'سبب العودة',
+            # ✅ حقول المسارات الخاصة
+            'operation_details': 'تفاصيل العملية',
+            'operation_name_en': 'اسم العملية بالإنجليزي',
+            'therapy_details': 'تفاصيل جلسة العلاج الطبيعي',
+            'device_details': 'تفاصيل الجهاز',
+            'admission_reason': 'سبب الرقود',
+            'admission_summary': 'ملخص الرقود',
+            # ✅ حقول استشارة مع قرار عملية
+            'decision': 'قرار الطبيب',
+            'success_rate': 'نسبة نجاح العملية',
+            'benefit_rate': 'نسبة الاستفادة',
+            'tests': 'الفحوصات والأشعة',
+            # ✅ حقول العلاج الإشعاعي
+            'radiation_therapy_type': 'نوع الإشعاعي',
+            'radiation_therapy_session_number': 'رقم الجلسة',
+            'radiation_therapy_remaining': 'الجلسات المتبقية',
+            'radiation_therapy_recommendations': 'ملاحظات / توصيات',
         }
         
         field_display = field_names.get(field_name, field_name)
@@ -1168,6 +1506,50 @@ async def handle_callback_during_edit(update: Update, context: ContextTypes.DEFA
     
     return EDIT_VALUE
 
+async def handle_text_during_date_calendar(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة الرسائل النصية أثناء انتظار اختيار التاريخ من التقويم - رفض النص وإعادة عرض التقويم"""
+    message = update.message
+    field_name = context.user_data.get('edit_field')
+    current_value = context.user_data['current_report_data'].get(field_name, "لا يوجد")
+    
+    # إرسال رسالة تحذيرية
+    await message.reply_text(
+        "⚠️ **لا يمكن إدخال التاريخ يدوياً**\n\n"
+        "✅ **يرجى استخدام التقويم أدناه لاختيار التاريخ**\n"
+        "اضغط على التاريخ المطلوب من التقويم.",
+        parse_mode=ParseMode.MARKDOWN
+    )
+    
+    # إعادة عرض التقويم
+    text = f"📅 **تعديل موعد العودة**\n\n"
+    if current_value and current_value != "لا يوجد":
+        followup_time = context.user_data['current_report_data'].get('followup_time', '')
+        if followup_time:
+            time_12h = format_time_12h(followup_time)
+            text += f"**القيمة الحالية:** {current_value} - {time_12h}\n\n"
+        else:
+            text += f"**القيمة الحالية:** {current_value}\n\n"
+    else:
+        text += "**القيمة الحالية:** لا يوجد موعد\n\n"
+    text += "✅ **اختر التاريخ من التقويم أدناه:**\n"
+    text += "_(لا يمكن إدخال التاريخ يدوياً)_\n"
+    
+    # عرض التقويم الكامل
+    now = datetime.now()
+    keyboard = create_calendar_keyboard(now.year, now.month, "edit_followup", allow_future=True)
+    keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="edit_back_to_fields")])
+    keyboard.append([InlineKeyboardButton("❌ إلغاء", callback_data="edit_cancel")])
+    
+    text += f"\n📆 **{MONTHS_AR[now.month]} {now.year}**"
+    
+    await message.reply_text(
+        text,
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode=ParseMode.MARKDOWN
+    )
+    
+    return EDIT_DATE_CALENDAR
+
 async def handle_date_calendar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة التقويم لتحديد التاريخ"""
     query = update.callback_query
@@ -1342,7 +1724,8 @@ async def handle_date_time_selection(update: Update, context: ContextTypes.DEFAU
     
     # معالجة اختيار وقت من الأزرار
     if query.data.startswith("edit_time:"):
-        time_str = query.data.split(":")[-1]
+        # استخراج الوقت بشكل صحيح (مثل edit_time:08:00 -> 08:00)
+        time_str = query.data.replace("edit_time:", "", 1)
         if time_str != "manual" and time_str != "skip":
             context.user_data['new_time'] = time_str
             # حفظ القيمة الكاملة
@@ -1479,9 +1862,26 @@ async def handle_new_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
         'medications': 'الأدوية',
         'followup_date': 'موعد العودة',
         'followup_reason': 'سبب العودة',
-        'case_status': 'حالة الطوارئ'
+        'case_status': 'حالة الطوارئ',
+        # ✅ حقول المسارات الخاصة
+        'operation_details': 'تفاصيل العملية',
+        'operation_name_en': 'اسم العملية بالإنجليزي',
+        'therapy_details': 'تفاصيل جلسة العلاج الطبيعي',
+        'device_details': 'تفاصيل الجهاز',
+        'admission_reason': 'سبب الرقود',
+        'admission_summary': 'ملخص الرقود',
+        # ✅ حقول استشارة مع قرار عملية
+        'decision': 'قرار الطبيب',
+        'success_rate': 'نسبة نجاح العملية',
+        'benefit_rate': 'نسبة الاستفادة',
+        'tests': 'الفحوصات والأشعة',
+        # ✅ حقول العلاج الإشعاعي
+        'radiation_therapy_type': 'نوع الإشعاعي',
+        'radiation_therapy_session_number': 'رقم الجلسة',
+        'radiation_therapy_remaining': 'الجلسات المتبقية',
+        'radiation_therapy_recommendations': 'ملاحظات / توصيات',
     }
-    
+
     field_display = field_names.get(field_name, field_name.replace('_', ' '))
     old_value = context.user_data['current_report_data'].get(field_name, "لا يوجد")
     
@@ -1550,6 +1950,163 @@ async def save_edit_to_database(query, context):
             report.notes = new_value
             report.medications = new_value  # ✅ حفظ في medications لاسترجاع tests لاحقاً
             logger.info(f"✅ تم حفظ notes في medications أيضاً للتقرير #{report_id} (استشارة جديدة)")
+
+        elif field_name == "notes" and report.medical_action == 'عملية':
+            # ✅ حفظ notes وإعادة بناء doctor_decision لمسار العملية
+            report.notes = new_value
+            current_data = context.user_data.get('current_report_data', {})
+            current_data['notes'] = new_value
+            context.user_data['current_report_data'] = current_data
+            operation_details = current_data.get('operation_details', 'لا يوجد')
+            operation_name_en = current_data.get('operation_name_en', 'لا يوجد')
+            new_decision = f"تفاصيل العملية: {operation_details}"
+            if operation_name_en and operation_name_en != 'لا يوجد':
+                new_decision += f"\nاسم العملية بالإنجليزي: {operation_name_en}"
+            if new_value and new_value != 'لا يوجد':
+                new_decision += f"\nملاحظات: {new_value}"
+            report.doctor_decision = new_decision
+            logger.info(f"✅ تم تحديث notes + doctor_decision لمسار العملية #{report_id}")
+
+        elif field_name == "notes" and report.medical_action == 'ترقيد':
+            # ✅ حفظ notes وإعادة بناء doctor_decision لمسار الترقيد
+            report.notes = new_value
+            current_data = context.user_data.get('current_report_data', {})
+            current_data['notes'] = new_value
+            context.user_data['current_report_data'] = current_data
+            admission_reason = current_data.get('admission_reason', 'لا يوجد')
+            new_decision = f"سبب الرقود: {admission_reason}"
+            if new_value and new_value != 'لا يوجد':
+                new_decision += f"\nملاحظات: {new_value}"
+            report.doctor_decision = new_decision
+            logger.info(f"✅ تم تحديث notes + doctor_decision لمسار الترقيد #{report_id}")
+
+        # ✅ معالجة الحقول المخزنة في doctor_decision (باستثناء استشارة مع قرار عملية - لها معالج خاص)
+        elif field_name in ['operation_details', 'operation_name_en', 'therapy_details', 'device_details', 'admission_reason', 'admission_summary'] and report.medical_action != 'استشارة مع قرار عملية':
+            # استخراج القيم الحالية من current_report_data
+            current_data = context.user_data.get('current_report_data', {})
+
+            # تحديث القيمة المحددة
+            current_data[field_name] = new_value
+            context.user_data['current_report_data'] = current_data
+
+            # إعادة بناء doctor_decision حسب نوع الإجراء
+            medical_action = report.medical_action
+
+            if medical_action == 'عملية':
+                operation_details = current_data.get('operation_details', 'لا يوجد')
+                operation_name_en = current_data.get('operation_name_en', 'لا يوجد')
+                notes = current_data.get('notes', '')
+
+                new_decision = f"تفاصيل العملية: {operation_details}"
+                if operation_name_en and operation_name_en != 'لا يوجد':
+                    new_decision += f"\nاسم العملية بالإنجليزي: {operation_name_en}"
+                if notes and notes != 'لا يوجد':
+                    new_decision += f"\nملاحظات: {notes}"
+                report.doctor_decision = new_decision
+                logger.info(f"✅ تم تحديث doctor_decision للعملية: {new_decision[:50]}...")
+
+            elif medical_action in ['خروج من المستشفى', 'خروج']:
+                admission_summary = current_data.get('admission_summary', 'لا يوجد')
+                operation_details = current_data.get('operation_details', 'لا يوجد')
+                operation_name_en = current_data.get('operation_name_en', 'لا يوجد')
+
+                new_decision = f"ملخص الرقود: {admission_summary}"
+                if operation_details and operation_details != 'لا يوجد':
+                    new_decision += f"\nتفاصيل العملية: {operation_details}"
+                if operation_name_en and operation_name_en != 'لا يوجد':
+                    new_decision += f"\nاسم العملية بالإنجليزي: {operation_name_en}"
+                report.doctor_decision = new_decision
+                logger.info(f"✅ تم تحديث doctor_decision للخروج: {new_decision[:50]}...")
+
+            elif medical_action in ['علاج طبيعي', 'علاج طبيعي وإعادة تأهيل']:
+                therapy_details = current_data.get('therapy_details', new_value)
+                report.doctor_decision = f"تفاصيل جلسة العلاج الطبيعي: {therapy_details}"
+                logger.info(f"✅ تم تحديث doctor_decision للعلاج الطبيعي")
+
+            elif medical_action == 'أجهزة تعويضية':
+                device_details = current_data.get('device_details', new_value)
+                report.doctor_decision = f"تفاصيل الجهاز: {device_details}"
+                logger.info(f"✅ تم تحديث doctor_decision للأجهزة التعويضية")
+
+            elif medical_action == 'ترقيد':
+                admission_reason = current_data.get('admission_reason', new_value)
+                notes = current_data.get('notes', '')
+
+                new_decision = f"سبب الرقود: {admission_reason}"
+                if notes and notes != 'لا يوجد':
+                    new_decision += f"\nملاحظات: {notes}"
+                report.doctor_decision = new_decision
+                # أيضاً حفظ في complaint_text للتوافق
+                if field_name == 'admission_reason':
+                    report.complaint_text = admission_reason
+                logger.info(f"✅ تم تحديث doctor_decision للترقيد")
+
+        # ✅ معالجة حقول استشارة مع قرار عملية (شاملة diagnosis)
+        elif field_name in ['diagnosis', 'decision', 'operation_name_en', 'success_rate', 'benefit_rate', 'tests'] and report.medical_action == 'استشارة مع قرار عملية':
+            # تحديث القيمة في current_report_data
+            current_data = context.user_data.get('current_report_data', {})
+            current_data[field_name] = new_value
+            context.user_data['current_report_data'] = current_data
+            
+            # إعادة بناء doctor_decision من الحقول الفرعية
+            diagnosis_val = current_data.get('diagnosis', '') or (report.diagnosis or '')
+            decision_val = current_data.get('decision', new_value if field_name == 'decision' else '')
+            op_name = current_data.get('operation_name_en', new_value if field_name == 'operation_name_en' else '')
+            s_rate = current_data.get('success_rate', new_value if field_name == 'success_rate' else '')
+            b_rate = current_data.get('benefit_rate', new_value if field_name == 'benefit_rate' else '')
+            tests_val = current_data.get('tests', new_value if field_name == 'tests' else '')
+            
+            # تنظيف القيم
+            if diagnosis_val == 'لا يوجد': diagnosis_val = ''
+            if decision_val == 'لا يوجد': decision_val = ''
+            if op_name == 'لا يوجد': op_name = ''
+            if s_rate == 'لا يوجد': s_rate = ''
+            if b_rate == 'لا يوجد': b_rate = ''
+            if tests_val == 'لا يوجد': tests_val = ''
+            
+            new_doctor_decision = f"التشخيص: {diagnosis_val}\n\nقرار الطبيب: {decision_val}"
+            if op_name:
+                new_doctor_decision += f"\n\nاسم العملية بالإنجليزي: {op_name}"
+            if s_rate:
+                new_doctor_decision += f"\n\nنسبة نجاح العملية: {s_rate}"
+            if b_rate:
+                new_doctor_decision += f"\n\nنسبة الاستفادة من العملية: {b_rate}"
+            if tests_val:
+                new_doctor_decision += f"\n\nالفحوصات المطلوبة: {tests_val}"
+            
+            report.doctor_decision = new_doctor_decision
+            # تحديث الحقول المنفصلة إذا تم تعديلها
+            if field_name == 'diagnosis':
+                report.diagnosis = new_value
+            logger.info(f"✅ تم تحديث doctor_decision لاستشارة مع قرار عملية: {field_name} = {new_value[:50]}...")
+
+        # ✅ معالجة حقول العلاج الإشعاعي
+        elif field_name in ['radiation_therapy_type', 'radiation_therapy_session_number', 'radiation_therapy_remaining', 'radiation_therapy_recommendations']:
+            setattr(report, field_name, new_value)
+            if field_name == 'radiation_therapy_recommendations':
+                # حفظ في حقل notes أيضاً
+                report.notes = new_value
+            # تحديث doctor_decision أيضاً
+            current_data = context.user_data.get('current_report_data', {})
+            current_data[field_name] = new_value
+            context.user_data['current_report_data'] = current_data
+            
+            rad_type = current_data.get('radiation_therapy_type', '') or getattr(report, 'radiation_therapy_type', '') or ''
+            session_num = current_data.get('radiation_therapy_session_number', '') or getattr(report, 'radiation_therapy_session_number', '') or ''
+            remaining = current_data.get('radiation_therapy_remaining', '') or getattr(report, 'radiation_therapy_remaining', '') or ''
+            
+            new_decision = f"نوع الإشعاعي: {rad_type}\n\n"
+            new_decision += f"رقم الجلسة: {session_num}\n\n"
+            new_decision += f"الجلسات المتبقية: {remaining}"
+            report.doctor_decision = new_decision
+            logger.info(f"✅ تم تحديث حقل العلاج الإشعاعي: {field_name} = {new_value}")
+
+        elif field_name == 'followup_reason' and report.medical_action == 'جلسة إشعاعي':
+            # حفظ سبب العودة في followup_reason و radiation_therapy_return_reason
+            report.followup_reason = new_value
+            report.radiation_therapy_return_reason = new_value
+            logger.info(f"✅ تم تحديث followup_reason + radiation_therapy_return_reason = {new_value}")
+
         else:
             setattr(report, field_name, new_value)
         
@@ -1706,9 +2263,128 @@ async def show_field_selection(query, context):
             'app_reschedule_reason': getattr(report, 'app_reschedule_reason', None) or "لا يوجد",
             'app_reschedule_return_date': getattr(report, 'app_reschedule_return_date', None),
             'app_reschedule_return_reason': getattr(report, 'app_reschedule_return_reason', None) or "لا يوجد",
-            'translator_name': translator.full_name if translator else "غير محدد",
+            'translator_name': report.translator_name or (translator.full_name if translator else "غير محدد"),
             'translator_id': report.translator_id,
+            # ✅ حقول العلاج الإشعاعي
+            'radiation_therapy_type': getattr(report, 'radiation_therapy_type', None) or "لا يوجد",
+            'radiation_therapy_session_number': getattr(report, 'radiation_therapy_session_number', None) or "لا يوجد",
+            'radiation_therapy_remaining': getattr(report, 'radiation_therapy_remaining', None) or "لا يوجد",
+            'radiation_therapy_recommendations': getattr(report, 'radiation_therapy_recommendations', None) or getattr(report, 'notes', None) or "",
+            'radiation_therapy_return_reason': getattr(report, 'radiation_therapy_return_reason', None) or "لا يوجد",
         })
+        
+        # ✅ إعادة استخراج الحقول الخاصة من doctor_decision المحدث حسب نوع الإجراء
+        dd_text = report.doctor_decision or ''
+        
+        if report.medical_action == 'استشارة مع قرار عملية':
+            try:
+                sections = dd_text.split('\n\n')
+                for section in sections:
+                    section = section.strip()
+                    if section.startswith('التشخيص:'):
+                        current_data['diagnosis'] = section.replace('التشخيص:', '', 1).strip() or "لا يوجد"
+                    elif section.startswith('قرار الطبيب:'):
+                        current_data['decision'] = section.replace('قرار الطبيب:', '', 1).strip() or "لا يوجد"
+                    elif section.startswith('اسم العملية بالإنجليزي:'):
+                        current_data['operation_name_en'] = section.replace('اسم العملية بالإنجليزي:', '', 1).strip() or "لا يوجد"
+                    elif section.startswith('نسبة نجاح العملية:'):
+                        current_data['success_rate'] = section.replace('نسبة نجاح العملية:', '', 1).strip() or "لا يوجد"
+                    elif section.startswith('نسبة الاستفادة من العملية:'):
+                        current_data['benefit_rate'] = section.replace('نسبة الاستفادة من العملية:', '', 1).strip() or "لا يوجد"
+                    elif section.startswith('الفحوصات المطلوبة:'):
+                        current_data['tests'] = section.replace('الفحوصات المطلوبة:', '', 1).strip() or "لا يوجد"
+            except Exception:
+                pass
+        
+        elif report.medical_action == 'عملية':
+            try:
+                if 'تفاصيل العملية:' in dd_text:
+                    parts = dd_text.split('تفاصيل العملية:', 1)
+                    if len(parts) > 1:
+                        rest = parts[1]
+                        if 'اسم العملية بالإنجليزي:' in rest:
+                            current_data['operation_details'] = rest.split('اسم العملية بالإنجليزي:')[0].strip() or "لا يوجد"
+                            rest2 = rest.split('اسم العملية بالإنجليزي:', 1)[1]
+                            if 'ملاحظات:' in rest2:
+                                current_data['operation_name_en'] = rest2.split('ملاحظات:')[0].strip() or "لا يوجد"
+                                current_data['notes'] = rest2.split('ملاحظات:', 1)[1].strip() or "لا يوجد"
+                            else:
+                                current_data['operation_name_en'] = rest2.strip() or "لا يوجد"
+                        else:
+                            current_data['operation_details'] = rest.strip() or "لا يوجد"
+                elif dd_text and dd_text.strip() and dd_text != "لا يوجد":
+                    current_data['operation_details'] = dd_text.strip()
+            except Exception:
+                pass
+        
+        elif report.medical_action in ['خروج من المستشفى', 'خروج']:
+            try:
+                if 'ملخص الرقود:' in dd_text:
+                    parts = dd_text.split('ملخص الرقود:', 1)
+                    if len(parts) > 1:
+                        rest = parts[1]
+                        if 'تفاصيل العملية:' in rest:
+                            current_data['admission_summary'] = rest.split('تفاصيل العملية:')[0].strip() or "لا يوجد"
+                            rest2 = rest.split('تفاصيل العملية:', 1)[1]
+                            if 'اسم العملية بالإنجليزي:' in rest2:
+                                current_data['operation_details'] = rest2.split('اسم العملية بالإنجليزي:')[0].strip() or "لا يوجد"
+                                current_data['operation_name_en'] = rest2.split('اسم العملية بالإنجليزي:', 1)[1].strip() or "لا يوجد"
+                            else:
+                                current_data['operation_details'] = rest2.strip() or "لا يوجد"
+                        else:
+                            current_data['admission_summary'] = rest.strip() or "لا يوجد"
+                elif 'تفاصيل العملية:' in dd_text:
+                    parts = dd_text.split('تفاصيل العملية:', 1)
+                    if len(parts) > 1:
+                        rest = parts[1]
+                        if 'اسم العملية بالإنجليزي:' in rest:
+                            current_data['operation_details'] = rest.split('اسم العملية بالإنجليزي:')[0].strip() or "لا يوجد"
+                            current_data['operation_name_en'] = rest.split('اسم العملية بالإنجليزي:', 1)[1].strip() or "لا يوجد"
+                        else:
+                            current_data['operation_details'] = rest.strip() or "لا يوجد"
+            except Exception:
+                pass
+        
+        elif report.medical_action in ['علاج طبيعي', 'علاج طبيعي وإعادة تأهيل']:
+            try:
+                if 'تفاصيل جلسة العلاج الطبيعي:' in dd_text:
+                    current_data['therapy_details'] = dd_text.split('تفاصيل جلسة العلاج الطبيعي:', 1)[1].strip() or "لا يوجد"
+                elif 'تفاصيل الجلسة:' in dd_text:
+                    current_data['therapy_details'] = dd_text.split('تفاصيل الجلسة:', 1)[1].strip() or "لا يوجد"
+                elif dd_text and dd_text.strip() and dd_text != "لا يوجد":
+                    current_data['therapy_details'] = dd_text.strip()
+            except Exception:
+                pass
+        
+        elif report.medical_action == 'أجهزة تعويضية':
+            try:
+                if 'تفاصيل الجهاز:' in dd_text:
+                    current_data['device_details'] = dd_text.split('تفاصيل الجهاز:', 1)[1].strip() or "لا يوجد"
+                elif dd_text and dd_text.strip() and dd_text != "لا يوجد":
+                    current_data['device_details'] = dd_text.strip()
+            except Exception:
+                pass
+        
+        elif report.medical_action == 'ترقيد':
+            try:
+                if 'سبب الرقود:' in dd_text:
+                    parts = dd_text.split('سبب الرقود:', 1)
+                    if len(parts) > 1:
+                        rest = parts[1]
+                        if 'ملاحظات:' in rest:
+                            current_data['admission_reason'] = rest.split('ملاحظات:')[0].strip() or "لا يوجد"
+                            current_data['notes'] = rest.split('ملاحظات:', 1)[1].strip() or "لا يوجد"
+                        else:
+                            current_data['admission_reason'] = rest.strip() or "لا يوجد"
+                elif dd_text and dd_text.strip() and dd_text != "لا يوجد":
+                    current_data['admission_reason'] = dd_text.strip()
+            except Exception:
+                pass
+            # fallback: استخدام complaint_text كـ admission_reason
+            if current_data.get('admission_reason', 'لا يوجد') == 'لا يوجد':
+                if report.complaint_text and report.complaint_text != "لا يوجد":
+                    current_data['admission_reason'] = report.complaint_text
+        
         context.user_data['current_report_data'] = current_data
         
         # عرض بيانات التقرير مرة أخرى
@@ -1730,23 +2406,24 @@ async def show_field_selection(query, context):
             else:
                 logger.info(f"⏭️ [EDIT_AFTER_PUBLISH] تخطي حقل '{field_name}' (لا توجد قيمة)")
         
-        # ✅ حماية صارمة: إذا كان نوع الإجراء مراجعة / عودة دورية وتمت محاولة عرض زر رقم الغرفة، أظهر Exception واضح
+        # ✅ حماية: إذا كان نوع الإجراء مراجعة / عودة دورية، لا نضيف رقم الغرفة
         if _has_field_value_in_report(report, current_data, 'room_number'):
             has_room = any(f == 'room_number' for f, _ in fields_with_values)
             if not has_room:
                 if medical_action and 'مراجعة / عودة دورية' in medical_action:
-                    raise Exception(f"[SECURITY] محاولة عرض زر رقم الغرفة لمسار مراجعة / عودة دورية! report_id={report_id} room_number={current_data.get('room_number')}")
-                # إدراجه في موقع منطقي (مثلاً قبل followup_date إذا وجد، أو في النهاية)
-                room_entry = ('room_number', '🏥 رقم الغرفة والطابق')
-                inserted = False
-                for i, (fname, _) in enumerate(fields_with_values):
-                    if fname == 'followup_date':
-                        fields_with_values.insert(i, room_entry)
-                        inserted = True
-                        break
-                if not inserted:
-                    fields_with_values.append(room_entry)
-                logger.info(f"✅ [EDIT_AFTER_PUBLISH] تم فرض إضافة 'room_number' لوجود قيمة له")
+                    logger.warning(f"⚠️ [EDIT_AFTER_PUBLISH] تجاهل رقم الغرفة لمسار مراجعة / عودة دورية report_id={report_id}")
+                else:
+                    # إدراجه في موقع منطقي (مثلاً قبل followup_date إذا وجد، أو في النهاية)
+                    room_entry = ('room_number', '🏥 رقم الغرفة والطابق')
+                    inserted = False
+                    for i, (fname, _) in enumerate(fields_with_values):
+                        if fname == 'followup_date':
+                            fields_with_values.insert(i, room_entry)
+                            inserted = True
+                            break
+                    if not inserted:
+                        fields_with_values.append(room_entry)
+                    logger.info(f"✅ [EDIT_AFTER_PUBLISH] تم فرض إضافة 'room_number' لوجود قيمة له")
         
         # ✅ التحقق من وجود حقول مدخلة
         if not fields_with_values:
@@ -1921,15 +2598,10 @@ def register(app):
                 CallbackQueryHandler(handle_date_calendar, pattern="^edit_followup:"),
                 CallbackQueryHandler(handle_date_calendar, pattern="^edit_back_to_fields$"),
                 CallbackQueryHandler(handle_date_calendar, pattern="^edit_cancel$"),
-                # منع إدخال النص - يجب استخدام التقويم فقط
+                # منع إدخال النص - يجب استخدام التقويم فقط وإعادة عرض التقويم
                 MessageHandler(
                     filters.TEXT & ~filters.COMMAND, 
-                    lambda u, c: u.message.reply_text(
-                        "⚠️ **لا يمكن إدخال التاريخ يدوياً**\n\n"
-                        "✅ **يرجى استخدام التقويم أعلاه لاختيار التاريخ**\n"
-                        "اضغط على التاريخ المطلوب من التقويم.",
-                        parse_mode=ParseMode.MARKDOWN
-                    )
+                    handle_text_during_date_calendar
                 )
             ],
             EDIT_DATE_TIME: [

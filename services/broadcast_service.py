@@ -66,6 +66,58 @@ def _is_similar_text(text1: str, text2: str, threshold: float = 0.7) -> bool:
 REPORTS_GROUP_ID = os.getenv("REPORTS_GROUP_ID", "")  # معرف المجموعة الخاصة بالتقارير
 
 
+def _split_telegram_message(text: str, max_len: int = 3500) -> list[str]:
+    """
+    تقسيم النص الطويل إلى أجزاء آمنة للإرسال في تيليجرام.
+    - Telegram limit ~4096 chars; we keep safety margin.
+    - Prefer splitting on newline when possible.
+    """
+    if text is None:
+        return [""]
+
+    remaining = str(text).strip()
+    if not remaining:
+        return [""]
+
+    chunks = []
+    while remaining:
+        if len(remaining) <= max_len:
+            chunks.append(remaining)
+            break
+
+        split_at = remaining.rfind("\n", 0, max_len)
+        if split_at == -1 or split_at < int(max_len * 0.5):
+            split_at = max_len
+
+        chunk = remaining[:split_at].rstrip()
+        if chunk:
+            chunks.append(chunk)
+        remaining = remaining[split_at:].lstrip("\n")
+
+    return chunks or [""]
+
+
+async def _send_message_in_chunks(bot: Bot, chat_id, text: str, parse_mode=None, reply_markup=None):
+    """
+    إرسال رسالة (طويلة أو قصيرة) على أجزاء.
+    - تُضاف reply_markup للجزء الأخير فقط.
+    - تُعاد آخر رسالة مُرسلة (مهم لحفظ message_id).
+    """
+    chunks = _split_telegram_message(text)
+    last_message = None
+
+    for idx, chunk in enumerate(chunks):
+        is_last = idx == (len(chunks) - 1)
+        last_message = await bot.send_message(
+            chat_id=chat_id,
+            text=chunk,
+            parse_mode=parse_mode,
+            reply_markup=reply_markup if is_last else None,
+        )
+
+    return last_message
+
+
 
 async def broadcast_new_report(bot: Bot, report_data: dict):
     """
@@ -94,9 +146,14 @@ async def broadcast_new_report(bot: Bot, report_data: dict):
 
     # ✅ حالة البث للمجموعة (لا تؤثر على الأدمن)
     broadcast_enabled = is_broadcast_enabled()
-    logger.info(f"📤 broadcast_new_report: BROADCAST_ENABLED={broadcast_enabled}, REPORTS_GROUP_ID={REPORTS_GROUP_ID}")
-    
+    logger.info(f"📤 broadcast_new_report: BROADCAST_ENABLED={broadcast_enabled}, REPORTS_GROUP_ID='{REPORTS_GROUP_ID}' (len={len(str(REPORTS_GROUP_ID)) if REPORTS_GROUP_ID else 0})")
+
     # ✅ إرسال للمجموعة (فقط إذا كان البث مفعل)
+    if not broadcast_enabled:
+        logger.warning(f"⚠️ broadcast_new_report: البث معطل! لن يتم إرسال التقرير للمجموعة")
+    if not REPORTS_GROUP_ID:
+        logger.warning(f"⚠️ broadcast_new_report: REPORTS_GROUP_ID فارغ! لن يتم إرسال التقرير للمجموعة")
+
     if broadcast_enabled and REPORTS_GROUP_ID:
         logger.info(f"📤 broadcast_new_report: محاولة الإرسال للمجموعة {REPORTS_GROUP_ID}")
         try:
@@ -144,7 +201,8 @@ async def broadcast_new_report(bot: Bot, report_data: dict):
             
             # المحاولة الأولى: مع Markdown
             try:
-                sent_message = await bot.send_message(
+                sent_message = await _send_message_in_chunks(
+                    bot=bot,
                     chat_id=REPORTS_GROUP_ID,
                     text=message,
                     parse_mode=ParseMode.MARKDOWN,
@@ -174,7 +232,8 @@ async def broadcast_new_report(bot: Bot, report_data: dict):
                     # خطأ في تنسيق Markdown - نحاول بدون Markdown
                     logger.warning(f"⚠️ broadcast_new_report: خطأ في تنسيق Markdown، محاولة الإرسال بدون Markdown...")
                     try:
-                        sent_message = await bot.send_message(
+                        sent_message = await _send_message_in_chunks(
+                            bot=bot,
                             chat_id=REPORTS_GROUP_ID,
                             text=message,
                             parse_mode=None,  # بدون Markdown
@@ -190,7 +249,8 @@ async def broadcast_new_report(bot: Bot, report_data: dict):
                     # خطأ آخر - نحاول بدون Markdown كحل أخير
                     logger.warning(f"⚠️ broadcast_new_report: خطأ غير معروف، محاولة الإرسال بدون Markdown...")
                     try:
-                        sent_message = await bot.send_message(
+                        sent_message = await _send_message_in_chunks(
+                            bot=bot,
                             chat_id=REPORTS_GROUP_ID,
                             text=message,
                             parse_mode=None,  # بدون Markdown
@@ -227,7 +287,8 @@ async def broadcast_new_report(bot: Bot, report_data: dict):
             user_id = report_data.get('user_id') or report_data.get('translator_id')
             if user_id:
                 try:
-                    await bot.send_message(
+                    await _send_message_in_chunks(
+                        bot=bot,
                         chat_id=user_id,
                         text=message,
                         parse_mode=ParseMode.MARKDOWN
@@ -244,7 +305,8 @@ async def broadcast_new_report(bot: Bot, report_data: dict):
                 for admin_id in ADMIN_IDS:
                     try:
                         try:
-                            await bot.send_message(
+                            await _send_message_in_chunks(
+                                bot=bot,
                                 chat_id=admin_id,
                                 text=message,
                                 parse_mode=ParseMode.MARKDOWN
@@ -252,7 +314,8 @@ async def broadcast_new_report(bot: Bot, report_data: dict):
                             logger.info(f"✅ تم إرسال التقرير للأدمن: {admin_id}")
                         except Exception as markdown_error:
                             try:
-                                await bot.send_message(
+                                await _send_message_in_chunks(
+                                    bot=bot,
                                     chat_id=admin_id,
                                     text=message,
                                     parse_mode=None
@@ -281,7 +344,8 @@ async def broadcast_new_report(bot: Bot, report_data: dict):
             try:
                 # المحاولة الأولى: مع Markdown
                 try:
-                    await bot.send_message(
+                    await _send_message_in_chunks(
+                        bot=bot,
                         chat_id=admin_id,
                         text=message,
                         parse_mode=ParseMode.MARKDOWN
@@ -292,7 +356,8 @@ async def broadcast_new_report(bot: Bot, report_data: dict):
                     logger.warning(f"⚠️ فشل الإرسال للأدمن {admin_id} مع Markdown: {error_msg}")
                     # المحاولة الثانية: بدون Markdown
                     try:
-                        await bot.send_message(
+                        await _send_message_in_chunks(
+                            bot=bot,
                             chat_id=admin_id,
                             text=message,
                             parse_mode=None
@@ -373,26 +438,26 @@ def format_report_message(data: dict) -> str:
             lines.append(f"📅🕐 التاريخ: {date_str}")
             lines.append("")  # سطر فارغ
     
-    # ✅ المعلومات الأساسية
+    # ✅ المعلومات الأساسية - مع escape_markdown لمنع أخطاء Markdown
     if data.get('patient_name'):
-        lines.append(f"👤 اسم المريض: {data['patient_name']}")
+        lines.append(f"👤 اسم المريض: {escape_markdown(str(data['patient_name']))}")
         lines.append("")
-    
+
     if data.get('hospital_name'):
-        lines.append(f"🏥 المستشفى: {data['hospital_name']}")
+        lines.append(f"🏥 المستشفى: {escape_markdown(str(data['hospital_name']))}")
         lines.append("")
-    
+
     if data.get('department_name'):
-        lines.append(f"🏷️ القسم: {data['department_name']}")
+        lines.append(f"🏷️ القسم: {escape_markdown(str(data['department_name']))}")
         lines.append("")
-    
+
     if data.get('doctor_name') and data.get('doctor_name') != 'لم يتم التحديد':
-        lines.append(f"👨‍⚕️ اسم الطبيب: {data['doctor_name']}")
+        lines.append(f"👨‍⚕️ اسم الطبيب: {escape_markdown(str(data['doctor_name']))}")
         lines.append("")
-    
+
     # ✅ نوع الإجراء
     if data.get('medical_action'):
-        lines.append(f"📌 نوع الإجراء: {data['medical_action']}")
+        lines.append(f"📌 نوع الإجراء: {escape_markdown(str(data['medical_action']))}")
         lines.append("")
         lines.append("━━━━━━━━━━━━━━━━━━━━")
         lines.append("")
@@ -432,12 +497,21 @@ def format_report_message(data: dict) -> str:
             lines.append(f"👨‍⚕️ المترجم: {escape_markdown(str(data['translator_name']))}")
         return "\n".join(lines)
     
+    elif medical_action == 'جلسة إشعاعي':
+        lines.extend(_build_radiation_therapy_fields(data))
+        lines.append("")
+        lines.append("━━━━━━━━━━━━━━━━━━━━")
+        lines.append("")
+        if data.get('translator_name'):
+            lines.append(f"👨‍⚕️ المترجم: {data['translator_name']}")
+        return "\n".join(lines)
+    
     else:
         # ✅ معالجة الحقول العامة (new_consult, followup, emergency, etc.)
         lines.extend(_build_general_fields(data))
     
     # ✅ موعد العودة وسبب العودة (للمسارات العامة)
-    if medical_action not in ['تأجيل موعد', 'استشارة مع قرار عملية', 'أشعة وفحوصات', 'استشارة أخيرة']:
+    if medical_action not in ['تأجيل موعد', 'استشارة مع قرار عملية', 'أشعة وفحوصات', 'استشارة أخيرة', 'جلسة إشعاعي']:
         lines.extend(_build_followup_fields(data))
     
     # ✅ خط فاصل نهائي
@@ -487,6 +561,58 @@ def _format_report_date(report_date):
         return f"{date_obj.strftime('%d')} {MONTH_NAMES_AR.get(date_obj.month, date_obj.month)} {date_obj.year} ({day_name}) - {time_str}"
     except:
         return str(report_date)
+
+
+def _extract_decision(data: dict) -> str:
+    """
+    ✅ استخراج قرار الطبيب من عدة مصادر
+    - فصل واضح بين diagnosis و decision
+    - ✅ منع التكرار: إذا كان decision موجوداً، لا نستخرجه من doctor_decision
+    """
+    # ✅ المحاولة الأولى: من decision مباشرة (الأولوية الأولى - منع التكرار)
+    decision = data.get('decision', '')
+    if decision and str(decision).strip():
+        # ✅ تنظيف القرار من أي نص "قرار الطبيب:" إذا كان موجوداً (منع التكرار)
+        decision_str = str(decision).strip()
+        if decision_str.startswith('قرار الطبيب:'):
+            decision_str = decision_str.replace('قرار الطبيب:', '', 1).strip()
+        # ✅ إذا كان decision موجوداً، نعيده مباشرة ولا نحتاج doctor_decision
+        return decision_str
+
+    # ✅ المحاولة الثانية: استخراج من doctor_decision (فقط إذا لم يكن decision موجوداً)
+    doctor_decision = data.get('doctor_decision', '')
+    if doctor_decision:
+        doctor_decision_str = str(doctor_decision).strip()
+
+        # ✅ التحقق من أن doctor_decision ليس نفس diagnosis (منع التكرار)
+        diagnosis = data.get('diagnosis', '')
+        if diagnosis and _is_similar_text(diagnosis, doctor_decision_str):
+            return None  # ✅ doctor_decision متشابه مع diagnosis، لا نعيده
+
+        # ✅ إذا كان doctor_decision يحتوي على "قرار الطبيب:"، نستخرج القرار فقط
+        if 'قرار الطبيب:' in doctor_decision_str:
+            parts = doctor_decision_str.split('قرار الطبيب:', 1)
+            if len(parts) > 1:
+                extracted = parts[1].strip()
+                # ✅ تنظيف النص من أي حقول إضافية
+                if '\n\n' in extracted:
+                    extracted = extracted.split('\n\n')[0].strip()
+                # ✅ إزالة أي نص بعد سطر جديد واحد إذا كان يحتوي على عناوين أخرى
+                for marker in ['الفحوصات:', 'وضع الحالة:', 'موعد العودة:', 'سبب العودة:']:
+                    if marker in extracted:
+                        extracted = extracted.split(marker)[0].strip()
+                if extracted and len(extracted) > 0:
+                    return extracted
+
+        # ✅ إذا كان يحتوي على "التشخيص:" فقط، لا نعيد شيء (التشخيص يُعرض منفصلاً)
+        if 'التشخيص:' in doctor_decision_str and 'قرار الطبيب:' not in doctor_decision_str:
+            return None
+
+        # ✅ إذا لم يكن يحتوي على "قرار الطبيب:" أو "التشخيص:"، نستخدمه كاملاً
+        if 'التشخيص:' not in doctor_decision_str and 'قرار الطبيب:' not in doctor_decision_str:
+            return doctor_decision_str
+
+    return None
 
 
 def _build_appointment_reschedule_fields(data: dict) -> list:
@@ -555,11 +681,8 @@ def _build_surgery_consult_fields(data: dict) -> list:
         # ✅ فقط إذا لم يكن decision موجوداً، نحاول استخراجه من doctor_decision
         decision = _extract_decision(data)
 
-    # ✅ منع التكرار: التحقق من أن القرار ليس متشابه مع التشخيص
-    diagnosis = data.get('diagnosis', '')
-    if decision and diagnosis:
-        if _is_similar_text(decision, diagnosis):
-            decision = None
+    # ✅ تم تعطيل منطق منع التكرار - عرض قرار الطبيب دائماً
+    # ✅ السبب: المستخدم يريد دائماً رؤية قرار الطبيب في التقرير المنشور
 
     if decision and str(decision).strip():
         lines.append(f"📝 قرار الطبيب: {escape_markdown(str(decision))}")
@@ -706,11 +829,8 @@ def _build_final_consult_fields(data: dict) -> list:
         # ✅ فقط إذا لم يكن decision موجوداً، نحاول استخراجه من doctor_decision
         decision = _extract_decision(data)
 
-    # ✅ منع التكرار: التحقق من أن القرار ليس متشابه مع التشخيص
-    diagnosis = data.get('diagnosis', '')
-    if decision and diagnosis:
-        if _is_similar_text(decision, diagnosis):
-            decision = None
+    # ✅ تم تعطيل منطق منع التكرار - عرض قرار الطبيب دائماً
+    # ✅ السبب: المستخدم يريد دائماً رؤية قرار الطبيب في التقرير المنشور
 
     if decision and str(decision).strip():
         lines.append(f"📝 **قرار الطبيب:**")
@@ -727,45 +847,130 @@ def _build_final_consult_fields(data: dict) -> list:
     return lines
 
 
+def _build_radiation_therapy_fields(data: dict) -> list:
+    """بناء حقول جلسة إشعاعي"""
+    lines = []
+    
+    # ✅ نوع الإشعاعي
+    radiation_type = data.get('radiation_therapy_type', '')
+    if radiation_type and str(radiation_type).strip():
+        lines.append(f"☢️ **نوع الإشعاعي:** {escape_markdown(str(radiation_type).strip())}")
+        lines.append("")
+    
+    # ✅ رقم الجلسة
+    session_number = data.get('radiation_therapy_session_number', '')
+    if session_number and str(session_number).strip():
+        lines.append(f"🔢 **رقم الجلسة:** {escape_markdown(str(session_number).strip())}")
+        lines.append("")
+    
+    # ✅ الجلسات المتبقية
+    remaining = data.get('radiation_therapy_remaining', '')
+    if remaining and str(remaining).strip():
+        lines.append(f"📊 **الجلسات المتبقية:** {escape_markdown(str(remaining).strip())}")
+        lines.append("")
+    
+    # ✅ ملاحظات / توصيات
+    recommendations = data.get('radiation_therapy_recommendations', '')
+    if recommendations and str(recommendations).strip():
+        lines.append(f"📝 **ملاحظات / توصيات:** {escape_markdown(str(recommendations).strip())}")
+        lines.append("")
+    
+    # ✅ موعد العودة
+    return_date = data.get('radiation_therapy_return_date') or data.get('followup_date')
+    if return_date and return_date != 'لا يوجد' and return_date != 'غير محدد':
+        date_str = _format_followup_date(return_date, data.get('followup_time'))
+        if date_str:
+            lines.append(f"📅🕐 **موعد العودة:** {date_str}")
+            lines.append("")
+    
+    # ✅ سبب العودة أو الملاحظات النهائية
+    return_reason = data.get('radiation_therapy_return_reason') or data.get('followup_reason') or data.get('radiation_therapy_final_notes', '')
+    if return_reason and str(return_reason).strip() and str(return_reason) != 'لا يوجد':
+        # التحقق من اكتمال الجلسات
+        completed = data.get('radiation_therapy_completed', False)
+        if completed:
+            lines.append(f"📝 **ملاحظات نهائية:** {escape_markdown(str(return_reason).strip())}")
+        else:
+            lines.append(f"✍️ **سبب العودة:** {escape_markdown(str(return_reason).strip())}")
+        lines.append("")
+    
+    return lines
+
+
 def _build_general_fields(data: dict) -> list:
     """بناء الحقول العامة (new_consult, followup, emergency, etc.)"""
     lines = []
-    
-    # ✅ شكوى المريض - حقل منفصل
-    if data.get('complaint_text') and str(data.get('complaint_text')).strip():
-        lines.append(f"💬 **شكوى المريض:**")
-        lines.append(escape_markdown(str(data['complaint_text'])))
-        lines.append("")
-    
-    # ✅ التشخيص - حقل منفصل تماماً
-    if data.get('diagnosis') and str(data.get('diagnosis')).strip():
-        lines.append(f"🔬 **التشخيص:**")
-        lines.append(escape_markdown(str(data['diagnosis'])))
-        lines.append("")
+    medical_action = (data.get('medical_action', '') or '').strip()
+
+    # ✅ المسارات التي لا تحتوي على شكوى وتشخيص وقرار طبيب
+    # تعرض فقط الحقول الخاصة بها + موعد العودة وسبب العودة
+    flows_without_complaint_diagnosis = [
+        'عملية', 'علاج طبيعي', 'علاج طبيعي وإعادة تأهيل', 'أجهزة تعويضية', 'ترقيد', 'خروج من المستشفى'
+    ]
+
+    # ✅ المسارات التي لا تحتوي على تشخيص (لكن لها شكوى/حالة المريض)
+    # متابعة في الرقود: لها "حالة المريض اليومية" و"قرار الطبيب اليومي" فقط - بدون تشخيص
+    flows_without_diagnosis = [
+        'عملية', 'علاج طبيعي', 'علاج طبيعي وإعادة تأهيل', 'أجهزة تعويضية', 'ترقيد', 'خروج من المستشفى',
+        'متابعة في الرقود'  # ✅ لا يحتوي على تشخيص
+    ]
+
+    # ✅ شكوى المريض / حالة المريض اليومية - حقل منفصل (لا يظهر في المسارات المحددة)
+    if medical_action not in flows_without_complaint_diagnosis:
+        if data.get('complaint_text') and str(data.get('complaint_text')).strip():
+            # ✅ تسمية مختلفة لـ "متابعة في الرقود"
+            if medical_action == 'متابعة في الرقود':
+                lines.append(f"🛏️ **حالة المريض اليومية:**")
+            else:
+                lines.append(f"💬 **شكوى المريض:**")
+            lines.append(escape_markdown(str(data['complaint_text'])))
+            lines.append("")
+
+    # ✅ التشخيص - حقل منفصل تماماً (لا يظهر في المسارات المحددة)
+    # ✅ "متابعة في الرقود" لا يحتوي على تشخيص
+    if medical_action not in flows_without_diagnosis:
+        if data.get('diagnosis') and str(data.get('diagnosis')).strip():
+            lines.append(f"🔬 **التشخيص:**")
+            lines.append(escape_markdown(str(data['diagnosis'])))
+            lines.append("")
     
     # ✅ قرار الطبيب - حقل منفصل تماماً
-    # ✅ منع التكرار: إذا كان decision موجوداً مباشرة، نستخدمه ولا نستخرجه من doctor_decision
-    decision = None
-    if data.get('decision') and str(data.get('decision')).strip():
-        # ✅ استخدام decision مباشرة (الأولوية الأولى)
-        decision = str(data.get('decision')).strip()
-        # ✅ تنظيف من أي نص "قرار الطبيب:" إذا كان موجوداً (منع التكرار)
-        if decision.startswith('قرار الطبيب:'):
-            decision = decision.replace('قرار الطبيب:', '', 1).strip()
-    else:
-        # ✅ فقط إذا لم يكن decision موجوداً، نحاول استخراجه من doctor_decision
-        decision = _extract_decision(data)
+    # ✅ المسارات التي تحتوي على حقل "قرار الطبيب":
+    # - استشارة جديدة، متابعة في الرقود، مراجعة / عودة دورية، طوارئ
+    # ✅ المسارات التي لا تحتوي على حقل "قرار الطبيب":
+    # - عملية، علاج طبيعي، أجهزة تعويضية، ترقيد، خروج من المستشفى
+    flows_with_decision = [
+        'استشارة جديدة', 'متابعة في الرقود', 'مراجعة / عودة دورية',
+        'طوارئ', 'استشارة مع قرار عملية', 'استشارة أخيرة'
+    ]
+    flows_without_decision = [
+        'عملية', 'علاج طبيعي', 'علاج طبيعي وإعادة تأهيل', 'أجهزة تعويضية', 'ترقيد',
+        'خروج من المستشفى', 'أشعة وفحوصات', 'تأجيل موعد'
+    ]
 
-    # ✅ منع التكرار: التحقق من أن القرار ليس متشابه مع التشخيص
-    diagnosis = data.get('diagnosis', '')
-    if decision and diagnosis:
-        if _is_similar_text(decision, diagnosis):
-            decision = None
+    # ✅ التحقق من نوع الإجراء قبل عرض قرار الطبيب
+    should_show_decision = medical_action in flows_with_decision
 
-    if decision and str(decision).strip():
-        lines.append(f"📝 **قرار الطبيب:**")
-        lines.append(escape_markdown(str(decision)))
-        lines.append("")
+    if should_show_decision:
+        decision = None
+        if data.get('decision') and str(data.get('decision')).strip():
+            # ✅ استخدام decision مباشرة (الأولوية الأولى)
+            decision = str(data.get('decision')).strip()
+            # ✅ تنظيف من أي نص "قرار الطبيب:" إذا كان موجوداً (منع التكرار)
+            if decision.startswith('قرار الطبيب:'):
+                decision = decision.replace('قرار الطبيب:', '', 1).strip()
+        else:
+            # ✅ فقط إذا لم يكن decision موجوداً، نحاول استخراجه من doctor_decision
+            decision = _extract_decision(data)
+
+        if decision and str(decision).strip():
+            # ✅ تسمية مختلفة لـ "متابعة في الرقود"
+            if medical_action == 'متابعة في الرقود':
+                lines.append(f"📝 **قرار الطبيب اليومي:**")
+            else:
+                lines.append(f"📝 **قرار الطبيب:**")
+            lines.append(escape_markdown(str(decision)))
+            lines.append("")
 
     # ✅ حالة الحالة (إذا كانت موجودة)
     if data.get('case_status') and str(data.get('case_status')) != 'لا يوجد':
@@ -777,20 +982,18 @@ def _build_general_fields(data: dict) -> list:
             lines.append("")
     
     # ✅ رقم الغرفة والطابق (فقط لـ emergency, admission, و "متابعة في الرقود")
-    # ✅ لا يُعرض لـ "مراجعة / عودة دورية"
-    medical_action = (data.get('medical_action', '') or '').strip()
-    # حماية مركزية: لا تعرض أو تعالج رقم الغرفة لأي مسار مراجعة/عودة دورية مهما كانت القيمة
-    forbidden_flows = ['مراجعة / عودة دورية', 'عودة دورية', 'مراجعة', 'periodic_followup']
-    if any(flow in medical_action for flow in forbidden_flows):
-        # ✅ تجاهل رقم الغرفة لمسارات المراجعة/عودة دورية (بدون رفع استثناء)
-        pass  # لا تعرض رقم الغرفة نهائيًا
-    elif medical_action == 'متابعة في الرقود':
-        room_info = data.get('room_number') or data.get('room_floor') or data.get('room')
-        if room_info and str(room_info).strip() and str(room_info).strip() != 'لم يتم التحديد':
-            lines.append(f"🏥 **رقم الغرفة والطابق:** {escape_markdown(str(room_info).strip())}")
-            lines.append("")
-    else:
-        # ✅ عرض رقم الغرفة للـ emergency و admission
+    # ✅ لا يُعرض لـ "مراجعة / عودة دورية" أو "استشارة جديدة"
+    # حماية مركزية: لا تعرض رقم الغرفة إلا للمسارات التي تحتاجها فعلاً
+    flows_with_room = ['متابعة في الرقود', 'طوارئ', 'ترقيد']
+    # ✅ استخدام medical_action فقط (القيم العربية) وليس current_flow
+    flows_without_room = ['مراجعة / عودة دورية', 'عودة دورية', 'استشارة جديدة']
+
+    # ✅ التحقق: هل المسار يحتاج رقم غرفة؟
+    should_show_room = medical_action in flows_with_room
+    # ✅ التحقق من التطابق الكامل أو الجزئي
+    should_hide_room = medical_action in flows_without_room or any(flow in str(medical_action) for flow in flows_without_room)
+
+    if should_show_room and not should_hide_room:
         room_info = data.get('room_number') or data.get('room_floor') or data.get('room')
         if room_info and str(room_info).strip() and str(room_info).strip() != 'لم يتم التحديد':
             lines.append(f"🏥 **رقم الغرفة والطابق:** {escape_markdown(str(room_info).strip())}")
@@ -818,39 +1021,78 @@ def _build_general_fields(data: dict) -> list:
             lines.append("")
     
     # ✅ الحقول الخاصة للمسارات المختلفة
-    if medical_action == 'عملية':
-        # تفاصيل العملية بالعربي
-        if data.get('operation_details') and str(data.get('operation_details')).strip():
-            lines.append(f"⚕️ **تفاصيل العملية:** {escape_markdown(str(data['operation_details']))}")
+    if medical_action == 'طوارئ':
+        # ✅ حقول خاصة بمسار الطوارئ
+        # وضع الحالة (تم الخروج / تم الترقيد / تم إجراء عملية)
+        case_status = data.get('status') or data.get('case_status') or ''
+        if case_status and str(case_status).strip():
+            lines.append(f"🏥 **وضع الحالة:** {escape_markdown(str(case_status).strip())}")
             lines.append("")
-        # اسم العملية بالإنجليزي
-        if data.get('operation_name_en') and str(data.get('operation_name_en')).strip():
-            lines.append(f"🔤 **اسم العملية بالإنجليزي:** {escape_markdown(str(data['operation_name_en']))}")
+
+        # إذا كان "تم الترقيد" - عرض ملاحظات الرقود ونوع الترقيد
+        if 'ترقيد' in str(case_status):
+            # ملاحظات الرقود
+            admission_notes = data.get('admission_notes') or ''
+            if admission_notes and str(admission_notes).strip():
+                lines.append(f"📝 **ملاحظات الرقود:** {escape_markdown(str(admission_notes).strip())}")
+                lines.append("")
+            # نوع الترقيد (العناية المركزة / الرقود)
+            admission_type = data.get('admission_type') or ''
+            if admission_type and str(admission_type).strip():
+                lines.append(f"🛏️ **نوع الترقيد:** {escape_markdown(str(admission_type).strip())}")
+                lines.append("")
+
+        # إذا كان "تم إجراء عملية" - عرض تفاصيل العملية
+        elif 'عملية' in str(case_status):
+            operation_details = data.get('operation_details') or ''
+            if operation_details and str(operation_details).strip():
+                lines.append(f"⚕️ **تفاصيل العملية:** {escape_markdown(str(operation_details).strip())}")
+                lines.append("")
+
+    elif medical_action == 'عملية':
+        # تفاصيل العملية بالعربي - محاولة من عدة حقول
+        operation_details = data.get('operation_details') or data.get('complaint_text') or ''
+        if operation_details and str(operation_details).strip():
+            lines.append(f"⚕️ **تفاصيل العملية:** {escape_markdown(str(operation_details).strip())}")
             lines.append("")
-        # ملاحظات
-        if data.get('notes') and str(data.get('notes')).strip():
-            lines.append(f"📝 **ملاحظات:** {escape_markdown(str(data['notes']))}")
+        # اسم العملية بالإنجليزي - محاولة من operation_name_en أو notes
+        operation_name_en = data.get('operation_name_en') or ''
+        # إذا لم يوجد، محاولة استخراجه من notes إذا كان يبدو كاسم إنجليزي
+        if not operation_name_en and data.get('notes'):
+            notes_val = str(data.get('notes', '')).strip()
+            # تحقق إذا كان notes يحتوي على نص إنجليزي فقط (اسم العملية)
+            if notes_val and all(c.isascii() or c.isspace() for c in notes_val):
+                operation_name_en = notes_val
+        if operation_name_en and str(operation_name_en).strip():
+            lines.append(f"🔤 **اسم العملية بالإنجليزي:** {escape_markdown(str(operation_name_en).strip())}")
+            lines.append("")
+        # ملاحظات - فقط إذا لم يكن هو نفسه اسم العملية بالإنجليزي
+        notes = data.get('notes') or ''
+        if notes and str(notes).strip() and notes != operation_name_en:
+            lines.append(f"📝 **ملاحظات:** {escape_markdown(str(notes).strip())}")
             lines.append("")
     
     elif medical_action == 'ترقيد':
-        # سبب الرقود
-        if data.get('admission_reason') and str(data.get('admission_reason')).strip():
-            lines.append(f"🛏️ **سبب الرقود:** {escape_markdown(str(data['admission_reason']))}")
+        # سبب الرقود - محاولة من admission_reason أولاً ثم complaint_text
+        admission_reason = data.get('admission_reason') or data.get('complaint_text') or ''
+        if admission_reason and str(admission_reason).strip():
+            lines.append(f"🛏️ **سبب الرقود:** {escape_markdown(str(admission_reason).strip())}")
             lines.append("")
         # ملاحظات
         if data.get('notes') and str(data.get('notes')).strip():
             lines.append(f"📝 **ملاحظات:** {escape_markdown(str(data['notes']))}")
             lines.append("")
     
-    elif medical_action == 'علاج طبيعي':
-        # تفاصيل جلسة العلاج الطبيعي
-        if data.get('therapy_details') and str(data.get('therapy_details')).strip():
-            lines.append(f"🏃 **تفاصيل الجلسة:** {escape_markdown(str(data['therapy_details']))}")
+    elif medical_action in ['علاج طبيعي', 'علاج طبيعي وإعادة تأهيل']:
+        # تفاصيل جلسة العلاج الطبيعي - محاولة من therapy_details أولاً ثم complaint_text
+        therapy_details = data.get('therapy_details') or data.get('complaint_text') or ''
+        if therapy_details and str(therapy_details).strip():
+            lines.append(f"🏃 **تفاصيل جلسة العلاج الطبيعي:** {escape_markdown(str(therapy_details).strip())}")
             lines.append("")
-    
+
     elif medical_action == 'أجهزة تعويضية':
-        # تفاصيل الجهاز
-        device_info = data.get('device_details') or data.get('device_name') or ''
+        # تفاصيل الجهاز - محاولة من عدة حقول
+        device_info = data.get('device_details') or data.get('device_name') or data.get('complaint_text') or ''
         if device_info and str(device_info).strip():
             lines.append(f"🦾 **تفاصيل الجهاز:** {escape_markdown(str(device_info))}")
             lines.append("")
@@ -874,9 +1116,6 @@ def _build_followup_fields(data: dict) -> list:
     """بناء حقول موعد العودة وسبب العودة"""
     lines = []
     
-    # ✅ تم إزالة عرض رقم الغرفة من مسار followup (عودة دورية)
-    # رقم الغرفة يظهر فقط في _build_general_fields للمسارات emergency و admission
-    
     # موعد العودة
     if data.get('followup_date') and data.get('followup_date') != 'لا يوجد':
         date_str = _format_followup_date(data.get('followup_date'), data.get('followup_time'))
@@ -896,372 +1135,72 @@ def _build_followup_fields(data: dict) -> list:
     return lines
 
 
-def _extract_decision(data: dict) -> str:
-    """
-    ✅ استخراج قرار الطبيب من عدة مصادر
-    - فصل واضح بين diagnosis و decision
-    - ✅ منع التكرار: إذا كان decision موجوداً، لا نستخرجه من doctor_decision
-    """
-    # ✅ المحاولة الأولى: من decision مباشرة (الأولوية الأولى - منع التكرار)
-    decision = data.get('decision', '')
-    if decision and str(decision).strip():
-        # ✅ تنظيف القرار من أي نص "قرار الطبيب:" إذا كان موجوداً (منع التكرار)
-        decision_str = str(decision).strip()
-        if decision_str.startswith('قرار الطبيب:'):
-            decision_str = decision_str.replace('قرار الطبيب:', '', 1).strip()
-        # ✅ إذا كان decision موجوداً، نعيده مباشرة ولا نحتاج doctor_decision
-        return decision_str
-
-    # ✅ المحاولة الثانية: استخراج من doctor_decision (فقط إذا لم يكن decision موجوداً)
-    doctor_decision = data.get('doctor_decision', '')
-    if doctor_decision:
-        doctor_decision_str = str(doctor_decision).strip()
-
-        # ✅ التحقق من أن doctor_decision ليس نفس diagnosis (منع التكرار)
-        diagnosis = data.get('diagnosis', '')
-        if diagnosis and _is_similar_text(diagnosis, doctor_decision_str):
-            return None  # ✅ doctor_decision متشابه مع diagnosis، لا نعيده
-
-        # ✅ إذا كان doctor_decision يحتوي على "قرار الطبيب:"، نستخرج القرار فقط
-        if 'قرار الطبيب:' in doctor_decision_str:
-            parts = doctor_decision_str.split('قرار الطبيب:', 1)
-            if len(parts) > 1:
-                extracted = parts[1].strip()
-                # ✅ تنظيف النص من أي حقول إضافية
-                if '\n\n' in extracted:
-                    extracted = extracted.split('\n\n')[0].strip()
-                # ✅ إزالة أي نص بعد سطر جديد واحد إذا كان يحتوي على عناوين أخرى
-                for marker in ['الفحوصات:', 'وضع الحالة:', 'موعد العودة:', 'سبب العودة:']:
-                    if marker in extracted:
-                        extracted = extracted.split(marker)[0].strip()
-                if extracted and len(extracted) > 0:
-                    return extracted
-
-        # ✅ إذا كان يحتوي على "التشخيص:" فقط، لا نعيد شيء (التشخيص يُعرض منفصلاً)
-        if 'التشخيص:' in doctor_decision_str and 'قرار الطبيب:' not in doctor_decision_str:
-            return None
-
-        # ✅ إذا لم يكن يحتوي على "قرار الطبيب:" أو "التشخيص:"، نستخدمه كاملاً
-        if 'التشخيص:' not in doctor_decision_str and 'قرار الطبيب:' not in doctor_decision_str:
-            return doctor_decision_str
-
-    return None
-
-
-def _format_followup_date(followup_date, followup_time=None):
-    """تنسيق موعد العودة"""
-    if not followup_date or followup_date == 'لا يوجد':
+def _format_followup_date(followup_date, followup_time):
+    """تنسيق تاريخ العودة"""
+    if not followup_date:
         return None
     
-    from datetime import datetime
-    
+    from datetime import datetime, date
     try:
         if isinstance(followup_date, str):
-            # إذا كان النص يحتوي على التاريخ والوقت معاً
-            if ' - ' in followup_date:
-                return followup_date
-            
-            # إذا كان النص يحتوي على اسم اليوم
-            if '(' in followup_date and ')' in followup_date:
-                if followup_time:
-                    time_display = _format_time_12h(followup_time)
-                    if time_display:
-                        return f"{followup_date} الساعة {time_display}"
-                return followup_date
-            
-            # محاولة تحليل التاريخ
-            try:
+            if ' ' in followup_date:
+                date_obj = datetime.strptime(followup_date, '%Y-%m-%d %H:%M')
+            else:
                 date_obj = datetime.strptime(followup_date, '%Y-%m-%d')
-                days_ar = {0: 'الاثنين', 1: 'الثلاثاء', 2: 'الأربعاء', 3: 'الخميس', 4: 'الجمعة', 5: 'السبت', 6: 'الأحد'}
-                MONTH_NAMES_AR = {1: "يناير", 2: "فبراير", 3: "مارس", 4: "أبريل", 5: "مايو", 6: "يونيو", 7: "يوليو", 8: "أغسطس", 9: "سبتمبر", 10: "أكتوبر", 11: "نوفمبر", 12: "ديسمبر"}
-                day_name = days_ar.get(date_obj.weekday(), '')
-                date_formatted = f"{date_obj.strftime('%d')} {MONTH_NAMES_AR.get(date_obj.month, date_obj.month)} {date_obj.year} ({day_name})"
-                
-                if followup_time:
-                    time_display = _format_time_12h(followup_time)
-                    if time_display:
-                        return f"{date_formatted} الساعة {time_display}"
-                return date_formatted
-            except:
-                # فشل التحليل - استخدام النص كما هو
-                if followup_time:
-                    time_display = _format_time_12h(followup_time)
-                    if time_display:
-                        return f"{followup_date} الساعة {time_display}"
-                return followup_date
-        else:
-            # كائن datetime
+        elif isinstance(followup_date, datetime):
             date_obj = followup_date
-            days_ar = {0: 'الاثنين', 1: 'الثلاثاء', 2: 'الأربعاء', 3: 'الخميس', 4: 'الجمعة', 5: 'السبت', 6: 'الأحد'}
-            MONTH_NAMES_AR = {1: "يناير", 2: "فبراير", 3: "مارس", 4: "أبريل", 5: "مايو", 6: "يونيو", 7: "يوليو", 8: "أغسطس", 9: "سبتمبر", 10: "أكتوبر", 11: "نوفمبر", 12: "ديسمبر"}
-            day_name = days_ar.get(date_obj.weekday(), '')
-            date_str = f"{date_obj.strftime('%d')} {MONTH_NAMES_AR.get(date_obj.month, date_obj.month)} {date_obj.year} ({day_name})"
+        elif isinstance(followup_date, date):
+            date_obj = datetime.combine(followup_date, datetime.min.time())
+        else:
+            return str(followup_date)
+        
+        days_ar = {0: 'الاثنين', 1: 'الثلاثاء', 2: 'الأربعاء', 3: 'الخميس', 4: 'الجمعة', 5: 'السبت', 6: 'الأحد'}
+        MONTH_NAMES_AR = {1: "يناير", 2: "فبراير", 3: "مارس", 4: "أبريل", 5: "مايو", 6: "يونيو", 7: "يوليو", 8: "أغسطس", 9: "سبتمبر", 10: "أكتوبر", 11: "نوفمبر", 12: "ديسمبر"}
+        
+        day_name = days_ar.get(date_obj.weekday(), '')
+        date_str = f"{date_obj.strftime('%d')} {MONTH_NAMES_AR.get(date_obj.month, date_obj.month)} {date_obj.year} ({day_name})"
+        
+        if followup_time:
+            if ':' in str(followup_time):
+                parts = str(followup_time).split(':')
+                hour = int(parts[0])
+                minute = parts[1] if len(parts) > 1 else '00'
+            else:
+                hour = int(followup_time)
+                minute = '00'
             
-            if followup_time:
-                time_display = _format_time_12h(followup_time)
-                if time_display:
-                    return f"{date_str} الساعة {time_display}"
-            return date_str
+            if hour == 0:
+                time_str = f"12:{minute} صباحاً"
+            elif hour < 12:
+                time_str = f"{hour}:{minute} صباحاً"
+            elif hour == 12:
+                time_str = f"12:{minute} ظهراً"
+            else:
+                time_str = f"{hour-12}:{minute} مساءً"
+            
+            date_str += f" - {time_str}"
+        
+        return date_str
     except:
         return str(followup_date)
 
 
-def _format_time_12h(time_str):
-    """تحويل الوقت لصيغة 12 ساعة"""
-    if not time_str:
-        return None
-    try:
-        hour, minute = time_str.split(':')
-        hour_int = int(hour)
-        if hour_int == 0:
-            return f"12:{minute} صباحاً"
-        elif hour_int < 12:
-            return f"{hour_int}:{minute} صباحاً"
-        elif hour_int == 12:
-            return f"12:{minute} ظهراً"
-        else:
-            return f"{hour_int-12}:{minute} مساءً"
-    except:
-        return time_str
-
-
-async def broadcast_schedule(bot: Bot, photo_source: str, schedule_data: dict, use_file_id: bool = False):
-    """
-    بث جدول المترجمين لجميع المستخدمين المعتمدين
+def format_initial_case_message(case_data: dict) -> str:
+    """تنسيق رسالة الحالة الأولية"""
+    lines = []
+    lines.append("🆕 **حالة جديدة**")
+    lines.append("")
     
-    Args:
-        bot: كائن البوت
-        photo_source: مسار الصورة أو file_id
-        schedule_data: بيانات الجدول
-        use_file_id: إذا كان True، استخدم file_id بدلاً من مسار الملف
-    """
-    message = format_schedule_message(schedule_data)
+    if case_data.get('patient_name'):
+        lines.append(f"👤 المريض: {escape_markdown(str(case_data['patient_name']))}")
+        lines.append("")
     
-    # إرسال لجميع المستخدمين المعتمدين
-    with SessionLocal() as s:
-        approved_users = s.query(Translator).filter_by(
-            is_approved=True,
-            is_suspended=False
-        ).all()
-        
-        for user in approved_users:
-            if not user.tg_user_id:
-                logger.warning(f"⚠️ تخطي {user.full_name}: لم يستخدم البوت بعد (لا يوجد chat_id)")
-                continue
-            
-            try:
-                if use_file_id:
-                    await bot.send_photo(
-                        chat_id=user.tg_user_id,
-                        photo=photo_source,
-                        caption=message,
-                        parse_mode=ParseMode.MARKDOWN
-                    )
-                else:
-                    with open(photo_source, 'rb') as photo:
-                        await bot.send_photo(
-                            chat_id=user.tg_user_id,
-                            photo=photo,
-                            caption=message,
-                            parse_mode=ParseMode.MARKDOWN
-                        )
-                logger.info(f"✅ تم إرسال الجدول إلى {user.full_name}")
-            except Exception as e:
-                logger.error(f"❌ فشل إرسال الجدول إلى {user.full_name}: {e}")
+    if case_data.get('hospital_name'):
+        lines.append(f"🏥 المستشفى: {escape_markdown(str(case_data['hospital_name']))}")
+        lines.append("")
     
-    # إرسال للأدمن
-    for admin_id in ADMIN_IDS:
-        try:
-            if use_file_id:
-                await bot.send_photo(
-                    chat_id=admin_id,
-                    photo=photo_source,
-                    caption=message + "\n\n👑 **نسخة الأدمن**",
-                    parse_mode=ParseMode.MARKDOWN
-                )
-            else:
-                with open(photo_source, 'rb') as photo:
-                    await bot.send_photo(
-                        chat_id=admin_id,
-                        photo=photo,
-                        caption=message + "\n\n👑 **نسخة الأدمن**",
-                        parse_mode=ParseMode.MARKDOWN
-                    )
-        except Exception as e:
-            logger.error(f"❌ فشل إرسال الجدول للأدمن {admin_id}: {e}")
-
-
-async def send_user_notification(bot: Bot, report_data: dict):
-    """
-    إرسال تنبيه للمستخدم عند إنشاء تقرير جديد
-
-    Args:
-        bot: كائن البوت
-        report_data: بيانات التقرير
+    if case_data.get('complaint'):
+        lines.append(f"💬 الشكوى: {escape_markdown(str(case_data['complaint']))}")
+        lines.append("")
     
-    """
-    try:
-        translator_id = report_data.get('translator_id')
-        patient_name = report_data.get('patient_name', 'غير محدد')
-
-        if translator_id:
-            # إرسال تنبيه سريع للمستخدم
-            notification_message = f"""
-🔔 **تقرير جديد تم إنشاؤه**
-
-👤 **المريض:** {patient_name}
-📅 **التاريخ:** {report_data.get('report_date', 'غير محدد')}
-
-✅ تم إرسال التقرير للمجموعة المخصصة
-🔗 يمكنك مراجعة جميع التقارير في المجموعة
-
-💡 **نصيحة:** لتجنب الضغط، تتم مراجعة التقارير في المجموعة بدلاً من الإرسال الفردي
-"""
-
-            await bot.send_message(
-                chat_id=translator_id,
-                text=notification_message,
-                parse_mode=ParseMode.MARKDOWN
-            )
-
-            logger.info(f"✅ تم إرسال تنبيه للمستخدم: {translator_id}")
-
-    except Exception as e:
-        logger.error(f"❌ فشل إرسال التنبيه للمستخدم: {e}")
-
-
-async def setup_reports_group(bot: Bot, group_invite_link: str = None):
-    """
-    إعداد مجموعة التقارير وإرسال الدعوة للمستخدمين
-
-    Args:
-        bot: كائن البوت
-        group_invite_link: رابط دعوة المجموعة (اختياري)
-    """
-    if not REPORTS_GROUP_ID:
-        logger.warning("⚠️ REPORTS_GROUP_ID غير محدد في متغيرات البيئة")
-        return
-
-    try:
-        # إرسال رسالة تعريفية للمجموعة
-        welcome_message = """
-🏥 **مجموعة تقارير المستشفى**
-
-📋 **كيفية عمل النظام:**
-• جميع التقارير الجديدة تُرسل هنا تلقائياً
-• يمكنك مراجعة التقارير في أي وقت
-• النظام يوفر الضغط على البوت الفردي
-• إشعارات سريعة تُرسل لك عند إنشاء تقرير جديد
-
-📱 **للانضمام:** إذا لم تكن عضواً، ستتلقى دعوة تلقائية
-
-⚠️ **ملاحظة:** هذا النظام يحسن الأداء عند وجود عدد كبير من المستخدمين
-"""
-
-        await bot.send_message(
-            chat_id=REPORTS_GROUP_ID,
-            text=welcome_message,
-            parse_mode=ParseMode.MARKDOWN
-        )
-
-        logger.info("✅ تم إعداد مجموعة التقارير")
-
-        # إرسال دعوات للمستخدمين إذا كان هناك رابط دعوة
-        if group_invite_link:
-            await send_group_invitations(bot, group_invite_link)
-
-    except Exception as e:
-        logger.error(f"❌ فشل إعداد مجموعة التقارير: {e}")
-
-
-async def send_group_invitations(bot: Bot, invite_link: str):
-    """
-    إرسال دعوات الانضمام للمجموعة لجميع المستخدمين
-
-    Args:
-        bot: كائن البوت
-        invite_link: رابط دعوة المجموعة
-    """
-    try:
-        with SessionLocal() as s:
-            approved_users = s.query(Translator).filter_by(
-                is_approved=True,
-                is_suspended=False
-            ).all()
-            
-            sent_count = 0
-            failed_count = 0
-            
-            for user in approved_users:
-                if not user.tg_user_id:
-                    logger.warning(f"⚠️ تخطي {user.full_name}: لم يستخدم البوت بعد")
-                    continue
-                
-                try:
-                    invitation_message = f"""
-🏥 **دعوة للانضمام لمجموعة التقارير**
-
-مرحباً {user.full_name}!
-
-📋 **المجموعة:** {invite_link}
-
-✅ **المميزات:**
-• جميع التقارير الجديدة تُرسل هنا تلقائياً
-• مراجعة سريعة وسهلة
-• لا حاجة للبحث في المحادثات الفردية
-
-🔗 **للانضمام:** اضغط على الرابط أعلاه
-"""
-                    await bot.send_message(
-                        chat_id=user.tg_user_id,
-                        text=invitation_message,
-                        parse_mode=ParseMode.MARKDOWN
-                    )
-                    sent_count += 1
-                except Exception as e:
-                    logger.error(f"❌ فشل إرسال دعوة لـ {user.full_name}: {e}")
-                    failed_count += 1
-            
-            logger.info(f"✅ تم إرسال {sent_count} دعوة، فشل {failed_count}")
-    
-    except Exception as e:
-        logger.error(f"❌ فشل إرسال الدعوات: {e}")
-
-
-def format_schedule_message(data: dict) -> str:
-    """
-    تنسيق رسالة جدول المترجمين
-    """
-    message = "📅 **جدول المترجمين**\n\n"
-    
-    if data.get('date'):
-        message += f"📆 **التاريخ:** {data['date']}\n\n"
-    
-    if data.get('translators'):
-        message += "👥 **المترجمون:**\n"
-        for translator in data['translators']:
-            message += f"• {translator}\n"
-        message += "\n"
-    
-    if data.get('notes'):
-        message += f"📝 **ملاحظات:**\n{data['notes']}\n"
-    
-    return message
-
-
-def format_initial_case_message(data: dict) -> str:
-    """
-    تنسيق رسالة الحالة الأولية
-    """
-    message = "🆕 **حالة أولية جديدة**\n\n"
-    
-    if data.get('patient_name'):
-        message += f"👤 **المريض:** {data['patient_name']}\n\n"
-    
-    if data.get('case_description'):
-        message += f"📋 **وصف الحالة:**\n{data['case_description']}\n\n"
-    
-    if data.get('date'):
-        message += f"📅 **التاريخ:** {data['date']}\n"
-    
-    return message
+    return "\n".join(lines)

@@ -230,7 +230,8 @@ async def handle_followup_decision(update: Update, context: ContextTypes.DEFAULT
     logger.info(f"🔍 [FOLLOWUP_DECISION] medical_action={data.get('medical_action')}, report_tmp keys: {list(data.keys())}")
 
     # التحقق من نوع المسار لتحديد الخطوة التالية
-    if data.get("current_flow") == "followup":
+    # ✅ المسارات التي تحتاج رقم غرفة: followup (متابعة في الرقود) و inpatient_followup
+    if data.get("current_flow") in ["followup", "inpatient_followup"]:
         # مسار متابعة في الرقود: طلب رقم الغرفة والطابق
         logger.info(f"✅ [FOLLOWUP_DECISION] تم حفظ قرار الطبيب، مسار 'متابعة في الرقود' - طلب رقم الغرفة")
         logger.info(f"✅ [FOLLOWUP_DECISION] العودة إلى FOLLOWUP_ROOM_FLOOR state")
@@ -244,7 +245,7 @@ async def handle_followup_decision(update: Update, context: ContextTypes.DEFAULT
         context.user_data['_conversation_state'] = FOLLOWUP_ROOM_FLOOR
         return FOLLOWUP_ROOM_FLOOR
     else:
-        # مسار مراجعة / عودة دورية: تخطي رقم الغرفة والذهاب للتقويم مباشرة
+        # مسار مراجعة / عودة دورية (periodic_followup): تخطي رقم الغرفة والذهاب للتقويم مباشرة
         logger.info(f"✅ [FOLLOWUP_DECISION] تم حفظ قرار الطبيب، مسار 'مراجعة / عودة دورية' - تخطي رقم الغرفة")
         await update.message.reply_text("✅ تم الحفظ")
         # عرض تقويم اختيار تاريخ ووقت العودة

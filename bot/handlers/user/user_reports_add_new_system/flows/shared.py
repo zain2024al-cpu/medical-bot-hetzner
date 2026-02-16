@@ -17,10 +17,12 @@ from ..states import (
     ADMISSION_TRANSLATOR, SURGERY_CONSULT_TRANSLATOR, OPERATION_TRANSLATOR,
     FINAL_CONSULT_TRANSLATOR, DISCHARGE_TRANSLATOR, PHYSICAL_THERAPY_TRANSLATOR,
     DEVICE_TRANSLATOR, RADIOLOGY_TRANSLATOR, APP_RESCHEDULE_TRANSLATOR,
+    RADIATION_THERAPY_TRANSLATOR,
     NEW_CONSULT_CONFIRM, FOLLOWUP_CONFIRM, EMERGENCY_CONFIRM,
     ADMISSION_CONFIRM, SURGERY_CONSULT_CONFIRM, OPERATION_CONFIRM,
     FINAL_CONSULT_CONFIRM, DISCHARGE_CONFIRM, PHYSICAL_THERAPY_CONFIRM,
     DEVICE_CONFIRM, RADIOLOGY_CONFIRM, APP_RESCHEDULE_CONFIRM,
+    RADIATION_THERAPY_CONFIRM,
     R_ACTION_TYPE
 )
 from ..utils import _nav_buttons
@@ -32,9 +34,9 @@ try:
 except ImportError:
     SessionLocal = None
 try:
-    from db.models import Translator, Report, Patient, Hospital, Department, Doctor
+    from db.models import TranslatorDirectory, Report, Patient, Hospital, Department, Doctor
 except ImportError:
-    Translator = Report = Patient = Hospital = Department = Doctor = None
+    TranslatorDirectory = Report = Patient = Hospital = Department = Doctor = None
 try:
     from bot.handlers.user.user_reports_add_helpers import validate_text_input, _build_action_type_keyboard
 except ImportError:
@@ -78,7 +80,7 @@ def ensure_default_translators():
     إضافة المترجمين الافتراضيين إلى قاعدة البيانات إذا لم يكونوا موجودين
     دالة ثابتة للقوائم - تضمن وجود المترجمين الأساسيين في قاعدة البيانات
     """
-    if not SessionLocal or not Translator:
+    if not SessionLocal or not TranslatorDirectory:
         logger.warning("⚠️ SessionLocal or Translator not available - skipping ensure_default_translators")
         return
     
@@ -109,19 +111,13 @@ def ensure_default_translators():
         with SessionLocal() as s:
             added_count = 0
             for name in translator_names:
-                # التحقق إذا كان المترجم موجوداً بالفعل
-                existing = s.query(Translator).filter(
-                    Translator.full_name.ilike(name)
+                existing = s.query(TranslatorDirectory).filter(
+                    TranslatorDirectory.name.ilike(name)
                 ).first()
                 
                 if not existing:
-                    # إضافة المترجم الجديد
-                    new_translator = Translator(
-                        full_name=name,
-                        is_approved=True,
-                        is_active=True,
-                        role="translator",
-                        status="approved"
+                    new_translator = TranslatorDirectory(
+                        name=name
                     )
                     s.add(new_translator)
                     added_count += 1
@@ -156,45 +152,19 @@ def format_field_value(value):
     return str(value)
 
 
-def format_time_12h(time_input):
-    """
-    تحويل الوقت لصيغة 12 ساعة مع صباحاً/ظهراً/مساءً
-    ✅ النسخة الموحدة - تدعم datetime objects و strings
-
-    Args:
-        time_input: يمكن أن يكون:
-            - datetime object
-            - string بصيغة "HH:MM" أو "HH"
-            - int (الساعة فقط)
-
-    Returns:
-        string بصيغة "X:XX صباحاً/ظهراً/مساءً" أو None إذا كان الإدخال فارغاً
-    """
-    if not time_input:
+def format_time_12h(time_str):
+    """تحويل الوقت لصيغة 12 ساعة مع صباحاً/ظهراً/مساءً"""
+    if not time_str:
         return None
-
     try:
-        # ✅ التعامل مع datetime object
-        if isinstance(time_input, datetime):
-            hour = time_input.hour
-            minute = f"{time_input.minute:02d}"
-        # ✅ التعامل مع string
-        elif isinstance(time_input, str):
-            if ':' in time_input:
-                parts = time_input.split(':')
-                hour = int(parts[0])
-                minute = parts[1] if len(parts) > 1 else '00'
-            else:
-                hour = int(time_input)
-                minute = '00'
-        # ✅ التعامل مع int
-        elif isinstance(time_input, int):
-            hour = time_input
-            minute = '00'
+        if ':' in str(time_str):
+            parts = str(time_str).split(':')
+            hour = int(parts[0])
+            minute = parts[1] if len(parts) > 1 else '00'
         else:
-            return str(time_input)
-
-        # تحويل لصيغة 12 ساعة
+            hour = int(time_str)
+            minute = '00'
+        
         if hour == 0:
             return f"12:{minute} صباحاً"
         elif hour < 12:
@@ -204,109 +174,7 @@ def format_time_12h(time_input):
         else:
             return f"{hour-12}:{minute} مساءً"
     except:
-        return str(time_input)
-
-
-def _chunked(lst, n):
-    """تقسيم قائمة إلى أجزاء بحجم n"""
-    for i in range(0, len(lst), n):
-        yield lst[i:i + n]
-
-
-def _build_hour_keyboard():
-    """
-    بناء لوحة اختيار الساعات بصيغة 12 ساعة
-    ✅ النسخة الموحدة
-    """
-    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-    keyboard = []
-    
-    # أوقات شائعة أولاً (صباحاً)
-    common_morning = [
-        ("🌅 8:00 صباحاً", "08"),
-        ("🌅 9:00 صباحاً", "09"),
-        ("🌅 10:00 صباحاً", "10"),
-        ("🌅 11:00 صباحاً", "11"),
-    ]
-    keyboard.append([InlineKeyboardButton(label, callback_data=f"time_hour:{val}") for label, val in common_morning])
-    
-    # الظهر
-    keyboard.append([
-        InlineKeyboardButton("☀️ 12:00 ظهراً", callback_data="time_hour:12")
-    ])
-    
-    # بعد الظهر
-    common_afternoon = [
-        ("🌆 1:00 مساءً", "13"),
-        ("🌆 2:00 مساءً", "14"),
-        ("🌆 3:00 مساءً", "15"),
-        ("🌆 4:00 مساءً", "16"),
-    ]
-    keyboard.append([InlineKeyboardButton(label, callback_data=f"time_hour:{val}") for label, val in common_afternoon])
-    
-    # مساءً
-    common_evening = [
-        ("🌃 5:00 مساءً", "17"),
-        ("🌃 6:00 مساءً", "18"),
-        ("🌃 7:00 مساءً", "19"),
-        ("🌃 8:00 مساءً", "20"),
-    ]
-    keyboard.append([InlineKeyboardButton(label, callback_data=f"time_hour:{val}") for label, val in common_evening])
-    
-    # زر "أوقات أخرى"
-    keyboard.append([InlineKeyboardButton("🕐 أوقات أخرى", callback_data="time_hour:more")])
-    
-    keyboard.append([InlineKeyboardButton("⏭️ بدون وقت", callback_data="time_skip")])
-    keyboard.append([
-        InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
-        InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel"),
-    ])
-    return InlineKeyboardMarkup(keyboard)
-
-
-def _build_minute_keyboard(hour: str):
-    """
-    بناء لوحة اختيار الدقائق مع عرض الوقت بصيغة 12 ساعة
-    ✅ النسخة الموحدة
-    """
-    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-    minute_options = ["00", "15", "30", "45"]
-    keyboard = []
-
-    # تحويل الساعة إلى صيغة 12 ساعة للعرض
-    hour_int = int(hour)
-    if hour_int == 0:
-        hour_display = "12"
-        period = "صباحاً"
-    elif hour_int < 12:
-        hour_display = str(hour_int)
-        period = "صباحاً"
-    elif hour_int == 12:
-        hour_display = "12"
-        period = "ظهراً"
-    else:
-        hour_display = str(hour_int - 12)
-        period = "مساءً"
-
-    for chunk in _chunked(minute_options, 2):
-        row = []
-        for m in chunk:
-            label = f"{hour_display}:{m} {period}"
-            row.append(
-                InlineKeyboardButton(
-                    label,
-                    callback_data=f"time_minute:{hour}:{m}"))
-        keyboard.append(row)
-
-    keyboard.append([InlineKeyboardButton(
-        "⏭️ بدون وقت", callback_data="time_skip")])
-    keyboard.append([
-        InlineKeyboardButton("🔙 تغيير الساعة", callback_data="time_back_hour"),
-        InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
-    ])
-    keyboard.append([InlineKeyboardButton(
-        "❌ إلغاء", callback_data="nav:cancel")])
-    return InlineKeyboardMarkup(keyboard)
+        return str(time_str)
 
 
 def get_field_display_name(field_key):
@@ -426,68 +294,71 @@ def _has_field_value(data, field_key):
 
 
 def get_editable_fields_by_flow_type(flow_type):
-    """الحصول على الحقول القابلة للتعديل حسب نوع التدفق - النسخة الموحدة
+    """الحصول على الحقول القابلة للتعديل حسب نوع التدفق - دالة ثابتة للقوائم
     ✅ ملاحظة: تم إزالة الحقول الأساسية (report_date, patient_name, hospital_name, department_name, doctor_name)
     لأنها تُحدد قبل بدء المسار وليست جزءاً من الإدخال اليدوي
-    ✅ تتضمن translator_name للسماح بتعديل المترجم
     """
     fields_map = {
         "new_consult": [
+            # ✅ الحقول المدخلة فقط في مسار استشارة جديدة
             ("complaint", "💬 شكوى المريض"),
             ("diagnosis", "🔬 التشخيص الطبي"),
             ("decision", "📝 قرار الطبيب"),
             ("tests", "🧪 الفحوصات والأشعة"),
             ("followup_date", "📅 موعد العودة"),
+            ("followup_time", "⏰ وقت العودة"),
             ("followup_reason", "✍️ سبب العودة"),
-            ("translator_name", "👤 المترجم"),
         ],
         "followup": [
-            ("complaint", "💬 حالة المريض اليومية"),
-            ("diagnosis", "🔬 التشخيص"),
-            ("decision", "📝 قرار الطبيب اليومي"),
-            ("room_number", "🚪 رقم الغرفة والطابق"),
+            # ✅ الحقول المدخلة فقط في مسار متابعة (متابعة في الرقود)
+            ("complaint", "💬 شكوى المريض"),
+            ("diagnosis", "🔬 التشخيص الطبي"),
+            ("decision", "📝 قرار الطبيب"),
+            ("room_number", "🏥 رقم الغرفة والطابق"),
             ("followup_date", "📅 موعد العودة"),
+            ("followup_time", "⏰ وقت العودة"),
             ("followup_reason", "✍️ سبب العودة"),
-            ("translator_name", "👤 المترجم"),
         ],
         "periodic_followup": [
             # ✅ مسار "مراجعة / عودة دورية" - بدون room_number
             ("complaint", "💬 شكوى المريض"),
-            ("diagnosis", "🔬 التشخيص"),
+            ("diagnosis", "🔬 التشخيص الطبي"),
             ("decision", "📝 قرار الطبيب"),
             ("followup_date", "📅 موعد العودة"),
+            ("followup_time", "⏰ وقت العودة"),
             ("followup_reason", "✍️ سبب العودة"),
-            ("translator_name", "👤 المترجم"),
         ],
         "inpatient_followup": [
             # ✅ مسار "متابعة في الرقود" - مع room_number
-            ("complaint", "💬 حالة المريض اليومية"),
-            ("diagnosis", "🔬 التشخيص"),
-            ("decision", "📝 قرار الطبيب اليومي"),
-            ("room_number", "🚪 رقم الغرفة والطابق"),
+            ("complaint", "💬 شكوى المريض"),
+            ("diagnosis", "🔬 التشخيص الطبي"),
+            ("decision", "📝 قرار الطبيب"),
+            ("room_number", "🏥 رقم الغرفة والطابق"),
             ("followup_date", "📅 موعد العودة"),
+            ("followup_time", "⏰ وقت العودة"),
             ("followup_reason", "✍️ سبب العودة"),
-            ("translator_name", "👤 المترجم"),
         ],
         "emergency": [
+            # ✅ الحقول المدخلة فقط في مسار طوارئ
             ("complaint", "💬 شكوى المريض"),
-            ("diagnosis", "🔬 التشخيص"),
+            ("diagnosis", "🔬 التشخيص الطبي"),
             ("decision", "📝 قرار الطبيب وماذا تم"),
             ("status", "🏥 وضع الحالة"),
-            ("admission_type", "🛏️ نوع الترقيد"),
+            ("room_number", "🚪 رقم الغرفة"),
             ("followup_date", "📅 موعد العودة"),
+            ("followup_time", "⏰ وقت العودة"),
             ("followup_reason", "✍️ سبب العودة"),
-            ("translator_name", "👤 المترجم"),
         ],
         "admission": [
+            # ✅ الحقول المدخلة فقط في مسار ترقيد
             ("admission_reason", "🛏️ سبب الرقود"),
             ("room_number", "🚪 رقم الغرفة"),
             ("notes", "📝 ملاحظات"),
             ("followup_date", "📅 موعد العودة"),
             ("followup_reason", "✍️ سبب العودة"),
-            ("translator_name", "👤 المترجم"),
         ],
         "surgery_consult": [
+            # ✅ الحقول المدخلة فقط في مسار استشارة مع قرار عملية
             ("diagnosis", "🔬 التشخيص"),
             ("decision", "📝 قرار الطبيب وتفاصيل العملية"),
             ("operation_name_en", "🔤 اسم العملية بالإنجليزي"),
@@ -495,61 +366,80 @@ def get_editable_fields_by_flow_type(flow_type):
             ("benefit_rate", "💡 نسبة الاستفادة"),
             ("tests", "🧪 الفحوصات والأشعة"),
             ("followup_date", "📅 موعد العودة"),
+            ("followup_time", "⏰ وقت العودة"),
             ("followup_reason", "✍️ سبب العودة"),
-            ("translator_name", "👤 المترجم"),
         ],
         "operation": [
+            # ✅ الحقول المدخلة فقط في مسار عملية
             ("operation_details", "⚕️ تفاصيل العملية بالعربي"),
             ("operation_name_en", "🔤 اسم العملية بالإنجليزي"),
             ("notes", "📝 ملاحظات"),
             ("followup_date", "📅 موعد العودة"),
+            ("followup_time", "⏰ وقت العودة"),
             ("followup_reason", "✍️ سبب العودة"),
-            ("translator_name", "👤 المترجم"),
         ],
         "final_consult": [
+            # ✅ الحقول المدخلة فقط في مسار استشارة أخيرة
             ("diagnosis", "🔬 التشخيص النهائي"),
             ("decision", "📝 قرار الطبيب"),
             ("recommendations", "💡 التوصيات الطبية"),
-            ("translator_name", "👤 المترجم"),
         ],
         "discharge": [
+            # ✅ الحقول المدخلة فقط في مسار خروج من المستشفى
             ("discharge_type", "🚪 نوع الخروج"),
             ("admission_summary", "📋 ملخص الرقود"),
             ("operation_details", "⚕️ تفاصيل العملية"),
             ("operation_name_en", "🔤 اسم العملية بالإنجليزي"),
             ("followup_date", "📅 موعد العودة"),
             ("followup_reason", "✍️ سبب العودة"),
-            ("translator_name", "👤 المترجم"),
         ],
         "rehab_physical": [
+            # ✅ الحقول المدخلة فقط في مسار علاج طبيعي
             ("therapy_details", "🏃 تفاصيل جلسة العلاج الطبيعي"),
             ("followup_date", "📅 موعد العودة"),
+            ("followup_time", "⏰ وقت العودة"),
             ("followup_reason", "✍️ سبب العودة"),
-            ("translator_name", "👤 المترجم"),
         ],
         "rehab_device": [
+            # ✅ الحقول المدخلة فقط في مسار أجهزة تعويضية
             ("device_name", "🦾 اسم الجهاز والتفاصيل"),
             ("followup_date", "📅 موعد العودة"),
+            ("followup_time", "⏰ وقت العودة"),
             ("followup_reason", "✍️ سبب العودة"),
-            ("translator_name", "👤 المترجم"),
         ],
         "radiology": [
+            # ✅ الحقول المدخلة فقط في مسار أشعة وفحوصات
             ("radiology_type", "🔬 نوع الأشعة/الفحص"),
             ("delivery_date", "📅 تاريخ الاستلام"),
-            ("translator_name", "👤 المترجم"),
+        ],
+        "radiation_therapy": [
+            # ✅ الحقول المدخلة فقط في مسار جلسة إشعاعي
+            ("radiation_therapy_type", "☢️ نوع الإشعاعي"),
+            ("radiation_therapy_session_number", "🔢 رقم الجلسة"),
+            ("radiation_therapy_remaining", "📊 الجلسات المتبقية"),
+            ("radiation_therapy_recommendations", "📝 ملاحظات / توصيات"),
+            ("followup_date", "📅 تاريخ العودة"),
+            ("followup_time", "⏰ وقت العودة"),
+            ("followup_reason", "✍️ سبب العودة"),
         ],
         "appointment_reschedule": [
-            ("app_reschedule_reason", "📅 سبب التأجيل"),
-            ("app_reschedule_return_date", "📅 موعد العودة الجديد"),
+            # ✅ الحقول المدخلة فقط في مسار تأجيل موعد
+            ("app_reschedule_reason", "📅 سبب تأجيل الموعد"),
+            ("app_reschedule_return_date", "📅 تاريخ العودة الجديد"),
             ("app_reschedule_return_reason", "✍️ سبب العودة"),
-            ("translator_name", "👤 المترجم"),
         ],
-        # ✅ أضف أسماء بديلة للتوافق
         "app_reschedule": [
-            ("app_reschedule_reason", "📅 سبب التأجيل"),
-            ("app_reschedule_return_date", "📅 موعد العودة الجديد"),
+            # ✅ نسخة للتوافق مع app_reschedule
+            ("app_reschedule_reason", "📅 سبب تأجيل الموعد"),
+            ("app_reschedule_return_date", "📅 تاريخ العودة الجديد"),
             ("app_reschedule_return_reason", "✍️ سبب العودة"),
-            ("translator_name", "👤 المترجم"),
+        ],
+        "device": [
+            # ✅ نسخة للتوافق مع device (rehab_device)
+            ("device_name", "🦾 اسم الجهاز والتفاصيل"),
+            ("followup_date", "📅 موعد العودة"),
+            ("followup_time", "⏰ وقت العودة"),
+            ("followup_reason", "✍️ سبب العودة"),
         ],
     }
     return fields_map.get(flow_type, [])
@@ -560,8 +450,11 @@ def get_translator_state(flow_type):
     states = {
         "new_consult": NEW_CONSULT_TRANSLATOR,
         "followup": FOLLOWUP_TRANSLATOR,
+        "periodic_followup": FOLLOWUP_TRANSLATOR,  # ✅ إضافة periodic_followup
+        "inpatient_followup": FOLLOWUP_TRANSLATOR,  # ✅ إضافة inpatient_followup
         "surgery_consult": SURGERY_CONSULT_TRANSLATOR,
         "appointment_reschedule": APP_RESCHEDULE_TRANSLATOR,
+        "app_reschedule": APP_RESCHEDULE_TRANSLATOR,  # ✅ إضافة للتوافق
         "emergency": EMERGENCY_TRANSLATOR,
         "admission": ADMISSION_TRANSLATOR,
         "operation": OPERATION_TRANSLATOR,
@@ -569,7 +462,9 @@ def get_translator_state(flow_type):
         "discharge": DISCHARGE_TRANSLATOR,
         "rehab_physical": PHYSICAL_THERAPY_TRANSLATOR,
         "rehab_device": DEVICE_TRANSLATOR,
-        "radiology": RADIOLOGY_TRANSLATOR
+        "device": DEVICE_TRANSLATOR,  # ✅ إضافة للتوافق
+        "radiology": RADIOLOGY_TRANSLATOR,
+        "radiation_therapy": RADIATION_THERAPY_TRANSLATOR
     }
     return states.get(flow_type, NEW_CONSULT_TRANSLATOR)
 
@@ -579,6 +474,8 @@ def get_confirm_state(flow_type):
     states = {
         "new_consult": NEW_CONSULT_CONFIRM,
         "followup": FOLLOWUP_CONFIRM,
+        "periodic_followup": FOLLOWUP_CONFIRM,
+        "inpatient_followup": FOLLOWUP_CONFIRM,
         "surgery_consult": SURGERY_CONSULT_CONFIRM,
         "appointment_reschedule": APP_RESCHEDULE_CONFIRM,
         "emergency": EMERGENCY_CONFIRM,
@@ -587,8 +484,10 @@ def get_confirm_state(flow_type):
         "final_consult": FINAL_CONSULT_CONFIRM,
         "discharge": DISCHARGE_CONFIRM,
         "rehab_physical": PHYSICAL_THERAPY_CONFIRM,
+        "rehab_device": DEVICE_CONFIRM,
         "device": DEVICE_CONFIRM,
-        "radiology": RADIOLOGY_CONFIRM
+        "radiology": RADIOLOGY_CONFIRM,
+        "radiation_therapy": RADIATION_THERAPY_CONFIRM
     }
     return states.get(flow_type, NEW_CONSULT_CONFIRM)
 
@@ -597,76 +496,41 @@ def get_confirm_state(flow_type):
 # Translator Functions
 # =============================
 
-async def show_translator_selection(message, context, flow_type, page=1):
+async def show_translator_selection(message, context, flow_type):
     """
-    ✅ عرض قائمة المترجمين للاختيار مع صفحات (الدالة الموحدة)
-    تم دمج: pagination من الملف الرئيسي + زر تخطي
+    عرض قائمة المترجمين للاختيار (من ملف translator_names.txt)
+    دالة ثابتة للقوائم
     """
-    if load_translator_names is None:
-        logger.error("❌ load_translator_names is None - cannot proceed")
-        await message.reply_text("⚠️ خطأ في النظام - يرجى المحاولة مرة أخرى")
-        return ConversationHandler.END
     translator_names = load_translator_names()
 
     if not translator_names:
         await message.reply_text("❌ خطأ: لا توجد أسماء مترجمين متاحة")
         # المتابعة بدون مترجم
         await show_final_summary(message, context, flow_type)
-        if get_confirm_state is None:
-            logger.error("❌ get_confirm_state is None - cannot proceed")
-            context.user_data['_conversation_state'] = NEW_CONSULT_CONFIRM
-            return NEW_CONSULT_CONFIRM
         confirm_state = get_confirm_state(flow_type)
         context.user_data['_conversation_state'] = confirm_state
         return confirm_state
-
-    # تقسيم إلى صفحتين: الصفحة الأولى 18 مترجم، الباقي في الصفحة الثانية
-    FIRST_PAGE_COUNT = 18
-
-    if page == 1:
-        page_names = translator_names[:FIRST_PAGE_COUNT]
-    else:
-        page_names = translator_names[FIRST_PAGE_COUNT:]
 
     # تقسيم الأسماء إلى صفوف (3 أسماء لكل صف)
     keyboard_buttons = []
     row = []
 
-    for name in page_names:
-        # الحصول على الـ index الحقيقي من القائمة الأصلية
-        real_index = translator_names.index(name)
-        row.append(InlineKeyboardButton(name, callback_data=f"simple_translator:{flow_type}:{real_index}"))
-        if len(row) == 3:
+    for i, name in enumerate(translator_names):
+        row.append(InlineKeyboardButton(name, callback_data=f"simple_translator:{flow_type}:{i}"))
+        if len(row) == 3 or i == len(translator_names) - 1:
             keyboard_buttons.append(row)
             row = []
 
-    # إضافة الصف الأخير إذا كان غير مكتمل
-    if row:
-        keyboard_buttons.append(row)
-
-    # أزرار التنقل بين الصفحات
-    nav_buttons = []
-    if page == 1 and len(translator_names) > FIRST_PAGE_COUNT:
-        nav_buttons.append(InlineKeyboardButton("⬅️ الصفحة التالية", callback_data=f"translator_page:{flow_type}:2"))
-    elif page == 2:
-        nav_buttons.append(InlineKeyboardButton("➡️ الصفحة السابقة", callback_data=f"translator_page:{flow_type}:1"))
-
-    if nav_buttons:
-        keyboard_buttons.append(nav_buttons)
-
-    # إضافة زر تخطي + رجوع + إلغاء
+    # إضافة زر تخطي (اختياري)
     keyboard_buttons.append([
-        InlineKeyboardButton("⏭️ تخطي", callback_data=f"simple_translator:{flow_type}:skip"),
-        InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
+        InlineKeyboardButton("⏭️ تخطي (بدون مترجم)", callback_data=f"simple_translator:{flow_type}:skip"),
         InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
     ])
 
     keyboard = InlineKeyboardMarkup(keyboard_buttons)
 
-    page_text = f"(الصفحة {page} من 2)" if len(translator_names) > FIRST_PAGE_COUNT else ""
-
     await message.reply_text(
-        f"👤 **اختر اسم المترجم** {page_text}\n\n"
+        f"👤 **اختر اسم المترجم**\n\n"
         f"المترجم مسؤول عن ترجمة التقرير إلى اللغة المطلوبة.\n"
         f"اختر من القائمة أدناه:",
         reply_markup=keyboard,
@@ -677,7 +541,6 @@ async def show_translator_selection(message, context, flow_type, page=1):
 async def handle_simple_translator_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     معالجة اختيار المترجم البسيط (من قائمة ثابتة)
-    ✅ النسخة الموحدة مع معالجة أخطاء قوية
     """
     query = update.callback_query
     await query.answer()
@@ -692,110 +555,42 @@ async def handle_simple_translator_choice(update: Update, context: ContextTypes.
         choice = parts[2]
 
         if choice == "skip":
-            # تخطي المترجم
             translator_name = "غير محدد"
             translator_id = None
         else:
-            # اختيار مترجم من القائمة
-            if load_translator_names is None:
-                logger.error("❌ load_translator_names is None - cannot proceed")
-                await query.edit_message_text("⚠️ خطأ في النظام - يرجى المحاولة مرة أخرى")
-                return ConversationHandler.END
             translator_names = load_translator_names()
             try:
                 index = int(choice)
                 translator_name = translator_names[index]
-                translator_id = None  # لا نحتاج id للمترجمين الثابتين
+                translator_id = None
             except (IndexError, ValueError):
                 await query.edit_message_text("❌ اختيار غير صحيح")
                 return ConversationHandler.END
+            
+            try:
+                from services.translators_service import get_translator_by_name
+                translator_info = get_translator_by_name(translator_name)
+                if translator_info:
+                    translator_id = translator_info.get("id")
+            except Exception as e:
+                logger.warning(f"⚠️ فشل تحديد معرف المترجم: {e}")
 
         # حفظ اسم المترجم
-        context.user_data.setdefault("report_tmp", {})
-        context.user_data["report_tmp"]["translator_name"] = translator_name
-        context.user_data["report_tmp"]["translator_id"] = translator_id
-
-        # ✅ التحقق من flow_type مع fallback
-        valid_flow_types = ["new_consult", "followup", "periodic_followup", "emergency", "admission",
-                          "surgery_consult", "operation", "final_consult", "discharge",
-                          "rehab_physical", "rehab_device", "radiology", "appointment_reschedule"]
-
-        if not flow_type or flow_type not in valid_flow_types:
-            # محاولة الحصول على flow_type من report_tmp
-            current_flow = context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
-            if current_flow in valid_flow_types:
-                flow_type = current_flow
-            else:
-                flow_type = "new_consult"  # القيمة الافتراضية
+        report_tmp = context.user_data.setdefault("report_tmp", {})
+        report_tmp["translator_name"] = translator_name
+        report_tmp["translator_id"] = translator_id
 
         # المتابعة للتأكيد النهائي
-        message_to_use = None
+        await query.edit_message_text(f"✅ تم اختيار المترجم: **{translator_name}**")
+        await show_final_summary(query.message, context, flow_type)
 
-        # محاولة تعديل الرسالة أولاً
-        try:
-            await query.edit_message_text(f"✅ تم اختيار المترجم: **{translator_name}**", parse_mode="Markdown")
-            message_to_use = query.message
-        except Exception as e:
-            logger.warning(f"⚠️ فشل تعديل رسالة المترجم: {e}")
-            message_to_use = query.message
-
-        # محاولة إرسال الملخص
-        try:
-            # ✅ show_final_summary معرفة محلياً في نفس الملف، لكن نتحقق من الأمان
-            # (قد تكون None إذا كان هناك مشكلة في الاستيراد)
-            if show_final_summary is not None:
-                if message_to_use:
-                    await show_final_summary(message_to_use, context, flow_type)
-                elif update.effective_message:
-                    await show_final_summary(update.effective_message, context, flow_type)
-                else:
-                    # كحل أخير، أرسل رسالة جديدة
-                    bot = context.bot
-                    new_message = await bot.send_message(
-                        chat_id=query.from_user.id,
-                        text="✅ تم اختيار المترجم"
-                    )
-                    await show_final_summary(new_message, context, flow_type)
-            else:
-                # ✅ fallback إذا كانت show_final_summary None
-                logger.warning("⚠️ show_final_summary is None - using fallback message")
-                fallback_text = f"✅ تم اختيار المترجم: {translator_name}\n\nاضغط على زر '📢 نشر التقرير' للمتابعة."
-                if message_to_use:
-                    await message_to_use.reply_text(fallback_text)
-                elif update.effective_message:
-                    await update.effective_message.reply_text(fallback_text)
-        except Exception as e:
-            logger.error(f"❌ خطأ في show_final_summary: {e}", exc_info=True)
-            # حتى لو فشل show_final_summary، نكمل العملية
-            try:
-                if not message_to_use and update.effective_message:
-                    await update.effective_message.reply_text(
-                        f"✅ تم اختيار المترجم: {translator_name}\n\n"
-                        f"اضغط على زر '📢 نشر التقرير' للمتابعة."
-                    )
-            except:
-                pass
-
-        try:
-            if get_confirm_state is None:
-                logger.error("❌ get_confirm_state is None - cannot proceed")
-                context.user_data['_conversation_state'] = NEW_CONSULT_CONFIRM
-                return NEW_CONSULT_CONFIRM
-            confirm_state = get_confirm_state(flow_type)
-            context.user_data['_conversation_state'] = confirm_state
-            return confirm_state
-        except Exception as e:
-            logger.error(f"❌ خطأ في get_confirm_state: {e}", exc_info=True)
-            # إرجاع state افتراضي
-            context.user_data['_conversation_state'] = NEW_CONSULT_CONFIRM
-            return NEW_CONSULT_CONFIRM
+        confirm_state = get_confirm_state(flow_type)
+        context.user_data['_conversation_state'] = confirm_state
+        return confirm_state
 
     except Exception as e:
-        logger.error(f"❌ خطأ في handle_simple_translator_choice: {e}", exc_info=True)
-        try:
-            await query.edit_message_text("❌ حدث خطأ في معالجة الاختيار")
-        except:
-            pass
+        logger.error(f"❌ خطأ في معالجة اختيار المترجم: {e}", exc_info=True)
+        await query.edit_message_text("❌ حدث خطأ في معالجة الاختيار")
         return ConversationHandler.END
 
 
@@ -807,27 +602,19 @@ async def render_translator_selection(message, context, flow_type):
     translators_list = []
     
     try:
-        if SessionLocal and Translator:
+        if SessionLocal and TranslatorDirectory:
             with SessionLocal() as s:
-                # جلب المترجمين المضافة يدوياً فقط (ليس لديهم tg_user_id)
-                all_translators = s.query(Translator).filter(
-                    Translator.is_approved == True,
-                    Translator.is_active == True,
-                    Translator.full_name.isnot(None),
-                    Translator.full_name != "",
-                    Translator.tg_user_id.is_(None)
-                ).order_by(Translator.full_name).all()
+                all_translators = s.query(TranslatorDirectory).order_by(TranslatorDirectory.name).all()
                 
-                # استخراج الأسماء فقط (بدون تكرار)
                 translator_names = []
                 seen_names = set()
                 for translator in all_translators:
-                    name = translator.full_name or translator.name
+                    name = translator.name
                     if name and name not in seen_names:
                         translator_names.append(name)
                         seen_names.add(name)
                         translators_list.append({
-                            'id': translator.id,
+                            'id': translator.translator_id,
                             'name': name
                         })
                 
@@ -926,26 +713,17 @@ async def show_translator_list(update: Update, context: ContextTypes.DEFAULT_TYP
         all_translators = saved_translators_list
     else:
         # ✅ إذا لم تكن هناك قائمة محفوظة، جلب من قاعدة البيانات
-        if not SessionLocal or not Translator:
+        if not SessionLocal or not TranslatorDirectory:
             logger.error("❌ SessionLocal or Translator not available")
             if query:
                 await query.edit_message_text("❌ خطأ في الاتصال بقاعدة البيانات")
-            if get_translator_state is None:
-                logger.error("❌ get_translator_state is None - cannot proceed")
-                return NEW_CONSULT_TRANSLATOR
             return get_translator_state(flow_type)
         
         with SessionLocal() as s:
-            all_translators_objects = s.query(Translator).filter(
-                Translator.is_approved == True,
-                Translator.is_active == True,
-                Translator.full_name.isnot(None),
-                Translator.full_name != "",
-                Translator.tg_user_id.is_(None)
-            ).order_by(Translator.full_name).all()
+            all_translators_objects = s.query(TranslatorDirectory).order_by(TranslatorDirectory.name).all()
             
             # تحويل إلى نفس البنية (list of dicts)
-            all_translators = [{'id': t.id, 'name': t.full_name} for t in all_translators_objects]
+            all_translators = [{'id': t.translator_id, 'name': t.name} for t in all_translators_objects]
     
     # ✅ الكود المشترك لعرض المترجمين
     total = len(all_translators)
@@ -1081,14 +859,14 @@ async def handle_translator_choice(update: Update, context: ContextTypes.DEFAULT
                 translator_id = int(parts[2])
                 logger.info(f"✅ Selecting translator by ID: {translator_id}")
                 found_translator = False
-                if SessionLocal and Translator:
+                if SessionLocal and TranslatorDirectory:
                     with SessionLocal() as s:
-                        translator = s.query(Translator).filter_by(id=translator_id).first()
+                        translator = s.query(TranslatorDirectory).filter_by(translator_id=translator_id).first()
                         if translator:
-                            context.user_data.setdefault("report_tmp", {})["translator_name"] = translator.full_name
+                            context.user_data.setdefault("report_tmp", {})["translator_name"] = translator.name
                             report_tmp = context.user_data.setdefault("report_tmp", {})
-                            report_tmp["translator_id"] = translator.id
-                            logger.info(f"✅ Translator selected: {translator.full_name}")
+                            report_tmp["translator_id"] = translator.translator_id
+                            logger.info(f"✅ Translator selected: {translator.name}")
                             found_translator = True
                         else:
                             report_tmp = context.user_data.setdefault("report_tmp", {})
@@ -1186,13 +964,13 @@ async def handle_translator_inline_selection(update: Update, context: ContextTyp
             
             # show_final_summary is defined in this same file (below)
             
-            if SessionLocal and Translator:
+            if SessionLocal and TranslatorDirectory:
                 with SessionLocal() as s:
-                    translator = s.query(Translator).filter_by(id=translator_id).first()
+                    translator = s.query(TranslatorDirectory).filter_by(translator_id=translator_id).first()
                     report_tmp = context.user_data.setdefault("report_tmp", {})
                     if translator:
-                        report_tmp["translator_name"] = translator.full_name
-                        report_tmp["translator_id"] = translator.id
+                        report_tmp["translator_name"] = translator.name
+                        report_tmp["translator_id"] = translator.translator_id
                     else:
                         report_tmp["translator_name"] = translator_name or "غير محدد"
                         report_tmp["translator_id"] = None
@@ -1248,31 +1026,27 @@ async def handle_translator_text(update: Update, context: ContextTypes.DEFAULT_T
     
     if context.user_data.get("report_tmp", {}).get("translator_add_new"):
         try:
-            if SessionLocal and Translator:
+            if SessionLocal and TranslatorDirectory:
                 with SessionLocal() as s:
-                    existing_translator = s.query(Translator).filter(
-                        Translator.full_name.ilike(text)
+                    existing_translator = s.query(TranslatorDirectory).filter(
+                        TranslatorDirectory.name.ilike(text)
                     ).first()
                     
                     report_tmp = context.user_data.setdefault("report_tmp", {})
                     if existing_translator:
-                        report_tmp["translator_name"] = existing_translator.full_name
-                        report_tmp["translator_id"] = existing_translator.id
-                        await update.message.reply_text(f"✅ تم استخدام المترجم الموجود: {existing_translator.full_name}")
+                        report_tmp["translator_name"] = existing_translator.name
+                        report_tmp["translator_id"] = existing_translator.translator_id
+                        await update.message.reply_text(f"✅ تم استخدام المترجم الموجود: {existing_translator.name}")
                     else:
-                        new_translator = Translator(
-                            full_name=text,
-                            is_approved=True,
-                            is_active=True,
-                            role="translator",
-                            status="approved"
+                        new_translator = TranslatorDirectory(
+                            name=text
                         )
                         s.add(new_translator)
                         s.commit()
                         s.refresh(new_translator)
                         
-                        report_tmp["translator_name"] = new_translator.full_name
-                        report_tmp["translator_id"] = new_translator.id
+                        report_tmp["translator_name"] = new_translator.name
+                        report_tmp["translator_id"] = new_translator.translator_id
                         await update.message.reply_text(f"✅ تم إضافة المترجم الجديد: {text}")
                     
                     report_tmp.pop("translator_add_new", None)
@@ -1291,6 +1065,13 @@ async def handle_translator_text(update: Update, context: ContextTypes.DEFAULT_T
         report_tmp = context.user_data.setdefault("report_tmp", {})
         report_tmp["translator_name"] = text
         report_tmp["translator_id"] = None
+        try:
+            from services.translators_service import get_translator_by_name
+            translator_info = get_translator_by_name(text)
+            if translator_info:
+                report_tmp["translator_id"] = translator_info.get("id")
+        except Exception as e:
+            logger.warning(f"⚠️ فشل تحديد معرف المترجم: {e}")
 
     await show_final_summary(update.message, context, flow_type)
 
@@ -1312,7 +1093,73 @@ async def show_final_summary(message, context, flow_type):
     """
     try:
         data = context.user_data.get("report_tmp", {}).copy()  # نسخة لتجنب التعديل على البيانات الأصلية
-        
+
+        # ✅ التأكد من تعيين medical_action بناءً على flow_type إذا كان مفقوداً
+        if not data.get("medical_action"):
+            flow_to_action = {
+                "new_consult": "استشارة جديدة",
+                "followup": "متابعة",
+                "periodic_followup": "مراجعة / عودة دورية",
+                "inpatient_followup": "متابعة في الرقود",
+                "emergency": "طوارئ",
+                "operation": "عملية",
+                "admission": "ترقيد",
+                "discharge": "خروج من المستشفى",
+                "surgery_consult": "استشارة مع قرار عملية",
+                "final_consult": "استشارة أخيرة",
+                "radiology": "أشعة وفحوصات",
+                "appointment_reschedule": "تأجيل موعد",
+                "rehab_physical": "علاج طبيعي",
+                "rehab_device": "أجهزة تعويضية",
+                "radiation_therapy": "جلسة إشعاعي",
+            }
+            if flow_type in flow_to_action:
+                data["medical_action"] = flow_to_action[flow_type]
+                # ✅ تحديث report_tmp الأصلي أيضاً
+                context.user_data.setdefault("report_tmp", {})["medical_action"] = flow_to_action[flow_type]
+                logger.info(f"✅ [SHOW_SUMMARY] تم تعيين medical_action='{flow_to_action[flow_type]}' من flow_type='{flow_type}'")
+
+        # ✅ التأكد من أن periodic_followup يستخدم medical_action الصحيح
+        if flow_type == "periodic_followup" and data.get("medical_action") != "مراجعة / عودة دورية":
+            data["medical_action"] = "مراجعة / عودة دورية"
+            context.user_data.setdefault("report_tmp", {})["medical_action"] = "مراجعة / عودة دورية"
+            logger.info(f"✅ [SHOW_SUMMARY] تصحيح medical_action إلى 'مراجعة / عودة دورية' لـ flow_type='{flow_type}'")
+
+        # ✅ تنظيف الحقول غير المناسبة للمسار - منع ظهور حقول خارجية
+        # periodic_followup لا يحتوي على tests أو room_number
+        if flow_type == "periodic_followup":
+            if data.get("tests"):
+                logger.info(f"✅ [SHOW_SUMMARY] إزالة tests لمسار periodic_followup (قيمة محفوظة خاطئة)")
+                data.pop("tests", None)
+            if data.get("room_number"):
+                logger.info(f"✅ [SHOW_SUMMARY] إزالة room_number لمسار periodic_followup")
+                data.pop("room_number", None)
+            # ✅ التأكد من تعيين current_flow في report_tmp
+            context.user_data.setdefault("report_tmp", {})["current_flow"] = "periodic_followup"
+
+        # ✅ inpatient_followup يحتوي على room_number لكن لا يحتوي على tests
+        if flow_type == "inpatient_followup":
+            if data.get("tests"):
+                logger.info(f"✅ [SHOW_SUMMARY] إزالة tests لمسار inpatient_followup")
+                data.pop("tests", None)
+            # ✅ التأكد من تعيين current_flow في report_tmp
+            context.user_data.setdefault("report_tmp", {})["current_flow"] = "inpatient_followup"
+
+        # ✅ followup (متابعة في الرقود) - القديم - يحتوي على room_number لكن لا يحتوي على tests
+        if flow_type == "followup":
+            if data.get("tests"):
+                logger.info(f"✅ [SHOW_SUMMARY] إزالة tests لمسار followup")
+                data.pop("tests", None)
+            context.user_data.setdefault("report_tmp", {})["current_flow"] = "followup"
+
+        # ✅ التأكد من أن inpatient_followup يستخدم medical_action الصحيح
+        if flow_type == "inpatient_followup" and data.get("medical_action") != "متابعة في الرقود":
+            data["medical_action"] = "متابعة في الرقود"
+            context.user_data.setdefault("report_tmp", {})["medical_action"] = "متابعة في الرقود"
+            logger.info(f"✅ [SHOW_SUMMARY] تصحيح medical_action إلى 'متابعة في الرقود' لـ flow_type='{flow_type}'")
+
+        logger.info(f"📋 [SHOW_SUMMARY] flow_type={flow_type}, medical_action={data.get('medical_action')}")
+
         # ✅ استيراد format_report_message من broadcast_service
         try:
             from services.broadcast_service import format_report_message
@@ -1320,7 +1167,7 @@ async def show_final_summary(message, context, flow_type):
             logger.error("❌ Cannot import format_report_message from broadcast_service")
             await message.reply_text("❌ حدث خطأ في عرض الملخص")
             return
-        
+
         # ✅ استخدام format_report_message لبناء الملخص (نفس منطق النشر)
         report_message = format_report_message(data)
         
@@ -1339,11 +1186,42 @@ async def show_final_summary(message, context, flow_type):
             [InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]
         ])
         
-        await message.reply_text(
-            report_message,
-            reply_markup=keyboard,
-            parse_mode="Markdown"
-        )
+        logger.info(f"🔍 [SHOW_SUMMARY] Creating publish button with callback_data: publish:{flow_type}")
+        logger.info(f"🔍 [SHOW_SUMMARY] medical_action in data: {data.get('medical_action')}")
+        logger.info(f"🔍 [SHOW_SUMMARY] current_flow in report_tmp: {context.user_data.get('report_tmp', {}).get('current_flow')}")
+        
+        max_message_len = 3500  # أقل من حد تيليجرام (4096) بهامش أمان
+        if len(report_message) <= max_message_len:
+            await message.reply_text(
+                report_message,
+                reply_markup=keyboard,
+                parse_mode="Markdown"
+            )
+        else:
+            # تقسيم الملخص الطويل إلى أجزاء مع إبقاء أزرار النشر في الجزء الأخير.
+            chunks = []
+            remaining = report_message.strip()
+            while remaining:
+                if len(remaining) <= max_message_len:
+                    chunks.append(remaining)
+                    break
+
+                split_at = remaining.rfind("\n", 0, max_message_len)
+                if split_at == -1 or split_at < int(max_message_len * 0.5):
+                    split_at = max_message_len
+
+                chunk = remaining[:split_at].rstrip()
+                if chunk:
+                    chunks.append(chunk)
+                remaining = remaining[split_at:].lstrip("\n")
+
+            for idx, chunk in enumerate(chunks):
+                is_last_chunk = idx == (len(chunks) - 1)
+                await message.reply_text(
+                    chunk,
+                    reply_markup=keyboard if is_last_chunk else None,
+                    parse_mode="Markdown"
+                )
         
     except Exception as e:
         logger.error(f"❌ Error in show_final_summary: {e}", exc_info=True)
@@ -1402,14 +1280,30 @@ async def handle_final_confirm(update: Update, context: ContextTypes.DEFAULT_TYP
     action = parts[0]
     flow_type = parts[1] if len(parts) > 1 else "new_consult"
     
+    logger.info(f"🔍 [HANDLE_FINAL_CONFIRM] Raw callback_data: {query.data}")
+    logger.info(f"🔍 [HANDLE_FINAL_CONFIRM] Parsed action: {action}, flow_type: {flow_type}")
+    
     data = context.user_data.get("report_tmp", {})
     current_flow = data.get("current_flow", "")
-    if flow_type not in ["new_consult", "followup", "emergency", "admission", "surgery_consult", 
-                         "operation", "final_consult", "discharge", "rehab_physical", "rehab_device", "radiology", "appointment_reschedule"]:
-        if current_flow:
+    valid_flow_types = ["new_consult", "followup", "emergency", "admission", "surgery_consult",
+                         "operation", "final_consult", "discharge", "rehab_physical", "rehab_device", "radiology", "appointment_reschedule",
+                         "radiation_therapy", "periodic_followup", "inpatient_followup", "device"]
+
+    logger.info(f"🔍 [HANDLE_FINAL_CONFIRM] report_tmp current_flow: {current_flow}")
+    logger.info(f"🔍 [HANDLE_FINAL_CONFIRM] report_tmp medical_action: {data.get('medical_action', '')}")
+
+    # ✅ إصلاح: إذا كان current_flow أكثر تحديداً (مثل periodic_followup بدلاً من followup)، استخدمه
+    more_specific_flows = {
+        "followup": ["periodic_followup", "inpatient_followup"],
+    }
+    if flow_type in more_specific_flows and current_flow in more_specific_flows.get(flow_type, []):
+        logger.info(f"💾 ✅ [CONFIRM] Overriding flow_type '{flow_type}' with more specific current_flow '{current_flow}'")
+        flow_type = current_flow
+    elif flow_type not in valid_flow_types:
+        if current_flow and current_flow in valid_flow_types:
             flow_type = current_flow
             logger.info(f"💾 Using current_flow from report_tmp: {flow_type}")
-    
+
     logger.info(f"💾 Action: {action}, Flow type: {flow_type}")
 
     if action == "review":
@@ -1490,15 +1384,35 @@ async def save_report_to_database(query, context, flow_type):
     
     # التحقق من flow_type من report_tmp إذا كان flow_type غير صحيح
     current_flow = data.get("current_flow", "")
-    valid_flow_types = ["new_consult", "followup", "emergency", "admission", "surgery_consult", 
-                         "operation", "final_consult", "discharge", "rehab_physical", "rehab_device", "radiology", "appointment_reschedule"]
-    if flow_type not in valid_flow_types:
+    valid_flow_types = ["new_consult", "followup", "emergency", "admission", "surgery_consult",
+                         "operation", "final_consult", "discharge", "rehab_physical", "rehab_device", "radiology", "appointment_reschedule",
+                         "radiation_therapy", "periodic_followup", "inpatient_followup"]
+
+    # ✅ إصلاح: إذا كان current_flow أكثر تحديداً (مثل periodic_followup بدلاً من followup)، استخدمه
+    # المسارات الأكثر تحديداً لها الأولوية
+    more_specific_flows = {
+        "followup": ["periodic_followup", "inpatient_followup"],  # periodic_followup و inpatient_followup أكثر تحديداً من followup
+    }
+    if flow_type in more_specific_flows and current_flow in more_specific_flows.get(flow_type, []):
+        logger.info(f"💾 ✅ Overriding flow_type '{flow_type}' with more specific current_flow '{current_flow}'")
+        flow_type = current_flow
+    elif flow_type not in valid_flow_types:
         if current_flow and current_flow in valid_flow_types:
             flow_type = current_flow
             logger.info(f"💾 Using current_flow from report_tmp: {flow_type}")
         else:
             logger.warning(f"💾 ⚠️ Invalid flow_type '{flow_type}' and current_flow '{current_flow}', defaulting to 'new_consult'")
             flow_type = "new_consult"
+
+    # ✅ إضافة تحقق للتأكد من تطابق medical_action مع flow_type
+    medical_action = data.get("medical_action", "")
+    expected_actions = {
+        "periodic_followup": "مراجعة / عودة دورية",
+        "inpatient_followup": "متابعة في الرقود",
+        "followup": "متابعة في الرقود",  # الافتراضي لـ followup القديم
+    }
+    if flow_type in expected_actions and medical_action == expected_actions[flow_type]:
+        logger.info(f"💾 ✅ medical_action '{medical_action}' matches flow_type '{flow_type}'")
     
     logger.info(f"💾 Final flow_type to use: {flow_type}")
     logger.info("=" * 80)
@@ -1559,6 +1473,8 @@ async def save_report_to_database(query, context, flow_type):
         action_names = {
             "new_consult": "استشارة جديدة",
             "followup": "متابعة في الرقود",
+            "periodic_followup": "مراجعة / عودة دورية",
+            "inpatient_followup": "متابعة في الرقود",
             "surgery_consult": "استشارة مع قرار عملية",
             "emergency": "طوارئ",
             "admission": "ترقيد",
@@ -1569,7 +1485,8 @@ async def save_report_to_database(query, context, flow_type):
             "rehab_device": "أجهزة تعويضية",
             "device": "أجهزة تعويضية",  # ✅ إضافة "device" للتوافق مع get_confirm_state
             "radiology": "أشعة وفحوصات",
-            "appointment_reschedule": "تأجيل موعد"
+            "appointment_reschedule": "تأجيل موعد",
+            "radiation_therapy": "جلسة إشعاعي"
         }
         
         # استخدام medical_action من data إذا كان موجوداً، وإلا استخدام flow_type
@@ -1584,8 +1501,17 @@ async def save_report_to_database(query, context, flow_type):
         logger.info(f"action_names.get(flow_type): {action_names.get(flow_type)}")
         logger.info("=" * 80)
         
-        # استخدام medical_action من data إذا كان موجوداً
-        final_medical_action = medical_action_from_data or action_names.get(flow_type, "غير محدد")
+        # ✅ تصحيح: استخدام action_names بناءً على flow_type كأولوية
+        # لتجنب مشكلة عرض "استشارة جديدة" لمسارات أخرى
+        expected_action = action_names.get(flow_type)
+        if expected_action:
+            # ✅ إذا كان flow_type معروفاً، استخدام الاسم الصحيح دائماً
+            final_medical_action = expected_action
+        elif medical_action_from_data:
+            # ✅ إذا لم يكن flow_type معروفاً، استخدام medical_action من data
+            final_medical_action = medical_action_from_data
+        else:
+            final_medical_action = "غير محدد"
         
         logger.info(f"Final medical_action to save: {repr(final_medical_action)}")
 
@@ -1667,7 +1593,62 @@ async def save_report_to_database(query, context, flow_type):
                 decision_text += f"\n\nتاريخ العودة الجديد: {date_str}"
             if app_reschedule_return_reason:
                 decision_text += f"\n\nسبب العودة: {app_reschedule_return_reason}"
-        elif flow_type in ["new_consult", "followup", "emergency"]:
+        elif flow_type == "radiation_therapy":
+            # الحصول على report_tmp مرة واحدة
+            report_tmp = context.user_data.get("report_tmp", {})
+            
+            # إضافة نوع الإشعاعي
+            radiation_type = data.get("radiation_therapy_type", "")
+            if not radiation_type or not str(radiation_type).strip():
+                radiation_type = report_tmp.get('radiation_therapy_type', '')
+            
+            # إضافة رقم الجلسة
+            session_number = data.get("radiation_therapy_session_number", "")
+            if not session_number or not str(session_number).strip():
+                session_number = report_tmp.get('radiation_therapy_session_number', '')
+            
+            # إضافة الجلسات المتبقية
+            remaining = data.get("radiation_therapy_remaining", "")
+            if not remaining or not str(remaining).strip():
+                remaining = report_tmp.get('radiation_therapy_remaining', '')
+            
+            # التحقق من اكتمال الجلسات
+            completed = data.get("radiation_therapy_completed", False)
+            if not completed:
+                completed = report_tmp.get('radiation_therapy_completed', False)
+            
+            # بناء نص القرار
+            complaint_text = ""  # لا يوجد شكوى في الجلسة الإشعاعية
+            decision_text = f"نوع الإشعاعي: {radiation_type}\n\n"
+            decision_text += f"رقم الجلسة: {session_number}\n\n"
+            decision_text += f"الجلسات المتبقية: {remaining}\n\n"
+            
+            # ملاحظات / توصيات
+            recommendations = data.get("radiation_therapy_recommendations", "")
+            if not recommendations or not str(recommendations).strip():
+                recommendations = report_tmp.get('radiation_therapy_recommendations', '')
+            if recommendations and str(recommendations).strip():
+                decision_text += f"ملاحظات / توصيات: {recommendations}\n\n"
+            
+            if completed:
+                decision_text += f"✅ تم إكمال جميع الجلسات\n\n"
+                final_notes = data.get("radiation_therapy_final_notes", "")
+                if not final_notes:
+                    final_notes = report_tmp.get('radiation_therapy_final_notes', '')
+                if final_notes:
+                    decision_text += f"ملاحظات نهائية: {final_notes}"
+            else:
+                return_date = data.get("radiation_therapy_return_date") or data.get("followup_date")
+                return_reason = data.get("radiation_therapy_return_reason") or data.get("followup_reason", "")
+                if return_date:
+                    if hasattr(return_date, 'strftime'):
+                        date_str = return_date.strftime('%Y-%m-%d')
+                    else:
+                        date_str = str(return_date)
+                    decision_text += f"تاريخ العودة: {date_str}\n\n"
+                if return_reason:
+                    decision_text += f"سبب العودة: {return_reason}"
+        elif flow_type in ["new_consult", "followup", "periodic_followup", "inpatient_followup", "emergency"]:
             complaint_text = data.get("complaint", "")
             diagnosis = data.get("diagnosis", "")
             decision = data.get("decision", "")
@@ -1757,13 +1738,15 @@ async def save_report_to_database(query, context, flow_type):
         else:
             logger.warning("⚠️ No user_id found! Report will have NULL submitted_by_user_id")
         
-        # ✅ الحصول على translator_id من جدول Translator إذا كان المستخدم مسجلاً
+        # ✅ الحصول على translator_id من جدول TranslatorDirectory إذا كان المستخدم مسجلاً
         actual_translator_id = data.get("translator_id")
         if not actual_translator_id and user_id:
-            translator_record = session.query(Translator).filter_by(tg_user_id=user_id).first()
+            translator_record = session.query(TranslatorDirectory).filter_by(translator_id=user_id).first()
             if translator_record:
-                actual_translator_id = translator_record.id
-                logger.info(f"✅ Found translator_id from Translator table: {actual_translator_id} ({translator_record.full_name})")
+                actual_translator_id = translator_record.translator_id
+                if not data.get("translator_name"):
+                    data["translator_name"] = translator_record.name
+                logger.info(f"✅ Found translator_id from TranslatorDirectory: {actual_translator_id} ({translator_record.name})")
         
         # إعداد حقول تأجيل الموعد
         app_reschedule_reason = None
@@ -1784,6 +1767,13 @@ async def save_report_to_database(query, context, flow_type):
             medications_field = data.get("tests", "")
         elif flow_type in ["surgery_consult", "operation"]:
             medications_field = data.get("tests", "") or data.get("medications", "")
+        
+        # ✅ حفظ الملاحظات / التوصيات في حقل notes لمسار العلاج الإشعاعي
+        notes_value = data.get("notes", "")
+        if flow_type == "radiation_therapy":
+            rad_recommendations = data.get("radiation_therapy_recommendations", "")
+            if rad_recommendations and str(rad_recommendations).strip():
+                notes_value = rad_recommendations
         
         # إنشاء التقرير مع جميع الحقول المطلوبة
         new_report = Report(
@@ -1808,7 +1798,7 @@ async def save_report_to_database(query, context, flow_type):
             medical_action=final_medical_action,
             diagnosis=data.get("diagnosis", ""),  # ✅ حفظ التشخيص بشكل منفصل
             medications=medications_field,  # ✅ حفظ tests في medications لـ new_consult
-            notes=data.get("notes", ""),  # ✅ حفظ notes
+            notes=notes_value,  # ✅ حفظ notes (أو ملاحظات/توصيات لمسار العلاج الإشعاعي)
             treatment_plan=data.get("treatment_plan", ""),  # ✅ حفظ treatment_plan
             case_status=data.get("status", ""),  # ✅ حفظ حالة الطوارئ
             
@@ -1833,6 +1823,16 @@ async def save_report_to_database(query, context, flow_type):
             # ✅ حقول الأشعة
             radiology_type=data.get("radiology_type", "") or None,
             radiology_delivery_date=to_naive_datetime(data.get("radiology_delivery_date")) if data.get("radiology_delivery_date") else None,
+            
+            # ✅ حقول العلاج الإشعاعي (فقط إذا كان المسار هو radiation_therapy)
+            radiation_therapy_type=(data.get("radiation_therapy_type", "") or None) if flow_type == "radiation_therapy" else None,
+            radiation_therapy_session_number=(data.get("radiation_therapy_session_number", "") or None) if flow_type == "radiation_therapy" else None,
+            radiation_therapy_remaining=(data.get("radiation_therapy_remaining", "") or None) if flow_type == "radiation_therapy" else None,
+            radiation_therapy_recommendations=(data.get("radiation_therapy_recommendations", "") or None) if flow_type == "radiation_therapy" else None,
+            radiation_therapy_return_date=(to_naive_datetime(data.get("radiation_therapy_return_date") or data.get("followup_date"))) if flow_type == "radiation_therapy" and (data.get("radiation_therapy_return_date") or data.get("followup_date")) else None,
+            radiation_therapy_return_reason=(data.get("radiation_therapy_return_reason") or data.get("followup_reason", "") or None) if flow_type == "radiation_therapy" else None,
+            radiation_therapy_final_notes=(data.get("radiation_therapy_final_notes", "") or None) if flow_type == "radiation_therapy" else None,
+            radiation_therapy_completed=(data.get("radiation_therapy_completed", False)) if flow_type == "radiation_therapy" else False,
         )
 
         session.add(new_report)
@@ -1868,7 +1868,25 @@ async def save_report_to_database(query, context, flow_type):
             # تجهيز بيانات البث
             followup_display = 'لا يوجد'
             if data.get('followup_date'):
-                followup_display = data['followup_date'].strftime('%Y-%m-%d')
+                followup_date = data['followup_date']
+                # ✅ التحقق من نوع البيانات قبل استخدام strftime
+                if hasattr(followup_date, 'strftime'):
+                    # إذا كان datetime object أو date object
+                    followup_display = followup_date.strftime('%Y-%m-%d')
+                elif isinstance(followup_date, str):
+                    # إذا كان string، استخدامه مباشرة أو محاولة تحويله
+                    try:
+                        # محاولة تحليل التاريخ إذا كان بصيغة YYYY-MM-DD
+                        # ✅ استخدام datetime المستورد من أعلى الملف (لا استيراد محلي)
+                        dt = datetime.strptime(followup_date.split()[0], '%Y-%m-%d')
+                        followup_display = dt.strftime('%Y-%m-%d')
+                    except (ValueError, AttributeError):
+                        # إذا فشل التحليل، استخدام النص كما هو
+                        followup_display = str(followup_date).split()[0] if ' ' in str(followup_date) else str(followup_date)
+                else:
+                    # أي نوع آخر، تحويله إلى string
+                    followup_display = str(followup_date).split()[0] if ' ' in str(followup_date) else str(followup_date)
+                
                 if data.get('followup_time'):
                     time_12h = format_time_12h(data['followup_time'])
                     followup_display += f" - {time_12h}"
@@ -1899,11 +1917,11 @@ async def save_report_to_database(query, context, flow_type):
             }
             
             # ✅ إضافة التشخيص لجميع المسارات التي تحتاجه
-            if flow_type in ["new_consult", "followup", "emergency", "surgery_consult", "final_consult"]:
+            if flow_type in ["new_consult", "followup", "periodic_followup", "inpatient_followup", "emergency", "surgery_consult", "final_consult"]:
                 broadcast_data['diagnosis'] = data.get('diagnosis', '')
             
             # ✅ إضافة decision مباشرة لمسار followup و new_consult و emergency
-            if flow_type in ["new_consult", "followup", "emergency"]:
+            if flow_type in ["new_consult", "followup", "periodic_followup", "inpatient_followup", "emergency"]:
                 broadcast_data['decision'] = data.get('decision', '')
             
             # ✅ إضافة tests لمسار new_consult
@@ -1926,7 +1944,160 @@ async def save_report_to_database(query, context, flow_type):
             # ✅ إضافة room_number لمسار "متابعة في الرقود" إذا كان موجوداً
             if data.get('room_number'):
                 broadcast_data['room_number'] = data.get('room_number')
-            
+
+            # ✅ إضافة حقول الطوارئ الخاصة
+            if flow_type == "emergency":
+                # وضع الحالة (تم الخروج / تم الترقيد / تم إجراء عملية)
+                if data.get('status'):
+                    broadcast_data['status'] = data.get('status')
+                # ملاحظات الرقود (عند اختيار "تم الترقيد")
+                if data.get('admission_notes'):
+                    broadcast_data['admission_notes'] = data.get('admission_notes')
+                # نوع الترقيد (العناية المركزة / الرقود)
+                if data.get('admission_type'):
+                    broadcast_data['admission_type'] = data.get('admission_type')
+                # تفاصيل العملية (عند اختيار "تم إجراء عملية")
+                if data.get('operation_details'):
+                    broadcast_data['operation_details'] = data.get('operation_details')
+                logger.info(f"🚨 save_report_to_database: حقول الطوارئ - status={data.get('status')}, admission_notes={data.get('admission_notes')}, admission_type={data.get('admission_type')}, operation_details={data.get('operation_details')}")
+
+            # ✅ إضافة حقول مسار العملية
+            if flow_type == "operation":
+                if data.get('operation_details'):
+                    broadcast_data['operation_details'] = data.get('operation_details')
+                if data.get('operation_name_en'):
+                    broadcast_data['operation_name_en'] = data.get('operation_name_en')
+                if data.get('notes'):
+                    broadcast_data['notes'] = data.get('notes')
+                logger.info(f"⚕️ save_report_to_database: حقول العملية - operation_details={data.get('operation_details')}, operation_name_en={data.get('operation_name_en')}, notes={data.get('notes')}")
+
+            # ✅ إضافة حقول مسار الترقيد
+            if flow_type == "admission":
+                if data.get('admission_reason'):
+                    broadcast_data['admission_reason'] = data.get('admission_reason')
+                if data.get('room_number'):
+                    broadcast_data['room_number'] = data.get('room_number')
+                if data.get('notes'):
+                    broadcast_data['notes'] = data.get('notes')
+                logger.info(f"🛏️ save_report_to_database: حقول الترقيد - admission_reason={data.get('admission_reason')}, room_number={data.get('room_number')}, notes={data.get('notes')}")
+
+            # ✅ إضافة حقول مسار العلاج الطبيعي
+            if flow_type == "rehab_physical":
+                if data.get('therapy_details'):
+                    broadcast_data['therapy_details'] = data.get('therapy_details')
+                logger.info(f"🏃 save_report_to_database: حقول العلاج الطبيعي - therapy_details={data.get('therapy_details')}")
+
+            # ✅ إضافة حقول مسار الأجهزة التعويضية
+            if flow_type == "rehab_device":
+                device_info = data.get('device_details') or data.get('device_name')
+                if device_info:
+                    broadcast_data['device_details'] = device_info
+                    broadcast_data['device_name'] = device_info
+                logger.info(f"🦾 save_report_to_database: حقول الأجهزة - device_details={device_info}")
+
+            # ✅ إضافة حقول مسار الخروج من المستشفى
+            if flow_type == "discharge":
+                if data.get('discharge_type'):
+                    broadcast_data['discharge_type'] = data.get('discharge_type')
+                if data.get('admission_summary'):
+                    broadcast_data['admission_summary'] = data.get('admission_summary')
+                if data.get('operation_details'):
+                    broadcast_data['operation_details'] = data.get('operation_details')
+                if data.get('operation_name_en'):
+                    broadcast_data['operation_name_en'] = data.get('operation_name_en')
+                logger.info(f"🏥 save_report_to_database: حقول الخروج - discharge_type={data.get('discharge_type')}, admission_summary={data.get('admission_summary')}, operation_details={data.get('operation_details')}")
+
+            # ✅ إضافة حقول مسار العلاج الإشعاعي
+            if flow_type == "radiation_therapy":
+                logger.info(f"☢️ save_report_to_database: بدء إضافة حقول العلاج الإشعاعي")
+                logger.info(f"☢️ save_report_to_database: data keys = {list(data.keys())}")
+                
+                # نوع الإشعاعي
+                radiation_type = data.get('radiation_therapy_type', '')
+                logger.info(f"☢️ save_report_to_database: radiation_type من data = {repr(radiation_type)}")
+                if not radiation_type:
+                    report_tmp = context.user_data.get("report_tmp", {})
+                    radiation_type = report_tmp.get('radiation_therapy_type', '')
+                    logger.info(f"☢️ save_report_to_database: radiation_type من report_tmp = {repr(radiation_type)}")
+                if radiation_type:
+                    broadcast_data['radiation_therapy_type'] = radiation_type
+                    logger.info(f"✅ save_report_to_database: تم إضافة radiation_therapy_type = {repr(radiation_type)}")
+                
+                # رقم الجلسة
+                session_number = data.get('radiation_therapy_session_number', '')
+                logger.info(f"☢️ save_report_to_database: session_number من data = {repr(session_number)}")
+                if not session_number:
+                    report_tmp = context.user_data.get("report_tmp", {})
+                    session_number = report_tmp.get('radiation_therapy_session_number', '')
+                    logger.info(f"☢️ save_report_to_database: session_number من report_tmp = {repr(session_number)}")
+                if session_number:
+                    broadcast_data['radiation_therapy_session_number'] = session_number
+                    logger.info(f"✅ save_report_to_database: تم إضافة radiation_therapy_session_number = {repr(session_number)}")
+                
+                # الجلسات المتبقية
+                remaining = data.get('radiation_therapy_remaining', '')
+                logger.info(f"☢️ save_report_to_database: remaining من data = {repr(remaining)}")
+                if not remaining:
+                    report_tmp = context.user_data.get("report_tmp", {})
+                    remaining = report_tmp.get('radiation_therapy_remaining', '')
+                    logger.info(f"☢️ save_report_to_database: remaining من report_tmp = {repr(remaining)}")
+                if remaining:
+                    broadcast_data['radiation_therapy_remaining'] = remaining
+                    logger.info(f"✅ save_report_to_database: تم إضافة radiation_therapy_remaining = {repr(remaining)}")
+                
+                # ملاحظات / توصيات
+                recommendations = data.get('radiation_therapy_recommendations', '')
+                if not recommendations:
+                    report_tmp = context.user_data.get("report_tmp", {})
+                    recommendations = report_tmp.get('radiation_therapy_recommendations', '')
+                if recommendations:
+                    broadcast_data['radiation_therapy_recommendations'] = recommendations
+                    logger.info(f"✅ save_report_to_database: تم إضافة radiation_therapy_recommendations = {repr(recommendations)}")
+                
+                # موعد العودة
+                return_date = data.get('radiation_therapy_return_date') or data.get('followup_date')
+                if not return_date:
+                    report_tmp = context.user_data.get("report_tmp", {})
+                    return_date = report_tmp.get('radiation_therapy_return_date') or report_tmp.get('followup_date')
+                if return_date:
+                    broadcast_data['radiation_therapy_return_date'] = return_date
+                    broadcast_data['followup_date'] = return_date
+                
+                # وقت العودة
+                followup_time = data.get('followup_time')
+                if not followup_time:
+                    report_tmp = context.user_data.get("report_tmp", {})
+                    followup_time = report_tmp.get('followup_time')
+                if followup_time:
+                    broadcast_data['followup_time'] = followup_time
+                
+                # سبب العودة أو الملاحظات النهائية
+                completed = data.get('radiation_therapy_completed', False)
+                if not completed:
+                    report_tmp = context.user_data.get("report_tmp", {})
+                    completed = report_tmp.get('radiation_therapy_completed', False)
+                
+                if completed:
+                    final_notes = data.get('radiation_therapy_final_notes', '')
+                    if not final_notes:
+                        report_tmp = context.user_data.get("report_tmp", {})
+                        final_notes = report_tmp.get('radiation_therapy_final_notes', '')
+                    if final_notes:
+                        broadcast_data['radiation_therapy_final_notes'] = final_notes
+                else:
+                    return_reason = data.get('radiation_therapy_return_reason') or data.get('followup_reason', '')
+                    if not return_reason:
+                        report_tmp = context.user_data.get("report_tmp", {})
+                        return_reason = report_tmp.get('radiation_therapy_return_reason') or report_tmp.get('followup_reason', '')
+                    if return_reason:
+                        broadcast_data['radiation_therapy_return_reason'] = return_reason
+                        broadcast_data['followup_reason'] = return_reason
+                
+                # حفظ حالة الاكتمال
+                broadcast_data['radiation_therapy_completed'] = completed
+                
+                logger.info(f"☢️ save_report_to_database: حقول العلاج الإشعاعي - type={radiation_type}, session={session_number}, remaining={remaining}, completed={completed}")
+
             # إضافة الحقول الخاصة لمسار تأجيل موعد
             if flow_type == "appointment_reschedule":
                 logger.info(f"📅 save_report_to_database: معالجة مسار appointment_reschedule")
@@ -2045,14 +2216,17 @@ async def save_report_to_database(query, context, flow_type):
                 logger.info(f"🔬 save_report_to_database: radiology_type في broadcast_data = {repr(broadcast_data.get('radiology_type'))}")
                 logger.info(f"🔬 save_report_to_database: radiology_delivery_date في broadcast_data = {repr(broadcast_data.get('radiology_delivery_date'))}")
             
+            broadcast_success = False
             try:
                 await broadcast_new_report(context.bot, broadcast_data)
                 logger.info(f"✅ save_report_to_database: تم بث التقرير #{report_id} لجميع المستخدمين")
+                broadcast_success = True
             except Exception as broadcast_error:
                 logger.error(f"❌ save_report_to_database: خطأ في بث التقرير #{report_id}: {broadcast_error}", exc_info=True)
                 # ✅ لا نوقف العملية - نكمل حتى لو فشل البث
         except Exception as e:
             logger.error(f"❌ save_report_to_database: خطأ عام في حفظ التقرير: {e}", exc_info=True)
+            broadcast_success = False
 
         # الرد للمستخدم
         success_message = (
@@ -2061,12 +2235,16 @@ async def save_report_to_database(query, context, flow_type):
             f"👤 المريض: {patient_name}\n"
             f"⚕️ نوع الإجراء: {action_names.get(flow_type, 'غير محدد')}\n"
         )
-        
+
         # إضافة اسم العملية بالإنجليزية لمسار "استشارة مع قرار عملية"
         if flow_type == "surgery_consult" and data.get("operation_name_en"):
             success_message += f"🏥 **اسم العملية:** {data.get('operation_name_en')}\n"
-        
-        success_message += f"\nتم إرسال التقرير لجميع المستخدمين."
+
+        # ✅ إظهار رسالة مختلفة حسب نجاح البث
+        if broadcast_success:
+            success_message += f"\n✅ تم إرسال التقرير للمجموعة."
+        else:
+            success_message += f"\n⚠️ تم حفظ التقرير لكن فشل إرساله للمجموعة. يرجى التواصل مع الأدمن."
         
         # ✅ محاولة تعديل الرسالة - مع fallback إذا فشل
         try:
@@ -2380,4 +2558,3 @@ async def handle_edit_before_save(query, context, flow_type=None):
             parse_mode="Markdown"
         )
         return ConversationHandler.END
-

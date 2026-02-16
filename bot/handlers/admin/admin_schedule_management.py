@@ -542,6 +542,7 @@ async def handle_manage_patients(update: Update, context: ContextTypes.DEFAULT_T
         reply_markup=keyboard,
         parse_mode=ParseMode.MARKDOWN
     )
+    return ConversationHandler.END
 
 async def handle_view_patient_names(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """عرض أسماء المرضى مع التصفح بالصفحات"""
@@ -599,23 +600,41 @@ async def handle_add_patient_name(update: Update, context: ContextTypes.DEFAULT_
     """بدء إضافة اسم مريض جديد"""
     query = update.callback_query
     await query.answer()
-    
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")],
+        [InlineKeyboardButton("❌ إلغاء", callback_data="cancel_patient_input")]
+    ])
+
     await query.edit_message_text(
         "➕ **إضافة اسم مريض جديد**\n\n"
         "📝 اكتب الاسم الكامل للمريض:\n"
         "مثال: أحمد محمد",
+        reply_markup=keyboard,
         parse_mode=ParseMode.MARKDOWN
     )
     return "ADD_PATIENT_NAME"
+
+async def handle_cancel_patient_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    if query:
+        await query.answer()
+    await handle_manage_patients(update, context)
+    return ConversationHandler.END
 
 async def handle_patient_name_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة إدخال اسم المريض الجديد - يستخدم الخدمة الموحدة"""
     name = update.message.text.strip()
     
     if not name or len(name) < 2:
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")],
+            [InlineKeyboardButton("❌ إلغاء", callback_data="cancel_patient_input")]
+        ])
         await update.message.reply_text(
             "⚠️ **خطأ:** الاسم قصير جداً\n\n"
             "يرجى إدخال اسم صحيح:",
+            reply_markup=keyboard,
             parse_mode=ParseMode.MARKDOWN
         )
         return "ADD_PATIENT_NAME"
@@ -952,6 +971,7 @@ async def handle_manage_hospitals(update: Update, context: ContextTypes.DEFAULT_
         reply_markup=keyboard,
         parse_mode=ParseMode.MARKDOWN
     )
+    return ConversationHandler.END
 
 
 async def handle_view_hospitals(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1014,14 +1034,27 @@ async def handle_add_hospital(update: Update, context: ContextTypes.DEFAULT_TYPE
     """بدء إضافة مستشفى جديد"""
     query = update.callback_query
     await query.answer()
-    
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔙 رجوع", callback_data="manage_hospitals")],
+        [InlineKeyboardButton("❌ إلغاء", callback_data="cancel_hospital_input")]
+    ])
+
     await query.edit_message_text(
         "➕ **إضافة مستشفى جديد**\n\n"
         "🏥 اكتب اسم المستشفى بالإنجليزي:\n"
         "مثال: Apollo Hospital, Bangalore",
+        reply_markup=keyboard,
         parse_mode=ParseMode.MARKDOWN
     )
     return "ADD_HOSPITAL"
+
+async def handle_cancel_hospital_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    if query:
+        await query.answer()
+    await handle_manage_hospitals(update, context)
+    return ConversationHandler.END
 
 
 async def handle_hospital_name_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1029,9 +1062,14 @@ async def handle_hospital_name_input(update: Update, context: ContextTypes.DEFAU
     name = update.message.text.strip()
     
     if not name or len(name) < 3:
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 رجوع", callback_data="manage_hospitals")],
+            [InlineKeyboardButton("❌ إلغاء", callback_data="cancel_hospital_input")]
+        ])
         await update.message.reply_text(
             "⚠️ **خطأ:** الاسم قصير جداً\n\n"
             "يرجى إدخال اسم صحيح:",
+            reply_markup=keyboard,
             parse_mode=ParseMode.MARKDOWN
         )
         return "ADD_HOSPITAL"
@@ -1379,7 +1417,8 @@ def register(app):
             ]
         },
         fallbacks=[
-            CallbackQueryHandler(handle_manage_patients, pattern="^manage_patients$")
+            CallbackQueryHandler(handle_manage_patients, pattern="^manage_patients$"),
+            CallbackQueryHandler(handle_cancel_patient_input, pattern="^cancel_patient_input$")
         ],
         per_chat=True,
         per_user=True,
@@ -1429,7 +1468,8 @@ def register(app):
             ]
         },
         fallbacks=[
-            CallbackQueryHandler(handle_manage_hospitals, pattern="^manage_hospitals$")
+            CallbackQueryHandler(handle_manage_hospitals, pattern="^manage_hospitals$"),
+            CallbackQueryHandler(handle_cancel_hospital_input, pattern="^cancel_hospital_input$")
         ],
         per_chat=True,
         per_user=True,

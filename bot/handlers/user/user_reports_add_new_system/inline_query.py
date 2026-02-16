@@ -18,9 +18,9 @@ except ImportError:
     SessionLocal = None
 
 try:
-    from db.models import Translator, Doctor
+    from db.models import TranslatorDirectory, Doctor
 except ImportError:
-    Translator = Doctor = None
+    TranslatorDirectory = Doctor = None
 
 
 async def doctor_inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -107,33 +107,27 @@ async def translator_inline_query_handler(update: Update, context: ContextTypes.
     results = []
 
     try:
-        if SessionLocal and Translator:
+        if SessionLocal and TranslatorDirectory:
             with SessionLocal() as s:
                 if query_text:
-                    translators = s.query(Translator).filter(
-                        Translator.is_approved == True,
-                        Translator.is_active == True,
-                        Translator.full_name.isnot(None),
-                        Translator.full_name != "",
-                        Translator.tg_user_id.is_(None),
-                        Translator.full_name.ilike(f"%{query_text}%")
-                    ).order_by(Translator.full_name).limit(50).all()
+                    translators = s.query(TranslatorDirectory).filter(
+                        TranslatorDirectory.name.isnot(None),
+                        TranslatorDirectory.name != "",
+                        TranslatorDirectory.name.ilike(f"%{query_text}%")
+                    ).order_by(TranslatorDirectory.name).limit(50).all()
                 else:
-                    translators = s.query(Translator).filter(
-                        Translator.is_approved == True,
-                        Translator.is_active == True,
-                        Translator.full_name.isnot(None),
-                        Translator.full_name != "",
-                        Translator.tg_user_id.is_(None)
-                    ).order_by(Translator.full_name).limit(50).all()
+                    translators = s.query(TranslatorDirectory).filter(
+                        TranslatorDirectory.name.isnot(None),
+                        TranslatorDirectory.name != ""
+                    ).order_by(TranslatorDirectory.name).limit(50).all()
 
                 for translator in translators:
                     result = InlineQueryResultArticle(
-                        id=f"translator_{translator.id}",
-                        title=f"👤 {translator.full_name}",
+                        id=f"translator_{translator.translator_id}",
+                        title=f"👤 {translator.name}",
                         description=f"اختر هذا المترجم",
                         input_message_content=InputTextMessageContent(
-                            message_text=f"__TRANSLATOR_SELECTED__:{translator.id}:{translator.full_name}"
+                            message_text=f"__TRANSLATOR_SELECTED__:{translator.translator_id}:{translator.name}"
                         )
                     )
                     results.append(result)
@@ -222,4 +216,3 @@ async def unified_inline_query_handler(update: Update, context: ContextTypes.DEF
         )
         await update.inline_query.answer([error_result], cache_time=1)
     return
-

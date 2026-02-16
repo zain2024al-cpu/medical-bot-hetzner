@@ -134,8 +134,9 @@ def prepare_hospitals_table_data(hospitals_stats: Dict) -> List[Dict]:
         percentage = round((count / total_reports * 100), 1) if total_reports > 0 else 0
         hospitals_data.append({
             'name': hospital,
-            'reports_count': count,
-            'patients_count': count,  # يمكن تحسينه
+            'count': count,  # ✅ تم التوحيد مع template
+            'reports_count': count,  # للتوافقية
+            'patients_count': count,
             'percentage': percentage
         })
     
@@ -161,12 +162,16 @@ def prepare_departments_table_data(departments_stats: Dict) -> List[Dict]:
 def prepare_doctors_table_data(doctors_stats: Dict) -> List[Dict]:
     """تجهيز بيانات جدول الأطباء"""
     doctors_data = []
+    total = sum(doctors_stats.values())
     
     for doctor, count in sorted(doctors_stats.items(), key=lambda x: x[1], reverse=True)[:15]:
+        percentage = round((count / total * 100), 1) if total > 0 else 0
         doctors_data.append({
             'name': doctor,
-            'reports_count': count,
-            'patients_count': count  # يمكن تحسينه
+            'count': count,  # ✅ تم التوحيد مع template
+            'reports_count': count,  # للتوافقية
+            'patients_count': count,
+            'percentage': percentage  # ✅ إضافة النسبة المئوية
         })
     
     return doctors_data
@@ -209,9 +214,11 @@ def prepare_top_patients_data(patients_data: List[Dict]) -> List[Dict]:
     top_patients = []
     
     for patient in sorted(patients_data, key=lambda x: x.get('visits', 0), reverse=True)[:15]:
+        visits_count = patient.get('visits', 0)
         top_patients.append({
             'name': patient.get('name', 'غير محدد'),
-            'visits': patient.get('visits', 0),
+            'count': visits_count,  # ✅ تم التوحيد مع template
+            'visits': visits_count,  # للتوافقية
             'last_visit': patient.get('last_visit', 'غير محدد')
         })
     

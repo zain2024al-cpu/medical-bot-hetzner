@@ -14,6 +14,89 @@ logger = logging.getLogger(__name__)
 _TRANSLATORS_CACHE = None
 _CACHE_TIMEOUT = 60  # seconds
 
+TRANSLATORS_SEED = [
+    {"translator_id": 7345544036, "name": "ادريس"},
+    {"translator_id": 1997643031, "name": "حسن"},
+    {"translator_id": 6002303025, "name": "مصطفى"},
+    {"translator_id": 8172870113, "name": "صبري"},
+    {"translator_id": 5713657641, "name": "عزي"},
+    {"translator_id": 591202186, "name": "زيد"},
+    {"translator_id": 7504265481, "name": "نجم الدين"},
+    {"translator_id": 7350590873, "name": "مهدي"},
+    {"translator_id": 1938862867, "name": "واصل"},
+    {"translator_id": 1982219162, "name": "ادم"},
+    {"translator_id": 8310133494, "name": "هاشم"},
+    {"translator_id": 7392642953, "name": "سعيد"},
+    {"translator_id": 6043664891, "name": "محمد علي"},
+    {"translator_id": 8054012415, "name": "عصام"},
+    {"translator_id": 6979080725, "name": "معتز"},
+    {"translator_id": 7536360652, "name": "عزالدين"},
+]
+
+
+def seed_translators_directory() -> int:
+    try:
+        from db.session import SessionLocal
+        from db.models import TranslatorDirectory
+        from sqlalchemy import or_
+
+        with SessionLocal() as session:
+            added_or_updated = 0
+            for entry in TRANSLATORS_SEED:
+                translator_id = entry["translator_id"]
+                name = entry["name"]
+
+                existing = session.query(TranslatorDirectory).filter(
+                    or_(
+                        TranslatorDirectory.translator_id == translator_id,
+                        TranslatorDirectory.name.ilike(name)
+                    )
+                ).first()
+
+                if existing:
+                    updated = False
+                    if existing.translator_id != translator_id:
+                        existing.translator_id = translator_id
+                        updated = True
+                    if existing.name != name:
+                        existing.name = name
+                        updated = True
+                    if updated:
+                        added_or_updated += 1
+                else:
+                    session.add(TranslatorDirectory(translator_id=translator_id, name=name))
+                    added_or_updated += 1
+
+            if added_or_updated:
+                session.commit()
+            return added_or_updated
+    except Exception as e:
+        logger.error(f"Error seeding translators directory: {e}")
+        return 0
+
+
+def sync_reports_translator_ids() -> int:
+    try:
+        from db.session import SessionLocal
+        from sqlalchemy import text
+
+        with SessionLocal() as session:
+            result = session.execute(text("""
+                UPDATE reports
+                SET translator_id = (
+                    SELECT translators.translator_id
+                    FROM translators
+                    WHERE TRIM(translators.name) = TRIM(reports.translator_name)
+                )
+                WHERE (translator_id IS NULL OR translator_id = 0)
+                  AND translator_name IS NOT NULL
+            """))
+            session.commit()
+            return result.rowcount or 0
+    except Exception as e:
+        logger.error(f"Error syncing report translator ids: {e}")
+        return 0
+
 
 def get_translators_from_database() -> List[Dict]:
     """
@@ -21,21 +104,19 @@ def get_translators_from_database() -> List[Dict]:
     """
     try:
         from db.session import SessionLocal
-        from db.models import Translator
+        from db.models import TranslatorDirectory
         
         with SessionLocal() as session:
-            translators = session.query(Translator).filter(
-                Translator.is_approved == True
-            ).order_by(Translator.full_name).all()
+            translators = session.query(TranslatorDirectory).order_by(TranslatorDirectory.name).all()
             
             result = []
             for t in translators:
                 result.append({
-                    'id': t.id,
-                    'name': t.full_name,
-                    'telegram_id': t.tg_user_id,  # ✅ تصحيح: استخدام tg_user_id بدلاً من telegram_id
-                    'phone': t.phone_number,  # ✅ تصحيح: استخدام phone_number بدلاً من phone
-                    'is_approved': t.is_approved
+                    'id': t.translator_id,
+                    'name': t.name,
+                    'telegram_id': t.translator_id,
+                    'phone': None,
+                    'is_approved': True
                 })
             
             logger.info(f"Loaded {len(result)} translators from database")
@@ -141,17 +222,17 @@ def get_translator_by_id(translator_id: int) -> Optional[Dict]:
     """
     try:
         from db.session import SessionLocal
-        from db.models import Translator
+        from db.models import TranslatorDirectory
         
         with SessionLocal() as session:
-            t = session.query(Translator).filter_by(id=translator_id).first()
+            t = session.query(TranslatorDirectory).filter_by(translator_id=translator_id).first()
             if t:
                 return {
-                    'id': t.id,
-                    'name': t.full_name,
-                    'telegram_id': t.telegram_id,
-                    'phone': t.phone,
-                    'is_approved': t.is_approved
+                    'id': t.translator_id,
+                    'name': t.name,
+                    'telegram_id': t.translator_id,
+                    'phone': None,
+                    'is_approved': True
                 }
     except Exception as e:
         logger.error(f"Error getting translator by id: {e}")
@@ -165,20 +246,18 @@ def add_translator(name: str, telegram_id: int = None, phone: str = None) -> boo
     """
     try:
         from db.session import SessionLocal
-        from db.models import Translator
+        from db.models import TranslatorDirectory
         
         with SessionLocal() as session:
-            # Check if exists
-            existing = session.query(Translator).filter_by(full_name=name).first()
+            existing = session.query(TranslatorDirectory).filter_by(name=name).first()
             if existing:
                 logger.info(f"Translator already exists: {name}")
                 return True
-            
-            new_translator = Translator(
-                full_name=name,
-                telegram_id=telegram_id,
-                phone=phone,
-                is_approved=True
+
+            translator_id_value = telegram_id if telegram_id is not None else None
+            new_translator = TranslatorDirectory(
+                translator_id=translator_id_value,
+                name=name
             )
             session.add(new_translator)
             session.commit()

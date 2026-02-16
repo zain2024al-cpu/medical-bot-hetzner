@@ -462,5 +462,6 @@ def register(app):
     # لأن ConversationHandler في admin_users_management.py يتعامل معه مباشرة
     app.add_handler(CallbackQueryHandler(handle_user_approval, pattern="^(approve|reject):"))
     app.add_handler(CallbackQueryHandler(handle_back_to_main, pattern="^back_to_main$"))
-    app.add_handler(CallbackQueryHandler(handle_admin_buttons, pattern="^admin:"))
+    # ✅ استثناء admin:evaluation لأنه يحتاج ConversationHandler
+    app.add_handler(CallbackQueryHandler(handle_admin_buttons, pattern=r"^admin:(?!evaluation$)"))
     app.add_handler(CallbackQueryHandler(handle_group_settings, pattern="^settings:"))
