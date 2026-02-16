@@ -507,7 +507,7 @@ async def handle_filter_choice(update: Update, context: ContextTypes.DEFAULT_TYP
     if choice == "patient":
         # ✅ عرض قائمة المرضى للاختيار منها
         context.user_data["mode"] = "print_patient"
-        context.user_data["patient_page"] = 0  # الصفحة الأولى
+        context.user_data["print_patient_page"] = 0  # الصفحة الأولى
         # ✅ مسح أي بيانات قديمة متعلقة بالفلترة
         context.user_data.pop("filter_value", None)
         context.user_data.pop("action_type", None)
@@ -540,7 +540,7 @@ async def handle_filter_choice(update: Update, context: ContextTypes.DEFAULT_TYP
     
     elif choice == "patient_text":
         # ✅ طباعة حسب المريض (نص داخل Telegram)
-        context.user_data["patient_page"] = 0  # إعادة تعيين الصفحة
+        context.user_data["print_patient_page"] = 0  # إعادة تعيين الصفحة
         return await show_patient_selection_for_print_local(q, context)
     
     elif choice == "hospital":
@@ -1784,7 +1784,7 @@ async def handle_patient_page(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     page = int(q.data.split(":", 1)[1])
     # ✅ حفظ رقم الصفحة الحالية في context
-    context.user_data["patient_page"] = page
+    context.user_data["print_patient_page"] = page
     
     patients_list = context.user_data.get("patients_list", [])
     
@@ -1822,7 +1822,7 @@ async def handle_action_type_choice(update: Update, context: ContextTypes.DEFAUL
                 patients_list = [(p.id, p.full_name) for p in patients]
                 context.user_data["patients_list"] = patients_list
 
-        page = context.user_data.get("patient_page", 0)
+        page = context.user_data.get("print_patient_page", 0)
         text, keyboard = _build_patient_list_keyboard(patients_list, page=page)
         await q.edit_message_text(text, reply_markup=keyboard, parse_mode="Markdown")
         return ENTER_NAME
@@ -1897,7 +1897,7 @@ async def handle_back_from_enter_name(update: Update, context: ContextTypes.DEFA
     # ✅ مسح البيانات المؤقتة عند الرجوع
     context.user_data.pop("mode", None)
     context.user_data.pop("patients_list", None)
-    context.user_data.pop("patient_page", None)
+    context.user_data.pop("print_patient_page", None)
     context.user_data.pop("filter_value", None)
     context.user_data.pop("action_type", None)
     
@@ -3179,7 +3179,7 @@ async def show_patient_selection_for_print_local(query, context):
         patients_sorted = sorted(patients, key=lambda x: x.get('name', ''))
         
         # تقسيم المرضى إلى صفحات (10 لكل صفحة)
-        page = context.user_data.get('patient_page', 0)
+        page = context.user_data.get('print_patient_page', 0)
         items_per_page = 10
         start_idx = page * items_per_page
         end_idx = start_idx + items_per_page
@@ -3251,11 +3251,11 @@ async def handle_patient_text_selection(update: Update, context: ContextTypes.DE
     if query.data.startswith("patient_page:"):
         # التنقل بين الصفحات
         direction = query.data.split(":")[1]
-        current_page = context.user_data.get('patient_page', 0)
+        current_page = context.user_data.get('print_patient_page', 0)
         if direction == "next":
-            context.user_data['patient_page'] = current_page + 1
+            context.user_data['print_patient_page'] = current_page + 1
         elif direction == "prev":
-            context.user_data['patient_page'] = max(0, current_page - 1)
+            context.user_data['print_patient_page'] = max(0, current_page - 1)
         return await show_patient_selection_for_print_local(query, context)
     
     if query.data.startswith("print_patient:"):

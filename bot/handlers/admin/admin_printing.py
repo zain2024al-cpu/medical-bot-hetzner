@@ -7,6 +7,7 @@ import asyncio
 import os
 import io
 import uuid
+import traceback
 from datetime import datetime, date, timedelta, time
 import logging
 
@@ -145,6 +146,7 @@ async def handle_print_type_selection(update: Update, context: ContextTypes.DEFA
 
     # ✅ إذا كان النوع هو patient_text، نعرض قائمة المرضى مباشرة
     if print_type == "patient_text":
+        context.user_data['print_patient_page'] = 0
         return await show_patient_selection_for_print(query, context)
 
     # ✅ تقرير أداء المترجمين - ينتقل مباشرة لاختيار الفترة ثم يعرض التقرير
@@ -1348,7 +1350,7 @@ async def show_patient_selection_for_print(query, context):
         patients_sorted = sorted(patients, key=lambda x: x.get('name', ''))
         
         # تقسيم المرضى إلى صفحات (10 لكل صفحة)
-        page = context.user_data.get('patient_page', 0)
+        page = context.user_data.get('print_patient_page', 0)
         items_per_page = 10
         start_idx = page * items_per_page
         end_idx = start_idx + items_per_page
@@ -1451,11 +1453,11 @@ async def handle_patient_selection_for_print(update: Update, context: ContextTyp
     if query.data.startswith("patient_page:"):
         # التنقل بين الصفحات
         direction = query.data.split(":")[1]
-        current_page = context.user_data.get('patient_page', 0)
+        current_page = context.user_data.get('print_patient_page', 0)
         if direction == "next":
-            context.user_data['patient_page'] = current_page + 1
+            context.user_data['print_patient_page'] = current_page + 1
         elif direction == "prev":
-            context.user_data['patient_page'] = max(0, current_page - 1)
+            context.user_data['print_patient_page'] = max(0, current_page - 1)
         return await show_patient_selection_for_print(query, context)
     
     if query.data.startswith("print_patient:"):
