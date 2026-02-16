@@ -45,6 +45,7 @@ def register_all_handlers(app):
     from bot.handlers.admin.admin_hospitals_management import register as register_hospitals_management
     from bot.handlers.admin.admin_translators_management import register as register_translators_management
     from bot.handlers.admin.admin_delete_reports import register as register_admin_delete_reports
+    from bot.handlers.admin.admin_backup_commands import register as register_admin_backup_commands
     # تم حذف admin_patient_management
     
     admin_initial_case.register(app)
@@ -62,6 +63,7 @@ def register_all_handlers(app):
     register_hospitals_management(app)  # ✅ إدارة المستشفيات
     register_translators_management(app)  # ✅ إدارة المترجمين
     register_admin_delete_reports(app)  # ✅ حذف التقارير للأدمن
+    register_admin_backup_commands(app)  # ✅ أوامر /backup و /logs للأدمن
     # تم حذف register_patient_management - نظام بسيط
 
     # 🔹 تسجيل handlers المستخدم المتخصصة
