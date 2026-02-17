@@ -17,9 +17,11 @@ def register_all_handlers(app):
     # 🔸 تسجيل handlers الأدمن المتخصصة (يجب تسجيل ConversationHandlers قبل admin_start)
     from bot.handlers.admin.admin_schedule_management import register as register_schedule_management
     from bot.handlers.admin.admin_evaluation import register as register_evaluation
+    from bot.handlers.admin.admin_admins import register as register_admin_admins
     register_schedule_management(app)
     register_evaluation(app)  # ✅ تسجيل ConversationHandler قبل admin_start
-    
+    register_admin_admins(app)  # ✅ إدارة الأدمنين - قبل admin_start لالتقاط admin:manage_admins
+
     # 🔸 تسجيل واجهة الأدمن
     from bot.handlers.admin.admin_start import register as register_admin_start
     register_admin_start(app)  # ✅ واجهة الأدمن (أمر /admin والموافقات)
@@ -38,7 +40,6 @@ def register_all_handlers(app):
         # admin_users,  # ❌ تم حذفه - تم دمجه في admin_users_management
     )
     from bot.handlers.admin.admin_users_management import register as register_users_management
-    from bot.handlers.admin.admin_admins import register as register_admin_admins
     from bot.handlers.admin.admin_printing import register as register_admin_printing  # ✅ معالج الطباعة
     from bot.handlers.admin.admin_daily_patients import register as register_daily_patients
     from bot.handlers.admin.admin_data_analysis import register as register_data_analysis
@@ -56,7 +57,7 @@ def register_all_handlers(app):
     # register_schedule_management(app)  # ✅ تم تسجيله أعلاه
     # register_evaluation(app)  # ✅ تم تسجيله أعلاه
     register_users_management(app)  # ✅ النظام الجديد الكامل (يشمل القبول/الرفض + الإدارة)
-    register_admin_admins(app)  # ✅ إدارة الأدمنين
+    # register_admin_admins تم تسجيله أعلاه (قبل admin_start)
     register_admin_printing(app)  # ✅ نظام الطباعة الاحترافي
     register_daily_patients(app)  # ✅ إدارة أسماء المرضى اليومية
     register_data_analysis(app)  # ✅ نظام تحليل البيانات الشامل

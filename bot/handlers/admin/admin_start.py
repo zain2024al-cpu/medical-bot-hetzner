@@ -213,11 +213,6 @@ async def handle_admin_buttons(update, context):
         # معالجات مجموعة التقارير
         await handle_group_management(update, context)
 
-    elif data == "admin:manage_admins":
-        # توجيه لإدارة الأدمنين
-        from bot.handlers.admin.admin_admins import start_admin_management
-        return await start_admin_management(update, context)
-
     elif data.startswith("admin:"):
         # أزرار أخرى - يمكن إضافة معالجات إضافية هنا
         await query.edit_message_text(
@@ -467,6 +462,6 @@ def register(app):
     # لأن ConversationHandler في admin_users_management.py يتعامل معه مباشرة
     app.add_handler(CallbackQueryHandler(handle_user_approval, pattern="^(approve|reject):"))
     app.add_handler(CallbackQueryHandler(handle_back_to_main, pattern="^back_to_main$"))
-    # ✅ استثناء admin:evaluation لأنه يحتاج ConversationHandler
-    app.add_handler(CallbackQueryHandler(handle_admin_buttons, pattern=r"^admin:(?!evaluation$)"))
+    # ✅ استثناء admin:evaluation و admin:manage_admins لأنها تحتاج ConversationHandler
+    app.add_handler(CallbackQueryHandler(handle_admin_buttons, pattern=r"^admin:(?!evaluation$|manage_admins$)"))
     app.add_handler(CallbackQueryHandler(handle_group_settings, pattern="^settings:"))

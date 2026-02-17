@@ -347,8 +347,10 @@ def register(app):
     conv = ConversationHandler(
         entry_points=[
             MessageHandler(filters.Regex("^👑 إدارة الأدمنين$"), start_admin_management),
+            # ✅ entry point من لوحة التحكم الرئيسية
+            CallbackQueryHandler(start_admin_management, pattern=r"^admin:manage_admins$"),
             # ✅ إضافة callback كـ entry point أيضاً
-            CallbackQueryHandler(start_admin_management, pattern=r"^aa:(add|remove|list|back)$")
+            CallbackQueryHandler(start_admin_management, pattern=r"^aa:(add|remove|list|back)$"),
         ],
         states={
             AA_START: [
