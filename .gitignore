@@ -147,3 +147,6 @@ media/
 # 🔧 Tools
 .vscode/settings.json
 .vscode/launch.json
+database.db
+db_backups/
+*.db
