@@ -50,7 +50,7 @@ def _set_sqlite_pragmas(dbapi_connection, connection_record):
     try:
         cursor.execute("PRAGMA journal_mode=WAL")
         cursor.execute("PRAGMA synchronous=NORMAL")
-        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA foreign_keys=OFF")
         cursor.execute("PRAGMA busy_timeout=5000")
     finally:
         cursor.close()
@@ -94,7 +94,7 @@ def init_database():
                 conn.execute(text("PRAGMA synchronous=NORMAL"))
                 conn.execute(text("PRAGMA cache_size=-64000"))  # 64MB cache
                 conn.execute(text("PRAGMA temp_store=MEMORY"))
-                conn.execute(text("PRAGMA foreign_keys=ON"))  # Ensure FK consistency
+                conn.execute(text("PRAGMA foreign_keys=OFF"))  # Disabled: Report model uses denormalized fields
                 conn.execute(text("PRAGMA busy_timeout=5000")) # 5s busy timeout
                 conn.commit()
             logger.info(f"✅ WAL mode enabled for optimal concurrency")
