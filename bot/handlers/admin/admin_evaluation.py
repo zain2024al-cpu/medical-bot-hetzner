@@ -135,7 +135,7 @@ def _generate_pdf(results, period_label, year, month):
     if month == "all" or month == 0:
         start_date_str = f"01/01/{year}"
         end_date_str = f"31/12/{year}"
-    else:
+        else:
         m = int(month)
         start_date_str = f"01/{m:02d}/{year}"
         if m == 12:
@@ -437,9 +437,9 @@ async def start_evaluation(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "├ 🕐 تقارير بعد 8 مساءً\n"
         "└ ⭐ نسبة الأداء العملي\n\n"
         "اختر السنة:",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode=ParseMode.MARKDOWN,
-    )
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode=ParseMode.MARKDOWN,
+        )
     return EVAL_SELECT_YEAR
 
 
@@ -552,8 +552,8 @@ async def handle_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await q.edit_message_text(
             f"📊 **تقييم أداء المترجمين**\n\n📅 السنة: **{year}**\n\nاختر الشهر:",
             reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode=ParseMode.MARKDOWN,
-        )
+        parse_mode=ParseMode.MARKDOWN,
+    )
         return EVAL_SELECT_MONTH
 
     fmt = q.data.split(":")[2]  # pdf, excel, both
@@ -595,9 +595,9 @@ async def handle_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
             total_late = sum(r['late_reports'] for r in results)
 
             header = (
-                f"╔══════════════════════════════════╗\n"
+                    f"╔══════════════════════════════════╗\n"
                 f"  ✅ **تم إعداد تقرير التقييم**\n"
-                f"╚══════════════════════════════════╝\n\n"
+                    f"╚══════════════════════════════════╝\n\n"
                 f"📅 الفترة: **{period_label}**\n"
                 f"👥 المترجمين: **{len(results)}**\n"
                 f"📄 إجمالي التقارير: **{total_reports}**\n"
@@ -629,7 +629,7 @@ async def handle_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             # توليد وإرسال الملفات
             file_prefix = f"تقييم_المترجمين_{year}"
-            if month != "all":
+        if month != "all":
                 file_prefix += f"_{month}"
 
             if fmt in ('pdf', 'both'):
@@ -674,38 +674,38 @@ def _save_evaluations_to_db(session, results, year, month):
     month_int = 0 if month == "all" else int(month)
     for res in results:
         try:
-            existing = session.query(MonthlyEvaluation).filter_by(
+        existing = session.query(MonthlyEvaluation).filter_by(
                 translator_name=res['translator_name'],
-                year=year,
-                month=month_int,
-            ).first()
+            year=year,
+            month=month_int,
+        ).first()
 
-            if existing:
-                existing.total_reports = res['total_reports']
+        if existing:
+            existing.total_reports = res['total_reports']
                 existing.work_days = res['work_days']
                 existing.late_reports = res['late_reports']
-                existing.total_points = res['final_score']
+            existing.total_points = res['final_score']
                 existing.final_rating = int(res['final_score'] / 20)
-                existing.performance_level = res['level']
-                existing.updated_at = datetime.utcnow()
-            else:
-                ev = MonthlyEvaluation(
+            existing.performance_level = res['level']
+            existing.updated_at = datetime.utcnow()
+        else:
+            ev = MonthlyEvaluation(
                     translator_id=res.get('translator_id'),
                     translator_name=res['translator_name'],
-                    year=year,
-                    month=month_int,
-                    total_reports=res['total_reports'],
+                year=year,
+                month=month_int,
+                total_reports=res['total_reports'],
                     work_days=res['work_days'],
                     late_reports=res['late_reports'],
-                    total_points=res['final_score'],
-                    final_rating=int(res['final_score'] / 20),
-                    performance_level=res['level'],
-                )
-                session.add(ev)
+                total_points=res['final_score'],
+                final_rating=int(res['final_score'] / 20),
+                performance_level=res['level'],
+            )
+            session.add(ev)
         except Exception as e:
             logger.warning(f"خطأ في حفظ تقييم {res['translator_name']}: {e}")
     try:
-        session.commit()
+    session.commit()
     except Exception as e:
         logger.error(f"خطأ في حفظ التقييمات: {e}")
         session.rollback()
