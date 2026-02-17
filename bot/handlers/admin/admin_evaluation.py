@@ -7,6 +7,7 @@ import logging
 import io
 import os
 import sys
+import calendar
 from datetime import datetime, date, timedelta
 from sqlalchemy import text
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -18,7 +19,8 @@ from telegram.constants import ParseMode
 from db.session import SessionLocal
 from db.models import MonthlyEvaluation
 from bot.shared_auth import is_admin
-from services.stats_service import get_monthly_stats, ALL_ACTION_TYPES
+from services.stats_service import get_monthly_stats, get_translator_stats, ALL_ACTION_TYPES
+from services.inline_calendar import MONTHS_AR, DAYS_AR, format_date_arabic
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +30,10 @@ logger = logging.getLogger(__name__)
 (
     EVAL_SELECT_YEAR,
     EVAL_SELECT_MONTH,
+    EVAL_SELECT_PERIOD,
+    EVAL_SELECT_DAY,
     EVAL_SELECT_FORMAT,
-) = range(3)
+) = range(5)
 
 MONTH_NAMES = {
     1: "يناير", 2: "فبراير", 3: "مارس", 4: "أبريل",
@@ -165,24 +169,24 @@ def _compute_rating(stats_results):
 # توليد ملف PDF (reportlab على Windows)
 # ════════════════════════════════════════
 
-def _generate_pdf(results, period_label, year, month):
+def _generate_pdf(results, period_label, year, month, start_date_str=None, end_date_str=None):
     """توليد تقرير PDF - بطاقة لكل مترجم"""
 
     total_reports = sum(r['total_reports'] for r in results)
     total_late = sum(r['late_reports'] for r in results)
 
-    # تواريخ الفترة
-    if month == "all" or month == 0:
-        start_date_str = f"01/01/{year}"
-        end_date_str = f"31/12/{year}"
-    else:
-        m = int(month)
-        start_date_str = f"01/{m:02d}/{year}"
-        if m == 12:
+    if not start_date_str or not end_date_str:
+        if month == "all" or month == 0:
+            start_date_str = f"01/01/{year}"
             end_date_str = f"31/12/{year}"
         else:
-            last_day = (datetime(year, m + 1, 1) - timedelta(days=1)).day
-            end_date_str = f"{last_day}/{m:02d}/{year}"
+            m = int(month)
+            start_date_str = f"01/{m:02d}/{year}"
+            if m == 12:
+                end_date_str = f"31/12/{year}"
+            else:
+                last_day = (datetime(year, m + 1, 1) - timedelta(days=1)).day
+                end_date_str = f"{last_day}/{m:02d}/{year}"
 
     # ─── محاولة استخدام reportlab ───
     try:
@@ -483,6 +487,31 @@ async def start_evaluation(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return EVAL_SELECT_YEAR
 
 
+def _build_day_calendar(year, month):
+    today = date.today()
+    keyboard = []
+    keyboard.append([InlineKeyboardButton(f"{MONTHS_AR[month]} {year}", callback_data="noop")])
+    keyboard.append([InlineKeyboardButton(day, callback_data="noop") for day in DAYS_AR])
+
+    for week in calendar.monthcalendar(year, month):
+        row = []
+        for day in week:
+            if day == 0:
+                row.append(InlineKeyboardButton(" ", callback_data="noop"))
+                continue
+            day_date = date(year, month, day)
+            if day_date > today:
+                row.append(InlineKeyboardButton(f"·{day}·", callback_data="noop"))
+            else:
+                date_str = f"{year}-{month:02d}-{day:02d}"
+                row.append(InlineKeyboardButton(str(day), callback_data=f"evalday:select:{date_str}"))
+        keyboard.append(row)
+
+    keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="eval:back_period")])
+    keyboard.append([InlineKeyboardButton("❌ إلغاء", callback_data="eval:cancel")])
+    return InlineKeyboardMarkup(keyboard)
+
+
 async def handle_year(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """اختيار السنة"""
     q = update.callback_query
@@ -543,31 +572,51 @@ async def handle_month(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return EVAL_SELECT_YEAR
 
     month_val = q.data.split(":")[2]
-    context.user_data.setdefault('eval_data', {})['month'] = month_val
+    eval_data = context.user_data.setdefault('eval_data', {})
+    eval_data['month'] = month_val
+    eval_data.pop('day', None)
+    eval_data.pop('period_type', None)
 
-    year = context.user_data.get('eval_data', {}).get('year', date.today().year)
+    year = eval_data.get('year', date.today().year)
     month_label = "كل الشهور" if month_val == "all" else MONTH_NAMES.get(int(month_val), month_val)
 
+    if month_val == "all":
+        eval_data['period_type'] = "full"
+        keyboard = [
+            [InlineKeyboardButton("📄 PDF", callback_data="eval:format:pdf")],
+            [InlineKeyboardButton("📊 Excel", callback_data="eval:format:excel")],
+            [InlineKeyboardButton("📄 PDF + 📊 Excel", callback_data="eval:format:both")],
+            [InlineKeyboardButton("🔙 رجوع", callback_data="eval:back_month")],
+            [InlineKeyboardButton("❌ إلغاء", callback_data="eval:cancel")],
+        ]
+
+        await q.edit_message_text(
+            f"📊 **تقييم أداء المترجمين**\n\n"
+            f"📅 الفترة: **{month_label} {year}**\n\n"
+            f"اختر صيغة الملف:",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        return EVAL_SELECT_FORMAT
+
     keyboard = [
-        [InlineKeyboardButton("📄 PDF", callback_data="eval:format:pdf")],
-        [InlineKeyboardButton("📊 Excel", callback_data="eval:format:excel")],
-        [InlineKeyboardButton("📄 PDF + 📊 Excel", callback_data="eval:format:both")],
+        [InlineKeyboardButton("📅 الشهر كامل", callback_data="eval:period:full")],
+        [InlineKeyboardButton("📆 يوم محدد", callback_data="eval:period:day")],
         [InlineKeyboardButton("🔙 رجوع", callback_data="eval:back_month")],
         [InlineKeyboardButton("❌ إلغاء", callback_data="eval:cancel")],
     ]
 
     await q.edit_message_text(
         f"📊 **تقييم أداء المترجمين**\n\n"
-        f"📅 الفترة: **{month_label} {year}**\n\n"
-        f"اختر صيغة الملف:",
+        f"📅 الشهر: **{month_label} {year}**\n\n"
+        f"اختر نوع الفترة:",
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode=ParseMode.MARKDOWN,
     )
-    return EVAL_SELECT_FORMAT
+    return EVAL_SELECT_PERIOD
 
 
-async def handle_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """اختيار التنسيق وتوليد التقرير"""
+async def handle_period(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
 
@@ -596,13 +645,182 @@ async def handle_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return EVAL_SELECT_MONTH
 
+    eval_data = context.user_data.setdefault('eval_data', {})
+    year = eval_data.get('year', date.today().year)
+    month = eval_data.get('month')
+    if not month or month == "all":
+        return EVAL_SELECT_MONTH
+
+    if q.data == "eval:period:full":
+        eval_data['period_type'] = "full"
+        month_label = MONTH_NAMES.get(int(month), month)
+        keyboard = [
+            [InlineKeyboardButton("📄 PDF", callback_data="eval:format:pdf")],
+            [InlineKeyboardButton("📊 Excel", callback_data="eval:format:excel")],
+            [InlineKeyboardButton("📄 PDF + 📊 Excel", callback_data="eval:format:both")],
+            [InlineKeyboardButton("🔙 رجوع", callback_data="eval:back_month")],
+            [InlineKeyboardButton("❌ إلغاء", callback_data="eval:cancel")],
+        ]
+        await q.edit_message_text(
+            f"📊 **تقييم أداء المترجمين**\n\n"
+            f"📅 الفترة: **{month_label} {year}**\n\n"
+            f"اختر صيغة الملف:",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        return EVAL_SELECT_FORMAT
+
+    if q.data == "eval:period:day":
+        eval_data['period_type'] = "day"
+        month_int = int(month)
+        await q.edit_message_text(
+            f"📊 **تقييم أداء المترجمين**\n\n"
+            f"📅 اختر يوماً من شهر **{MONTH_NAMES.get(month_int)} {year}**:",
+            reply_markup=_build_day_calendar(year, month_int),
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        return EVAL_SELECT_DAY
+
+    return EVAL_SELECT_PERIOD
+
+
+async def handle_day(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+
+    if q.data == "eval:cancel":
+        await q.edit_message_text("✅ تم إلغاء التقييم.")
+        return ConversationHandler.END
+
+    if q.data == "eval:back_period":
+        eval_data = context.user_data.get('eval_data', {})
+        year = eval_data.get('year', date.today().year)
+        month = eval_data.get('month')
+        if not month or month == "all":
+            return EVAL_SELECT_MONTH
+        month_label = MONTH_NAMES.get(int(month), month)
+        keyboard = [
+            [InlineKeyboardButton("📅 الشهر كامل", callback_data="eval:period:full")],
+            [InlineKeyboardButton("📆 يوم محدد", callback_data="eval:period:day")],
+            [InlineKeyboardButton("🔙 رجوع", callback_data="eval:back_month")],
+            [InlineKeyboardButton("❌ إلغاء", callback_data="eval:cancel")],
+        ]
+        await q.edit_message_text(
+            f"📊 **تقييم أداء المترجمين**\n\n"
+            f"📅 الشهر: **{month_label} {year}**\n\n"
+            f"اختر نوع الفترة:",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        return EVAL_SELECT_PERIOD
+
+    if q.data.startswith("evalday:select:"):
+        date_str = q.data.split(":")[-1]
+        selected_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        eval_data = context.user_data.setdefault('eval_data', {})
+        month = eval_data.get('month')
+        year = eval_data.get('year')
+        if month and year:
+            if selected_date.month != int(month) or selected_date.year != int(year):
+                await q.answer("اختر يوماً من نفس الشهر", show_alert=True)
+                await q.edit_message_text(
+                    f"📊 **تقييم أداء المترجمين**\n\n"
+                    f"📅 اختر يوماً من شهر **{MONTH_NAMES.get(int(month))} {year}**:",
+                    reply_markup=_build_day_calendar(int(year), int(month)),
+                    parse_mode=ParseMode.MARKDOWN,
+                )
+                return EVAL_SELECT_DAY
+
+        eval_data['day'] = selected_date
+        period_label = format_date_arabic(selected_date)
+        keyboard = [
+            [InlineKeyboardButton("📄 PDF", callback_data="eval:format:pdf")],
+            [InlineKeyboardButton("📊 Excel", callback_data="eval:format:excel")],
+            [InlineKeyboardButton("📄 PDF + 📊 Excel", callback_data="eval:format:both")],
+            [InlineKeyboardButton("🔙 رجوع", callback_data="eval:back_month")],
+            [InlineKeyboardButton("❌ إلغاء", callback_data="eval:cancel")],
+        ]
+        await q.edit_message_text(
+            f"📊 **تقييم أداء المترجمين**\n\n"
+            f"📅 الفترة: **{period_label}**\n\n"
+            f"اختر صيغة الملف:",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        return EVAL_SELECT_FORMAT
+
+    return EVAL_SELECT_DAY
+
+
+async def handle_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """اختيار التنسيق وتوليد التقرير"""
+    q = update.callback_query
+    await q.answer()
+
+    if q.data == "eval:cancel":
+        await q.edit_message_text("✅ تم إلغاء التقييم.")
+        return ConversationHandler.END
+
+    if q.data == "eval:back_month":
+        eval_data = context.user_data.get('eval_data', {})
+        year = eval_data.get('year', date.today().year)
+        month = eval_data.get('month')
+        period_type = eval_data.get('period_type')
+        if month and month != "all" and period_type in ("full", "day"):
+            month_label = MONTH_NAMES.get(int(month), month)
+            keyboard = [
+                [InlineKeyboardButton("📅 الشهر كامل", callback_data="eval:period:full")],
+                [InlineKeyboardButton("📆 يوم محدد", callback_data="eval:period:day")],
+                [InlineKeyboardButton("🔙 رجوع", callback_data="eval:back_month")],
+                [InlineKeyboardButton("❌ إلغاء", callback_data="eval:cancel")],
+            ]
+            await q.edit_message_text(
+                f"📊 **تقييم أداء المترجمين**\n\n"
+                f"📅 الشهر: **{month_label} {year}**\n\n"
+                f"اختر نوع الفترة:",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode=ParseMode.MARKDOWN,
+            )
+            return EVAL_SELECT_PERIOD
+        keyboard = []
+        for i in range(0, 12, 3):
+            row = []
+            for j in range(3):
+                m = i + j + 1
+                row.append(InlineKeyboardButton(
+                    MONTH_NAMES[m], callback_data=f"eval:month:{m}"
+                ))
+            keyboard.append(row)
+        keyboard.append([InlineKeyboardButton("📄 كل الشهور", callback_data="eval:month:all")])
+        keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="eval:back_year")])
+        keyboard.append([InlineKeyboardButton("❌ إلغاء", callback_data="eval:cancel")])
+        await q.edit_message_text(
+            f"📊 **تقييم أداء المترجمين**\n\n📅 السنة: **{year}**\n\nاختر الشهر:",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        return EVAL_SELECT_MONTH
+
     fmt = q.data.split(":")[2]  # pdf, excel, both
     data = context.user_data.get('eval_data', {})
     year = data.get('year', date.today().year)
     month = data.get('month', 'all')
+    period_type = data.get('period_type', 'full')
 
-    month_label = "كل الشهور" if month == "all" else MONTH_NAMES.get(int(month), month)
-    period_label = f"{month_label} {year}"
+    if period_type == "day" and data.get('day'):
+        day_date = data.get('day')
+        period_label = format_date_arabic(day_date)
+        start_date = day_date
+        end_date = day_date
+        start_date_str = day_date.strftime("%d/%m/%Y")
+        end_date_str = day_date.strftime("%d/%m/%Y")
+    else:
+        month_label = "كل الشهور" if month == "all" else MONTH_NAMES.get(int(month), month)
+        period_label = f"{month_label} {year}"
+        start_date = None
+        end_date = None
+        start_date_str = None
+        end_date_str = None
 
     await q.edit_message_text(
         f"⏳ **جاري إعداد تقرير التقييم...**\n\n"
@@ -613,8 +831,10 @@ async def handle_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         with SessionLocal() as session:
-            # ═══ المصدر الوحيد: stats_service ═══
-            raw_stats = get_monthly_stats(session, year, month)
+            if period_type == "day" and start_date and end_date:
+                raw_stats = get_translator_stats(session, start_date, end_date)
+            else:
+                raw_stats = get_monthly_stats(session, year, month)
 
             if not raw_stats:
                 await q.edit_message_text(
@@ -628,7 +848,8 @@ async def handle_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
             results = _compute_rating(raw_stats)
 
             # حفظ في قاعدة البيانات
-            _save_evaluations_to_db(session, results, year, month)
+            if period_type != "day":
+                _save_evaluations_to_db(session, results, year, month)
 
             # إرسال ملخص نصي
             total_reports = sum(r['total_reports'] for r in results)
@@ -674,12 +895,14 @@ async def handle_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             # توليد وإرسال الملفات
             file_prefix = f"تقييم_المترجمين_{year}"
-            if month != "all":
+            if period_type == "day" and data.get('day'):
+                file_prefix += f"_{data['day'].strftime('%Y_%m_%d')}"
+            elif month != "all":
                 file_prefix += f"_{month}"
 
             if fmt in ('pdf', 'both'):
                 try:
-                    file_bytes, file_ext = _generate_pdf(results, period_label, year, month)
+                    file_bytes, file_ext = _generate_pdf(results, period_label, year, month, start_date_str, end_date_str)
                     file_obj = io.BytesIO(file_bytes)
                     file_obj.name = f"{file_prefix}.{file_ext}"
                     await q.message.reply_document(
@@ -842,6 +1065,12 @@ def register(app):
             ],
             EVAL_SELECT_MONTH: [
                 CallbackQueryHandler(handle_month, pattern=r"^eval:"),
+            ],
+            EVAL_SELECT_PERIOD: [
+                CallbackQueryHandler(handle_period, pattern=r"^eval:"),
+            ],
+            EVAL_SELECT_DAY: [
+                CallbackQueryHandler(handle_day, pattern=r"^(evalday:|eval:)"),
             ],
             EVAL_SELECT_FORMAT: [
                 CallbackQueryHandler(handle_format, pattern=r"^eval:"),
