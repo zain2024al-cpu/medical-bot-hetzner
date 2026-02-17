@@ -348,6 +348,8 @@ def register(app):
             CallbackQueryHandler(start_admin_management, pattern=r"^admin:manage_admins$"),
             # ✅ إضافة callback كـ entry point أيضاً
             CallbackQueryHandler(start_admin_management, pattern=r"^aa:(add|remove|list|back)$"),
+            CallbackQueryHandler(handle_admin_actions, pattern=r"^remove_admin:"),
+            CallbackQueryHandler(handle_confirm_remove_admin, pattern=r"^confirm_remove:"),
         ],
         states={
             AA_START: [
