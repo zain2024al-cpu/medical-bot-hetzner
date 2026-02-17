@@ -338,12 +338,9 @@ async def handle_admin_callback_outside_conv(update: Update, context: ContextTyp
 
 def register(app):
     """تسجيل المعالجات"""
-    # ✅ إضافة معالج خارجي لالتقاط callbacks حتى خارج المحادثة
-    app.add_handler(CallbackQueryHandler(
-        handle_admin_callback_outside_conv,
-        pattern=r"^aa:"
-    ))
-    
+    # ❌ تم حذف المعالج الخارجي - كان يلتقط aa: قبل ConversationHandler ويمنعه من العمل
+    # ConversationHandler مع allow_reentry=True يتعامل مع كل شيء
+
     conv = ConversationHandler(
         entry_points=[
             MessageHandler(filters.Regex("^👑 إدارة الأدمنين$"), start_admin_management),
@@ -367,9 +364,9 @@ def register(app):
             ]
         },
         fallbacks=[
-            CallbackQueryHandler(handle_admin_actions, pattern=r"^aa:back$"),
-            # ✅ السماح بإعادة الضغط على الأزرار
-            CallbackQueryHandler(handle_admin_actions, pattern=r"^aa:(add|remove|list)$")
+            CallbackQueryHandler(handle_admin_actions, pattern=r"^aa:"),
+            CallbackQueryHandler(handle_admin_actions, pattern=r"^remove_admin:"),
+            CallbackQueryHandler(handle_confirm_remove_admin, pattern=r"^confirm_remove:"),
         ],
         name="admin_management_conv",
         per_chat=True,
