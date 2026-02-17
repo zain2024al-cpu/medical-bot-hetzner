@@ -8,6 +8,7 @@ import io
 import os
 import sys
 from datetime import datetime, date, timedelta
+from sqlalchemy import text
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ContextTypes, ConversationHandler, MessageHandler,
@@ -58,6 +59,45 @@ def _medal(rank):
     elif rank == 2: return "🥈"
     elif rank == 3: return "🥉"
     return f"#{rank}"
+
+
+def _report_label(count: int) -> str:
+    return "تقرير" if count == 1 else "تقارير"
+
+
+def _get_daily_counts(session, translator_id, start_date, end_date):
+    if not translator_id:
+        return []
+    sql = text("""
+        SELECT DATE(COALESCE(r.report_date, r.created_at)) as day, COUNT(*) as count
+        FROM reports r
+        WHERE COALESCE(r.report_date, r.created_at) >= :start
+        AND COALESCE(r.report_date, r.created_at) < :end
+        AND r.status = 'active'
+        AND r.translator_id = :translator_id
+        GROUP BY day
+        ORDER BY day
+    """)
+    rows = session.execute(sql, {"start": start_date, "end": end_date, "translator_id": translator_id}).fetchall()
+    return [(str(r[0]), int(r[1])) for r in rows]
+
+
+async def _send_text_chunks(message, text):
+    lines = text.splitlines()
+    chunk = ""
+    for line in lines:
+        if len(chunk) + len(line) + 1 > 3500:
+            try:
+                await message.reply_text(chunk, parse_mode=ParseMode.MARKDOWN)
+            except Exception:
+                await message.reply_text(chunk)
+            chunk = ""
+        chunk += (line + "\n")
+    if chunk.strip():
+        try:
+            await message.reply_text(chunk.strip(), parse_mode=ParseMode.MARKDOWN)
+        except Exception:
+            await message.reply_text(chunk.strip())
 
 
 def _compute_rating(stats_results):
@@ -620,12 +660,17 @@ async def handle_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     for action_name, count in sorted(non_zero.items(), key=lambda x: x[1], reverse=True):
                         detail += f"│   • {action_name}: **{count}**\n"
 
+                start_date = item.get("start_date")
+                end_date = item.get("end_date")
+                daily_counts = _get_daily_counts(session, item.get("translator_id"), start_date, end_date)
+                if daily_counts:
+                    detail += "├ 📆 **أيام العمل والتقارير:**\n"
+                    for day, count in daily_counts:
+                        detail += f"│   • {day}: **{count}** {_report_label(count)}\n"
+
                 detail += "\n"
 
-                try:
-                    await q.message.reply_text(detail, parse_mode=ParseMode.MARKDOWN)
-                except Exception:
-                    await q.message.reply_text(detail)
+                await _send_text_chunks(q.message, detail)
 
             # توليد وإرسال الملفات
             file_prefix = f"تقييم_المترجمين_{year}"

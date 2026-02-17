@@ -76,24 +76,64 @@ def seed_translators_directory() -> int:
 
 
 def sync_reports_translator_ids() -> int:
-    """تحديث translator_id في reports بناءً على translator_name"""
+    """تحديث translator_id في reports بناءً على submitted_by_user_id أو translator_name"""
     try:
         from db.session import SessionLocal
         from sqlalchemy import text
 
         with SessionLocal() as session:
-            result = session.execute(text("""
+            updated_count = 0
+
+            result_by_user = session.execute(text("""
+                UPDATE reports
+                SET translator_id = submitted_by_user_id
+                WHERE submitted_by_user_id IS NOT NULL
+                  AND submitted_by_user_id IN (SELECT translator_id FROM translators)
+                  AND (
+                        translator_id IS NULL OR translator_id = 0
+                        OR translator_id NOT IN (SELECT translator_id FROM translators)
+                  )
+            """))
+            updated_count += result_by_user.rowcount or 0
+
+            result_by_name = session.execute(text("""
                 UPDATE reports
                 SET translator_id = (
                     SELECT translators.translator_id
                     FROM translators
                     WHERE TRIM(translators.name) = TRIM(reports.translator_name)
                 )
-                WHERE (translator_id IS NULL OR translator_id = 0)
-                  AND translator_name IS NOT NULL
+                WHERE translator_name IS NOT NULL
+                  AND (
+                        translator_id IS NULL OR translator_id = 0
+                        OR translator_id NOT IN (SELECT translator_id FROM translators)
+                  )
+                  AND EXISTS (
+                        SELECT 1 FROM translators
+                        WHERE TRIM(translators.name) = TRIM(reports.translator_name)
+                  )
             """))
+            updated_count += result_by_name.rowcount or 0
+
+            result_clear_invalid = session.execute(text("""
+                UPDATE reports
+                SET translator_id = NULL
+                WHERE translator_id IS NOT NULL
+                  AND translator_id NOT IN (SELECT translator_id FROM translators)
+                  AND (
+                        translator_name IS NULL
+                        OR TRIM(translator_name) = ''
+                        OR TRIM(translator_name) NOT IN (SELECT name FROM translators)
+                  )
+                  AND (
+                        submitted_by_user_id IS NULL
+                        OR submitted_by_user_id NOT IN (SELECT translator_id FROM translators)
+                  )
+            """))
+            updated_count += result_clear_invalid.rowcount or 0
+
             session.commit()
-            return result.rowcount or 0
+            return updated_count
     except Exception as e:
         logger.error(f"Error syncing report translator ids: {e}")
         return 0
@@ -349,9 +389,6 @@ __all__ = [
     'get_translators_count',
     'load_translator_names',
 ]
-
-
-
 
 
 

@@ -66,6 +66,9 @@ KNOWN_CALLBACKS = [
     # Admin
     # ===========================
     r"^admin:",
+    r"^aa:",               # إدارة الأدمنين
+    r"^remove_admin:",     # حذف أدمن
+    r"^confirm_remove:",   # تأكيد حذف أدمن
     r"^um:",               # إدارة المستخدمين
     r"^suspend_reason:",   # أسباب التجميد
     r"^confirm_delete:",   # تأكيد الحذف
@@ -203,6 +206,14 @@ async def handle_any_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     # تجاهل الـ callbacks المعروفة - ستتم معالجتها بواسطة handlers أخرى
     if is_known_callback(callback_data):
+        # معالجة خاصة لإدارة الأدمنين - إذا وصلت هنا فالمستخدم خارج ConversationHandler
+        if callback_data.startswith("aa:") or callback_data == "admin:manage_admins":
+            try:
+                from bot.handlers.admin.admin_admins import start_admin_management
+                await start_admin_management(update, context)
+            except Exception as e:
+                logger.error(f"❌ Error redirecting to admin management: {e}")
+            return
         # لا نفعل شيء - الـ handler المناسب سيتعامل معها
         return
     

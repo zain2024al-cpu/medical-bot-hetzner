@@ -72,7 +72,7 @@ def _run_translator_query(session, start_date_str: str, end_date_str: str):
                 r.translator_id,
                 COALESCE(td.name, r.translator_name, 'مترجم #' || r.translator_id) as translator_name,
                 COUNT(*) as total_reports,
-                COUNT(DISTINCT DATE(COALESCE(r.created_at, r.report_date))) as attendance_days,
+                COUNT(DISTINCT DATE(r.report_date)) as attendance_days,
                 SUM(
                     CASE WHEN CAST(strftime('%H', r.created_at) AS INTEGER) >= 20
                     THEN 1 ELSE 0 END
