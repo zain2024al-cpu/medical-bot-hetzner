@@ -213,6 +213,11 @@ async def handle_admin_buttons(update, context):
         # معالجات مجموعة التقارير
         await handle_group_management(update, context)
 
+    elif data == "admin:manage_admins":
+        # توجيه لإدارة الأدمنين
+        from bot.handlers.admin.admin_admins import start_admin_management
+        return await start_admin_management(update, context)
+
     elif data.startswith("admin:"):
         # أزرار أخرى - يمكن إضافة معالجات إضافية هنا
         await query.edit_message_text(
