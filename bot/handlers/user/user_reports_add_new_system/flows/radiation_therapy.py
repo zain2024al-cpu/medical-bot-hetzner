@@ -403,32 +403,9 @@ async def handle_radiation_calendar_callback(update: Update, context: ContextTyp
         return RADIATION_THERAPY_RETURN_DATE
 
     elif data.startswith("rad_time_hour:"):
-        # اختيار الساعة - عرض الدقائق
+        # اختيار الساعة - حفظ الوقت مباشرة بدون اختيار الدقائق
         hour = data.split(":")[1]
-        context.user_data.setdefault("report_tmp", {})["radiation_selected_hour"] = hour
-
-        await query.edit_message_text(
-            f"⏰ **اختر الدقائق:**\n\n"
-            f"الساعة المختارة: {hour}:__",
-            reply_markup=_build_radiation_minute_keyboard(hour),
-            parse_mode="Markdown"
-        )
-        return RADIATION_THERAPY_RETURN_DATE
-
-    elif data == "rad_time_back":
-        # الرجوع لاختيار الساعة
-        await query.edit_message_text(
-            "⏰ **اختر وقت الجلسة:**",
-            reply_markup=_build_radiation_hour_keyboard(),
-            parse_mode="Markdown"
-        )
-        return RADIATION_THERAPY_RETURN_DATE
-
-    elif data.startswith("rad_time_minute:"):
-        # اختيار الدقائق - حفظ الوقت الكامل
-        parts = data.split(":")
-        hour = parts[1]
-        minute = parts[2]
+        minute = "00"
 
         date_str = context.user_data.get("report_tmp", {}).get("radiation_selected_date", "")
         time_str = f"{hour}:{minute}"
@@ -461,6 +438,11 @@ async def handle_radiation_calendar_callback(update: Update, context: ContextTyp
             )
 
         return RADIATION_THERAPY_RETURN_REASON
+
+    elif data == "rad_time_back":
+        # الرجوع للتقويم من اختيار الساعة
+        await _render_radiation_calendar(query, context)
+        return RADIATION_THERAPY_RETURN_DATE
 
     return RADIATION_THERAPY_RETURN_DATE
 

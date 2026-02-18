@@ -5346,16 +5346,18 @@ async def handle_new_consult_followup_time_hour(update: Update, context: Context
             next_state = PHYSICAL_THERAPY_FOLLOWUP_DATE
         elif current_flow == "device":
             next_state = DEVICE_FOLLOWUP_DATE
+        elif current_flow == "appointment_reschedule":
+            next_state = APP_RESCHEDULE_RETURN_DATE
         else:
             next_state = NEW_CONSULT_FOLLOWUP_TIME
-        
+
         await query.edit_message_text(
             "🕐 **اختيار الساعة**\n\nاختر الساعة من القائمة:",
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown",
         )
         return next_state
-    
+
     # حفظ الوقت مباشرة بدون اختيار الدقائق (الدقائق = 00)
     minute = "00"
     time_value = f"{hour}:{minute}"
@@ -5422,9 +5424,11 @@ async def handle_new_consult_followup_time_hour(update: Update, context: Context
             next_state = PHYSICAL_THERAPY_FOLLOWUP_REASON
         elif current_flow == "device":
             next_state = DEVICE_FOLLOWUP_REASON
+        elif current_flow == "appointment_reschedule":
+            next_state = APP_RESCHEDULE_RETURN_REASON
         else:
             next_state = NEW_CONSULT_FOLLOWUP_REASON
-        
+
         # الانتقال إلى خطوة سبب العودة
         await query.message.reply_text(
             "✅ تم الحفظ\n\n"
@@ -5539,9 +5543,11 @@ async def handle_new_consult_followup_time_minute(update: Update, context: Conte
             next_state = PHYSICAL_THERAPY_FOLLOWUP_REASON
         elif current_flow == "device":
             next_state = DEVICE_FOLLOWUP_REASON
+        elif current_flow == "appointment_reschedule":
+            next_state = APP_RESCHEDULE_RETURN_REASON
         else:
             next_state = NEW_CONSULT_FOLLOWUP_REASON
-        
+
         # الانتقال إلى خطوة سبب العودة
         await query.message.reply_text(
             "✍️ **سبب العودة**\n\n"
@@ -5623,9 +5629,11 @@ async def handle_new_consult_followup_time_skip(update: Update, context: Context
             next_state = PHYSICAL_THERAPY_FOLLOWUP_REASON
         elif current_flow == "device":
             next_state = DEVICE_FOLLOWUP_REASON
+        elif current_flow == "appointment_reschedule":
+            next_state = APP_RESCHEDULE_RETURN_REASON
         else:
             next_state = NEW_CONSULT_FOLLOWUP_REASON
-        
+
         # الانتقال إلى خطوة سبب العودة
         await query.message.reply_text(
             "✍️ **سبب العودة**\n\n"
@@ -7690,31 +7698,58 @@ async def handle_reschedule_calendar_nav(update: Update, context: ContextTypes.D
 
 
 async def handle_reschedule_calendar_day(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """معالج اختيار تاريخ العودة"""
+    """معالج اختيار تاريخ العودة - يعرض اختيار الوقت بعد التاريخ"""
     query = update.callback_query
     await query.answer()
-    
+
     date_str = query.data.split(":", 1)[1]
     try:
         return_date = datetime.strptime(date_str, "%Y-%m-%d").date()
         context.user_data["report_tmp"]["app_reschedule_return_date"] = return_date
         context.user_data["report_tmp"]["followup_date"] = return_date
+        context.user_data["report_tmp"]["_pending_followup_date"] = return_date
 
-        days_ar = {0: 'الاثنين', 1: 'الثلاثاء', 2: 'الأربعاء', 3: 'الخميس', 4: 'الجمعة', 5: 'السبت', 6: 'الأحد'}
-        day_name = days_ar.get(return_date.weekday(), '')
-        date_display = f"📅 {return_date.strftime('%d')} {MONTH_NAMES_AR.get(return_date.month, return_date.month)} {return_date.year} ({day_name})"
+        # عرض اختيار الوقت (نفس نظام باقي المسارات)
+        keyboard = []
+        common_morning = [
+            ("🌅 8:00 صباحاً", "08"),
+            ("🌅 9:00 صباحاً", "09"),
+            ("🌅 10:00 صباحاً", "10"),
+            ("🌅 11:00 صباحاً", "11"),
+        ]
+        keyboard.append([InlineKeyboardButton(label,
+            callback_data=f"followup_time_hour:{val}") for label, val in common_morning])
+
+        keyboard.append([InlineKeyboardButton("☀️ 12:00 ظهراً", callback_data="followup_time_hour:12")])
+
+        common_afternoon = [
+            ("🌆 1:00 مساءً", "13"),
+            ("🌆 2:00 مساءً", "14"),
+            ("🌆 3:00 مساءً", "15"),
+            ("🌆 4:00 مساءً", "16"),
+        ]
+        keyboard.append([InlineKeyboardButton(label,
+            callback_data=f"followup_time_hour:{val}") for label, val in common_afternoon])
+
+        keyboard.append([InlineKeyboardButton("🕐 أوقات أخرى", callback_data="followup_time_hour:more")])
+        keyboard.append([
+            InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
+            InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
+        ])
 
         await query.edit_message_text(
             f"✅ **تم اختيار التاريخ**\n\n"
-            f"📅 **تاريخ العودة الجديد:**\n"
-            f"{date_display}\n\n"
-            f"يرجى إدخال سبب العودة:",
+            f"📅 **التاريخ:**\n"
+            f"{date_str}\n\n"
+            f"🕐 **الوقت** (اختياري)\n\n"
+            f"اختر الساعة:",
+            reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown"
         )
-        
-        context.user_data['_conversation_state'] = APP_RESCHEDULE_RETURN_REASON
-        return APP_RESCHEDULE_RETURN_REASON
-        
+
+        context.user_data['_conversation_state'] = APP_RESCHEDULE_RETURN_DATE
+        return APP_RESCHEDULE_RETURN_DATE
+
     except ValueError:
         await query.answer("صيغة غير صالحة", show_alert=True)
         return APP_RESCHEDULE_RETURN_DATE
@@ -11834,7 +11869,10 @@ def register(app):
             APP_RESCHEDULE_RETURN_DATE: [
                 CallbackQueryHandler(handle_reschedule_calendar_nav, pattern="^reschedule_cal_nav:"),
                 CallbackQueryHandler(handle_reschedule_calendar_day, pattern="^reschedule_cal_day:"),
+                CallbackQueryHandler(handle_new_consult_followup_time_hour, pattern="^followup_time_hour:"),
+                CallbackQueryHandler(handle_new_consult_followup_time_minute, pattern="^followup_time_minute:"),
                 CallbackQueryHandler(handle_smart_back_navigation, pattern="^nav:back$"),
+                CallbackQueryHandler(handle_cancel_navigation, pattern="^nav:cancel$"),
             ],
             APP_RESCHEDULE_RETURN_REASON: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_app_reschedule_return_reason),

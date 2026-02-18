@@ -521,9 +521,9 @@ async def show_translator_selection(message, context, flow_type):
             keyboard_buttons.append(row)
             row = []
 
-    # إضافة زر تخطي (اختياري)
+    # إضافة أزرار التنقل
     keyboard_buttons.append([
-        InlineKeyboardButton("⏭️ تخطي (بدون مترجم)", callback_data=f"simple_translator:{flow_type}:skip"),
+        InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
         InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
     ])
 
