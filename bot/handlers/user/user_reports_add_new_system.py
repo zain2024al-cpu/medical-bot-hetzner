@@ -868,7 +868,7 @@ async def cancel_search(update, context):
     current_state = context.user_data.get('_conversation_state')
     flow_type = context.user_data.get('report_tmp', {}).get('current_flow', 'new_consult')
 
-    previous_step = smart_nav_manager.get_previous_step(flow_type, current_state)
+    previous_step = smart_nav_manager.get_previous_step(flow_type, current_state, context)
 
     if previous_step:
         await execute_smart_state_action(previous_step, flow_type, update, context)
@@ -1157,6 +1157,7 @@ class SmartNavigationManager:
             },
 
             # تدفق خروج من المستشفى
+            # ✅ خريطة الرجوع تعتمد على discharge_type (يتم حلها ديناميكياً في get_previous_step)
             'discharge': {
                 STATE_SELECT_DATE: None,
                 STATE_SELECT_PATIENT: STATE_SELECT_DATE,
@@ -1167,9 +1168,12 @@ class SmartNavigationManager:
                 STATE_SELECT_ACTION_TYPE: STATE_SELECT_DOCTOR,
                 'DISCHARGE_TYPE': STATE_SELECT_ACTION_TYPE,
                 'DISCHARGE_ADMISSION_SUMMARY': 'DISCHARGE_TYPE',
-                'DISCHARGE_OPERATION_DETAILS': 'DISCHARGE_ADMISSION_SUMMARY',
+                'DISCHARGE_OPERATION_DETAILS': 'DISCHARGE_TYPE',
                 'DISCHARGE_OPERATION_NAME_EN': 'DISCHARGE_OPERATION_DETAILS',
-                'DISCHARGE_FOLLOWUP_DATE': 'DISCHARGE_OPERATION_NAME_EN',
+                # DISCHARGE_FOLLOWUP_DATE: يتم حله ديناميكياً حسب discharge_type
+                # admission → DISCHARGE_ADMISSION_SUMMARY
+                # operation → DISCHARGE_OPERATION_NAME_EN
+                'DISCHARGE_FOLLOWUP_DATE': '_DYNAMIC_DISCHARGE_BACK_',
                 'DISCHARGE_FOLLOWUP_REASON': 'DISCHARGE_FOLLOWUP_DATE',
                 'DISCHARGE_TRANSLATOR': 'DISCHARGE_FOLLOWUP_REASON',
                 'DISCHARGE_CONFIRM': 'DISCHARGE_TRANSLATOR',
@@ -1199,29 +1203,31 @@ class SmartNavigationManager:
             'last_results': None
         }
 
-    def get_previous_step(self, flow_type, current_step):
+    def get_previous_step(self, flow_type, current_step, context=None):
         """
         الحصول على الخطوة السابقة بدقة لنوع التدفق المحدد
+        context: اختياري - يُستخدم لتحديد المسار الديناميكي (مثل discharge_type)
         """
         import logging
         logger = logging.getLogger(__name__)
-        
+
         # ✅ تسجيل تفصيلي للتشخيص
         logger.info(f"🔍 GET_PREVIOUS_STEP: flow_type='{flow_type}', current_step={current_step}")
-        
+
         if flow_type not in self.step_flows:
             logger.warning(f"⚠️ Flow type '{flow_type}' not found in step_flows")
             return STATE_SELECT_ACTION_TYPE
-        
+
         flow_map = self.step_flows[flow_type]
         logger.info(f"🗺️ Using flow_map for '{flow_type}': {flow_map}")
         
         # ✅ أولاً: تحقق إذا كان current_step موجود مباشرة في flow_map (كرقم)
         if current_step in flow_map:
             prev_step = flow_map[current_step]
+            prev_step = self._resolve_dynamic_back(prev_step, flow_type, context, logger)
             logger.info(f"✅ Found direct match for state {current_step}, prev_step = {prev_step}")
             return prev_step
-        
+
         # ربط أسماء الـ states بقيمها الفعلية (لتحويل الأرقام لأسماء)
         state_name_to_value = {
             # الـ states الأساسية
@@ -1371,6 +1377,7 @@ class SmartNavigationManager:
             
             if current_step_name and current_step_name in flow_map:
                 prev_step = flow_map[current_step_name]
+                prev_step = self._resolve_dynamic_back(prev_step, flow_type, context, logger)
                 logger.debug(f"✅ Found in flow_map: {current_step_name} -> {prev_step} (type: {type(prev_step).__name__})")
                 # ✅ معالجة الخطوة السابقة - قد تكون رقم أو string
                 if isinstance(prev_step, str):
@@ -1384,6 +1391,7 @@ class SmartNavigationManager:
                 # ✅ محاولة استخدام current_step مباشرة كرقم
                 if current_step in flow_map:
                     prev_step = flow_map[current_step]
+                    prev_step = self._resolve_dynamic_back(prev_step, flow_type, context, logger)
                     logger.debug(f"✅ Found current_step as int: {current_step} -> {prev_step} (type: {type(prev_step).__name__})")
                     if isinstance(prev_step, str) and prev_step in state_name_to_value:
                         return state_name_to_value[prev_step]
@@ -1392,16 +1400,18 @@ class SmartNavigationManager:
                     return prev_step
         elif isinstance(current_step, str) and current_step in flow_map:
             prev_step = flow_map[current_step]
+            prev_step = self._resolve_dynamic_back(prev_step, flow_type, context, logger)
             logger.debug(f"✅ Found string key: {current_step} -> {prev_step} (type: {type(prev_step).__name__})")
             if isinstance(prev_step, str) and prev_step in state_name_to_value:
                 return state_name_to_value[prev_step]
             elif isinstance(prev_step, int):
                 return prev_step
             return prev_step
-        
+
         # ✅ محاولة أخيرة: البحث في flow_map باستخدام current_step كرقم
         if isinstance(current_step, int) and current_step in flow_map:
             prev_step = flow_map[current_step]
+            prev_step = self._resolve_dynamic_back(prev_step, flow_type, context, logger)
             logger.debug(f"✅ Found as int (fallback): {current_step} -> {prev_step} (type: {type(prev_step).__name__})")
             if isinstance(prev_step, str) and prev_step in state_name_to_value:
                 return state_name_to_value[prev_step]
@@ -1411,6 +1421,28 @@ class SmartNavigationManager:
         
         logger.warning(f"⚠️ Could not find previous step for current_step={current_step}, flow_type={flow_type}")
         return STATE_SELECT_ACTION_TYPE  # الرجوع لقائمة نوع الإجراء
+
+    def _resolve_dynamic_back(self, prev_step, flow_type, context, logger):
+        """
+        حل القيم الديناميكية لزر الرجوع.
+        يُستخدم عندما تعتمد الخطوة السابقة على بيانات المستخدم (مثل discharge_type).
+        """
+        if prev_step != '_DYNAMIC_DISCHARGE_BACK_':
+            return prev_step
+
+        # ✅ خروج من المستشفى: الخطوة السابقة لـ FOLLOWUP_DATE تعتمد على نوع الخروج
+        if context is not None:
+            discharge_type = context.user_data.get('report_tmp', {}).get('discharge_type', '')
+        else:
+            discharge_type = ''
+
+        if discharge_type == 'admission':
+            logger.info("🔙 DYNAMIC_BACK: discharge admission → DISCHARGE_ADMISSION_SUMMARY")
+            return 'DISCHARGE_ADMISSION_SUMMARY'
+        else:
+            # operation أو أي نوع آخر
+            logger.info("🔙 DYNAMIC_BACK: discharge operation → DISCHARGE_OPERATION_NAME_EN")
+            return 'DISCHARGE_OPERATION_NAME_EN'
 
     def get_next_step(self, flow_type, current_step):
         """
@@ -1999,7 +2031,7 @@ async def execute_smart_state_action(target_step, flow_type, update, context):
             if flow_type == 'periodic_followup':
                 logger.info("🔄 FOLLOWUP_ROOM_FLOOR in periodic_followup flow - skipping to previous step")
                 # الرجوع إلى قرار الطبيب مباشرة
-                previous_step = smart_nav_manager.get_previous_step(flow_type, target_step)
+                previous_step = smart_nav_manager.get_previous_step(flow_type, target_step, context)
                 if previous_step is not None:
                     context.user_data['_conversation_state'] = previous_step
                     return await execute_smart_state_action(previous_step, flow_type, update, context)
@@ -2115,12 +2147,15 @@ async def execute_smart_state_action(target_step, flow_type, update, context):
                 )
             elif 'DISCHARGE' in step_name:
                 await update.callback_query.edit_message_text(
-                    "🏥 اختر نوع الخروج:",
+                    "🏠 **خروج من المستشفى**\n\n"
+                    "اختر نوع الخروج:",
                     reply_markup=InlineKeyboardMarkup([
-                        [InlineKeyboardButton("✅ خروج عادي", callback_data="discharge_type:normal")],
-                        [InlineKeyboardButton("⚠️ خروج ضد النصيحة الطبية", callback_data="discharge_type:ama")],
+                        [InlineKeyboardButton("🛏️ خروج بعد رقود طبي", callback_data="discharge_type:admission")],
+                        [InlineKeyboardButton("⚕️ خروج بعد عملية", callback_data="discharge_type:operation")],
                         [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back")],
-                    ])
+                        [InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]
+                    ]),
+                    parse_mode="Markdown"
                 )
             elif 'RADIOLOGY' in step_name:
                 # إدخال نص لنوع الأشعة (مثل start_radiology_flow)
@@ -2297,7 +2332,7 @@ async def handle_smart_back_navigation(update: Update, context: ContextTypes.DEF
         
         # ✅ الحصول على الخطوة السابقة - مع تسجيل مفصل
         logger.debug(f"🔍 Getting previous step for flow_type='{flow_type}', current_state={current_state}")
-        previous_step = smart_nav_manager.get_previous_step(flow_type, current_state)
+        previous_step = smart_nav_manager.get_previous_step(flow_type, current_state, context)
         logger.info(f"🔙 NAVIGATION_RESULT: {current_state} → {previous_step} (flow_type={flow_type})")
 
         if previous_step is None:
