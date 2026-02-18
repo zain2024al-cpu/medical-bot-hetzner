@@ -67,6 +67,7 @@ def _run_translator_query(session, start_date_str: str, end_date_str: str):
     try:
         # ═══ الاستعلام الرسمي الوحيد ═══
         # ✅ استخدام TranslatorDirectory كمرجع أساسي لتوحيد الأسماء
+        # ✅ تحويل created_at من UTC إلى التوقيت المحلي (UTC+5:30) قبل مقارنة الساعة
         sql = text("""
             SELECT
                 r.translator_id,
@@ -74,7 +75,7 @@ def _run_translator_query(session, start_date_str: str, end_date_str: str):
                 COUNT(*) as total_reports,
                 COUNT(DISTINCT DATE(r.report_date)) as attendance_days,
                 SUM(
-                    CASE WHEN CAST(strftime('%H', r.created_at) AS INTEGER) >= 20
+                    CASE WHEN CAST(strftime('%H', datetime(r.created_at, '+5 hours', '+30 minutes')) AS INTEGER) >= 20
                     THEN 1 ELSE 0 END
                 ) as late_reports
             FROM reports r
@@ -238,8 +239,13 @@ def _run_translator_query_resilient(start_date_str: str, end_date_str: str):
         item = results_map[tid]
         item["total_reports"] += 1
         item["attendance_dates"].add(effective_dt.date())
-        if created_dt and created_dt.hour >= 20:
-            item["late_reports"] += 1
+        # ✅ تحويل created_at من UTC إلى التوقيت المحلي (UTC+5:30) قبل المقارنة
+        if created_dt:
+            local_hour = created_dt.hour + 5 + (1 if created_dt.minute >= 30 else 0)
+            if local_hour >= 24:
+                local_hour -= 24
+            if local_hour >= 20:
+                item["late_reports"] += 1
 
         action_name = (medical_action or "أخرى").strip() if medical_action else "أخرى"
         if action_name in item["action_breakdown"]:
