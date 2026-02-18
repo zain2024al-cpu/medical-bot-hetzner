@@ -344,25 +344,25 @@ def register(app):
     conv = ConversationHandler(
         entry_points=[
             MessageHandler(filters.Regex("^👑 إدارة الأدمنين$"), start_admin_management),
-            # ✅ entry point من لوحة التحكم الرئيسية
+            # ✅ entry point من لوحة التحكم الرئيسية فقط
             CallbackQueryHandler(start_admin_management, pattern=r"^admin:manage_admins$"),
-            # ✅ إضافة callback كـ entry point أيضاً
-            CallbackQueryHandler(start_admin_management, pattern=r"^aa:(add|remove|list|back)$"),
-            CallbackQueryHandler(handle_admin_actions, pattern=r"^remove_admin:"),
-            CallbackQueryHandler(handle_confirm_remove_admin, pattern=r"^confirm_remove:"),
         ],
         states={
             AA_START: [
-                CallbackQueryHandler(handle_admin_actions, pattern=r"^aa:")
+                CallbackQueryHandler(handle_admin_actions, pattern=r"^aa:"),
+                CallbackQueryHandler(handle_admin_actions, pattern=r"^remove_admin:"),
             ],
             AA_ADD_INPUT: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_add_admin_input)
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_add_admin_input),
+                CallbackQueryHandler(handle_admin_actions, pattern=r"^aa:"),
             ],
             AA_REMOVE_SELECT: [
-                CallbackQueryHandler(handle_admin_actions, pattern=r"^(aa:|remove_admin:)")
+                CallbackQueryHandler(handle_admin_actions, pattern=r"^(aa:|remove_admin:)"),
+                CallbackQueryHandler(handle_confirm_remove_admin, pattern=r"^confirm_remove:"),
             ],
             AA_CONFIRM_REMOVE: [
-                CallbackQueryHandler(handle_confirm_remove_admin, pattern=r"^confirm_remove:")
+                CallbackQueryHandler(handle_confirm_remove_admin, pattern=r"^confirm_remove:"),
+                CallbackQueryHandler(handle_admin_actions, pattern=r"^aa:"),
             ]
         },
         fallbacks=[
