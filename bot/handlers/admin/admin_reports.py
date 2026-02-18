@@ -2742,7 +2742,7 @@ def _get_filter_label(filter_type):
     }
     return labels.get(filter_type, '')
 
-def export_to_html(reports_data, filename="reports", filter_type=None):
+def export_to_html(reports_data, filename="reports", filter_type=None, title=None, filter_desc=None):
     """تصدير التقارير إلى HTML احترافي مع رسوم بيانية ديناميكية"""
     from jinja2 import Environment, FileSystemLoader
     from datetime import datetime
@@ -2809,9 +2809,9 @@ def export_to_html(reports_data, filename="reports", filter_type=None):
             template = None
         
         context = {
-            'title': 'التقرير الطبي الشامل',
+            'title': title or 'التقرير الطبي الشامل',
             'generated_at': datetime.now().strftime("%Y-%m-%d %H:%M"),
-            'filter_value': _get_filter_label(filter_type),
+            'filter_value': filter_desc or _get_filter_label(filter_type),
             'reports': html_reports,
             'stats': stats,
             'charts': charts
