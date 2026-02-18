@@ -68,6 +68,7 @@ def _run_translator_query(session, start_date_str: str, end_date_str: str):
         # ═══ الاستعلام الرسمي الوحيد ═══
         # ✅ استخدام TranslatorDirectory كمرجع أساسي لتوحيد الأسماء
         # ✅ تحويل created_at من UTC إلى التوقيت المحلي (UTC+5:30) قبل مقارنة الساعة
+        # ✅ استخدام report_date حصراً لحساب أيام العمل
         sql = text("""
             SELECT
                 r.translator_id,
@@ -209,10 +210,13 @@ def _run_translator_query_resilient(start_date_str: str, end_date_str: str):
 
         report_dt = _parse_datetime(report_date)
         created_dt = _parse_datetime(created_at)
-        effective_dt = report_dt or created_dt
-        if not effective_dt:
+        
+        # ✅ تعديل: الاعتماد حصرياً على report_date (مثل الاستعلام الرئيسي)
+        # لتجنب حساب created_at كأيام عمل إذا غاب report_date
+        if not report_dt:
             continue
-        if not (start_dt <= effective_dt < end_dt):
+
+        if not (start_dt <= report_dt < end_dt):
             continue
 
         tid = int(translator_id)
@@ -238,7 +242,7 @@ def _run_translator_query_resilient(start_date_str: str, end_date_str: str):
 
         item = results_map[tid]
         item["total_reports"] += 1
-        item["attendance_dates"].add(effective_dt.date())
+        item["attendance_dates"].add(report_dt.date())
         # ✅ تحويل created_at من UTC إلى التوقيت المحلي (UTC+5:30) قبل المقارنة
         if created_dt:
             local_hour = created_dt.hour + 5 + (1 if created_dt.minute >= 30 else 0)
