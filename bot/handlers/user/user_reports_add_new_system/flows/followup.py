@@ -59,8 +59,8 @@ async def start_followup_flow(message, context):
     context.user_data['_conversation_state'] = FOLLOWUP_COMPLAINT
     
     await message.reply_text(
-        "💬 **متابعة في الرقود**\n\n"
-        "أدخل شكوى المريض:",
+        "🛏️ **متابعة في الرقود**\n\n"
+        "أدخل حالة المريض اليومية:",
         reply_markup=_nav_buttons(show_back=True),
         parse_mode="Markdown"
     )
@@ -122,9 +122,13 @@ async def handle_followup_complaint(update: Update, context: ContextTypes.DEFAUL
     valid, msg = validate_text_input(text, min_length=3)
 
     if not valid:
+        if data.get("medical_action") == "متابعة في الرقود":
+            error_label = "يرجى إدخال حالة المريض اليومية:"
+        else:
+            error_label = "يرجى إدخال شكوى المريض:"
         await update.message.reply_text(
             f"⚠️ **خطأ: {msg}**\n\n"
-            f"يرجى إدخال شكوى المريض:",
+            f"{error_label}",
             reply_markup=_nav_buttons(show_back=True),
             parse_mode="Markdown"
         )
@@ -185,8 +189,8 @@ async def handle_followup_diagnosis(update: Update, context: ContextTypes.DEFAUL
     if data.get("medical_action") == "متابعة في الرقود":
         await update.message.reply_text(
             f"✅ تم الحفظ\n\n"
-            f"📝 **متابعة في الرقود: قرار الطبيب**\n\n"
-            f"أدخل قرار الطبيب:",
+            f"📝 **متابعة في الرقود: قرار الطبيب اليومي**\n\n"
+            f"أدخل قرار الطبيب اليومي:",
             reply_markup=_nav_buttons(show_back=True),
             parse_mode="Markdown"
         )
@@ -217,9 +221,13 @@ async def handle_followup_decision(update: Update, context: ContextTypes.DEFAULT
     valid, msg = validate_text_input(text, min_length=3)
 
     if not valid:
+        if data.get("medical_action") == "متابعة في الرقود":
+            decision_label = "يرجى إدخال قرار الطبيب اليومي:"
+        else:
+            decision_label = "يرجى إدخال قرار الطبيب:"
         await update.message.reply_text(
             f"⚠️ **خطأ: {msg}**\n\n"
-            f"يرجى إدخال قرار الطبيب:",
+            f"{decision_label}",
             reply_markup=_nav_buttons(show_back=True),
             parse_mode="Markdown"
         )

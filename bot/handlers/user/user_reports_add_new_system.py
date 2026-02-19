@@ -8606,9 +8606,20 @@ async def show_final_summary(message, context, flow_type):
     # تفاصيل حسب نوع المسار
     if flow_type in ["new_consult", "followup", "emergency"]:
 
-        summary += f"💬 **الشكوى:** {data.get('complaint', 'غير محدد')}\n"
+        # ✅ توحيد العناوين: "متابعة في الرقود" تستخدم مسميات مختلفة
+        is_inpatient = (flow_type == "followup" and data.get("medical_action") == "متابعة في الرقود")
+
+        if is_inpatient:
+            summary += f"🛏️ **حالة المريض اليومية:** {data.get('complaint', 'غير محدد')}\n"
+        else:
+            summary += f"💬 **شكوى المريض:** {data.get('complaint', 'غير محدد')}\n"
+
         summary += f"🔬 **التشخيص:** {data.get('diagnosis', 'غير محدد')}\n"
-        summary += f"📝 **قرار الطبيب:** {data.get('decision', 'غير محدد')}\n"
+
+        if is_inpatient:
+            summary += f"📝 **قرار الطبيب اليومي:** {data.get('decision', 'غير محدد')}\n"
+        else:
+            summary += f"📝 **قرار الطبيب:** {data.get('decision', 'غير محدد')}\n"
 
         if flow_type == "new_consult":
             summary += f"🔬 **الفحوصات المطلوبة:** {data.get('tests', 'لا يوجد')}\n"
@@ -8616,7 +8627,13 @@ async def show_final_summary(message, context, flow_type):
         if flow_type == "emergency":
             summary += f"🏥 **وضع الحالة:** {data.get('status', 'غير محدد')}\n"
 
-        # تاريخ العودة
+        # ✅ رقم الغرفة والطابق (فقط لمتابعة في الرقود)
+        if is_inpatient:
+            room_info = data.get('room_number') or data.get('room_floor') or data.get('room')
+            if room_info and str(room_info).strip():
+                summary += f"🏥 **رقم الغرفة والطابق:** {room_info}\n"
+
+        # موعد العودة
         followup_date = data.get('followup_date')
         if followup_date:
             if hasattr(followup_date, 'strftime'):
@@ -8626,9 +8643,9 @@ async def show_final_summary(message, context, flow_type):
             followup_time = data.get('followup_time', '')
             if followup_time:
                 time_display = format_time_string_12h(followup_time)
-                summary += f"📅 **تاريخ العودة:** {date_str} الساعة {time_display}\n"
+                summary += f"📅 **موعد العودة:** {date_str} الساعة {time_display}\n"
             else:
-                summary += f"📅 **تاريخ العودة:** {date_str}\n"
+                summary += f"📅 **موعد العودة:** {date_str}\n"
             summary += f"✍️ **سبب العودة:** {data.get('followup_reason', 'غير محدد')}\n"
 
         # حماية إضافية: لا تعرض رقم الغرفة في periodic_review/مراجعة دورية حتى لو كان موجودًا
