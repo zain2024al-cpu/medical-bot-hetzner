@@ -7,8 +7,12 @@ from dotenv import load_dotenv
 
 # 🧭 تحميل متغيرات البيئة من ملف config.env (للتطوير المحلي فقط)
 # في الاستضافة السحابية، المتغيرات تكون متوفرة مباشرة في البيئة
+# ✅ استخدام المسار المطلق لضمان العمل بغض النظر عن مجلد التشغيل
+_CONFIG_DIR = os.path.dirname(os.path.abspath(__file__))
+_CONFIG_ENV_PATH = os.path.join(_CONFIG_DIR, '..', 'config.env')
+_CONFIG_ENV_PATH = os.path.normpath(_CONFIG_ENV_PATH)
 try:
-    load_dotenv("config.env")
+    load_dotenv(_CONFIG_ENV_PATH)
 except FileNotFoundError:
     pass  # طبيعي في الاستضافة السحابية
 

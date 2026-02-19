@@ -327,37 +327,36 @@ def _save_admin_ids_to_env():
         logger.error(f"❌ فشل حفظ معرفات الأدمنين في {config_path}: {e}")
         raise
 
-async def handle_admin_callback_outside_conv(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """معالجة callbacks إدارة الأدمنين خارج المحادثة"""
+async def _aa_entry_from_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    نقطة دخول ذكية: عند ضغط زر aa: خارج المحادثة النشطة
+    يعيد فتح قائمة إدارة الأدمنين ثم يعالج الزر مباشرة
+    """
     query = update.callback_query
     if not query:
-        return
-    
-    try:
-        await query.answer()
-    except Exception:
-        pass
-    
-    # إذا كان callback لإدارة الأدمنين، نبدأ المحادثة
-    if query.data.startswith("aa:"):
-        # مسح أي بيانات قديمة
-        context.user_data.clear()
-        # بدء المحادثة
-        return await start_admin_management(update, context)
-    
-    return ConversationHandler.END
+        return ConversationHandler.END
+
+    user = update.effective_user
+    if not is_admin(user.id):
+        try:
+            await query.answer("🚫 هذه الخاصية مخصصة للإدمن فقط.", show_alert=True)
+        except Exception:
+            pass
+        return ConversationHandler.END
+
+    # معالجة الزر مباشرة بدلاً من إعادة عرض القائمة
+    return await handle_admin_actions(update, context)
 
 
 def register(app):
     """تسجيل المعالجات"""
-    # ❌ تم حذف المعالج الخارجي - كان يلتقط aa: قبل ConversationHandler ويمنعه من العمل
-    # ConversationHandler مع allow_reentry=True يتعامل مع كل شيء
-
     conv = ConversationHandler(
         entry_points=[
             MessageHandler(filters.Regex("^👑 إدارة الأدمنين$"), start_admin_management),
-            # ✅ entry point من لوحة التحكم الرئيسية فقط
+            # ✅ entry point من لوحة التحكم الرئيسية
             CallbackQueryHandler(start_admin_management, pattern=r"^admin:manage_admins$"),
+            # ✅ entry points لأزرار aa: - حتى لو انتهت المحادثة السابقة تعمل الأزرار
+            CallbackQueryHandler(_aa_entry_from_button, pattern=r"^aa:"),
         ],
         states={
             AA_START: [
