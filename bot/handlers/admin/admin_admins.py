@@ -36,7 +36,8 @@ async def start_admin_management(update: Update, context: ContextTypes.DEFAULT_T
         [InlineKeyboardButton("➕ إضافة أدمن", callback_data="aa:add")],
         [InlineKeyboardButton("🗑️ حذف أدمن", callback_data="aa:remove")],
         [InlineKeyboardButton("📋 عرض الأدمنين", callback_data="aa:list")],
-        [InlineKeyboardButton("🔙 رجوع", callback_data="aa:back")]
+        [InlineKeyboardButton("🔙 رجوع", callback_data="aa:back")],
+        [InlineKeyboardButton("❌ إلغاء", callback_data="aa:cancel")]
     ])
 
     # معالجة callback query إذا كان موجوداً
@@ -90,7 +91,10 @@ async def handle_admin_actions(update: Update, context: ContextTypes.DEFAULT_TYP
             "1. أرسل /id للبوت @userinfobot\n"
             "2. أو في أي محادثة مع البوت، اضغط على الرابط الخاص بالمستخدم\n\n"
             "⚠️ **تحذير:** تأكد من صحة المعرف قبل الإضافة.",
-            parse_mode="Markdown"
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("❌ إلغاء", callback_data="aa:cancel")]
+            ])
         )
         return AA_ADD_INPUT
 
@@ -112,6 +116,7 @@ async def handle_admin_actions(update: Update, context: ContextTypes.DEFAULT_TYP
             admin_list.append([InlineKeyboardButton(f"🗑️ {admin_id}", callback_data=f"remove_admin:{admin_id}")])
 
         admin_list.append([InlineKeyboardButton("🔙 رجوع", callback_data="aa:back")])
+        admin_list.append([InlineKeyboardButton("❌ إلغاء", callback_data="aa:cancel")])
 
         await query.edit_message_text(
             "🗑️ **حذف أدمن**\n\n"
@@ -149,6 +154,11 @@ async def handle_admin_actions(update: Update, context: ContextTypes.DEFAULT_TYP
         except:
             pass
         return ConversationHandler.END
+    
+    elif data == "cancel":
+        context.user_data.clear()
+        await query.edit_message_text("❌ تم إلغاء العملية")
+        return ConversationHandler.END
 
     elif data.startswith("remove_admin:"):
         admin_id_to_remove = int(data.split(":")[1])
@@ -156,7 +166,7 @@ async def handle_admin_actions(update: Update, context: ContextTypes.DEFAULT_TYP
         # التأكيد قبل الحذف
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("⚠️ نعم، احذف", callback_data=f"confirm_remove:{admin_id_to_remove}")],
-            [InlineKeyboardButton("❌ إلغاء", callback_data="aa:back")]
+            [InlineKeyboardButton("❌ إلغاء", callback_data="aa:cancel")]
         ])
 
         await query.edit_message_text(
@@ -180,7 +190,10 @@ async def handle_add_admin_input(update: Update, context: ContextTypes.DEFAULT_T
             "❌ **خطأ في المعرف**\n\n"
             "المعرف يجب أن يكون رقماً صحيحاً.\n\n"
             "أعد إدخال المعرف:",
-            parse_mode="Markdown"
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("❌ إلغاء", callback_data="aa:cancel")]
+            ])
         )
         return AA_ADD_INPUT
 
@@ -282,7 +295,8 @@ def _admin_management_kb():
         [InlineKeyboardButton("➕ إضافة أدمن", callback_data="aa:add")],
         [InlineKeyboardButton("🗑️ حذف أدمن", callback_data="aa:remove")],
         [InlineKeyboardButton("📋 عرض الأدمنين", callback_data="aa:list")],
-        [InlineKeyboardButton("🔙 رجوع", callback_data="aa:back")]
+        [InlineKeyboardButton("🔙 رجوع", callback_data="aa:back")],
+        [InlineKeyboardButton("❌ إلغاء", callback_data="aa:cancel")]
     ])
 
 def _get_config_env_path():
