@@ -9,10 +9,9 @@ from telegram.ext import (
     CallbackQueryHandler, filters
 )
 from telegram.constants import ParseMode
-from datetime import datetime, date, timedelta
+from datetime import datetime, date
 from db.session import SessionLocal
 from db.models import Report, Translator, Patient, Hospital, Department, Doctor
-from bot.shared_auth import is_admin
 from bot.keyboards import user_main_kb
 from sqlalchemy import or_, and_
 import logging
@@ -45,28 +44,15 @@ async def start_delete_reports(update: Update, context: ContextTypes.DEFAULT_TYP
             
         logger.info(f"🗑️ start_delete_reports: بدء عملية حذف التقارير للمستخدم {user.id}")
         
-        # التحقق من أن المستخدم أدمن أولاً
-        if is_admin(user.id):
-            logger.info("ℹ️ المستخدم أدمن - توجيه إلى لوحة الأدمن")
-            from bot.handlers.admin.admin_start import admin_start
-            await admin_start(update, context)
-            return ConversationHandler.END
-        
         if not SessionLocal:
             logger.error("❌ SessionLocal غير متاح")
             await update.message.reply_text("❌ **خطأ:** قاعدة البيانات غير متاحة حالياً")
             return ConversationHandler.END
         
         with SessionLocal() as s:
-            # ✅ البحث عن تقارير اليوم للمستخدم
             today = date.today()
-            
-            # ✅ إصلاح مشكلة التوقيت: توسيع النطاق ليشمل 24 ساعة الماضية + 12 ساعة قادمة
-            now_utc = datetime.utcnow()
-            today_start = now_utc - timedelta(hours=24)
-            today_end = now_utc + timedelta(hours=12)
-            
-            logger.info(f"🔍 نطاق الحذف (UTC - Expanded): من {today_start} إلى {today_end}")
+            today_start = datetime.combine(today, datetime.min.time())
+            today_end = datetime.combine(today, datetime.max.time())
 
             # ✅ البحث بمعرف المستخدم الذي أنشأ التقرير (submitted_by_user_id)
             # هذا الحقل يتم حفظه عند إنشاء التقرير بغض النظر عن اسم المترجم المختار
@@ -110,8 +96,8 @@ async def start_delete_reports(update: Update, context: ContextTypes.DEFAULT_TYP
 
             if not reports:
                 await update.message.reply_text(
-                    "📋 **لا توجد تقارير متاحة**\n\n"
-                    "لم يتم العثور على أي تقارير قمت بنشرها.\n"
+                    "📋 **لا توجد تقارير لليوم**\n\n"
+                    "لم يتم العثور على أي تقارير قمت بنشرها اليوم.\n"
                     "استخدم زر '📝 إضافة تقرير جديد' لإضافة تقرير.",
                     reply_markup=user_main_kb(),
                     parse_mode=ParseMode.MARKDOWN

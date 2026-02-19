@@ -43,21 +43,35 @@ async def handle_schedule_button(update: Update, context: ContextTypes.DEFAULT_T
         await show_schedule_to_user(update, context)
 
 
-async def show_schedule_to_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def show_schedule_to_user(update: Update, context: ContextTypes.DEFAULT_TYPE, allow_latest: bool = False):
     """عرض جدول اليوم للمستخدمين"""
-    
-    # جلب آخر جدول تم رفعه
+    today = date.today()
     with SessionLocal() as s:
-        # البحث عن آخر جدول تم رفعه (بدلاً من البحث بتاريخ اليوم فقط)
-        ds = s.query(DailySchedule).order_by(DailySchedule.date.desc()).first()
+        if allow_latest:
+            ds = s.query(DailySchedule).order_by(DailySchedule.date.desc()).first()
+        else:
+            ds = (
+                s.query(DailySchedule)
+                .filter(func.date(DailySchedule.date) == today.isoformat())
+                .order_by(DailySchedule.date.desc())
+                .first()
+            )
 
     if not ds:
-        await update.message.reply_text(
-            "⚠️ **لا يوجد جدول متاح**\n\n"
-            "لم يقم الأدمن برفع أي جدول بعد.\n"
-            "يرجى المحاولة لاحقاً أو التواصل مع الإدارة.",
-            parse_mode="Markdown"
-        )
+        if allow_latest:
+            await update.message.reply_text(
+                "⚠️ **لا يوجد جدول متاح**\n\n"
+                "لم يقم الأدمن برفع أي جدول بعد.\n"
+                "يرجى المحاولة لاحقاً أو التواصل مع الإدارة.",
+                parse_mode="Markdown"
+            )
+        else:
+            await update.message.reply_text(
+                "⚠️ **لا يوجد جدول اليوم**\n\n"
+                "لم ترفع الإدارة جدول اليوم.\n"
+                "يرجى المحاولة لاحقاً.",
+                parse_mode="Markdown"
+            )
         return
 
     # إضافة معلومات عن تاريخ الجدول
@@ -102,7 +116,7 @@ async def handle_schedule_admin_callback(update: Update, context: ContextTypes.D
         await query.edit_message_text("🔄 جاري جلب الجدول...")
         # نستخدم نفس دالة عرض المستخدمين
         update.message = query.message
-        await show_schedule_to_user(update, context)
+        await show_schedule_to_user(update, context, allow_latest=True)
         
     elif action == "upload":
         # بدء عملية رفع جدول جديد
@@ -122,4 +136,3 @@ def register(app):
     """تسجيل handler زر جدول اليوم المشترك"""
     app.add_handler(MessageHandler(filters.Regex("^📅 جدول اليوم$"), handle_schedule_button))
     app.add_handler(CallbackQueryHandler(handle_schedule_admin_callback, pattern="^schedule_admin:"))
-
