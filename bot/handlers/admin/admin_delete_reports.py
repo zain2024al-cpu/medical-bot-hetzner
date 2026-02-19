@@ -36,8 +36,8 @@ async def start_delete_reports(update: Update, context: ContextTypes.DEFAULT_TYP
     """بداية مسار حذف التقارير - عرض السنوات"""
     user = update.effective_user
     if not is_admin(user.id):
-        await update.message.reply_text("🚫 هذه الخاصية مخصصة للأدمن فقط.")
-        return
+        from bot.handlers.user.user_reports_delete import start_delete_reports as user_start_delete_reports
+        return await user_start_delete_reports(update, context)
 
     # مسح بيانات الحذف السابقة
     context.user_data.pop('delete_reports', None)
