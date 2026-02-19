@@ -9,3 +9,4 @@ apscheduler
 reportlab
 arabic-reshaper
 python-bidi
+openpyxl
