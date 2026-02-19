@@ -10,6 +10,12 @@ import logging
 from db.session import SessionLocal, get_db
 from db.models import Hospital
 from bot.shared_auth import is_admin
+from services.hospitals_service import (
+    add_hospital as service_add_hospital,
+    delete_hospital as service_delete_hospital,
+    update_hospital as service_update_hospital,
+    reload_hospitals as service_reload_hospitals
+)
 
 logger = logging.getLogger(__name__)
 
@@ -171,7 +177,14 @@ async def handle_hospital_name_input(update: Update, context: ContextTypes.DEFAU
             s.add(new_hospital)
             # get_db() context manager يقوم بالـ commit تلقائياً عند الخروج
             logger.info(f"✅ تم إضافة المستشفى '{name}' إلى قاعدة البيانات")
-        
+
+        # مزامنة مع خدمة المستشفيات (ملف JSON) حتى يظهر في واجهة المستخدم
+        try:
+            service_add_hospital(name)
+            logger.info(f"✅ تم مزامنة المستشفى '{name}' مع خدمة المستشفيات")
+        except Exception as sync_err:
+            logger.warning(f"⚠️ فشل مزامنة المستشفى مع خدمة المستشفيات: {sync_err}")
+
         keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_hospitals")]])
         
         await update.message.reply_text(
@@ -294,7 +307,14 @@ async def handle_confirm_delete_hospital(update: Update, context: ContextTypes.D
                 session.delete(hospital)
                 session.commit()
                 logger.info(f"✅ تم حذف المستشفى '{full_name}' من قاعدة البيانات (ID: {hospital_id})")
-                
+
+                # مزامنة الحذف مع خدمة المستشفيات (ملف JSON)
+                try:
+                    service_delete_hospital(full_name)
+                    logger.info(f"✅ تم مزامنة حذف المستشفى '{full_name}' مع خدمة المستشفيات")
+                except Exception as sync_err:
+                    logger.warning(f"⚠️ فشل مزامنة حذف المستشفى: {sync_err}")
+
                 # عد المستشفيات المتبقية
                 remaining = session.query(Hospital).count()
                 
@@ -479,7 +499,14 @@ async def handle_edit_hospital_input(update: Update, context: ContextTypes.DEFAU
                 hospital.name = new_name
                 # get_db() context manager يقوم بالـ commit تلقائياً عند الخروج
                 logger.info(f"✅ تم تعديل اسم المستشفى من '{old_name}' إلى '{new_name}'")
-        
+
+        # مزامنة التعديل مع خدمة المستشفيات (ملف JSON)
+        try:
+            service_update_hospital(old_name, new_name)
+            logger.info(f"✅ تم مزامنة تعديل المستشفى مع خدمة المستشفيات")
+        except Exception as sync_err:
+            logger.warning(f"⚠️ فشل مزامنة تعديل المستشفى: {sync_err}")
+
         # مسح البيانات المحفوظة
         context.user_data.pop('edit_hospital_id', None)
         context.user_data.pop('edit_hospital_old_name', None)
@@ -561,7 +588,16 @@ async def handle_sync_hospitals(update: Update, context: ContextTypes.DEFAULT_TY
             
             # get_db() context manager يقوم بالـ commit تلقائياً عند الخروج
             total = s.query(Hospital).count()
-        
+
+        # إعادة تحميل خدمة المستشفيات لتشمل المستشفيات الجديدة في ملف JSON
+        try:
+            for name in PREDEFINED_HOSPITALS:
+                service_add_hospital(name)
+            service_reload_hospitals()
+            logger.info("✅ تم مزامنة المستشفيات مع خدمة المستشفيات (JSON)")
+        except Exception as sync_err:
+            logger.warning(f"⚠️ فشل مزامنة المستشفيات مع خدمة المستشفيات: {sync_err}")
+
         logger.info(f"✅ تم مزامنة {added_count} مستشفى جديد إلى قاعدة البيانات")
         
         keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_hospitals")]])

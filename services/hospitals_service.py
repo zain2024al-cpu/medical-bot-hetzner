@@ -134,7 +134,8 @@ def add_hospital(hospital_name: str) -> bool:
     
     _HOSPITALS_DATA['hospitals'].append(new_hospital)
     _HOSPITALS_LIST.append(hospital_name)
-    _HOSPITALS_DATA['statistics']['total_hospitals'] = len(_HOSPITALS_DATA['hospitals'])
+    if 'statistics' in _HOSPITALS_DATA:
+        _HOSPITALS_DATA['statistics']['total_hospitals'] = len(_HOSPITALS_DATA['hospitals'])
     
     # Save to file
     try:
@@ -175,7 +176,8 @@ def delete_hospital(hospital_name: str) -> bool:
                 _HOSPITALS_LIST.remove(hospital['name'])
             
             # Update statistics
-            _HOSPITALS_DATA['statistics']['total_hospitals'] = len(_HOSPITALS_DATA['hospitals'])
+            if 'statistics' in _HOSPITALS_DATA:
+                _HOSPITALS_DATA['statistics']['total_hospitals'] = len(_HOSPITALS_DATA['hospitals'])
             
             # Save to file
             try:
