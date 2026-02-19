@@ -6,6 +6,7 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler, MessageHandler, CallbackQueryHandler, filters, CommandHandler
 from telegram.constants import ParseMode
+from telegram.error import BadRequest
 import os
 import logging
 from datetime import datetime, date
@@ -284,7 +285,11 @@ async def view_current_schedule(update: Update, context: ContextTypes.DEFAULT_TY
                 time_str = daily_schedule.created_at.strftime('%H:%M') if daily_schedule.created_at else "غير محدد"
                 
                 # عرض الجدول
-                await query.edit_message_text("📋 **الجدول الحالي:**")
+                try:
+                    await query.edit_message_text("📋 **الجدول الحالي:**")
+                except BadRequest as e:
+                    if "Message is not modified" not in str(e):
+                        raise
                 
                 # إرسال الصورة
                 if daily_schedule.photo_file_id:
