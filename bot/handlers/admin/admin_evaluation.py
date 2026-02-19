@@ -329,6 +329,7 @@ def _generate_excel(results, period_label, year, month):
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
     from openpyxl.utils import get_column_letter
+    from openpyxl.worksheet.properties import PageSetupProperties
 
     wb = Workbook()
 
@@ -336,6 +337,9 @@ def _generate_excel(results, period_label, year, month):
     ws = wb.active
     ws.title = "ملخص التقييمات"
     ws.sheet_view.rightToLeft = True
+    ws.page_setup.orientation = 'landscape'
+    ws.sheet_properties.pageSetUpPr = PageSetupProperties(fitToPage=True)
+    ws.print_options.horizontalCentered = True
 
     header_font = Font(name='Arial', bold=True, color='FFFFFF', size=11)
     header_fill = PatternFill(start_color='1A237E', end_color='1A237E', fill_type='solid')
@@ -405,6 +409,9 @@ def _generate_excel(results, period_label, year, month):
     # ─── الورقة 2: تفصيل الإجراءات ───
     ws2 = wb.create_sheet("تفصيل الإجراءات")
     ws2.sheet_view.rightToLeft = True
+    ws2.page_setup.orientation = 'landscape'
+    ws2.sheet_properties.pageSetUpPr = PageSetupProperties(fitToPage=True)
+    ws2.print_options.horizontalCentered = True
 
     total_cols = 1 + len(ALL_ACTION_TYPES) + 2
     end_col_letter = get_column_letter(total_cols)
