@@ -8614,7 +8614,9 @@ async def show_final_summary(message, context, flow_type):
         else:
             summary += f"💬 **شكوى المريض:** {data.get('complaint', 'غير محدد')}\n"
 
-        summary += f"🔬 **التشخيص:** {data.get('diagnosis', 'غير محدد')}\n"
+        # ✅ التشخيص لا يظهر في "متابعة في الرقود"
+        if not is_inpatient:
+            summary += f"🔬 **التشخيص:** {data.get('diagnosis', 'غير محدد')}\n"
 
         if is_inpatient:
             summary += f"📝 **قرار الطبيب اليومي:** {data.get('decision', 'غير محدد')}\n"

@@ -137,13 +137,16 @@ async def handle_followup_complaint(update: Update, context: ContextTypes.DEFAUL
     data["complaint"] = text
 
     if data.get("medical_action") == "متابعة في الرقود":
+        # ✅ تخطي التشخيص - الانتقال مباشرة لقرار الطبيب اليومي
         await update.message.reply_text(
             f"✅ تم الحفظ\n\n"
-            f"🔬 **متابعة في الرقود: التشخيص**\n\n"
-            f"أدخل التشخيص:",
+            f"📝 **متابعة في الرقود: قرار الطبيب اليومي**\n\n"
+            f"أدخل قرار الطبيب اليومي:",
             reply_markup=_nav_buttons(show_back=True),
             parse_mode="Markdown"
         )
+        context.user_data['_conversation_state'] = FOLLOWUP_DECISION
+        return FOLLOWUP_DECISION
     else:
         await update.message.reply_text(
             f"✅ تم الحفظ\n\n"
