@@ -10,6 +10,7 @@ from bot.keyboards import admin_main_kb
 from config.settings import ADMIN_IDS
 from datetime import datetime
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -284,11 +285,21 @@ def _admin_management_kb():
         [InlineKeyboardButton("🔙 رجوع", callback_data="aa:back")]
     ])
 
+def _get_config_env_path():
+    """الحصول على المسار المطلق لملف config.env"""
+    # المسار المطلق بناءً على مجلد المشروع الجذري
+    # bot/handlers/admin/admin_admins.py -> نرجع 3 مستويات للجذر
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.join(base_dir, '..', '..', '..')
+    project_root = os.path.normpath(project_root)
+    return os.path.join(project_root, 'config.env')
+
 def _save_admin_ids_to_env():
     """حفظ معرفات الأدمنين في ملف البيئة"""
+    config_path = _get_config_env_path()
     try:
         # قراءة ملف البيئة
-        with open('config.env', 'r', encoding='utf-8') as f:
+        with open(config_path, 'r', encoding='utf-8') as f:
             lines = f.readlines()
 
         # البحث عن سطر ADMIN_IDS وتحديثه
@@ -306,13 +317,14 @@ def _save_admin_ids_to_env():
             lines.append(f'\nADMIN_IDS={admin_ids_str}\n')
 
         # كتابة الملف
-        with open('config.env', 'w', encoding='utf-8') as f:
+        with open(config_path, 'w', encoding='utf-8') as f:
             f.writelines(lines)
 
-        logger.info("✅ تم حفظ معرفات الأدمنين في ملف البيئة")
+        logger.info(f"✅ تم حفظ معرفات الأدمنين في ملف البيئة: {config_path}")
+        logger.info(f"✅ ADMIN_IDS = {ADMIN_IDS}")
 
     except Exception as e:
-        logger.error(f"❌ فشل حفظ معرفات الأدمنين: {e}")
+        logger.error(f"❌ فشل حفظ معرفات الأدمنين في {config_path}: {e}")
         raise
 
 async def handle_admin_callback_outside_conv(update: Update, context: ContextTypes.DEFAULT_TYPE):
