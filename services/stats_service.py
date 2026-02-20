@@ -143,7 +143,6 @@ def _run_translator_query(session, start_date_str: str, end_date_str: str):
                 "total_reports": total,
                 "work_days": work_days,              # كل يوم نُشر فيه تقرير يُحسب يوم دوام
                 "attendance_days": attendance_days,    # أيام الحضور الفعلي (فيها تقارير)
-                "absent_days": 0,                      # وفق القاعدة الجديدة: يوم نشر = يوم دوام
                 "late_reports": late,
                 "action_breakdown": action_breakdown,
                 "start_date": start_date_str,
@@ -271,7 +270,6 @@ def _run_translator_query_resilient(start_date_str: str, end_date_str: str):
             "total_reports": item["total_reports"],
             "work_days": attendance_days,
             "attendance_days": attendance_days,
-            "absent_days": 0,
             "late_reports": item["late_reports"],
             "action_breakdown": item["action_breakdown"],
             "start_date": start_date_str,

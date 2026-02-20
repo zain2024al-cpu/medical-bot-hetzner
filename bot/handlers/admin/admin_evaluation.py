@@ -257,7 +257,11 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
     story.append(Spacer(1, 16))
 
     for i, item in enumerate(results, 1):
-        story.append(Paragraph(r(f"{_medal(i)} {item['translator_name']}"), section_style))
+        # اسم المترجم + التقييم
+        level = item.get('level', '-')
+        score = item.get('final_score', 0)
+        stars = item.get('stars', '')
+        story.append(Paragraph(r(f"{_medal(i)} {item['translator_name']} - {level} ({score}%) {stars}"), section_style))
         story.append(Spacer(1, 6))
 
         info_table = Table(
@@ -265,6 +269,7 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
                 [str(item["total_reports"]), r("إجمالي التقارير")],
                 [str(item["work_days"]), r("أيام العمل")],
                 [str(item["late_reports"]), r("تقارير بعد 8 مساءً")],
+                [f"{score}% - {r(level)}", r("التقييم")],
             ],
             colWidths=[140, 270]
         )
@@ -280,21 +285,52 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
         story.append(info_table)
         story.append(Spacer(1, 10))
 
+        # جدول تفصيل الإجراءات
         action_breakdown = item.get("action_breakdown", {})
         action_rows_data = [[r("النسبة"), r("العدد"), r("نوع الإجراء")]]
         for action_name, count in sorted(action_breakdown.items(), key=lambda x: x[1], reverse=True):
-            pct = (count / item["total_reports"] * 100) if item["total_reports"] > 0 else 0
-            action_rows_data.append([f"{pct:.0f}%", str(count), r(action_name)])
-        action_table = Table(action_rows_data, colWidths=[80, 80, 220])
-        action_table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1a237e")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("FONTNAME", (0, 0), (-1, -1), font_name),
-            ("ALIGN", (0, 0), (-1, -1), "RIGHT"),
-            ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
-        ]))
-        action_table.hAlign = "RIGHT"
-        story.append(action_table)
+            if count > 0:
+                pct = (count / item["total_reports"] * 100) if item["total_reports"] > 0 else 0
+                action_rows_data.append([f"{pct:.0f}%", str(count), r(action_name)])
+        if len(action_rows_data) > 1:
+            action_table = Table(action_rows_data, colWidths=[80, 80, 220])
+            action_table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1a237e")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("FONTNAME", (0, 0), (-1, -1), font_name),
+                ("ALIGN", (0, 0), (-1, -1), "RIGHT"),
+                ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
+            ]))
+            action_table.hAlign = "RIGHT"
+            story.append(action_table)
+            story.append(Spacer(1, 10))
+
+        # جدول تفصيل الأيام
+        item_start = item.get("start_date")
+        item_end = item.get("end_date")
+        if item_start and item_end:
+            try:
+                from db.session import SessionLocal
+                with SessionLocal() as pdf_session:
+                    daily = _get_daily_counts(pdf_session, item.get("translator_id"), item_start, item_end)
+                if daily:
+                    day_rows = [[r("التقارير"), r("التاريخ")]]
+                    for day_str, count in daily:
+                        day_rows.append([str(count), r(day_str)])
+                    day_table = Table(day_rows, colWidths=[80, 220])
+                    day_table.setStyle(TableStyle([
+                        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2e7d32")),
+                        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                        ("FONTNAME", (0, 0), (-1, -1), font_name),
+                        ("ALIGN", (0, 0), (-1, -1), "RIGHT"),
+                        ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
+                    ]))
+                    day_table.hAlign = "RIGHT"
+                    story.append(Paragraph(r("تفصيل الأيام"), base_style))
+                    story.append(Spacer(1, 4))
+                    story.append(day_table)
+            except Exception as e:
+                logger.warning(f"خطأ في تفصيل الأيام للـ PDF: {e}")
 
         if i < len(results):
             story.append(PageBreak())
@@ -361,17 +397,17 @@ def _generate_excel(results, period_label, year, month):
         'ضعيف': PatternFill(start_color='FFEBEE', end_color='FFEBEE', fill_type='solid'),
     }
 
-    ws.merge_cells('A1:E1')
+    ws.merge_cells('A1:G1')
     ws['A1'] = f"تقرير تقييم أداء المترجمين - {period_label}"
     ws['A1'].font = title_font
     ws['A1'].alignment = center_align
 
-    ws.merge_cells('A2:E2')
+    ws.merge_cells('A2:G2')
     ws['A2'] = f"تاريخ الإصدار: {datetime.now().strftime('%Y-%m-%d %H:%M')}"
     ws['A2'].font = Font(name='Arial', size=10, color='777777')
     ws['A2'].alignment = center_align
 
-    headers = ['الترتيب', 'المترجم', 'إجمالي التقارير', 'أيام العمل', 'بعد 8 مساءً']
+    headers = ['الترتيب', 'المترجم', 'إجمالي التقارير', 'أيام العمل', 'بعد 8 مساءً', 'النسبة %', 'التقييم']
 
     row = 4
     for col, header in enumerate(headers, 1):
@@ -394,6 +430,8 @@ def _generate_excel(results, period_label, year, month):
             item['total_reports'],
             item['work_days'],
             item['late_reports'],
+            item.get('final_score', 0),
+            item.get('level', '-'),
         ]
 
         for col, val in enumerate(values, 1):
@@ -401,8 +439,13 @@ def _generate_excel(results, period_label, year, month):
             cell.font = bold_font if col == 2 else normal_font
             cell.alignment = center_align if col != 2 else right_align
             cell.border = thin_border
+            # تلوين خلية التقييم حسب المستوى
+            if col == 7:
+                level_fill = level_fills.get(str(val))
+                if level_fill:
+                    cell.fill = level_fill
 
-    col_widths = [8, 25, 15, 12, 14]
+    col_widths = [8, 25, 15, 12, 14, 10, 12]
     for i, w in enumerate(col_widths, 1):
         ws.column_dimensions[get_column_letter(i)].width = w
 
@@ -877,6 +920,7 @@ async def handle_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
             for i, item in enumerate(results, 1):
                 medal = _medal(i)
                 detail = f"{medal} **{item['translator_name']}**\n"
+                detail += f"├ ⭐ التقييم: **{item.get('level', '-')}** ({item.get('final_score', 0)}%) {item.get('stars', '')}\n"
                 detail += f"├ 📄 إجمالي التقارير: **{item['total_reports']}**\n"
                 detail += f"├ 📅 أيام العمل: **{item['work_days']}** يوم\n"
                 detail += f"├ 🕐 بعد 8 مساءً: **{item['late_reports']}**\n"
@@ -888,11 +932,11 @@ async def handle_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     for action_name, count in sorted(non_zero.items(), key=lambda x: x[1], reverse=True):
                         detail += f"│   • {action_name}: **{count}**\n"
 
-                start_date = item.get("start_date")
-                end_date = item.get("end_date")
-                daily_counts = _get_daily_counts(session, item.get("translator_id"), start_date, end_date)
+                item_start = item.get("start_date")
+                item_end = item.get("end_date")
+                daily_counts = _get_daily_counts(session, item.get("translator_id"), item_start, item_end)
                 if daily_counts:
-                    detail += "├ 📆 **أيام العمل والتقارير:**\n"
+                    detail += "├ 📆 **تفصيل الأيام:**\n"
                     for day, count in daily_counts:
                         detail += f"│   • {day}: **{count}** {_report_label(count)}\n"
 
