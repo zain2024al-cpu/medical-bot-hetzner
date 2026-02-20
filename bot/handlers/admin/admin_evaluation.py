@@ -912,19 +912,13 @@ async def handle_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             # ═══ رسالة تشخيصية للأدمن ═══
             diag_lines = [f"🔍 **تشخيص:** وجدت {len(results)} مترجم، {total_reports} تقرير"]
-            # عد التقارير بدون translator_id
             try:
                 from sqlalchemy import text as sa_text
-                no_tid_sql = sa_text("""
-                    SELECT COUNT(*) FROM reports r
-                    WHERE COALESCE(r.report_date, r.created_at) >= :start
-                    AND COALESCE(r.report_date, r.created_at) < :end
-                    AND r.status = 'active'
-                    AND r.translator_id IS NULL
-                """)
+                from datetime import timedelta as td2
+
+                # حساب النطاق الزمني
                 if period_type == "day" and start_date:
                     s_str = start_date.strftime("%Y-%m-%d") if hasattr(start_date, 'strftime') else str(start_date)
-                    from datetime import timedelta as td2
                     e_date = start_date + td2(days=1) if hasattr(start_date, 'strftime') else None
                     e_str = e_date.strftime("%Y-%m-%d") if e_date else str(end_date)
                 else:
@@ -935,9 +929,45 @@ async def handle_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         m = int(month)
                         s_str = f"{year}-{m:02d}-01"
                         e_str = f"{year}-{m+1:02d}-01" if m < 12 else f"{year+1}-01-01"
-                no_tid_count = session.execute(no_tid_sql, {"start": s_str, "end": e_str}).scalar() or 0
-                if no_tid_count > 0:
-                    diag_lines.append(f"⚠️ تقارير بدون مترجم (translator\\_id=NULL): **{no_tid_count}**")
+
+                diag_lines.append(f"📅 النطاق: {s_str} → {e_str}")
+
+                # تقارير بدون translator_id
+                no_tid = session.execute(sa_text(
+                    "SELECT COUNT(*) FROM reports WHERE COALESCE(report_date, created_at) >= :s AND COALESCE(report_date, created_at) < :e AND status='active' AND translator_id IS NULL"
+                ), {"s": s_str, "e": e_str}).scalar() or 0
+                if no_tid > 0:
+                    diag_lines.append(f"⚠️ بدون مترجم: **{no_tid}**")
+
+                # تقارير ليست active
+                not_active = session.execute(sa_text(
+                    "SELECT COUNT(*) FROM reports WHERE COALESCE(report_date, created_at) >= :s AND COALESCE(report_date, created_at) < :e AND (status != 'active' OR status IS NULL)"
+                ), {"s": s_str, "e": e_str}).scalar() or 0
+                if not_active > 0:
+                    diag_lines.append(f"⚠️ غير نشطة: **{not_active}**")
+
+                # تقارير اليوم السابق (بسبب UTC)
+                if period_type == "day" and start_date:
+                    prev_s = (start_date - td2(days=1)).strftime("%Y-%m-%d")
+                    prev_count = session.execute(sa_text(
+                        "SELECT COUNT(*) FROM reports WHERE COALESCE(report_date, created_at) >= :s AND COALESCE(report_date, created_at) < :e AND status='active' AND translator_id IS NOT NULL"
+                    ), {"s": prev_s, "e": s_str}).scalar() or 0
+                    # تقارير created_at في نفس اليوم لكن report_date في يوم سابق
+                    mismatched = session.execute(sa_text(
+                        "SELECT COUNT(*) FROM reports WHERE DATE(created_at) >= :target AND DATE(created_at) < :next_day AND DATE(report_date) < :target AND status='active' AND translator_id IS NOT NULL"
+                    ), {"target": s_str, "next_day": e_str}).scalar() or 0
+                    if mismatched > 0:
+                        diag_lines.append(f"⚠️ تقارير created\\_at={s_str} لكن report\\_date قبله: **{mismatched}**")
+                    # تقارير created في هذا اليوم بغض النظر عن report_date
+                    by_created = session.execute(sa_text(
+                        "SELECT COUNT(*) FROM reports WHERE DATE(created_at) >= :s AND DATE(created_at) < :e AND status='active' AND translator_id IS NOT NULL"
+                    ), {"s": s_str, "e": e_str}).scalar() or 0
+                    diag_lines.append(f"📊 حسب created\\_at: **{by_created}** تقرير")
+                    by_report_date = session.execute(sa_text(
+                        "SELECT COUNT(*) FROM reports WHERE DATE(report_date) >= :s AND DATE(report_date) < :e AND status='active' AND translator_id IS NOT NULL"
+                    ), {"s": s_str, "e": e_str}).scalar() or 0
+                    diag_lines.append(f"📊 حسب report\\_date: **{by_report_date}** تقرير")
+
             except Exception as diag_err:
                 logger.warning(f"Diagnostic query error: {diag_err}")
 
