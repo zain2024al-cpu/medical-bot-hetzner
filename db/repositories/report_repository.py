@@ -44,9 +44,10 @@ class ReportRepository:
                 report_data["created_at"] = datetime.utcnow()
                 report_data["updated_at"] = datetime.utcnow()
                 
-                # Ensure report_date exists
+                # Ensure report_date exists (use IST local time, not UTC)
                 if "report_date" not in report_data:
-                    report_data["report_date"] = datetime.utcnow()
+                    from db.models import _now_ist_naive
+                    report_data["report_date"] = _now_ist_naive()
                 
                 report = Report(**report_data)
                 db.add(report)

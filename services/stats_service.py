@@ -91,6 +91,40 @@ def _run_translator_query(session, start_date_str: str, end_date_str: str):
 
         rows = session.execute(sql, {"start": start_date_str, "end": end_date_str}).fetchall()
 
+        # ═══ LOG: عدد المترجمين والتقارير ═══
+        logger.info(f"📊 stats_service: range=[{start_date_str} → {end_date_str}], translators={len(rows)}")
+        for row in rows:
+            logger.info(f"   ├ tid={row[0]}, name={row[1]}, reports={row[2]}, days={row[3]}, late={row[4]}")
+
+        # ═══ LOG: إجمالي التقارير بدون تجميع ═══
+        count_sql = text("""
+            SELECT COUNT(*) FROM reports r
+            WHERE COALESCE(r.report_date, r.created_at) >= :start
+            AND COALESCE(r.report_date, r.created_at) < :end
+            AND r.status = 'active'
+        """)
+        total_all = session.execute(count_sql, {"start": start_date_str, "end": end_date_str}).scalar()
+
+        count_with_tid = text("""
+            SELECT COUNT(*) FROM reports r
+            WHERE COALESCE(r.report_date, r.created_at) >= :start
+            AND COALESCE(r.report_date, r.created_at) < :end
+            AND r.status = 'active'
+            AND r.translator_id IS NOT NULL
+        """)
+        total_with_tid = session.execute(count_with_tid, {"start": start_date_str, "end": end_date_str}).scalar()
+
+        count_no_tid = text("""
+            SELECT COUNT(*) FROM reports r
+            WHERE COALESCE(r.report_date, r.created_at) >= :start
+            AND COALESCE(r.report_date, r.created_at) < :end
+            AND r.status = 'active'
+            AND r.translator_id IS NULL
+        """)
+        total_no_tid = session.execute(count_no_tid, {"start": start_date_str, "end": end_date_str}).scalar()
+
+        logger.info(f"📊 stats_service: total_all={total_all}, with_tid={total_with_tid}, without_tid={total_no_tid}")
+
         # ═══ استعلام تفصيل الإجراءات ═══
         action_sql = text("""
             SELECT

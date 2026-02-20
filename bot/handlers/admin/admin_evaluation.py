@@ -881,10 +881,15 @@ async def handle_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         with SessionLocal() as session:
+            logger.info(f"📊 EVAL: period_type={period_type}, start={start_date}, end={end_date}, year={year}, month={month}")
             if period_type == "day" and start_date and end_date:
                 raw_stats = get_translator_stats(session, start_date, end_date)
             else:
                 raw_stats = get_monthly_stats(session, year, month)
+
+            logger.info(f"📊 EVAL: raw_stats returned {len(raw_stats)} translators, total_reports={sum(r['total_reports'] for r in raw_stats)}")
+            for i, rs in enumerate(raw_stats):
+                logger.info(f"   ├ [{i+1}] tid={rs['translator_id']}, name={rs['translator_name']}, reports={rs['total_reports']}")
 
             if not raw_stats:
                 await q.edit_message_text(
@@ -904,6 +909,39 @@ async def handle_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # إرسال ملخص نصي
             total_reports = sum(r['total_reports'] for r in results)
             total_late = sum(r['late_reports'] for r in results)
+
+            # ═══ رسالة تشخيصية للأدمن ═══
+            diag_lines = [f"🔍 **تشخيص:** وجدت {len(results)} مترجم، {total_reports} تقرير"]
+            # عد التقارير بدون translator_id
+            try:
+                from sqlalchemy import text as sa_text
+                no_tid_sql = sa_text("""
+                    SELECT COUNT(*) FROM reports r
+                    WHERE COALESCE(r.report_date, r.created_at) >= :start
+                    AND COALESCE(r.report_date, r.created_at) < :end
+                    AND r.status = 'active'
+                    AND r.translator_id IS NULL
+                """)
+                if period_type == "day" and start_date:
+                    s_str = start_date.strftime("%Y-%m-%d") if hasattr(start_date, 'strftime') else str(start_date)
+                    from datetime import timedelta as td2
+                    e_date = start_date + td2(days=1) if hasattr(start_date, 'strftime') else None
+                    e_str = e_date.strftime("%Y-%m-%d") if e_date else str(end_date)
+                else:
+                    if month == "all" or month == 0:
+                        s_str = f"{year}-01-01"
+                        e_str = f"{year + 1}-01-01"
+                    else:
+                        m = int(month)
+                        s_str = f"{year}-{m:02d}-01"
+                        e_str = f"{year}-{m+1:02d}-01" if m < 12 else f"{year+1}-01-01"
+                no_tid_count = session.execute(no_tid_sql, {"start": s_str, "end": e_str}).scalar() or 0
+                if no_tid_count > 0:
+                    diag_lines.append(f"⚠️ تقارير بدون مترجم (translator\\_id=NULL): **{no_tid_count}**")
+            except Exception as diag_err:
+                logger.warning(f"Diagnostic query error: {diag_err}")
+
+            await q.message.reply_text("\n".join(diag_lines), parse_mode=ParseMode.MARKDOWN)
 
             header = (
                 f"╔══════════════════════════════════╗\n"

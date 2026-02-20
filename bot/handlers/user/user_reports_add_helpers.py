@@ -5,8 +5,9 @@
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 from db.session import SessionLocal
 from db.models import Report, Patient, Hospital, Department, Doctor, Translator
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import logging
+from zoneinfo import ZoneInfo
 
 logger = logging.getLogger(__name__)
 
@@ -236,7 +237,7 @@ async def save_report_to_db(query, context):
             # التواريخ
             followup_date=data_tmp.get("followup_date"),
             followup_reason=data_tmp.get("followup_reason", ""),
-            report_date=data_tmp.get("report_date") or datetime.utcnow(),
+            report_date=data_tmp.get("report_date") or datetime.now(ZoneInfo("Asia/Kolkata")).replace(tzinfo=None),
             created_at=datetime.utcnow(),
             
             # حقول تأجيل الموعد

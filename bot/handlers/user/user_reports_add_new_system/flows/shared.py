@@ -6,7 +6,7 @@
 
 import logging
 import os
-from datetime import datetime, date
+from datetime import datetime, date, timedelta, timezone
 from zoneinfo import ZoneInfo
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes, ConversationHandler
@@ -1707,15 +1707,22 @@ async def save_report_to_database(query, context, flow_type):
                 from datetime import datetime as dt_module
                 return dt_module.combine(dt, dt_module.min.time())
             
-            # ✅ إذا كان datetime مع tzinfo، أزل tzinfo
+            # ✅ إذا كان datetime مع tzinfo، أزل tzinfo بدون تحويل UTC
+            # report_date يمثل التاريخ المحلي الذي يراه المستخدم (تاريخ العمل)
+            # لذلك نحتفظ بالتاريخ والوقت المحلي كما هو ونزيل فقط معلومات المنطقة الزمنية
             if hasattr(dt, 'tzinfo') and dt.tzinfo is not None:
-                # تحويل إلى UTC ثم إزالة tzinfo
-                return dt.astimezone(ZoneInfo('UTC')).replace(tzinfo=None)
+                return dt.replace(tzinfo=None)
             
             return dt
         
-        # معالجة report_date
-        report_date = data.get("report_date", datetime.now())
+        # معالجة report_date (استخدام التوقيت المحلي IST كافتراضي)
+        report_date = data.get("report_date")
+        if not report_date:
+            try:
+                report_date = datetime.now(ZoneInfo("Asia/Kolkata")).replace(tzinfo=None)
+            except Exception:
+                ist = timezone(timedelta(hours=5, minutes=30))
+                report_date = datetime.now(timezone.utc).astimezone(ist).replace(tzinfo=None)
         report_date = to_naive_datetime(report_date)
         
         # معالجة followup_date

@@ -4,12 +4,22 @@
 # ================================================
 
 import logging
-from datetime import datetime, date
+from datetime import datetime, date, timedelta, timezone
 from typing import Optional
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, Text, Float, ForeignKey, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 
 logger = logging.getLogger(__name__)
+
+
+def _now_ist_naive():
+    """التوقيت المحلي IST (UTC+5:30) بدون tzinfo - لحفظ report_date"""
+    try:
+        from zoneinfo import ZoneInfo
+        return datetime.now(ZoneInfo("Asia/Kolkata")).replace(tzinfo=None)
+    except Exception:
+        ist = timezone(timedelta(hours=5, minutes=30))
+        return datetime.now(timezone.utc).astimezone(ist).replace(tzinfo=None)
 
 Base = declarative_base()
 
@@ -153,7 +163,7 @@ class Report(Base):
     # Report details
     visit_date = Column(DateTime, nullable=True)
     visit_time = Column(String(50), nullable=True)
-    report_date = Column(DateTime, default=datetime.utcnow, nullable=True, index=True)
+    report_date = Column(DateTime, default=_now_ist_naive, nullable=True, index=True)
     
     # Medical details
     medical_action = Column(String(255), nullable=True)
