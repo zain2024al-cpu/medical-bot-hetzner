@@ -68,21 +68,21 @@ def _run_translator_query(session, start_date_str: str, end_date_str: str):
         # ═══ الاستعلام الرسمي الوحيد ═══
         # ✅ استخدام TranslatorDirectory كمرجع أساسي لتوحيد الأسماء
         # ✅ تحويل created_at من UTC إلى التوقيت المحلي (UTC+5:30) قبل مقارنة الساعة
-        # ✅ استخدام report_date حصراً لحساب أيام العمل
+        # ✅ استخدام COALESCE(report_date, created_at) لضمان عدم فقدان تقارير بدون report_date
         sql = text("""
             SELECT
                 r.translator_id,
                 COALESCE(td.name, r.translator_name, 'مترجم #' || r.translator_id) as translator_name,
                 COUNT(*) as total_reports,
-                COUNT(DISTINCT DATE(r.report_date)) as attendance_days,
+                COUNT(DISTINCT DATE(COALESCE(r.report_date, r.created_at))) as attendance_days,
                 SUM(
                     CASE WHEN CAST(strftime('%H', datetime(r.created_at, '+5 hours', '+30 minutes')) AS INTEGER) >= 20
                     THEN 1 ELSE 0 END
                 ) as late_reports
             FROM reports r
             LEFT JOIN translators td ON r.translator_id = td.translator_id
-            WHERE r.report_date >= :start
-            AND r.report_date < :end
+            WHERE COALESCE(r.report_date, r.created_at) >= :start
+            AND COALESCE(r.report_date, r.created_at) < :end
             AND r.status = 'active'
             AND r.translator_id IS NOT NULL
             GROUP BY r.translator_id
@@ -98,8 +98,8 @@ def _run_translator_query(session, start_date_str: str, end_date_str: str):
                 COALESCE(r.medical_action, 'أخرى') as action_type,
                 COUNT(*) as action_count
             FROM reports r
-            WHERE r.report_date >= :start
-            AND r.report_date < :end
+            WHERE COALESCE(r.report_date, r.created_at) >= :start
+            AND COALESCE(r.report_date, r.created_at) < :end
             AND r.status = 'active'
             AND r.translator_id IS NOT NULL
             GROUP BY r.translator_id, action_type
@@ -209,9 +209,10 @@ def _run_translator_query_resilient(start_date_str: str, end_date_str: str):
 
         report_dt = _parse_datetime(report_date)
         created_dt = _parse_datetime(created_at)
-        
-        # ✅ تعديل: الاعتماد حصرياً على report_date (مثل الاستعلام الرئيسي)
-        # لتجنب حساب created_at كأيام عمل إذا غاب report_date
+
+        # ✅ استخدام COALESCE: report_date أولاً، وإذا غاب نستخدم created_at
+        if not report_dt:
+            report_dt = created_dt
         if not report_dt:
             continue
 
