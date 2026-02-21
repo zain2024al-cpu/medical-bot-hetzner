@@ -73,13 +73,17 @@ def _get_daily_counts(session, translator_id, start_date, end_date, translator_n
     """جلب عدد التقارير اليومية - بالاسم أولاً (لتوحيد المترجمين) ثم بالـ ID"""
     if not translator_id and not translator_name:
         return []
+    # شرط التاريخ المزدوج (يلتقط التقارير القديمة بـ UTC)
+    _DF = """(
+        (COALESCE(r.report_date, r.created_at) >= :start AND COALESCE(r.report_date, r.created_at) < :end)
+        OR (DATE(datetime(r.created_at, '+5 hours', '+30 minutes')) >= :start AND DATE(datetime(r.created_at, '+5 hours', '+30 minutes')) < :end)
+    )"""
     if translator_name:
-        sql = text("""
+        sql = text(f"""
             SELECT DATE(COALESCE(r.report_date, r.created_at)) as day, COUNT(*) as count
             FROM reports r
             LEFT JOIN translators td ON r.translator_id = td.translator_id
-            WHERE COALESCE(r.report_date, r.created_at) >= :start
-            AND COALESCE(r.report_date, r.created_at) < :end
+            WHERE {_DF}
             AND r.status = 'active'
             AND COALESCE(td.name, r.translator_name) = :tname
             GROUP BY day
@@ -87,11 +91,10 @@ def _get_daily_counts(session, translator_id, start_date, end_date, translator_n
         """)
         rows = session.execute(sql, {"start": start_date, "end": end_date, "tname": translator_name}).fetchall()
     else:
-        sql = text("""
+        sql = text(f"""
             SELECT DATE(COALESCE(r.report_date, r.created_at)) as day, COUNT(*) as count
             FROM reports r
-            WHERE COALESCE(r.report_date, r.created_at) >= :start
-            AND COALESCE(r.report_date, r.created_at) < :end
+            WHERE {_DF}
             AND r.status = 'active'
             AND r.translator_id = :translator_id
             GROUP BY day
@@ -119,66 +122,14 @@ async def _send_text_chunks(message, text):
             await message.reply_text(chunk.strip())
 
 
-def _timing_score(avg_hour):
-    """
-    تقييم وقت الإرسال — يبدأ الحساب من الساعة 1 ظهراً (13:00).
-    كل ما كان بدري بعد 1 كان أفضل، وكل ما تأخر يقل التقييم.
-
-    avg_hour = متوسط الساعة (بتوقيت IST، مثلاً 13.5 = 1:30 مساءً)
-
-    النظام:
-      1 - 2 مساءً (13-14)   → 100%  (ممتاز - بدري)
-      2 - 3 مساءً (14-15)   → 90%
-      3 - 4 مساءً (15-16)   → 75%
-      4 - 5 مساءً (16-17)   → 60%
-      5 - 6 مساءً (17-18)   → 45%
-      6 - 8 مساءً (18-20)   → 25%
-      بعد 8 مساءً (20+)     → 10%  (متأخر جداً)
-      قبل 1 ظهراً (< 13)   → 100%  (رفع مبكر - ممتاز)
-    """
-    if avg_hour is None:
-        return 50  # افتراضي
-    if avg_hour < 13:
-        return 100  # قبل 1 ظهراً = مبكر = ممتاز
-    elif avg_hour < 14:
-        return 100
-    elif avg_hour < 15:
-        return 90
-    elif avg_hour < 16:
-        return 75
-    elif avg_hour < 17:
-        return 60
-    elif avg_hour < 18:
-        return 45
-    elif avg_hour < 20:
-        return 25
-    else:
-        return 10
-
-
-def _format_avg_hour(avg_hour):
-    """تحويل متوسط الساعة إلى صيغة مقروءة"""
-    if avg_hour is None:
-        return "—"
-    h = int(avg_hour)
-    m = int((avg_hour - h) * 60)
-    period = "ص" if h < 12 else "م"
-    display_h = h if h <= 12 else h - 12
-    if display_h == 0:
-        display_h = 12
-    return f"{display_h}:{m:02d} {period}"
-
-
 def _compute_rating(stats_results):
     """
     إضافة التقييم (النسبة + المستوى) على نتائج stats_service.
 
-    التقييم يعتمد على 4 عوامل:
-    - الإنتاجية: عدد التقارير مقارنة بالمتوسط (35%)
-    - وقت الإرسال: كل ما كان بدري كان أفضل (35%)
-    - الانتظام: أيام الحضور (15%)
-    - الالتزام: التقارير قبل 8 مساءً (15%)
-    - خصم: التقارير المكررة تخصم من النتيجة
+    التقييم يعتمد على 3 عوامل:
+    - الإنتاجية: عدد التقارير مقارنة بالمتوسط (50%)
+    - الانتظام: أيام العمل / أيام الفترة (30%)
+    - الالتزام: التقارير قبل 8 مساءً / إجمالي التقارير (20%)
     """
     if not stats_results:
         return []
@@ -192,8 +143,6 @@ def _compute_rating(stats_results):
         work_days = s['work_days']
         attendance_days = s['attendance_days']
         late = s['late_reports']
-        duplicates = s.get('duplicate_reports', 0)
-        avg_hour = s.get('avg_hour')
 
         # 1) الإنتاجية: نسبة للمتوسط (cap 100%)
         if avg_reports > 0:
@@ -201,40 +150,29 @@ def _compute_rating(stats_results):
         else:
             productivity = 100 if total > 0 else 0
 
-        # 2) وقت الإرسال: البدري أفضل
-        timing = _timing_score(avg_hour)
-
-        # 3) الانتظام: أيام الحضور / أيام العمل
+        # 2) الانتظام: أيام الحضور / أيام العمل الرسمية
         if work_days > 0:
             regularity = min((attendance_days / work_days) * 100, 100)
         else:
             regularity = 100
 
-        # 4) الالتزام الزمني: قبل 8 مساءً
+        # 3) الالتزام الزمني: قبل 8 مساءً
         if total > 0:
             punctuality = ((total - late) / total) * 100
         else:
             punctuality = 100
 
-        # النتيجة قبل الخصم
-        raw_score = (
-            productivity * 0.35 +
-            timing * 0.35 +
-            regularity * 0.15 +
-            punctuality * 0.15
-        )
-
-        # خصم التقارير المكررة: -3 نقاط لكل تقرير مكرر
-        dup_penalty = duplicates * 3
-        final_score = round(max(raw_score - dup_penalty, 0), 1)
+        # النتيجة النهائية
+        final_score = round(
+            productivity * 0.50 +
+            regularity * 0.30 +
+            punctuality * 0.20
+        , 1)
 
         level, color, stars = _rating_label(final_score)
 
         results.append({
             **s,
-            'timing_score': timing,
-            'avg_hour_display': _format_avg_hour(avg_hour),
-            'dup_penalty': dup_penalty,
             'final_score': final_score,
             'level': level,
             'color': color,
@@ -1105,7 +1043,6 @@ async def handle_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             await q.message.reply_text("\n".join(diag_lines), parse_mode=ParseMode.MARKDOWN)
 
-            total_dups = sum(r.get('duplicate_reports', 0) for r in results)
             header = (
                 f"╔══════════════════════════════════╗\n"
                 f"  ✅ **تم إعداد تقرير التقييم**\n"
@@ -1115,8 +1052,6 @@ async def handle_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"📄 إجمالي التقارير: **{total_reports}**\n"
                 f"🕐 تقارير بعد 8 مساءً: **{total_late}**\n"
             )
-            if total_dups > 0:
-                header += f"⚠️ تقارير مكررة: **{total_dups}**\n"
             await q.message.reply_text(header, parse_mode=ParseMode.MARKDOWN)
 
             # إرسال تفاصيل كل مترجم
@@ -1125,12 +1060,8 @@ async def handle_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 detail = f"{medal} **{item['translator_name']}**\n"
                 detail += f"├ ⭐ التقييم: **{item.get('level', '-')}** ({item.get('final_score', 0)}%) {item.get('stars', '')}\n"
                 detail += f"├ 📄 إجمالي التقارير: **{item['total_reports']}**\n"
-                detail += f"├ 🕐 متوسط وقت الإرسال: **{item.get('avg_hour_display', '—')}**\n"
                 detail += f"├ 📅 أيام العمل: **{item['work_days']}** يوم\n"
-                detail += f"├ 🌙 بعد 8 مساءً: **{item['late_reports']}**\n"
-                dups = item.get('duplicate_reports', 0)
-                if dups > 0:
-                    detail += f"├ ⚠️ تقارير مكررة: **{dups}** (خصم {item.get('dup_penalty', 0)} نقطة)\n"
+                detail += f"├ 🕐 بعد 8 مساءً: **{item['late_reports']}**\n"
 
                 # تفصيل الإجراءات (غير الصفرية فقط)
                 non_zero = {k: v for k, v in item.get('action_breakdown', {}).items() if v > 0}

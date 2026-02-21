@@ -70,6 +70,8 @@ def _run_translator_query(session, start_date_str: str, end_date_str: str):
         # ✅ تحويل created_at من UTC إلى التوقيت المحلي (UTC+5:30) قبل مقارنة الساعة
         # ✅ استخدام COALESCE(report_date, created_at) لضمان عدم فقدان تقارير بدون report_date
         # ✅ التجميع بالاسم (لتوحيد المترجمين الذين لهم أكثر من translator_id)
+        # ✅ WHERE مزدوج: report_date OR created_at بتوقيت IST
+        # لأن التقارير القديمة (قبل إصلاح التوقيت) قد تكون report_date بـ UTC
         sql = text("""
             SELECT
                 MIN(r.translator_id) as translator_id,
@@ -82,8 +84,10 @@ def _run_translator_query(session, start_date_str: str, end_date_str: str):
                 ) as late_reports
             FROM reports r
             LEFT JOIN translators td ON r.translator_id = td.translator_id
-            WHERE COALESCE(r.report_date, r.created_at) >= :start
-            AND COALESCE(r.report_date, r.created_at) < :end
+            WHERE (
+                (COALESCE(r.report_date, r.created_at) >= :start AND COALESCE(r.report_date, r.created_at) < :end)
+                OR (DATE(datetime(r.created_at, '+5 hours', '+30 minutes')) >= :start AND DATE(datetime(r.created_at, '+5 hours', '+30 minutes')) < :end)
+            )
             AND r.status = 'active'
             AND r.translator_id IS NOT NULL
             GROUP BY COALESCE(td.name, r.translator_name)
@@ -97,28 +101,31 @@ def _run_translator_query(session, start_date_str: str, end_date_str: str):
         for row in rows:
             logger.info(f"   ├ tid={row[0]}, name={row[1]}, reports={row[2]}, days={row[3]}, late={row[4]}")
 
+        # ═══ شرط التاريخ الموحّد (يلتقط التقارير القديمة المحفوظة بـ UTC أيضاً) ═══
+        _DATE_FILTER = """(
+            (COALESCE(r.report_date, r.created_at) >= :start AND COALESCE(r.report_date, r.created_at) < :end)
+            OR (DATE(datetime(r.created_at, '+5 hours', '+30 minutes')) >= :start AND DATE(datetime(r.created_at, '+5 hours', '+30 minutes')) < :end)
+        )"""
+
         # ═══ LOG: إجمالي التقارير بدون تجميع ═══
-        count_sql = text("""
+        count_sql = text(f"""
             SELECT COUNT(*) FROM reports r
-            WHERE COALESCE(r.report_date, r.created_at) >= :start
-            AND COALESCE(r.report_date, r.created_at) < :end
+            WHERE {_DATE_FILTER}
             AND r.status = 'active'
         """)
         total_all = session.execute(count_sql, {"start": start_date_str, "end": end_date_str}).scalar()
 
-        count_with_tid = text("""
+        count_with_tid = text(f"""
             SELECT COUNT(*) FROM reports r
-            WHERE COALESCE(r.report_date, r.created_at) >= :start
-            AND COALESCE(r.report_date, r.created_at) < :end
+            WHERE {_DATE_FILTER}
             AND r.status = 'active'
             AND r.translator_id IS NOT NULL
         """)
         total_with_tid = session.execute(count_with_tid, {"start": start_date_str, "end": end_date_str}).scalar()
 
-        count_no_tid = text("""
+        count_no_tid = text(f"""
             SELECT COUNT(*) FROM reports r
-            WHERE COALESCE(r.report_date, r.created_at) >= :start
-            AND COALESCE(r.report_date, r.created_at) < :end
+            WHERE {_DATE_FILTER}
             AND r.status = 'active'
             AND r.translator_id IS NULL
         """)
@@ -127,15 +134,14 @@ def _run_translator_query(session, start_date_str: str, end_date_str: str):
         logger.info(f"📊 stats_service: total_all={total_all}, with_tid={total_with_tid}, without_tid={total_no_tid}")
 
         # ═══ استعلام تفصيل الإجراءات (مجمّع بالاسم) ═══
-        action_sql = text("""
+        action_sql = text(f"""
             SELECT
                 COALESCE(td.name, r.translator_name) as tname,
                 COALESCE(r.medical_action, 'أخرى') as action_type,
                 COUNT(*) as action_count
             FROM reports r
             LEFT JOIN translators td ON r.translator_id = td.translator_id
-            WHERE COALESCE(r.report_date, r.created_at) >= :start
-            AND COALESCE(r.report_date, r.created_at) < :end
+            WHERE {_DATE_FILTER}
             AND r.status = 'active'
             AND r.translator_id IS NOT NULL
             GROUP BY tname, action_type
@@ -152,38 +158,6 @@ def _run_translator_query(session, start_date_str: str, end_date_str: str):
             if tname not in action_map:
                 action_map[tname] = {}
             action_map[tname][action_type] = count
-
-        # ═══ استعلام التقارير المكررة (نفس الاسم + نفس المريض + نفس اليوم) ═══
-        dup_sql = text("""
-            SELECT COALESCE(td.name, r.translator_name) as tname,
-                   COUNT(*) - COUNT(DISTINCT r.patient_name || '|' || DATE(COALESCE(r.report_date, r.created_at))) as duplicates
-            FROM reports r
-            LEFT JOIN translators td ON r.translator_id = td.translator_id
-            WHERE COALESCE(r.report_date, r.created_at) >= :start
-            AND COALESCE(r.report_date, r.created_at) < :end
-            AND r.status = 'active'
-            AND r.translator_id IS NOT NULL
-            GROUP BY tname
-        """)
-        dup_rows = session.execute(dup_sql, {"start": start_date_str, "end": end_date_str}).fetchall()
-        dup_map = {row[0]: max(row[1], 0) for row in dup_rows}
-
-        # ═══ متوسط ساعة الإرسال لكل مترجم بالاسم (بتوقيت IST) ═══
-        avg_hour_sql = text("""
-            SELECT COALESCE(td.name, r.translator_name) as tname,
-                   AVG(CAST(strftime('%H', datetime(r.created_at, '+5 hours', '+30 minutes')) AS REAL)
-                       + CAST(strftime('%M', datetime(r.created_at, '+5 hours', '+30 minutes')) AS REAL) / 60.0
-                   ) as avg_hour
-            FROM reports r
-            LEFT JOIN translators td ON r.translator_id = td.translator_id
-            WHERE COALESCE(r.report_date, r.created_at) >= :start
-            AND COALESCE(r.report_date, r.created_at) < :end
-            AND r.status = 'active'
-            AND r.translator_id IS NOT NULL
-            GROUP BY tname
-        """)
-        avg_hour_rows = session.execute(avg_hour_sql, {"start": start_date_str, "end": end_date_str}).fetchall()
-        avg_hour_map = {row[0]: round(row[1], 1) if row[1] is not None else None for row in avg_hour_rows}
 
         # بناء النتيجة النهائية
         results = []
@@ -213,8 +187,6 @@ def _run_translator_query(session, start_date_str: str, end_date_str: str):
                 "work_days": work_days,
                 "attendance_days": attendance_days,
                 "late_reports": late,
-                "duplicate_reports": dup_map.get(name, 0),
-                "avg_hour": avg_hour_map.get(name),
                 "action_breakdown": action_breakdown,
                 "start_date": start_date_str,
                 "end_date": end_date_str,
