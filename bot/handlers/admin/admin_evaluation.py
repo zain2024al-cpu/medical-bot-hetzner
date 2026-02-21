@@ -69,20 +69,35 @@ def _report_label(count: int) -> str:
     return "تقرير" if count == 1 else "تقارير"
 
 
-def _get_daily_counts(session, translator_id, start_date, end_date):
-    if not translator_id:
+def _get_daily_counts(session, translator_id, start_date, end_date, translator_name=None):
+    """جلب عدد التقارير اليومية - بالاسم أولاً (لتوحيد المترجمين) ثم بالـ ID"""
+    if not translator_id and not translator_name:
         return []
-    sql = text("""
-        SELECT DATE(COALESCE(r.report_date, r.created_at)) as day, COUNT(*) as count
-        FROM reports r
-        WHERE COALESCE(r.report_date, r.created_at) >= :start
-        AND COALESCE(r.report_date, r.created_at) < :end
-        AND r.status = 'active'
-        AND r.translator_id = :translator_id
-        GROUP BY day
-        ORDER BY day
-    """)
-    rows = session.execute(sql, {"start": start_date, "end": end_date, "translator_id": translator_id}).fetchall()
+    if translator_name:
+        sql = text("""
+            SELECT DATE(COALESCE(r.report_date, r.created_at)) as day, COUNT(*) as count
+            FROM reports r
+            LEFT JOIN translators td ON r.translator_id = td.translator_id
+            WHERE COALESCE(r.report_date, r.created_at) >= :start
+            AND COALESCE(r.report_date, r.created_at) < :end
+            AND r.status = 'active'
+            AND COALESCE(td.name, r.translator_name) = :tname
+            GROUP BY day
+            ORDER BY day
+        """)
+        rows = session.execute(sql, {"start": start_date, "end": end_date, "tname": translator_name}).fetchall()
+    else:
+        sql = text("""
+            SELECT DATE(COALESCE(r.report_date, r.created_at)) as day, COUNT(*) as count
+            FROM reports r
+            WHERE COALESCE(r.report_date, r.created_at) >= :start
+            AND COALESCE(r.report_date, r.created_at) < :end
+            AND r.status = 'active'
+            AND r.translator_id = :translator_id
+            GROUP BY day
+            ORDER BY day
+        """)
+        rows = session.execute(sql, {"start": start_date, "end": end_date, "translator_id": translator_id}).fetchall()
     return [(str(r[0]), int(r[1])) for r in rows]
 
 
@@ -377,7 +392,7 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
             try:
                 from db.session import SessionLocal
                 with SessionLocal() as pdf_session:
-                    daily = _get_daily_counts(pdf_session, item.get("translator_id"), item_start, item_end)
+                    daily = _get_daily_counts(pdf_session, item.get("translator_id"), item_start, item_end, translator_name=item.get("translator_name"))
                 if daily:
                     day_rows = [[r("التقارير"), r("التاريخ")]]
                     for day_str, count in daily:
@@ -1126,7 +1141,7 @@ async def handle_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
                 item_start = item.get("start_date")
                 item_end = item.get("end_date")
-                daily_counts = _get_daily_counts(session, item.get("translator_id"), item_start, item_end)
+                daily_counts = _get_daily_counts(session, item.get("translator_id"), item_start, item_end, translator_name=item.get("translator_name"))
                 if daily_counts:
                     detail += "├ 📆 **تفصيل الأيام:**\n"
                     for day, count in daily_counts:
