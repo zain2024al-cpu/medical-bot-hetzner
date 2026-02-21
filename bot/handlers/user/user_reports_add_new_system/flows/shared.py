@@ -1761,6 +1761,15 @@ async def save_report_to_database(query, context, flow_type):
                 actual_translator_name = translator_record.name
                 logger.info(f"✅ Found translator_id from TranslatorDirectory: {actual_translator_id} ({translator_record.name})")
         
+        # ✅ محاولة ثالثة: البحث بالاسم إذا لا يزال translator_id مفقوداً
+        if not actual_translator_id and actual_translator_name and actual_translator_name != "غير محدد":
+            translator_record = session.query(TranslatorDirectory).filter(
+                TranslatorDirectory.name == actual_translator_name
+            ).first()
+            if translator_record:
+                actual_translator_id = translator_record.translator_id
+                logger.info(f"✅ Found translator_id by name lookup: {actual_translator_id} ({actual_translator_name})")
+
         # إذا لم يكن هناك اسم بعد، استخدم الاسم من data
         if not actual_translator_name:
             actual_translator_name = data.get("translator_name")

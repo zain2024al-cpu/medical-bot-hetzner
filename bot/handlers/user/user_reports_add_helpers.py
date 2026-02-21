@@ -203,6 +203,19 @@ async def save_report_to_db(query, context):
             translator_id_value = translator.tg_user_id or None
         if not translator_name_value and translator:
             translator_name_value = translator.full_name
+
+        # ✅ محاولة إضافية: البحث بالاسم في TranslatorDirectory إذا translator_id لا يزال مفقوداً
+        if not translator_id_value and translator_name_value and translator_name_value != "غير محدد":
+            try:
+                from db.models import TranslatorDirectory
+                td_record = session.query(TranslatorDirectory).filter(
+                    TranslatorDirectory.name == translator_name_value
+                ).first()
+                if td_record:
+                    translator_id_value = td_record.translator_id
+                    logger.info(f"✅ Found translator_id by name in helpers: {translator_id_value} ({translator_name_value})")
+            except Exception as e:
+                logger.warning(f"⚠️ Name lookup failed in helpers: {e}")
         
         # إنشاء التقرير
         print("📝 إنشاء التقرير...")

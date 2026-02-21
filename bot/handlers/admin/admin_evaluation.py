@@ -938,6 +938,30 @@ async def handle_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 ), {"s": s_str, "e": e_str}).scalar() or 0
                 if no_tid > 0:
                     diag_lines.append(f"⚠️ بدون مترجم: **{no_tid}**")
+                    # ═══ تفاصيل التقارير المجهولة ═══
+                    unknown_rows = session.execute(sa_text(
+                        """SELECT id, patient_name, translator_name, medical_action,
+                                  report_date, created_at
+                           FROM reports
+                           WHERE COALESCE(report_date, created_at) >= :s
+                             AND COALESCE(report_date, created_at) < :e
+                             AND status='active'
+                             AND translator_id IS NULL
+                           ORDER BY created_at DESC"""
+                    ), {"s": s_str, "e": e_str}).fetchall()
+                    if unknown_rows:
+                        diag_lines.append(f"\n📌 **التقارير المجهولة ({len(unknown_rows)}):**")
+                        for ur in unknown_rows:
+                            uid, pname, tname, action, rd, ca = ur
+                            pname = pname or "—"
+                            tname = tname or "—"
+                            action = action or "—"
+                            rd_str = str(rd)[:16] if rd else "—"
+                            ca_str = str(ca)[:16] if ca else "—"
+                            diag_lines.append(
+                                f"• ID={uid} | مترجم: {tname} | مريض: {pname}\n"
+                                f"  إجراء: {action} | تاريخ: {rd_str} | أنشئ: {ca_str}"
+                            )
 
                 # تقارير ليست active
                 not_active = session.execute(sa_text(
@@ -967,6 +991,34 @@ async def handle_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         "SELECT COUNT(*) FROM reports WHERE DATE(report_date) >= :s AND DATE(report_date) < :e AND status='active' AND translator_id IS NOT NULL"
                     ), {"s": s_str, "e": e_str}).scalar() or 0
                     diag_lines.append(f"📊 حسب report\\_date: **{by_report_date}** تقرير")
+
+                # ═══ كل المترجمين في هذا اليوم بكل الطرق ═══
+                if period_type == "day" and start_date:
+                    all_translators_sql = sa_text("""
+                        SELECT translator_id, translator_name, COUNT(*) as cnt,
+                               MIN(report_date) as min_rd, MAX(report_date) as max_rd,
+                               MIN(created_at) as min_ca, MAX(created_at) as max_ca
+                        FROM reports
+                        WHERE (
+                            DATE(report_date) = :target
+                            OR DATE(created_at) = :target
+                            OR (COALESCE(report_date, created_at) >= :s AND COALESCE(report_date, created_at) < :e)
+                        )
+                        AND status = 'active'
+                        GROUP BY translator_id
+                        ORDER BY cnt DESC
+                    """)
+                    all_rows = session.execute(all_translators_sql, {"target": s_str, "s": s_str, "e": e_str}).fetchall()
+                    if all_rows:
+                        diag_lines.append(f"\n📋 **كل المترجمين ليوم {s_str}:**")
+                        for row in all_rows:
+                            tid = row[0]
+                            tname = row[1] or f"#{tid}"
+                            cnt = row[2]
+                            # هل ظهر في النتائج؟
+                            found = "✅" if any(r.get('translator_id') == tid for r in results) else "❌"
+                            tid_label = f"tid={tid}" if tid else "tid=NULL"
+                            diag_lines.append(f"{found} {tname} ({tid_label}): {cnt} تقرير")
 
             except Exception as diag_err:
                 logger.warning(f"Diagnostic query error: {diag_err}")
