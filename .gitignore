@@ -150,3 +150,7 @@ media/
 database.db
 db_backups/
 *.db
+
+# Windows reserved names
+nul
+git
