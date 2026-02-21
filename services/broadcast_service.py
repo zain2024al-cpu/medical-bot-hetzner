@@ -5,7 +5,7 @@
 
 from db.session import SessionLocal
 from db.models import Translator
-from config.settings import ADMIN_IDS
+from config.settings import ADMIN_IDS, REPORTS_GROUP_ID as _SETTINGS_GROUP_ID
 from bot.broadcast_control import is_broadcast_enabled
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
@@ -63,7 +63,7 @@ def _is_similar_text(text1: str, text2: str, threshold: float = 0.7) -> bool:
 
 
 # إعدادات المجموعة
-REPORTS_GROUP_ID = os.getenv("REPORTS_GROUP_ID", "")  # معرف المجموعة الخاصة بالتقارير
+REPORTS_GROUP_ID = _SETTINGS_GROUP_ID or os.getenv("REPORTS_GROUP_ID", "")  # معرف المجموعة الخاصة بالتقارير
 
 
 def _split_telegram_message(text: str, max_len: int = 3500) -> list[str]:
