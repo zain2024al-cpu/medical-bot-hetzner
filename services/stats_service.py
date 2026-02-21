@@ -151,6 +151,35 @@ def _run_translator_query(session, start_date_str: str, end_date_str: str):
                 action_map[tid] = {}
             action_map[tid][action_type] = count
 
+        # ═══ استعلام التقارير المكررة (نفس المترجم + نفس المريض + نفس اليوم) ═══
+        dup_sql = text("""
+            SELECT r.translator_id, COUNT(*) - COUNT(DISTINCT r.patient_name || '|' || DATE(COALESCE(r.report_date, r.created_at))) as duplicates
+            FROM reports r
+            WHERE COALESCE(r.report_date, r.created_at) >= :start
+            AND COALESCE(r.report_date, r.created_at) < :end
+            AND r.status = 'active'
+            AND r.translator_id IS NOT NULL
+            GROUP BY r.translator_id
+        """)
+        dup_rows = session.execute(dup_sql, {"start": start_date_str, "end": end_date_str}).fetchall()
+        dup_map = {row[0]: max(row[1], 0) for row in dup_rows}
+
+        # ═══ متوسط ساعة الإرسال لكل مترجم (بتوقيت IST) ═══
+        avg_hour_sql = text("""
+            SELECT r.translator_id,
+                   AVG(CAST(strftime('%H', datetime(r.created_at, '+5 hours', '+30 minutes')) AS REAL)
+                       + CAST(strftime('%M', datetime(r.created_at, '+5 hours', '+30 minutes')) AS REAL) / 60.0
+                   ) as avg_hour
+            FROM reports r
+            WHERE COALESCE(r.report_date, r.created_at) >= :start
+            AND COALESCE(r.report_date, r.created_at) < :end
+            AND r.status = 'active'
+            AND r.translator_id IS NOT NULL
+            GROUP BY r.translator_id
+        """)
+        avg_hour_rows = session.execute(avg_hour_sql, {"start": start_date_str, "end": end_date_str}).fetchall()
+        avg_hour_map = {row[0]: round(row[1], 1) if row[1] is not None else None for row in avg_hour_rows}
+
         # بناء النتيجة النهائية
         results = []
         for row in rows:
@@ -178,6 +207,8 @@ def _run_translator_query(session, start_date_str: str, end_date_str: str):
                 "work_days": work_days,              # كل يوم نُشر فيه تقرير يُحسب يوم دوام
                 "attendance_days": attendance_days,    # أيام الحضور الفعلي (فيها تقارير)
                 "late_reports": late,
+                "duplicate_reports": dup_map.get(tid, 0),  # تقارير مكررة (نفس المريض نفس اليوم)
+                "avg_hour": avg_hour_map.get(tid),         # متوسط ساعة الإرسال (IST)
                 "action_breakdown": action_breakdown,
                 "start_date": start_date_str,
                 "end_date": end_date_str,
