@@ -1861,11 +1861,25 @@ async def save_report_to_database(query, context, flow_type):
             radiation_therapy_completed=(data.get("radiation_therapy_completed", False)) if flow_type == "radiation_therapy" else False,
         )
 
+        # ✅ تحقق قبل الحفظ: translator_id يجب أن يكون موجوداً
+        if not new_report.translator_id:
+            logger.warning(f"⚠️ SAVE WARNING: Report saving WITHOUT translator_id! translator_name={actual_translator_name}, user_id={user_id}")
+
         session.add(new_report)
         session.commit()
         session.refresh(new_report)
 
         report_id = new_report.id
+
+        # ✅ تسجيل تفاصيل الحفظ للمراقبة
+        logger.info(
+            f"💾 SAVED Report #{report_id}: "
+            f"translator={actual_translator_name}(tid={actual_translator_id}), "
+            f"patient={patient_name}, "
+            f"report_date={report_date}, "
+            f"created_at={created_at}, "
+            f"action={final_medical_action}"
+        )
 
         # الحصول على اسم المترجم (من data أولاً، ثم من translator_id)
         translator_name = data.get("translator_name", "غير محدد")

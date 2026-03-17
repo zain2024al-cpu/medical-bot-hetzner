@@ -33,7 +33,9 @@ logger = logging.getLogger(__name__)
     EVAL_SELECT_PERIOD,
     EVAL_SELECT_DAY,
     EVAL_SELECT_FORMAT,
-) = range(5)
+    EVAL_CUSTOM_START,
+    EVAL_CUSTOM_END,
+) = range(7)
 
 MONTH_NAMES = {
     1: "يناير", 2: "فبراير", 3: "مارس", 4: "أبريل",
@@ -580,6 +582,111 @@ def _build_day_calendar(year, month):
     return InlineKeyboardMarkup(keyboard)
 
 
+def _build_custom_calendar(year, month, step="start"):
+    """بناء تقويم مخصص لاختيار البداية/النهاية"""
+    today = date.today()
+    keyboard = []
+    
+    # عنوان الشهر والسنة مع أزرار التنقل
+    prev_month = month - 1 if month > 1 else 12
+    prev_year = year if month > 1 else year - 1
+    next_month = month + 1 if month < 12 else 1
+    next_year = year if month < 12 else year + 1
+    
+    keyboard.append([
+        InlineKeyboardButton("◀️", callback_data=f"evalcustom:nav:{prev_year}:{prev_month}:{step}"),
+        InlineKeyboardButton(f"{MONTH_NAMES[month]} {year}", callback_data="noop"),
+        InlineKeyboardButton("▶️", callback_data=f"evalcustom:nav:{next_year}:{next_month}:{step}")
+    ])
+    
+    keyboard.append([InlineKeyboardButton(day, callback_data="noop") for day in DAYS_AR])
+
+    for week in calendar.monthcalendar(year, month):
+        row = []
+        for day in week:
+            if day == 0:
+                row.append(InlineKeyboardButton(" ", callback_data="noop"))
+                continue
+            day_date = date(year, month, day)
+            if day_date > today:
+                row.append(InlineKeyboardButton(f"·{day}·", callback_data="noop"))
+            else:
+                date_str = f"{year}-{month:02d}-{day:02d}"
+                row.append(InlineKeyboardButton(str(day), callback_data=f"evalcustom:select:{date_str}:{step}"))
+        keyboard.append(row)
+
+    if step == "start":
+        keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="eval:back_year")])
+    else:
+        keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="eval:month:custom")])
+    keyboard.append([InlineKeyboardButton("❌ إلغاء", callback_data="eval:cancel")])
+    return InlineKeyboardMarkup(keyboard)
+
+
+async def handle_custom_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة اختيار التاريخ في الفترة المخصصة"""
+    q = update.callback_query
+    await q.answer()
+    
+    data = q.data.split(":")
+    action = data[1]
+    
+    eval_data = context.user_data.setdefault('eval_data', {})
+    
+    if action == "nav":
+        y, m, step = int(data[2]), int(data[3]), data[4]
+        title = "تاريخ البداية" if step == "start" else "تاريخ النهاية"
+        await q.edit_message_text(
+            f"📅 **تقييم فترة مخصصة**\n\nاختر **{title}**:",
+            reply_markup=_build_custom_calendar(y, m, step),
+            parse_mode=ParseMode.MARKDOWN
+        )
+        return EVAL_CUSTOM_START if step == "start" else EVAL_CUSTOM_END
+        
+    if action == "select":
+        date_str, step = data[2], data[3]
+        selected_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        
+        if step == "start":
+            eval_data['start_date'] = selected_date
+            # الانتقال لاختيار تاريخ النهاية
+            await q.edit_message_text(
+                f"📅 **تقييم فترة مخصصة**\n\n"
+                f"تاريخ البداية: **{selected_date}**\n\n"
+                f"الآن اختر **تاريخ النهاية**:",
+                reply_markup=_build_custom_calendar(selected_date.year, selected_date.month, "end"),
+                parse_mode=ParseMode.MARKDOWN
+            )
+            return EVAL_CUSTOM_END
+        else:
+            start_date = eval_data.get('start_date')
+            if start_date and selected_date < start_date:
+                await q.answer("⚠️ تاريخ النهاية لا يمكن أن يكون قبل تاريخ البداية", show_alert=True)
+                return EVAL_CUSTOM_END
+                
+            eval_data['end_date'] = selected_date
+            period_label = f"من {start_date} إلى {selected_date}"
+            
+            keyboard = [
+                [InlineKeyboardButton("📄 PDF", callback_data="eval:format:pdf")],
+                [InlineKeyboardButton("📊 Excel", callback_data="eval:format:excel")],
+                [InlineKeyboardButton("📄 PDF + 📊 Excel", callback_data="eval:format:both")],
+                [InlineKeyboardButton("🔙 رجوع", callback_data="eval:month:custom")],
+                [InlineKeyboardButton("❌ إلغاء", callback_data="eval:cancel")],
+            ]
+            
+            await q.edit_message_text(
+                f"📊 **تقييم أداء المترجمين**\n\n"
+                f"📅 الفترة: **{period_label}**\n\n"
+                f"اختر صيغة الملف:",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode=ParseMode.MARKDOWN,
+            )
+            return EVAL_SELECT_FORMAT
+
+    return EVAL_CUSTOM_START
+
+
 async def handle_year(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """اختيار السنة"""
     q = update.callback_query
@@ -603,6 +710,7 @@ async def handle_year(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard.append(row)
 
     keyboard.append([InlineKeyboardButton("📄 كل الشهور", callback_data="eval:month:all")])
+    keyboard.append([InlineKeyboardButton("📅 فترة مخصصة (من - إلى)", callback_data="eval:month:custom")])
     keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="eval:back_year")])
     keyboard.append([InlineKeyboardButton("❌ إلغاء", callback_data="eval:cancel")])
 
@@ -644,8 +752,22 @@ async def handle_month(update: Update, context: ContextTypes.DEFAULT_TYPE):
     eval_data['month'] = month_val
     eval_data.pop('day', None)
     eval_data.pop('period_type', None)
+    eval_data.pop('start_date', None)
+    eval_data.pop('end_date', None)
 
     year = eval_data.get('year', date.today().year)
+    
+    if month_val == "custom":
+        eval_data['period_type'] = "custom"
+        # عرض تقويم لاختيار تاريخ البداية
+        await q.edit_message_text(
+            "📅 **تقييم فترة مخصصة**\n\n"
+            "الخطوة 1: اختر **تاريخ البداية**:",
+            reply_markup=_build_custom_calendar(year, date.today().month, "start"),
+            parse_mode=ParseMode.MARKDOWN
+        )
+        return EVAL_CUSTOM_START
+
     month_label = "كل الشهور" if month_val == "all" else MONTH_NAMES.get(int(month_val), month_val)
 
     if month_val == "all":
@@ -882,6 +1004,12 @@ async def handle_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
         end_date = day_date
         start_date_str = day_date.strftime("%d/%m/%Y")
         end_date_str = day_date.strftime("%d/%m/%Y")
+    elif period_type == "custom" and data.get('start_date') and data.get('end_date'):
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        period_label = f"من {start_date} إلى {end_date}"
+        start_date_str = start_date.strftime("%d/%m/%Y")
+        end_date_str = end_date.strftime("%d/%m/%Y")
     else:
         month_label = "كل الشهور" if month == "all" else MONTH_NAMES.get(int(month), month)
         period_label = f"{month_label} {year}"
@@ -900,7 +1028,7 @@ async def handle_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         with SessionLocal() as session:
             logger.info(f"📊 EVAL: period_type={period_type}, start={start_date}, end={end_date}, year={year}, month={month}")
-            if period_type == "day" and start_date and end_date:
+            if (period_type == "day" or period_type == "custom") and start_date and end_date:
                 raw_stats = get_translator_stats(session, start_date, end_date)
             else:
                 raw_stats = get_monthly_stats(session, year, month)
@@ -920,8 +1048,8 @@ async def handle_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # إضافة التقييم فوق الإحصائيات
             results = _compute_rating(raw_stats)
 
-            # حفظ في قاعدة البيانات
-            if period_type != "day":
+            # حفظ في قاعدة البيانات (فقط للشهور الكاملة أو السنة الكاملة)
+            if period_type not in ("day", "custom"):
                 _save_evaluations_to_db(session, results, year, month)
 
             # إرسال ملخص نصي
@@ -935,10 +1063,15 @@ async def handle_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 from datetime import timedelta as td2
 
                 # حساب النطاق الزمني
-                if period_type == "day" and start_date:
+                if (period_type == "day" or period_type == "custom") and start_date:
                     s_str = start_date.strftime("%Y-%m-%d") if hasattr(start_date, 'strftime') else str(start_date)
-                    e_date = start_date + td2(days=1) if hasattr(start_date, 'strftime') else None
-                    e_str = e_date.strftime("%Y-%m-%d") if e_date else str(end_date)
+                    # لـ get_translator_stats، النهاية حصرية (exclusive) فنزيد يوماً واحداً إذا كان يوماً واحداً
+                    if period_type == "day":
+                        e_date = start_date + td2(days=1)
+                        e_str = e_date.strftime("%Y-%m-%d")
+                    else:
+                        e_date = end_date + td2(days=1)
+                        e_str = e_date.strftime("%Y-%m-%d")
                 else:
                     if month == "all" or month == 0:
                         s_str = f"{year}-01-01"
@@ -1086,6 +1219,8 @@ async def handle_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
             file_prefix = f"تقييم_المترجمين_{year}"
             if period_type == "day" and data.get('day'):
                 file_prefix += f"_{data['day'].strftime('%Y_%m_%d')}"
+            elif period_type == "custom" and data.get('start_date') and data.get('end_date'):
+                file_prefix += f"_{data['start_date'].strftime('%Y_%m_%d')}_إلى_{data['end_date'].strftime('%Y_%m_%d')}"
             elif month != "all":
                 file_prefix += f"_{month}"
 
@@ -1263,6 +1398,16 @@ def register(app):
             ],
             EVAL_SELECT_FORMAT: [
                 CallbackQueryHandler(handle_format, pattern=r"^eval:"),
+            ],
+            EVAL_CUSTOM_START: [
+                CallbackQueryHandler(handle_custom_date, pattern=r"^evalcustom:"),
+                CallbackQueryHandler(_cancel_evaluation, pattern=r"^eval:cancel$"),
+                CallbackQueryHandler(handle_month, pattern=r"^eval:back_year$"),
+            ],
+            EVAL_CUSTOM_END: [
+                CallbackQueryHandler(handle_custom_date, pattern=r"^evalcustom:"),
+                CallbackQueryHandler(handle_month, pattern=r"^eval:month:custom$"),
+                CallbackQueryHandler(_cancel_evaluation, pattern=r"^eval:cancel$"),
             ],
         },
         fallbacks=[
