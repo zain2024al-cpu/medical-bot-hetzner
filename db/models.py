@@ -293,6 +293,7 @@ class InitialCase(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     translator_id = Column(Integer, nullable=True)
     translator_name = Column(String(255), nullable=True)
+    patient_id = Column(Integer, nullable=True)
     patient_name = Column(String(255), nullable=True)
     case_details = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=True)
