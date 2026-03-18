@@ -22,6 +22,7 @@ from sqlalchemy import func, extract, or_
 import matplotlib
 matplotlib.use('Agg')  # استخدام backend بدون GUI
 import matplotlib.pyplot as plt
+from collections import defaultdict
 
 # محاولة استيراد مكتبات العربية (اختيارية)
 try:
@@ -71,6 +72,79 @@ def format_arabic_text(text):
             return text
     return text
 
+def generate_html_report(reports, stats, charts_paths, period_name):
+    """
+    توليد تقرير HTML يتضمن ملخصًا لأنواع الإجراءات وتقارير المرضى التفصيلية.
+    """
+    
+    # 1. حساب ملخص أنواع الإجراءات
+    action_summary = defaultdict(int)
+    for report in reports:
+        if report.medical_action:
+            action_summary[report.medical_action] += 1
+            
+    summary_html = "<h2>ملخص الإجراءات الطبية</h2>"
+    if action_summary:
+        summary_html += "<ul>"
+        for action, count in action_summary.items():
+            summary_html += f"<li>{format_arabic_text(action)}: {count}</li>"
+        summary_html += "</ul>"
+    else:
+        summary_html += "<p>لا توجد إجراءات طبية مسجلة في هذه الفترة.</p>"
+
+    # 2. توليد التقارير التفصيلية للمرضى
+    detailed_reports_html = "<h2>التقارير التفصيلية للمرضى</h2>"
+    if reports:
+        for report in reports:
+            detailed_reports_html += f"""
+            <div style="border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; border-radius: 5px;">
+                <h3>تقرير المريض: {format_arabic_text(report.patient_name)}</h3>
+                <p><strong>تاريخ التقرير:</strong> {report.report_date.strftime('%Y-%m-%d')}</p>
+                <p><strong>الإجراء الطبي:</strong> {format_arabic_text(report.medical_action or 'غير محدد')}</p>
+                <p><strong>المستشفى:</strong> {format_arabic_text(report.hospital_name or 'غير محدد')}</p>
+                <p><strong>القسم:</strong> {format_arabic_text(report.department_name or 'غير محدد')}</p>
+                <p><strong>المترجم:</strong> {format_arabic_text(report.translator_name or 'غير محدد')}</p>
+                <p><strong>ملاحظات:</strong> {format_arabic_text(report.notes or 'لا توجد ملاحظات')}</p>
+            </div>
+            """
+    else:
+        detailed_reports_html += "<p>لا توجد تقارير مفصلة للمرضى في هذه الفترة.</p>"
+
+    # 3. دمج كل شيء في قالب HTML كامل
+    full_html_content = f"""
+    <!DOCTYPE html>
+    <html lang="ar" dir="rtl">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>تقرير طبي - {format_arabic_text(period_name)}</title>
+        <style>
+            body {{ font-family: 'DejaVu Sans', sans-serif; direction: rtl; text-align: right; margin: 20px; background-color: #f4f4f4; color: #333; }}
+            h1, h2, h3 {{ color: #0056b3; }}
+            .container {{ background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
+            ul {{ list-style-type: none; padding: 0; }}
+            li {{ background-color: #e9ecef; margin-bottom: 5px; padding: 8px; border-radius: 4px; }}
+            p strong {{ color: #0056b3; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>تقرير طبي شامل</h1>
+            <p><strong>الفترة:</strong> {format_arabic_text(period_name)}</p>
+            <p><strong>تاريخ الإنشاء:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M')}</p>
+            
+            {summary_html}
+            
+            {detailed_reports_html}
+            
+            <div style="margin-top: 30px; font-size: 0.8em; color: #666;">
+                <p>تم إنشاء هذا التقرير بواسطة نظام البوت الآلي.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    return full_html_content
 
 def normalize_date_range(start_date, end_date):
     """تحويل قيم date إلى DateTime لضمان شمول اليوم بالكامل"""
@@ -90,6 +164,16 @@ def normalize_date_range(start_date, end_date):
             end_dt = datetime.combine(end_date, time.max)
     
     return start_dt, end_dt
+
+def generate_statistics(session, reports, start_dt, end_dt):
+    """Placeholder for generating statistics."""
+    logger.warning("Using placeholder generate_statistics function.")
+    return {"total_reports": len(reports), "unique_patients": 0, "total_translators": 0}
+
+def generate_charts(session, reports, start_dt, end_dt):
+    """Placeholder for generating charts."""
+    logger.warning("Using placeholder generate_charts function.")
+    return []
 
 # ================================================
 # بدء نظام الطباعة
@@ -444,24 +528,26 @@ def _build_report_package(start_dt, end_dt, period_name):
         stats = generate_statistics(s, reports, start_dt, end_dt)
         charts_paths = generate_charts(s, reports, start_dt, end_dt)
         cleanup_paths.extend(charts_paths)
-        try:
-            html_content = generate_html_report(reports, stats, charts_paths, period_name)
-            unique_key = _unique_export_basename()
-            html_path = os.path.join(EXPORTS_DIR, f'report_{unique_key}.html')
-            # التأكد من وجود المجلد
-            os.makedirs(EXPORTS_DIR, exist_ok=True)
-            # كتابة ملف HTML
-            with open(html_path, 'w', encoding='utf-8') as f:
-                f.write(html_content)
-            cleanup_paths.append(html_path)
-        except Exception as html_error:
-            import traceback
-            tb = traceback.format_exc()
-            error_msg = f"فشل في إنشاء ملف HTML: {str(html_error)}\n\nTraceback (truncated):\n{tb}"
-            try:
-                logger.error(f"❌ {error_msg}")
-            except Exception:
-                print(f"❌ {error_msg}")
+        
+        html_content = generate_html_report(reports, stats, charts_paths, period_name)
+        unique_key = _unique_export_basename()
+        html_filename = f'report_{unique_key}.html'
+        html_path = os.path.join(EXPORTS_DIR, html_filename)
+        
+        os.makedirs(EXPORTS_DIR, exist_ok=True)
+        with open(html_path, 'w', encoding='utf-8') as f:
+            f.write(html_content)
+        cleanup_paths.append(html_path)
+
+        return {
+            "empty": False,
+            "file_path": html_path,
+            "filename": html_filename,
+            "file_type": "HTML",
+            "report_count": len(reports),
+            "period_name": period_name,
+            "cleanup_paths": cleanup_paths
+        }
             # أعادة رفع الاستثناء مع تضمين التتبع لتسهيل التشخيص في الواجهة
             raise Exception(error_msg) from html_error
         pdf_created, pdf_path = _render_pdf_from_html(html_path)

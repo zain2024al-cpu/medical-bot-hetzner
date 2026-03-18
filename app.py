@@ -160,6 +160,9 @@ async def main():
     
     # Create application with increased timeouts
     from telegram.ext import ApplicationBuilder
+    from config.settings import TIMEZONE
+    import pytz
+    
     app = (
         ApplicationBuilder()
         .token(BOT_TOKEN)
@@ -170,6 +173,32 @@ async def main():
         .build()
     )
     app.add_error_handler(error_handler)
+
+    # ✅ إعداد المجدول الزمني (JobQueue)
+    if app.job_queue:
+        from services.notification_service import send_daily_appointments_reminder
+        from db.maintenance import run_scheduled_maintenance
+        from datetime import time as dt_time
+        
+        # ⏰ 1. تنبيه المواعيد اليومي (الساعة 8:00 مساءً)
+        # ملاحظة: يتم استخدام المنطقة الزمنية المحددة في الإعدادات
+        tz = pytz.timezone(TIMEZONE)
+        app.job_queue.run_daily(
+            lambda context: send_daily_appointments_reminder(context.application),
+            time=dt_time(hour=20, minute=0, tzinfo=tz),
+            name="daily_appointments_reminder"
+        )
+        logger.info(f"📅 Scheduled daily appointments reminder at 20:00 ({TIMEZONE})")
+        
+        # 🔧 2. الصيانة اليومية (الساعة 3:00 صباحاً)
+        app.job_queue.run_daily(
+            lambda context: asyncio.create_task(asyncio.to_thread(run_scheduled_maintenance)),
+            time=dt_time(hour=3, minute=0, tzinfo=tz),
+            name="daily_maintenance"
+        )
+        logger.info(f"🔧 Scheduled daily maintenance at 03:00 ({TIMEZONE})")
+    else:
+        logger.warning("⚠️ JobQueue is not available! Scheduled tasks will not run.")
     
     # Try to add advanced handlers
     try:
@@ -210,32 +239,9 @@ async def main():
     logger.info("=" * 50)
     
     # Keep running
-    last_maintenance = 0
     try:
         while True:
-            await asyncio.sleep(30)
-            
-            # Run maintenance every 24 hours (86400 seconds)
-            import time
-            current_time = time.time()
-            # Initial run after 1 minute if not run yet (for testing), then every 24 hours
-            # But let's stick to simple logic: run if > 24h
-            # To ensure it runs on startup/restart after a bit, we can check if last_maintenance == 0
-            if last_maintenance == 0:
-                 # Don't run immediately on startup to allow bot to initialize fully
-                 last_maintenance = current_time - 86000 # Run in ~400 seconds (approx 6 mins)
-            
-            if current_time - last_maintenance > 86400:
-                logger.info("⏰ Running daily scheduled maintenance...")
-                try:
-                    from db.maintenance import run_scheduled_maintenance
-                    # Run in thread to avoid blocking the event loop
-                    await asyncio.to_thread(run_scheduled_maintenance)
-                    last_maintenance = current_time
-                    logger.info("✅ Daily maintenance completed")
-                except Exception as e:
-                    logger.error(f"❌ Maintenance failed: {e}")
-            
+            await asyncio.sleep(3600)  # Sleep for 1 hour to reduce CPU usage
             logger.info("Bot alive...")
     except asyncio.CancelledError:
         await app.updater.stop()
