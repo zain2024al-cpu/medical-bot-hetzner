@@ -548,10 +548,6 @@ def _build_report_package(start_dt, end_dt, period_name):
             "period_name": period_name,
             "cleanup_paths": cleanup_paths
         }
-        else:
-            final_path = html_path
-            file_type = "HTML"
-            filename = f'تقرير_طبي_{unique_key}.html'
     return {
         "empty": False,
         "report_count": len(reports),
