@@ -548,14 +548,6 @@ def _build_report_package(start_dt, end_dt, period_name):
             "period_name": period_name,
             "cleanup_paths": cleanup_paths
         }
-            # أعادة رفع الاستثناء مع تضمين التتبع لتسهيل التشخيص في الواجهة
-            raise Exception(error_msg) from html_error
-        pdf_created, pdf_path = _render_pdf_from_html(html_path)
-        if pdf_created:
-            cleanup_paths.append(pdf_path)
-            final_path = pdf_path
-            file_type = "PDF"
-            filename = f'تقرير_طبي_{unique_key}.pdf'
         else:
             final_path = html_path
             file_type = "HTML"
