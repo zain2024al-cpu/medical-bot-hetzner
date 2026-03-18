@@ -795,16 +795,20 @@ async def save_case(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 s.refresh(patient)
             
             # إنشاء الحالة الأولية في الجدول الجديد
+            case_details = f"""
+العمر: {data.get('patient_age')}
+الشكوى الرئيسية: {data.get('main_complaint')}
+القصة المرضية الحالية: {data.get('current_history')}
+ملاحظات: {data.get('notes')}
+إجراءات سابقة: {data.get('previous_procedures')}
+تفاصيل الفحوصات: {data.get('test_details')}
+            """.strip()
+
             initial_case = InitialCase(
-                patient_id=patient.id,
-                patient_age=data.get('patient_age'),
-                main_complaint=data.get('main_complaint'),
-                current_history=data.get('current_history'),
-                notes=data.get('notes'),
-                previous_procedures=data.get('previous_procedures'),
-                test_details=data.get('test_details'),
-                created_by=update.effective_user.id,
-                created_at=datetime.utcnow()
+                patient_name=data.get('patient_name'),
+                case_details=case_details,
+                created_at=datetime.utcnow(),
+                status="pending"
             )
             s.add(initial_case)
             s.commit()

@@ -108,6 +108,16 @@ async def _daily_followups_job(app):
     except Exception as e:
         print(f"Error in daily followups: {e}")
 
+async def _tomorrow_appointments_job(app):
+    """مهمة إرسال تنبيه بمواعيد يوم غد للأدمن (8:00 مساءً)"""
+    try:
+        from services.tomorrow_appointments import notify_admins_of_tomorrow_appointments
+        from config.settings import ADMIN_IDS
+        if app and hasattr(app, 'bot'):
+            await notify_admins_of_tomorrow_appointments(app.bot, ADMIN_IDS)
+    except Exception as e:
+        print(f"Error in tomorrow appointments job: {e}")
+
 async def _sqlite_quick_backup_job():
     """مهمة النسخ الاحتياطي السريع كل 10 دقائق"""
     try:
@@ -233,6 +243,18 @@ def start_scheduler(app=None):
                 print("✅ Daily followups extraction: 9:00 PM daily")
             except UnicodeEncodeError:
                 print("[OK] Daily followups extraction: 9:00 PM daily")
+            
+            # 3.5. تنبيه بمواعيد الغد للأدمن (8:00 مساءً)
+            scheduler.add_job(
+                _tomorrow_appointments_job,
+                trigger=CronTrigger(hour=20, minute=0, timezone='UTC'),  # 8:00 PM
+                args=[app],
+                id='tomorrow_appointments'
+            )
+            try:
+                print("✅ Tomorrow appointments notification: 8:00 PM daily")
+            except UnicodeEncodeError:
+                print("[OK] Tomorrow appointments notification: 8:00 PM daily")
         
         # 4. النسخ الاحتياطي السريع كل 10 دقائق
         scheduler.add_job(
