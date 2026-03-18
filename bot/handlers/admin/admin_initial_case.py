@@ -805,9 +805,17 @@ async def save_case(update: Update, context: ContextTypes.DEFAULT_TYPE):
             """.strip()
 
             initial_case = InitialCase(
+                patient_id=patient.id,
                 patient_name=data.get('patient_name'),
+                patient_age=data.get('patient_age'),
+                main_complaint=data.get('main_complaint'),
+                current_history=data.get('current_history'),
+                notes=data.get('notes'),
+                previous_procedures=data.get('previous_procedures'),
+                test_details=data.get('test_details'),
                 case_details=case_details,
                 created_at=datetime.utcnow(),
+                created_by=update.effective_user.id,
                 status="pending"
             )
             s.add(initial_case)

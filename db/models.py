@@ -291,11 +291,17 @@ class InitialCase(Base):
     __tablename__ = "initial_cases"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    translator_id = Column(Integer, nullable=True)
-    translator_name = Column(String(255), nullable=True)
+    patient_id = Column(Integer, nullable=True)
     patient_name = Column(String(255), nullable=True)
+    patient_age = Column(String(50), nullable=True)
+    main_complaint = Column(Text, nullable=True)
+    current_history = Column(Text, nullable=True)
+    notes = Column(Text, nullable=True)
+    previous_procedures = Column(Text, nullable=True)
+    test_details = Column(Text, nullable=True)
     case_details = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=True)
+    created_by = Column(Integer, nullable=True)
     status = Column(String(50), default="pending", nullable=True)
 
 
