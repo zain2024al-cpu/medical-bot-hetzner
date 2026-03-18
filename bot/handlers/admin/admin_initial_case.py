@@ -805,7 +805,6 @@ async def save_case(update: Update, context: ContextTypes.DEFAULT_TYPE):
             """.strip()
 
             initial_case = InitialCase(
-                patient_id=patient.id,
                 patient_name=data.get('patient_name'),
                 case_details=case_details,
                 created_at=datetime.utcnow(),
