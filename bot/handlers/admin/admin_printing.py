@@ -1187,7 +1187,7 @@ def generate_html_report(reports, stats, charts_paths, period_name):
         }}
         
         /* كروت تفاصيل التقارير */
-        .report-card {
+        .report-card {{
             background: white;
             border: 1px solid #e1e8ed;
             border-radius: 10px;
@@ -1196,63 +1196,63 @@ def generate_html_report(reports, stats, charts_paths, period_name):
             page-break-inside: avoid;
             box-shadow: 0 2px 5px rgba(0,0,0,0.05);
             border-right: 6px solid #3498db;
-        }
+        }}
         
-        .report-card-header {
+        .report-card-header {{
             display: flex;
             justify-content: space-between;
             align-items: center;
             border-bottom: 1px solid #f0f4f8;
             padding-bottom: 12px;
             margin-bottom: 15px;
-        }
+        }}
         
-        .report-card-title {
+        .report-card-title {{
             font-size: 14pt;
             font-weight: bold;
             color: #2c3e50;
-        }
+        }}
         
-        .report-card-date {
+        .report-card-date {{
             font-size: 10pt;
             color: #7f8c8d;
-        }
+        }}
         
-        .report-card-grid {
+        .report-card-grid {{
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 12px;
-        }
+        }}
         
-        .report-field {
+        .report-field {{
             font-size: 10pt;
             margin-bottom: 5px;
-        }
+        }}
         
-        .report-field strong {
+        .report-field strong {{
             color: #34495e;
             min-width: 100px;
             display: inline-block;
-        }
+        }}
         
-        .report-content {
+        .report-content {{
             margin-top: 15px;
             padding-top: 12px;
             border-top: 1px dashed #ecf0f1;
-        }
+        }}
         
-        .report-content h4 {
+        .report-content h4 {{
             margin: 0 0 8px 0;
             color: #2980b9;
             font-size: 11pt;
-        }
+        }}
         
-        .report-content p {
+        .report-content p {{
             margin: 0;
             white-space: pre-wrap;
             font-size: 10pt;
             color: #34495e;
-        }
+        }}
         
         /* تحسينات الطباعة */
         @media print {{
