@@ -1572,7 +1572,7 @@ def generate_html_report(reports, stats, charts_paths, period_name):
             </div>
             <div class="summary-item">
                 <div class="label">📊 أنواع الإجراءات</div>
-                <div class="value">{len(stats['by_type'])}</div>
+                <div class="value">{len(stats['by_action'])}</div>
             </div>
         </div>
     </div>
