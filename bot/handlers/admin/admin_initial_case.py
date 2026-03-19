@@ -839,7 +839,7 @@ async def save_case(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     'test_details': data.get('test_details'),
                 }
                 
-                await broadcast_initial_case(update.callback_query.bot, case_broadcast_data)
+                await broadcast_initial_case(context.bot, case_broadcast_data)
                 print(f"تم بث الحالة الاولية للمريض {data.get('patient_name')}")
             except Exception as e:
                 print(f"خطأ في بث الحالة الاولية: {e}")

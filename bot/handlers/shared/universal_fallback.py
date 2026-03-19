@@ -75,6 +75,11 @@ KNOWN_CALLBACKS = [
     r"^back_to_admin$",
     r"^back_to_main$",
     r"^back_to_schedule$",
+    r"^has_tests:",        # إضافة حالة (Admin)
+    r"^action:",           # إجراءات التأكيد (Admin)
+    r"^proc:",             # إجراءات (Admin)
+    r"^proc_select:",      # اختيار إجراء (Admin)
+    r"^skip:",             # تخطي (Admin),
     
     # إدارة الجدول (Admin)
     r"^upload_schedule$",

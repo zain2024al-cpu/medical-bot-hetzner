@@ -72,23 +72,59 @@ def format_arabic_text(text):
             return text
     return text
 
-def generate_html_report(reports, stats, charts_paths, period_name):
+def generate_simple_html_report(reports, stats, charts_paths, period_name):
     """
-    توليد تقرير HTML يتضمن ملخصًا لأنواع الإجراءات وتقارير المرضى التفصيلية.
+    توليد تقرير HTML بسيط يتضمن ملخصًا لأنواع الإجراءات وتقارير المرضى التفصيلية.
     """
     
     # 1. حساب ملخص أنواع الإجراءات
     action_summary = defaultdict(int)
+    total_actions = 0
+    unique_patients = set()
+    unique_hospitals = set()
+    
     for report in reports:
         if report.medical_action:
             action_summary[report.medical_action] += 1
+            total_actions += 1
+        if report.patient_id:
+            unique_patients.add(report.patient_id)
+        if report.hospital_id:
+            unique_hospitals.add(report.hospital_id)
+    
+    total_patients = len(unique_patients)
+    total_hospitals = len(unique_hospitals)
             
-    summary_html = "<h2>ملخص الإجراءات الطبية</h2>"
+    summary_html = f"""
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 12px; margin-bottom: 25px; text-align: center;">
+        <h2 style="margin: 0 0 10px 0; color: white;">📊 ملخص التقرير الشامل</h2>
+        <div style="display: flex; justify-content: center; gap: 30px; flex-wrap: wrap; margin-top: 15px;">
+            <div><strong>إجمالي التقارير:</strong> {len(reports)}</div>
+            <div><strong>إجمالي المرضى:</strong> {total_patients}</div>
+            <div><strong>عدد المستشفيات:</strong> {total_hospitals}</div>
+        </div>
+    </div>
+    <h2 style="color: #2c3e50;">ملخص الإجراءات الطبية (الإجمالي: {total_actions})</h2>
+    """
     if action_summary:
-        summary_html += "<ul>"
-        for action, count in action_summary.items():
-            summary_html += f"<li>{format_arabic_text(action)}: {count}</li>"
-        summary_html += "</ul>"
+        summary_html += """
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <thead>
+                <tr style="background-color: #0056b3; color: white;">
+                    <th style="padding: 10px; border: 1px solid #ddd; text-align: right;">نوع الإجراء</th>
+                    <th style="padding: 10px; border: 1px solid #ddd; text-align: center;">المجموع</th>
+                </tr>
+            </thead>
+            <tbody>
+        """
+        for action, count in sorted(action_summary.items(), key=lambda x: x[1], reverse=True):
+            summary_html += f"""
+                <tr>
+                    <td style="padding: 10px; border: 1px solid #ddd;">{format_arabic_text(action)}</td>
+                    <td style="padding: 10px; border: 1px solid #ddd; text-align: center;"><strong>{count}</strong></td>
+                </tr>
+            """
+        summary_html += "</tbody></table>"
     else:
         summary_html += "<p>لا توجد إجراءات طبية مسجلة في هذه الفترة.</p>"
 
@@ -672,12 +708,12 @@ def generate_statistics(session, reports, start_date, end_date):
     followups = sum(1 for r in reports if r.medical_action and ('متابعة' in r.medical_action or 'مراجعة' in r.medical_action))
     stats['followups'] = followups
     
-    # التقسيم حسب النوع
-    report_types = {}
+    # التقسيم حسب النوع (الإجراء الطبي)
+    medical_actions = {}
     for report in reports:
-        report_type = _infer_medical_action_from_report(report) or 'غير محدد'
-        report_types[report_type] = report_types.get(report_type, 0) + 1
-    stats['by_type'] = report_types
+        action = _infer_medical_action_from_report(report) or 'غير محدد'
+        medical_actions[action] = medical_actions.get(action, 0) + 1
+    stats['by_action'] = medical_actions
     
     # التقسيم حسب المستشفى
     hospitals = {}
@@ -689,6 +725,7 @@ def generate_statistics(session, reports, start_date, end_date):
             hospital = report.hospital_name or 'غير محدد'
         hospitals[hospital] = hospitals.get(hospital, 0) + 1
     stats['by_hospital'] = hospitals
+    stats['total_hospitals'] = len(hospitals)
     
     # التقسيم حسب المترجم
     translators = {}
@@ -1149,6 +1186,74 @@ def generate_html_report(reports, stats, charts_paths, period_name):
             direction: rtl;
         }}
         
+        /* كروت تفاصيل التقارير */
+        .report-card {
+            background: white;
+            border: 1px solid #e1e8ed;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 25px;
+            page-break-inside: avoid;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            border-right: 6px solid #3498db;
+        }
+        
+        .report-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #f0f4f8;
+            padding-bottom: 12px;
+            margin-bottom: 15px;
+        }
+        
+        .report-card-title {
+            font-size: 14pt;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .report-card-date {
+            font-size: 10pt;
+            color: #7f8c8d;
+        }
+        
+        .report-card-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+        
+        .report-field {
+            font-size: 10pt;
+            margin-bottom: 5px;
+        }
+        
+        .report-field strong {
+            color: #34495e;
+            min-width: 100px;
+            display: inline-block;
+        }
+        
+        .report-content {
+            margin-top: 15px;
+            padding-top: 12px;
+            border-top: 1px dashed #ecf0f1;
+        }
+        
+        .report-content h4 {
+            margin: 0 0 8px 0;
+            color: #2980b9;
+            font-size: 11pt;
+        }
+        
+        .report-content p {
+            margin: 0;
+            white-space: pre-wrap;
+            font-size: 10pt;
+            color: #34495e;
+        }
+        
         /* تحسينات الطباعة */
         @media print {{
             .page-break {{
@@ -1181,27 +1286,36 @@ def generate_html_report(reports, stats, charts_paths, period_name):
     </p>
 </div>
 
-<!-- الجدول التفصيلي للتقارير -->
+<!-- جدول ملخص الإحصائيات حسب نوع الإجراء -->
 <div class="section">
-    <div class="section-title">📋 جدول التقارير التفصيلي</div>
+    <div class="section-title">📈 ملخص الإحصائيات حسب نوع الإجراء</div>
     <table>
         <thead>
             <tr>
-                <th>نوع التقرير</th>
+                <th>نوع الإجراء</th>
                 <th>العدد</th>
-                <th>النسبة</th>
+                <th>النسبة المئوية</th>
             </tr>
         </thead>
         <tbody>
 '''
     
-    for report_type, count in sorted(stats['by_type'].items(), key=lambda x: x[1], reverse=True):
+    for action, count in sorted(stats['by_action'].items(), key=lambda x: x[1], reverse=True):
         percentage = (count / stats['total_reports'] * 100) if stats['total_reports'] > 0 else 0
         html += f'''
             <tr>
-                <td>{report_type}</td>
+                <td>{action}</td>
                 <td>{count}</td>
                 <td>{percentage:.1f}%</td>
+            </tr>
+'''
+    
+    # صف الإجمالي
+    html += f'''
+            <tr style="background-color: #f1f8ff; font-weight: bold;">
+                <td>الإجمالي الكلي</td>
+                <td>{stats['total_reports']}</td>
+                <td>100%</td>
             </tr>
 '''
     
@@ -1245,7 +1359,7 @@ def generate_html_report(reports, stats, charts_paths, period_name):
             </div>
             <div class="summary-item">
                 <div class="label">📊 أنواع الإجراءات</div>
-                <div class="value">{len(stats['by_type'])}</div>
+                <div class="value">{len(stats['by_action'])}</div>
             </div>
         </div>
     </div>
@@ -1261,7 +1375,7 @@ def generate_html_report(reports, stats, charts_paths, period_name):
     
     # إضافة الرسوم البيانية مع عناوين
     chart_titles = [
-        '📊 التوزيع حسب نوع التقرير',
+        '📊 التوزيع حسب نوع الإجراء',
         '🏥 التوزيع حسب المستشفيات',
         '📈 التقارير عبر الزمن'
     ]
@@ -1337,6 +1451,84 @@ def generate_html_report(reports, stats, charts_paths, period_name):
                 <td>{percentage:.1f}%</td>
             </tr>
 '''
+    
+    
+    # صفحة تفاصيل التقارير
+    html += '''
+<div class="page-break">
+    <div class="section-title">📋 تفاصيل التقارير الفردية</div>
+'''
+    
+    for i, report in enumerate(reports, 1):
+        report_date_str = report.report_date.strftime('%Y-%m-%d %H:%M') if report.report_date else 'غير محدد'
+        hospital = report.hospital_name or 'غير محدد'
+        translator = report.translator_name or 'غير محدد'
+        action = report.medical_action or 'غير محدد'
+        patient = report.patient_name or 'غير محدد'
+        department = report.department or 'غير محدد'
+        doctor = report.doctor_name or 'غير محدد'
+        
+        html += f'''
+    <div class="report-card">
+        <div class="report-card-header">
+            <div class="report-card-title">#{i} - {patient}</div>
+            <div class="report-card-date">{report_date_str}</div>
+        </div>
+        
+        <div class="report-card-grid">
+            <div class="report-field"><strong>👤 المريض:</strong> {patient}</div>
+            <div class="report-field"><strong>📋 الإجراء:</strong> {action}</div>
+            <div class="report-field"><strong>🏥 المستشفى:</strong> {hospital}</div>
+            <div class="report-field"><strong>🏢 القسم:</strong> {department}</div>
+            <div class="report-field"><strong>👨‍⚕️ الطبيب:</strong> {doctor}</div>
+            <div class="report-field"><strong>👨‍⚕️ المترجم:</strong> {translator}</div>
+        </div>
+'''
+        
+        # تفاصيل طبية اختيارية
+        if report.complaint_text:
+            html += f'''
+        <div class="report-content">
+            <h4>💬 الشكوى:</h4>
+            <p>{report.complaint_text}</p>
+        </div>
+'''
+        
+        if report.diagnosis:
+            html += f'''
+        <div class="report-content">
+            <h4>🔬 التشخيص:</h4>
+            <p>{report.diagnosis}</p>
+        </div>
+'''
+
+        if report.doctor_decision:
+            html += f'''
+        <div class="report-content">
+            <h4>📝 قرار الطبيب:</h4>
+            <p>{report.doctor_decision}</p>
+        </div>
+'''
+            
+        if report.treatment_plan:
+            html += f'''
+        <div class="report-content">
+            <h4>💊 خطة العلاج:</h4>
+            <p>{report.treatment_plan}</p>
+        </div>
+'''
+
+        if report.notes:
+            html += f'''
+        <div class="report-content">
+            <h4>📋 ملاحظات إضافية:</h4>
+            <p>{report.notes}</p>
+        </div>
+'''
+
+        html += '    </div>'
+
+    html += '</div>'
     
     # جدول ملخص نهائي
     html += f'''
@@ -1605,11 +1797,14 @@ async def print_patient_reports_as_text(query, context, patient_id):
             else:
                 period_text = "غير محدد"
             
-            # إحصائيات حسب نوع الإجراء
+            # إحصائيات حسب نوع الإجراء والمستشفى
             action_stats = {}
+            hospitals = set()
             for report in reports:
                 action = report.medical_action or "غير محدد"
                 action_stats[action] = action_stats.get(action, 0) + 1
+                if report.hospital_name:
+                    hospitals.add(report.hospital_name)
             
             # بناء النص
             text_parts = []
@@ -1629,6 +1824,7 @@ async def print_patient_reports_as_text(query, context, patient_id):
 
             header += f"""│
 │  📊 **إجمالي التقارير:** {total_reports} تقرير
+│  🏥 **عدد المستشفيات:** {len(hospitals)}
 │  📅 **الفترة:** {period_text}
 │
 └─────────────────────────────────────┘
@@ -1637,18 +1833,17 @@ async def print_patient_reports_as_text(query, context, patient_id):
 
             # 2. إحصائيات سريعة بشكل احترافي
             stats_text = """
-┌──────── 📈 إحصائيات سريعة ────────┐
+┌──────── 📈 إحصائيات الإجراءات ────────┐
 │
 """
+            total_actions_count = 0
             for action, count in sorted(action_stats.items(), key=lambda x: x[1], reverse=True):
-                # إضافة شريط تقدم بسيط
-                bar_length = min(count, 10)
-                bar = "▓" * bar_length + "░" * (10 - bar_length)
-                stats_text += f"│  {bar} {action}: **{count}**\n"
-
-            stats_text += """│
+                stats_text += f"│  🔹 **{action}:** {count}\n"
+                total_actions_count += count
+            
+            stats_text += f"""│
+│  ✅ **الإجمالي:** {total_actions_count} إجراء
 └─────────────────────────────────────┘
-
 """
             text_parts.append(stats_text)
             

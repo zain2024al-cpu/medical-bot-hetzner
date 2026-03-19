@@ -2105,6 +2105,69 @@ def export_to_pdf_windows(reports_data, filename="reports"):
         ]))
         
         elements.append(info_table)
+        
+        # ═══════════════════════════════════════
+        # 📈 ملخص الإحصائيات الشامل
+        # ═══════════════════════════════════════
+        elements.append(Spacer(1, 10*mm))
+        
+        summary_title_style = ParagraphStyle(
+            'SummaryTitle',
+            fontSize=18,
+            textColor=colors.HexColor('#2c3e50'),
+            alignment=TA_RIGHT,
+            spaceAfter=5*mm,
+            fontName=arabic_font
+        )
+        elements.append(Paragraph(ar('📊 ملخص الإحصائيات الشامل'), summary_title_style))
+        
+        # حساب الإحصائيات
+        stats = _calculate_detailed_stats(reports_data)
+        
+        # 1. المربعات الإحصائية العلوية
+        summary_info_data = [
+            [str(stats['unique_hospitals']), ar('🏥 عدد المستشفيات'), str(stats['unique_patients']), ar('🩺 عدد المرضى')],
+            [str(stats.get('operations', 0)), ar('🔪 العمليات'), str(stats['total_reports']), ar('📄 إجمالي التقارير')]
+        ]
+        
+        summary_info_table = Table(summary_info_data, colWidths=[4*cm, 6*cm, 4*cm, 6*cm])
+        summary_info_table.setStyle(TableStyle([
+            ('BACKGROUND', (1, 0), (1, -1), colors.HexColor('#3498db')),
+            ('BACKGROUND', (3, 0), (3, -1), colors.HexColor('#3498db')),
+            ('TEXTCOLOR', (1, 0), (1, -1), colors.white),
+            ('TEXTCOLOR', (3, 0), (3, -1), colors.white),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, -1), arabic_font),
+            ('FONTSIZE', (0, 0), (-1, -1), 12),
+            ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#bdc3c7')),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ]))
+        elements.append(summary_info_table)
+        elements.append(Spacer(1, 10*mm))
+        
+        # 2. جدول توزيع الإجراءات
+        by_action = stats.get('by_action', {})
+        if by_action:
+            elements.append(Paragraph(ar('توزيع الإجراءات الطبية:'), ParagraphStyle('ActionTitle', fontSize=14, fontName=arabic_font, alignment=TA_RIGHT, spaceAfter=3*mm)))
+            
+            summary_data = [[ar('النسبة'), ar('المجموع'), ar('نوع الإجراء')]]
+            total = stats['total_reports']
+            
+            for action, count in sorted(by_action.items(), key=lambda x: x[1], reverse=True):
+                percentage = f"{(count/total*100):.1f}%" if total > 0 else "0%"
+                summary_data.append([percentage, str(count), ar(action)])
+            
+            summary_table = Table(summary_data, colWidths=[3*cm, 3*cm, 10*cm])
+            summary_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c3e50')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('FONTNAME', (0, 0), (-1, -1), arabic_font),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f9f9f9')]),
+            ]))
+            elements.append(summary_table)
+        
         elements.append(PageBreak())
         
         # ═══════════════════════════════════════
@@ -2257,31 +2320,32 @@ def _calculate_detailed_stats(reports_data):
     doctor_counter = Counter()
     
     for r in reports_data:
-        action = r.get('medical_action', 'غير محدد')
+        # دعم مفاتيح متعددة لضمان الحصول على البيانات
+        action = r.get('medical_action') or r.get('action') or 'غير محدد'
         action_counter[action] += 1
         
         # تصنيف حسب نوع الإجراء
-        if 'استشارة' in action or 'جديد' in action:
+        if any(word in action for word in ['استشارة', 'جديد']):
             stats['new_cases'] += 1
-        elif 'عملية' in action or 'جراح' in action:
+        elif any(word in action for word in ['عملية', 'جراح']):
             stats['operations'] += 1
-        elif 'متابعة' in action or 'مراجعة' in action:
+        elif any(word in action for word in ['متابعة', 'مراجعة']):
             stats['followups'] += 1
-        elif 'إجراء' in action or 'طبي' in action:
+        elif any(word in action for word in ['إجراء', 'طبي']):
             stats['medical_actions'] += 1
         
         # عد حسب المستشفى
-        hospital = r.get('hospital_name')
+        hospital = r.get('hospital_name') or r.get('hospital')
         if hospital:
             hospital_counter[hospital] += 1
         
         # عد حسب القسم
-        department = r.get('department_name')
+        department = r.get('department_name') or r.get('department')
         if department:
             department_counter[department] += 1
         
         # عد حسب الطبيب
-        doctor = r.get('doctor_name')
+        doctor = r.get('doctor_name') or r.get('doctor') or r.get('doctor_full_name')
         if doctor:
             doctor_counter[doctor] += 1
     
@@ -2907,15 +2971,65 @@ def export_to_excel(reports_data, filename="reports"):
         wb = load_workbook(filepath)
         ws = wb.active
         
+        # حساب الإحصائيات للإضافة في البداية
+        stats = _calculate_detailed_stats(reports_data)
+        
+        # إدراج صفوف للملخص في البداية (10 صفوف)
+        ws.insert_rows(1, 10)
+        
+        # عنوان الملخص
+        ws['A1'] = "📊 ملخص التقرير الإحصائي"
+        ws['A1'].font = Font(bold=True, size=16, color="FFFFFF", name='Arial')
+        ws['A1'].fill = PatternFill(start_color="2c3e50", end_color="2c3e50", fill_type="solid")
+        ws['A1'].alignment = Alignment(horizontal="center", vertical="center")
+        ws.merge_cells('A1:K1')
+        
+        # معلومات سريعة
+        summary_labels = ["إجمالي التقارير", "عدد المرضى", "عدد المستشفيات", "العمليات"]
+        summary_values = [stats['total_reports'], stats['unique_patients'], stats['unique_hospitals'], stats.get('operations', 0)]
+        
+        cols = ['B', 'D', 'G', 'I']
+        for i, (label, value) in enumerate(zip(summary_labels, summary_values)):
+            col = cols[i]
+            # العنوان
+            ws[f'{col}3'] = label
+            ws[f'{col}3'].font = Font(bold=True, color="FFFFFF", size=11)
+            ws[f'{col}3'].fill = PatternFill(start_color="3498db", end_color="3498db", fill_type="solid")
+            ws[f'{col}3'].alignment = Alignment(horizontal="center")
+            
+            # القيمة
+            ws[f'{col}4'] = value
+            ws[f'{col}4'].font = Font(bold=True, size=14)
+            ws[f'{col}4'].alignment = Alignment(horizontal="center")
+            ws[f'{col}4'].border = Border(bottom=Side(style='medium', color='3498db'))
+
+        # ملخص الإجراءات (أعلى 5)
+        ws['A6'] = "🔝 أعلى 5 إجراءات طبية:"
+        ws['A6'].font = Font(bold=True, size=12)
+        ws.merge_cells('A6:C6')
+        
+        by_action = stats.get('by_action', {})
+        for i, (action, count) in enumerate(list(sorted(by_action.items(), key=lambda x: x[1], reverse=True))[:5], 7):
+            ws[f'A{i}'] = f"• {action}:"
+            ws[f'B{i}'] = count
+            ws[f'A{i}'].alignment = Alignment(horizontal="right")
+            ws[f'B{i}'].font = Font(bold=True)
+            
+        # إضافة فاصل قبل الجدول
+        ws['A10'] = "📋 تفاصيل التقارير:"
+        ws['A10'].font = Font(bold=True, size=12, color="34495e")
+        ws.merge_cells('A10:K10')
+        
         # ✅ تفعيل RTL للورقة بالكامل
         ws.sheet_view.rightToLeft = True
         
-        # تنسيق الهيدر
+        # تنسيق الهيدر (أصبح الآن في الصف 11 بعد الإدراج)
+        header_row = 11
         header_fill = PatternFill(start_color="2c3e50", end_color="2c3e50", fill_type="solid")
         header_font = Font(bold=True, color="FFFFFF", size=12, name='Arial')
         header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True, readingOrder=2)
         
-        for cell in ws[1]:
+        for cell in ws[header_row]:
             cell.fill = header_fill
             cell.font = header_font
             cell.alignment = header_alignment
@@ -2928,7 +3042,7 @@ def export_to_excel(reports_data, filename="reports"):
             bottom=Side(style='thin', color='bdc3c7')
         )
         
-        for row in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
+        for row in ws.iter_rows(min_row=header_row + 1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
             for cell in row:
                 cell.border = thin_border
                 cell.alignment = Alignment(
@@ -2940,20 +3054,20 @@ def export_to_excel(reports_data, filename="reports"):
                 cell.font = Font(name='Arial', size=10)
         
         # تعديل عرض الأعمدة
-        ws.column_dimensions['A'].width = 8   # رقم
-        ws.column_dimensions['B'].width = 12  # التاريخ
-        ws.column_dimensions['C'].width = 18  # المريض
-        ws.column_dimensions['D'].width = 20  # المستشفى
+        ws.column_dimensions['A'].width = 12  # رقم
+        ws.column_dimensions['B'].width = 15  # التاريخ
+        ws.column_dimensions['C'].width = 20  # المريض
+        ws.column_dimensions['D'].width = 25  # المستشفى
         ws.column_dimensions['E'].width = 15  # القسم
         ws.column_dimensions['F'].width = 15  # الطبيب
-        ws.column_dimensions['G'].width = 18  # الإجراء
-        ws.column_dimensions['H'].width = 30  # الشكوى
-        ws.column_dimensions['I'].width = 30  # القرار
+        ws.column_dimensions['G'].width = 20  # الإجراء
+        ws.column_dimensions['H'].width = 35  # الشكوى
+        ws.column_dimensions['I'].width = 35  # القرار
         ws.column_dimensions['J'].width = 12  # موعد المراجعة
         ws.column_dimensions['K'].width = 20  # سبب المراجعة
         
-        # تلوين الصفوف بالتناوب
-        for idx, row in enumerate(ws.iter_rows(min_row=2, max_row=ws.max_row), start=2):
+        # تلوين الصفوف بالتناوب (يبدأ من بعد الهيدر)
+        for idx, row in enumerate(ws.iter_rows(min_row=header_row + 1, max_row=ws.max_row), start=header_row + 1):
             if idx % 2 == 0:
                 for cell in row:
                     cell.fill = PatternFill(start_color="f8f9fa", end_color="f8f9fa", fill_type="solid")
@@ -2963,26 +3077,81 @@ def export_to_excel(reports_data, filename="reports"):
         stats_ws.sheet_view.rightToLeft = True  # RTL
         
         # عنوان
-        stats_ws['A1'] = "📊 إحصائيات التقارير"
+        stats_ws['A1'] = "📊 إحصائيات التقارير الشاملة"
         stats_ws['A1'].font = Font(bold=True, size=16, color="2c3e50", name='Arial')
         stats_ws['A1'].alignment = Alignment(horizontal="center", vertical="center")
         stats_ws['A1'].fill = PatternFill(start_color="ecf0f1", end_color="ecf0f1", fill_type="solid")
         stats_ws.merge_cells('A1:B1')
         
-        # عناوين
+        # معلومات عامة
         labels = ["إجمالي التقارير:", "تاريخ الإنشاء:", "الحالة:"]
         values = [len(reports_data), datetime.now().strftime("%Y-%m-%d %H:%M"), "مكتمل ✅"]
         
-        for idx, (label, value) in enumerate(zip(labels, values), start=3):
-            stats_ws[f'A{idx}'] = label
-            stats_ws[f'B{idx}'] = value
-            stats_ws[f'A{idx}'].font = Font(bold=True, size=11, name='Arial')
-            stats_ws[f'A{idx}'].alignment = Alignment(horizontal="right", vertical="center", readingOrder=2)
-            stats_ws[f'B{idx}'].alignment = Alignment(horizontal="right", vertical="center", readingOrder=2)
-            stats_ws[f'B{idx}'].font = Font(size=11, name='Arial')
+        current_row = 3
+        for label, value in zip(labels, values):
+            stats_ws[f'A{current_row}'] = label
+            stats_ws[f'B{current_row}'] = value
+            stats_ws[f'A{current_row}'].font = Font(bold=True, size=11, name='Arial')
+            stats_ws[f'A{current_row}'].alignment = Alignment(horizontal="right", vertical="center", readingOrder=2)
+            stats_ws[f'B{current_row}'].alignment = Alignment(horizontal="right", vertical="center", readingOrder=2)
+            stats_ws[f'B{current_row}'].font = Font(size=11, name='Arial')
+            current_row += 1
+            
+        # ملخص الإجراءات الطبية
+        current_row += 2
+        stats_ws[f'A{current_row}'] = "📋 ملخص الإجراءات الطبية"
+        stats_ws[f'A{current_row}'].font = Font(bold=True, size=14, color="FFFFFF", name='Arial')
+        stats_ws[f'A{current_row}'].fill = PatternFill(start_color="3498db", end_color="3498db", fill_type="solid")
+        stats_ws[f'A{current_row}'].alignment = Alignment(horizontal="center", vertical="center")
+        stats_ws.merge_cells(f'A{current_row}:C{current_row}')
+        current_row += 1
         
-        stats_ws.column_dimensions['A'].width = 25
-        stats_ws.column_dimensions['B'].width = 35
+        stats_ws[f'A{current_row}'] = "نوع الإجراء"
+        stats_ws[f'B{current_row}'] = "المجموع"
+        stats_ws[f'C{current_row}'] = "النسبة المئوية"
+        stats_ws[f'A{current_row}'].font = Font(bold=True, size=11, name='Arial')
+        stats_ws[f'B{current_row}'].font = Font(bold=True, size=11, name='Arial')
+        stats_ws[f'C{current_row}'].font = Font(bold=True, size=11, name='Arial')
+        stats_ws[f'A{current_row}'].alignment = Alignment(horizontal="center", vertical="center")
+        stats_ws[f'B{current_row}'].alignment = Alignment(horizontal="center", vertical="center")
+        stats_ws[f'C{current_row}'].alignment = Alignment(horizontal="center", vertical="center")
+        current_row += 1
+        
+        # حساب الإحصائيات
+        stats = _calculate_detailed_stats(reports_data)
+        by_action = stats.get('by_action', {})
+        total_reports = len(reports_data)
+        
+        for action, count in sorted(by_action.items(), key=lambda x: x[1], reverse=True):
+            percentage = (count / total_reports * 100) if total_reports > 0 else 0
+            stats_ws[f'A{current_row}'] = action
+            stats_ws[f'B{current_row}'] = count
+            stats_ws[f'C{current_row}'] = f"{percentage:.1f}%"
+            stats_ws[f'A{current_row}'].alignment = Alignment(horizontal="right", vertical="center", readingOrder=2)
+            stats_ws[f'B{current_row}'].alignment = Alignment(horizontal="center", vertical="center")
+            stats_ws[f'C{current_row}'].alignment = Alignment(horizontal="center", vertical="center")
+            stats_ws[f'A{current_row}'].font = Font(name='Arial', size=10)
+            stats_ws[f'B{current_row}'].font = Font(name='Arial', size=10)
+            stats_ws[f'C{current_row}'].font = Font(name='Arial', size=10)
+            current_row += 1
+            
+        # صف الإجمالي النهائي
+        stats_ws[f'A{current_row}'] = "الإجمالي الكلي"
+        stats_ws[f'B{current_row}'] = total_reports
+        stats_ws[f'C{current_row}'] = "100%"
+        stats_ws[f'A{current_row}'].font = Font(bold=True, size=11, color="FFFFFF", name='Arial')
+        stats_ws[f'B{current_row}'].font = Font(bold=True, size=11, color="FFFFFF", name='Arial')
+        stats_ws[f'C{current_row}'].font = Font(bold=True, size=11, color="FFFFFF", name='Arial')
+        stats_ws[f'A{current_row}'].fill = PatternFill(start_color="2c3e50", end_color="2c3e50", fill_type="solid")
+        stats_ws[f'B{current_row}'].fill = PatternFill(start_color="2c3e50", end_color="2c3e50", fill_type="solid")
+        stats_ws[f'C{current_row}'].fill = PatternFill(start_color="2c3e50", end_color="2c3e50", fill_type="solid")
+        stats_ws[f'A{current_row}'].alignment = Alignment(horizontal="right", vertical="center")
+        stats_ws[f'B{current_row}'].alignment = Alignment(horizontal="center", vertical="center")
+        stats_ws[f'C{current_row}'].alignment = Alignment(horizontal="center", vertical="center")
+
+        stats_ws.column_dimensions['A'].width = 30
+        stats_ws.column_dimensions['B'].width = 15
+        stats_ws.column_dimensions['C'].width = 15
         
         wb.save(filepath)
         wb.close()
@@ -3055,6 +3224,64 @@ def export_to_word(reports_data, filename="reports"):
             for cell in row.cells:
                 cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
         
+        doc.add_paragraph()
+        
+        # 📈 ملخص الإجراءات الطبية (جديد)
+        stats_title = doc.add_heading('📈 ملخص الإجراءات الطبية', level=1)
+        stats_title.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        stats_title.runs[0].font.color.rgb = RGBColor(52, 152, 219)
+        
+        # حساب الإحصائيات
+        stats = _calculate_detailed_stats(reports_data)
+        by_action = stats.get('by_action', {})
+        
+        if by_action:
+            action_table = doc.add_table(rows=1, cols=2)
+            action_table.style = 'Table Grid'
+            
+            # الهيدر
+            hdr_cells = action_table.rows[0].cells
+            hdr_cells[1].text = 'نوع الإجراء'
+            hdr_cells[0].text = 'المجموع'
+            
+            for cell in hdr_cells:
+                cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                # تفعيل RTL للهيدر
+                pPr = cell.paragraphs[0]._element.get_or_add_pPr()
+                bidi = OxmlElement('w:bidi')
+                bidi.set(qn('w:val'), '1')
+                pPr.append(bidi)
+                if cell.paragraphs[0].runs:
+                    cell.paragraphs[0].runs[0].font.bold = True
+            
+            # البيانات
+            for action, count in sorted(by_action.items(), key=lambda x: x[1], reverse=True):
+                row_cells = action_table.add_row().cells
+                row_cells[1].text = action
+                row_cells[0].text = str(count)
+                
+                for cell in row_cells:
+                    cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                    # تفعيل RTL للبيانات
+                    pPr = cell.paragraphs[0]._element.get_or_add_pPr()
+                    bidi = OxmlElement('w:bidi')
+                    bidi.set(qn('w:val'), '1')
+                    pPr.append(bidi)
+                
+            # صف الإجمالي
+            total_row = action_table.add_row().cells
+            total_row[1].text = 'إجمالي الإجراءات'
+            total_row[0].text = str(len(reports_data))
+            
+            for cell in total_row:
+                cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                pPr = cell.paragraphs[0]._element.get_or_add_pPr()
+                bidi = OxmlElement('w:bidi')
+                bidi.set(qn('w:val'), '1')
+                pPr.append(bidi)
+                if cell.paragraphs[0].runs:
+                    cell.paragraphs[0].runs[0].font.bold = True
+
         doc.add_page_break()
         
         # التقارير التفصيلية
