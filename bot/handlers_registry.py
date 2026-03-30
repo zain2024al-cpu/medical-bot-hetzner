@@ -50,6 +50,15 @@ def register_all_handlers(app):
     from bot.handlers.admin.admin_reports import handle_print_patient_command
     from telegram.ext import CommandHandler
     app.add_handler(CommandHandler("print_patient", handle_print_patient_command))
+
+    # ✅ هذه الدوال كانت تُستدعى بدون استيرادها (سبب NameError على السيرفر)
+    from bot.handlers.admin.admin_daily_patients import register as register_daily_patients
+    from bot.handlers.admin.admin_data_analysis import register as register_data_analysis
+    from bot.handlers.admin.admin_hospitals_management import register as register_hospitals_management
+    from bot.handlers.admin.admin_translators_management import register as register_translators_management
+    from bot.handlers.admin.admin_delete_reports import register as register_admin_delete_reports
+    from bot.handlers.admin.admin_backup_commands import register as register_admin_backup_commands
+
     register_daily_patients(app)  # ✅ إدارة أسماء المرضى اليومية
     register_data_analysis(app)  # ✅ نظام تحليل البيانات الشامل
     register_hospitals_management(app)  # ✅ إدارة المستشفيات
