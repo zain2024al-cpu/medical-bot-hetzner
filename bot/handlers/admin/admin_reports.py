@@ -18,12 +18,14 @@ from bot.shared_auth import is_admin
 from bot.decorators import admin_handler
 import os
 import io
+import asyncio
 import base64
 import logging
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from collections import Counter
+import sys
 
 logger = logging.getLogger(__name__)
 
@@ -1135,7 +1137,7 @@ def _query_reports(filter_type, name_val, year_val, month_val, dept_val=None, ac
         return None, rows, stats, charts
 
 
-async def _create_reports_charts(hospitals_counter, departments_counter, actions_counter, rows):
+def _create_reports_charts_sync(hospitals_counter, departments_counter, actions_counter, rows):
     """إنشاء رسوم بيانية للتقارير"""
     import matplotlib
     matplotlib.use('Agg')
@@ -1279,7 +1281,7 @@ async def _create_reports_charts(hospitals_counter, departments_counter, actions
     
     return charts
 
-async def _generate_reports_pdf_with_charts(pdf_data, charts_data):
+def _generate_reports_pdf_with_charts_sync(pdf_data, charts_data):
     """إنشاء PDF بتصميم فريد مع الرسوم البيانية"""
     from datetime import datetime
     import sys
@@ -1510,15 +1512,15 @@ async def confirm_export(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if True:
             if export_format == "excel":
                 logger.info("📗 بدء تصدير Excel...")
-                file_path = export_to_excel(rows, f"reports_{f_type or 'all'}")
+                file_path = await asyncio.to_thread(export_to_excel, rows, f"reports_{f_type or 'all'}")
                 logger.info(f"✅ تم إنشاء Excel: {file_path}")
             elif export_format == "word":
                 logger.info("📘 بدء تصدير Word...")
-                file_path = export_to_word(rows, f"reports_{f_type or 'all'}")
+                file_path = await asyncio.to_thread(export_to_word, rows, f"reports_{f_type or 'all'}")
                 logger.info(f"✅ تم إنشاء Word: {file_path}")
             elif export_format == "html":
                 logger.info("🌐 بدء تصدير HTML...")
-                file_path = export_to_html(rows, f"reports_{f_type or 'all'}", filter_type=f_type, title=title, filter_desc=filter_desc)
+                file_path = await asyncio.to_thread(export_to_html, rows, f"reports_{f_type or 'all'}", filter_type=f_type, title=title, filter_desc=filter_desc)
                 logger.info(f"✅ تم إنشاء HTML: {file_path}")
             else:  # pdf (default)
                 logger.info("📕 بدء تصدير PDF...")
@@ -1526,125 +1528,126 @@ async def confirm_export(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 from services.pdf_generator_enhanced import generate_data_analysis_pdf_with_tables
                 
                 # تحضير البيانات بنفس صيغة التحليلات
-                pdf_data = {
-                'date_from': context_data.get('filter_value', 'غير محدد'),
-                'date_to': datetime.now().strftime('%Y-%m-%d'),
-                'total_reports': len(rows),
-                'total_patients': len(set(r.get('patient_name') for r in rows if r.get('patient_name'))),
-                'hospitals_count': len(set(r.get('hospital_name') for r in rows if r.get('hospital_name'))),
-                'doctors_count': len(set(r.get('doctor_name') for r in rows if r.get('doctor_name'))),
-                'hospitals_data': [],
-                'departments_data': [],
-                'doctors_data': [],
-                'complaints_data': [],
-                'actions_data': [],
-                'top_patients': []
-                }
-                
-                # إحصائيات المستشفيات
                 from collections import Counter
-                hospitals_counter = Counter()
-                departments_counter = Counter()
-                doctors_counter = Counter()
-                actions_counter = Counter()
-                complaints_counter = Counter()
                 
-                for r in rows:
-                    if r.get('hospital_name'):
-                        hospitals_counter[r['hospital_name']] += 1
-                    if r.get('department_name'):
-                        departments_counter[r['department_name']] += 1
-                    if r.get('doctor_name'):
-                        doctors_counter[r['doctor_name']] += 1
-                    if r.get('medical_action'):
-                        actions_counter[r['medical_action']] += 1
-                    if r.get('complaint_text'):
-                        complaints_counter[r['complaint_text'][:50]] += 1
-                
-                # تحضير البيانات بنفس التنسيق الذي يتوقعه القالب
-                pdf_data['hospitals_data'] = [
-                    {
-                        'name': k, 
-                        'reports_count': v,  # القالب يتوقع reports_count
-                        'count': v,
-                        'percentage': float(f"{(v/len(rows)*100):.1f}"),  # القالب يتوقع percentage كرقم
-                        'percent': f"{(v/len(rows)*100):.1f}"
-                    } 
-                    for k, v in hospitals_counter.most_common(10)
-                ]
-                
-                pdf_data['departments_data'] = [
-                    {
-                        'name': k, 
-                        'count': v,
-                        'percentage': float(f"{(v/len(rows)*100):.1f}"),
-                        'percent': f"{(v/len(rows)*100):.1f}"
-                    } 
-                    for k, v in departments_counter.most_common(10)
-                ]
-                
-                pdf_data['doctors_data'] = [
-                    {
-                        'name': k, 
-                        'reports_count': v,  # القالب يتوقع reports_count
-                        'count': v,
-                        'percentage': float(f"{(v/len(rows)*100):.1f}"),
-                        'percent': f"{(v/len(rows)*100):.1f}"
-                    } 
-                    for k, v in doctors_counter.most_common(10)
-                ]
-                
-                pdf_data['actions_data'] = [
-                    {
-                        'name': k, 
-                        'count': v,
-                        'percentage': float(f"{(v/len(rows)*100):.1f}"),
-                        'percent': f"{(v/len(rows)*100):.1f}"
-                    } 
-                    for k, v in actions_counter.most_common(10)
-                ]
-                
-                pdf_data['complaints_data'] = [
-                    {
-                        'name': k, 
-                        'count': v,
-                        'percentage': float(f"{(v/len(rows)*100):.1f}"),
-                        'percent': f"{(v/len(rows)*100):.1f}"
-                    } 
-                    for k, v in complaints_counter.most_common(10)
-                ]
-                
-                # إضافة أفضل المرضى (بعدد الزيارات)
-                patients_counter = Counter()
-                patients_last_visit = {}  # تخزين آخر زيارة لكل مريض
-                for r in rows:
-                    patient_name = r.get('patient_name')
-                    if patient_name:
-                        patients_counter[patient_name] += 1
-                        # حفظ آخر تاريخ زيارة
-                        visit_date = r.get('report_date', 'غير محدد')
-                        if patient_name not in patients_last_visit or visit_date > patients_last_visit.get(patient_name, ''):
-                            patients_last_visit[patient_name] = visit_date
-                
-                pdf_data['top_patients'] = [
-                    {
-                        'name': k, 
-                        'visits': v,
-                        'last_visit': patients_last_visit.get(k, 'غير محدد')
-                    } 
-                    for k, v in patients_counter.most_common(10)
-                ]
-                
-                # إنشاء الرسوم البيانية
-                charts_data = await _create_reports_charts(
-                    hospitals_counter, 
-                    departments_counter, 
-                    actions_counter,
-                    rows
-                )
-                
-                # إنشاء PDF احترافي بالقالب الجديد
-                file_path = await _generate_reports_pdf_with_charts(pdf_data, charts_data)
+                # تنفيذ عملية تحضير البيانات والرسوم في thread منفصل لتجنب الحظر
+                def prepare_pdf_data_and_charts():
+                    pdf_data = {
+                        'date_from': context_data.get('filter_value', 'غير محدد'),
+                        'date_to': datetime.now().strftime('%Y-%m-%d'),
+                        'total_reports': len(rows),
+                        'total_patients': len(set(r.get('patient_name') for r in rows if r.get('patient_name'))),
+                        'hospitals_count': len(set(r.get('hospital_name') for r in rows if r.get('hospital_name'))),
+                        'doctors_count': len(set(r.get('doctor_name') for r in rows if r.get('doctor_name'))),
+                        'hospitals_data': [],
+                        'departments_data': [],
+                        'doctors_data': [],
+                        'complaints_data': [],
+                        'actions_data': [],
+                        'top_patients': []
+                    }
+                    
+                    hospitals_counter = Counter()
+                    departments_counter = Counter()
+                    doctors_counter = Counter()
+                    actions_counter = Counter()
+                    complaints_counter = Counter()
+                    
+                    for r in rows:
+                        if r.get('hospital_name'):
+                            hospitals_counter[r['hospital_name']] += 1
+                        if r.get('department_name'):
+                            departments_counter[r['department_name']] += 1
+                        if r.get('doctor_name'):
+                            doctors_counter[r['doctor_name']] += 1
+                        if r.get('medical_action'):
+                            actions_counter[r['medical_action']] += 1
+                        if r.get('complaint_text'):
+                            complaints_counter[r['complaint_text'][:50]] += 1
+                    
+                    pdf_data['hospitals_data'] = [
+                        {
+                            'name': k, 
+                            'reports_count': v,
+                            'count': v,
+                            'percentage': float(f"{(v/len(rows)*100):.1f}"),
+                            'percent': f"{(v/len(rows)*100):.1f}"
+                        } 
+                        for k, v in hospitals_counter.most_common(10)
+                    ]
+                    
+                    pdf_data['departments_data'] = [
+                        {
+                            'name': k, 
+                            'count': v,
+                            'percentage': float(f"{(v/len(rows)*100):.1f}"),
+                            'percent': f"{(v/len(rows)*100):.1f}"
+                        } 
+                        for k, v in departments_counter.most_common(10)
+                    ]
+                    
+                    pdf_data['doctors_data'] = [
+                        {
+                            'name': k, 
+                            'reports_count': v,
+                            'count': v,
+                            'percentage': float(f"{(v/len(rows)*100):.1f}"),
+                            'percent': f"{(v/len(rows)*100):.1f}"
+                        } 
+                        for k, v in doctors_counter.most_common(10)
+                    ]
+                    
+                    pdf_data['actions_data'] = [
+                        {
+                            'name': k, 
+                            'count': v,
+                            'percentage': float(f"{(v/len(rows)*100):.1f}"),
+                            'percent': f"{(v/len(rows)*100):.1f}"
+                        } 
+                        for k, v in actions_counter.most_common(10)
+                    ]
+                    
+                    pdf_data['complaints_data'] = [
+                        {
+                            'name': k, 
+                            'count': v,
+                            'percentage': float(f"{(v/len(rows)*100):.1f}"),
+                            'percent': f"{(v/len(rows)*100):.1f}"
+                        } 
+                        for k, v in complaints_counter.most_common(10)
+                    ]
+                    
+                    patients_counter = Counter()
+                    patients_last_visit = {}
+                    for r in rows:
+                        patient_name = r.get('patient_name')
+                        if patient_name:
+                            patients_counter[patient_name] += 1
+                            visit_date = r.get('report_date', 'غير محدد')
+                            if patient_name not in patients_last_visit or visit_date > patients_last_visit.get(patient_name, ''):
+                                patients_last_visit[patient_name] = visit_date
+                    
+                    pdf_data['top_patients'] = [
+                        {
+                            'name': k, 
+                            'visits': v,
+                            'last_visit': patients_last_visit.get(k, 'غير محدد')
+                        } 
+                        for k, v in patients_counter.most_common(10)
+                    ]
+                    
+                    # إنشاء الرسوم البيانية (متزامن الآن)
+                    charts_data = _create_reports_charts_sync(
+                        hospitals_counter, 
+                        departments_counter, 
+                        actions_counter,
+                        rows
+                    )
+                    
+                    # إنشاء PDF (متزامن الآن)
+                    return _generate_reports_pdf_with_charts_sync(pdf_data, charts_data)
+
+                file_path = await asyncio.to_thread(prepare_pdf_data_and_charts)
                 logger.info(f"✅ تم إنشاء PDF: {file_path}")
             
             if file_path and os.path.exists(file_path):
@@ -1995,17 +1998,28 @@ def export_to_pdf_windows(reports_data, filename="reports"):
     import os
     
     try:
-        # ✅ تسجيل خط عربي - جرب عدة خطوط من Windows
+        # ✅ تسجيل خط عربي - جرب عدة خطوط من Windows و Linux
         arabic_font = 'Helvetica'
+        import sys
         try:
             # الخيارات المتاحة في Windows (بالترتيب من الأفضل للأسوأ)
-            font_options = [
-                ("C:\\Windows\\Fonts\\tahoma.ttf", "Tahoma"),           # ممتاز للعربي
-                ("C:\\Windows\\Fonts\\tahomabd.ttf", "TahomaBold"),    # ممتاز للعربي (عريض)
-                ("C:\\Windows\\Fonts\\arial.ttf", "Arial"),            # جيد
-                ("C:\\Windows\\Fonts\\times.ttf", "Times"),            # احتياطي
-            ]
-            
+            font_options = []
+            if sys.platform == 'win32':
+                font_options = [
+                    ("C:\\Windows\\Fonts\\tahoma.ttf", "Tahoma"),
+                    ("C:\\Windows\\Fonts\\tahomabd.ttf", "TahomaBold"),
+                    ("C:\\Windows\\Fonts\\arial.ttf", "Arial"),
+                    ("C:\\Windows\\Fonts\\times.ttf", "Times"),
+                ]
+            else:
+                # Linux font paths
+                font_options = [
+                    ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "DejaVuSans"),
+                    ("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "DejaVuSansBold"),
+                    ("/usr/share/fonts/truetype/freefont/FreeSans.ttf", "FreeSans"),
+                    ("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf", "LiberationSans"),
+                ]
+
             for font_path, font_name in font_options:
                 if os.path.exists(font_path):
                     pdfmetrics.registerFont(TTFont(font_name, font_path))
@@ -2366,20 +2380,27 @@ def _generate_dynamic_charts(reports_data, filter_type, stats):
     from io import BytesIO
     from arabic_reshaper import reshape
     from bidi.algorithm import get_display
-    
+    import os
+    import sys
+
     # ✅ إعداد الخط العربي لـ matplotlib
     try:
-        # محاولة استخدام خط عربي من Windows
-        font_path = "C:\\Windows\\Fonts\\tahoma.ttf"
-        import os
+        if sys.platform == 'win32':
+            font_path = "C:\\Windows\\Fonts\\tahoma.ttf"
+        else:
+            # Linux font paths
+            font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+            if not os.path.exists(font_path):
+                font_path = "/usr/share/fonts/truetype/freefont/FreeSans.ttf"
+
         if os.path.exists(font_path):
             prop = font_manager.FontProperties(fname=font_path)
             plt.rcParams['font.family'] = prop.get_name()
         else:
-            plt.rcParams['font.family'] = 'Arial'
+            plt.rcParams['font.family'] = 'DejaVu Sans'
     except:
-        plt.rcParams['font.family'] = 'Arial'
-    
+        plt.rcParams['font.family'] = 'DejaVu Sans'
+
     plt.rcParams['axes.unicode_minus'] = False
     
     def ar(text):

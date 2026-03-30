@@ -174,6 +174,17 @@ KNOWN_CALLBACKS = [
     r"^back_",
     r"^approve:",
     r"^reject:",
+
+    # ===========================
+    # التقارير والتصدير (admin_reports)
+    # ===========================
+    r"^filter:",              # فلترة (patient, patient_text, hospital, department, date, all)
+    r"^action_type:",         # نوع الإجراء (all, etc.)
+    r"^add_date_filter:",     # فلترة التاريخ (yes, no)
+    r"^print_patient:",       # طباعة مريض محدد
+    r"^patient_page:",        # صفحات المرضى
+    r"^print_type:",          # نوع الطباعة
+    r"^period:",              # الفترة الزمنية
 ]
 
 # ================================================
