@@ -143,6 +143,32 @@ async def _send_message_in_chunks(bot: Bot, chat_id, text: str, parse_mode=None,
     return last_message
 
 
+async def send_user_notification(bot: Bot, report_data: dict):
+    """
+    تنبيه بسيط للمستخدم الذي أنشأ التقرير.
+    هذه الدالة مطلوبة لأن broadcast_new_report يستدعيها (لتجنب NameError).
+    """
+    user_id = report_data.get("user_id") or report_data.get("translator_id")
+    if not user_id:
+        return
+
+    patient_name = report_data.get("patient_name") or "غير محدد"
+    medical_action = report_data.get("medical_action") or "غير محدد"
+    report_id = report_data.get("report_id")
+
+    text = (
+        "🔔 تقرير جديد متاح للتحضير\n\n"
+        f"👤 المريض: {escape_markdown(str(patient_name))}\n"
+        f"🩺 الإجراء: {escape_markdown(str(medical_action))}\n"
+    )
+    if report_id:
+        text += f"🆔 التقرير: #{report_id}"
+
+    try:
+        await bot.send_message(chat_id=user_id, text=text, parse_mode=ParseMode.MARKDOWN)
+    except Exception:
+        await bot.send_message(chat_id=user_id, text=text, parse_mode=None)
+
 
 async def broadcast_new_report(bot: Bot, report_data: dict):
     """
