@@ -175,8 +175,7 @@ KNOWN_CALLBACKS = [
     r"^approve:",
     r"^reject:",
 
-    # ===========================
-    # التقارير والتصدير (admin_reports)
+    # التقارير والتصدير (admin_reports & admin_printing)
     # ===========================
     r"^filter:",              # فلترة (patient, patient_text, hospital, department, date, all)
     r"^action_type:",         # نوع الإجراء (all, etc.)
@@ -185,6 +184,21 @@ KNOWN_CALLBACKS = [
     r"^patient_page:",        # صفحات المرضى
     r"^print_type:",          # نوع الطباعة
     r"^period:",              # الفترة الزمنية
+    r"^perf_period:",         # فترة أداء المترجمين
+    r"^export:",              # تصدير التقارير
+    r"^opt:",                 # خيارات الطباعة
+    r"^generate:",            # توليد التقارير
+    r"^back:",                # أزرار الرجوع (جديد)
+    r"^print:",               # أوامر الطباعة (cancel)
+    r"^abort$",               # إلغاء المحادثة (جديد)
+    r"^year:",                # اختيار السنة
+    r"^month:",               # اختيار الشهر
+    r"^select_hospital:",     # اختيار مستشفى
+    r"^select_dept:",         # اختيار قسم
+    r"^dept_option:",         # خيارات القسم
+    r"^hospital:",            # خيارات المستشفى
+    r"^dept:",                # خيارات القسم
+    r"^separator$",           # فاصل
 ]
 
 # ================================================

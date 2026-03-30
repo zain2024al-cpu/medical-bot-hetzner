@@ -231,6 +231,7 @@ async def start_professional_printing(update: Update, context: ContextTypes.DEFA
         [InlineKeyboardButton("👨‍⚕️ تقرير مترجم محدد", callback_data="print_type:translator")],
         [InlineKeyboardButton("📊 تقرير أداء المترجمين", callback_data="print_type:translator_performance")],
         [InlineKeyboardButton("📅 تقرير المواعيد القادمة", callback_data="print_type:upcoming_appointments")],
+        [InlineKeyboardButton("🔍 فلترة مخصصة (متقدم)", callback_data="print_type:advanced_filter")],
         [InlineKeyboardButton("❌ إلغاء", callback_data="print:cancel")]
     ])
 
@@ -266,6 +267,12 @@ async def handle_print_type_selection(update: Update, context: ContextTypes.DEFA
     # ✅ تقرير المواعيد القادمة - يعرض مباشرة
     if print_type == "upcoming_appointments":
         return await generate_upcoming_appointments_report(query, context)
+
+    # ✅ فلترة مخصصة (متقدم) - من admin_reports
+    if print_type == "advanced_filter":
+        from bot.handlers.admin import admin_reports
+        await query.edit_message_text("🖨️ اختر نوع الفلترة:", reply_markup=admin_reports._filters_kb())
+        return ADV_SELECT_FILTER
 
     # عرض خيارات الفترة الزمنية
     period_text = """
@@ -312,6 +319,9 @@ async def handle_period_selection(update: Update, context: ContextTypes.DEFAULT_
             [InlineKeyboardButton("🖨️ طباعة حسب المريض", callback_data="print_type:patient_text")],
             [InlineKeyboardButton("🏥 تقرير مستشفى محدد", callback_data="print_type:hospital")],
             [InlineKeyboardButton("👨‍⚕️ تقرير مترجم محدد", callback_data="print_type:translator")],
+            [InlineKeyboardButton("📊 تقرير أداء المترجمين", callback_data="print_type:translator_performance")],
+            [InlineKeyboardButton("📅 تقرير المواعيد القادمة", callback_data="print_type:upcoming_appointments")],
+            [InlineKeyboardButton("🔍 فلترة مخصصة (متقدم)", callback_data="print_type:advanced_filter")],
             [InlineKeyboardButton("❌ إلغاء", callback_data="print:cancel")]
         ])
 
@@ -2123,6 +2133,9 @@ def format_report_as_text(report, index, total):
 
 PRINT_TRANSLATOR_PERFORMANCE_PERIOD = 10  # حالة جديدة
 
+# ✅ حالات الفلترة المتقدمة (من admin_reports)
+ADV_SELECT_FILTER, ADV_ENTER_NAME, ADV_SELECT_DEPT_OPT, ADV_ENTER_DEPT, ADV_SELECT_YEAR, ADV_SELECT_MONTH, ADV_CONFIRM_EXPORT, ADV_PRINT_PATIENT, ADV_SELECT_ACTION = range(720, 729)
+
 async def show_translator_performance_period(query, context):
     """عرض خيارات الفترة الزمنية لتقرير أداء المترجمين"""
     period_text = """
@@ -2453,21 +2466,45 @@ async def generate_upcoming_appointments_report(query, context):
         else:
             await query.edit_message_text(header, parse_mode=ParseMode.MARKDOWN)
             
-            # (تقسيم النص كما هو موجود في النسخة الأصلية)
-            # بما أنني قمت بتعديل جزء منه، سأحاول الحفاظ على المنطق الأصلي
             current_text = ""
             for date_str, day_appts in sorted(appointments_by_date.items()):
-                # ... (أكمل تقسيم النص هنا إذا لزم الأمر، لكنني سأكتفي بهذا القدر حالياً)
-                pass
-                for date_str, day_reports in sorted(appointments_by_date.items()):
-                    appointment_date = datetime.strptime(date_str, '%Y-%m-%d')
-                    day_name = ["الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت", "الأحد"][appointment_date.weekday()]
-                    days_remaining = (appointment_date.date() - today).days
+                appointment_date = datetime.strptime(date_str, '%Y-%m-%d')
+                day_name = ["الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت", "الأحد"][appointment_date.weekday()]
+                days_remaining = (appointment_date.date() - today).days
 
-                    if days_remaining == 0:
-                        remaining_text = "🔴 اليوم"
-                    elif days_remaining == 1:
-                        remaining_text = "🟠 غداً"
+                if days_remaining == 0:
+                    remaining_text = "🔴 اليوم"
+                elif days_remaining == 1:
+                    remaining_text = "🟠 غداً"
+                elif days_remaining <= 3:
+                    remaining_text = f"🟡 بعد {days_remaining} أيام"
+                else:
+                    remaining_text = f"🟢 بعد {days_remaining} يوم"
+
+                day_header = f"\n┌──────── 📅 {day_name} {appointment_date.strftime('%d-%m-%Y')} ────────\n│ {remaining_text} - {len(day_appts)} موعد\n├─────────────────────────────────────\n"
+                
+                day_details = ""
+                for appt in day_appts:
+                    patient_name = appt['patient_name']
+                    time_str = appt['followup_time'] or "—"
+                    hospital = appt['hospital_name'] or "—"
+                    reason = appt['followup_reason'] or "—"
+                    day_details += f"│ 👤 {patient_name}\n│    🕐 {time_str} | 🏥 {hospital}\n│    ✍️ {reason[:50]}{'...' if len(reason) > 50 else ''}\n│\n"
+                
+                day_footer = "└─────────────────────────────────────\n"
+                full_day_text = day_header + day_details + day_footer
+
+                if len(current_text) + len(full_day_text) > max_length:
+                    if current_text:
+                        await query.message.reply_text(current_text, parse_mode=ParseMode.MARKDOWN)
+                    current_text = full_day_text
+                else:
+                    current_text += full_day_text
+
+            if current_text.strip():
+                await query.message.reply_text(current_text, parse_mode=ParseMode.MARKDOWN)
+
+        return ConversationHandler.END
                     elif days_remaining <= 3:
                         remaining_text = f"🟡 بعد {days_remaining} أيام"
                     else:
@@ -2522,6 +2559,7 @@ async def generate_upcoming_appointments_report(query, context):
 
 def register(app):
     """تسجيل معالج الطباعة الاحترافي"""
+    from bot.handlers.admin import admin_reports
 
     conv = ConversationHandler(
         entry_points=[
@@ -2544,9 +2582,66 @@ def register(app):
             PRINT_TRANSLATOR_PERFORMANCE_PERIOD: [
                 CallbackQueryHandler(handle_translator_performance_period, pattern="^perf_period:|^back:type|^print:cancel$")
             ],
+
+            # ✅ حالات الفلترة المتقدمة (مدمجة من admin_reports)
+            ADV_SELECT_FILTER: [
+                CallbackQueryHandler(admin_reports.handle_filter_choice, pattern=r"^filter:(patient|patient_text|hospital|department|date|all)$"),
+                CallbackQueryHandler(admin_reports.handle_print_patient_options, pattern=r"^print_patient_(all|period)$"),
+                CallbackQueryHandler(admin_reports.handle_patient_text_selection, pattern=r"^print_patient:\d+$"),
+                CallbackQueryHandler(admin_reports.handle_patient_text_page, pattern=r"^patient_page:(next|prev)$"),
+                CallbackQueryHandler(admin_reports.handle_back_to_filter, pattern=r"^back:type$"),
+                CallbackQueryHandler(admin_reports.handle_back_to_filter, pattern=r"^back:filter$"),
+                CallbackQueryHandler(admin_reports.confirm_export, pattern=r"^abort$"),
+                CallbackQueryHandler(admin_reports.confirm_export, pattern=r"^print:cancel$"),
+            ],
+            ADV_ENTER_NAME: [
+                CallbackQueryHandler(admin_reports.handle_print_patient_selection, pattern=r"^print_patient:\d+$"),
+                CallbackQueryHandler(admin_reports.handle_patient_page, pattern=r"^patient_page:\d+$"),
+                CallbackQueryHandler(admin_reports.handle_hospital_selection, pattern=r"^select_hospital:"),
+                CallbackQueryHandler(admin_reports.handle_department_selection, pattern=r"^select_dept:"),
+                CallbackQueryHandler(admin_reports.handle_manual_entry, pattern=r"^(hospital|dept):manual$"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_reports.get_name),
+                CallbackQueryHandler(admin_reports.handle_back_from_enter_name, pattern=r"^back:filter$"),
+                CallbackQueryHandler(admin_reports.confirm_export, pattern=r"^abort$"),
+            ],
+            ADV_SELECT_DEPT_OPT: [
+                CallbackQueryHandler(admin_reports.handle_department_option, pattern=r"^(dept_option:|back:filter)"),
+                CallbackQueryHandler(admin_reports.confirm_export, pattern=r"^abort$"),
+            ],
+            ADV_ENTER_DEPT: [
+                CallbackQueryHandler(admin_reports.handle_department_selection, pattern=r"^select_dept:"),
+                CallbackQueryHandler(admin_reports.handle_dept_manual_entry, pattern=r"^dept:manual$"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_reports.handle_department_name),
+                CallbackQueryHandler(admin_reports.handle_back_from_enter_dept, pattern=r"^back:dept_option$"),
+                CallbackQueryHandler(admin_reports.confirm_export, pattern=r"^abort$"),
+            ],
+            ADV_SELECT_ACTION: [
+                CallbackQueryHandler(admin_reports.handle_action_type_choice, pattern=r"^action_type:"),
+                CallbackQueryHandler(admin_reports.handle_action_type_choice, pattern=r"^back:patient_list$"),
+                CallbackQueryHandler(admin_reports.confirm_export, pattern=r"^abort$"),
+            ],
+            ADV_SELECT_YEAR: [
+                CallbackQueryHandler(admin_reports.handle_year_choice, pattern=r"^(year:|add_date_filter:|back:filter|back:dept_option|back:dept_list|back:action_type)"),
+                CallbackQueryHandler(admin_reports.confirm_export, pattern=r"^abort$"),
+            ],
+            ADV_SELECT_MONTH: [
+                CallbackQueryHandler(admin_reports.handle_month_choice, pattern=r"^(month:|back:year)"),
+                CallbackQueryHandler(admin_reports.confirm_export, pattern=r"^abort$"),
+            ],
+            ADV_CONFIRM_EXPORT: [
+                CallbackQueryHandler(admin_reports.confirm_export, pattern=r"^(export:(yes|no|pdf|excel|word|html)|abort|back:confirm)$"),
+            ],
+            ADV_PRINT_PATIENT: [
+                CallbackQueryHandler(admin_reports.handle_patient_text_selection, pattern=r"^print_patient:\d+$"),
+                CallbackQueryHandler(admin_reports.handle_patient_text_page, pattern=r"^patient_page:(next|prev)$"),
+                CallbackQueryHandler(admin_reports.handle_back_to_filter, pattern=r"^back:filter$"),
+                CallbackQueryHandler(admin_reports.confirm_export, pattern=r"^print:cancel$"),
+                CallbackQueryHandler(admin_reports.confirm_export, pattern=r"^abort$"),
+            ],
         },
         fallbacks=[
-            CallbackQueryHandler(handle_print_options, pattern="^print:cancel$")
+            CallbackQueryHandler(handle_print_options, pattern="^print:cancel$"),
+            CallbackQueryHandler(admin_reports.confirm_export, pattern="^abort$"),
         ],
         name="admin_professional_printing",
         per_chat=True,

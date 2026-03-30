@@ -36,29 +36,20 @@ def register_all_handlers(app):
         admin_reports,
         admin_ai,
         admin_notes,
-        # admin_schedule,  # تم تعطيله - استخدم shared_schedule
-        # admin_users,  # ❌ تم حذفه - تم دمجه في admin_users_management
     )
     from bot.handlers.admin.admin_users_management import register as register_users_management
     from bot.handlers.admin.admin_printing import register as register_admin_printing  # ✅ معالج الطباعة
-    from bot.handlers.admin.admin_daily_patients import register as register_daily_patients
-    from bot.handlers.admin.admin_data_analysis import register as register_data_analysis
-    from bot.handlers.admin.admin_hospitals_management import register as register_hospitals_management
-    from bot.handlers.admin.admin_translators_management import register as register_translators_management
-    from bot.handlers.admin.admin_delete_reports import register as register_admin_delete_reports
-    from bot.handlers.admin.admin_backup_commands import register as register_admin_backup_commands
-    # تم حذف admin_patient_management
+    
+    # ✅ تسجيل نظام الطباعة الاحترافي (يحتوي الآن على الفلترة المتقدمة مدمجة)
+    register_admin_printing(app)  # ✅ نظام الطباعة الاحترافي الموحد
     
     admin_initial_case.register(app)
-    admin_reports.register(app)  # ✅ نظام الطباعة المحدث (مع خيار القسم)
-    admin_ai.register(app)
-    admin_notes.register(app)
-    # admin_users.register(app)  # ❌ تم حذفه - تم دمجه في admin_users_management
-    # register_schedule_management(app)  # ✅ تم تسجيله أعلاه
-    # register_evaluation(app)  # ✅ تم تسجيله أعلاه
-    register_users_management(app)  # ✅ النظام الجديد الكامل (يشمل القبول/الرفض + الإدارة)
-    # register_admin_admins تم تسجيله أعلاه (قبل admin_start)
-    register_admin_printing(app)  # ✅ نظام الطباعة الاحترافي
+    # admin_reports.register(app)  # ❌ تم الدمج في admin_printing
+    
+    # تسجيل أمر /print_patient من admin_reports بشكل منفصل
+    from bot.handlers.admin.admin_reports import handle_print_patient_command
+    from telegram.ext import CommandHandler
+    app.add_handler(CommandHandler("print_patient", handle_print_patient_command))
     register_daily_patients(app)  # ✅ إدارة أسماء المرضى اليومية
     register_data_analysis(app)  # ✅ نظام تحليل البيانات الشامل
     register_hospitals_management(app)  # ✅ إدارة المستشفيات
