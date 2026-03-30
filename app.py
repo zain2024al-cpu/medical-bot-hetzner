@@ -207,8 +207,16 @@ async def main():
         register_all_handlers(app)
         logger.info("Advanced handlers loaded successfully!")
     except Exception as e:
-        logger.warning(f"Could not load advanced handlers: {e}")
+        # إظهار سبب الفشل الحقيقي يساعد جدًا في مشكلة "الأزرار لا تستجيب" أونلاين
+        logger.exception("Could not load advanced handlers")
         logger.info("Using basic handlers only")
+        # ما زلنا نحتاج universal fallback حتى لو فشل تسجيل الهاندلرز المتقدمة
+        try:
+            from bot.handlers.shared.universal_fallback import register as register_universal_fallback
+            register_universal_fallback(app)
+            logger.info("Universal fallback registered (advanced handlers failed).")
+        except Exception:
+            logger.warning("Failed to register universal fallback", exc_info=True)
         # Add basic handlers only if advanced handlers failed
         app.add_handler(CommandHandler("start", start))
         app.add_handler(CommandHandler("help", help_command))

@@ -15,6 +15,31 @@ import os
 logger = logging.getLogger(__name__)
 
 
+def _resolve_bot(bot_like):
+    if isinstance(bot_like, Bot):
+        return bot_like
+
+    get_bot = getattr(bot_like, "get_bot", None)
+    if callable(get_bot):
+        try:
+            resolved_bot = get_bot()
+            if isinstance(resolved_bot, Bot):
+                return resolved_bot
+        except Exception:
+            pass
+
+    nested_message = getattr(bot_like, "message", None)
+    nested_bot = getattr(nested_message, "bot", None) if nested_message else None
+    if isinstance(nested_bot, Bot):
+        return nested_bot
+
+    direct_bot = getattr(bot_like, "bot", None)
+    if isinstance(direct_bot, Bot):
+        return direct_bot
+
+    return None
+
+
 def escape_markdown(text):
     """تنظيف النص من الأحرف الخاصة بـ Markdown"""
     if not text:
@@ -379,7 +404,10 @@ async def broadcast_initial_case(bot: Bot, case_data: dict):
         bot: كائن البوت
         case_data: بيانات الحالة كـ dictionary
     """
-    # تنسيق الرسالة
+    bot = _resolve_bot(bot)
+    if bot is None:
+        raise ValueError("Bot instance is not available for initial case broadcast")
+
     message = format_initial_case_message(case_data)
     
     # إرسال لجميع المستخدمين المعتمدين

@@ -236,7 +236,12 @@ async def handle_any_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     # تجاهل الـ callbacks المعروفة - ستتم معالجتها بواسطة handlers أخرى
     if is_known_callback(callback_data):
-        # لا نفعل شيء - الـ handler المناسب سيتعامل معها
+        # حتى لو كانت معرفة، أحيانًا لا يوجد handler مطابق (مثل فشل تسجيل الهاندلرز أونلاين).
+        # نعمل `answer` لتفادي صمت/تحميل تيليجرام.
+        try:
+            await query.answer()
+        except Exception:
+            pass
         return
     
     try:

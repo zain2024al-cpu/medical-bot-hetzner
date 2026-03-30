@@ -2264,22 +2264,21 @@ async def generate_translator_performance_report(query, context, start_date, end
 
 """
 
-            details = ""
-            for rank, s in enumerate(stats_results, 1):
-                percentage = (s['total_reports'] / total_reports * 100) if total_reports > 0 else 0
-                bar_length = int(percentage / 10)
-                bar = "█" * bar_length + "░" * (10 - bar_length)
+        details = ""
+        for rank, s in enumerate(stats_results, 1):
+            percentage = (s['total_reports'] / total_reports * 100) if total_reports > 0 else 0
+            bar_length = int(percentage / 10)
+            bar = "█" * bar_length + "░" * (10 - bar_length)
 
-                # أكثر نوع إجراء
-                non_zero_actions = {k: v for k, v in s.get('action_breakdown', {}).items() if v > 0}
-                top_action = max(non_zero_actions.items(), key=lambda x: x[1])[0] if non_zero_actions else "—"
+            non_zero_actions = {k: v for k, v in s.get('action_breakdown', {}).items() if v > 0}
+            top_action = max(non_zero_actions.items(), key=lambda x: x[1])[0] if non_zero_actions else "—"
 
-                if rank == 1: medal = "🥇"
-                elif rank == 2: medal = "🥈"
-                elif rank == 3: medal = "🥉"
-                else: medal = f"#{rank}"
+            if rank == 1: medal = "🥇"
+            elif rank == 2: medal = "🥈"
+            elif rank == 3: medal = "🥉"
+            else: medal = f"#{rank}"
 
-                details += f"""
+            details += f"""
 ┌──────────────────────────────────────
 │ {medal} **{s['translator_name']}**
 ├──────────────────────────────────────
@@ -2293,23 +2292,23 @@ async def generate_translator_performance_report(query, context, start_date, end
 
 """
 
-            full_report = header + details
-            max_length = 4000
+        full_report = header + details
+        max_length = 4000
 
-            if len(full_report) <= max_length:
-                await query.edit_message_text(full_report, parse_mode=ParseMode.MARKDOWN)
-            else:
-                await query.edit_message_text(header, parse_mode=ParseMode.MARKDOWN)
+        if len(full_report) <= max_length:
+            await query.edit_message_text(full_report, parse_mode=ParseMode.MARKDOWN)
+        else:
+            await query.edit_message_text(header, parse_mode=ParseMode.MARKDOWN)
 
-                current_text = ""
-                for rank, s in enumerate(stats_results, 1):
-                    percentage = (s['total_reports'] / total_reports * 100) if total_reports > 0 else 0
-                    bar_length = int(percentage / 10)
-                    bar = "█" * bar_length + "░" * (10 - bar_length)
-                    non_zero_actions = {k: v for k, v in s.get('action_breakdown', {}).items() if v > 0}
-                    top_action = max(non_zero_actions.items(), key=lambda x: x[1])[0] if non_zero_actions else "—"
+            current_text = ""
+            for rank, s in enumerate(stats_results, 1):
+                percentage = (s['total_reports'] / total_reports * 100) if total_reports > 0 else 0
+                bar_length = int(percentage / 10)
+                bar = "█" * bar_length + "░" * (10 - bar_length)
+                non_zero_actions = {k: v for k, v in s.get('action_breakdown', {}).items() if v > 0}
+                top_action = max(non_zero_actions.items(), key=lambda x: x[1])[0] if non_zero_actions else "—"
 
-                    translator_text = f"""
+                translator_text = f"""
 ┌──────────────────────────────────────
 │ **{s['translator_name']}**
 │ 📊 التقارير: **{s['total_reports']}** ({percentage:.1f}%)
@@ -2320,16 +2319,16 @@ async def generate_translator_performance_report(query, context, start_date, end
 └──────────────────────────────────────
 
 """
-                    if len(current_text) + len(translator_text) > max_length:
-                        await query.message.reply_text(current_text, parse_mode=ParseMode.MARKDOWN)
-                        current_text = translator_text
-                    else:
-                        current_text += translator_text
-
-                if current_text.strip():
+                if len(current_text) + len(translator_text) > max_length:
                     await query.message.reply_text(current_text, parse_mode=ParseMode.MARKDOWN)
+                    current_text = translator_text
+                else:
+                    current_text += translator_text
 
-            return ConversationHandler.END
+            if current_text.strip():
+                await query.message.reply_text(current_text, parse_mode=ParseMode.MARKDOWN)
+
+        return ConversationHandler.END
 
     except Exception as e:
         logger.error(f"❌ خطأ في تقرير أداء المترجمين: {e}", exc_info=True)
@@ -2505,44 +2504,6 @@ async def generate_upcoming_appointments_report(query, context):
                 await query.message.reply_text(current_text, parse_mode=ParseMode.MARKDOWN)
 
         return ConversationHandler.END
-                    elif days_remaining <= 3:
-                        remaining_text = f"🟡 بعد {days_remaining} أيام"
-                    else:
-                        remaining_text = f"🟢 بعد {days_remaining} يوم"
-
-                    day_text = f"""
-┌──────── 📅 {day_name} {appointment_date.strftime('%d-%m-%Y')} ────────
-│ {remaining_text} - {len(day_reports)} موعد
-├─────────────────────────────────────
-"""
-                    for report in day_reports:
-                        patient_name = "غير محدد"
-                        if report.patient_id:
-                            patient = session.query(Patient).filter_by(id=report.patient_id).first()
-                            if patient:
-                                patient_name = patient.full_name or "غير محدد"
-
-                        time_str = report.followup_time or "—"
-                        hospital = report.hospital_name or "—"
-                        reason = report.followup_reason or "—"
-
-                        day_text += f"""│ 👤 {patient_name}
-│    🕐 {time_str} | 🏥 {hospital}
-│    ✍️ {reason[:50]}{'...' if len(reason) > 50 else ''}
-│
-"""
-                    day_text += "└─────────────────────────────────────\n"
-
-                    if len(current_text) + len(day_text) > max_length:
-                        await query.message.reply_text(current_text, parse_mode=ParseMode.MARKDOWN)
-                        current_text = day_text
-                    else:
-                        current_text += day_text
-
-                if current_text.strip():
-                    await query.message.reply_text(current_text, parse_mode=ParseMode.MARKDOWN)
-
-            return ConversationHandler.END
 
     except Exception as e:
         logger.error(f"❌ خطأ في تقرير المواعيد القادمة: {e}", exc_info=True)
@@ -2592,7 +2553,6 @@ def register(app):
                 CallbackQueryHandler(admin_reports.handle_back_to_filter, pattern=r"^back:type$"),
                 CallbackQueryHandler(admin_reports.handle_back_to_filter, pattern=r"^back:filter$"),
                 CallbackQueryHandler(admin_reports.confirm_export, pattern=r"^abort$"),
-                CallbackQueryHandler(admin_reports.confirm_export, pattern=r"^print:cancel$"),
             ],
             ADV_ENTER_NAME: [
                 CallbackQueryHandler(admin_reports.handle_print_patient_selection, pattern=r"^print_patient:\d+$"),
@@ -2635,8 +2595,8 @@ def register(app):
                 CallbackQueryHandler(admin_reports.handle_patient_text_selection, pattern=r"^print_patient:\d+$"),
                 CallbackQueryHandler(admin_reports.handle_patient_text_page, pattern=r"^patient_page:(next|prev)$"),
                 CallbackQueryHandler(admin_reports.handle_back_to_filter, pattern=r"^back:filter$"),
-                CallbackQueryHandler(admin_reports.confirm_export, pattern=r"^print:cancel$"),
-                CallbackQueryHandler(admin_reports.confirm_export, pattern=r"^abort$"),
+                CallbackQueryHandler(admin_reports.handle_patient_text_selection, pattern=r"^print:cancel$"),
+                CallbackQueryHandler(admin_reports.handle_patient_text_selection, pattern=r"^abort$"),
             ],
         },
         fallbacks=[
