@@ -9,15 +9,16 @@ import logging
 
 from .states import STATE_SELECT_HOSPITAL, STATE_SELECT_DEPARTMENT
 from .navigation import nav_push
-from ..user_reports_add_helpers import PREDEFINED_HOSPITALS
 
 logger = logging.getLogger(__name__)
 
-# ✅ دالة لجلب المستشفيات من قاعدة البيانات مع دمج القائمة المحددة مسبقاً
+# ✅ دالة لجلب المستشفيات من قاعدة البيانات (مصدر الحقيقة)
 def get_hospitals_list():
-    """جلب المستشفيات من قاعدة البيانات أولاً، ثم دمجها مع القائمة المحددة مسبقاً"""
+    """
+    جلب المستشفيات من قاعدة البيانات (Hospital table).
+    Fallback إلى ملف doctors_unified.json فقط إذا كانت قاعدة البيانات فارغة/غير متاحة.
+    """
     db_hospitals = []
-    all_hospitals_set = set()
     
     # ✅ 1. جلب المستشفيات من قاعدة البيانات
     try:
@@ -32,26 +33,24 @@ def get_hospitals_list():
                     h.name for h in hospitals 
                     if h.name and not any('\u0600' <= char <= '\u06FF' for char in h.name)
                 ]
-                all_hospitals_set.update(db_hospitals)
                 logger.info(f"✅ Loaded {len(db_hospitals)} English hospitals from database")
     except Exception as e:
         logger.warning(f"⚠️ Could not load hospitals from database: {e}", exc_info=True)
-    
-    # ✅ 2. دمج القائمة المحددة مسبقاً (إضافة فقط المستشفيات غير الموجودة)
-    for predefined_hospital in PREDEFINED_HOSPITALS:
-        if predefined_hospital and predefined_hospital not in all_hospitals_set:
-            all_hospitals_set.add(predefined_hospital)
-    
-    # ✅ 3. ترتيب القائمة النهائية
-    final_list = list(all_hospitals_set)
-    
-    # ترتيب: المستشفيات من قاعدة البيانات أولاً، ثم القائمة المحددة مسبقاً
-    final_sorted = sorted(final_list, key=lambda x: (
-        0 if x in db_hospitals else 1,  # قاعدة البيانات أولاً
-        x.lower()  # ثم الترتيب الأبجدي
-    ))
-    
-    logger.info(f"✅ Total hospitals: {len(final_sorted)} (DB: {len(db_hospitals)}, Predefined: {len(PREDEFINED_HOSPITALS)})")
+
+    # ✅ 2. إذا كانت قاعدة البيانات فارغة، نستخدم JSON كـ fallback فقط
+    if not db_hospitals:
+        try:
+            from services.hospitals_service import get_all_hospitals
+            json_hospitals = get_all_hospitals() or []
+            logger.warning(f"⚠️ Hospitals DB is empty/unavailable; using JSON fallback ({len(json_hospitals)})")
+            return list(json_hospitals)
+        except Exception as e:
+            logger.error(f"❌ Failed to load hospitals from JSON fallback: {e}", exc_info=True)
+            return []
+
+    # ✅ 3. ترتيب القائمة النهائية (من قاعدة البيانات فقط)
+    final_sorted = sorted(set(db_hospitals), key=lambda x: x.lower())
+    logger.info(f"✅ Total hospitals: {len(final_sorted)} (DB source of truth)")
     return final_sorted
 
 

@@ -3400,7 +3400,27 @@ def _sort_hospitals_custom_OLD_DISABLED(hospitals_list):
 
 
 def _get_hospitals_from_database_or_predefined():
-    """جلب المستشفيات من الخدمة الموحدة"""
+    """
+    جلب المستشفيات من قاعدة البيانات (Hospital table) كمصدر الحقيقة.
+    Fallback إلى doctors_unified.json فقط إذا كانت قاعدة البيانات فارغة/غير متاحة.
+    """
+    try:
+        from db.session import SessionLocal
+        from db.models import Hospital
+
+        with SessionLocal() as s:
+            hospitals = s.query(Hospital).order_by(Hospital.name).all()
+            db_names = [
+                h.name for h in hospitals
+                if h.name and not any('\u0600' <= char <= '\u06FF' for char in h.name)
+            ]
+            if db_names:
+                return db_names
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"⚠️ فشل تحميل المستشفيات من قاعدة البيانات: {e}")
+
+    # Fallback: JSON unified file (قد يتم استبداله أثناء النشر)
     try:
         from services.hospitals_service import get_all_hospitals
         hospitals = get_all_hospitals()
@@ -3408,8 +3428,9 @@ def _get_hospitals_from_database_or_predefined():
             return hospitals
     except Exception as e:
         import logging
-        logging.getLogger(__name__).warning(f"⚠️ فشل تحميل المستشفيات: {e}")
-    # Fallback: استخدام القائمة الثابتة
+        logging.getLogger(__name__).warning(f"⚠️ فشل تحميل المستشفيات من ملف JSON: {e}")
+
+    # آخر حل: القائمة القديمة المحملة وقت التشغيل
     return PREDEFINED_HOSPITALS.copy()
 
 
