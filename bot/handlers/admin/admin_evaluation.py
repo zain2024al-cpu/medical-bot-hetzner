@@ -128,16 +128,14 @@ def _compute_rating(stats_results):
     """
     إضافة التقييم (النسبة + المستوى) على نتائج stats_service.
 
-    التقييم يعتمد على 3 عوامل:
-    - الإنتاجية: عدد التقارير مقارنة بالمتوسط (50%)
-    - الانتظام: أيام العمل / أيام الفترة (30%)
-    - الالتزام: التقارير قبل 8 مساءً / إجمالي التقارير (20%)
+    معيار الترتيب (حسب طلب الإدارة):
+    1) الالتزام: أقل تقارير بعد 8 مساءً / أعلى نسبة قبل 8 مساءً (الأولوية الأولى)
+    2) عدد التقارير (الأولوية الثانية عند التعادل)
+
+    ملاحظة: نحتفظ بحقل final_score كنسبة الالتزام (قبل 8 مساءً) لعرضها في التقرير.
     """
     if not stats_results:
         return []
-
-    # حساب متوسط التقارير (للمقارنة النسبية)
-    avg_reports = sum(r['total_reports'] for r in stats_results) / len(stats_results)
 
     results = []
     for s in stats_results:
@@ -146,42 +144,29 @@ def _compute_rating(stats_results):
         attendance_days = s['attendance_days']
         late = s['late_reports']
 
-        # 1) الإنتاجية: نسبة للمتوسط (cap 100%)
-        if avg_reports > 0:
-            productivity = min((total / avg_reports) * 100, 100)
-        else:
-            productivity = 100 if total > 0 else 0
-
-        # 2) الانتظام: أيام الحضور / أيام العمل الرسمية
-        if work_days > 0:
-            regularity = min((attendance_days / work_days) * 100, 100)
-        else:
-            regularity = 100
-
-        # 3) الالتزام الزمني: قبل 8 مساءً
+        # الالتزام الزمني: نسبة التقارير قبل 8 مساءً
         if total > 0:
-            punctuality = ((total - late) / total) * 100
+            punctuality_pct = ((total - late) / total) * 100
         else:
-            punctuality = 100
+            punctuality_pct = 100
 
-        # النتيجة النهائية
-        final_score = round(
-            productivity * 0.50 +
-            regularity * 0.30 +
-            punctuality * 0.20
-        , 1)
+        # final_score = نسبة الالتزام (للعرض)
+        final_score = round(punctuality_pct, 1)
 
         level, color, stars = _rating_label(final_score)
 
         results.append({
             **s,
             'final_score': final_score,
+            'punctuality_pct': final_score,
             'level': level,
             'color': color,
             'stars': stars,
         })
 
-    results.sort(key=lambda x: (-x['final_score'], -x['total_reports']))
+    # الترتيب: الأعلى التزاماً أولاً، ثم الأعلى تقارير
+    # (late_reports أقل يعني punctuality أعلى، لكن نرتب مباشرة على punctuality)
+    results.sort(key=lambda x: (-x.get('punctuality_pct', 0), -x['total_reports']))
     return results
 
 
