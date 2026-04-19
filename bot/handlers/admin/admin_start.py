@@ -3,6 +3,8 @@
 # 🔹 لوحة تحكم الأدمن + نظام الموافقة على المستخدمين
 # ================================================
 
+import logging
+
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 from bot.shared_auth import is_admin
@@ -11,23 +13,41 @@ from db.session import SessionLocal
 from db.models import Translator
 from datetime import datetime
 
+logger = logging.getLogger(__name__)
+
 
 async def send_admin_dual_panels(update: Update, first_text: str | None = None):
     """
-    يرسل لوحتي الأدمن: ReplyKeyboard أسفل الشاشة + Inline (فيها رفع أرشيف ولصق تقرير، إلخ).
-    بدون الرسالة الثانية لا يظهر زر «لصق تقرير» لأن /admin كان يعرض القائمة السفلية فقط.
+    يرسل لوحتي الأدمن: ReplyKeyboard أسفل الشاشة + Inline (لصق تقرير، أرشيف، …).
+    لا نستخدم Markdown على النص الذي يحتوي اسم المستخدم — الرموز مثل _ في الاسم تكسر الإرسال
+    فتختفي الرسالة الثانية بالكامل ولا يظهر زر لصق التقرير.
     """
     anchor = update.message or (update.callback_query.message if update.callback_query else None)
     if not anchor:
         return
     user = update.effective_user
-    first = first_text or f"👑 أهلاً {user.first_name}! لوحة التحكم جاهزة."
-    await anchor.reply_text(first, reply_markup=admin_main_kb(), parse_mode="Markdown")
-    await anchor.reply_text(
-        "📎 **من الأزرار المضمّنة أدناه:** رفع أرشيف (Excel/DB)، **لصق تقرير جاهز**، إدارة الجدول، …",
-        reply_markup=admin_main_inline_kb(),
-        parse_mode="Markdown",
+    fn = (user.first_name or "أدمن") if user else "أدمن"
+    first = first_text if first_text is not None else f"👑 أهلاً {fn}! لوحة التحكم جاهزة."
+    try:
+        await anchor.reply_text(first, reply_markup=admin_main_kb())
+    except Exception as e:
+        logger.exception("send_admin_dual_panels: فشل الرسالة الأولى: %s", e)
+        return
+    second = (
+        "📎 الأزرار المضمّنة أدناه — الصف الأول: لصق تقرير أو رفع أرشيف.\n"
+        "(إن لم تظهر، مرّر الرسالة للأعلى أو اضغط 📋 لصق تقرير جاهز في القائمة السفلية.)"
     )
+    try:
+        await anchor.reply_text(second, reply_markup=admin_main_inline_kb())
+    except Exception as e:
+        logger.exception("send_admin_dual_panels: فشل الرسالة الثانية (Inline): %s", e)
+        try:
+            await anchor.reply_text(
+                "📎 أزرار إضافية:",
+                reply_markup=admin_main_inline_kb(),
+            )
+        except Exception as e2:
+            logger.exception("send_admin_dual_panels: إعادة المحاولة فشلت: %s", e2)
 
 
 # 🟣 أمر /admin لفتح لوحة تحكم الأدمن
@@ -206,11 +226,11 @@ async def handle_admin_buttons(update, context):
     data = query.data
 
     if data == "admin:refresh":
-        # تحديث الصفحة الرئيسية
+        # تحديث الصفحة الرئيسية (بدون Markdown على الاسم — قد يحتوي _ ويكسر الإرسال)
+        fn = user.first_name or ""
         await query.edit_message_text(
-            f"👑 **لوحة تحكم الأدمن**\n\nأهلاً {user.first_name}!\nاختر العملية المطلوبة:",
+            f"👑 لوحة تحكم الأدمن\n\nأهلاً {fn}!\nاختر العملية المطلوبة:",
             reply_markup=admin_main_inline_kb_with_group(),
-            parse_mode="Markdown"
         )
 
     elif data == "admin:manage_group":

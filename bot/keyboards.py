@@ -188,7 +188,12 @@ def admin_main_inline_kb():
     لوحة أدمن احترافية بأزرار مضمنة
     """
     keyboard = [
-        # الصف الأول: الحالات والتقارير
+        # الصف الأول: الأكثر طلباً — لصق نص / أرشيف (يظهر فوراً دون تمرير)
+        [
+            InlineKeyboardButton("📋 لصق تقرير (نص)", callback_data="admin:paste_full_report"),
+            InlineKeyboardButton("📤 رفع أرشيف", callback_data="admin:reports_recovery"),
+        ],
+        # الحالات والتقارير
         [
             InlineKeyboardButton("➕ إضافة حالة أولية", callback_data="admin:add_initial_case"),
             InlineKeyboardButton("🖨️ طباعة التقارير", callback_data="admin:print_reports")
@@ -203,13 +208,7 @@ def admin_main_inline_kb():
             InlineKeyboardButton("👑 إدارة الأدمنين", callback_data="admin:manage_admins"),
             InlineKeyboardButton("📊 تحليل البيانات", callback_data="admin:analytics")
         ],
-        [
-            InlineKeyboardButton("📤 رفع أرشيف تقارير (Excel / CSV / JSON / .db)", callback_data="admin:reports_recovery")
-        ],
-        [
-            InlineKeyboardButton("📋 لصق تقرير جاهز (نص)", callback_data="admin:paste_full_report")
-        ],
-        # الصف الرابع: الجدول والتحديث
+        # الصف: الجدول والتحديث
         [
             InlineKeyboardButton("📅 إدارة الجدول", callback_data="admin:schedule"),
             InlineKeyboardButton("🔄 تحديث", callback_data="admin:refresh")
@@ -224,7 +223,10 @@ def admin_main_inline_kb_with_group():
     لوحة أدمن محسنة تشمل إدارة المجموعة
     """
     keyboard = [
-        # الصف الأول: الحالات والتقارير
+        [
+            InlineKeyboardButton("📋 لصق تقرير (نص)", callback_data="admin:paste_full_report"),
+            InlineKeyboardButton("📤 رفع أرشيف", callback_data="admin:reports_recovery"),
+        ],
         [
             InlineKeyboardButton("➕ إضافة حالة أولية", callback_data="admin:add_initial_case"),
             InlineKeyboardButton("🖨️ طباعة التقارير", callback_data="admin:print_reports")
@@ -239,13 +241,7 @@ def admin_main_inline_kb_with_group():
             InlineKeyboardButton("👑 إدارة الأدمنين", callback_data="admin:manage_admins"),
             InlineKeyboardButton("📊 تحليل البيانات", callback_data="admin:analytics")
         ],
-        [
-            InlineKeyboardButton("📤 رفع أرشيف تقارير (Excel / CSV / JSON / .db)", callback_data="admin:reports_recovery")
-        ],
-        [
-            InlineKeyboardButton("📋 لصق تقرير جاهز (نص)", callback_data="admin:paste_full_report")
-        ],
-        # الصف الرابع: التحديث
+        # التحديث
         [
             InlineKeyboardButton("🔄 تحديث الصفحة", callback_data="admin:refresh")
         ]
