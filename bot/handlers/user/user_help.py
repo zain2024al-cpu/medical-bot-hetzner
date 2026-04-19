@@ -15,9 +15,9 @@ async def user_refresh(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # التحقق إذا كان أدمن
     if is_admin(user_id):
-        from bot.handlers.admin.admin_start import send_admin_dual_panels
+        from bot.handlers.admin.admin_start import send_admin_panel
 
-        await send_admin_dual_panels(update, first_text="✅ تم تحديث الصفحة")
+        await send_admin_panel(update, first_text="✅ تم تحديث الصفحة")
         return
     
     # للمستخدم العادي

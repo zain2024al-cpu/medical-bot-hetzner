@@ -8,7 +8,7 @@ import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 from bot.shared_auth import is_admin
-from bot.keyboards import admin_main_kb, admin_main_inline_kb, reports_group_management_kb, admin_main_inline_kb_with_group
+from bot.keyboards import admin_main_kb, reports_group_management_kb
 from db.session import SessionLocal
 from db.models import Translator
 from datetime import datetime
@@ -16,12 +16,8 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 
-async def send_admin_dual_panels(update: Update, first_text: str | None = None):
-    """
-    يرسل لوحتي الأدمن: ReplyKeyboard أسفل الشاشة + Inline (لصق تقرير، أرشيف، …).
-    لا نستخدم Markdown على النص الذي يحتوي اسم المستخدم — الرموز مثل _ في الاسم تكسر الإرسال
-    فتختفي الرسالة الثانية بالكامل ولا يظهر زر لصق التقرير.
-    """
+async def send_admin_panel(update: Update, first_text: str | None = None):
+    """رسالة واحدة + لوحة المفاتيح السفلية فقط (بدون أزرار مضمّنة ثانية على الشاشة)."""
     anchor = update.message or (update.callback_query.message if update.callback_query else None)
     if not anchor:
         return
@@ -31,23 +27,7 @@ async def send_admin_dual_panels(update: Update, first_text: str | None = None):
     try:
         await anchor.reply_text(first, reply_markup=admin_main_kb())
     except Exception as e:
-        logger.exception("send_admin_dual_panels: فشل الرسالة الأولى: %s", e)
-        return
-    second = (
-        "📎 الأزرار المضمّنة أدناه — الصف الأول: لصق تقرير أو رفع أرشيف.\n"
-        "(إن لم تظهر، مرّر الرسالة للأعلى أو اضغط 📋 لصق تقرير جاهز في القائمة السفلية.)"
-    )
-    try:
-        await anchor.reply_text(second, reply_markup=admin_main_inline_kb())
-    except Exception as e:
-        logger.exception("send_admin_dual_panels: فشل الرسالة الثانية (Inline): %s", e)
-        try:
-            await anchor.reply_text(
-                "📎 أزرار إضافية:",
-                reply_markup=admin_main_inline_kb(),
-            )
-        except Exception as e2:
-            logger.exception("send_admin_dual_panels: إعادة المحاولة فشلت: %s", e2)
+        logger.exception("send_admin_panel: %s", e)
 
 
 # 🟣 أمر /admin لفتح لوحة تحكم الأدمن
@@ -60,7 +40,7 @@ async def admin_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data:
         context.user_data.clear()
     
-    await send_admin_dual_panels(update)
+    await send_admin_panel(update)
 
 
 # 🔄 أمر /cancel لإعادة تعيين كل شيء
@@ -79,9 +59,9 @@ async def cancel_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     
     if is_admin(user.id):
-        await send_admin_dual_panels(
+        await send_admin_panel(
             update,
-            first_text="✅ **تم إعادة تعيين كل الحالات**\n\nيمكنك الآن استخدام أي زر من جديد.",
+            first_text="✅ تم إعادة تعيين كل الحالات.\n\nيمكنك الآن استخدام أي زر من جديد.",
         )
     else:
         await update.message.reply_text(
@@ -202,7 +182,7 @@ async def handle_back_to_main(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     # لا يمكن استخدام edit_message_text مع ReplyKeyboardMarkup
     # لذلك نرسل رسالة جديدة
-    await send_admin_dual_panels(
+    await send_admin_panel(
         update,
         first_text=f"👑 أهلاً {user.first_name}! لوحة التحكم جاهزة.",
     )
@@ -225,13 +205,29 @@ async def handle_admin_buttons(update, context):
 
     data = query.data
 
-    if data == "admin:refresh":
-        # تحديث الصفحة الرئيسية (بدون Markdown على الاسم — قد يحتوي _ ويكسر الإرسال)
-        fn = user.first_name or ""
-        await query.edit_message_text(
-            f"👑 لوحة تحكم الأدمن\n\nأهلاً {fn}!\nاختر العملية المطلوبة:",
-            reply_markup=admin_main_inline_kb_with_group(),
+    if data == "admin:reports_recovery":
+        await query.answer(
+            "تم إلغاء «رفع الأرشيف» من الواجهة. استخدم 📋 لصق تقرير جاهز من الأسفل.",
+            show_alert=True,
         )
+        try:
+            await query.message.delete()
+        except Exception:
+            pass
+        return
+
+    if data == "admin:refresh":
+        fn = user.first_name or ""
+        try:
+            await query.message.delete()
+        except Exception:
+            pass
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f"🔄 تم التحديث.\n\n👑 أهلاً {fn}!",
+            reply_markup=admin_main_kb(),
+        )
+        return
 
     elif data == "admin:manage_group":
         # إدارة مجموعة التقارير
@@ -247,10 +243,14 @@ async def handle_admin_buttons(update, context):
         await handle_group_management(update, context)
 
     elif data.startswith("admin:"):
-        # أزرار أخرى - يمكن إضافة معالجات إضافية هنا
-        await query.edit_message_text(
-            f"⚠️ هذه الخاصية قيد التطوير: {data}",
-            reply_markup=admin_main_inline_kb()
+        try:
+            await query.message.delete()
+        except Exception:
+            pass
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f"⚠️ هذه الخاصية قيد التطوير: {data}",
+            reply_markup=admin_main_kb(),
         )
 
 
@@ -467,11 +467,11 @@ async def handle_toggle_broadcast_button(update: Update, context: ContextTypes.D
         # تحديث لوحة المفاتيح
         status_text = "🟢 تم تفعيل إرسال التقارير للمجموعة" if final_state else "🔴 تم إيقاف إرسال التقارير للمجموعة"
         
-        await send_admin_dual_panels(
+        await send_admin_panel(
             update,
             first_text=(
                 f"{status_text}\n\n"
-                f"📊 **الحالة الحالية:** {'✅ مفعل' if final_state else '❌ معطل'}\n\n"
+                f"📊 الحالة الحالية: {'مفعل' if final_state else 'معطل'}\n\n"
                 f"💡 التغيير فعال فوراً - لا حاجة لإعادة تشغيل البوت"
             ),
         )
@@ -500,5 +500,5 @@ def register(app):
     # - admin:evaluation (تقييم المترجمين)
     # - admin:manage_admins (إدارة الأدمنين)
     # - admin:print_reports (طباعة التقارير)
-    app.add_handler(CallbackQueryHandler(handle_admin_buttons, pattern=r"^admin:(?!evaluation$|manage_admins$|print_reports$|reports_recovery$|paste_full_report$)"))
+    app.add_handler(CallbackQueryHandler(handle_admin_buttons, pattern=r"^admin:(?!evaluation$|manage_admins$|print_reports$|paste_full_report$)"))
     app.add_handler(CallbackQueryHandler(handle_group_settings, pattern="^settings:"))
