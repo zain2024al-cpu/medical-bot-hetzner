@@ -154,6 +154,8 @@ KNOWN_CALLBACKS = [
     # ===========================
     r"^start_report$",
     r"^user_action:add_report$",
+    r"^admin:paste_full_report$",
+    r"^paste_report:",
     r"^add_report$",
     r"^edit_reports$",
     r"^start_main_menu$",

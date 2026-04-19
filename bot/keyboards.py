@@ -81,30 +81,26 @@ def user_main_inline_kb():
     - أكثر مرونة واحترافية
     """
     keyboard = [
-        # الصف الأول: الإجراءات السريعة
+        # الصف الأول
         [
-            InlineKeyboardButton("⚡ إضافة سريع", callback_data="user_action:quick_add"),
-            InlineKeyboardButton("⚡ تقاريري اليوم", callback_data="user_action:my_today")
+            InlineKeyboardButton("⚡ تقاريري اليوم", callback_data="user_action:my_today"),
+            InlineKeyboardButton("📝 إضافة تقرير", callback_data="user_action:add_report"),
         ],
         # الصف الثاني: العمليات الأساسية
         [
-            InlineKeyboardButton("📝 إضافة تقرير", callback_data="user_action:add_report"),
-            InlineKeyboardButton("✏️ تعديل", callback_data="user_action:edit")
-        ],
-        # الصف الثالث: الجدول والإحصائيات
-        [
+            InlineKeyboardButton("✏️ تعديل", callback_data="user_action:edit"),
             InlineKeyboardButton("📅 جدول اليوم", callback_data="user_action:schedule"),
-            InlineKeyboardButton("📊 إحصائياتي", callback_data="user_action:my_stats")
         ],
-        # الصف الرابع: السجل والمساعدة
+        # الصف الثالث: الإحصائيات والسجل
         [
+            InlineKeyboardButton("📊 إحصائياتي", callback_data="user_action:my_stats"),
             InlineKeyboardButton("📜 السجل", callback_data="user_action:history"),
-            InlineKeyboardButton("ℹ️ مساعدة", callback_data="user_action:help")
         ],
-        # الصف الخامس: التحديث
+        # الصف الرابع: المساعدة والتحديث
         [
-            InlineKeyboardButton("🔄 تحديث", callback_data="user_action:refresh")
-        ]
+            InlineKeyboardButton("ℹ️ مساعدة", callback_data="user_action:help"),
+            InlineKeyboardButton("🔄 تحديث", callback_data="user_action:refresh"),
+        ],
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -114,7 +110,7 @@ def user_compact_inline_kb():
     """قائمة مختصرة للاستخدام السريع"""
     keyboard = [
         [
-            InlineKeyboardButton("⚡ إضافة سريع", callback_data="user_action:quick_add"),
+            InlineKeyboardButton("⚡ تقاريري اليوم", callback_data="user_action:my_today"),
             InlineKeyboardButton("📊 إحصائياتي", callback_data="user_action:my_stats")
         ],
         [
@@ -206,6 +202,12 @@ def admin_main_inline_kb():
             InlineKeyboardButton("👑 إدارة الأدمنين", callback_data="admin:manage_admins"),
             InlineKeyboardButton("📊 تحليل البيانات", callback_data="admin:analytics")
         ],
+        [
+            InlineKeyboardButton("📤 رفع أرشيف تقارير (Excel / CSV / JSON / .db)", callback_data="admin:reports_recovery")
+        ],
+        [
+            InlineKeyboardButton("📋 لصق تقرير جاهز (نص)", callback_data="admin:paste_full_report")
+        ],
         # الصف الرابع: الجدول والتحديث
         [
             InlineKeyboardButton("📅 إدارة الجدول", callback_data="admin:schedule"),
@@ -235,6 +237,12 @@ def admin_main_inline_kb_with_group():
         [
             InlineKeyboardButton("👑 إدارة الأدمنين", callback_data="admin:manage_admins"),
             InlineKeyboardButton("📊 تحليل البيانات", callback_data="admin:analytics")
+        ],
+        [
+            InlineKeyboardButton("📤 رفع أرشيف تقارير (Excel / CSV / JSON / .db)", callback_data="admin:reports_recovery")
+        ],
+        [
+            InlineKeyboardButton("📋 لصق تقرير جاهز (نص)", callback_data="admin:paste_full_report")
         ],
         # الصف الرابع: التحديث
         [

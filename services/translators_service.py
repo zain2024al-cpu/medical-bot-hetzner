@@ -6,7 +6,10 @@ Unified Translators Service - Single Source of Truth (Database)
 
 import os
 import logging
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
@@ -285,10 +288,51 @@ def get_translator_by_name(name: str) -> Optional[Dict]:
     name_lower = name.lower().strip()
     
     for t in translators:
-        if t['name'].lower() == name_lower:
+        tn = (t.get("name") or "").strip()
+        if tn.lower() == name_lower:
             return t
     
     return None
+
+
+def resolve_translator_for_report(session: "Session", raw_name: str) -> Tuple[Optional[int], str]:
+    """
+    مطابقة اسم المترجم مع دليل translators بنفس قواعد النظام (بدون حساسية لحالة الأحرف
+    والمسافات الزائدة). عند التطابق يُعاد الاسم **كما هو مخزّن في الدليل** لتوحيد التقارير.
+
+    Returns:
+        (translator_id أو None، الاسم للحفظ في التقرير)
+    """
+    from sqlalchemy import func
+
+    from db.models import TranslatorDirectory, User
+
+    name = (raw_name or "").strip()
+    if not name:
+        return None, ""
+
+    td = (
+        session.query(TranslatorDirectory)
+        .filter(
+            func.lower(func.trim(func.coalesce(TranslatorDirectory.name, ""))) == name.lower()
+        )
+        .first()
+    )
+    if td and td.translator_id is not None and (td.name or "").strip():
+        return int(td.translator_id), (td.name or "").strip()
+
+    u = (
+        session.query(User)
+        .filter(
+            func.lower(func.trim(func.coalesce(User.full_name, ""))) == name.lower()
+        )
+        .first()
+    )
+    if u and u.tg_user_id is not None:
+        canon = (u.full_name or name).strip()
+        return int(u.tg_user_id), canon
+
+    return None, name
 
 
 def get_translator_by_id(translator_id: int) -> Optional[Dict]:
@@ -384,6 +428,7 @@ __all__ = [
     'get_all_translators',
     'get_translator_by_name',
     'get_translator_by_id',
+    'resolve_translator_for_report',
     'add_translator',
     'sync_file_to_database',
     'get_translators_count',

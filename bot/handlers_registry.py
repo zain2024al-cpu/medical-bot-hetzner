@@ -21,6 +21,10 @@ def register_all_handlers(app):
     register_schedule_management(app)
     register_evaluation(app)  # ✅ تسجيل ConversationHandler قبل admin_start
     register_admin_admins(app)  # ✅ إدارة الأدمنين - قبل admin_start لالتقاط admin:manage_admins
+    from bot.handlers.admin.admin_reports_recovery import register as register_reports_recovery
+    register_reports_recovery(app)  # ✅ استعادة تقارير من .db / .json قبل admin_start
+    from bot.handlers.user.user_paste_full_report import register as register_paste_full_report
+    register_paste_full_report(app)  # ✅ لصق تقرير جاهز (أدمن فقط) قبل admin_start
 
     # 🔸 تسجيل واجهة الأدمن
     from bot.handlers.admin.admin_start import register as register_admin_start

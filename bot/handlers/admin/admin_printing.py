@@ -238,6 +238,50 @@ async def start_professional_printing(update: Update, context: ContextTypes.DEFA
     await update.message.reply_text(welcome_text, reply_markup=keyboard, parse_mode=ParseMode.MARKDOWN)
     return PRINT_SELECT_TYPE
 
+
+@admin_handler
+async def start_professional_printing_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """بدء نظام الطباعة من زر inline (admin:print_reports)"""
+    query = update.callback_query
+    if query:
+        try:
+            await query.answer()
+        except Exception:
+            pass
+
+    user = update.effective_user
+    if not is_admin(user.id):
+        if query:
+            await query.edit_message_text("🚫 هذه الخاصية مخصصة للإدمن فقط.")
+        return ConversationHandler.END
+
+    # إعادة ضبط الحالة ثم عرض نفس قائمة الأنواع
+    context.user_data.clear()
+
+    welcome_text = """
+🖨️ **نظام الطباعة الاحترافي**
+
+اختر نوع التقرير المطلوب:
+"""
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📊 تقرير شامل مع إحصائيات", callback_data="print_type:full_stats")],
+        [InlineKeyboardButton("📈 تقرير رسوم بيانية فقط", callback_data="print_type:charts_only")],
+        [InlineKeyboardButton("📋 تقرير تفصيلي للتقارير", callback_data="print_type:detailed")],
+        [InlineKeyboardButton("👤 تقرير مريض محدد", callback_data="print_type:patient")],
+        [InlineKeyboardButton("🖨️ طباعة حسب المريض", callback_data="print_type:patient_text")],
+        [InlineKeyboardButton("🏥 تقرير مستشفى محدد", callback_data="print_type:hospital")],
+        [InlineKeyboardButton("👨‍⚕️ تقرير مترجم محدد", callback_data="print_type:translator")],
+        [InlineKeyboardButton("📊 تقرير أداء المترجمين", callback_data="print_type:translator_performance")],
+        [InlineKeyboardButton("📅 تقرير المواعيد القادمة", callback_data="print_type:upcoming_appointments")],
+        [InlineKeyboardButton("🔍 فلترة مخصصة (متقدم)", callback_data="print_type:advanced_filter")],
+        [InlineKeyboardButton("❌ إلغاء", callback_data="print:cancel")],
+    ])
+
+    if query:
+        await query.edit_message_text(welcome_text, reply_markup=keyboard, parse_mode=ParseMode.MARKDOWN)
+    return PRINT_SELECT_TYPE
+
 # ================================================
 # معالجة اختيار نوع التقرير
 # ================================================
@@ -2524,7 +2568,8 @@ def register(app):
 
     conv = ConversationHandler(
         entry_points=[
-            MessageHandler(filters.Regex("^🖨️ طباعة التقارير$"), start_professional_printing)
+            MessageHandler(filters.Regex("^🖨️ طباعة التقارير$"), start_professional_printing),
+            CallbackQueryHandler(start_professional_printing_callback, pattern=r"^admin:print_reports$"),
         ],
         states={
             PRINT_SELECT_TYPE: [
