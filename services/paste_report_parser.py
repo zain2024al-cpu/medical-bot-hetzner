@@ -50,6 +50,45 @@ def merge_report_date_with_visit_time(
         return report_date
 
 
+# حد أقصى للتقارير في رسالة واحدة (يمنع ضغطاً غير معقول على السيرفر)
+MAX_BULK_PASTE_REPORTS = 200
+
+
+def split_bulk_report_texts(raw: str) -> List[str]:
+    """
+    يقسّم لصقاً طويلاً إلى تقارير متعددة بنفس قالب المجموعة:
+    - عند تكرار «🆕 تقرير جديد» / «✏️ تقرير معدل»
+    - أو عند تكرار سطر يبدأ بـ «التاريخ:» / «📅🕐 التاريخ:» (لصق بدون رأس 🆕)
+
+    تقرير واحد يبقى كقائمة بطول 1. الناتج يُمرَّر لكل عنصر إلى parse_full_report_text.
+    """
+    text = _norm(raw)
+    if not text:
+        return []
+    if len(text) < 40:
+        return [text]
+
+    scan = re.sub(r"[\*_`]+", "", text)
+
+    parts = re.split(
+        r"(?m)(?=^🆕\s*تقرير\s+جديد|^✏️\s*تقرير\s+معدل)",
+        scan,
+    )
+    chunks = [p.strip() for p in parts if p.strip() and len(p.strip()) >= 40]
+    if len(chunks) > 1:
+        return chunks[:MAX_BULK_PASTE_REPORTS]
+
+    parts2 = re.split(
+        r"(?m)(?=^(?:📅🕐\s*|📅\s*|📆\s*)?التاريخ\s*[﹕：:])",
+        scan,
+    )
+    chunks2 = [p.strip() for p in parts2 if p.strip() and len(p.strip()) >= 40]
+    if len(chunks2) > 1:
+        return chunks2[:MAX_BULK_PASTE_REPORTS]
+
+    return [text]
+
+
 _AR_MONTHS = {
     "يناير": 1,
     "فبراير": 2,

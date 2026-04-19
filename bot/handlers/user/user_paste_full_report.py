@@ -21,7 +21,12 @@ from telegram.ext import (
 from bot.shared_auth import is_admin
 from db.models import Report, _now_ist_naive
 from db.session import SessionLocal
-from services.paste_report_parser import merge_report_date_with_visit_time, parse_full_report_text
+from services.paste_report_parser import (
+    MAX_BULK_PASTE_REPORTS,
+    merge_report_date_with_visit_time,
+    parse_full_report_text,
+    split_bulk_report_texts,
+)
 from services.paste_entity_resolve import resolve_patient_hospital_dept_ids
 from services.translators_service import (
     resolve_translator_for_report,
@@ -52,8 +57,10 @@ async def start_paste_report(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     text = (
         "📋 **إرسال تقرير جاهز (أدمن)**\n\n"
-        "الصق الرسالة **كاملة** بنفس القالب (التاريخ، اسم المريض، المستشفى، …).\n\n"
-        "بعد اللصق يُحفظ التقرير مباشرة كتقرير جديد.\n\n"
+        "• **تقرير واحد:** الصق القالب كاملاً — يُحفظ مباشرة.\n"
+        "• **عدة تقارير:** الصقها في **رسالة واحدة**؛ يُفصل تلقائياً عند "
+        "«🆕 تقرير جديد» أو عند تكرار سطر **التاريخ:** (نفس منطق المجموعة).\n\n"
+        f"حد أقصى **{MAX_BULK_PASTE_REPORTS}** تقريراً لكل رسالة.\n\n"
         "أرسل /cancel للإلغاء."
     )
     kb = InlineKeyboardMarkup([[InlineKeyboardButton("❌ إلغاء", callback_data="paste_report:cancel")]])
@@ -67,6 +74,54 @@ async def start_paste_report(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return WAIT_PASTE
 
 
+def _save_paste_fields_to_db(session, user, fields: dict, report_date, visit_time):
+    """يُنشئ تقريراً ويُرجع الكائن بعد commit + refresh."""
+    tname_raw = (fields.get("translator_name") or "").strip() or None
+    if tname_raw:
+        tid, tname = resolve_translator_for_report(session, tname_raw)
+    else:
+        sender_name = (user.full_name or user.first_name or "").strip()
+        if sender_name:
+            tid, tname = resolve_translator_for_report(session, sender_name)
+        else:
+            tid, tname = None, str(user.id)
+
+    pid, hid, did = resolve_patient_hospital_dept_ids(
+        session,
+        fields.get("patient_name"),
+        fields.get("hospital_name"),
+        fields.get("department"),
+    )
+
+    rep = Report(
+        translator_id=tid,
+        translator_name=tname,
+        submitted_by_user_id=user.id,
+        patient_id=pid,
+        hospital_id=hid,
+        department_id=did,
+        patient_name=fields.get("patient_name"),
+        hospital_name=fields.get("hospital_name"),
+        department=fields.get("department"),
+        doctor_name=fields.get("doctor_name"),
+        medical_action=fields.get("medical_action"),
+        complaint_text=fields.get("complaint_text") or "",
+        case_status=fields.get("case_status"),
+        doctor_decision=fields.get("doctor_decision"),
+        room_number=fields.get("room_number"),
+        followup_date=fields.get("followup_date"),
+        followup_reason=fields.get("followup_reason"),
+        report_date=report_date,
+        visit_time=visit_time,
+        status="active",
+        created_at=datetime.utcnow(),
+    )
+    session.add(rep)
+    session.commit()
+    session.refresh(rep)
+    return rep
+
+
 async def receive_pasted_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         await update.effective_message.reply_text("⚠️ أرسل النص فقط (التقرير بالصيغة المطلوبة).")
@@ -78,97 +133,108 @@ async def receive_pasted_report(update: Update, context: ContextTypes.DEFAULT_TY
         return ConversationHandler.END
 
     raw = update.message.text.strip()
-    try:
-        fields, warnings = parse_full_report_text(raw)
-    except ValueError as e:
-        await update.message.reply_text(f"❌ {e}\n\nجرّب مرة أخرى أو /cancel")
-        return WAIT_PASTE
-
-    report_date = fields.get("report_date") or _now_ist_naive()
-    visit_time = fields.get("visit_time")
-    merged_dt = merge_report_date_with_visit_time(report_date, visit_time)
-    if merged_dt:
-        report_date = merged_dt
-
-    session = SessionLocal()
-    try:
-        tname_raw = (fields.get("translator_name") or "").strip() or None
-        if tname_raw:
-            tid, tname = resolve_translator_for_report(session, tname_raw)
-        else:
-            sender_name = (user.full_name or user.first_name or "").strip()
-            if sender_name:
-                tid, tname = resolve_translator_for_report(session, sender_name)
-            else:
-                tid, tname = None, str(user.id)
-
-        pid, hid, did = resolve_patient_hospital_dept_ids(
-            session,
-            fields.get("patient_name"),
-            fields.get("hospital_name"),
-            fields.get("department"),
+    chunks = split_bulk_report_texts(raw)
+    status_msg = None
+    if len(chunks) > 1:
+        status_msg = await update.message.reply_text(
+            f"⏳ جاري حفظ **{len(chunks)}** تقرير...",
+            parse_mode=ParseMode.MARKDOWN,
         )
 
-        rep = Report(
-            translator_id=tid,
-            translator_name=tname,
-            submitted_by_user_id=user.id,
-            patient_id=pid,
-            hospital_id=hid,
-            department_id=did,
-            patient_name=fields.get("patient_name"),
-            hospital_name=fields.get("hospital_name"),
-            department=fields.get("department"),
-            doctor_name=fields.get("doctor_name"),
-            medical_action=fields.get("medical_action"),
-            complaint_text=fields.get("complaint_text") or "",
-            case_status=fields.get("case_status"),
-            doctor_decision=fields.get("doctor_decision"),
-            room_number=fields.get("room_number"),
-            followup_date=fields.get("followup_date"),
-            followup_reason=fields.get("followup_reason"),
-            report_date=report_date,
-            visit_time=visit_time,
-            status="active",
-            created_at=datetime.utcnow(),
-        )
-        session.add(rep)
-        session.commit()
-        session.refresh(rep)
-        rid = rep.id
-    except Exception as e:
-        session.rollback()
-        logger.exception("paste_full_report save failed")
-        await update.message.reply_text(f"❌ فشل الحفظ: {str(e)[:350]}")
-        return ConversationHandler.END
-    finally:
-        session.close()
+    saved_ids: list[int] = []
+    parse_errors: list[tuple[int, str]] = []
+    save_errors: list[tuple[int, str]] = []
+    warn_samples: list[str] = []
 
-    # تقييم المترجمين و stats_service يعتمدان على translator_id؛ المزامنة تربط الاسم بالدليل بعد اللصق (مثل المجموعة)
+    for idx, chunk in enumerate(chunks, start=1):
+        try:
+            fields, warnings = parse_full_report_text(chunk)
+        except ValueError as e:
+            parse_errors.append((idx, str(e)[:220]))
+            continue
+
+        report_date = fields.get("report_date") or _now_ist_naive()
+        visit_time = fields.get("visit_time")
+        merged_dt = merge_report_date_with_visit_time(report_date, visit_time)
+        if merged_dt:
+            report_date = merged_dt
+
+        session = SessionLocal()
+        try:
+            rep = _save_paste_fields_to_db(session, user, fields, report_date, visit_time)
+            saved_ids.append(rep.id)
+            if warnings:
+                for w in warnings[:2]:
+                    warn_samples.append(f"#{idx}: {w}")
+        except Exception as e:
+            session.rollback()
+            logger.exception("paste_full_report save failed idx=%s", idx)
+            save_errors.append((idx, str(e)[:220]))
+        finally:
+            session.close()
+
     await asyncio.to_thread(sync_reports_translator_ids)
     await asyncio.to_thread(sync_reports_translator_names)
 
-    warn_link = ""
-    s2 = SessionLocal()
-    try:
-        r2 = s2.query(Report).filter_by(id=rid).first()
-        if r2 and r2.translator_id is None and (r2.translator_name or "").strip():
-            warn_link = (
-                "\n⚠️ لم يُربط التقرير بمترجم في الدليل (اسم المترجم لا يطابق القائمة) — "
-                "لن يُحسب في **تقييم المترجمين** حتى تُصحّح الاسم أو تُضاف للدليل."
+    no_tid_count = 0
+    if saved_ids:
+        s2 = SessionLocal()
+        try:
+            no_tid_count = (
+                s2.query(Report)
+                .filter(Report.id.in_(saved_ids), Report.translator_id.is_(None))
+                .count()
             )
-    finally:
-        s2.close()
+        finally:
+            s2.close()
 
-    warn_txt = ""
-    if warnings:
-        warn_txt = "\n⚠️ " + "\n⚠️ ".join(warnings[:5])
+    warn_link = ""
+    if no_tid_count and saved_ids:
+        warn_link = (
+            f"\n⚠️ **{no_tid_count}** تقريراً دون ربط بمترجم في الدليل — "
+            "لن تُحسب في **تقييم المترجمين** حتى تُصحّح الأسماء.\n"
+        )
 
-    await update.message.reply_text(
-        f"✅ **تم حفظ التقرير** — رقم التقرير: `{rid}`\n"
-        f"{warn_txt}{warn_link}",
-        parse_mode=ParseMode.MARKDOWN,
-    )
+    lines: list[str] = []
+    if saved_ids:
+        lo, hi = min(saved_ids), max(saved_ids)
+        if len(saved_ids) == 1:
+            lines.append(f"✅ **تم حفظ التقرير** — رقم التقرير: `{lo}`")
+        else:
+            lines.append(f"✅ **تم حفظ {len(saved_ids)} تقريراً** — الأرقام من `{lo}` إلى `{hi}`")
+    else:
+        lines.append("❌ **لم يُحفظ أي تقرير.**")
+
+    if parse_errors:
+        lines.append("\n**أخطاء تحليل:**")
+        for i, msg in parse_errors[:12]:
+            lines.append(f"• الجزء {i}: {msg}")
+        if len(parse_errors) > 12:
+            lines.append(f"• … و **{len(parse_errors) - 12}** أخرى")
+
+    if save_errors:
+        lines.append("\n**أخطاء حفظ:**")
+        for i, msg in save_errors[:12]:
+            lines.append(f"• الجزء {i}: {msg}")
+        if len(save_errors) > 12:
+            lines.append(f"• … و **{len(save_errors) - 12}** أخرى")
+
+    if warn_samples:
+        lines.append("\n**عيّنة تحذيرات التحليل:**")
+        lines.extend(f"• {w}" for w in warn_samples[:8])
+
+    body = "\n".join(lines) + warn_link
+    if len(body) > 3900:
+        body = body[:3880] + "\n…"
+
+    if status_msg:
+        try:
+            await status_msg.edit_text(body, parse_mode=ParseMode.MARKDOWN)
+        except Exception:
+            await update.message.reply_text(body, parse_mode=ParseMode.MARKDOWN)
+    else:
+        await update.message.reply_text(body, parse_mode=ParseMode.MARKDOWN)
+
     return ConversationHandler.END
 
 
