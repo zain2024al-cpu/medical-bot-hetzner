@@ -15,6 +15,7 @@ def admin_main_kb():
         ["👥 إدارة المستخدمين", "📊 تقييم المترجمين"],
         ["👑 إدارة الأدمنين", "📊 تحليل البيانات"],
         ["📅 إدارة الجدول", "🗑️ حذف التقارير"],
+        ["📋 لصق تقرير جاهز"],
         ["🔄 تحديث الصفحة", broadcast_status]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)

@@ -40,6 +40,8 @@ async def start_paste_report(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 await query.edit_message_text("🚫 هذا الإجراء **للأدمن فقط**.", parse_mode=ParseMode.MARKDOWN)
             except Exception:
                 pass
+        elif update.message:
+            await update.message.reply_text("🚫 هذا الإجراء للأدمن فقط.")
         return ConversationHandler.END
 
     text = (
@@ -54,6 +56,8 @@ async def start_paste_report(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await query.edit_message_text(text, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
         except Exception:
             await query.message.reply_text(text, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+    elif update.message:
+        await update.message.reply_text(text, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
     return WAIT_PASTE
 
 
@@ -154,6 +158,10 @@ def register(app):
     conv = ConversationHandler(
         entry_points=[
             CallbackQueryHandler(start_paste_report, pattern=r"^admin:paste_full_report$"),
+            MessageHandler(
+                filters.ChatType.PRIVATE & filters.TEXT & filters.Regex(r"^📋 لصق تقرير جاهز\s*$"),
+                start_paste_report,
+            ),
         ],
         states={
             WAIT_PASTE: [

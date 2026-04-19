@@ -12,6 +12,24 @@ from db.models import Translator
 from datetime import datetime
 
 
+async def send_admin_dual_panels(update: Update, first_text: str | None = None):
+    """
+    يرسل لوحتي الأدمن: ReplyKeyboard أسفل الشاشة + Inline (فيها رفع أرشيف ولصق تقرير، إلخ).
+    بدون الرسالة الثانية لا يظهر زر «لصق تقرير» لأن /admin كان يعرض القائمة السفلية فقط.
+    """
+    anchor = update.message or (update.callback_query.message if update.callback_query else None)
+    if not anchor:
+        return
+    user = update.effective_user
+    first = first_text or f"👑 أهلاً {user.first_name}! لوحة التحكم جاهزة."
+    await anchor.reply_text(first, reply_markup=admin_main_kb(), parse_mode="Markdown")
+    await anchor.reply_text(
+        "📎 **من الأزرار المضمّنة أدناه:** رفع أرشيف (Excel/DB)، **لصق تقرير جاهز**، إدارة الجدول، …",
+        reply_markup=admin_main_inline_kb(),
+        parse_mode="Markdown",
+    )
+
+
 # 🟣 أمر /admin لفتح لوحة تحكم الأدمن
 async def admin_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -22,10 +40,7 @@ async def admin_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data:
         context.user_data.clear()
     
-    await update.message.reply_text(
-        f"👑 أهلاً {user.first_name}! لوحة التحكم جاهزة.",
-        reply_markup=admin_main_kb()
-    )
+    await send_admin_dual_panels(update)
 
 
 # 🔄 أمر /cancel لإعادة تعيين كل شيء
@@ -44,11 +59,9 @@ async def cancel_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     
     if is_admin(user.id):
-        await update.message.reply_text(
-            "✅ **تم إعادة تعيين كل الحالات**\n\n"
-            "يمكنك الآن استخدام أي زر من جديد.",
-            reply_markup=admin_main_kb(),
-            parse_mode="Markdown"
+        await send_admin_dual_panels(
+            update,
+            first_text="✅ **تم إعادة تعيين كل الحالات**\n\nيمكنك الآن استخدام أي زر من جديد.",
         )
     else:
         await update.message.reply_text(
@@ -169,9 +182,9 @@ async def handle_back_to_main(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     # لا يمكن استخدام edit_message_text مع ReplyKeyboardMarkup
     # لذلك نرسل رسالة جديدة
-    await query.message.reply_text(
-        f"👑 أهلاً {user.first_name}! لوحة التحكم جاهزة.",
-        reply_markup=admin_main_kb()
+    await send_admin_dual_panels(
+        update,
+        first_text=f"👑 أهلاً {user.first_name}! لوحة التحكم جاهزة.",
     )
     # محاولة حذف الرسالة القديمة
     try:
@@ -434,12 +447,13 @@ async def handle_toggle_broadcast_button(update: Update, context: ContextTypes.D
         # تحديث لوحة المفاتيح
         status_text = "🟢 تم تفعيل إرسال التقارير للمجموعة" if final_state else "🔴 تم إيقاف إرسال التقارير للمجموعة"
         
-        await update.message.reply_text(
-            f"{status_text}\n\n"
-            f"📊 **الحالة الحالية:** {'✅ مفعل' if final_state else '❌ معطل'}\n\n"
-            f"💡 التغيير فعال فوراً - لا حاجة لإعادة تشغيل البوت",
-            reply_markup=admin_main_kb(),
-            parse_mode="Markdown"
+        await send_admin_dual_panels(
+            update,
+            first_text=(
+                f"{status_text}\n\n"
+                f"📊 **الحالة الحالية:** {'✅ مفعل' if final_state else '❌ معطل'}\n\n"
+                f"💡 التغيير فعال فوراً - لا حاجة لإعادة تشغيل البوت"
+            ),
         )
         logger.info("✅ handle_toggle_broadcast_button: تم التحديث بنجاح")
         
@@ -447,7 +461,7 @@ async def handle_toggle_broadcast_button(update: Update, context: ContextTypes.D
         logger.error(f"❌ خطأ في handle_toggle_broadcast_button: {e}", exc_info=True)
         await update.message.reply_text(
             f"❌ حدث خطأ: {str(e)[:100]}",
-            reply_markup=admin_main_kb()
+            reply_markup=admin_main_kb(),
         )
 
 

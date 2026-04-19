@@ -15,11 +15,9 @@ async def user_refresh(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # التحقق إذا كان أدمن
     if is_admin(user_id):
-        from bot.keyboards import admin_main_kb
-        await update.message.reply_text(
-            "✅ تم تحديث الصفحة",
-            reply_markup=admin_main_kb()
-        )
+        from bot.handlers.admin.admin_start import send_admin_dual_panels
+
+        await send_admin_dual_panels(update, first_text="✅ تم تحديث الصفحة")
         return
     
     # للمستخدم العادي
