@@ -3,6 +3,7 @@
 # ================================================
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime
 
@@ -20,8 +21,13 @@ from telegram.ext import (
 from bot.shared_auth import is_admin
 from db.models import Report, _now_ist_naive
 from db.session import SessionLocal
-from services.paste_report_parser import parse_full_report_text
-from services.translators_service import resolve_translator_for_report
+from services.paste_report_parser import merge_report_date_with_visit_time, parse_full_report_text
+from services.paste_entity_resolve import resolve_patient_hospital_dept_ids
+from services.translators_service import (
+    resolve_translator_for_report,
+    sync_reports_translator_ids,
+    sync_reports_translator_names,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +86,9 @@ async def receive_pasted_report(update: Update, context: ContextTypes.DEFAULT_TY
 
     report_date = fields.get("report_date") or _now_ist_naive()
     visit_time = fields.get("visit_time")
+    merged_dt = merge_report_date_with_visit_time(report_date, visit_time)
+    if merged_dt:
+        report_date = merged_dt
 
     session = SessionLocal()
     try:
@@ -93,10 +102,20 @@ async def receive_pasted_report(update: Update, context: ContextTypes.DEFAULT_TY
             else:
                 tid, tname = None, str(user.id)
 
+        pid, hid, did = resolve_patient_hospital_dept_ids(
+            session,
+            fields.get("patient_name"),
+            fields.get("hospital_name"),
+            fields.get("department"),
+        )
+
         rep = Report(
             translator_id=tid,
             translator_name=tname,
             submitted_by_user_id=user.id,
+            patient_id=pid,
+            hospital_id=hid,
+            department_id=did,
             patient_name=fields.get("patient_name"),
             hospital_name=fields.get("hospital_name"),
             department=fields.get("department"),
@@ -125,13 +144,29 @@ async def receive_pasted_report(update: Update, context: ContextTypes.DEFAULT_TY
     finally:
         session.close()
 
+    # تقييم المترجمين و stats_service يعتمدان على translator_id؛ المزامنة تربط الاسم بالدليل بعد اللصق (مثل المجموعة)
+    await asyncio.to_thread(sync_reports_translator_ids)
+    await asyncio.to_thread(sync_reports_translator_names)
+
+    warn_link = ""
+    s2 = SessionLocal()
+    try:
+        r2 = s2.query(Report).filter_by(id=rid).first()
+        if r2 and r2.translator_id is None and (r2.translator_name or "").strip():
+            warn_link = (
+                "\n⚠️ لم يُربط التقرير بمترجم في الدليل (اسم المترجم لا يطابق القائمة) — "
+                "لن يُحسب في **تقييم المترجمين** حتى تُصحّح الاسم أو تُضاف للدليل."
+            )
+    finally:
+        s2.close()
+
     warn_txt = ""
     if warnings:
         warn_txt = "\n⚠️ " + "\n⚠️ ".join(warnings[:5])
 
     await update.message.reply_text(
         f"✅ **تم حفظ التقرير** — رقم التقرير: `{rid}`\n"
-        f"{warn_txt}",
+        f"{warn_txt}{warn_link}",
         parse_mode=ParseMode.MARKDOWN,
     )
     return ConversationHandler.END

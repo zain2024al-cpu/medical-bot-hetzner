@@ -8,6 +8,48 @@ import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
+# أنماط سطر التاريخ — نفس القالب قد يُلصق مع **Markdown** أو نقطتين عربيتين أو «التاريخ والوقت»
+_DATE_LINE_PATTERNS = [
+    r"(?:📅🕐\s*|📅\s*|📆\s*)?التاريخ\s*[:：﹕]\s*(.+?)(?:\n|$)",
+    r"(?:📅🕐\s*|📅\s*)?التاريخ\s+و\s*الوقت\s*[:：﹕]\s*(.+?)(?:\n|$)",
+    r"التاريخ\s+و\s*الوقت\s*[:：﹕]\s*(.+?)(?:\n|$)",
+    r"تاريخ\s+التقرير\s*[:：﹕]\s*(.+?)(?:\n|$)",
+    r"(?:🕐\s*)?التاريخ\s*[:：﹕]\s*(.+?)(?:\n|$)",
+]
+
+def _extract_date_block_after_label(text_scan: str) -> Optional[str]:
+    """
+    يأخذ نص التاريخ كاملاً حتى سطر «👤 اسم المريض» (قد يمتد لأكثر من سطر إذا انكسرت
+    «- 8:16 مساءً» على سطر ثانٍ).
+    """
+    m = re.search(
+        r"(?:📅🕐\s*|📅\s*|📆\s*)?التاريخ\s*[:：﹕]\s*(.+?)(?=\n\s*👤)",
+        text_scan,
+        re.IGNORECASE | re.DOTALL,
+    )
+    if m:
+        return _norm(m.group(1).strip())
+    return None
+
+
+def merge_report_date_with_visit_time(
+    report_date: Optional[datetime], visit_time: Optional[str]
+) -> Optional[datetime]:
+    """يدمج وقت الزيارة في report_date (IST نفس التخزين) ليتوافق مع احتساب التأخير."""
+    if not report_date or not visit_time:
+        return report_date
+    vt = visit_time.strip()
+    if not vt or ":" not in vt:
+        return report_date
+    try:
+        h_s, rest = vt.split(":", 1)
+        mi_part = rest[:2] if len(rest) >= 2 else rest
+        h, mi = int(h_s), int(mi_part)
+        return report_date.replace(hour=h, minute=mi, second=0, microsecond=0)
+    except (ValueError, TypeError):
+        return report_date
+
+
 _AR_MONTHS = {
     "يناير": 1,
     "فبراير": 2,
@@ -71,17 +113,35 @@ def _parse_ar_report_datetime(line: str) -> Tuple[Optional[datetime], Optional[s
             except ValueError:
                 dt = None
             if dt:
-                tm = re.search(r"-\s*(\d{1,2}):(\d{2})\s*(صباحاً|مساءً|ص|م)?", line)
-                if tm:
-                    h, mi = int(tm.group(1)), int(tm.group(2))
-                    ap = tm.group(3) or ""
-                    if "مساء" in ap or ap == "م":
-                        if h < 12:
+                visit_str = None
+                tail = line[m.end() :] if m else ""
+                for pat in (
+                    r"-\s*(\d{1,2}):(\d{2})\s*(صباحاً|مساءً|صباحا|مساءا|ص|م)?",
+                    r"\)\s*-\s*(\d{1,2}):(\d{2})\s*(صباحاً|مساءً|صباحا|مساءا|ص|م)?",
+                    r"\)\s+(\d{1,2}):(\d{2})\s*(صباحاً|مساءً|صباحا|مساءا|ص|م)?",
+                ):
+                    tm = re.search(pat, line)
+                    if tm:
+                        h, mi = int(tm.group(1)), int(tm.group(2))
+                        ap = tm.group(3) or ""
+                        after = line[tm.start() :]
+                        if "مساء" in after or ap in ("م",) or (
+                            ap and "مساء" in ap
+                        ):
+                            if h < 12:
+                                h += 12
+                        elif "صباح" in ap or ap == "ص":
+                            if h == 12:
+                                h = 0
+                        visit_str = f"{h}:{mi:02d}"
+                        break
+                if not visit_str and tail:
+                    tm2 = re.search(r"(\d{1,2}):(\d{2})", tail)
+                    if tm2 and ("مساء" in tail or "صباح" in tail):
+                        h, mi = int(tm2.group(1)), int(tm2.group(2))
+                        if "مساء" in tail and h < 12:
                             h += 12
-                    elif "صباح" in ap or ap == "ص":
-                        if h == 12:
-                            h = 0
-                    visit_str = f"{h}:{mi:02d}"
+                        visit_str = f"{h}:{mi:02d}"
                 return dt, visit_str
 
     return None, None
@@ -163,9 +223,15 @@ def parse_full_report_text(raw: str) -> Tuple[Dict[str, Any], List[str]]:
         m = re.search(pat, text, re.MULTILINE | re.IGNORECASE)
         return _norm(m.group(1)) if m else None
 
-    date_line = grab_line(r"(?:📅🕐\s*|📅\s*)?التاريخ:\s*(.+?)(?:\n|$)")
+    # نسخة بلا ** أو ` من تيليجرام حتى تُطابق «التاريخ:» حتى لو كان العنوان بخط عريض
+    text_scan = re.sub(r"[\*_`]+", "", text)
+    date_line = _extract_date_block_after_label(text_scan)
     if not date_line:
-        date_line = grab_line(r"التاريخ:\s*(.+?)(?:\n|$)")
+        for _pat in _DATE_LINE_PATTERNS:
+            mx = re.search(_pat, text_scan, re.MULTILINE | re.IGNORECASE)
+            if mx:
+                date_line = _norm(mx.group(1))
+                break
     if date_line:
         rd, vt = _parse_ar_report_datetime(date_line)
         if rd:

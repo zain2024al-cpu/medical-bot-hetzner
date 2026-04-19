@@ -597,23 +597,55 @@ def _build_report_package(start_dt, end_dt, period_name, options):
         if print_type == 'hospital':
             hospital_id = options.get('hospital_id')
             hospital_name = options.get('hospital_name')
+            hnorm = func.lower(func.trim(func.coalesce(Report.hospital_name, "")))
             if hospital_id:
-                query_reports = query_reports.filter(Report.hospital_id == hospital_id)
+                hrow = s.query(Hospital).filter_by(id=hospital_id).first()
+                hnl = (hrow.name or "").strip().lower() if hrow else ""
+                if hnl:
+                    query_reports = query_reports.filter(
+                        or_(Report.hospital_id == hospital_id, hnorm == hnl)
+                    )
+                else:
+                    query_reports = query_reports.filter(Report.hospital_id == hospital_id)
             elif hospital_name:
-                query_reports = query_reports.filter(Report.hospital_name == hospital_name)
+                query_reports = query_reports.filter(
+                    hnorm == hospital_name.strip().lower()
+                )
         
         elif print_type == 'translator':
             translator_id = options.get('translator_id')
             translator_name = options.get('translator_name')
+            tnorm = func.lower(func.trim(func.coalesce(Report.translator_name, "")))
             if translator_id:
-                query_reports = query_reports.filter(Report.translator_id == translator_id)
+                trow = s.query(TranslatorDirectory).filter_by(
+                    translator_id=translator_id
+                ).first()
+                tnl = (trow.name or "").strip().lower() if trow else ""
+                if tnl:
+                    query_reports = query_reports.filter(
+                        or_(Report.translator_id == translator_id, tnorm == tnl)
+                    )
+                else:
+                    query_reports = query_reports.filter(
+                        Report.translator_id == translator_id
+                    )
             elif translator_name:
-                query_reports = query_reports.filter(Report.translator_name == translator_name)
+                query_reports = query_reports.filter(
+                    tnorm == translator_name.strip().lower()
+                )
         
         elif print_type == 'patient':
             patient_id = options.get('patient_id')
             if patient_id:
-                query_reports = query_reports.filter(Report.patient_id == patient_id)
+                patient = s.query(Patient).filter_by(id=patient_id).first()
+                pnl = (patient.full_name or "").strip().lower() if patient else ""
+                pnorm = func.lower(func.trim(func.coalesce(Report.patient_name, "")))
+                if pnl:
+                    query_reports = query_reports.filter(
+                        or_(Report.patient_id == patient_id, pnorm == pnl)
+                    )
+                else:
+                    query_reports = query_reports.filter(Report.patient_id == patient_id)
         
         # فلترة حسب التاريخ
         if start_dt and end_dt:
@@ -1829,15 +1861,14 @@ def _get_patient_reports_data_sync(patient_id):
         patient_name = patient.full_name or "غير محدد"
         patient_file_number = getattr(patient, 'file_number', None) or getattr(patient, 'file_id', None)
         
-        # ✅ الحصول على جميع تقارير المريض - بحث شامل بـ patient_id أو patient_name
-        filters_list = [Report.patient_id == patient_id]
+        # تقارير اللصق قد تُربط لاحقاً بالاسم فقط؛ ندمج ID + تطبيع الاسم (مثل PDF/الإحصاء)
+        pnorm = func.lower(func.trim(func.coalesce(Report.patient_name, "")))
+        conds = [Report.patient_id == patient_id]
         if patient_name and patient_name != "غير محدد":
-            filters_list.append(Report.patient_name == patient_name)
-            filters_list.append(func.trim(Report.patient_name) == patient_name.strip())
-        
-        reports = session.query(Report).filter(
-            or_(*filters_list)
-        ).order_by(Report.report_date.desc()).all()
+            conds.append(pnorm == patient_name.strip().lower())
+        reports = session.query(Report).filter(or_(*conds)).order_by(
+            Report.report_date.desc()
+        ).all()
         
         # إزالة التكرار
         seen_ids = set()

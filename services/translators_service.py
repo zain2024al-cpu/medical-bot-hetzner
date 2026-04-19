@@ -99,21 +99,24 @@ def sync_reports_translator_ids() -> int:
             """))
             updated_count += result_by_user.rowcount or 0
 
+            # مطابقة الاسم مع الدليل: TRIM + LOWER (نفس منطق resolve) حتى تُحسب تقارير اللصق في التقييم
             result_by_name = session.execute(text("""
                 UPDATE reports
                 SET translator_id = (
                     SELECT translators.translator_id
                     FROM translators
-                    WHERE TRIM(translators.name) = TRIM(reports.translator_name)
+                    WHERE LOWER(TRIM(COALESCE(translators.name, ''))) = LOWER(TRIM(COALESCE(reports.translator_name, '')))
+                    LIMIT 1
                 )
                 WHERE translator_name IS NOT NULL
+                  AND TRIM(translator_name) != ''
                   AND (
                         translator_id IS NULL OR translator_id = 0
                         OR translator_id NOT IN (SELECT translator_id FROM translators)
                   )
                   AND EXISTS (
                         SELECT 1 FROM translators
-                        WHERE TRIM(translators.name) = TRIM(reports.translator_name)
+                        WHERE LOWER(TRIM(COALESCE(translators.name, ''))) = LOWER(TRIM(COALESCE(reports.translator_name, '')))
                   )
             """))
             updated_count += result_by_name.rowcount or 0

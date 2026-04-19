@@ -11,7 +11,9 @@
 #   - إجمالي التقارير: COUNT(*) WHERE status='active' AND translator_id IS NOT NULL
 #   - أيام الحضور (attendance_days): COUNT(DISTINCT DATE(created_at)) - الأيام التي رفع فيها تقارير
 #   - أيام العمل (work_days): نفس أيام الحضور (كل يوم نُشر فيه تقرير = يوم دوام)
-#   - التقارير المتأخرة: created_at hour >= 20
+#   - التقارير المتأخرة: ساعة «وقت التقرير» >= 20 (IST)، بالترتيب:
+#       ساعة report_date إن وُجد في الحقل وقت (بعد دمج visit_time عند الحفظ)،
+#       وإلا ساعة من visit_time (H:MM)، وإلا ساعة created_at بعد التحويل إلى IST
 # ================================================
 
 import logging
@@ -21,6 +23,44 @@ from sqlalchemy import text
 from db.session import DATABASE_PATH
 
 logger = logging.getLogger(__name__)
+
+# ساعة 0–23 بالـ IST لاحتساب «بعد 8 مساءً» في SQLite (نفس ترتيب المنطق في Python)
+_EFF_HOUR_IST_FOR_LATE_SQL = """(
+    CASE
+        WHEN r.report_date IS NOT NULL AND (
+             CAST(strftime('%H', r.report_date) AS INTEGER) != 0
+             OR CAST(strftime('%M', r.report_date) AS INTEGER) != 0
+        )
+        THEN CAST(strftime('%H', r.report_date) AS INTEGER)
+        WHEN r.visit_time IS NOT NULL AND length(trim(r.visit_time)) >= 3
+             AND instr(trim(r.visit_time), ':') > 0
+        THEN CAST(substr(trim(r.visit_time), 1, instr(trim(r.visit_time), ':') - 1) AS INTEGER)
+        ELSE CAST(strftime('%H', datetime(r.created_at, '+5 hours', '+30 minutes')) AS INTEGER)
+    END
+)"""
+
+
+def _effective_ist_hour_for_late(visit_time, report_date, created_at):
+    """نسخة Python لنفس منطق _EFF_HOUR_IST_FOR_LATE_SQL (المسار الاحتياطي)."""
+    rd = _parse_datetime(report_date)
+    if rd and (rd.hour != 0 or rd.minute != 0 or (getattr(rd, "second", 0) or 0) != 0):
+        return rd.hour
+    vt = (visit_time or "").strip()
+    if vt and ":" in vt:
+        part = vt.split(":")[0].strip()
+        try:
+            h = int(part)
+            if 0 <= h <= 23:
+                return h
+        except ValueError:
+            pass
+    cd = _parse_datetime(created_at)
+    if not cd:
+        return 0
+    local_hour = cd.hour + 5 + (1 if cd.minute >= 30 else 0)
+    if local_hour >= 24:
+        local_hour -= 24
+    return local_hour
 
 
 def _parse_datetime(value):
@@ -72,14 +112,14 @@ def _run_translator_query(session, start_date_str: str, end_date_str: str):
         # ✅ التجميع بالاسم (لتوحيد المترجمين الذين لهم أكثر من translator_id)
         # ✅ WHERE مزدوج: report_date OR created_at بتوقيت IST
         # لأن التقارير القديمة (قبل إصلاح التوقيت) قد تكون report_date بـ UTC
-        sql = text("""
+        sql = text(f"""
             SELECT
                 MIN(r.translator_id) as translator_id,
                 COALESCE(td.name, r.translator_name, 'مترجم #' || r.translator_id) as translator_name,
                 COUNT(*) as total_reports,
                 COUNT(DISTINCT DATE(COALESCE(r.report_date, r.created_at))) as attendance_days,
                 SUM(
-                    CASE WHEN CAST(strftime('%H', datetime(r.created_at, '+5 hours', '+30 minutes')) AS INTEGER) >= 20
+                    CASE WHEN {_EFF_HOUR_IST_FOR_LATE_SQL} >= 20
                     THEN 1 ELSE 0 END
                 ) as late_reports
             FROM reports r
@@ -232,7 +272,7 @@ def _run_translator_query_resilient(start_date_str: str, end_date_str: str):
     for report_id in range(1, max_id + 1):
         try:
             cur.execute(
-                "SELECT translator_id, translator_name, medical_action, report_date, created_at, status "
+                "SELECT translator_id, translator_name, medical_action, report_date, created_at, visit_time, status "
                 "FROM reports WHERE id = ?",
                 (report_id,),
             )
@@ -244,7 +284,7 @@ def _run_translator_query_resilient(start_date_str: str, end_date_str: str):
         if not row:
             continue
 
-        translator_id, translator_name, medical_action, report_date, created_at, status = row
+        translator_id, translator_name, medical_action, report_date, created_at, visit_time, status = row
         if translator_id is None:
             continue
         if status and str(status).strip().lower() != "active":
@@ -286,13 +326,8 @@ def _run_translator_query_resilient(start_date_str: str, end_date_str: str):
         item = results_map[tid]
         item["total_reports"] += 1
         item["attendance_dates"].add(report_dt.date())
-        # ✅ تحويل created_at من UTC إلى التوقيت المحلي (UTC+5:30) قبل المقارنة
-        if created_dt:
-            local_hour = created_dt.hour + 5 + (1 if created_dt.minute >= 30 else 0)
-            if local_hour >= 24:
-                local_hour -= 24
-            if local_hour >= 20:
-                item["late_reports"] += 1
+        if _effective_ist_hour_for_late(visit_time, report_date, created_at) >= 20:
+            item["late_reports"] += 1
 
         action_name = (medical_action or "أخرى").strip() if medical_action else "أخرى"
         if action_name in item["action_breakdown"]:
