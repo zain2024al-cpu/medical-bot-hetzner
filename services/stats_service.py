@@ -189,15 +189,16 @@ def _run_translator_query(session, start_date_str: str, end_date_str: str):
 
         action_rows = session.execute(action_sql, {"start": start_date_str, "end": end_date_str}).fetchall()
 
-        # تجميع الإجراءات حسب الاسم
+        # تجميع الإجراءات حسب الاسم (مع تطبيع المفاتيح لمنع التكرار بسبب مسافات إضافية)
         action_map = {}
         for row in action_rows:
             tname = row[0]
-            action_type = row[1] or "أخرى"
+            raw_action = row[1] or "أخرى"
+            action_type = " ".join(str(raw_action).split()) or "أخرى"
             count = row[2]
             if tname not in action_map:
                 action_map[tname] = {}
-            action_map[tname][action_type] = count
+            action_map[tname][action_type] = action_map[tname].get(action_type, 0) + count
 
         # بناء النتيجة النهائية
         results = []
@@ -211,14 +212,16 @@ def _run_translator_query(session, start_date_str: str, end_date_str: str):
 
             # بناء action_breakdown مع ضمان وجود كل الأنواع الـ 13
             # ✅ البحث بالاسم (لتوحيد المترجمين ذوي الأكثر من ID)
+            # ✅ توحيد المفاتيح: strip + دمج المسافات المتعددة لمنع تكرار مثل
+            #    "تأجيل موعد" و"تأجيل موعد " (نفس النص لكن بفراغ لاحق)
             raw_actions = action_map.get(name, {})
             action_breakdown = {a: 0 for a in ALL_ACTION_TYPES}
             for action_name, count in raw_actions.items():
-                action_name_clean = (action_name or "").strip()
-                if action_name_clean in action_breakdown:
-                    action_breakdown[action_name_clean] = count
-                elif action_name_clean:
-                    action_breakdown[action_name_clean] = count
+                action_name_clean = " ".join((action_name or "").split())
+                if not action_name_clean:
+                    continue
+                # += بدلاً من = لتجميع أي متغيرات متطابقة بعد التطبيع
+                action_breakdown[action_name_clean] = action_breakdown.get(action_name_clean, 0) + count
 
             results.append({
                 "translator_id": tid,
@@ -329,11 +332,8 @@ def _run_translator_query_resilient(start_date_str: str, end_date_str: str):
         if _effective_ist_hour_for_late(visit_time, report_date, created_at) >= 20:
             item["late_reports"] += 1
 
-        action_name = (medical_action or "أخرى").strip() if medical_action else "أخرى"
-        if action_name in item["action_breakdown"]:
-            item["action_breakdown"][action_name] += 1
-        else:
-            item["action_breakdown"][action_name] = item["action_breakdown"].get(action_name, 0) + 1
+        action_name = " ".join(str(medical_action or "أخرى").split()) or "أخرى"
+        item["action_breakdown"][action_name] = item["action_breakdown"].get(action_name, 0) + 1
 
     con.close()
 

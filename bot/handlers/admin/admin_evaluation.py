@@ -306,8 +306,14 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
         story.append(info_table)
         story.append(Spacer(1, 12))
 
-        # جدول تفصيل الإجراءات
-        action_breakdown = item.get("action_breakdown", {})
+        # جدول تفصيل الإجراءات (مع دمج دفاعي لأي مفاتيح متطابقة بعد التطبيع)
+        raw_breakdown = item.get("action_breakdown", {})
+        action_breakdown: dict[str, int] = {}
+        for k, v in raw_breakdown.items():
+            nk = " ".join(str(k or "").split())
+            if not nk:
+                continue
+            action_breakdown[nk] = action_breakdown.get(nk, 0) + int(v or 0)
         action_rows_data = [[r("النسبة"), r("العدد"), r("نوع الإجراء")]]
         for action_name, count in sorted(action_breakdown.items(), key=lambda x: x[1], reverse=True):
             if count > 0:
