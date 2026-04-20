@@ -6,6 +6,7 @@
 import logging
 import io
 import os
+import re
 import sys
 import calendar
 from datetime import datetime, date, timedelta
@@ -17,7 +18,7 @@ from telegram.ext import (
 )
 from telegram.constants import ParseMode
 from db.session import SessionLocal
-from db.models import MonthlyEvaluation
+from db.models import MonthlyEvaluation, TranslatorDirectory
 from bot.shared_auth import is_admin
 from services.stats_service import get_monthly_stats, get_translator_stats, ALL_ACTION_TYPES
 from services.inline_calendar import MONTHS_AR, DAYS_AR, format_date_arabic
@@ -28,6 +29,8 @@ logger = logging.getLogger(__name__)
 # حالات المحادثة
 # ════════════════════════════════════════
 (
+    EVAL_SELECT_MODE,
+    EVAL_SELECT_TRANSLATOR,
     EVAL_SELECT_YEAR,
     EVAL_SELECT_MONTH,
     EVAL_SELECT_PERIOD,
@@ -35,7 +38,9 @@ logger = logging.getLogger(__name__)
     EVAL_SELECT_FORMAT,
     EVAL_CUSTOM_START,
     EVAL_CUSTOM_END,
-) = range(7)
+) = range(9)
+
+EVAL_TRANSLATORS_PER_PAGE = 12
 
 MONTH_NAMES = {
     1: "يناير", 2: "فبراير", 3: "مارس", 4: "أبريل",
@@ -161,7 +166,7 @@ def _compute_rating(stats_results):
 # توليد ملف PDF (reportlab على Windows)
 # ════════════════════════════════════════
 
-def _generate_pdf(results, period_label, year, month, start_date_str=None, end_date_str=None):
+def _generate_pdf(results, period_label, year, month, start_date_str=None, end_date_str=None, target_name: str | None = None):
     """توليد تقرير PDF - بطاقة لكل مترجم"""
 
     total_reports = sum(r['total_reports'] for r in results)
@@ -193,7 +198,7 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
         from bidi.algorithm import get_display
     except Exception as e:
         logger.warning(f"فشل تحميل مكتبات PDF: {e}")
-        return _generate_html_fallback(results, period_label, year, month, start_date_str, end_date_str, total_reports, total_late), "html"
+        return _generate_html_fallback(results, period_label, year, month, start_date_str, end_date_str, total_reports, total_late, target_name=target_name), "html"
 
     # تسجيل خط عربي
     font_name = "Helvetica"
@@ -216,42 +221,65 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
         return get_display(reshape(value))
 
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=24, leftMargin=24, topMargin=24, bottomMargin=24)
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=24, leftMargin=24, topMargin=26, bottomMargin=26)
 
     styles = getSampleStyleSheet()
-    base_style = ParagraphStyle("base", parent=styles["Normal"], fontName=font_name, fontSize=11, leading=14, alignment=TA_RIGHT)
-    title_style = ParagraphStyle("title", parent=styles["Title"], fontName=font_name, fontSize=16, leading=20, alignment=TA_CENTER)
-    subtitle_style = ParagraphStyle("subtitle", parent=styles["Heading2"], fontName=font_name, fontSize=12, leading=16, alignment=TA_CENTER)
-    section_style = ParagraphStyle("section", parent=styles["Heading3"], fontName=font_name, fontSize=12, leading=16, alignment=TA_RIGHT)
+    base_style = ParagraphStyle("base", parent=styles["Normal"], fontName=font_name, fontSize=14, leading=19, alignment=TA_RIGHT)
+    title_style = ParagraphStyle("title", parent=styles["Title"], fontName=font_name, fontSize=22, leading=28, alignment=TA_CENTER)
+    subtitle_style = ParagraphStyle("subtitle", parent=styles["Heading2"], fontName=font_name, fontSize=16, leading=22, alignment=TA_CENTER)
+    section_style = ParagraphStyle("section", parent=styles["Heading3"], fontName=font_name, fontSize=17, leading=22, alignment=TA_RIGHT)
+
+    # أحجام الخطوط داخل الجداول
+    TBL_HEADER_FS = 14
+    TBL_CELL_FS = 13
+    DAY_CELL_FS = 12
 
     story = []
-    story.append(Paragraph(r("تقرير تقييم أداء المترجمين"), title_style))
+    header_title = "تقرير تقييم مترجم فردي" if target_name else "تقرير تقييم أداء المترجمين"
+    story.append(Paragraph(r(header_title), title_style))
+    if target_name:
+        story.append(Paragraph(r(f"المترجم: {target_name}"), subtitle_style))
     story.append(Paragraph(r(f"من {start_date_str} إلى {end_date_str}"), subtitle_style))
-    story.append(Spacer(1, 12))
+    story.append(Spacer(1, 14))
 
     total_before = total_reports - total_late
-    summary_table = Table(
-        [
-            [r("تقارير بعد 8 مساءً"), r("تقارير قبل 8 مساءً"), r("إجمالي التقارير"), r("عدد المترجمين")],
-            [str(total_late), str(total_before), str(total_reports), str(len(results))]
-        ],
-        colWidths=[120, 120, 120, 120]
-    )
+    if target_name and len(results) == 1:
+        # ملخص مترجم فردي (بدون عمود "عدد المترجمين")
+        summary_table = Table(
+            [
+                [r("تقارير بعد 8 مساءً"), r("تقارير قبل 8 مساءً"), r("إجمالي التقارير")],
+                [str(total_late), str(total_before), str(total_reports)]
+            ],
+            colWidths=[160, 160, 160]
+        )
+    else:
+        summary_table = Table(
+            [
+                [r("تقارير بعد 8 مساءً"), r("تقارير قبل 8 مساءً"), r("إجمالي التقارير"), r("عدد المترجمين")],
+                [str(total_late), str(total_before), str(total_reports), str(len(results))]
+            ],
+            colWidths=[125, 125, 125, 125]
+        )
     summary_table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1a237e")),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-        ("ALIGN", (0, 0), (-1, -1), "RIGHT"),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("FONTNAME", (0, 0), (-1, -1), font_name),
+        ("FONTSIZE", (0, 0), (-1, 0), TBL_HEADER_FS),
+        ("FONTSIZE", (0, 1), (-1, -1), TBL_CELL_FS + 2),
         ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-        ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
     ]))
-    summary_table.hAlign = "RIGHT"
+    summary_table.hAlign = "CENTER"
     story.append(summary_table)
-    story.append(Spacer(1, 16))
+    story.append(Spacer(1, 18))
 
     for i, item in enumerate(results, 1):
-        story.append(Paragraph(r(f"{_medal(i)} {item['translator_name']}"), section_style))
-        story.append(Spacer(1, 6))
+        rank_prefix = "" if target_name else f"{_medal(i)} "
+        story.append(Paragraph(r(f"{rank_prefix}{item['translator_name']}"), section_style))
+        story.append(Spacer(1, 8))
 
         before_8pm = item.get("before_8pm_reports", max(item["total_reports"] - item["late_reports"], 0))
         info_table = Table(
@@ -261,19 +289,22 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
                 [str(item["late_reports"]), r("تقارير بعد 8 مساءً")],
                 [str(item["work_days"]), r("أيام العمل")],
             ],
-            colWidths=[140, 270]
+            colWidths=[150, 290]
         )
         info_table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e3f2fd")),
+            ("BACKGROUND", (1, 0), (1, -1), colors.HexColor("#e3f2fd")),
             ("FONTNAME", (0, 0), (-1, -1), font_name),
-            ("ALIGN", (0, 0), (-1, -1), "RIGHT"),
-            ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
+            ("FONTSIZE", (0, 0), (-1, -1), TBL_CELL_FS + 1),
+            ("ALIGN", (0, 0), (0, -1), "CENTER"),
+            ("ALIGN", (1, 0), (1, -1), "RIGHT"),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
+            ("TOPPADDING", (0, 0), (-1, -1), 7),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
         ]))
         info_table.hAlign = "RIGHT"
         story.append(info_table)
-        story.append(Spacer(1, 10))
+        story.append(Spacer(1, 12))
 
         # جدول تفصيل الإجراءات
         action_breakdown = item.get("action_breakdown", {})
@@ -283,17 +314,22 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
                 pct = (count / item["total_reports"] * 100) if item["total_reports"] > 0 else 0
                 action_rows_data.append([f"{pct:.0f}%", str(count), r(action_name)])
         if len(action_rows_data) > 1:
-            action_table = Table(action_rows_data, colWidths=[80, 80, 220])
+            action_table = Table(action_rows_data, colWidths=[85, 85, 260])
             action_table.setStyle(TableStyle([
                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1a237e")),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                 ("FONTNAME", (0, 0), (-1, -1), font_name),
-                ("ALIGN", (0, 0), (-1, -1), "RIGHT"),
+                ("FONTSIZE", (0, 0), (-1, 0), TBL_HEADER_FS),
+                ("FONTSIZE", (0, 1), (-1, -1), TBL_CELL_FS),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                 ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
             ]))
             action_table.hAlign = "RIGHT"
             story.append(action_table)
-            story.append(Spacer(1, 10))
+            story.append(Spacer(1, 12))
 
         # جدول تفصيل الأيام
         item_start = item.get("start_date")
@@ -307,17 +343,22 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
                     day_rows = [[r("التقارير"), r("التاريخ")]]
                     for day_str, count in daily:
                         day_rows.append([str(count), r(day_str)])
-                    day_table = Table(day_rows, colWidths=[80, 220])
+                    day_table = Table(day_rows, colWidths=[90, 260])
                     day_table.setStyle(TableStyle([
                         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2e7d32")),
                         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                         ("FONTNAME", (0, 0), (-1, -1), font_name),
-                        ("ALIGN", (0, 0), (-1, -1), "RIGHT"),
+                        ("FONTSIZE", (0, 0), (-1, 0), TBL_HEADER_FS),
+                        ("FONTSIZE", (0, 1), (-1, -1), DAY_CELL_FS),
+                        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                         ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
+                        ("TOPPADDING", (0, 0), (-1, -1), 5),
+                        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
                     ]))
                     day_table.hAlign = "RIGHT"
                     story.append(Paragraph(r("تفصيل الأيام"), base_style))
-                    story.append(Spacer(1, 4))
+                    story.append(Spacer(1, 6))
                     story.append(day_table)
             except Exception as e:
                 logger.warning(f"خطأ في تفصيل الأيام للـ PDF: {e}")
@@ -329,7 +370,7 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
     return buffer.getvalue(), "pdf"
 
 
-def _generate_html_fallback(results, period_label, year, month, start_date_str, end_date_str, total_reports, total_late):
+def _generate_html_fallback(results, period_label, year, month, start_date_str, end_date_str, total_reports, total_late, target_name: str | None = None):
     """HTML fallback إذا فشل reportlab"""
     total_before = total_reports - total_late
     translator_pages = ""
@@ -337,13 +378,25 @@ def _generate_html_fallback(results, period_label, year, month, start_date_str, 
         actions_rows = ""
         for action_name, count in sorted(item.get('action_breakdown', {}).items(), key=lambda x: x[1], reverse=True):
             color = "" if count > 0 else ' style="color:#bbb;"'
-            actions_rows += f'<tr{color}><td style="text-align:right;padding:5px 10px;">{action_name}</td><td style="text-align:center;padding:5px 10px;">{count}</td></tr>'
+            actions_rows += f'<tr{color}><td style="text-align:right;padding:7px 12px;font-size:14px;">{action_name}</td><td style="text-align:center;padding:7px 12px;font-size:14px;">{count}</td></tr>'
         before_8pm = item.get("before_8pm_reports", max(item["total_reports"] - item["late_reports"], 0))
-        translator_pages += f'''<div style="page-break-before:always;"><h2>{_medal(i)} {item["translator_name"]}</h2>
-        <p>إجمالي التقارير: <b>{item["total_reports"]}</b> | قبل 8 مساءً: <b>{before_8pm}</b> | بعد 8 مساءً: <b>{item["late_reports"]}</b> | أيام العمل: <b>{item["work_days"]}</b></p>
-        <table border="1" cellpadding="5"><tr><th>نوع الإجراء</th><th>العدد</th></tr>{actions_rows}</table></div>'''
+        rank_prefix = "" if target_name else f"{_medal(i)} "
+        translator_pages += f'''<div style="page-break-before:always;font-size:15px;"><h2 style="font-size:22px;">{rank_prefix}{item["translator_name"]}</h2>
+        <p style="font-size:16px;">إجمالي التقارير: <b>{item["total_reports"]}</b> | قبل 8 مساءً: <b>{before_8pm}</b> | بعد 8 مساءً: <b>{item["late_reports"]}</b> | أيام العمل: <b>{item["work_days"]}</b></p>
+        <table border="1" cellpadding="5" style="font-size:14px;border-collapse:collapse;"><tr style="background:#1a237e;color:#fff;font-size:15px;"><th style="padding:8px 12px;">نوع الإجراء</th><th style="padding:8px 12px;">العدد</th></tr>{actions_rows}</table></div>'''
 
-    html = f'<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8"></head><body><h1>تقرير تقييم المترجمين</h1><p>{period_label} | مترجمين: {len(results)} | تقارير: {total_reports} | قبل 8 مساءً: {total_before} | بعد 8 مساءً: {total_late}</p>{translator_pages}</body></html>'
+    header_title = "تقرير تقييم مترجم فردي" if target_name else "تقرير تقييم المترجمين"
+    sub = f"المترجم: <b>{target_name}</b> | " if target_name else ""
+    summary = (
+        f"{sub}{period_label} | تقارير: <b>{total_reports}</b> | قبل 8 مساءً: <b>{total_before}</b> | بعد 8 مساءً: <b>{total_late}</b>"
+        if target_name else
+        f"{period_label} | مترجمين: <b>{len(results)}</b> | تقارير: <b>{total_reports}</b> | قبل 8 مساءً: <b>{total_before}</b> | بعد 8 مساءً: <b>{total_late}</b>"
+    )
+    html = (
+        f'<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8">'
+        f'<style>body{{font-family:Tahoma,Arial,sans-serif;font-size:15px;}}h1{{font-size:26px;}}p{{font-size:16px;}}</style>'
+        f'</head><body><h1>{header_title}</h1><p>{summary}</p>{translator_pages}</body></html>'
+    )
     return html.encode("utf-8")
 
 
@@ -351,7 +404,7 @@ def _generate_html_fallback(results, period_label, year, month, start_date_str, 
 # توليد ملف Excel
 # ════════════════════════════════════════
 
-def _generate_excel(results, period_label, year, month):
+def _generate_excel(results, period_label, year, month, target_name: str | None = None):
     """توليد تقرير Excel - ملخص + تفصيل الإجراءات"""
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -382,7 +435,11 @@ def _generate_excel(results, period_label, year, month):
         bottom=Side(style='thin', color='CCCCCC'),
     )
     ws.merge_cells('A1:F1')
-    ws['A1'] = f"تقرير تقييم أداء المترجمين - {period_label}"
+    main_title = (
+        f"تقرير تقييم مترجم فردي - {target_name} - {period_label}"
+        if target_name else f"تقرير تقييم أداء المترجمين - {period_label}"
+    )
+    ws['A1'] = main_title
     ws['A1'].font = title_font
     ws['A1'].alignment = center_align
 
@@ -483,23 +540,67 @@ def _generate_excel(results, period_label, year, month):
 # Handlers
 # ════════════════════════════════════════
 
-async def start_evaluation(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نقطة الدخول - اختيار السنة"""
-    user = update.effective_user
-    if not is_admin(user.id):
-        await update.message.reply_text("هذه الخاصية مخصصة للأدمن فقط.")
-        return ConversationHandler.END
+def _build_mode_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("👥 تقييم جميع المترجمين", callback_data="evalmode:all")],
+        [InlineKeyboardButton("👤 تقييم مترجم فردي", callback_data="evalmode:single")],
+        [InlineKeyboardButton("❌ إلغاء", callback_data="eval:cancel")],
+    ])
 
-    context.user_data.pop('eval_data', None)
 
+def _fetch_translators_for_picker() -> list[dict]:
+    with SessionLocal() as s:
+        rows = s.query(TranslatorDirectory).order_by(TranslatorDirectory.name).all()
+        return [
+            {"id": r.translator_id, "name": (r.name or "").strip()}
+            for r in rows
+            if r.name and r.name.strip()
+        ]
+
+
+def _build_translators_picker(page: int) -> InlineKeyboardMarkup:
+    translators = _fetch_translators_for_picker()
+    total = len(translators)
+    per_page = EVAL_TRANSLATORS_PER_PAGE
+    pages = max(1, (total + per_page - 1) // per_page)
+    page = max(0, min(page, pages - 1))
+    start = page * per_page
+    end = min(start + per_page, total)
+
+    keyboard: list[list[InlineKeyboardButton]] = []
+    for t in translators[start:end]:
+        keyboard.append([InlineKeyboardButton(
+            f"👤 {t['name']}",
+            callback_data=f"evaltr:pick:{t['id'] or 0}"
+        )])
+
+    nav: list[InlineKeyboardButton] = []
+    if pages > 1:
+        if page > 0:
+            nav.append(InlineKeyboardButton("◀️ السابق", callback_data=f"evaltr:page:{page - 1}"))
+        nav.append(InlineKeyboardButton(f"{page + 1}/{pages}", callback_data="noop"))
+        if page < pages - 1:
+            nav.append(InlineKeyboardButton("التالي ▶️", callback_data=f"evaltr:page:{page + 1}"))
+    if nav:
+        keyboard.append(nav)
+
+    keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="evalmode:back")])
+    keyboard.append([InlineKeyboardButton("❌ إلغاء", callback_data="eval:cancel")])
+    return InlineKeyboardMarkup(keyboard)
+
+
+def _build_years_keyboard() -> InlineKeyboardMarkup:
     current_year = date.today().year
-    keyboard = [
+    return InlineKeyboardMarkup([
         [InlineKeyboardButton(f"📅 {current_year}", callback_data=f"eval:year:{current_year}")],
         [InlineKeyboardButton(f"📅 {current_year - 1}", callback_data=f"eval:year:{current_year - 1}")],
+        [InlineKeyboardButton("🔙 رجوع", callback_data="evalmode:back")],
         [InlineKeyboardButton("❌ إلغاء", callback_data="eval:cancel")],
-    ]
+    ])
 
-    await update.message.reply_text(
+
+def _eval_intro_text() -> str:
+    return (
         "╔══════════════════════════════════╗\n"
         "     📊 **تقييم أداء المترجمين**\n"
         "╚══════════════════════════════════╝\n\n"
@@ -507,15 +608,118 @@ async def start_evaluation(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "├ 👤 اسم المترجم\n"
         "├ 📅 الفترة (من - إلى)\n"
         "├ 📄 إجمالي التقارير\n"
-        "├ 📋 تفصيل حسب نوع الإجراء\n"
+        "├ 🌇 قبل 8 مساءً\n"
+        "├ 🌙 بعد 8 مساءً\n"
         "├ 📅 عدد أيام العمل\n"
-        "├ 🕐 تقارير بعد 8 مساءً\n"
-        "└ ⭐ نسبة الأداء العملي\n\n"
-        "اختر السنة:",
-        reply_markup=InlineKeyboardMarkup(keyboard),
+        "└ 📋 تفصيل حسب نوع الإجراء\n\n"
+        "اختر نوع التقييم:"
+    )
+
+
+async def handle_eval_mode(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+
+    data = q.data
+    if data == "evalmode:back":
+        await q.edit_message_text(
+            _eval_intro_text(),
+            reply_markup=_build_mode_keyboard(),
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        return EVAL_SELECT_MODE
+
+    eval_data = context.user_data.setdefault('eval_data', {})
+
+    if data == "evalmode:all":
+        eval_data['mode'] = 'all'
+        eval_data.pop('target_translator_name', None)
+        eval_data.pop('target_translator_id', None)
+        await q.edit_message_text(
+            "📊 **تقييم أداء المترجمين**\n\n👥 الوضع: **كل المترجمين**\n\nاختر السنة:",
+            reply_markup=_build_years_keyboard(),
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        return EVAL_SELECT_YEAR
+
+    if data == "evalmode:single":
+        eval_data['mode'] = 'single'
+        await q.edit_message_text(
+            "👤 **تقييم مترجم فردي**\n\nاختر المترجم من القائمة:",
+            reply_markup=_build_translators_picker(0),
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        return EVAL_SELECT_TRANSLATOR
+
+    return EVAL_SELECT_MODE
+
+
+async def handle_translator_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+
+    data = q.data
+    if data == "evalmode:back":
+        await q.edit_message_text(
+            _eval_intro_text(),
+            reply_markup=_build_mode_keyboard(),
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        return EVAL_SELECT_MODE
+
+    if data.startswith("evaltr:page:"):
+        page = int(data.split(":")[2])
+        try:
+            await q.edit_message_reply_markup(reply_markup=_build_translators_picker(page))
+        except Exception:
+            await q.edit_message_text(
+                "👤 **تقييم مترجم فردي**\n\nاختر المترجم من القائمة:",
+                reply_markup=_build_translators_picker(page),
+                parse_mode=ParseMode.MARKDOWN,
+            )
+        return EVAL_SELECT_TRANSLATOR
+
+    if data.startswith("evaltr:pick:"):
+        try:
+            tid = int(data.split(":")[2])
+        except ValueError:
+            tid = 0
+        with SessionLocal() as s:
+            tr = s.query(TranslatorDirectory).filter_by(translator_id=tid).first() if tid else None
+            name = (tr.name or "").strip() if tr else ""
+        if not name:
+            await q.answer("⚠️ تعذّر قراءة المترجم", show_alert=True)
+            return EVAL_SELECT_TRANSLATOR
+
+        eval_data = context.user_data.setdefault('eval_data', {})
+        eval_data['target_translator_id'] = tid or None
+        eval_data['target_translator_name'] = name
+
+        await q.edit_message_text(
+            f"👤 **تقييم مترجم فردي**\n\nالمترجم: **{name}**\n\nاختر السنة:",
+            reply_markup=_build_years_keyboard(),
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        return EVAL_SELECT_YEAR
+
+    return EVAL_SELECT_TRANSLATOR
+
+
+async def start_evaluation(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نقطة الدخول - اختيار وضع التقييم"""
+    user = update.effective_user
+    if not is_admin(user.id):
+        await update.message.reply_text("هذه الخاصية مخصصة للأدمن فقط.")
+        return ConversationHandler.END
+
+    context.user_data.pop('eval_data', None)
+
+    await update.message.reply_text(
+        _eval_intro_text(),
+        reply_markup=_build_mode_keyboard(),
         parse_mode=ParseMode.MARKDOWN,
     )
-    return EVAL_SELECT_YEAR
+    return EVAL_SELECT_MODE
 
 
 def _build_day_calendar(year, month):
@@ -695,15 +899,16 @@ async def handle_month(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
 
     if q.data == "eval:back_year":
-        current_year = date.today().year
-        keyboard = [
-            [InlineKeyboardButton(f"📅 {current_year}", callback_data=f"eval:year:{current_year}")],
-            [InlineKeyboardButton(f"📅 {current_year - 1}", callback_data=f"eval:year:{current_year - 1}")],
-            [InlineKeyboardButton("❌ إلغاء", callback_data="eval:cancel")],
-        ]
+        eval_data = context.user_data.get('eval_data', {})
+        mode = eval_data.get('mode', 'all')
+        tname = (eval_data.get('target_translator_name') or "").strip()
+        if mode == 'single' and tname:
+            title = f"👤 **تقييم مترجم فردي**\n\nالمترجم: **{tname}**\n\nاختر السنة:"
+        else:
+            title = "📊 **تقييم أداء المترجمين**\n\n👥 الوضع: **كل المترجمين**\n\nاختر السنة:"
         await q.edit_message_text(
-            "📊 **تقييم أداء المترجمين**\n\nاختر السنة:",
-            reply_markup=InlineKeyboardMarkup(keyboard),
+            title,
+            reply_markup=_build_years_keyboard(),
             parse_mode=ParseMode.MARKDOWN,
         )
         return EVAL_SELECT_YEAR
@@ -1006,11 +1211,29 @@ async def handle_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 return ConversationHandler.END
 
+            # تصفية لمترجم فردي إن اختير
+            target_tid = data.get('target_translator_id')
+            target_tname = (data.get('target_translator_name') or "").strip()
+            if target_tname or target_tid:
+                def _match(r):
+                    if target_tid and r.get('translator_id') == target_tid:
+                        return True
+                    rn = (r.get('translator_name') or "").strip().lower()
+                    return rn == target_tname.lower()
+                raw_stats = [r for r in raw_stats if _match(r)]
+                if not raw_stats:
+                    await q.edit_message_text(
+                        f"⚠️ **لا توجد تقارير للمترجم:** {target_tname}\n"
+                        f"📅 خلال الفترة: {period_label}",
+                        parse_mode=ParseMode.MARKDOWN,
+                    )
+                    return ConversationHandler.END
+
             # إضافة التقييم فوق الإحصائيات
             results = _compute_rating(raw_stats)
 
-            # حفظ في قاعدة البيانات (فقط للشهور الكاملة أو السنة الكاملة)
-            if period_type not in ("day", "custom"):
+            # حفظ في قاعدة البيانات (فقط للشهور الكاملة أو السنة الكاملة، ولتقييم الكل فقط)
+            if period_type not in ("day", "custom") and not (target_tname or target_tid):
                 _save_evaluations_to_db(session, results, year, month)
 
             # إرسال ملخص نصي
@@ -1138,21 +1361,33 @@ async def handle_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await q.message.reply_text("\n".join(diag_lines), parse_mode=ParseMode.MARKDOWN)
 
             total_before = total_reports - total_late
-            header = (
-                f"╔══════════════════════════════════╗\n"
-                f"  ✅ **تم إعداد تقرير التقييم**\n"
-                f"╚══════════════════════════════════╝\n\n"
-                f"📅 الفترة: **{period_label}**\n"
-                f"👥 المترجمين: **{len(results)}**\n"
-                f"📄 إجمالي التقارير: **{total_reports}**\n"
-                f"🌇 تقارير قبل 8 مساءً: **{total_before}**\n"
-                f"🌙 تقارير بعد 8 مساءً: **{total_late}**\n"
-            )
+            if target_tname:
+                header = (
+                    f"╔══════════════════════════════════╗\n"
+                    f"  ✅ **تم إعداد تقرير التقييم الفردي**\n"
+                    f"╚══════════════════════════════════╝\n\n"
+                    f"👤 المترجم: **{target_tname}**\n"
+                    f"📅 الفترة: **{period_label}**\n"
+                    f"📄 إجمالي التقارير: **{total_reports}**\n"
+                    f"🌇 تقارير قبل 8 مساءً: **{total_before}**\n"
+                    f"🌙 تقارير بعد 8 مساءً: **{total_late}**\n"
+                )
+            else:
+                header = (
+                    f"╔══════════════════════════════════╗\n"
+                    f"  ✅ **تم إعداد تقرير التقييم**\n"
+                    f"╚══════════════════════════════════╝\n\n"
+                    f"📅 الفترة: **{period_label}**\n"
+                    f"👥 المترجمين: **{len(results)}**\n"
+                    f"📄 إجمالي التقارير: **{total_reports}**\n"
+                    f"🌇 تقارير قبل 8 مساءً: **{total_before}**\n"
+                    f"🌙 تقارير بعد 8 مساءً: **{total_late}**\n"
+                )
             await q.message.reply_text(header, parse_mode=ParseMode.MARKDOWN)
 
             # إرسال تفاصيل كل مترجم
             for i, item in enumerate(results, 1):
-                medal = _medal(i)
+                medal = "👤" if target_tname else _medal(i)
                 before_8pm = item.get('before_8pm_reports', max(item['total_reports'] - item['late_reports'], 0))
                 detail = f"{medal} **{item['translator_name']}**\n"
                 detail += f"├ 📄 إجمالي التقارير: **{item['total_reports']}**\n"
@@ -1180,7 +1415,15 @@ async def handle_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await _send_text_chunks(q.message, detail)
 
             # توليد وإرسال الملفات
-            file_prefix = f"تقييم_المترجمين_{year}"
+            if target_tname:
+                safe_name = re.sub(r"[^\w\-]+", "_", target_tname, flags=re.UNICODE).strip("_") or "مترجم"
+                file_prefix = f"تقييم_فردي_{safe_name}_{year}"
+                caption_pdf = f"📄 تقرير تقييم المترجم: {target_tname} - {period_label}"
+                caption_xlsx = f"📊 تقرير Excel: {target_tname} - {period_label}"
+            else:
+                file_prefix = f"تقييم_المترجمين_{year}"
+                caption_pdf = f"📄 تقرير تقييم المترجمين - {period_label}"
+                caption_xlsx = f"📊 تقرير Excel - {period_label}"
             if period_type == "day" and data.get('day'):
                 file_prefix += f"_{data['day'].strftime('%Y_%m_%d')}"
             elif period_type == "custom" and data.get('start_date') and data.get('end_date'):
@@ -1190,12 +1433,12 @@ async def handle_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             if fmt in ('pdf', 'both'):
                 try:
-                    file_bytes, file_ext = _generate_pdf(results, period_label, year, month, start_date_str, end_date_str)
+                    file_bytes, file_ext = _generate_pdf(results, period_label, year, month, start_date_str, end_date_str, target_name=target_tname or None)
                     file_obj = io.BytesIO(file_bytes)
                     file_obj.name = f"{file_prefix}.{file_ext}"
                     await q.message.reply_document(
                         document=file_obj,
-                        caption=f"📄 تقرير تقييم المترجمين - {period_label}",
+                        caption=caption_pdf,
                     )
                     if file_ext != "pdf":
                         await q.message.reply_text("⚠️ تم إرسال HTML لأن PDF غير متوفر.")
@@ -1205,12 +1448,12 @@ async def handle_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             if fmt in ('excel', 'both'):
                 try:
-                    excel_bytes = _generate_excel(results, period_label, year, month)
+                    excel_bytes = _generate_excel(results, period_label, year, month, target_name=target_tname or None)
                     excel_file = io.BytesIO(excel_bytes)
                     excel_file.name = f"{file_prefix}.xlsx"
                     await q.message.reply_document(
                         document=excel_file,
-                        caption=f"📊 تقرير تقييم المترجمين - {period_label}",
+                        caption=caption_xlsx,
                     )
                 except Exception as e:
                     logger.error(f"خطأ في Excel: {e}", exc_info=True)
@@ -1309,35 +1552,13 @@ async def start_evaluation_callback(update: Update, context: ContextTypes.DEFAUL
 
     context.user_data.pop('eval_data', None)
 
-    current_year = date.today().year
-    keyboard = [
-        [InlineKeyboardButton(f"📅 {current_year}", callback_data=f"eval:year:{current_year}")],
-        [InlineKeyboardButton(f"📅 {current_year - 1}", callback_data=f"eval:year:{current_year - 1}")],
-        [InlineKeyboardButton("❌ إلغاء", callback_data="eval:cancel")],
-    ]
-
-    text = (
-        "╔══════════════════════════════════╗\n"
-        "     📊 **تقييم أداء المترجمين**\n"
-        "╚══════════════════════════════════╝\n\n"
-        "📌 **التقرير يتضمن:**\n"
-        "├ 👤 اسم المترجم\n"
-        "├ 📅 الفترة (من - إلى)\n"
-        "├ 📄 إجمالي التقارير\n"
-        "├ 📋 تفصيل حسب نوع الإجراء\n"
-        "├ 📅 عدد أيام العمل\n"
-        "├ 🕐 تقارير بعد 8 مساءً\n"
-        "└ ⭐ نسبة الأداء العملي\n\n"
-        "اختر السنة:"
-    )
-
     if query:
         await query.edit_message_text(
-            text,
-            reply_markup=InlineKeyboardMarkup(keyboard),
+            _eval_intro_text(),
+            reply_markup=_build_mode_keyboard(),
             parse_mode=ParseMode.MARKDOWN,
         )
-    return EVAL_SELECT_YEAR
+    return EVAL_SELECT_MODE
 
 
 def register(app):
@@ -1348,7 +1569,17 @@ def register(app):
             CallbackQueryHandler(start_evaluation_callback, pattern=r"^(admin:evaluation|eval_translators|translator_evaluation)$"),
         ],
         states={
+            EVAL_SELECT_MODE: [
+                CallbackQueryHandler(handle_eval_mode, pattern=r"^evalmode:"),
+                CallbackQueryHandler(_cancel_evaluation, pattern=r"^eval:cancel$"),
+            ],
+            EVAL_SELECT_TRANSLATOR: [
+                CallbackQueryHandler(handle_translator_pick, pattern=r"^evaltr:"),
+                CallbackQueryHandler(handle_eval_mode, pattern=r"^evalmode:"),
+                CallbackQueryHandler(_cancel_evaluation, pattern=r"^eval:cancel$"),
+            ],
             EVAL_SELECT_YEAR: [
+                CallbackQueryHandler(handle_eval_mode, pattern=r"^evalmode:back$"),
                 CallbackQueryHandler(handle_year, pattern=r"^eval:"),
             ],
             EVAL_SELECT_MONTH: [
