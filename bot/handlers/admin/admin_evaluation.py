@@ -126,47 +126,34 @@ async def _send_text_chunks(message, text):
 
 def _compute_rating(stats_results):
     """
-    إضافة التقييم (النسبة + المستوى) على نتائج stats_service.
+    يحسب عدد التقارير قبل 8 مساءً (= إجمالي - متأخر) لكل مترجم، ويُرتّب النتائج
+    من الأعلى إجمالي تقارير إلى الأدنى، ثم الأقل تأخراً عند التعادل.
 
-    معيار الترتيب (حسب طلب الإدارة):
-    1) الالتزام: أقل تقارير بعد 8 مساءً / أعلى نسبة قبل 8 مساءً (الأولوية الأولى)
-    2) عدد التقارير (الأولوية الثانية عند التعادل)
-
-    ملاحظة: نحتفظ بحقل final_score كنسبة الالتزام (قبل 8 مساءً) لعرضها في التقرير.
+    ملاحظة: بناءً على طلب الإدارة تمت إزالة حقول التقييم (النسبة/المستوى/النجوم)
+    من العرض، لكن نُبقي حقول التوافق القديمة بقيم صفرية لكيلا تنكسر
+    الاستدعاءات الأخرى التي تحفظ في قاعدة البيانات.
     """
     if not stats_results:
         return []
 
     results = []
     for s in stats_results:
-        total = s['total_reports']
-        work_days = s['work_days']
-        attendance_days = s['attendance_days']
-        late = s['late_reports']
-
-        # الالتزام الزمني: نسبة التقارير قبل 8 مساءً
-        if total > 0:
-            punctuality_pct = ((total - late) / total) * 100
-        else:
-            punctuality_pct = 100
-
-        # final_score = نسبة الالتزام (للعرض)
-        final_score = round(punctuality_pct, 1)
-
-        level, color, stars = _rating_label(final_score)
+        total = int(s.get('total_reports') or 0)
+        late = int(s.get('late_reports') or 0)
+        before_8pm = max(total - late, 0)
 
         results.append({
             **s,
-            'final_score': final_score,
-            'punctuality_pct': final_score,
-            'level': level,
-            'color': color,
-            'stars': stars,
+            'before_8pm_reports': before_8pm,
+            # للتوافق مع الحفظ القديم فقط — ليست معروضة للمستخدم
+            'final_score': 0,
+            'punctuality_pct': 0,
+            'level': '-',
+            'color': '',
+            'stars': '',
         })
 
-    # الترتيب: الأعلى التزاماً أولاً، ثم الأعلى تقارير
-    # (late_reports أقل يعني punctuality أعلى، لكن نرتب مباشرة على punctuality)
-    results.sort(key=lambda x: (-x.get('punctuality_pct', 0), -x['total_reports']))
+    results.sort(key=lambda x: (-x['total_reports'], x['late_reports']))
     return results
 
 
@@ -242,12 +229,13 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
     story.append(Paragraph(r(f"من {start_date_str} إلى {end_date_str}"), subtitle_style))
     story.append(Spacer(1, 12))
 
+    total_before = total_reports - total_late
     summary_table = Table(
         [
-            [r("تقارير بعد 8 مساءً"), r("إجمالي التقارير"), r("عدد المترجمين")],
-            [str(total_late), str(total_reports), str(len(results))]
+            [r("تقارير بعد 8 مساءً"), r("تقارير قبل 8 مساءً"), r("إجمالي التقارير"), r("عدد المترجمين")],
+            [str(total_late), str(total_before), str(total_reports), str(len(results))]
         ],
-        colWidths=[150, 150, 150]
+        colWidths=[120, 120, 120, 120]
     )
     summary_table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1a237e")),
@@ -262,19 +250,16 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
     story.append(Spacer(1, 16))
 
     for i, item in enumerate(results, 1):
-        # اسم المترجم + التقييم
-        level = item.get('level', '-')
-        score = item.get('final_score', 0)
-        stars = item.get('stars', '')
-        story.append(Paragraph(r(f"{_medal(i)} {item['translator_name']} - {level} ({score}%) {stars}"), section_style))
+        story.append(Paragraph(r(f"{_medal(i)} {item['translator_name']}"), section_style))
         story.append(Spacer(1, 6))
 
+        before_8pm = item.get("before_8pm_reports", max(item["total_reports"] - item["late_reports"], 0))
         info_table = Table(
             [
                 [str(item["total_reports"]), r("إجمالي التقارير")],
-                [str(item["work_days"]), r("أيام العمل")],
+                [str(before_8pm), r("تقارير قبل 8 مساءً")],
                 [str(item["late_reports"]), r("تقارير بعد 8 مساءً")],
-                [f"{score}% - {r(level)}", r("التقييم")],
+                [str(item["work_days"]), r("أيام العمل")],
             ],
             colWidths=[140, 270]
         )
@@ -346,18 +331,19 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
 
 def _generate_html_fallback(results, period_label, year, month, start_date_str, end_date_str, total_reports, total_late):
     """HTML fallback إذا فشل reportlab"""
+    total_before = total_reports - total_late
     translator_pages = ""
     for i, item in enumerate(results, 1):
         actions_rows = ""
         for action_name, count in sorted(item.get('action_breakdown', {}).items(), key=lambda x: x[1], reverse=True):
-            pct = (count / item['total_reports'] * 100) if item['total_reports'] > 0 else 0
             color = "" if count > 0 else ' style="color:#bbb;"'
-            actions_rows += f'<tr{color}><td style="text-align:right;padding:5px 10px;">{action_name}</td><td style="text-align:center;padding:5px 10px;">{count}</td><td style="text-align:center;padding:5px 10px;">{pct:.0f}%</td></tr>'
+            actions_rows += f'<tr{color}><td style="text-align:right;padding:5px 10px;">{action_name}</td><td style="text-align:center;padding:5px 10px;">{count}</td></tr>'
+        before_8pm = item.get("before_8pm_reports", max(item["total_reports"] - item["late_reports"], 0))
         translator_pages += f'''<div style="page-break-before:always;"><h2>{_medal(i)} {item["translator_name"]}</h2>
-        <p>إجمالي التقارير: <b>{item["total_reports"]}</b> | أيام العمل: <b>{item["work_days"]}</b> | بعد 8 مساءً: <b>{item["late_reports"]}</b></p>
-        <table border="1" cellpadding="5"><tr><th>نوع الإجراء</th><th>العدد</th><th>النسبة</th></tr>{actions_rows}</table></div>'''
+        <p>إجمالي التقارير: <b>{item["total_reports"]}</b> | قبل 8 مساءً: <b>{before_8pm}</b> | بعد 8 مساءً: <b>{item["late_reports"]}</b> | أيام العمل: <b>{item["work_days"]}</b></p>
+        <table border="1" cellpadding="5"><tr><th>نوع الإجراء</th><th>العدد</th></tr>{actions_rows}</table></div>'''
 
-    html = f'<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8"></head><body><h1>تقرير تقييم المترجمين</h1><p>{period_label} | مترجمين: {len(results)} | تقارير: {total_reports} | بعد 8 مساءً: {total_late}</p>{translator_pages}</body></html>'
+    html = f'<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8"></head><body><h1>تقرير تقييم المترجمين</h1><p>{period_label} | مترجمين: {len(results)} | تقارير: {total_reports} | قبل 8 مساءً: {total_before} | بعد 8 مساءً: {total_late}</p>{translator_pages}</body></html>'
     return html.encode("utf-8")
 
 
@@ -395,24 +381,17 @@ def _generate_excel(results, period_label, year, month):
         top=Side(style='thin', color='CCCCCC'),
         bottom=Side(style='thin', color='CCCCCC'),
     )
-    level_fills = {
-        'ممتاز': PatternFill(start_color='E8F5E9', end_color='E8F5E9', fill_type='solid'),
-        'جيد': PatternFill(start_color='FFF8E1', end_color='FFF8E1', fill_type='solid'),
-        'مقبول': PatternFill(start_color='FFF3E0', end_color='FFF3E0', fill_type='solid'),
-        'ضعيف': PatternFill(start_color='FFEBEE', end_color='FFEBEE', fill_type='solid'),
-    }
-
-    ws.merge_cells('A1:G1')
+    ws.merge_cells('A1:F1')
     ws['A1'] = f"تقرير تقييم أداء المترجمين - {period_label}"
     ws['A1'].font = title_font
     ws['A1'].alignment = center_align
 
-    ws.merge_cells('A2:G2')
+    ws.merge_cells('A2:F2')
     ws['A2'] = f"تاريخ الإصدار: {datetime.now().strftime('%Y-%m-%d %H:%M')}"
     ws['A2'].font = Font(name='Arial', size=10, color='777777')
     ws['A2'].alignment = center_align
 
-    headers = ['الترتيب', 'المترجم', 'إجمالي التقارير', 'أيام العمل', 'بعد 8 مساءً', 'النسبة %', 'التقييم']
+    headers = ['الترتيب', 'المترجم', 'إجمالي التقارير', 'قبل 8 مساءً', 'بعد 8 مساءً', 'أيام العمل']
 
     row = 4
     for col, header in enumerate(headers, 1):
@@ -429,14 +408,14 @@ def _generate_excel(results, period_label, year, month):
         elif i == 2: medal = "🥈 "
         elif i == 3: medal = "🥉 "
 
+        before_8pm = item.get('before_8pm_reports', max(item['total_reports'] - item['late_reports'], 0))
         values = [
             i,
             f"{medal}{item['translator_name']}",
             item['total_reports'],
-            item['work_days'],
+            before_8pm,
             item['late_reports'],
-            item.get('final_score', 0),
-            item.get('level', '-'),
+            item['work_days'],
         ]
 
         for col, val in enumerate(values, 1):
@@ -444,13 +423,8 @@ def _generate_excel(results, period_label, year, month):
             cell.font = bold_font if col == 2 else normal_font
             cell.alignment = center_align if col != 2 else right_align
             cell.border = thin_border
-            # تلوين خلية التقييم حسب المستوى
-            if col == 7:
-                level_fill = level_fills.get(str(val))
-                if level_fill:
-                    cell.fill = level_fill
 
-    col_widths = [8, 25, 15, 12, 14, 10, 12]
+    col_widths = [8, 28, 15, 14, 14, 12]
     for i, w in enumerate(col_widths, 1):
         ws.column_dimensions[get_column_letter(i)].width = w
 
@@ -461,14 +435,14 @@ def _generate_excel(results, period_label, year, month):
     ws2.sheet_properties.pageSetUpPr = PageSetupProperties(fitToPage=True)
     ws2.print_options.horizontalCentered = True
 
-    total_cols = 1 + len(ALL_ACTION_TYPES) + 2
+    total_cols = 1 + len(ALL_ACTION_TYPES) + 3
     end_col_letter = get_column_letter(total_cols)
     ws2.merge_cells(f'A1:{end_col_letter}1')
     ws2['A1'] = f"تفصيل التقارير حسب نوع الإجراء - {period_label}"
     ws2['A1'].font = title_font
     ws2['A1'].alignment = center_align
 
-    detail_headers = ['المترجم'] + ALL_ACTION_TYPES + ['المجموع', 'بعد 8 مساءً']
+    detail_headers = ['المترجم'] + ALL_ACTION_TYPES + ['المجموع', 'قبل 8 مساءً', 'بعد 8 مساءً']
 
     row = 3
     for col, header in enumerate(detail_headers, 1):
@@ -484,7 +458,9 @@ def _generate_excel(results, period_label, year, month):
         values = [item['translator_name']]
         for action_type in ALL_ACTION_TYPES:
             values.append(action_breakdown.get(action_type, 0))
+        before_8pm = item.get('before_8pm_reports', max(item['total_reports'] - item['late_reports'], 0))
         values.append(item['total_reports'])
+        values.append(before_8pm)
         values.append(item['late_reports'])
 
         for col, val in enumerate(values, 1):
@@ -1161,6 +1137,7 @@ async def handle_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             await q.message.reply_text("\n".join(diag_lines), parse_mode=ParseMode.MARKDOWN)
 
+            total_before = total_reports - total_late
             header = (
                 f"╔══════════════════════════════════╗\n"
                 f"  ✅ **تم إعداد تقرير التقييم**\n"
@@ -1168,18 +1145,20 @@ async def handle_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"📅 الفترة: **{period_label}**\n"
                 f"👥 المترجمين: **{len(results)}**\n"
                 f"📄 إجمالي التقارير: **{total_reports}**\n"
-                f"🕐 تقارير بعد 8 مساءً: **{total_late}**\n"
+                f"🌇 تقارير قبل 8 مساءً: **{total_before}**\n"
+                f"🌙 تقارير بعد 8 مساءً: **{total_late}**\n"
             )
             await q.message.reply_text(header, parse_mode=ParseMode.MARKDOWN)
 
             # إرسال تفاصيل كل مترجم
             for i, item in enumerate(results, 1):
                 medal = _medal(i)
+                before_8pm = item.get('before_8pm_reports', max(item['total_reports'] - item['late_reports'], 0))
                 detail = f"{medal} **{item['translator_name']}**\n"
-                detail += f"├ ⭐ التقييم: **{item.get('level', '-')}** ({item.get('final_score', 0)}%) {item.get('stars', '')}\n"
                 detail += f"├ 📄 إجمالي التقارير: **{item['total_reports']}**\n"
+                detail += f"├ 🌇 قبل 8 مساءً: **{before_8pm}**\n"
+                detail += f"├ 🌙 بعد 8 مساءً: **{item['late_reports']}**\n"
                 detail += f"├ 📅 أيام العمل: **{item['work_days']}** يوم\n"
-                detail += f"├ 🕐 بعد 8 مساءً: **{item['late_reports']}**\n"
 
                 # تفصيل الإجراءات (غير الصفرية فقط)
                 non_zero = {k: v for k, v in item.get('action_breakdown', {}).items() if v > 0}
