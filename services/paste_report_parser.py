@@ -297,6 +297,14 @@ def parse_full_report_text(raw: str) -> Tuple[Dict[str, Any], List[str]]:
     out["medical_action"] = grab_line(r"📌\s*نوع الإجراء:\s*(.+?)(?:\n|$)") or grab_line(
         r"نوع الإجراء:\s*(.+?)(?:\n|$)"
     )
+    # تنظيف محارف الزخرفة/الخطوط الفاصلة (مثل ━) وعلامات RTL من اسم الإجراء
+    if out.get("medical_action"):
+        try:
+            from services.stats_service import normalize_action_name as _norm_action
+            cleaned = _norm_action(out["medical_action"])
+            out["medical_action"] = cleaned or None
+        except Exception:
+            pass
 
     case_block, _ = _extract_block(
         text,

@@ -307,10 +307,11 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
         story.append(Spacer(1, 12))
 
         # جدول تفصيل الإجراءات (مع دمج دفاعي لأي مفاتيح متطابقة بعد التطبيع)
+        from services.stats_service import normalize_action_name as _norm_action
         raw_breakdown = item.get("action_breakdown", {})
         action_breakdown: dict[str, int] = {}
         for k, v in raw_breakdown.items():
-            nk = " ".join(str(k or "").split())
+            nk = _norm_action(k)
             if not nk:
                 continue
             action_breakdown[nk] = action_breakdown.get(nk, 0) + int(v or 0)

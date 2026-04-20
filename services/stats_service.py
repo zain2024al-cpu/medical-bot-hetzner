@@ -17,12 +17,51 @@
 # ================================================
 
 import logging
+import re as _re
 import sqlite3
 from datetime import datetime, date, timedelta
 from sqlalchemy import text
 from db.session import DATABASE_PATH
 
 logger = logging.getLogger(__name__)
+
+
+# محارف تزيينية/مخفية شائعة قد تلتصق بأسماء الإجراءات عند اللصق من رسائل تيليجرام
+# (خطوط أفقية، علامات RTL/LRM، فراغات صفرية، شرطات طويلة، tatweel، tashkeel)
+_DECORATION_CHARS = (
+    "\u200b\u200c\u200d\u200e\u200f\u202a\u202b\u202c\u202d\u202e"
+    "\u2066\u2067\u2068\u2069\ufeff"
+    "\u0640"  # Arabic tatweel
+)
+_BOX_DRAWING_RANGE = _re.compile(r"[\u2500-\u257F]+")
+_DASH_RANGE = _re.compile(r"[\u2010-\u2015]+")
+_TASHKEEL_RANGE = _re.compile(r"[\u064B-\u0652\u0670]+")
+_TRAILING_PUNCT = _re.compile(r"[\s\-_.،,:;/\\|•·–—]+$")
+_LEADING_PUNCT = _re.compile(r"^[\s\-_.،,:;/\\|•·–—]+")
+
+
+def normalize_action_name(s) -> str:
+    """
+    تطبيع اسم الإجراء: إزالة خطوط التزيين/علامات RTL ودمج الفراغات،
+    لمنع تكرار مفاتيح مثل «تأجيل موعد» و«تأجيل موعد━».
+    """
+    if s is None:
+        return ""
+    t = str(s)
+    # إزالة المحارف غير المرئية/التزيينية
+    for ch in _DECORATION_CHARS:
+        t = t.replace(ch, "")
+    # إزالة خطوط الرسم (━ ─ ┃ …) والشرطات الطويلة
+    t = _BOX_DRAWING_RANGE.sub(" ", t)
+    t = _DASH_RANGE.sub(" ", t)
+    # إزالة التشكيل
+    t = _TASHKEEL_RANGE.sub("", t)
+    # دمج الفراغات
+    t = " ".join(t.split())
+    # إزالة علامات الترقيم من البداية/النهاية
+    t = _LEADING_PUNCT.sub("", t)
+    t = _TRAILING_PUNCT.sub("", t)
+    return t.strip()
 
 # ساعة 0–23 بالـ IST لاحتساب «بعد 8 مساءً» في SQLite (نفس ترتيب المنطق في Python)
 _EFF_HOUR_IST_FOR_LATE_SQL = """(
@@ -189,12 +228,11 @@ def _run_translator_query(session, start_date_str: str, end_date_str: str):
 
         action_rows = session.execute(action_sql, {"start": start_date_str, "end": end_date_str}).fetchall()
 
-        # تجميع الإجراءات حسب الاسم (مع تطبيع المفاتيح لمنع التكرار بسبب مسافات إضافية)
+        # تجميع الإجراءات حسب الاسم (مع تطبيع المفاتيح لمنع التكرار بسبب مسافات/خطوط زخرفية)
         action_map = {}
         for row in action_rows:
             tname = row[0]
-            raw_action = row[1] or "أخرى"
-            action_type = " ".join(str(raw_action).split()) or "أخرى"
+            action_type = normalize_action_name(row[1]) or "أخرى"
             count = row[2]
             if tname not in action_map:
                 action_map[tname] = {}
@@ -217,7 +255,7 @@ def _run_translator_query(session, start_date_str: str, end_date_str: str):
             raw_actions = action_map.get(name, {})
             action_breakdown = {a: 0 for a in ALL_ACTION_TYPES}
             for action_name, count in raw_actions.items():
-                action_name_clean = " ".join((action_name or "").split())
+                action_name_clean = normalize_action_name(action_name)
                 if not action_name_clean:
                     continue
                 # += بدلاً من = لتجميع أي متغيرات متطابقة بعد التطبيع
@@ -332,7 +370,7 @@ def _run_translator_query_resilient(start_date_str: str, end_date_str: str):
         if _effective_ist_hour_for_late(visit_time, report_date, created_at) >= 20:
             item["late_reports"] += 1
 
-        action_name = " ".join(str(medical_action or "أخرى").split()) or "أخرى"
+        action_name = normalize_action_name(medical_action) or "أخرى"
         item["action_breakdown"][action_name] = item["action_breakdown"].get(action_name, 0) + 1
 
     con.close()
