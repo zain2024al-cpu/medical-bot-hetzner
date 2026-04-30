@@ -63,6 +63,8 @@ DIRECT_DEPARTMENTS = [
     "الأذن والأنف والحنجرة | ENT",
     "الأمراض الجلدية | Dermatology",
     "النساء والتوليد | Obstetrics & Gynecology",
+    "الطب النووي | Nuclear Medicine",
+    "طب الأسنان | Dentistry",
     "العلاج الطبيعي وإعادة التأهيل | Physical Therapy & Rehabilitation",
     "علاج وإدارة الألم | Pain Management",
     "الطب النفسي | Psychiatry",

@@ -34,6 +34,9 @@ NOTIFICATIONS_GROUP_ID = os.getenv("NOTIFICATIONS_GROUP_ID", "")
 # 📢 معرف مجموعة التقارير (لنشر التقارير)
 REPORTS_GROUP_ID = os.getenv("REPORTS_GROUP_ID", "")
 
+# 📄 معرف مجموعة التقارير الطبية (PDF الصور الطبية)
+MEDICAL_REPORTS_GROUP_ID = os.getenv("MEDICAL_REPORTS_GROUP_ID", "-1002190577845")
+
 # 🗂️ مسار قاعدة البيانات
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "..", "db", "medical_reports.db")

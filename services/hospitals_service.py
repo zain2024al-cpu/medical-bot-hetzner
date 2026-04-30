@@ -62,6 +62,28 @@ def get_all_hospitals() -> List[str]:
     الحصول على جميع أسماء المستشفيات
     Returns list of hospital names
     """
+    # ✅ مصدر الحقيقة: قاعدة البيانات (Hospital table)
+    try:
+        from db.session import SessionLocal
+        from db.models import Hospital
+        with SessionLocal() as s:
+            rows = s.query(Hospital).order_by(Hospital.name).all()
+            if rows:
+                names = [r.name for r in rows if r.name]
+                # dedupe while preserving DB order
+                seen = set()
+                out = []
+                for n in names:
+                    k = n.strip().lower()
+                    if k in seen:
+                        continue
+                    seen.add(k)
+                    out.append(n)
+                return out
+    except Exception as e:
+        logger.warning(f"⚠️ Could not load hospitals from DB in hospitals_service: {e}")
+
+    # fallback قديم: JSON
     _load_data()
     return _HOSPITALS_LIST.copy()
 

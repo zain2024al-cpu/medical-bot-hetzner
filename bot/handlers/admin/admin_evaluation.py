@@ -76,6 +76,17 @@ def _report_label(count: int) -> str:
     return "تقرير" if count == 1 else "تقارير"
 
 
+def _normalize_person_name(name: str) -> str:
+    """تطبيع بسيط لأسماء الأشخاص لتقليل مشاكل اختلاف الهمزات/المسافات."""
+    s = (name or "").strip().lower()
+    if not s:
+        return ""
+    s = re.sub(r"\s+", " ", s)
+    s = s.replace("أ", "ا").replace("إ", "ا").replace("آ", "ا").replace("ٱ", "ا")
+    s = s.replace("ة", "ه").replace("ى", "ي")
+    return s
+
+
 def _get_daily_counts(session, translator_id, start_date, end_date, translator_name=None):
     """جلب عدد التقارير اليومية - بالاسم أولاً (لتوحيد المترجمين) ثم بالـ ID"""
     if not translator_id and not translator_name:
@@ -203,6 +214,10 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
     # تسجيل خط عربي
     font_name = "Helvetica"
     font_options = [
+        ("C:\\Windows\\Fonts\\cairo.ttf", "Cairo"),
+        ("C:\\Windows\\Fonts\\Cairo-Regular.ttf", "Cairo"),
+        ("C:\\Windows\\Fonts\\tajawal.ttf", "Tajawal"),
+        ("C:\\Windows\\Fonts\\Tajawal-Regular.ttf", "Tajawal"),
         ("C:\\Windows\\Fonts\\tahoma.ttf", "Tahoma"),
         ("C:\\Windows\\Fonts\\arial.ttf", "Arial"),
         ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "DejaVuSans"),
@@ -220,94 +235,122 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
         value = "" if text_val is None else str(text_val)
         return get_display(reshape(value))
 
+    # تصميم احترافي متعدد الصفحات
+    from reportlab.platypus import Flowable
+    from reportlab.graphics.shapes import Drawing, Rect, String
+    from reportlab.graphics.charts.barcharts import VerticalBarChart
+    from reportlab.lib.units import mm
+    from services.stats_service import normalize_action_name as _norm_action
+
+    MAIN = colors.HexColor("#0D47A1")
+    MAIN_LIGHT = colors.HexColor("#E3F2FD")
+    ACCENT = colors.HexColor("#26A69A")
+    CARD_BG = colors.HexColor("#F8FAFC")
+    GRID = colors.HexColor("#DDE3EA")
+
+    class HeaderBand(Flowable):
+        def __init__(self, title_text: str, subtitle_text: str):
+            super().__init__()
+            self.width = 540
+            self.height = 62
+            self.title_text = title_text
+            self.subtitle_text = subtitle_text
+
+        def draw(self):
+            c = self.canv
+            c.setFillColor(MAIN)
+            c.roundRect(0, 0, self.width, self.height, 8, stroke=0, fill=1)
+            # شعار مبسط (badge) بدلاً من صورة
+            c.setFillColor(colors.white)
+            c.circle(24, self.height / 2, 14, stroke=0, fill=1)
+            c.setFillColor(MAIN)
+            c.setFont(font_name, 14)
+            c.drawCentredString(24, self.height / 2 - 5, "T")
+            c.setFillColor(colors.white)
+            c.setFont(font_name, 24)
+            c.drawRightString(self.width - 12, self.height - 34, self.title_text)
+            if self.subtitle_text:
+                c.setFont(font_name, 11)
+                c.setFillColor(colors.HexColor("#D6E4FF"))
+                c.drawRightString(self.width - 12, 12, self.subtitle_text)
+
+    def _draw_card(label: str, value: str, width=250, height=84, color=MAIN, value_color=None, label_color=None):
+        d = Drawing(width, height)
+        d.add(Rect(0, 0, width, height, rx=8, ry=8, fillColor=CARD_BG, strokeColor=GRID, strokeWidth=0.8))
+        d.add(Rect(0, height - 8, width, 8, fillColor=color, strokeColor=color, strokeWidth=0))
+        d.add(String(
+            width - 10,
+            height - 32,
+            r(label),
+            fontName=font_name,
+            fontSize=12,
+            fillColor=(label_color or colors.HexColor("#455A64")),
+            textAnchor="end",
+        ))
+        d.add(String(
+            width - 10,
+            18,
+            str(value),
+            fontName=font_name,
+            fontSize=24,
+            fillColor=(value_color or MAIN),
+            textAnchor="end",
+        ))
+        return d
+
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=24, leftMargin=24, topMargin=26, bottomMargin=26)
-
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=18, leftMargin=18, topMargin=14, bottomMargin=14)
     styles = getSampleStyleSheet()
-    base_style = ParagraphStyle("base", parent=styles["Normal"], fontName=font_name, fontSize=14, leading=19, alignment=TA_RIGHT)
-    title_style = ParagraphStyle("title", parent=styles["Title"], fontName=font_name, fontSize=22, leading=28, alignment=TA_CENTER)
-    subtitle_style = ParagraphStyle("subtitle", parent=styles["Heading2"], fontName=font_name, fontSize=16, leading=22, alignment=TA_CENTER)
-    section_style = ParagraphStyle("section", parent=styles["Heading3"], fontName=font_name, fontSize=17, leading=22, alignment=TA_RIGHT)
-
-    # أحجام الخطوط داخل الجداول
-    TBL_HEADER_FS = 14
-    TBL_CELL_FS = 13
-    DAY_CELL_FS = 12
+    report_title_style = ParagraphStyle("report_title", parent=styles["Heading1"], fontName=font_name, fontSize=28, leading=34, alignment=TA_CENTER)
+    date_style = ParagraphStyle("date", parent=styles["Normal"], fontName=font_name, fontSize=14, leading=18, alignment=TA_CENTER, textColor=colors.HexColor("#455A64"))
+    base_style = ParagraphStyle("base", parent=styles["Normal"], fontName=font_name, fontSize=12, leading=16, alignment=TA_RIGHT)
+    section_style = ParagraphStyle("section", parent=styles["Heading3"], fontName=font_name, fontSize=18, leading=24, alignment=TA_CENTER, textColor=MAIN)
 
     story = []
-    header_title = "تقرير تقييم مترجم فردي" if target_name else "تقرير تقييم أداء المترجمين"
-    story.append(Paragraph(r(header_title), title_style))
-    if target_name:
-        story.append(Paragraph(r(f"المترجم: {target_name}"), subtitle_style))
-    story.append(Paragraph(r(f"من {start_date_str} إلى {end_date_str}"), subtitle_style))
-    story.append(Spacer(1, 14))
-
     total_before = total_reports - total_late
-    if target_name and len(results) == 1:
-        # ملخص مترجم فردي (بدون عمود "عدد المترجمين")
-        summary_table = Table(
-            [
-                [r("تقارير بعد 8 مساءً"), r("تقارير قبل 8 مساءً"), r("إجمالي التقارير")],
-                [str(total_late), str(total_before), str(total_reports)]
-            ],
-            colWidths=[160, 160, 160]
-        )
-    else:
-        summary_table = Table(
-            [
-                [r("تقارير بعد 8 مساءً"), r("تقارير قبل 8 مساءً"), r("إجمالي التقارير"), r("عدد المترجمين")],
-                [str(total_late), str(total_before), str(total_reports), str(len(results))]
-            ],
-            colWidths=[125, 125, 125, 125]
-        )
-    summary_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1a237e")),
-        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("FONTNAME", (0, 0), (-1, -1), font_name),
-        ("FONTSIZE", (0, 0), (-1, 0), TBL_HEADER_FS),
-        ("FONTSIZE", (0, 1), (-1, -1), TBL_CELL_FS + 2),
-        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-        ("TOPPADDING", (0, 0), (-1, -1), 8),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
-    ]))
-    summary_table.hAlign = "CENTER"
-    story.append(summary_table)
-    story.append(Spacer(1, 18))
 
     for i, item in enumerate(results, 1):
-        rank_prefix = "" if target_name else f"{_medal(i)} "
-        story.append(Paragraph(r(f"{rank_prefix}{item['translator_name']}"), section_style))
-        story.append(Spacer(1, 8))
-
         before_8pm = item.get("before_8pm_reports", max(item["total_reports"] - item["late_reports"], 0))
-        info_table = Table(
-            [
-                [str(item["total_reports"]), r("إجمالي التقارير")],
-                [str(before_8pm), r("تقارير قبل 8 مساءً")],
-                [str(item["late_reports"]), r("تقارير بعد 8 مساءً")],
-                [str(item["work_days"]), r("أيام العمل")],
-            ],
-            colWidths=[150, 290]
-        )
-        info_table.setStyle(TableStyle([
-            ("BACKGROUND", (1, 0), (1, -1), colors.HexColor("#e3f2fd")),
-            ("FONTNAME", (0, 0), (-1, -1), font_name),
-            ("FONTSIZE", (0, 0), (-1, -1), TBL_CELL_FS + 1),
-            ("ALIGN", (0, 0), (0, -1), "CENTER"),
-            ("ALIGN", (1, 0), (1, -1), "RIGHT"),
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
-            ("TOPPADDING", (0, 0), (-1, -1), 7),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
-        ]))
-        info_table.hAlign = "RIGHT"
-        story.append(info_table)
-        story.append(Spacer(1, 12))
 
-        # جدول تفصيل الإجراءات (مع دمج دفاعي لأي مفاتيح متطابقة بعد التطبيع)
-        from services.stats_service import normalize_action_name as _norm_action
+        # ── صفحة 1: عنوان + فترة + إحصائيات ──
+        story.append(HeaderBand(r(f"تقرير تقييم المترجم: {item['translator_name']}"), ""))
+        story.append(Spacer(1, 4))
+        story.append(Paragraph(r(f"من {start_date_str} إلى {end_date_str}"), date_style))
+        story.append(Spacer(1, 6))
+
+        cards = Table(
+            [
+                # ترتيب RTL بصرياً: يمين أعلى (إجمالي) ثم يسار أعلى (قبل 8)
+                [_draw_card("قبل 8 مساء", str(before_8pm), color=ACCENT), _draw_card("إجمالي التقارير", str(item["total_reports"]), color=MAIN)],
+                # يمين أسفل (بعد 8) ثم يسار أسفل (أيام العمل)
+                [
+                    _draw_card("إجمالي أيام العمل", str(item["work_days"]), color=colors.HexColor("#7E57C2")),
+                    _draw_card(
+                        "بعد 8 مساء",
+                        str(item["late_reports"]),
+                        color=colors.HexColor("#EF5350"),
+                        value_color=colors.HexColor("#D32F2F"),
+                        label_color=colors.HexColor("#D32F2F"),
+                    ),
+                ],
+            ],
+            colWidths=[260, 260],
+        )
+        cards.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ]))
+        story.append(cards)
+
+        # ── نفس الصفحة: جدول الإجراءات (دمج الصفحة الأولى والثانية) ──
+        story.append(Spacer(1, 6))
+        story.append(Paragraph(r("جدول الإجراءات"), section_style))
+        story.append(Spacer(1, 4))
+
         raw_breakdown = item.get("action_breakdown", {})
         action_breakdown: dict[str, int] = {}
         for k, v in raw_breakdown.items():
@@ -315,60 +358,148 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
             if not nk:
                 continue
             action_breakdown[nk] = action_breakdown.get(nk, 0) + int(v or 0)
-        action_rows_data = [[r("النسبة"), r("العدد"), r("نوع الإجراء")]]
+
+        # الترتيب المطلوب: نوع الإجراء | العدد | النسبة
+        # ملاحظة: ReportLab يرسم الأعمدة من اليسار لليمين، لذا نجعل "نوع الإجراء" عموداً أخيراً
+        # ليظهر في أقصى اليمين أثناء القراءة العربية.
+        rows = [[r("النسبة"), r("العدد"), r("نوع الإجراء")]]
+        reschedule_row_idx = None
         for action_name, count in sorted(action_breakdown.items(), key=lambda x: x[1], reverse=True):
-            if count > 0:
-                pct = (count / item["total_reports"] * 100) if item["total_reports"] > 0 else 0
-                action_rows_data.append([f"{pct:.0f}%", str(count), r(action_name)])
-        if len(action_rows_data) > 1:
-            action_table = Table(action_rows_data, colWidths=[85, 85, 260])
-            action_table.setStyle(TableStyle([
-                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1a237e")),
+            if count <= 0:
+                continue
+            pct = (count / item["total_reports"] * 100.0) if item["total_reports"] > 0 else 0.0
+            rows.append([f"{pct:.0f}%", str(count), r(action_name)])
+            if action_name == "تأجيل موعد":
+                reschedule_row_idx = len(rows) - 1
+
+        if len(rows) == 1:
+            story.append(Paragraph(r("لا توجد بيانات إجراءات لعرضها"), base_style))
+        else:
+            tbl = Table(rows, colWidths=[90, 70, 360], repeatRows=1)
+            style_cmds = [
+                ("BACKGROUND", (0, 0), (-1, 0), MAIN),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                 ("FONTNAME", (0, 0), (-1, -1), font_name),
-                ("FONTSIZE", (0, 0), (-1, 0), TBL_HEADER_FS),
-                ("FONTSIZE", (0, 1), (-1, -1), TBL_CELL_FS),
+                ("FONTSIZE", (0, 0), (-1, 0), 14),
+                ("FONTSIZE", (0, 1), (-1, -1), 13),
+                ("GRID", (0, 0), (-1, -1), 0.4, GRID),
+                # توسيط النصوص والأرقام داخل الجدول
                 ("ALIGN", (0, 0), (-1, -1), "CENTER"),
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
-                ("TOPPADDING", (0, 0), (-1, -1), 6),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-            ]))
-            action_table.hAlign = "RIGHT"
-            story.append(action_table)
-            story.append(Spacer(1, 12))
+                ("TOPPADDING", (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ]
+            for rr in range(1, len(rows)):
+                if rr % 2 == 0:
+                    style_cmds.append(("BACKGROUND", (0, rr), (-1, rr), colors.HexColor("#FAFBFD")))
+            # تمييز "تأجيل موعد" باللون الأحمر
+            if reschedule_row_idx is not None:
+                style_cmds.append(("TEXTCOLOR", (0, reschedule_row_idx), (-1, reschedule_row_idx), colors.HexColor("#D32F2F")))
+                style_cmds.append(("FONTSIZE", (0, reschedule_row_idx), (-1, reschedule_row_idx), 13))
+            tbl.setStyle(TableStyle(style_cmds))
+            story.append(tbl)
 
-        # جدول تفصيل الأيام
+        story.append(PageBreak())
+
+        # ── صفحة 3: النشاط اليومي (رسم بياني) ──
+        story.append(Paragraph(r(f"{item['translator_name']} - النشاط اليومي"), section_style))
+        story.append(Spacer(1, 4))
         item_start = item.get("start_date")
         item_end = item.get("end_date")
+        daily = []
         if item_start and item_end:
             try:
                 from db.session import SessionLocal
                 with SessionLocal() as pdf_session:
                     daily = _get_daily_counts(pdf_session, item.get("translator_id"), item_start, item_end, translator_name=item.get("translator_name"))
-                if daily:
-                    day_rows = [[r("التقارير"), r("التاريخ")]]
-                    for day_str, count in daily:
-                        day_rows.append([str(count), r(day_str)])
-                    day_table = Table(day_rows, colWidths=[90, 260])
-                    day_table.setStyle(TableStyle([
-                        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2e7d32")),
-                        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                        ("FONTNAME", (0, 0), (-1, -1), font_name),
-                        ("FONTSIZE", (0, 0), (-1, 0), TBL_HEADER_FS),
-                        ("FONTSIZE", (0, 1), (-1, -1), DAY_CELL_FS),
-                        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                        ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
-                        ("TOPPADDING", (0, 0), (-1, -1), 5),
-                        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-                    ]))
-                    day_table.hAlign = "RIGHT"
-                    story.append(Paragraph(r("تفصيل الأيام"), base_style))
-                    story.append(Spacer(1, 6))
-                    story.append(day_table)
             except Exception as e:
-                logger.warning(f"خطأ في تفصيل الأيام للـ PDF: {e}")
+                logger.warning(f"خطأ في بيانات النشاط اليومي للـ PDF: {e}")
+
+        if daily:
+            labels = []
+            values = []
+            # تقليل كثافة العلامات للحفاظ على وضوح الرسم
+            sampled = daily[-20:] if len(daily) > 20 else daily
+            for d, c in sampled:
+                try:
+                    dt = datetime.strptime(d, "%Y-%m-%d")
+                    labels.append(dt.strftime("%d/%m"))
+                except Exception:
+                    labels.append(d)
+                values.append(int(c))
+
+            # توسيط الرسم البياني عمودياً داخل الصفحة قدر الإمكان
+            story.append(Spacer(1, 90))
+            drawing = Drawing(520, 250)
+            chart = VerticalBarChart()
+            chart.x = 40
+            chart.y = 38
+            chart.height = 180
+            chart.width = 450
+            chart.data = [values]
+            chart.strokeColor = GRID
+            chart.valueAxis.valueMin = 0
+            chart.valueAxis.valueMax = max(values) + 1
+            chart.valueAxis.valueStep = max(1, int((max(values) + 1) / 5))
+            chart.categoryAxis.categoryNames = labels
+            chart.categoryAxis.labels.angle = 35
+            chart.categoryAxis.labels.dy = -12
+            chart.categoryAxis.labels.fontName = font_name
+            chart.categoryAxis.labels.fontSize = 8
+            chart.valueAxis.labels.fontName = font_name
+            chart.valueAxis.labels.fontSize = 8
+            chart.bars[0].fillColor = MAIN
+            chart.bars[0].strokeColor = MAIN
+            drawing.add(Rect(0, 0, 520, 250, fillColor=colors.HexColor("#FFFFFF"), strokeColor=GRID, strokeWidth=0.7))
+            drawing.add(chart)
+            story.append(drawing)
+            story.append(Spacer(1, 12))
+
+            total_day_tbl = Table(
+                [[r("عدد الأيام المعروضة"), str(len(sampled)), r("أعلى نشاط يومي"), str(max(values))]],
+                colWidths=[130, 100, 130, 100],
+            )
+            total_day_tbl.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), MAIN_LIGHT),
+                ("FONTNAME", (0, 0), (-1, -1), font_name),
+                ("FONTSIZE", (0, 0), (-1, -1), 11),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("GRID", (0, 0), (-1, -1), 0.4, GRID),
+            ]))
+            story.append(total_day_tbl)
+            story.append(Spacer(1, 6))
+
+            # جدول كامل لكل الأيام: التاريخ | عدد التقارير
+            # لتفادي صفحة أخيرة فيها سطر/سطرين فقط، نفصل الجدول بصفحة مستقلة إذا كانت الأيام كثيرة.
+            show_table_on_new_page = len(daily) > 15
+            if show_table_on_new_page:
+                story.append(PageBreak())
+
+            day_rows = [[r("عدد التقارير"), r("التاريخ")]]
+            for day_str, count in daily:
+                day_rows.append([str(count), r(day_str)])
+            day_table = Table(day_rows, colWidths=[120, 380], repeatRows=1)
+            day_style = [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2E7D32")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("FONTNAME", (0, 0), (-1, -1), font_name),
+                ("FONTSIZE", (0, 0), (-1, 0), 13),
+                ("FONTSIZE", (0, 1), (-1, -1), 12),
+                ("GRID", (0, 0), (-1, -1), 0.35, GRID),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ]
+            for rr in range(1, len(day_rows)):
+                if rr % 2 == 0:
+                    day_style.append(("BACKGROUND", (0, rr), (-1, rr), colors.HexColor("#FAFBFD")))
+            day_table.setStyle(TableStyle(day_style))
+            story.append(Paragraph(r("تفاصيل الأيام (التاريخ | عدد التقارير)"), base_style))
+            story.append(Spacer(1, 3))
+            story.append(day_table)
+        else:
+            story.append(Paragraph(r("لا توجد بيانات نشاط يومي متاحة لهذه الفترة."), base_style))
 
         if i < len(results):
             story.append(PageBreak())
@@ -1225,8 +1356,9 @@ async def handle_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 def _match(r):
                     if target_tid and r.get('translator_id') == target_tid:
                         return True
-                    rn = (r.get('translator_name') or "").strip().lower()
-                    return rn == target_tname.lower()
+                    rn = _normalize_person_name(r.get('translator_name') or "")
+                    tn = _normalize_person_name(target_tname)
+                    return bool(rn and tn and rn == tn)
                 raw_stats = [r for r in raw_stats if _match(r)]
                 if not raw_stats:
                     await q.edit_message_text(
@@ -1243,183 +1375,7 @@ async def handle_format(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if period_type not in ("day", "custom") and not (target_tname or target_tid):
                 _save_evaluations_to_db(session, results, year, month)
 
-            # إرسال ملخص نصي
-            total_reports = sum(r['total_reports'] for r in results)
-            total_late = sum(r['late_reports'] for r in results)
-
-            # ═══ رسالة تشخيصية للأدمن ═══
-            diag_lines = [f"🔍 **تشخيص:** وجدت {len(results)} مترجم، {total_reports} تقرير"]
-            try:
-                from sqlalchemy import text as sa_text
-                from datetime import timedelta as td2
-
-                # حساب النطاق الزمني
-                if (period_type == "day" or period_type == "custom") and start_date:
-                    s_str = start_date.strftime("%Y-%m-%d") if hasattr(start_date, 'strftime') else str(start_date)
-                    # لـ get_translator_stats، النهاية حصرية (exclusive) فنزيد يوماً واحداً إذا كان يوماً واحداً
-                    if period_type == "day":
-                        e_date = start_date + td2(days=1)
-                        e_str = e_date.strftime("%Y-%m-%d")
-                    else:
-                        e_date = end_date + td2(days=1)
-                        e_str = e_date.strftime("%Y-%m-%d")
-                else:
-                    if month == "all" or month == 0:
-                        s_str = f"{year}-01-01"
-                        e_str = f"{year + 1}-01-01"
-                    else:
-                        m = int(month)
-                        s_str = f"{year}-{m:02d}-01"
-                        e_str = f"{year}-{m+1:02d}-01" if m < 12 else f"{year+1}-01-01"
-
-                diag_lines.append(f"📅 النطاق: {s_str} → {e_str}")
-
-                # تقارير بدون translator_id
-                no_tid = session.execute(sa_text(
-                    "SELECT COUNT(*) FROM reports WHERE COALESCE(report_date, created_at) >= :s AND COALESCE(report_date, created_at) < :e AND status='active' AND translator_id IS NULL"
-                ), {"s": s_str, "e": e_str}).scalar() or 0
-                if no_tid > 0:
-                    diag_lines.append(f"⚠️ بدون مترجم: **{no_tid}**")
-                    # ═══ تفاصيل التقارير المجهولة ═══
-                    unknown_rows = session.execute(sa_text(
-                        """SELECT id, patient_name, translator_name, medical_action,
-                                  report_date, created_at
-                           FROM reports
-                           WHERE COALESCE(report_date, created_at) >= :s
-                             AND COALESCE(report_date, created_at) < :e
-                             AND status='active'
-                             AND translator_id IS NULL
-                           ORDER BY created_at DESC"""
-                    ), {"s": s_str, "e": e_str}).fetchall()
-                    if unknown_rows:
-                        diag_lines.append(f"\n📌 **التقارير المجهولة ({len(unknown_rows)}):**")
-                        for ur in unknown_rows:
-                            uid, pname, tname, action, rd, ca = ur
-                            pname = pname or "—"
-                            tname = tname or "—"
-                            action = action or "—"
-                            rd_str = str(rd)[:16] if rd else "—"
-                            ca_str = str(ca)[:16] if ca else "—"
-                            diag_lines.append(
-                                f"• ID={uid} | مترجم: {tname} | مريض: {pname}\n"
-                                f"  إجراء: {action} | تاريخ: {rd_str} | أنشئ: {ca_str}"
-                            )
-
-                # تقارير ليست active
-                not_active = session.execute(sa_text(
-                    "SELECT COUNT(*) FROM reports WHERE COALESCE(report_date, created_at) >= :s AND COALESCE(report_date, created_at) < :e AND (status != 'active' OR status IS NULL)"
-                ), {"s": s_str, "e": e_str}).scalar() or 0
-                if not_active > 0:
-                    diag_lines.append(f"⚠️ غير نشطة: **{not_active}**")
-
-                # تقارير اليوم السابق (بسبب UTC)
-                if period_type == "day" and start_date:
-                    prev_s = (start_date - td2(days=1)).strftime("%Y-%m-%d")
-                    prev_count = session.execute(sa_text(
-                        "SELECT COUNT(*) FROM reports WHERE COALESCE(report_date, created_at) >= :s AND COALESCE(report_date, created_at) < :e AND status='active' AND translator_id IS NOT NULL"
-                    ), {"s": prev_s, "e": s_str}).scalar() or 0
-                    # تقارير created_at في نفس اليوم لكن report_date في يوم سابق
-                    mismatched = session.execute(sa_text(
-                        "SELECT COUNT(*) FROM reports WHERE DATE(created_at) >= :target AND DATE(created_at) < :next_day AND DATE(report_date) < :target AND status='active' AND translator_id IS NOT NULL"
-                    ), {"target": s_str, "next_day": e_str}).scalar() or 0
-                    if mismatched > 0:
-                        diag_lines.append(f"⚠️ تقارير created\\_at={s_str} لكن report\\_date قبله: **{mismatched}**")
-                    # تقارير created في هذا اليوم بغض النظر عن report_date
-                    by_created = session.execute(sa_text(
-                        "SELECT COUNT(*) FROM reports WHERE DATE(created_at) >= :s AND DATE(created_at) < :e AND status='active' AND translator_id IS NOT NULL"
-                    ), {"s": s_str, "e": e_str}).scalar() or 0
-                    diag_lines.append(f"📊 حسب created\\_at: **{by_created}** تقرير")
-                    by_report_date = session.execute(sa_text(
-                        "SELECT COUNT(*) FROM reports WHERE DATE(report_date) >= :s AND DATE(report_date) < :e AND status='active' AND translator_id IS NOT NULL"
-                    ), {"s": s_str, "e": e_str}).scalar() or 0
-                    diag_lines.append(f"📊 حسب report\\_date: **{by_report_date}** تقرير")
-
-                # ═══ كل المترجمين في هذا اليوم بكل الطرق ═══
-                if period_type == "day" and start_date:
-                    all_translators_sql = sa_text("""
-                        SELECT translator_id, translator_name, COUNT(*) as cnt,
-                               MIN(report_date) as min_rd, MAX(report_date) as max_rd,
-                               MIN(created_at) as min_ca, MAX(created_at) as max_ca
-                        FROM reports
-                        WHERE (
-                            DATE(report_date) = :target
-                            OR DATE(created_at) = :target
-                            OR (COALESCE(report_date, created_at) >= :s AND COALESCE(report_date, created_at) < :e)
-                        )
-                        AND status = 'active'
-                        GROUP BY translator_id
-                        ORDER BY cnt DESC
-                    """)
-                    all_rows = session.execute(all_translators_sql, {"target": s_str, "s": s_str, "e": e_str}).fetchall()
-                    if all_rows:
-                        diag_lines.append(f"\n📋 **كل المترجمين ليوم {s_str}:**")
-                        for row in all_rows:
-                            tid = row[0]
-                            tname = row[1] or f"#{tid}"
-                            cnt = row[2]
-                            # هل ظهر في النتائج؟
-                            found = "✅" if any(r.get('translator_id') == tid for r in results) else "❌"
-                            tid_label = f"tid={tid}" if tid else "tid=NULL"
-                            diag_lines.append(f"{found} {tname} ({tid_label}): {cnt} تقرير")
-
-            except Exception as diag_err:
-                logger.warning(f"Diagnostic query error: {diag_err}")
-
-            await q.message.reply_text("\n".join(diag_lines), parse_mode=ParseMode.MARKDOWN)
-
-            total_before = total_reports - total_late
-            if target_tname:
-                header = (
-                    f"╔══════════════════════════════════╗\n"
-                    f"  ✅ **تم إعداد تقرير التقييم الفردي**\n"
-                    f"╚══════════════════════════════════╝\n\n"
-                    f"👤 المترجم: **{target_tname}**\n"
-                    f"📅 الفترة: **{period_label}**\n"
-                    f"📄 إجمالي التقارير: **{total_reports}**\n"
-                    f"🌇 تقارير قبل 8 مساءً: **{total_before}**\n"
-                    f"🌙 تقارير بعد 8 مساءً: **{total_late}**\n"
-                )
-            else:
-                header = (
-                    f"╔══════════════════════════════════╗\n"
-                    f"  ✅ **تم إعداد تقرير التقييم**\n"
-                    f"╚══════════════════════════════════╝\n\n"
-                    f"📅 الفترة: **{period_label}**\n"
-                    f"👥 المترجمين: **{len(results)}**\n"
-                    f"📄 إجمالي التقارير: **{total_reports}**\n"
-                    f"🌇 تقارير قبل 8 مساءً: **{total_before}**\n"
-                    f"🌙 تقارير بعد 8 مساءً: **{total_late}**\n"
-                )
-            await q.message.reply_text(header, parse_mode=ParseMode.MARKDOWN)
-
-            # إرسال تفاصيل كل مترجم
-            for i, item in enumerate(results, 1):
-                medal = "👤" if target_tname else _medal(i)
-                before_8pm = item.get('before_8pm_reports', max(item['total_reports'] - item['late_reports'], 0))
-                detail = f"{medal} **{item['translator_name']}**\n"
-                detail += f"├ 📄 إجمالي التقارير: **{item['total_reports']}**\n"
-                detail += f"├ 🌇 قبل 8 مساءً: **{before_8pm}**\n"
-                detail += f"├ 🌙 بعد 8 مساءً: **{item['late_reports']}**\n"
-                detail += f"├ 📅 أيام العمل: **{item['work_days']}** يوم\n"
-
-                # تفصيل الإجراءات (غير الصفرية فقط)
-                non_zero = {k: v for k, v in item.get('action_breakdown', {}).items() if v > 0}
-                if non_zero:
-                    detail += "├ 📋 **التقارير حسب النوع:**\n"
-                    for action_name, count in sorted(non_zero.items(), key=lambda x: x[1], reverse=True):
-                        detail += f"│   • {action_name}: **{count}**\n"
-
-                item_start = item.get("start_date")
-                item_end = item.get("end_date")
-                daily_counts = _get_daily_counts(session, item.get("translator_id"), item_start, item_end, translator_name=item.get("translator_name"))
-                if daily_counts:
-                    detail += "├ 📆 **تفصيل الأيام:**\n"
-                    for day, count in daily_counts:
-                        detail += f"│   • {day}: **{count}** {_report_label(count)}\n"
-
-                detail += "\n"
-
-                await _send_text_chunks(q.message, detail)
+            # لا نرسل ملخص/تفاصيل نصية على الشاشة — الإخراج يكون ملفات فقط
 
             # توليد وإرسال الملفات
             if target_tname:

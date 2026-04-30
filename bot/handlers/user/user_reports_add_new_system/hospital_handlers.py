@@ -20,7 +20,7 @@ def get_hospitals_list():
     """
     db_hospitals = []
     
-    # ✅ 1. جلب المستشفيات من قاعدة البيانات
+    # ✅ 1. جلب المستشفيات من قاعدة البيانات (مصدر الحقيقة)
     try:
         from db.session import SessionLocal
         from db.models import Hospital
@@ -28,12 +28,9 @@ def get_hospitals_list():
         with SessionLocal() as s:
             hospitals = s.query(Hospital).order_by(Hospital.name).all()
             if hospitals:
-                # ✅ فلترة: فقط المستشفيات الإنجليزية (إزالة العربية)
-                db_hospitals = [
-                    h.name for h in hospitals 
-                    if h.name and not any('\u0600' <= char <= '\u06FF' for char in h.name)
-                ]
-                logger.info(f"✅ Loaded {len(db_hospitals)} English hospitals from database")
+                # ✅ بدون أي فلترة (عربي/إنجليزي) لضمان التطابق مع شاشة الأدمن
+                db_hospitals = [h.name for h in hospitals if h.name]
+                logger.info(f"✅ Loaded {len(db_hospitals)} hospitals from database")
     except Exception as e:
         logger.warning(f"⚠️ Could not load hospitals from database: {e}", exc_info=True)
 
@@ -48,10 +45,18 @@ def get_hospitals_list():
             logger.error(f"❌ Failed to load hospitals from JSON fallback: {e}", exc_info=True)
             return []
 
-    # ✅ 3. ترتيب القائمة النهائية (من قاعدة البيانات فقط)
-    final_sorted = sorted(set(db_hospitals), key=lambda x: x.lower())
-    logger.info(f"✅ Total hospitals: {len(final_sorted)} (DB source of truth)")
-    return final_sorted
+    # ✅ 3. إزالة التكرار مع الحفاظ على ترتيب قاعدة البيانات نفسه
+    seen = set()
+    final_list = []
+    for name in db_hospitals:
+        key = name.strip().lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        final_list.append(name)
+
+    logger.info(f"✅ Total hospitals: {len(final_list)} (DB source of truth)")
+    return final_list
 
 
 def _sort_hospitals_custom(hospitals_list):

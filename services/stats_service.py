@@ -73,7 +73,25 @@ _EFF_HOUR_IST_FOR_LATE_SQL = """(
         THEN CAST(strftime('%H', r.report_date) AS INTEGER)
         WHEN r.visit_time IS NOT NULL AND length(trim(r.visit_time)) >= 3
              AND instr(trim(r.visit_time), ':') > 0
-        THEN CAST(substr(trim(r.visit_time), 1, instr(trim(r.visit_time), ':') - 1) AS INTEGER)
+        THEN (
+            CASE
+                WHEN (
+                    lower(trim(r.visit_time)) LIKE '%pm%'
+                    OR trim(r.visit_time) LIKE '%مساء%'
+                )
+                AND CAST(substr(trim(r.visit_time), 1, instr(trim(r.visit_time), ':') - 1) AS INTEGER) < 12
+                THEN CAST(substr(trim(r.visit_time), 1, instr(trim(r.visit_time), ':') - 1) AS INTEGER) + 12
+
+                WHEN (
+                    lower(trim(r.visit_time)) LIKE '%am%'
+                    OR trim(r.visit_time) LIKE '%صباح%'
+                )
+                AND CAST(substr(trim(r.visit_time), 1, instr(trim(r.visit_time), ':') - 1) AS INTEGER) = 12
+                THEN 0
+
+                ELSE CAST(substr(trim(r.visit_time), 1, instr(trim(r.visit_time), ':') - 1) AS INTEGER)
+            END
+        )
         ELSE CAST(strftime('%H', datetime(r.created_at, '+5 hours', '+30 minutes')) AS INTEGER)
     END
 )"""
@@ -90,6 +108,13 @@ def _effective_ist_hour_for_late(visit_time, report_date, created_at):
         try:
             h = int(part)
             if 0 <= h <= 23:
+                vt_lower = vt.lower()
+                is_pm = ("مساء" in vt) or ("pm" in vt_lower)
+                is_am = ("صباح" in vt) or ("am" in vt_lower)
+                if is_pm and h < 12:
+                    h += 12
+                elif is_am and h == 12:
+                    h = 0
                 return h
         except ValueError:
             pass
@@ -156,7 +181,15 @@ def _run_translator_query(session, start_date_str: str, end_date_str: str):
                 MIN(r.translator_id) as translator_id,
                 COALESCE(td.name, r.translator_name, 'مترجم #' || r.translator_id) as translator_name,
                 COUNT(*) as total_reports,
-                COUNT(DISTINCT DATE(COALESCE(r.report_date, r.created_at))) as attendance_days,
+                COUNT(
+                    DISTINCT DATE(
+                        CASE
+                            WHEN r.created_at IS NOT NULL
+                            THEN datetime(r.created_at, '+5 hours', '+30 minutes')
+                            ELSE r.report_date
+                        END
+                    )
+                ) as attendance_days,
                 SUM(
                     CASE WHEN {_EFF_HOUR_IST_FOR_LATE_SQL} >= 20
                     THEN 1 ELSE 0 END
@@ -337,10 +370,17 @@ def _run_translator_query_resilient(start_date_str: str, end_date_str: str):
         # ✅ استخدام COALESCE: report_date أولاً، وإذا غاب نستخدم created_at
         if not report_dt:
             report_dt = created_dt
-        if not report_dt:
+        if not report_dt and not created_dt:
             continue
 
-        if not (start_dt <= report_dt < end_dt):
+        in_range = False
+        if report_dt and (start_dt <= report_dt < end_dt):
+            in_range = True
+        if not in_range and created_dt:
+            created_local_date = (created_dt + timedelta(hours=5, minutes=30)).date()
+            if start_dt.date() <= created_local_date < end_dt.date():
+                in_range = True
+        if not in_range:
             continue
 
         tid = int(translator_id)
@@ -366,7 +406,10 @@ def _run_translator_query_resilient(start_date_str: str, end_date_str: str):
 
         item = results_map[tid]
         item["total_reports"] += 1
-        item["attendance_dates"].add(report_dt.date())
+        if created_dt:
+            item["attendance_dates"].add((created_dt + timedelta(hours=5, minutes=30)).date())
+        elif report_dt:
+            item["attendance_dates"].add(report_dt.date())
         if _effective_ist_hour_for_late(visit_time, report_date, created_at) >= 20:
             item["late_reports"] += 1
 

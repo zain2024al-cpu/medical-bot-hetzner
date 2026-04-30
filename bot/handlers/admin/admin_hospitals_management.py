@@ -47,7 +47,6 @@ async def handle_manage_hospitals(update: Update, context: ContextTypes.DEFAULT_
         [InlineKeyboardButton("📋 عرض جميع المستشفيات", callback_data="view_hospitals")],
         [InlineKeyboardButton("✏️ تعديل مستشفى", callback_data="edit_hospital")],
         [InlineKeyboardButton("🗑️ حذف مستشفى", callback_data="delete_hospital")],
-        [InlineKeyboardButton("🔄 مزامنة من القائمة الثابتة", callback_data="sync_hospitals")],
         [InlineKeyboardButton("🔙 رجوع", callback_data="back_to_schedule")]
     ])
     
@@ -632,7 +631,6 @@ async def handle_cancel_hospital_input(update: Update, context: ContextTypes.DEF
         [InlineKeyboardButton("📋 عرض جميع المستشفيات", callback_data="view_hospitals")],
         [InlineKeyboardButton("✏️ تعديل مستشفى", callback_data="edit_hospital")],
         [InlineKeyboardButton("🗑️ حذف مستشفى", callback_data="delete_hospital")],
-        [InlineKeyboardButton("🔄 مزامنة من القائمة الثابتة", callback_data="sync_hospitals")],
         [InlineKeyboardButton("🔙 رجوع", callback_data="back_to_schedule")]
     ])
 
@@ -693,5 +691,5 @@ def register(app):
     app.add_handler(CallbackQueryHandler(handle_confirm_delete_hospital, pattern="^confirm_delete_hosp:\\d+$"))  # ID فقط
     app.add_handler(CallbackQueryHandler(handle_edit_hospital, pattern="^edit_hospital$"))
     app.add_handler(CallbackQueryHandler(handle_edit_hospital, pattern="^edit_hosp_page:"))  # صفحات التعديل
-    app.add_handler(CallbackQueryHandler(handle_sync_hospitals, pattern="^sync_hospitals$"))
+    # ⚠️ تم تعطيل مزامنة القائمة الثابتة لضمان أن DB هي المصدر الوحيد للحقيقة.
 

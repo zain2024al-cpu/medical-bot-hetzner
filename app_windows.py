@@ -54,7 +54,10 @@ logger = logging.getLogger(__name__)
 
 # تفعيل وضع WAL في قاعدة البيانات
 import sqlite3
-db_path = os.path.join('db', 'medical_reports.db')
+try:
+    from db.session import DATABASE_PATH as db_path
+except Exception:
+    db_path = os.path.join('db', 'medical_reports.db')
 try:
     conn = sqlite3.connect(db_path)
     conn.execute('PRAGMA journal_mode=WAL;')
@@ -163,7 +166,6 @@ async def main():
     # ⚙️ إعدادات افتراضية للبوت
     defaults = Defaults(
         parse_mode=ParseMode.MARKDOWN,
-        link_preview_options=None,
         block=False
     )
 
@@ -175,7 +177,6 @@ async def main():
         write_timeout=60.0,
         connect_timeout=30.0,
         pool_timeout=30.0,
-        media_write_timeout=120.0
     )
 
     # 🏗️ بناء التطبيق

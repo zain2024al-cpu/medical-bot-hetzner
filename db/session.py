@@ -17,8 +17,11 @@ logger = logging.getLogger(__name__)
 # Database Configuration
 # ================================================
 
-# SQLite database path (inside Cloud Run container)
-DATABASE_PATH = os.getenv("DATABASE_PATH", "db/medical_reports.db")
+# SQLite database path
+# ✅ مهم: اجعل المسار ثابتاً بالنسبة للمشروع لتفادي إنشاء DB جديدة عند التشغيل من CWD مختلف.
+_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+_DEFAULT_DB_PATH = os.path.join(_PROJECT_ROOT, "db", "medical_reports.db")
+DATABASE_PATH = os.getenv("DATABASE_PATH") or _DEFAULT_DB_PATH
 
 # Create SQLite URL
 DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
