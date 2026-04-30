@@ -179,7 +179,36 @@ def delete_hospital(hospital_name: str) -> bool:
     حذف مستشفى
     """
     global _HOSPITALS_DATA, _HOSPITALS_LIST
-    
+
+    # ✅ المصدر الأساسي: قاعدة البيانات
+    try:
+        from db.session import SessionLocal
+        from db.models import Hospital
+
+        name_clean = (hospital_name or "").strip()
+        if name_clean:
+            with SessionLocal() as s:
+                row = s.query(Hospital).filter(Hospital.name == name_clean).first()
+                if not row:
+                    # محاولة مطابقة غير حساسة للمسافات/الحروف
+                    row = s.query(Hospital).filter(Hospital.name.ilike(name_clean)).first()
+                if row:
+                    s.delete(row)
+                    s.commit()
+                    logger.info(f"Deleted hospital from DB: {name_clean}")
+                    # مزامنة اختيارية مع JSON (لا تؤثر على نجاح الحذف)
+                    try:
+                        _HOSPITALS_DATA = None
+                        _HOSPITALS_LIST = []
+                        _load_data()
+                        _delete_hospital_from_json(name_clean)
+                    except Exception as _sync_err:
+                        logger.warning(f"⚠️ DB deleted but JSON sync failed: {_sync_err}")
+                    return True
+    except Exception as e:
+        logger.warning(f"⚠️ Could not delete hospital from DB, falling back to JSON: {e}")
+
+    # fallback قديم: JSON
     _load_data()
     
     if not _HOSPITALS_DATA:
@@ -188,31 +217,37 @@ def delete_hospital(hospital_name: str) -> bool:
     # Find and remove hospital
     hospital_name_lower = hospital_name.lower().strip()
     
+    return _delete_hospital_from_json(hospital_name)
+    
+    return False
+
+
+def _delete_hospital_from_json(hospital_name: str) -> bool:
+    """حذف من doctors_unified.json (fallback/مزامنة)"""
+    global _HOSPITALS_DATA, _HOSPITALS_LIST
+
+    _load_data()
+    if not _HOSPITALS_DATA:
+        return False
+
+    hospital_name_lower = (hospital_name or "").lower().strip()
     for i, hospital in enumerate(_HOSPITALS_DATA.get('hospitals', [])):
-        if hospital['name'].lower().strip() == hospital_name_lower:
-            # Remove from data
+        if (hospital.get('name') or "").lower().strip() == hospital_name_lower:
             _HOSPITALS_DATA['hospitals'].pop(i)
-            
-            # Remove from cache
-            if hospital['name'] in _HOSPITALS_LIST:
-                _HOSPITALS_LIST.remove(hospital['name'])
-            
-            # Update statistics
+            if hospital.get('name') in _HOSPITALS_LIST:
+                _HOSPITALS_LIST.remove(hospital.get('name'))
             if 'statistics' in _HOSPITALS_DATA:
                 _HOSPITALS_DATA['statistics']['total_hospitals'] = len(_HOSPITALS_DATA['hospitals'])
-            
-            # Save to file
             try:
                 data_path = _get_data_path()
                 if data_path:
                     with open(data_path, 'w', encoding='utf-8') as f:
                         json.dump(_HOSPITALS_DATA, f, ensure_ascii=False, indent=2)
-                    logger.info(f"Deleted hospital: {hospital_name}")
+                    logger.info(f"Deleted hospital from JSON: {hospital_name}")
                     return True
             except Exception as e:
-                logger.error(f"Failed to save after deleting hospital: {e}")
+                logger.error(f"Failed to save after deleting hospital (JSON): {e}")
                 return False
-    
     return False
 
 
