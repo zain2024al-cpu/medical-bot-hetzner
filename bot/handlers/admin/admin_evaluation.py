@@ -298,6 +298,12 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
         ))
         return d
 
+    def _draw_empty_card(width=250, height=84):
+        d = Drawing(width, height)
+        # Empty placeholder to keep grid alignment when adding an odd number of cards
+        d.add(Rect(0, 0, width, height, rx=8, ry=8, fillColor=CARD_BG, strokeColor=GRID, strokeWidth=0.8))
+        return d
+
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=18, leftMargin=18, topMargin=14, bottomMargin=14)
     styles = getSampleStyleSheet()
@@ -311,6 +317,12 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
 
     for i, item in enumerate(results, 1):
         before_8pm = item.get("before_8pm_reports", max(item["total_reports"] - item["late_reports"], 0))
+        try:
+            _sd = start_date.date() if hasattr(start_date, "date") else start_date
+            _ed = end_date.date() if hasattr(end_date, "date") else end_date
+            period_days = int((_ed - _sd).days) + 1
+        except Exception:
+            period_days = ""
 
         # ── صفحة 1: عنوان + فترة + إحصائيات ──
         story.append(HeaderBand(r(f"تقرير تقييم المترجم: {item['translator_name']}"), ""))
@@ -332,6 +344,11 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
                         value_color=colors.HexColor("#D32F2F"),
                         label_color=colors.HexColor("#D32F2F"),
                     ),
+                ],
+                # صف إضافي: يمين (أيام الفترة) + يسار (فارغ) للحفاظ على الشبكة
+                [
+                    _draw_empty_card(),
+                    _draw_card("إجمالي أيام الفترة", str(period_days), color=colors.HexColor("#26A69A")),
                 ],
             ],
             colWidths=[260, 260],
