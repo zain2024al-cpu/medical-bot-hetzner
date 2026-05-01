@@ -318,11 +318,12 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
     for i, item in enumerate(results, 1):
         before_8pm = item.get("before_8pm_reports", max(item["total_reports"] - item["late_reports"], 0))
         try:
-            _sd = start_date.date() if hasattr(start_date, "date") else start_date
-            _ed = end_date.date() if hasattr(end_date, "date") else end_date
-            period_days = int((_ed - _sd).days) + 1
+            # _generate_pdf receives strings like "dd/mm/YYYY"
+            _sd = datetime.strptime(start_date_str, "%d/%m/%Y").date()
+            _ed = datetime.strptime(end_date_str, "%d/%m/%Y").date()
+            period_days = max(int((_ed - _sd).days) + 1, 1)
         except Exception:
-            period_days = ""
+            period_days = "-"
 
         # ── صفحة 1: عنوان + فترة + إحصائيات ──
         story.append(HeaderBand(r(f"تقرير تقييم المترجم: {item['translator_name']}"), ""))
