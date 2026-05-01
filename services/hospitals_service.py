@@ -15,6 +15,13 @@ logger = logging.getLogger(__name__)
 _HOSPITALS_DATA = None
 _HOSPITALS_LIST = []
 
+# Names that are UI buttons (not real hospitals) and must never appear in lists.
+_INVALID_HOSPITAL_NAMES = {
+    "📅 إدارة الجدول",
+    "👥 إدارة المستخدمين",
+    "📊 تقييم المترجمين",
+}
+
 
 def _get_data_path():
     """الحصول على مسار ملف البيانات"""
@@ -69,7 +76,7 @@ def get_all_hospitals() -> List[str]:
         with SessionLocal() as s:
             rows = s.query(Hospital).order_by(Hospital.name).all()
             if rows:
-                names = [r.name for r in rows if r.name]
+                names = [r.name for r in rows if r.name and r.name.strip() and r.name.strip() not in _INVALID_HOSPITAL_NAMES]
                 # dedupe while preserving DB order
                 seen = set()
                 out = []
@@ -133,14 +140,33 @@ def add_hospital(hospital_name: str) -> bool:
     إضافة مستشفى جديد
     """
     global _HOSPITALS_DATA, _HOSPITALS_LIST
-    
+    name_clean = (hospital_name or "").strip()
+    if not name_clean:
+        return False
+    if name_clean in _INVALID_HOSPITAL_NAMES:
+        logger.warning(f"رفض إضافة اسم غير صالح كمستشفى: {name_clean!r}")
+        return False
+
+    # ✅ المصدر الأساسي: قاعدة البيانات
+    try:
+        from db.session import SessionLocal
+        from db.models import Hospital
+        with SessionLocal() as s:
+            exists = s.query(Hospital).filter(Hospital.name == name_clean).first()
+            if not exists:
+                s.add(Hospital(name=name_clean))
+                s.commit()
+        # refresh cache (optional sync will run below)
+    except Exception as e:
+        logger.warning(f"⚠️ Could not add hospital to DB, will try JSON sync: {e}")
+
     _load_data()
     
     if not _HOSPITALS_DATA:
         return False
     
     # Check if already exists
-    if hospital_name in _HOSPITALS_LIST:
+    if name_clean in _HOSPITALS_LIST:
         return True
     
     # Add new hospital
@@ -148,14 +174,14 @@ def add_hospital(hospital_name: str) -> bool:
     
     new_hospital = {
         "id": new_id,
-        "name": hospital_name,
-        "name_normalized": hospital_name.lower().strip(),
+        "name": name_clean,
+        "name_normalized": name_clean.lower().strip(),
         "departments": [],
         "doctor_count": 0
     }
     
     _HOSPITALS_DATA['hospitals'].append(new_hospital)
-    _HOSPITALS_LIST.append(hospital_name)
+    _HOSPITALS_LIST.append(name_clean)
     if 'statistics' in _HOSPITALS_DATA:
         _HOSPITALS_DATA['statistics']['total_hospitals'] = len(_HOSPITALS_DATA['hospitals'])
     
