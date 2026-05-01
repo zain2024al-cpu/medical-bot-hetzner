@@ -12180,24 +12180,7 @@ async def show_translator_selection(message, context, flow_type, page=1):
     report_tmp = context.user_data.setdefault("report_tmp", {})
     skip_medical_gate = bool(context.user_data.get("_skip_medical_gate_once"))
 
-    # ✅ بوابة "هل يوجد تقرير طبي؟" قبل اختيار المترجم
-    if _is_medical_report_step_enabled(context) and (not skip_medical_gate) and (not report_tmp.get("_medical_report_step_done")):
-        report_tmp["_pending_translator_flow"] = flow_type
-        keyboard = InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton("✅ نعم", callback_data="medrep:yes"),
-                InlineKeyboardButton("❌ لا", callback_data="medrep:no"),
-            ],
-            [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back")],
-        ])
-        await message.reply_text(
-            "📎 **هل يوجد تقرير طبي؟**\n\n"
-            "اختر (نعم) لرفع صور التقرير الطبي، أو (لا) لكتابة سبب عدم توفره.",
-            reply_markup=keyboard,
-            parse_mode="Markdown",
-        )
-        context.user_data["_conversation_state"] = MEDICAL_REPORT_ASK
-        return MEDICAL_REPORT_ASK
+    # ✅ تم تعطيل/إزالة خطوة "هل يوجد تقرير طبي؟" — الانتقال مباشرة لاختيار المترجم
 
     # استهلاك علم التخطي لمرة واحدة فقط
     context.user_data.pop("_skip_medical_gate_once", None)
