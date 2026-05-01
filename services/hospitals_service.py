@@ -22,6 +22,38 @@ _INVALID_HOSPITAL_NAMES = {
     "📊 تقييم المترجمين",
 }
 
+def _get_custom_order_path() -> str:
+    # ملف ترتيب بسيط: كل سطر اسم مستشفى (بالضبط كما يظهر)
+    return os.path.join(os.path.dirname(__file__), "..", "data", "hospitals_order.txt")
+
+
+def _apply_custom_order(names: List[str]) -> List[str]:
+    """
+    Apply a user-defined priority order.
+    - Hospitals listed in hospitals_order.txt come first in that exact order.
+    - Remaining hospitals keep their current order.
+    """
+    try:
+        path = _get_custom_order_path()
+        if not os.path.exists(path):
+            return names
+        with open(path, "r", encoding="utf-8") as f:
+            wanted = [ln.strip() for ln in f.read().splitlines() if ln.strip() and not ln.strip().startswith("#")]
+        if not wanted:
+            return names
+
+        index = {n.strip(): i for i, n in enumerate(wanted)}
+
+        # stable: keep original relative order for non-specified hospitals
+        def key(n: str):
+            return (0, index.get(n.strip(), 10**9)) if n.strip() in index else (1, 10**9)
+
+        # But we must keep stable order for those not in index; Python sort is stable.
+        return sorted(names, key=key)
+    except Exception as e:
+        logger.warning(f"⚠️ Could not apply custom hospital order: {e}")
+        return names
+
 
 def _get_data_path():
     """الحصول على مسار ملف البيانات"""
@@ -86,13 +118,13 @@ def get_all_hospitals() -> List[str]:
                         continue
                     seen.add(k)
                     out.append(n)
-                return out
+                return _apply_custom_order(out)
     except Exception as e:
         logger.warning(f"⚠️ Could not load hospitals from DB in hospitals_service: {e}")
 
     # fallback قديم: JSON
     _load_data()
-    return _HOSPITALS_LIST.copy()
+    return _apply_custom_order(_HOSPITALS_LIST.copy())
 
 
 def get_hospitals_with_details() -> List[Dict]:

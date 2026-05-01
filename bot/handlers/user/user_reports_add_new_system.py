@@ -3468,26 +3468,23 @@ def _get_hospitals_from_database_or_predefined():
     جلب المستشفيات من قاعدة البيانات (Hospital table) كمصدر الحقيقة.
     Fallback إلى doctors_unified.json فقط إذا كانت قاعدة البيانات فارغة/غير متاحة.
     """
-    try:
-        from db.session import SessionLocal
-        from db.models import Hospital
-
-        with SessionLocal() as s:
-            hospitals = s.query(Hospital).order_by(Hospital.name).all()
-            # ✅ اعرض كل الأسماء من DB (عربي/إنجليزي) — الأدمن قد يضيف مستشفيات عربية
-            db_names = [h.name for h in hospitals if h.name]
-            if db_names:
-                return db_names
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning(f"⚠️ فشل تحميل المستشفيات من قاعدة البيانات: {e}")
-
-    # Fallback: JSON unified file (قد يتم استبداله أثناء النشر)
+    # ✅ استخدم الخدمة الموحدة حتى نستفيد من ترتيب الأولوية (hospitals_order.txt)
     try:
         from services.hospitals_service import get_all_hospitals
         hospitals = get_all_hospitals()
         if hospitals:
             return hospitals
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"⚠️ فشل تحميل المستشفيات من hospitals_service: {e}")
+
+    # Fallback: JSON unified file (قد يتم استبداله أثناء النشر)
+    try:
+        from services.hospitals_service import get_hospitals_with_details
+        data = get_hospitals_with_details() or []
+        names = [h.get("name") for h in data if h.get("name")]
+        if names:
+            return names
     except Exception as e:
         import logging
         logging.getLogger(__name__).warning(f"⚠️ فشل تحميل المستشفيات من ملف JSON: {e}")
