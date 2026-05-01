@@ -3474,10 +3474,8 @@ def _get_hospitals_from_database_or_predefined():
 
         with SessionLocal() as s:
             hospitals = s.query(Hospital).order_by(Hospital.name).all()
-            db_names = [
-                h.name for h in hospitals
-                if h.name and not any('\u0600' <= char <= '\u06FF' for char in h.name)
-            ]
+            # ✅ اعرض كل الأسماء من DB (عربي/إنجليزي) — الأدمن قد يضيف مستشفيات عربية
+            db_names = [h.name for h in hospitals if h.name]
             if db_names:
                 return db_names
     except Exception as e:
