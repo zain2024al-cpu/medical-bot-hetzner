@@ -298,12 +298,6 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
         ))
         return d
 
-    def _draw_empty_card(width=250, height=84):
-        d = Drawing(width, height)
-        # Empty placeholder to keep grid alignment when adding an odd number of cards
-        d.add(Rect(0, 0, width, height, rx=8, ry=8, fillColor=CARD_BG, strokeColor=GRID, strokeWidth=0.8))
-        return d
-
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=18, leftMargin=18, topMargin=14, bottomMargin=14)
     styles = getSampleStyleSheet()
@@ -317,6 +311,9 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
 
     for i, item in enumerate(results, 1):
         before_8pm = item.get("before_8pm_reports", max(item["total_reports"] - item["late_reports"], 0))
+        total_reports_i = int(item.get("total_reports") or 0)
+        late_reports_i = int(item.get("late_reports") or 0)
+        late_pct = (late_reports_i / total_reports_i * 100.0) if total_reports_i > 0 else 0.0
         try:
             # _generate_pdf receives strings like "dd/mm/YYYY"
             _sd = datetime.strptime(start_date_str, "%d/%m/%Y").date()
@@ -334,22 +331,28 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
         cards = Table(
             [
                 # ترتيب RTL بصرياً: يمين أعلى (إجمالي) ثم يسار أعلى (قبل 8)
-                [_draw_card("قبل 8 مساء", str(before_8pm), color=ACCENT), _draw_card("إجمالي التقارير", str(item["total_reports"]), color=MAIN)],
-                # يمين أسفل (بعد 8) ثم يسار أسفل (أيام العمل)
+                [_draw_card("قبل 8 مساء", str(before_8pm), color=ACCENT), _draw_card("إجمالي التقارير", str(total_reports_i), color=MAIN)],
+                # الصف الثاني: يمين (بعد 8) ثم يسار (نسبة المتأخر)
                 [
-                    _draw_card("إجمالي أيام العمل", str(item["work_days"]), color=colors.HexColor("#7E57C2")),
                     _draw_card(
                         "بعد 8 مساء",
-                        str(item["late_reports"]),
+                        str(late_reports_i),
+                        color=colors.HexColor("#EF5350"),
+                        value_color=colors.HexColor("#D32F2F"),
+                        label_color=colors.HexColor("#D32F2F"),
+                    ),
+                    _draw_card(
+                        "نسبة التقارير بعد 8 مساء",
+                        f"{late_pct:.0f}%",
                         color=colors.HexColor("#EF5350"),
                         value_color=colors.HexColor("#D32F2F"),
                         label_color=colors.HexColor("#D32F2F"),
                     ),
                 ],
-                # صف إضافي: يمين (أيام الفترة) + يسار (فارغ) للحفاظ على الشبكة
+                # الصف الثالث: يمين (أيام العمل) ثم يسار (أيام الفترة) ليكونا البطاقة 5 و6
                 [
-                    _draw_empty_card(),
                     _draw_card("إجمالي أيام الفترة", str(period_days), color=colors.HexColor("#26A69A")),
+                    _draw_card("إجمالي أيام العمل", str(item["work_days"]), color=colors.HexColor("#7E57C2")),
                 ],
             ],
             colWidths=[260, 260],
@@ -398,14 +401,17 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
                 ("BACKGROUND", (0, 0), (-1, 0), MAIN),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                 ("FONTNAME", (0, 0), (-1, -1), font_name),
-                ("FONTSIZE", (0, 0), (-1, 0), 14),
-                ("FONTSIZE", (0, 1), (-1, -1), 13),
+                ("FONTSIZE", (0, 0), (-1, 0), 16),
+                ("FONTSIZE", (0, 1), (-1, -1), 14),
                 ("GRID", (0, 0), (-1, -1), 0.4, GRID),
                 # توسيط النصوص والأرقام داخل الجدول
                 ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("TOPPADDING", (0, 0), (-1, -1), 5),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                # رفع المحتوى للأعلى داخل الخلايا
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("TOPPADDING", (0, 0), (-1, 0), 3),   # الهيدر أعلى
+                ("BOTTOMPADDING", (0, 0), (-1, 0), 7),
+                ("TOPPADDING", (0, 1), (-1, -1), 2),  # الصفوف أعلى
+                ("BOTTOMPADDING", (0, 1), (-1, -1), 7),
             ]
             for rr in range(1, len(rows)):
                 if rr % 2 == 0:
@@ -501,13 +507,16 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2E7D32")),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                 ("FONTNAME", (0, 0), (-1, -1), font_name),
-                ("FONTSIZE", (0, 0), (-1, 0), 13),
-                ("FONTSIZE", (0, 1), (-1, -1), 12),
+                ("FONTSIZE", (0, 0), (-1, 0), 15),
+                ("FONTSIZE", (0, 1), (-1, -1), 14),
                 ("GRID", (0, 0), (-1, -1), 0.35, GRID),
                 ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("TOPPADDING", (0, 0), (-1, -1), 4),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                # رفع التاريخ وعدد التقارير للأعلى داخل الخلايا
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("TOPPADDING", (0, 0), (-1, 0), 3),
+                ("BOTTOMPADDING", (0, 0), (-1, 0), 7),
+                ("TOPPADDING", (0, 1), (-1, -1), 2),
+                ("BOTTOMPADDING", (0, 1), (-1, -1), 7),
             ]
             for rr in range(1, len(day_rows)):
                 if rr % 2 == 0:
