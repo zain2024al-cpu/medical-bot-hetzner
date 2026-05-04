@@ -7325,8 +7325,12 @@ async def handle_device_followup_reason(update: Update, context: ContextTypes.DE
 async def start_radiology_flow(message, context):
     """بدء مسار أشعة وفحوصات"""
     # التأكد من حفظ medical_action و current_flow
-    context.user_data.setdefault("report_tmp", {})["medical_action"] = "أشعة وفحوصات"
-    context.user_data["report_tmp"]["current_flow"] = "radiology"
+    rt = context.user_data.setdefault("report_tmp", {})
+    rt["medical_action"] = "أشعة وفحوصات"
+    rt["current_flow"] = "radiology"
+    # ✅ ضمان عدم تخطي بوابة التقرير الطبي بسبب بقايا جلسة سابقة
+    rt.pop("_medical_report_step_done", None)
+    context.user_data.pop("_skip_medical_gate_once", None)
     # حفظ الحالة يدوياً في user_data للمساعدة في التتبع
     context.user_data['_conversation_state'] = RADIOLOGY_TYPE
     
@@ -7642,12 +7646,10 @@ async def handle_radiology_calendar_day(update: Update, context: ContextTypes.DE
             f"📅 **تاريخ التسليم:**\n"
             f"{date_display}"
         )
-        await show_translator_selection(query.message, context, "radiology")
-        
-        # حفظ الحالة يدوياً في user_data للمساعدة في التتبع
-        context.user_data['_conversation_state'] = RADIOLOGY_TRANSLATOR
-
-        return RADIOLOGY_TRANSLATOR
+        # ✅ قد تُظهر بوابة "هل يوجد تقرير طبي؟" وتُرجع MEDICAL_REPORT_ASK
+        next_state = await show_translator_selection(query.message, context, "radiology")
+        context.user_data['_conversation_state'] = next_state
+        return next_state
     except ValueError:
         await query.answer("صيغة غير صالحة", show_alert=True)
         return RADIOLOGY_DELIVERY_DATE
@@ -11845,7 +11847,7 @@ def register(app):
                 CallbackQueryHandler(handle_smart_back_navigation, pattern="^nav:back$"),
                 CallbackQueryHandler(handle_smart_cancel_navigation, pattern="^nav:cancel$"),
                 CallbackQueryHandler(handle_simple_translator_choice, pattern="^simple_translator:"),
-                CallbackQueryHandler(handle_medical_report_answer, pattern="^medrep:(yes|no)$"),
+                CallbackQueryHandler(handle_medical_report_answer, pattern="^medrep:(yes|no|skip)$"),
             ],
             RADIOLOGY_CONFIRM: [
                 CallbackQueryHandler(handle_final_confirm, pattern="^(save|publish|edit):"),
