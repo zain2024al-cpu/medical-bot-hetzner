@@ -1,0 +1,60 @@
+# ترتيب المستشفيات بالأولوية (كما طلبت) — كل سطر = اسم مستشفى واحد.
+Manipal Hospital - Old Airport Road
+St. John's Medical College Hospital, Bangalore
+Silverline Diagnostics Kalyan Nagar
+Aster Whitefield Hospital, Bangalore
+Fortis Hospital BG Road, Bangalore
+M S Ramaiah Memorial Hospital, Bangalore
+KIMS Hospital, Mahadevapura
+SPARSH Hospital, Hennur Road
+SPARSH Hospital, Infantry Road
+Sakra World Hospital, Bangalore
+Rainbow children’s Hospital, Delhi
+AIG Hospitals, Gachibowli Hyderabad
+Agarwals Eye Hospital,  Bengaluru
+Anand Diagnostic Laboratory Center
+Annaswamy Mudaliar General Hospital
+Apollo Hospital, Bannerghatta, Bangalore
+Apollo Hospitals Jubilee Hills Hyderabad
+Artemis Hospital, Delhi
+Aster CMI Hospital, Bangalore
+Aster RV Hospital, Bangalore
+Ayana Clinic
+BLK-Max Super Specialty Hospital, Delhi
+Bhagwan Mahaveer Jain Hospital - Millers Road
+COLUMBIAA hospital
+Cura Hospital, Kammanahalli
+Fortis Hospital Gurgaon
+Gleneagles Global Hospital, Kengeri, Bangalore
+HCG Hospital, K R Road Bangalore
+Horus eye care.
+Intell Prosthetic Intelligence
+KARE Prosthetics and Orthotics, Bangalore
+Klinik Gluhen - Dental Clinic
+L V Prasad Eye Institute, Hyderabad
+Manipal Hospital - Millers Road
+Manipal Hospital - Sarjapur Road
+Manipal Hospital - Whitefield
+Manipal Hospital - Yeshwanthpur
+Manipal Hospital Dwarka delhi
+Manipal Hospital Varthur Road
+Manipal Hospital Yelahanka
+Max Super Speciality Hospital, Saket, Delhi
+Medanta - The Medicity, Gurugram
+My Face clinic
+NU Hospitals, Rajajinagar Bangalore
+Narayana Hospital, Bommasandra Bangalore
+Narayana Nethralaya, Rajajinagar
+Nueclear Diagnostics, Bangalore
+Rainbow Children's Hospital, Marathahalli
+Rela Hospital, Chennai
+Sankara Eye Hospital, Bengaluru
+Sankara Nethralaya chennai
+Smaya's Dento Care - Whitefield, Bangalore
+Tenet center diagnostic , Indira Nagar
+Trilife Hospital, Bangalore
+Udai Omni Hospital - Hyderabad
+VENKATESHIWAR
+HOSPITAL New Delhi
+Zion Hospital, Kammanahalli
+
