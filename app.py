@@ -14,6 +14,7 @@ if sys.platform == 'win32':
 import asyncio
 import logging
 import warnings
+import re
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
 from config.settings import BOT_TOKEN
@@ -27,6 +28,56 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+class _RedactSecretsFilter(logging.Filter):
+    """
+    Redact Telegram bot tokens from any log message.
+    Prevents accidental token leakage via pm2 logs, screenshots, copy/paste, etc.
+    """
+
+    _tg_token_re = re.compile(r"(https?://api\\.telegram\\.org/bot)(\\d+:)[^/\\s]+", re.IGNORECASE)
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            msg = record.getMessage()
+            if msg:
+                redacted = self._tg_token_re.sub(r"\\1\\2***REDACTED***", msg)
+                if redacted != msg:
+                    record.msg = redacted
+                    record.args = ()
+        except Exception:
+            # Never break logging
+            pass
+        return True
+
+
+def _harden_logging():
+    # Reduce noisy/unsafe third-party logs (these are the lines that leak the token)
+    for name in (
+        "telegram",
+        "telegram.ext",
+        "telegram.request",
+        "telegram._bot",
+        "telegram._utils",
+        "httpx",
+        "httpcore",
+    ):
+        logging.getLogger(name).setLevel(logging.WARNING)
+
+    root = logging.getLogger()
+    flt = _RedactSecretsFilter()
+    try:
+        root.addFilter(flt)
+    except Exception:
+        pass
+    for h in list(root.handlers):
+        try:
+            h.addFilter(flt)
+        except Exception:
+            pass
+
+
+_harden_logging()
 
 _instance_lock_handle = None
 

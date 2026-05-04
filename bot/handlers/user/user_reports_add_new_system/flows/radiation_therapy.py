@@ -515,6 +515,33 @@ async def handle_radiation_therapy_return_reason(update: Update, context: Contex
 
     await update.message.reply_text("✅ تم الحفظ")
 
+    # ✅ بوابة "هل يوجد تقرير طبي؟" قبل المترجم (كانت مفقودة لهذا المسار)
+    try:
+        report_tmp = context.user_data.setdefault("report_tmp", {})
+        skip_medical_gate = bool(context.user_data.get("_skip_medical_gate_once"))
+        if (not skip_medical_gate) and (not report_tmp.get("_medical_report_step_done")):
+            report_tmp["_pending_translator_flow"] = "radiation_therapy"
+            keyboard = InlineKeyboardMarkup(
+                [
+                    [
+                        InlineKeyboardButton("✅ نعم", callback_data="medrep:yes"),
+                        InlineKeyboardButton("❌ لا", callback_data="medrep:no"),
+                    ],
+                    [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back")],
+                ]
+            )
+            await update.message.reply_text(
+                "📎 **هل يوجد تقرير طبي؟**\n\n"
+                "اختر (نعم) لرفع صور التقرير الطبي، أو (لا) لكتابة سبب عدم توفره.",
+                reply_markup=keyboard,
+                parse_mode="Markdown",
+            )
+            context.user_data["_conversation_state"] = "MEDICAL_REPORT_ASK"
+            return "MEDICAL_REPORT_ASK"
+        context.user_data.pop("_skip_medical_gate_once", None)
+    except Exception:
+        pass
+
     # عرض المترجمين مع pagination
     await show_radiation_translator_selection(update.message, context)
 

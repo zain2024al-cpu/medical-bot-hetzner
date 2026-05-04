@@ -494,11 +494,63 @@ def get_confirm_state(flow_type):
 # Translator Functions
 # =============================
 
+def _is_medical_report_step_enabled(context) -> bool:
+    """
+    تحكم مركزي لتفعيل/إيقاف خطوة "هل يوجد تقرير طبي؟".
+    مكرر هنا لتفادي import دائري مع user_reports_add_new_system.py.
+    """
+    return True
+
+
 async def show_translator_selection(message, context, flow_type):
     """
     عرض قائمة المترجمين للاختيار (من ملف translator_names.txt)
     دالة ثابتة للقوائم
     """
+    # ✅ بوابة "هل يوجد تقرير طبي؟" قبل اختيار المترجم
+    # ملاحظة: التنفيذ الفعلي للخطوات (رفع الصور/سبب عدم وجود تقرير) موجود في user_reports_add_new_system.py
+    # لكن بعض المسارات (مثل متابعة في الرقود) كانت تصل لاختيار المترجم عبر هذه الدالة مباشرة،
+    # فكانت تتخطى البوابة. لذلك نضيفها هنا أيضًا.
+    try:
+        report_tmp = context.user_data.setdefault("report_tmp", {})
+        skip_medical_gate = bool(context.user_data.get("_skip_medical_gate_once"))
+        flows_without_gate = {"appointment_reschedule"}
+
+        if (
+            flow_type not in flows_without_gate
+            and _is_medical_report_step_enabled(context)
+            and (not skip_medical_gate)
+            and (not report_tmp.get("_medical_report_step_done"))
+        ):
+            report_tmp["_pending_translator_flow"] = flow_type
+            first_row = [
+                InlineKeyboardButton("✅ نعم", callback_data="medrep:yes"),
+                InlineKeyboardButton("❌ لا", callback_data="medrep:no"),
+            ]
+            if flow_type == "radiology":
+                first_row.append(InlineKeyboardButton("⏭️ تخطي", callback_data="medrep:skip"))
+
+            keyboard = InlineKeyboardMarkup(
+                [
+                    first_row,
+                    [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back")],
+                ]
+            )
+            await message.reply_text(
+                "📎 **هل يوجد تقرير طبي؟**\n\n"
+                "اختر (نعم) لرفع صور التقرير الطبي، أو (لا) لكتابة سبب عدم توفره.",
+                reply_markup=keyboard,
+                parse_mode="Markdown",
+            )
+            context.user_data["_conversation_state"] = "MEDICAL_REPORT_ASK"
+            return "MEDICAL_REPORT_ASK"
+
+        # استهلاك علم التخطي لمرة واحدة فقط
+        context.user_data.pop("_skip_medical_gate_once", None)
+    except Exception:
+        # لا نمنع اختيار المترجم إذا حدث خطأ في البوابة
+        pass
+
     translator_names = load_translator_names()
 
     if not translator_names:

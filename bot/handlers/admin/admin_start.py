@@ -490,6 +490,17 @@ def register(app):
     app.add_handler(CommandHandler("admin", admin_start))
     app.add_handler(CommandHandler("cancel", cancel_all))  # ✅ أمر إعادة التعيين
     app.add_handler(MessageHandler(filters.Regex("^ℹ️ مساعدة$"), admin_start))
+    # ✅ ضمان عمل زر إدارة المستخدمين حتى لو فشل ConversationHandler (اختلافات نص/إيموجي)
+    async def _handle_manage_users_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        from bot.handlers.admin.admin_users_management import start_user_management
+        return await start_user_management(update, context)
+
+    app.add_handler(
+        MessageHandler(
+            filters.Regex(r"^(?:👥\ufe0f?\\s*)?إدارة\\s*المستخدمين\\s*$"),
+            _handle_manage_users_button,
+        )
+    )
     # ✅ معالج زر إيقاف/تفعيل إرسال التقارير من لوحة المفاتيح
     app.add_handler(MessageHandler(filters.Regex(r"^(🟢 تفعيل إرسال التقارير|🔴 إيقاف إرسال التقارير)$"), handle_toggle_broadcast_button))
     # ✅ لا نحتاج لإضافة معالج لزر "👥 إدارة المستخدمين" هنا

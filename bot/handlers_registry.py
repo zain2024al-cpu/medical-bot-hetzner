@@ -44,6 +44,9 @@ def register_all_handlers(app):
     
     # ✅ تسجيل نظام الطباعة الاحترافي (يحتوي الآن على الفلترة المتقدمة مدمجة)
     register_admin_printing(app)  # ✅ نظام الطباعة الاحترافي الموحد
+
+    # ✅ إدارة المستخدمين للأدمن (يجب أن تكون مسجلة حتى تعمل callbacks الخاصة بها)
+    register_users_management(app)
     
     admin_initial_case.register(app)
     # admin_reports.register(app)  # ❌ تم الدمج في admin_printing

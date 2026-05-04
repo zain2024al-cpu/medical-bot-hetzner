@@ -13,6 +13,46 @@ from ..user_reports_add_helpers import validate_text_input
 
 logger = logging.getLogger(__name__)
 
+# -----------------------------
+# Helpers
+# -----------------------------
+
+def _norm(s: str) -> str:
+    """Normalize for loose DB matching (case/space)."""
+    return " ".join((s or "").strip().split()).casefold()
+
+
+def _hospital_name_variants(hospital_name: str) -> list[str]:
+    """
+    Generate common variants that appear after hospital dedupe/merge scripts.
+    Example:
+      "Manipal Hospital - Old Airport Road" <-> "Manipal Hospital, Old Airport Road"
+    """
+    base = (hospital_name or "").strip()
+    if not base:
+        return []
+
+    variants = [base]
+
+    # Swap first " - " with ", " (common normalization between UI lists and DB rows)
+    if " - " in base:
+        variants.append(base.replace(" - ", ", ", 1))
+
+    # Sometimes suffixes like ", Bangalore" are present in some sources but not DB
+    if base.lower().endswith(", bangalore"):
+        variants.append(base[: -len(", bangalore")].strip())
+
+    # de-dup preserving order
+    out = []
+    seen = set()
+    for v in variants:
+        k = _norm(v)
+        if k and k not in seen:
+            seen.add(k)
+            out.append(v)
+    return out
+
+
 # Imports المشتركة
 try:
     from db.session import SessionLocal
@@ -49,7 +89,21 @@ async def render_doctor_selection(message, context):
                 try:
                     with SessionLocal() as s:
                         # البحث عن المستشفى والقسم
-                        hospital = s.query(Hospital).filter(Hospital.name == hospital_name).first()
+                        hospital = None
+                        # ✅ مرونة في مطابقة اسم المستشفى (بعد دمج/تنظيف التكرارات قد يتغير الشكل)
+                        for cand in _hospital_name_variants(hospital_name):
+                            key = _norm(cand)
+                            hospital = (
+                                s.query(Hospital)
+                                .filter(func.lower(func.trim(Hospital.name)) == key)
+                                .first()
+                            )
+                            if hospital:
+                                break
+                        # fallback: exact match (kept for safety)
+                        if not hospital:
+                            hospital = s.query(Hospital).filter(Hospital.name == hospital_name).first()
+
                         department = s.query(Department).filter(Department.name == department_name).first()
                         
                         # جلب الأطباء من قاعدة البيانات المربوطة بالمستشفى والقسم
@@ -84,7 +138,8 @@ async def render_doctor_selection(message, context):
                     "Aster CMI": "Aster CMI Hospital, Bangalore",
                     "Aster RV": "Aster RV Hospital, Bangalore",
                     "Aster Whitefield": "Aster Whitefield Hospital, Bangalore",
-                    "Manipal Hospital - Old Airport Road": "Manipal Hospital, Old Airport Road, Bangalore",
+                    # ✅ مطابق للاسم الموجود في DB بعد الدمج غالبًا
+                    "Manipal Hospital - Old Airport Road": "Manipal Hospital, Old Airport Road",
                     "Manipal Hospital - Millers Road": "Manipal Hospital, Millers Road, Bangalore",
                     "Manipal Hospital - Whitefield": "Manipal Hospital, Whitefield, Bangalore",
                     "Manipal Hospital - Yeshwanthpur": "Manipal Hospital, Yeshwanthpur, Bangalore",
