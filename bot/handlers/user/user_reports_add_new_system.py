@@ -73,23 +73,9 @@ from .user_reports_add_helpers import (
 def _is_medical_report_step_enabled(context: ContextTypes.DEFAULT_TYPE) -> bool:
     """
     تحكم مركزي لتفعيل/إيقاف خطوة "هل يوجد تقرير طبي؟".
-    - افتراضيًا: OFF (حتى لا تُفعّل أونلاين بالخطأ)
-    - يمكن تفعيلها من البيئة: ENABLE_MEDICAL_REPORT_STEP=true
-    - ويمكن تفعيلها/إيقافها أثناء التشغيل بأمر أدمن (/medrep_on /medrep_off)
-      ويتم حفظها في persistence عبر bot_data.
+    ✅ مفعّلة دائمًا (حسب طلب التشغيل الحالي).
     """
-    # 1) override runtime (persisted)
-    try:
-        if context and isinstance(getattr(context, "bot_data", None), dict):
-            v = context.bot_data.get("MEDICAL_REPORT_STEP_ENABLED")
-            if v is not None:
-                return bool(v)
-    except Exception:
-        pass
-
-    # 2) env default
-    env_val = (os.getenv("ENABLE_MEDICAL_REPORT_STEP") or "").strip().lower()
-    return env_val in ("1", "true", "yes", "on")
+    return True
 
 
 async def _set_medical_report_step(update: Update, context: ContextTypes.DEFAULT_TYPE, enabled: bool):
@@ -11350,7 +11336,7 @@ def register(app):
             ],
             # خطوة التقرير الطبي قبل شاشة المترجم
             MEDICAL_REPORT_ASK: [
-                CallbackQueryHandler(handle_medical_report_answer, pattern="^medrep:(yes|no)$"),
+                CallbackQueryHandler(handle_medical_report_answer, pattern="^medrep:(yes|no|skip)$"),
                 CallbackQueryHandler(handle_smart_back_navigation, pattern="^nav:back$"),
             ],
             MEDICAL_REPORT_UPLOAD: [
@@ -11358,6 +11344,8 @@ def register(app):
                 MessageHandler(filters.PHOTO, handle_medical_report_photo),
                 MessageHandler(filters.Document.IMAGE, handle_medical_report_photo),
                 MessageHandler(filters.Document.MimeType("application/pdf"), handle_medical_report_photo),
+                MessageHandler(filters.VIDEO, handle_medical_report_photo),
+                MessageHandler(filters.Document.VIDEO, handle_medical_report_photo),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_medical_report_photo),
                 CallbackQueryHandler(handle_smart_back_navigation, pattern="^nav:back$"),
             ],
@@ -12180,8 +12168,7 @@ async def show_translator_selection(message, context, flow_type, page=1):
     # ✅ بوابة "هل يوجد تقرير طبي؟" قبل اختيار المترجم
     # مطلوبة لمعظم المسارات، لكن *مطلوب إزالتها فقط* لمساري:
     # - تأجيل موعد (appointment_reschedule)
-    # - أشعة وفحوصات (radiology)
-    _flows_without_medrep_gate = {"appointment_reschedule", "radiology"}
+    _flows_without_medrep_gate = {"appointment_reschedule"}
     if (
         flow_type not in _flows_without_medrep_gate
         and _is_medical_report_step_enabled(context)
@@ -12189,12 +12176,17 @@ async def show_translator_selection(message, context, flow_type, page=1):
         and (not report_tmp.get("_medical_report_step_done"))
     ):
         report_tmp["_pending_translator_flow"] = flow_type
+        first_row = [
+            InlineKeyboardButton("✅ نعم", callback_data="medrep:yes"),
+            InlineKeyboardButton("❌ لا", callback_data="medrep:no"),
+        ]
+        # ✅ فقط في الأشعة والفحوصات: السماح بالتخطي مباشرة لاختيار المترجم
+        if flow_type == "radiology":
+            first_row.append(InlineKeyboardButton("⏭️ تخطي", callback_data="medrep:skip"))
+
         keyboard = InlineKeyboardMarkup(
             [
-                [
-                    InlineKeyboardButton("✅ نعم", callback_data="medrep:yes"),
-                    InlineKeyboardButton("❌ لا", callback_data="medrep:no"),
-                ],
+                first_row,
                 [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back")],
             ]
         )
@@ -12337,6 +12329,20 @@ async def _continue_to_translator_after_medical(message, context):
     report_tmp["_medical_report_step_done"] = True
     context.user_data["_skip_medical_gate_once"] = True
 
+    # ✅ مسار جلسة إشعاعي لديه شاشة مترجم خاصة (pagination مختلفة)
+    if flow_type == "radiation_therapy":
+        try:
+            from bot.handlers.user.user_reports_add_new_system.flows.radiation_therapy import (
+                show_radiation_translator_selection,
+            )
+            from bot.handlers.user.user_reports_add_new_system.states import RADIATION_THERAPY_TRANSLATOR
+            await show_radiation_translator_selection(message, context)
+            context.user_data["_conversation_state"] = RADIATION_THERAPY_TRANSLATOR
+            return RADIATION_THERAPY_TRANSLATOR
+        except Exception:
+            # fallback: use the default translator list
+            pass
+
     await show_translator_selection(message, context, flow_type)
     translator_state = get_translator_state(flow_type)
     context.user_data["_conversation_state"] = translator_state
@@ -12344,7 +12350,7 @@ async def _continue_to_translator_after_medical(message, context):
 
 
 async def handle_medical_report_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """معالجة اختيار وجود تقرير طبي (نعم/لا)."""
+    """معالجة اختيار وجود تقرير طبي (نعم/لا/تخطي)."""
     query = update.callback_query
     if not query:
         return MEDICAL_REPORT_ASK
@@ -12358,9 +12364,10 @@ async def handle_medical_report_answer(update: Update, context: ContextTypes.DEF
         report_tmp["medical_report_missing_reason"] = None
         report_tmp["medical_report_photo_file_ids"] = []
         report_tmp["medical_report_pdf_file_ids"] = []
+        report_tmp["medical_report_video_file_ids"] = []
         report_tmp["_medical_report_step_done"] = False
         await query.message.reply_text(
-            "📷 ارسل صورة/صور **أو** ملف PDF للتقرير الطبي.\n"
+            "📷🎥 ارسل صورة/صور **أو** ملف PDF **أو** فيديو للتقرير الطبي.\n"
             "بعد الانتهاء ارسل /done",
         )
         context.user_data["_conversation_state"] = MEDICAL_REPORT_UPLOAD
@@ -12376,11 +12383,23 @@ async def handle_medical_report_answer(update: Update, context: ContextTypes.DEF
         context.user_data["_conversation_state"] = MEDICAL_REPORT_REASON
         return MEDICAL_REPORT_REASON
 
+    if data == "medrep:skip":
+        # ✅ التخطي مطلوب فقط لمسار الأشعة والفحوصات
+        flow_type = report_tmp.get("_pending_translator_flow") or report_tmp.get("current_flow") or ""
+        if flow_type != "radiology":
+            return MEDICAL_REPORT_ASK
+        report_tmp["medical_report_available"] = None
+        report_tmp["medical_report_missing_reason"] = None
+        report_tmp["medical_report_photo_file_ids"] = []
+        report_tmp["medical_report_pdf_file_ids"] = []
+        report_tmp["medical_report_video_file_ids"] = []
+        return await _continue_to_translator_after_medical(query.message, context)
+
     return MEDICAL_REPORT_ASK
 
 
 async def handle_medical_report_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """استقبال صور التقرير الطبي أثناء الرفع."""
+    """استقبال ملفات التقرير الطبي أثناء الرفع (صور/PDF/فيديو)."""
     msg = update.message
     if not msg:
         return MEDICAL_REPORT_UPLOAD
@@ -12393,6 +12412,7 @@ async def handle_medical_report_photo(update: Update, context: ContextTypes.DEFA
     report_tmp = context.user_data.setdefault("report_tmp", {})
     arr = report_tmp.setdefault("medical_report_photo_file_ids", [])
     pdf_arr = report_tmp.setdefault("medical_report_pdf_file_ids", [])
+    vid_arr = report_tmp.setdefault("medical_report_video_file_ids", [])
 
     if msg.photo:
         if pdf_arr:
@@ -12424,7 +12444,21 @@ async def handle_medical_report_photo(update: Update, context: ContextTypes.DEFA
         context.user_data["_conversation_state"] = MEDICAL_REPORT_UPLOAD
         return MEDICAL_REPORT_UPLOAD
 
-    await msg.reply_text("ارسل صورة/صور أو ملف PDF للتقرير الطبي، أو استخدم /done للإنهاء.")
+    # ✅ فيديو كرسالة فيديو
+    if msg.video:
+        vid_arr.append(msg.video.file_id)
+        await msg.reply_text(f"✅ تم استلام الفيديو رقم {len(vid_arr)}. ارسل المزيد أو /done.")
+        context.user_data["_conversation_state"] = MEDICAL_REPORT_UPLOAD
+        return MEDICAL_REPORT_UPLOAD
+
+    # ✅ فيديو كملف document
+    if msg.document and (msg.document.mime_type or "").lower().startswith("video/"):
+        vid_arr.append(msg.document.file_id)
+        await msg.reply_text(f"✅ تم استلام الفيديو رقم {len(vid_arr)}. ارسل المزيد أو /done.")
+        context.user_data["_conversation_state"] = MEDICAL_REPORT_UPLOAD
+        return MEDICAL_REPORT_UPLOAD
+
+    await msg.reply_text("ارسل صورة/صور أو ملف PDF أو فيديو للتقرير الطبي، أو استخدم /done للإنهاء.")
     return MEDICAL_REPORT_UPLOAD
 
 
@@ -12434,9 +12468,10 @@ async def handle_medical_report_done(update: Update, context: ContextTypes.DEFAU
     report_tmp = context.user_data.setdefault("report_tmp", {})
     file_ids = report_tmp.get("medical_report_photo_file_ids") or []
     pdf_ids = report_tmp.get("medical_report_pdf_file_ids") or []
+    vid_ids = report_tmp.get("medical_report_video_file_ids") or []
 
-    if not file_ids and not pdf_ids:
-        await msg.reply_text("⚠️ لم يتم استلام صور أو PDF بعد. ارسل ملفًا واحدًا على الأقل أو اختر (لا).")
+    if not file_ids and not pdf_ids and not vid_ids:
+        await msg.reply_text("⚠️ لم يتم استلام صور أو PDF أو فيديو بعد. ارسل ملفًا واحدًا على الأقل أو اختر (لا).")
         return MEDICAL_REPORT_UPLOAD
 
     patient_name = str(report_tmp.get("patient_name") or "patient").strip()
@@ -12460,6 +12495,21 @@ async def handle_medical_report_done(update: Update, context: ContextTypes.DEFAU
             f"السبب: {e}"
         )
         return MEDICAL_REPORT_UPLOAD
+
+    # ✅ إرسال الفيديوهات (إن وجدت) كملفات منفصلة للمجموعة
+    # لا ندخلها ضمن PDF، فقط ننشرها ثم نكمل نشر الـ PDF (إن وجد).
+    if vid_ids:
+        try:
+            for idx, fid in enumerate(vid_ids, start=1):
+                await context.bot.send_video(
+                    chat_id=group_id,
+                    video=fid,
+                    caption=(caption if idx == 1 and not pdf_ids and not file_ids else None),
+                )
+            await msg.reply_text("✅ تم إرسال الفيديو/الفيديوهات إلى المجموعة.")
+        except Exception as e:
+            await msg.reply_text(f"❌ فشل إرسال الفيديو للمجموعة: {e}")
+            return MEDICAL_REPORT_UPLOAD
 
     # الحالة 1: PDF مباشر (بدون تحويل)
     if pdf_ids:
@@ -12497,6 +12547,10 @@ async def handle_medical_report_done(update: Update, context: ContextTypes.DEFAU
         except Exception as e:
             await msg.reply_text(f"❌ فشل إرسال PDF للمجموعة: {e}")
             return MEDICAL_REPORT_UPLOAD
+        return await _continue_to_translator_after_medical(msg, context)
+
+    # إذا كانت فيديوهات فقط (بدون PDF/صور) نكمل مباشرة
+    if vid_ids and (not file_ids) and (not pdf_ids):
         return await _continue_to_translator_after_medical(msg, context)
 
     # الحالة 2: صور => تحويل PDF ثم إرسال
@@ -12551,6 +12605,7 @@ async def handle_medical_report_reason_text(update: Update, context: ContextType
     report_tmp = context.user_data.setdefault("report_tmp", {})
     report_tmp["medical_report_missing_reason"] = reason
     report_tmp["medical_report_photo_file_ids"] = []
+    report_tmp["medical_report_video_file_ids"] = []
     await msg.reply_text("✅ تم حفظ السبب.")
     return await _continue_to_translator_after_medical(msg, context)
 
