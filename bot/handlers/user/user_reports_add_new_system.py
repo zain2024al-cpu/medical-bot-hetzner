@@ -2637,8 +2637,8 @@ def _build_doctors_keyboard(page: int, doctors: list, context):
     # التأكد من أن الصفحة في النطاق الصحيح
     page = max(0, min(page, total_pages - 1))
     
-    # حفظ قائمة الأطباء في context
-    context.user_data['_doctors_list'] = doctors
+    # حفظ قائمة الأطباء في report_tmp (IDX snapshot doctrine)
+    context.user_data.setdefault("report_tmp", {})["_doctors_list"] = doctors
     context.user_data['_doctors_page'] = page
     
     keyboard = []
@@ -3987,8 +3987,8 @@ async def handle_doctor_page(update: Update, context: ContextTypes.DEFAULT_TYPE)
     page = int(query.data.split(":")[1])
     
     # جلب قائمة الأطباء المحفوظة
-    doctors = context.user_data.get('_doctors_list', [])
-    
+    doctors = context.user_data.get("report_tmp", {}).get('_doctors_list', [])
+
     # بناء الكيبورد الجديد
     keyboard, total_doctors = _build_doctors_keyboard(page, doctors, context)
     
@@ -4029,7 +4029,7 @@ async def handle_doctor_btn_selection(update: Update, context: ContextTypes.DEFA
     idx = int(query.data.split(":")[1])
     
     # جلب الطبيب من القائمة المحفوظة
-    doctors = context.user_data.get('_doctors_list', [])
+    doctors = context.user_data.get("report_tmp", {}).get('_doctors_list', [])
     
     if idx < len(doctors):
         doctor = doctors[idx]
@@ -10894,255 +10894,221 @@ async def handle_restart_from_start_main_menu(update: Update, context: ContextTy
 # تسجيل الـ ConversationHandler
 # =============================
 
-def register(app):
-    """تسجيل جميع handlers للمرحلة 1"""
+# =============================
+# Module-level inline query handlers (extracted from register() for importability)
+# =============================
 
-    # =============================
-    # Handlers منفصلة للبحث الذكي - فصل كامل بين المرضى والأطباء
-    # =============================
+async def patient_inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler منفصل للبحث عن المرضى فقط - لا يتداخل مع الأطباء"""
+    query_text = update.inline_query.query.strip() if update.inline_query.query else ""
+    logger.info(f"🔍 patient_inline_query_handler: Searching patients with query='{query_text}'")
 
-    async def patient_inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handler منفصل للبحث عن المرضى فقط - لا يتداخل مع الأطباء"""
-        import logging
-        logger = logging.getLogger(__name__)
+    results = []
 
-        query_text = update.inline_query.query.strip() if update.inline_query.query else ""
-        logger.info(f"🔍 patient_inline_query_handler: Searching patients with query='{query_text}'")
+    try:
+        with SessionLocal() as s:
+            if query_text:
+                patients = s.query(Patient).filter(
+                    Patient.full_name.ilike(f"%{query_text}%")
+                ).limit(20).all()
+            else:
+                patients = s.query(Patient).order_by(Patient.created_at.desc()).limit(20).all()
 
-        results = []
-
-        try:
-            with SessionLocal() as s:
-                if query_text:
-                    patients = s.query(Patient).filter(
-                        Patient.full_name.ilike(f"%{query_text}%")
-                    ).limit(20).all()
-                else:
-                    patients = s.query(Patient).order_by(Patient.created_at.desc()).limit(20).all()
-
-                for patient in patients:
-                    result = InlineQueryResultArticle(
-                        id=f"patient_{patient.id}",
-                        title=f"👤 {patient.full_name}",
-                        description=f"اختر هذا المريض",
-                        input_message_content=InputTextMessageContent(
-                            message_text=f"__PATIENT_SELECTED__:{patient.id}:{patient.full_name}"
-                        )
-                    )
-                    results.append(result)
-
-            logger.info(f"patient_inline_query_handler: Found {len(results)} patients from database")
-
-        except Exception as db_error:
-            logger.error(f"❌ خطأ في البحث عن المرضى من قاعدة البيانات: {db_error}")
-            # Fallback: قراءة من الملف
-            try:
-                import os
-                file_path = "data/patient_names.txt"
-                if os.path.exists(file_path):
-                    names = []
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        for line in f:
-                            line = line.strip()
-                            if line and not line.startswith('#'):
-                                names.append(line)
-
-                    # فلترة حسب query_text
-                    if query_text:
-                        names = [n for n in names if query_text.lower() in n.lower()]
-
-                    # إنشاء نتائج من الملف
-                    for idx, name in enumerate(names[:20]):
-                        result = InlineQueryResultArticle(
-                            id=f"patient_file_{idx}",
-                            title=f"👤 {name}",
-                            description=f"اختر هذا المريض",
-                            input_message_content=InputTextMessageContent(
-                                message_text=f"__PATIENT_SELECTED__:0:{name}"
-                            )
-                        )
-                        results.append(result)
-
-                    logger.info(f"patient_inline_query_handler: Found {len(results)} patients from file (fallback)")
-            except Exception as file_error:
-                logger.error(f"❌ خطأ في قراءة ملف المرضى: {file_error}")
-
-        # إرسال النتائج
-        if not results:
-            results.append(InlineQueryResultArticle(
-                id="no_patients",
-                title="⚠️ لا توجد أسماء مرضى",
-                description="جرب البحث باسم مريض محدد",
-                input_message_content=InputTextMessageContent(
-                    message_text="__PATIENT_SELECTED__:0:لا يوجد"
-                )
-            ))
-
-        await update.inline_query.answer(results, cache_time=1)
-
-        async def handle_view_reschedule_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            """عرض سبب تأجيل الموعد عند الضغط على الزر في مجموعة البث"""
-            try:
-                query = update.callback_query
-                if not query or not query.data:
-                    return
-                await query.answer()
-                parts = query.data.split(':', 1)
-                if len(parts) < 2:
-                    await query.message.reply_text("⚠️ لم يتم تحديد التقرير.")
-                    return
-                try:
-                    report_id = int(parts[1])
-                except:
-                    await query.message.reply_text("⚠️ معرف تقرير غير صالح.")
-                    return
-
-                # جلب التقرير من قاعدة البيانات
-                from db.session import SessionLocal
-                from db.models import Report
-
-                with SessionLocal() as s:
-                    report = s.query(Report).filter_by(id=report_id).first()
-                    if not report:
-                        await query.message.reply_text("⚠️ لم يتم العثور على التقرير.")
-                        return
-
-                    # محاولة استخراج معلومات التأجيل من الحقول المتاحة
-                    # الحقل الأساسي هو app_reschedule_reason
-                    reason = None
-                    
-                    # أولاً: التحقق من الحقل الصحيح app_reschedule_reason
-                    if getattr(report, 'app_reschedule_reason', None):
-                        reason = report.app_reschedule_reason
-                    # ثانياً: fallback إلى followup_reason
-                    elif getattr(report, 'followup_reason', None):
-                        reason = report.followup_reason
-                    # ثالثاً: fallback إلى doctor_decision إذا كان يحتوي على سبب التأجيل
-                    elif getattr(report, 'doctor_decision', None) and 'سبب تأجيل' in str(report.doctor_decision):
-                        reason = report.doctor_decision
-
-                    # إذا لم نوجد سبباً واضحاً، عرض رسالة ملائمة
-                    if not reason or not str(reason).strip():
-                        await query.message.reply_text("ℹ️ لا يوجد سبب تأجيل مسجل لهذا التقرير.")
-                        return
-
-                    # بناء رسالة شاملة
-                    text = f"📅 **سبب تأجيل الموعد للتقرير #{report_id}:**\n\n{reason}"
-                    
-                    # إضافة تاريخ العودة إذا كان موجوداً
-                    return_date = getattr(report, 'app_reschedule_return_date', None) or getattr(report, 'followup_date', None)
-                    if return_date:
-                        if hasattr(return_date, 'strftime'):
-                            text += f"\n\n📅 **موعد العودة:** {return_date.strftime('%Y-%m-%d')}"
-                        else:
-                            text += f"\n\n📅 **موعد العودة:** {return_date}"
-                    
-                    # إضافة سبب العودة إذا كان موجوداً
-                    return_reason = getattr(report, 'app_reschedule_return_reason', None)
-                    if return_reason and str(return_reason).strip():
-                        text += f"\n\n✍️ **سبب العودة:** {return_reason}"
-                    
-                    await query.message.reply_text(text, parse_mode="Markdown")
-
-            except Exception as e:
-                import logging
-                logging.getLogger(__name__).exception(f"خطأ في handle_view_reschedule_callback: {e}")
-                try:
-                    await update.callback_query.message.reply_text("⚠️ حدث خطأ أثناء جلب بيانات التأجيل.")
-                except:
-                    pass
-
-        # تسجيل معالج global للزر view_reschedule (يجب أن يكون خارج ConversationHandler)
-        try:
-            from telegram.ext import CallbackQueryHandler
-            app.add_handler(CallbackQueryHandler(handle_view_reschedule_callback, pattern="^view_reschedule:"))
-        except Exception:
-            pass
-
-    async def doctor_inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handler بسيط للبحث عن الأطباء مع فلترة حسب المستشفى والقسم"""
-        try:
-            # الحصول على البيانات
-            query_text = update.inline_query.query.strip() if update.inline_query.query else ""
-
-            # الحصول على بيانات المستشفى والقسم المحددين
-            report_tmp = context.user_data.get("report_tmp", {})
-            hospital_name = report_tmp.get("hospital_name", "").strip()
-            department_name = report_tmp.get("department_name", "").strip()
-
-            # تحويل أسماء المستشفيات المختصرة إلى الأسماء الكاملة في قاعدة البيانات
-            hospital_mapping = {
-                "Aster CMI": "Aster CMI Hospital, Bangalore",
-                "Aster RV": "Aster RV Hospital, Bangalore",
-                "Aster Whitefield": "Aster Whitefield Hospital, Bangalore",
-                "Manipal Hospital - Old Airport Road": "Manipal Hospital, Old Airport Road, Bangalore",
-                "Manipal Hospital - Millers Road": "Manipal Hospital, Millers Road, Bangalore",
-                "Manipal Hospital - Whitefield": "Manipal Hospital, Whitefield, Bangalore",
-                "Manipal Hospital - Yeshwanthpur": "Manipal Hospital, Yeshwanthpur, Bangalore",
-                "Manipal Hospital - Sarjapur Road": "Manipal Hospital, Sarjapur Road, Bangalore",
-            }
-
-            # استخدام الاسم الكامل إذا كان متوفراً
-            search_hospital = hospital_mapping.get(hospital_name, hospital_name)
-
-
-            # البحث عن الأطباء مع الفلترة
-            doctors_results = search_doctors(
-                query=query_text if query_text else "",
-                hospital=search_hospital if search_hospital else None,
-                department=department_name if department_name else None,
-                limit=20  # زيادة العدد للحصول على نتائج أكثر
-            )
-
-
-            # بناء النتائج
-            results = []
-            for idx, doctor in enumerate(doctors_results):
-                name = doctor.get('name', 'طبيب بدون اسم')
-                hospital = doctor.get('hospital', 'مستشفى غير محدد')
-                department = doctor.get('department_ar', doctor.get('department_en', 'قسم غير محدد'))
-
+            for patient in patients:
                 result = InlineQueryResultArticle(
-                    id=f"doc_{idx}",
-                    title=f"👨‍⚕️ {name}",
-                    description=f"🏥 {hospital[:30]} | 📋 {department[:30]}",
+                    id=f"patient_{patient.id}",
+                    title=f"👤 {patient.full_name}",
+                    description=f"اختر هذا المريض",
                     input_message_content=InputTextMessageContent(
-                        message_text=f"__DOCTOR_SELECTED__:{idx}:{name}"
+                        message_text=f"__PATIENT_SELECTED__:{patient.id}:{patient.full_name}"
                     )
                 )
                 results.append(result)
 
-            # إرسال النتائج
-            await update.inline_query.answer(results, cache_time=1)
+        logger.info(f"patient_inline_query_handler: Found {len(results)} patients from database")
 
-        except Exception as e:
-            import traceback
-            # إرسال نتائج فارغة في حالة الخطأ
-            await update.inline_query.answer([], cache_time=1)
+    except Exception as db_error:
+        logger.error(f"❌ خطأ في البحث عن المرضى من قاعدة البيانات: {db_error}")
+        try:
+            import os
+            file_path = "data/patient_names.txt"
+            if os.path.exists(file_path):
+                names = []
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith('#'):
+                            names.append(line)
 
-    async def handle_chosen_inline_result(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """معالجة اختيار من inline query"""
-        result_id = update.chosen_inline_result.result_id
-        query_text = update.chosen_inline_result.query
-        
-        if result_id.startswith("patient_"):
-            patient_id = int(result_id.split("_")[1])
-            report_tmp = context.user_data.setdefault("report_tmp", {})
-            with SessionLocal() as s:
-                patient = s.query(Patient).filter_by(id=patient_id).first()
-                if patient:
-                    report_tmp["patient_name"] = patient.full_name
-                    report_tmp["patient_id"] = patient_id
-        elif result_id.startswith("doctor_"):
-            # النظام الجديد: ID هو index وليس doctor.id
-            # اسم الطبيب سيأتي من message_text في handle_doctor
-            # هنا نحفظ فقط أن الطبيب تم اختياره
-            report_tmp = context.user_data.setdefault("report_tmp", {})
-            # محاولة البحث عن الطبيب من اسمه في قاعدة البيانات (اختياري)
-            # لكن handle_doctor سيتعامل مع الرسالة مباشرة
+                if query_text:
+                    names = [n for n in names if query_text.lower() in n.lower()]
+
+                for idx, name in enumerate(names[:20]):
+                    result = InlineQueryResultArticle(
+                        id=f"patient_file_{idx}",
+                        title=f"👤 {name}",
+                        description=f"اختر هذا المريض",
+                        input_message_content=InputTextMessageContent(
+                            message_text=f"__PATIENT_SELECTED__:0:{name}"
+                        )
+                    )
+                    results.append(result)
+
+                logger.info(f"patient_inline_query_handler: Found {len(results)} patients from file (fallback)")
+        except Exception as file_error:
+            logger.error(f"❌ خطأ في قراءة ملف المرضى: {file_error}")
+
+    if not results:
+        results.append(InlineQueryResultArticle(
+            id="no_patients",
+            title="⚠️ لا توجد أسماء مرضى",
+            description="جرب البحث باسم مريض محدد",
+            input_message_content=InputTextMessageContent(
+                message_text="__PATIENT_SELECTED__:0:لا يوجد"
+            )
+        ))
+
+    await update.inline_query.answer(results, cache_time=1)
+
+
+async def handle_view_reschedule_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """عرض سبب تأجيل الموعد عند الضغط على الزر في مجموعة البث"""
+    try:
+        query = update.callback_query
+        if not query or not query.data:
+            return
+        await query.answer()
+        parts = query.data.split(':', 1)
+        if len(parts) < 2:
+            await query.message.reply_text("⚠️ لم يتم تحديد التقرير.")
+            return
+        try:
+            report_id = int(parts[1])
+        except Exception:
+            await query.message.reply_text("⚠️ معرف تقرير غير صالح.")
+            return
+
+        from db.session import SessionLocal as _SL
+        from db.models import Report as _Report
+
+        with _SL() as s:
+            report = s.query(_Report).filter_by(id=report_id).first()
+            if not report:
+                await query.message.reply_text("⚠️ لم يتم العثور على التقرير.")
+                return
+
+            reason = None
+            if getattr(report, 'app_reschedule_reason', None):
+                reason = report.app_reschedule_reason
+            elif getattr(report, 'followup_reason', None):
+                reason = report.followup_reason
+            elif getattr(report, 'doctor_decision', None) and 'سبب تأجيل' in str(report.doctor_decision):
+                reason = report.doctor_decision
+
+            if not reason or not str(reason).strip():
+                await query.message.reply_text("ℹ️ لا يوجد سبب تأجيل مسجل لهذا التقرير.")
+                return
+
+            text = f"📅 **سبب تأجيل الموعد للتقرير #{report_id}:**\n\n{reason}"
+
+            return_date = getattr(report, 'app_reschedule_return_date', None) or getattr(report, 'followup_date', None)
+            if return_date:
+                if hasattr(return_date, 'strftime'):
+                    text += f"\n\n📅 **موعد العودة:** {return_date.strftime('%Y-%m-%d')}"
+                else:
+                    text += f"\n\n📅 **موعد العودة:** {return_date}"
+
+            return_reason = getattr(report, 'app_reschedule_return_reason', None)
+            if return_reason and str(return_reason).strip():
+                text += f"\n\n✍️ **سبب العودة:** {return_reason}"
+
+            await query.message.reply_text(text, parse_mode="Markdown")
+
+    except Exception as e:
+        logger.exception(f"خطأ في handle_view_reschedule_callback: {e}")
+        try:
+            await update.callback_query.message.reply_text("⚠️ حدث خطأ أثناء جلب بيانات التأجيل.")
+        except Exception:
             pass
 
+
+async def doctor_inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler بسيط للبحث عن الأطباء مع فلترة حسب المستشفى والقسم"""
+    try:
+        query_text = update.inline_query.query.strip() if update.inline_query.query else ""
+
+        report_tmp = context.user_data.get("report_tmp", {})
+        hospital_name = report_tmp.get("hospital_name", "").strip()
+        department_name = report_tmp.get("department_name", "").strip()
+
+        hospital_mapping = {
+            "Aster CMI": "Aster CMI Hospital, Bangalore",
+            "Aster RV": "Aster RV Hospital, Bangalore",
+            "Aster Whitefield": "Aster Whitefield Hospital, Bangalore",
+            "Manipal Hospital - Old Airport Road": "Manipal Hospital, Old Airport Road, Bangalore",
+            "Manipal Hospital - Millers Road": "Manipal Hospital, Millers Road, Bangalore",
+            "Manipal Hospital - Whitefield": "Manipal Hospital, Whitefield, Bangalore",
+            "Manipal Hospital - Yeshwanthpur": "Manipal Hospital, Yeshwanthpur, Bangalore",
+            "Manipal Hospital - Sarjapur Road": "Manipal Hospital, Sarjapur Road, Bangalore",
+        }
+
+        search_hospital = hospital_mapping.get(hospital_name, hospital_name)
+
+        doctors_results = search_doctors(
+            query=query_text if query_text else "",
+            hospital=search_hospital if search_hospital else None,
+            department=department_name if department_name else None,
+            limit=20,
+        )
+
+        results = []
+        for idx, doctor in enumerate(doctors_results):
+            name = doctor.get('name', 'طبيب بدون اسم')
+            hospital = doctor.get('hospital', 'مستشفى غير محدد')
+            department = doctor.get('department_ar', doctor.get('department_en', 'قسم غير محدد'))
+
+            result = InlineQueryResultArticle(
+                id=f"doc_{idx}",
+                title=f"👨‍⚕️ {name}",
+                description=f"🏥 {hospital[:30]} | 📋 {department[:30]}",
+                input_message_content=InputTextMessageContent(
+                    message_text=f"__DOCTOR_SELECTED__:{idx}:{name}"
+                )
+            )
+            results.append(result)
+
+        await update.inline_query.answer(results, cache_time=1)
+
+    except Exception:
+        await update.inline_query.answer([], cache_time=1)
+
+
+async def handle_chosen_inline_result(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة اختيار من inline query"""
+    result_id = update.chosen_inline_result.result_id
+
+    if result_id.startswith("patient_"):
+        patient_id = int(result_id.split("_")[1])
+        report_tmp = context.user_data.setdefault("report_tmp", {})
+        with SessionLocal() as s:
+            patient = s.query(Patient).filter_by(id=patient_id).first()
+            if patient:
+                report_tmp["patient_name"] = patient.full_name
+                report_tmp["patient_id"] = patient_id
+    elif result_id.startswith("doctor_"):
+        context.user_data.setdefault("report_tmp", {})
+
+
+def register(app):
+    """تسجيل جميع handlers للمرحلة 1"""
+
     app.add_handler(ChosenInlineResultHandler(handle_chosen_inline_result))
+
+    # تسجيل معالج global للزر view_reschedule (يجب أن يكون خارج ConversationHandler)
+    try:
+        app.add_handler(CallbackQueryHandler(handle_view_reschedule_callback, pattern="^view_reschedule:"))
+    except Exception:
+        pass
 
     # تسجيل ConversationHandler لإضافة التقارير
     conv_handler = ConversationHandler(
