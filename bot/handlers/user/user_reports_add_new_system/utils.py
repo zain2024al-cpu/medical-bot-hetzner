@@ -103,7 +103,7 @@ def _cancel_kb():
 
 
 def format_time_12h(dt: datetime) -> str:
-    """تحويل الوقت إلى صيغة 12 ساعة مع التمييز بين صباح/مساء"""
+    """تحويل الوقت إلى صيغة 12 ساعة مع التمييز بين صباح/مساء (يقبل datetime object)"""
     hour = dt.hour
     minute = dt.minute
     if hour == 0:
@@ -112,6 +112,31 @@ def format_time_12h(dt: datetime) -> str:
         return f"{hour}:{minute:02d} صباحاً"
     else:
         return f"{hour-12}:{minute:02d} مساءً"
+
+
+def format_time_12h_str(time_str) -> str | None:
+    """تحويل الوقت لصيغة 12 ساعة مع صباحاً/ظهراً/مساءً (يقبل string مثل '13:30')"""
+    if not time_str:
+        return None
+    try:
+        if ':' in str(time_str):
+            parts = str(time_str).split(':')
+            hour = int(parts[0])
+            minute = parts[1] if len(parts) > 1 else '00'
+        else:
+            hour = int(time_str)
+            minute = '00'
+
+        if hour == 0:
+            return f"12:{minute} صباحاً"
+        elif hour < 12:
+            return f"{hour}:{minute} صباحاً"
+        elif hour == 12:
+            return f"12:{minute} ظهراً"
+        else:
+            return f"{hour-12}:{minute} مساءً"
+    except Exception:
+        return str(time_str)
 
 
 def _build_hour_keyboard():
