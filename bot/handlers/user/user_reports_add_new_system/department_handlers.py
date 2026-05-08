@@ -10,6 +10,7 @@ import logging
 from .states import STATE_SELECT_DEPARTMENT, STATE_SELECT_DOCTOR, R_SUBDEPARTMENT, R_DEPARTMENT
 from .navigation import nav_push
 from ..user_reports_add_helpers import PREDEFINED_DEPARTMENTS, DIRECT_DEPARTMENTS
+from .ui_primitives import paginate, pagination_buttons
 
 logger = logging.getLogger(__name__)
 
@@ -61,47 +62,28 @@ def _build_departments_keyboard(page=0, search_query="", context=None):
         all_departments = filtered_depts
 
     total = len(all_departments)
-    total_pages = max(1, (total + items_per_page - 1) // items_per_page)
-    page = max(0, min(page, total_pages - 1))
-    start_idx = page * items_per_page
-    end_idx = min(start_idx + items_per_page, total)
+    page_items, page, total_pages = paginate(all_departments, page, per_page=items_per_page)
 
-    keyboard = []
-
-    # حفظ قائمة الأقسام في user_data للوصول إليها لاحقاً
     if context:
         context.user_data.setdefault("report_tmp", {})["departments_list"] = all_departments
         context.user_data["report_tmp"]["departments_page"] = page
 
-    # عرض الأقسام - كل قسم في صف منفصل
-    for i in range(start_idx, end_idx):
-        dept_name = all_departments[i]
-        
+    keyboard = []
+    start_idx = page * items_per_page
+    for i, dept_name in enumerate(page_items):
         has_subdepartments = dept_name in PREDEFINED_DEPARTMENTS
-        
         if has_subdepartments:
             display = f"📁 {dept_name[:22]}..." if len(dept_name) > 22 else f"📁 {dept_name}"
         else:
             display = f"🏷️ {dept_name[:22]}..." if len(dept_name) > 22 else f"🏷️ {dept_name}"
-        
         keyboard.append([InlineKeyboardButton(
             display,
-            callback_data=f"dept_idx:{i}"
+            callback_data=f"dept_idx:{start_idx + i}"
         )])
 
-    # أزرار التنقل
-    nav_buttons = []
-    if total_pages > 1:
-        if page > 0:
-            nav_buttons.append(
-                InlineKeyboardButton("⬅️ السابق", callback_data=f"dept_page:{page - 1}"))
-        nav_buttons.append(
-            InlineKeyboardButton(f"📄 {page + 1}/{total_pages}", callback_data="noop"))
-        if page < total_pages - 1:
-            nav_buttons.append(
-                InlineKeyboardButton("➡️ التالي", callback_data=f"dept_page:{page + 1}"))
-        if nav_buttons:
-            keyboard.append(nav_buttons)
+    nav_row = pagination_buttons(page, total_pages, "dept_page")
+    if nav_row:
+        keyboard.append(nav_row)
 
     keyboard.append([
         InlineKeyboardButton("🔙 رجوع", callback_data="go_to_hospital_selection"),
@@ -160,10 +142,23 @@ async def handle_department_selection(update: Update, context: ContextTypes.DEFA
     if query.data.startswith("dept_idx:"):
         dept_index = int(query.data.split(":", 1)[1])
         departments_list = context.user_data.get("report_tmp", {}).get("departments_list", [])
+
+        if not departments_list:
+            # Snapshot wiped (PM2 restart) — re-render so user picks from fresh list.
+            logger.warning(
+                "departments_list snapshot missing for user %s — re-rendering department selection",
+                getattr(query.from_user, "id", "?"),
+            )
+            await query.answer()
+            await render_department_selection(query.message, context)
+            return STATE_SELECT_DEPARTMENT
+
         if 0 <= dept_index < len(departments_list):
             dept = departments_list[dept_index]
         else:
-            dept = query.data.split(":", 1)[1] if ":" in query.data else ""
+            logger.error("dept_idx %d out of range (list len %d)", dept_index, len(departments_list))
+            await query.answer("⚠️ خطأ في اختيار القسم، يرجى المحاولة مرة أخرى.", show_alert=True)
+            return STATE_SELECT_DEPARTMENT
     else:
         dept = query.data.split(":", 1)[1]
 
@@ -238,38 +233,25 @@ async def show_subdepartment_options(message, context, main_dept, page=0):
     nav_push(context, STATE_SELECT_SUBDEPARTMENT)
     context.user_data['_conversation_state'] = STATE_SELECT_SUBDEPARTMENT
     
-    items_per_page = 8
     subdepts = PREDEFINED_DEPARTMENTS.get(main_dept, [])
     total = len(subdepts)
-    total_pages = (total + items_per_page - 1) // items_per_page
-    page = max(0, min(page, total_pages - 1))
+    page_items, page, total_pages = paginate(subdepts, page, per_page=8)
 
     report_tmp = context.user_data.setdefault("report_tmp", {})
     report_tmp["subdepartments_list"] = subdepts
     report_tmp["main_department"] = main_dept
 
-    start_idx = page * items_per_page
-    end_idx = min(start_idx + items_per_page, total)
-
     keyboard = []
-    for i in range(start_idx, end_idx):
+    start_idx = page * 8
+    for i, name in enumerate(page_items):
         keyboard.append([InlineKeyboardButton(
-            f"🏥 {subdepts[i]}",
-            callback_data=f"subdept_idx:{i}"
+            f"🏥 {name}",
+            callback_data=f"subdept_idx:{start_idx + i}"
         )])
 
-    if total_pages > 1:
-        nav_buttons = []
-        if page > 0:
-            nav_buttons.append(
-                InlineKeyboardButton("⬅️ السابق", callback_data=f"subdept_page:{page - 1}"))
-        nav_buttons.append(
-            InlineKeyboardButton(f"📄 {page + 1}/{total_pages}", callback_data="noop"))
-        if page < total_pages - 1:
-            nav_buttons.append(
-                InlineKeyboardButton("➡️ التالي", callback_data=f"subdept_page:{page + 1}"))
-        if nav_buttons:
-            keyboard.append(nav_buttons)
+    nav_row = pagination_buttons(page, total_pages, "subdept_page")
+    if nav_row:
+        keyboard.append(nav_row)
 
     keyboard.append([InlineKeyboardButton(
         "🔙 رجوع", callback_data="nav:back")])
@@ -303,23 +285,33 @@ async def handle_subdepartment_choice(update: Update, context: ContextTypes.DEFA
         await show_departments_menu(query.message, context)
         return STATE_SELECT_DEPARTMENT
 
-    # إذا كان الاختيار فهرس، استرجاع الاسم من القائمة
-    if choice.isdigit():
-        idx = int(choice)
-        subdepts = context.user_data.get("report_tmp", {}).get("subdepartments_list", [])
-        if 0 <= idx < len(subdepts):
-            choice = subdepts[idx]
-        else:
-            await query.answer("⚠️ خطأ في الفهرس", show_alert=True)
-            return R_SUBDEPARTMENT
-
-    # معالجة subdept_idx: format
+    # subdept_idx: format (standard path) — resolve IDX against snapshot
     if query.data.startswith("subdept_idx:"):
         idx = int(query.data.split(":", 1)[1])
-        subdepts = context.user_data.get("report_tmp", {}).get("subdepartments_list", [])
+        report_tmp = context.user_data.get("report_tmp", {})
+        subdepts = report_tmp.get("subdepartments_list", [])
+
+        if not subdepts:
+            # Snapshot wiped (PM2 restart) — cascaded recovery:
+            # if main_department is known, re-render subdept screen;
+            # otherwise fall back to department selection.
+            main_dept = report_tmp.get("main_department", "")
+            logger.warning(
+                "subdepartments_list snapshot missing for user %s (main_dept=%r) — cascaded re-render",
+                getattr(query.from_user, "id", "?"), main_dept,
+            )
+            await query.answer()
+            if main_dept:
+                await show_subdepartment_options(query.message, context, main_dept)
+                return R_SUBDEPARTMENT
+            else:
+                await render_department_selection(query.message, context)
+                return STATE_SELECT_DEPARTMENT
+
         if 0 <= idx < len(subdepts):
             choice = subdepts[idx]
         else:
+            logger.error("subdept_idx %d out of range (list len %d)", idx, len(subdepts))
             await query.answer("⚠️ خطأ في الفهرس", show_alert=True)
             return R_SUBDEPARTMENT
 
@@ -343,6 +335,16 @@ async def handle_subdepartment_page(update: Update, context: ContextTypes.DEFAUL
 
     page = int(query.data.split(":", 1)[1])
     main_dept = context.user_data.get("report_tmp", {}).get("main_department", "")
+
+    if not main_dept:
+        # main_department wiped (PM2 restart) — fall back to department selection
+        logger.warning(
+            "main_department missing during subdept page nav for user %s — re-rendering department selection",
+            getattr(query.from_user, "id", "?"),
+        )
+        await render_department_selection(query.message, context)
+        return STATE_SELECT_DEPARTMENT
+
     await query.message.delete()
     await show_subdepartment_options(query.message, context, main_dept, page)
     return R_SUBDEPARTMENT

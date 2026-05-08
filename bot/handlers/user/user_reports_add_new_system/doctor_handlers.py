@@ -167,7 +167,7 @@ async def render_doctor_selection(message, context):
         doctor_names.sort()
         
         # حفظ قائمة الأطباء في context للاسترجاع لاحقاً
-        context.user_data["_doctors_list"] = doctor_names
+        context.user_data.setdefault("report_tmp", {})["_doctors_list"] = doctor_names
         
         # إضافة أزرار الأطباء (حد أقصى 50 طبيب)
         for idx, name in enumerate(doctor_names[:50]):
@@ -267,9 +267,19 @@ async def handle_doctor_selection(update: Update, context: ContextTypes.DEFAULT_
             doctor_idx = int(index_str)
             
             # استرجاع قائمة الأطباء من context.user_data
-            doctors_list = context.user_data.get("_doctors_list", [])
-            
-            if not doctors_list or doctor_idx < 0 or doctor_idx >= len(doctors_list):
+            doctors_list = context.user_data.get("report_tmp", {}).get("_doctors_list", [])
+
+            if not doctors_list:
+                # Snapshot wiped by PM2 restart — self-heal by re-rendering selection screen
+                logger.warning(
+                    "_doctors_list snapshot missing for user %s — re-rendering doctor selection",
+                    getattr(query.from_user, "id", "?"),
+                )
+                await query.answer()
+                await render_doctor_selection(query.message, context)
+                return STATE_SELECT_DOCTOR
+
+            if doctor_idx < 0 or doctor_idx >= len(doctors_list):
                 logger.error(f"❌ فهرس غير صالح: {doctor_idx}, القائمة تحتوي على {len(doctors_list)} عنصر")
                 await query.answer("⚠️ حدث خطأ في اختيار الطبيب", show_alert=True)
                 return STATE_SELECT_DOCTOR
@@ -281,7 +291,7 @@ async def handle_doctor_selection(update: Update, context: ContextTypes.DEFAULT_
             context.user_data["report_tmp"].setdefault("step_history", []).append(R_DOCTOR)
             
             # تنظيف البيانات المؤقتة
-            context.user_data.pop("_doctors_list", None)
+            context.user_data.get("report_tmp", {}).pop("_doctors_list", None)
             
             await query.edit_message_text(
                 f"✅ **تم اختيار الطبيب**\n\n"

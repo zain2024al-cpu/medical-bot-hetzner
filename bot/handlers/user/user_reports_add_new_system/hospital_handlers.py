@@ -9,6 +9,7 @@ import logging
 
 from .states import STATE_SELECT_HOSPITAL, STATE_SELECT_DEPARTMENT
 from .navigation import nav_push
+from .ui_primitives import paginate, pagination_buttons
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +29,11 @@ def get_hospitals_list():
         with SessionLocal() as s:
             hospitals = s.query(Hospital).order_by(Hospital.name).all()
             if hospitals:
-                # ✅ بدون أي فلترة (عربي/إنجليزي) لضمان التطابق مع شاشة الأدمن
-                db_hospitals = [h.name for h in hospitals if h.name]
+                from services.hospitals_service import _INVALID_HOSPITAL_NAMES
+                db_hospitals = [
+                    h.name for h in hospitals
+                    if h.name and h.name.strip() not in _INVALID_HOSPITAL_NAMES
+                ]
                 logger.info(f"✅ Loaded {len(db_hospitals)} hospitals from database")
     except Exception as e:
         logger.warning(f"⚠️ Could not load hospitals from database: {e}", exc_info=True)
@@ -67,80 +71,35 @@ def _sort_hospitals_custom(hospitals_list):
     # إرجاع القائمة كما هي بدون ترتيب
     return list(hospitals_list)
 
-def _sort_hospitals_custom_OLD_DISABLED(hospitals_list):
-    """ترتيب المستشفيات حسب الأولوية: Manipal -> Aster -> Bangalore -> البقية - معطل"""
-    def get_sort_key(hospital):
-        hospital_lower = hospital.lower()
-        
-        # 1. مستشفيات Manipal أولاً
-        if 'manipal' in hospital_lower:
-            return (0, hospital)
-        
-        # 2. مستشفيات Aster ثانياً
-        if 'aster' in hospital_lower:
-            return (1, hospital)
-        
-        # 3. مستشفيات Bangalore ثالثاً
-        if 'bangalore' in hospital_lower or 'bengaluru' in hospital_lower:
-            return (2, hospital)
-        
-        # 4. البقية
-        return (3, hospital)
-    
-    return sorted(hospitals_list, key=get_sort_key)
-
-
 def _build_hospitals_keyboard(page=0, search_query="", context=None):
     """بناء لوحة مفاتيح المستشفيات مع بحث"""
-    items_per_page = 8
-
-    # ✅ جلب المستشفيات من قاعدة البيانات أولاً
     all_hospitals = get_hospitals_list()
-    
-    # تصفية المستشفيات إذا كان هناك بحث
+
     if search_query:
         search_lower = search_query.lower()
-        hospitals_list = [
-            h for h in all_hospitals if search_lower in h.lower()]
+        hospitals_list = [h for h in all_hospitals if search_lower in h.lower()]
     else:
         hospitals_list = list(all_hospitals)
 
     total = len(hospitals_list)
-    total_pages = max(1, (total + items_per_page - 1) // items_per_page)
-    page = max(0, min(page, total_pages - 1))
-    start_idx = page * items_per_page
-    end_idx = min(start_idx + items_per_page, total)
+    page_items, page, total_pages = paginate(hospitals_list, page, per_page=8)
 
-    keyboard = []
-
-    # حفظ قائمة المستشفيات في user_data للوصول إليها لاحقاً
     if context:
         context.user_data.setdefault("report_tmp", {})["hospitals_list"] = hospitals_list
         context.user_data["report_tmp"]["hospitals_page"] = page
 
-    # عرض المستشفيات (سطر واحد لكل مستشفى)
-    for i in range(start_idx, end_idx):
-        hospital_index = i
+    keyboard = []
+    start_idx = page * 8
+    for i, name in enumerate(page_items):
         keyboard.append([InlineKeyboardButton(
-            f"🏥 {hospitals_list[i]}",
-            callback_data=f"hospital_idx:{hospital_index}"
+            f"🏥 {name}",
+            callback_data=f"hospital_idx:{start_idx + i}"
         )])
 
-    # أزرار التنقل
-    nav_buttons = []
-    if total_pages > 1:
-        if page > 0:
-            nav_buttons.append(
-                InlineKeyboardButton("⬅️ السابق", callback_data=f"hosp_page:{page - 1}"))
-        nav_buttons.append(
-            InlineKeyboardButton(f"📄 {page + 1}/{total_pages}", callback_data="noop"))
-        if page < total_pages - 1:
-            nav_buttons.append(
-                InlineKeyboardButton("➡️ التالي", callback_data=f"hosp_page:{page + 1}"))
-        if nav_buttons:
-            keyboard.append(nav_buttons)
+    nav_row = pagination_buttons(page, total_pages, "hosp_page")
+    if nav_row:
+        keyboard.append(nav_row)
 
-    # أزرار التنقل - استخدام زر الرجوع العادي
     keyboard.append([
         InlineKeyboardButton("🔙 رجوع", callback_data="go_to_patient_selection"),
         InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
@@ -180,27 +139,26 @@ async def handle_hospital_selection(update: Update, context: ContextTypes.DEFAUL
     if query.data.startswith("hospital_idx:"):
         hospital_index = int(query.data.split(":", 1)[1])
         hospitals_list = context.user_data.get("report_tmp", {}).get("hospitals_list", [])
-        
+
         if not hospitals_list:
-            logger.warning(f"⚠️ hospitals_list is empty, rebuilding it. Index: {hospital_index}")
-            hospitals_list = get_hospitals_list()
-            context.user_data.setdefault("report_tmp", {})["hospitals_list"] = hospitals_list
-            logger.info(f"✅ Rebuilt hospitals_list with {len(hospitals_list)} hospitals")
-        
+            # Snapshot wiped (PM2 restart) — re-render so user picks from a fresh list.
+            # Do NOT rebuild-and-resolve: resolving a stale index into a rebuilt list is
+            # drift injection — the order may have changed since the button was rendered.
+            logger.warning(
+                "hospitals_list snapshot missing for user %s — re-rendering hospital selection",
+                getattr(query.from_user, "id", "?"),
+            )
+            await query.answer()
+            await render_hospital_selection(query.message, context)
+            return STATE_SELECT_HOSPITAL
+
         if 0 <= hospital_index < len(hospitals_list):
             choice = hospitals_list[hospital_index]
             logger.info(f"✅ Selected hospital at index {hospital_index}: {choice}")
         else:
             logger.error(f"❌ Invalid hospital index: {hospital_index}, list length: {len(hospitals_list)}")
-            hospitals_list = get_hospitals_list()
-            context.user_data.setdefault("report_tmp", {})["hospitals_list"] = hospitals_list
-            if 0 <= hospital_index < len(hospitals_list):
-                choice = hospitals_list[hospital_index]
-                logger.info(f"✅ Selected hospital after rebuild at index {hospital_index}: {choice}")
-            else:
-                logger.error(f"❌ Still invalid index after rebuild: {hospital_index}")
-                await query.answer("❌ خطأ في اختيار المستشفى. يرجى المحاولة مرة أخرى.", show_alert=True)
-                return STATE_SELECT_HOSPITAL
+            await query.answer("❌ خطأ في اختيار المستشفى. يرجى المحاولة مرة أخرى.", show_alert=True)
+            return STATE_SELECT_HOSPITAL
     else:
         choice = query.data.split(":", 1)[1]
         logger.info(f"✅ Selected hospital from callback data: {choice}")

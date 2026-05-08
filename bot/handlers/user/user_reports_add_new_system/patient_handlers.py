@@ -88,7 +88,7 @@ async def patient_inline_query_handler(update: Update, context: ContextTypes.DEF
         else:
             # سلوك احتياطي: استخدام قائمة أسماء المرضى المخزنة في context.user_data إن وجدت
             logger.warning("⚠️ SessionLocal أو نموذج Patient غير متاح؛ استخدام قائمة مؤقتة من context.user_data إذا كانت متوفرة")
-            cached = context.user_data.get("_patient_names_list", [])
+            cached = context.user_data.get("report_tmp", {}).get("_patient_names_list", [])
             if cached:
                 logger.info(f"🔁 استخدام {len(cached)} اسمًا من القائمة المؤقتة")
                 # تصفية القائمة حسب الاستعلام
@@ -268,7 +268,7 @@ async def show_patient_list(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         
         # ✅ تحديث قائمة الأسماء في context.user_data (للاستخدام لاحقاً في نفس الجلسة)
         all_patient_names = unique_names
-        context.user_data["_patient_names_list"] = all_patient_names
+        context.user_data.setdefault("report_tmp", {})["_patient_names_list"] = all_patient_names
         
         total = len(all_patient_names)
         total_pages = max(1, (total + items_per_page - 1) // items_per_page)
@@ -406,9 +406,19 @@ async def handle_patient_selection(
             global_index = int(index_str)
             
             # استرجاع قائمة الأسماء من context.user_data
-            patient_names_list = context.user_data.get("_patient_names_list", [])
-            
-            if not patient_names_list or global_index < 0 or global_index >= len(patient_names_list):
+            patient_names_list = context.user_data.get("report_tmp", {}).get("_patient_names_list", [])
+
+            if not patient_names_list:
+                # Snapshot wiped (PM2 restart) — re-render list directly so user picks from
+                # a fresh authority state. Do NOT rebuild-and-resolve against stale index.
+                logger.warning(
+                    "_patient_names_list snapshot missing for user %s — re-rendering patient list",
+                    getattr(query.from_user, "id", "?"),
+                )
+                await show_patient_list(update, context, page=0)
+                return STATE_SELECT_PATIENT
+
+            if global_index < 0 or global_index >= len(patient_names_list):
                 logger.error(f"❌ فهرس غير صالح: {global_index}, القائمة تحتوي على {len(patient_names_list)} عنصر")
                 await query.answer("⚠️ حدث خطأ في اختيار المريض", show_alert=True)
                 return STATE_SELECT_PATIENT
@@ -439,7 +449,7 @@ async def handle_patient_selection(
             )
             
             # تنظيف البيانات المؤقتة
-            context.user_data.pop("_patient_names_list", None)
+            context.user_data.get("report_tmp", {}).pop("_patient_names_list", None)
             
             # الانتقال إلى اختيار المستشفى
             await show_hospitals_menu(query.message, context)
