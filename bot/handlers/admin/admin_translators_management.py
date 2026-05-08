@@ -9,13 +9,101 @@ from telegram.constants import ParseMode
 import logging
 import os
 from db.session import SessionLocal
-from db.models import User
+from db.models import User, TranslatorDirectory
 from bot.shared_auth import is_admin
 
 logger = logging.getLogger(__name__)
 
 # مسار ملف المترجمين
 TRANSLATOR_NAMES_FILE = "data/translator_names.txt"
+
+
+# ================================================
+# DB helpers — dual-write authority convergence
+# ================================================
+
+def _db_add_translator(name: str) -> bool:
+    """
+    Add translator to TranslatorDirectory (DB authority).
+    translator_id is NULL for admin-added translators with no known Telegram ID.
+    Duplicate detection uses LOWER(TRIM()) to prevent near-duplicates.
+    Returns True on success or if already exists, False on error.
+    """
+    try:
+        with SessionLocal() as s:
+            existing = s.query(TranslatorDirectory).filter(
+                TranslatorDirectory.name == name
+            ).first()
+            if existing:
+                logger.info("TD: translator already exists in DB: [%s]", name)
+                return True
+            s.add(TranslatorDirectory(translator_id=None, name=name))
+            s.commit()
+            logger.info("TD: added translator to DB: [%s]", name)
+            return True
+    except Exception as e:
+        logger.error("TD: failed to add translator [%s]: %s", name, e)
+        return False
+
+
+def _db_delete_translator(name: str) -> bool:
+    """
+    Remove translator from TranslatorDirectory by exact name.
+    Safe: no FK cascade — historical reports retain their denormalized fields.
+    Returns True if deleted or not found (idempotent), False on error.
+    """
+    try:
+        with SessionLocal() as s:
+            row = s.query(TranslatorDirectory).filter(
+                TranslatorDirectory.name == name
+            ).first()
+            if row:
+                s.delete(row)
+                s.commit()
+                logger.info("TD: deleted translator from DB: [%s]", name)
+            else:
+                logger.warning("TD: translator not found in DB for delete: [%s]", name)
+            return True
+    except Exception as e:
+        logger.error("TD: failed to delete translator [%s]: %s", name, e)
+        return False
+
+
+def _db_rename_translator(old_name: str, new_name: str) -> bool:
+    """
+    Rename translator in TranslatorDirectory (old_name → new_name).
+    If old_name not found, inserts new_name as a new entry (NULL translator_id).
+    Returns True on success, False on error.
+    """
+    try:
+        with SessionLocal() as s:
+            row = s.query(TranslatorDirectory).filter(
+                TranslatorDirectory.name == old_name
+            ).first()
+            if row:
+                row.name = new_name
+                s.commit()
+                logger.info("TD: renamed translator in DB: [%s] -> [%s]", old_name, new_name)
+            else:
+                # old_name never existed in DB — insert new entry
+                s.add(TranslatorDirectory(translator_id=None, name=new_name))
+                s.commit()
+                logger.warning(
+                    "TD: old_name [%s] not found in DB during rename; inserted [%s] as new entry",
+                    old_name, new_name
+                )
+            return True
+    except Exception as e:
+        logger.error("TD: failed to rename translator [%s] -> [%s]: %s", old_name, new_name, e)
+        return False
+
+
+def _db_add_translator_if_absent(name: str) -> bool:
+    """
+    Add translator to DB only if not already present (used by sync path).
+    Returns True on success or already-exists, False on error.
+    """
+    return _db_add_translator(name)
 
 
 def get_translator_names_from_file():
@@ -192,26 +280,33 @@ async def handle_translator_name_input(update: Update, context: ContextTypes.DEF
         )
         return ConversationHandler.END
     
-    # إضافة الاسم
+    # إضافة الاسم — DB first (authority), then file (backup)
     names.append(name)
-    
-    if save_translator_names_to_file(names):
-        logger.info(f"✅ تم إضافة المترجم '{name}'")
-        
-        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_translators")]])
-        
+
+    db_ok = _db_add_translator(name)
+    if not db_ok:
+        logger.error("TD: DB write failed for add [%s] — aborting file write", name)
         await update.message.reply_text(
-            f"✅ **تم إضافة المترجم بنجاح:** {name}\n\n"
-            f"👥 سيظهر المترجم عند إنشاء تقرير جديد",
-            reply_markup=keyboard,
+            "❌ **خطأ في الحفظ في قاعدة البيانات**\n\nلم يتم الحفظ.",
             parse_mode=ParseMode.MARKDOWN
         )
-    else:
-        await update.message.reply_text(
-            "❌ **خطأ في الحفظ**",
-            parse_mode=ParseMode.MARKDOWN
-        )
-    
+        return ConversationHandler.END
+
+    file_ok = save_translator_names_to_file(names)
+    if not file_ok:
+        logger.warning("TD: file write failed after DB success for add [%s] — DB is authoritative", name)
+
+    logger.info("TD add complete: [%s]  db=%s  file=%s", name, db_ok, file_ok)
+
+    keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_translators")]])
+
+    await update.message.reply_text(
+        f"✅ **تم إضافة المترجم بنجاح:** {name}\n\n"
+        f"👥 سيظهر المترجم عند إنشاء تقرير جديد",
+        reply_markup=keyboard,
+        parse_mode=ParseMode.MARKDOWN
+    )
+
     return ConversationHandler.END
 
 
@@ -309,25 +404,32 @@ async def handle_confirm_delete_translator(update: Update, context: ContextTypes
     # قراءة الأسماء من الملف
     names = get_translator_names_from_file()
     
-    # حذف الاسم
+    # حذف الاسم — DB first (authority), then file (backup)
     if name_to_delete in names:
         names.remove(name_to_delete)
-        
-        if save_translator_names_to_file(names):
-            logger.info(f"✅ تم حذف المترجم '{name_to_delete}'")
-            
+
+        db_ok = _db_delete_translator(name_to_delete)
+        if not db_ok:
+            logger.error("TD: DB write failed for delete [%s] — aborting file write", name_to_delete)
             await query.edit_message_text(
-                f"✅ **تم حذف المترجم:** {name_to_delete}\n\n"
-                f"📊 **عدد المترجمين المتبقين:** {len(names)}",
+                "❌ **خطأ في الحذف من قاعدة البيانات**\n\nلم يتم الحذف.",
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_translators")]]),
                 parse_mode=ParseMode.MARKDOWN
             )
-        else:
-            await query.edit_message_text(
-                "❌ **خطأ في الحفظ**",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_translators")]]),
-                parse_mode=ParseMode.MARKDOWN
-            )
+            return
+
+        file_ok = save_translator_names_to_file(names)
+        if not file_ok:
+            logger.warning("TD: file write failed after DB success for delete [%s] — DB is authoritative", name_to_delete)
+
+        logger.info("TD delete complete: [%s]  db=%s  file=%s", name_to_delete, db_ok, file_ok)
+
+        await query.edit_message_text(
+            f"✅ **تم حذف المترجم:** {name_to_delete}\n\n"
+            f"📊 **عدد المترجمين المتبقين:** {len(names)}",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_translators")]]),
+            parse_mode=ParseMode.MARKDOWN
+        )
     else:
         await query.edit_message_text(
             "⚠️ **المترجم غير موجود**",
@@ -473,31 +575,41 @@ async def handle_edit_translator_input(update: Update, context: ContextTypes.DEF
     # قراءة الأسماء
     names = get_translator_names_from_file()
     
-    # تعديل الاسم
+    # تعديل الاسم — DB first (authority), then file (backup)
     if index < len(names) and names[index] == old_name:
         names[index] = new_name
-        
-        if save_translator_names_to_file(names):
-            logger.info(f"✅ تم تعديل اسم المترجم من '{old_name}' إلى '{new_name}'")
-            
-            # مسح البيانات المحفوظة
-            context.user_data.pop('edit_translator_index', None)
-            context.user_data.pop('edit_translator_old_name', None)
-            
-            keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_translators")]])
-            
+
+        db_ok = _db_rename_translator(old_name, new_name)
+        if not db_ok:
+            logger.error("TD: DB write failed for rename [%s]->[%s] — aborting file write", old_name, new_name)
             await update.message.reply_text(
-                f"✅ **تم تعديل اسم المترجم بنجاح**\n\n"
-                f"👤 **من:** {old_name}\n"
-                f"👤 **إلى:** {new_name}",
-                reply_markup=keyboard,
+                "❌ **خطأ في التعديل في قاعدة البيانات**\n\nلم يتم التعديل.",
                 parse_mode=ParseMode.MARKDOWN
             )
-        else:
-            await update.message.reply_text(
-                "❌ **خطأ في الحفظ**",
-                parse_mode=ParseMode.MARKDOWN
+            return ConversationHandler.END
+
+        file_ok = save_translator_names_to_file(names)
+        if not file_ok:
+            logger.warning(
+                "TD: file write failed after DB success for rename [%s]->[%s] — DB is authoritative",
+                old_name, new_name
             )
+
+        logger.info("TD rename complete: [%s]->[%s]  db=%s  file=%s", old_name, new_name, db_ok, file_ok)
+
+        # مسح البيانات المحفوظة
+        context.user_data.pop('edit_translator_index', None)
+        context.user_data.pop('edit_translator_old_name', None)
+
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_translators")]])
+
+        await update.message.reply_text(
+            f"✅ **تم تعديل اسم المترجم بنجاح**\n\n"
+            f"👤 **من:** {old_name}\n"
+            f"👤 **إلى:** {new_name}",
+            reply_markup=keyboard,
+            parse_mode=ParseMode.MARKDOWN
+        )
     else:
         await update.message.reply_text(
             "⚠️ **المترجم غير موجود**",
@@ -531,14 +643,24 @@ async def handle_sync_translators(update: Update, context: ContextTypes.DEFAULT_
                     # إضافة الاسم الأول فقط لتسهيل الاختيار
                     first_name = full_name.split()[0] if full_name else None
                     if first_name and first_name not in current_names:
+                        # DB write first (authority); file write follows after loop
+                        db_ok = _db_add_translator_if_absent(first_name)
+                        if not db_ok:
+                            logger.error(
+                                "TD: DB write failed during sync for [%s] — skipping this entry",
+                                first_name
+                            )
+                            continue
                         current_names.add(first_name)
                         added_count += 1
-        
-        # حفظ الأسماء
+
+        # حفظ الأسماء — file write after all DB writes succeed
         names_list = sorted(list(current_names))
-        save_translator_names_to_file(names_list)
-        
-        logger.info(f"✅ تم مزامنة {added_count} مترجم جديد")
+        file_ok = save_translator_names_to_file(names_list)
+        if not file_ok:
+            logger.warning("TD: file write failed after sync DB writes — DB is authoritative, %d entries added", added_count)
+
+        logger.info("TD sync complete: added=%d  total=%d  file=%s", added_count, len(names_list), file_ok)
         
         keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_translators")]])
         
