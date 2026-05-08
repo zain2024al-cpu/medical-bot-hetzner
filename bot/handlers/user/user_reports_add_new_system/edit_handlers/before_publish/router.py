@@ -11,98 +11,156 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# استيراد handlers منفصلة
+# استيراد handlers منفصلة — كل module محمي باستقلالية تامة
+# فشل import أي module لا يؤثر على بقية الـ modules
+
 try:
     from .new_consult_edit import (
         handle_new_consult_edit_field_selection,
         handle_new_consult_edit_field_input,
     )
+except ImportError as e:
+    logger.error(f"❌ Cannot import new_consult_edit: {e}")
+    handle_new_consult_edit_field_selection = None
+    handle_new_consult_edit_field_input = None
+
+try:
     from .followup_edit import (
         handle_followup_edit_field_selection,
         handle_followup_edit_field_input,
     )
+except ImportError as e:
+    logger.error(f"❌ Cannot import followup_edit: {e}")
+    handle_followup_edit_field_selection = None
+    handle_followup_edit_field_input = None
+
+try:
     from .periodic_followup_edit import (
         handle_periodic_followup_edit_field_selection,
         handle_periodic_followup_edit_field_input,
     )
+except ImportError as e:
+    logger.error(f"❌ Cannot import periodic_followup_edit: {e}")
+    handle_periodic_followup_edit_field_selection = None
+    handle_periodic_followup_edit_field_input = None
+
+try:
     from .inpatient_followup_edit import (
         handle_inpatient_followup_edit_field_selection,
         handle_inpatient_followup_edit_field_input,
     )
+except ImportError as e:
+    logger.error(f"❌ Cannot import inpatient_followup_edit: {e}")
+    handle_inpatient_followup_edit_field_selection = None
+    handle_inpatient_followup_edit_field_input = None
+
+try:
     from .emergency_edit import (
         handle_emergency_edit_field_selection,
         handle_emergency_edit_field_input,
     )
+except ImportError as e:
+    logger.error(f"❌ Cannot import emergency_edit: {e}")
+    handle_emergency_edit_field_selection = None
+    handle_emergency_edit_field_input = None
+
+try:
     from .surgery_consult_edit import (
         handle_surgery_consult_edit_field_selection,
         handle_surgery_consult_edit_field_input,
     )
+except ImportError as e:
+    logger.error(f"❌ Cannot import surgery_consult_edit: {e}")
+    handle_surgery_consult_edit_field_selection = None
+    handle_surgery_consult_edit_field_input = None
+
+try:
     from .operation_edit import (
         handle_operation_edit_field_selection,
         handle_operation_edit_field_input,
     )
+except ImportError as e:
+    logger.error(f"❌ Cannot import operation_edit: {e}")
+    handle_operation_edit_field_selection = None
+    handle_operation_edit_field_input = None
+
+try:
     from .final_consult_edit import (
         handle_final_consult_edit_field_selection,
         handle_final_consult_edit_field_input,
     )
+except ImportError as e:
+    logger.error(f"❌ Cannot import final_consult_edit: {e}")
+    handle_final_consult_edit_field_selection = None
+    handle_final_consult_edit_field_input = None
+
+try:
     from .admission_edit import (
         handle_admission_edit_field_selection,
         handle_admission_edit_field_input,
     )
+except ImportError as e:
+    logger.error(f"❌ Cannot import admission_edit: {e}")
+    handle_admission_edit_field_selection = None
+    handle_admission_edit_field_input = None
+
+try:
     from .discharge_edit import (
         handle_discharge_edit_field_selection,
         handle_discharge_edit_field_input,
     )
+except ImportError as e:
+    logger.error(f"❌ Cannot import discharge_edit: {e}")
+    handle_discharge_edit_field_selection = None
+    handle_discharge_edit_field_input = None
+
+try:
     from .radiology_edit import (
         handle_radiology_edit_field_selection,
         handle_radiology_edit_field_input,
     )
+except ImportError as e:
+    logger.error(f"❌ Cannot import radiology_edit: {e}")
+    handle_radiology_edit_field_selection = None
+    handle_radiology_edit_field_input = None
+
+try:
     from .appointment_reschedule_edit import (
         handle_appointment_reschedule_edit_field_selection,
         handle_appointment_reschedule_edit_field_input,
     )
+except ImportError as e:
+    logger.error(f"❌ Cannot import appointment_reschedule_edit: {e}")
+    handle_appointment_reschedule_edit_field_selection = None
+    handle_appointment_reschedule_edit_field_input = None
+
+try:
     from .rehab_physical_edit import (
         handle_rehab_physical_edit_field_selection,
         handle_rehab_physical_edit_field_input,
     )
+except ImportError as e:
+    logger.error(f"❌ Cannot import rehab_physical_edit: {e}")
+    handle_rehab_physical_edit_field_selection = None
+    handle_rehab_physical_edit_field_input = None
+
+try:
     from .rehab_device_edit import (
         handle_rehab_device_edit_field_selection,
         handle_rehab_device_edit_field_input,
     )
+except ImportError as e:
+    logger.error(f"❌ Cannot import rehab_device_edit: {e}")
+    handle_rehab_device_edit_field_selection = None
+    handle_rehab_device_edit_field_input = None
+
+try:
     from .radiation_therapy_edit import (
         handle_radiation_therapy_edit_field_selection,
         handle_radiation_therapy_edit_field_input,
     )
 except ImportError as e:
-    logger.error(f"❌ Cannot import edit handlers: {e}")
-    handle_new_consult_edit_field_selection = None
-    handle_new_consult_edit_field_input = None
-    handle_followup_edit_field_selection = None
-    handle_followup_edit_field_input = None
-    handle_periodic_followup_edit_field_selection = None
-    handle_periodic_followup_edit_field_input = None
-    handle_inpatient_followup_edit_field_selection = None
-    handle_inpatient_followup_edit_field_input = None
-    handle_emergency_edit_field_selection = None
-    handle_emergency_edit_field_input = None
-    handle_surgery_consult_edit_field_selection = None
-    handle_surgery_consult_edit_field_input = None
-    handle_operation_edit_field_selection = None
-    handle_operation_edit_field_input = None
-    handle_final_consult_edit_field_selection = None
-    handle_final_consult_edit_field_input = None
-    handle_admission_edit_field_selection = None
-    handle_admission_edit_field_input = None
-    handle_discharge_edit_field_selection = None
-    handle_discharge_edit_field_input = None
-    handle_radiology_edit_field_selection = None
-    handle_radiology_edit_field_input = None
-    handle_appointment_reschedule_edit_field_selection = None
-    handle_appointment_reschedule_edit_field_input = None
-    handle_rehab_physical_edit_field_selection = None
-    handle_rehab_physical_edit_field_input = None
-    handle_rehab_device_edit_field_selection = None
-    handle_rehab_device_edit_field_input = None
+    logger.error(f"❌ Cannot import radiation_therapy_edit: {e}")
     handle_radiation_therapy_edit_field_selection = None
     handle_radiation_therapy_edit_field_input = None
 
@@ -331,11 +389,10 @@ async def route_edit_field_input(update: Update, context: ContextTypes.DEFAULT_T
                     "عملية": "operation",
                     "ترقيد": "admission",
                     "خروج من المستشفى": "discharge",
-                    "استشارة نهائية": "final_consult",
+                    "استشارة أخيرة": "final_consult",
                     "أشعة وفحوصات": "radiology",
                     "تأجيل موعد": "appointment_reschedule",
-                    "علاج طبيعي": "rehab_physical",
-                    "أجهزة تعويضية": "rehab_device",
+                    "علاج طبيعي وإعادة تأهيل": "rehab_physical",
                     "جلسة إشعاعي": "radiation_therapy"
                 }
                 flow_type = action_to_flow.get(medical_action)
