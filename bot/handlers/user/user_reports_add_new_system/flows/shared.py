@@ -25,7 +25,7 @@ from ..states import (
     RADIATION_THERAPY_CONFIRM,
     R_ACTION_TYPE
 )
-from ..utils import _nav_buttons
+from ..utils import _nav_buttons, format_time_12h_str
 from ..navigation_helpers import handle_cancel_navigation
 
 # External imports
@@ -69,7 +69,7 @@ def load_translator_names():
     fallback_names = [
         "معتز", "ادم", "هاشم", "مصطفى", "حسن", "نجم الدين", "محمد علي",
         "صبري", "عزي", "سعيد", "عصام", "زيد", "مهدي", "ادريس",
-        "واصل", "عزالدين", "عبدالسلام", "يحيى العنسي", "ياسر"
+        "واصل", "عزالدين", "عبدالسلام", "يحيى", "ياسر"
     ]
     logger.warning(f"⚠️ استخدام القائمة الاحتياطية: {len(fallback_names)} مترجم")
     return fallback_names
@@ -152,29 +152,8 @@ def format_field_value(value):
     return str(value)
 
 
-def format_time_12h(time_str):
-    """تحويل الوقت لصيغة 12 ساعة مع صباحاً/ظهراً/مساءً"""
-    if not time_str:
-        return None
-    try:
-        if ':' in str(time_str):
-            parts = str(time_str).split(':')
-            hour = int(parts[0])
-            minute = parts[1] if len(parts) > 1 else '00'
-        else:
-            hour = int(time_str)
-            minute = '00'
-        
-        if hour == 0:
-            return f"12:{minute} صباحاً"
-        elif hour < 12:
-            return f"{hour}:{minute} صباحاً"
-        elif hour == 12:
-            return f"12:{minute} ظهراً"
-        else:
-            return f"{hour-12}:{minute} مساءً"
-    except:
-        return str(time_str)
+# format_time_12h: alias للتوافق مع الكود الموجود — المصدر الأصلي في utils.py
+format_time_12h = format_time_12h_str
 
 
 def get_field_display_name(field_key):
@@ -566,7 +545,7 @@ async def show_translator_selection(message, context, flow_type):
     row = []
 
     for i, name in enumerate(translator_names):
-        row.append(InlineKeyboardButton(name, callback_data=f"simple_translator:{flow_type}:{i}"))
+        row.append(InlineKeyboardButton(name, callback_data=f"simple_translator:{flow_type}:{name}"))
         if len(row) == 3 or i == len(translator_names) - 1:
             keyboard_buttons.append(row)
             row = []
@@ -607,23 +586,54 @@ async def handle_simple_translator_choice(update: Update, context: ContextTypes.
         if choice == "skip":
             translator_name = "غير محدد"
             translator_id = None
-        else:
+            logger.debug("translator callback: skip")
+        elif choice.lstrip('-').isdigit():
+            # ── IDX-format (legacy, draining) ──────────────────────────────
+            # Emitted by old renders before the IDX→NAME migration deployment.
+            # Kept permanently for coexistence safety; cost is zero.
+            logger.debug("translator callback: IDX-format  idx=%s  flow=%s", choice, flow_type)
             translator_names = load_translator_names()
             try:
                 index = int(choice)
                 translator_name = translator_names[index]
                 translator_id = None
-            except (IndexError, ValueError):
+                logger.debug("translator IDX resolved: idx=%d → name=[%s]", index, translator_name)
+            except (IndexError, ValueError) as exc:
+                logger.warning(
+                    "translator callback: invalid IDX payload  choice=%r  flow=%s  error=%s",
+                    choice, flow_type, exc
+                )
                 await query.edit_message_text("❌ اختيار غير صحيح")
                 return ConversationHandler.END
-            
             try:
                 from services.translators_service import get_translator_by_name
                 translator_info = get_translator_by_name(translator_name)
                 if translator_info:
                     translator_id = translator_info.get("id")
+                    logger.debug("translator IDX: name→id resolved  name=[%s]  id=%s", translator_name, translator_id)
+                else:
+                    logger.warning("translator IDX: name not found in TD  name=[%s]", translator_name)
             except Exception as e:
-                logger.warning(f"⚠️ فشل تحديد معرف المترجم: {e}")
+                logger.warning("translator IDX: id lookup failed  name=[%s]  error=%s", translator_name, e)
+        else:
+            # ── NAME-format (current protocol post-migration) ───────────────
+            logger.debug("translator callback: NAME-format  name=[%s]  flow=%s", choice, flow_type)
+            translator_name = choice
+            translator_id = None
+            try:
+                from services.translators_service import get_translator_by_name
+                translator_info = get_translator_by_name(translator_name)
+                if translator_info:
+                    translator_id = translator_info.get("id")
+                    logger.debug("translator NAME: id resolved  name=[%s]  id=%s", translator_name, translator_id)
+                else:
+                    logger.warning(
+                        "translator NAME: name not found in TD  name=[%s]  flow=%s"
+                        " — will save name-only (translator_id=NULL)",
+                        translator_name, flow_type
+                    )
+            except Exception as e:
+                logger.warning("translator NAME: id lookup failed  name=[%s]  error=%s", translator_name, e)
 
         # حفظ اسم المترجم
         report_tmp = context.user_data.setdefault("report_tmp", {})
@@ -1513,11 +1523,47 @@ async def save_report_to_database(query, context, flow_type):
         doctor_name = data.get("doctor_name")
         doctor = None
         if doctor_name:
-            doctor = session.query(Doctor).filter_by(full_name=doctor_name).first()
+            # B-DA.5.1b: composite-key primary lookup before name-only fallback
+            if hospital and department:
+                candidates = (
+                    session.query(Doctor)
+                    .filter_by(full_name=doctor_name, hospital_id=hospital.id, department_id=department.id)
+                    .all()
+                )
+                if len(candidates) == 1:
+                    doctor = candidates[0]
+                    logger.debug(
+                        "💾 Doctor resolved by composite key: [%s] hospital_id=%s dept_id=%s",
+                        doctor_name, hospital.id, department.id,
+                    )
+                elif len(candidates) > 1:
+                    doctor = candidates[0]
+                    logger.warning(
+                        "💾 Multiple Doctor rows match composite key [%s / h=%s / d=%s] — using first (id=%s)",
+                        doctor_name, hospital.id, department.id, doctor.id,
+                    )
+                # zero matches → fall through to name-only below
+
             if not doctor:
-                doctor = Doctor(full_name=doctor_name)
-                session.add(doctor)
-                session.flush()
+                # Name-only fallback (no hospital/dept context, or composite missed)
+                name_matches = session.query(Doctor).filter_by(full_name=doctor_name).all()
+                if len(name_matches) == 1:
+                    doctor = name_matches[0]
+                elif len(name_matches) > 1:
+                    doctor = name_matches[0]
+                    logger.warning(
+                        "💾 Falling back to name-only Doctor lookup for [%s] — %d matches, "
+                        "using first (id=%s); duplicate-name FK ambiguity possible",
+                        doctor_name, len(name_matches), doctor.id,
+                    )
+                else:
+                    doctor = Doctor(full_name=doctor_name)
+                    session.add(doctor)
+                    session.flush()
+                    logger.warning(
+                        "💾 Bare Doctor record auto-created for [%s] — no composite or name match found",
+                        doctor_name,
+                    )
 
         # تحديد نوع الإجراء
         action_names = {

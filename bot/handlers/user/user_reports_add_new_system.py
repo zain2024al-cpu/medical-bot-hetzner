@@ -7,11 +7,7 @@
 
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, InlineQueryResultArticle, InputTextMessageContent
 from telegram.ext import ContextTypes, ConversationHandler, MessageHandler, CallbackQueryHandler, CommandHandler, InlineQueryHandler, ChosenInlineResultHandler, filters
-from telegram.error import BadRequest, Forbidden
 import logging
-import io
-import re
-import tempfile
 
 # إعداد logger لهذا الملف
 logger = logging.getLogger(__name__)
@@ -53,10 +49,6 @@ try:
     from config.settings import TIMEZONE
 except ImportError:
     TIMEZONE = 'Asia/Kolkata'  # توقيت الهند (IST = UTC+5:30)
-try:
-    from config.settings import MEDICAL_REPORTS_GROUP_ID
-except ImportError:
-    MEDICAL_REPORTS_GROUP_ID = ""
 from datetime import datetime, timedelta, date
 import calendar
 import hashlib
@@ -66,43 +58,6 @@ from .user_reports_add_helpers import (
     PREDEFINED_ACTIONS, validate_text_input, validate_english_only, save_report_to_db,
     broadcast_report, create_evaluation
 )
-
-# =========================================================
-# Feature toggle: Medical report step (gate before translator)
-# =========================================================
-def _is_medical_report_step_enabled(context: ContextTypes.DEFAULT_TYPE) -> bool:
-    """
-    تحكم مركزي لتفعيل/إيقاف خطوة "هل يوجد تقرير طبي؟".
-    ✅ مفعّلة دائمًا (حسب طلب التشغيل الحالي).
-    """
-    return True
-
-
-async def _set_medical_report_step(update: Update, context: ContextTypes.DEFAULT_TYPE, enabled: bool):
-    """أمر أدمن لتفعيل/إيقاف خطوة التقرير الطبي."""
-    try:
-        from bot.shared_auth import is_admin
-    except Exception:
-        is_admin = lambda *_a, **_kw: False
-
-    user = update.effective_user
-    if not user or not is_admin(user.id):
-        if update.message:
-            await update.message.reply_text("هذه الخاصية للأدمن فقط.")
-        return
-
-    context.bot_data["MEDICAL_REPORT_STEP_ENABLED"] = bool(enabled)
-    msg = "✅ تم تفعيل خطوة التقرير الطبي." if enabled else "🛑 تم إيقاف خطوة التقرير الطبي."
-    if update.message:
-        await update.message.reply_text(msg)
-
-
-async def cmd_medrep_on(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    return await _set_medical_report_step(update, context, True)
-
-
-async def cmd_medrep_off(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    return await _set_medical_report_step(update, context, False)
 
 # استيراد handle_final_confirm من flows/shared.py
 try:
@@ -260,11 +215,6 @@ R_DEPARTMENT = STATE_SELECT_DEPARTMENT
 R_SUBDEPARTMENT = STATE_SELECT_SUBDEPARTMENT
 R_DOCTOR = STATE_SELECT_DOCTOR
 R_ACTION_TYPE = STATE_SELECT_ACTION_TYPE
-
-# خطوة التقرير الطبي قبل اختيار المترجم
-MEDICAL_REPORT_ASK = "MEDICAL_REPORT_ASK"
-MEDICAL_REPORT_UPLOAD = "MEDICAL_REPORT_UPLOAD"
-MEDICAL_REPORT_REASON = "MEDICAL_REPORT_REASON"
 
 # =============================
 # State History Stack Manager
@@ -3426,35 +3376,8 @@ def _sort_hospitals_custom(hospitals_list):
     # إرجاع القائمة كما هي بدون ترتيب
     return list(hospitals_list)
 
-def _sort_hospitals_custom_OLD_DISABLED(hospitals_list):
-    """ترتيب المستشفيات حسب الأولوية: Manipal -> Aster -> Bangalore -> البقية - معطل"""
-    def get_sort_key(hospital):
-        hospital_lower = hospital.lower()
-        
-        # 1. مستشفيات Manipal أولاً
-        if 'manipal' in hospital_lower:
-            return (0, hospital)
-        
-        # 2. مستشفيات Aster ثانياً
-        if 'aster' in hospital_lower:
-            return (1, hospital)
-        
-        # 3. مستشفيات Bangalore ثالثاً
-        if 'bangalore' in hospital_lower or 'bengaluru' in hospital_lower:
-            return (2, hospital)
-        
-        # 4. البقية
-        return (3, hospital)
-    
-    return sorted(hospitals_list, key=get_sort_key)
-
-
 def _get_hospitals_from_database_or_predefined():
-    """
-    جلب المستشفيات من قاعدة البيانات (Hospital table) كمصدر الحقيقة.
-    Fallback إلى doctors_unified.json فقط إذا كانت قاعدة البيانات فارغة/غير متاحة.
-    """
-    # ✅ استخدم الخدمة الموحدة حتى نستفيد من ترتيب الأولوية (hospitals_order.txt)
+    """جلب المستشفيات من الخدمة الموحدة"""
     try:
         from services.hospitals_service import get_all_hospitals
         hospitals = get_all_hospitals()
@@ -3462,20 +3385,8 @@ def _get_hospitals_from_database_or_predefined():
             return hospitals
     except Exception as e:
         import logging
-        logging.getLogger(__name__).warning(f"⚠️ فشل تحميل المستشفيات من hospitals_service: {e}")
-
-    # Fallback: JSON unified file (قد يتم استبداله أثناء النشر)
-    try:
-        from services.hospitals_service import get_hospitals_with_details
-        data = get_hospitals_with_details() or []
-        names = [h.get("name") for h in data if h.get("name")]
-        if names:
-            return names
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning(f"⚠️ فشل تحميل المستشفيات من ملف JSON: {e}")
-
-    # آخر حل: القائمة القديمة المحملة وقت التشغيل
+        logging.getLogger(__name__).warning(f"⚠️ فشل تحميل المستشفيات: {e}")
+    # Fallback: استخدام القائمة الثابتة
     return PREDEFINED_HOSPITALS.copy()
 
 
@@ -7325,12 +7236,8 @@ async def handle_device_followup_reason(update: Update, context: ContextTypes.DE
 async def start_radiology_flow(message, context):
     """بدء مسار أشعة وفحوصات"""
     # التأكد من حفظ medical_action و current_flow
-    rt = context.user_data.setdefault("report_tmp", {})
-    rt["medical_action"] = "أشعة وفحوصات"
-    rt["current_flow"] = "radiology"
-    # ✅ ضمان عدم تخطي بوابة التقرير الطبي بسبب بقايا جلسة سابقة
-    rt.pop("_medical_report_step_done", None)
-    context.user_data.pop("_skip_medical_gate_once", None)
+    context.user_data.setdefault("report_tmp", {})["medical_action"] = "أشعة وفحوصات"
+    context.user_data["report_tmp"]["current_flow"] = "radiology"
     # حفظ الحالة يدوياً في user_data للمساعدة في التتبع
     context.user_data['_conversation_state'] = RADIOLOGY_TYPE
     
@@ -7646,10 +7553,12 @@ async def handle_radiology_calendar_day(update: Update, context: ContextTypes.DE
             f"📅 **تاريخ التسليم:**\n"
             f"{date_display}"
         )
-        # ✅ قد تُظهر بوابة "هل يوجد تقرير طبي؟" وتُرجع MEDICAL_REPORT_ASK
-        next_state = await show_translator_selection(query.message, context, "radiology")
-        context.user_data['_conversation_state'] = next_state
-        return next_state
+        await show_translator_selection(query.message, context, "radiology")
+        
+        # حفظ الحالة يدوياً في user_data للمساعدة في التتبع
+        context.user_data['_conversation_state'] = RADIOLOGY_TRANSLATOR
+
+        return RADIOLOGY_TRANSLATOR
     except ValueError:
         await query.answer("صيغة غير صالحة", show_alert=True)
         return RADIOLOGY_DELIVERY_DATE
@@ -7892,7 +7801,7 @@ async def handle_translator_choice(update: Update, context: ContextTypes.DEFAULT
             translator = s.query(Translator).filter_by(tg_user_id=user_id).first()
             if translator:
                 context.user_data.setdefault("report_tmp", {})["translator_name"] = translator.full_name
-                context.user_data["report_tmp"]["translator_id"] = translator.id
+                context.user_data["report_tmp"]["translator_id"] = translator.tg_user_id
             else:
                 context.user_data.setdefault("report_tmp", {})["translator_name"] = "غير محدد"
                 context.user_data["report_tmp"]["translator_id"] = None
@@ -7957,8 +7866,6 @@ def get_translator_state(flow_type):
     states = {
         "new_consult": NEW_CONSULT_TRANSLATOR,
         "followup": FOLLOWUP_TRANSLATOR,
-        "periodic_followup": FOLLOWUP_TRANSLATOR,
-        "inpatient_followup": FOLLOWUP_TRANSLATOR,
         "surgery_consult": SURGERY_CONSULT_TRANSLATOR,
         "emergency": EMERGENCY_TRANSLATOR,
         "admission": ADMISSION_TRANSLATOR,
@@ -7967,10 +7874,7 @@ def get_translator_state(flow_type):
         "discharge": DISCHARGE_TRANSLATOR,
         "rehab_physical": PHYSICAL_THERAPY_TRANSLATOR,
         "rehab_device": DEVICE_TRANSLATOR,
-        "device": DEVICE_TRANSLATOR,
-        "radiology": RADIOLOGY_TRANSLATOR,
-        "appointment_reschedule": APP_RESCHEDULE_TRANSLATOR,
-        "radiation_therapy": RADIATION_THERAPY_TRANSLATOR,
+        "radiology": RADIOLOGY_TRANSLATOR
     }
     return states.get(flow_type, NEW_CONSULT_TRANSLATOR)
 
@@ -11336,25 +11240,6 @@ def register(app):
                 # معالجة callbacks القديمة (من حالات سابقة)
                 CallbackQueryHandler(handle_stale_callback, pattern="^(hosp_page|hospital_page|dept_page|department_page|subdept_page|subdepartment_page|doctor_idx|hospital_idx|dept_idx|subdept|subdept_idx):"),
             ],
-            # خطوة التقرير الطبي قبل شاشة المترجم
-            MEDICAL_REPORT_ASK: [
-                CallbackQueryHandler(handle_medical_report_answer, pattern="^medrep:(yes|no|skip)$"),
-                CallbackQueryHandler(handle_smart_back_navigation, pattern="^nav:back$"),
-            ],
-            MEDICAL_REPORT_UPLOAD: [
-                CommandHandler("done", handle_medical_report_done),
-                MessageHandler(filters.PHOTO, handle_medical_report_photo),
-                MessageHandler(filters.Document.IMAGE, handle_medical_report_photo),
-                MessageHandler(filters.Document.MimeType("application/pdf"), handle_medical_report_photo),
-                MessageHandler(filters.VIDEO, handle_medical_report_photo),
-                MessageHandler(filters.Document.VIDEO, handle_medical_report_photo),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_medical_report_photo),
-                CallbackQueryHandler(handle_smart_back_navigation, pattern="^nav:back$"),
-            ],
-            MEDICAL_REPORT_REASON: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_medical_report_reason_text),
-                CallbackQueryHandler(handle_smart_back_navigation, pattern="^nav:back$"),
-            ],
             # إضافة جميع المسارات الخاصة بأنواع الإجراءات:
             # ✅ استخدام handlers من flows/new_consult.py
             NEW_CONSULT_COMPLAINT: [
@@ -11394,7 +11279,6 @@ def register(app):
             NEW_CONSULT_TRANSLATOR: [
                 CallbackQueryHandler(handle_translator_page_navigation, pattern="^translator_page:"),
                 CallbackQueryHandler(handle_simple_translator_choice, pattern="^simple_translator:"),
-                CallbackQueryHandler(handle_medical_report_answer, pattern="^medrep:(yes|no)$"),
             ],
             NEW_CONSULT_CONFIRM: [
                 CallbackQueryHandler(handle_final_confirm, pattern="^(save|publish|edit):"),
@@ -11483,7 +11367,6 @@ def register(app):
             SURGERY_CONSULT_TRANSLATOR: [
                 CallbackQueryHandler(handle_translator_page_navigation, pattern="^translator_page:"),
                 CallbackQueryHandler(handle_simple_translator_choice, pattern="^simple_translator:"),
-                CallbackQueryHandler(handle_medical_report_answer, pattern="^medrep:(yes|no)$"),
             ],
             SURGERY_CONSULT_CONFIRM: [
                 CallbackQueryHandler(handle_final_confirm, pattern="^(save|publish|edit):"),
@@ -11523,7 +11406,6 @@ def register(app):
             FINAL_CONSULT_TRANSLATOR: [
                 CallbackQueryHandler(handle_translator_page_navigation, pattern="^translator_page:"),
                 CallbackQueryHandler(handle_simple_translator_choice, pattern="^simple_translator:"),
-                CallbackQueryHandler(handle_medical_report_answer, pattern="^medrep:(yes|no)$"),
             ],
             FINAL_CONSULT_CONFIRM: [
                 CallbackQueryHandler(handle_final_confirm, pattern="^(save|publish|edit):"),
@@ -11582,7 +11464,6 @@ def register(app):
             FOLLOWUP_TRANSLATOR: [
                 CallbackQueryHandler(handle_translator_page_navigation, pattern="^translator_page:"),
                 CallbackQueryHandler(handle_simple_translator_choice, pattern="^simple_translator:"),
-                CallbackQueryHandler(handle_medical_report_answer, pattern="^medrep:(yes|no)$"),
             ],
             FOLLOWUP_CONFIRM: [
                 CallbackQueryHandler(handle_final_confirm, pattern="^(save|publish|edit):"),
@@ -11659,7 +11540,6 @@ def register(app):
             EMERGENCY_TRANSLATOR: [
                 CallbackQueryHandler(handle_translator_page_navigation, pattern="^translator_page:"),
                 CallbackQueryHandler(handle_simple_translator_choice, pattern="^simple_translator:"),
-                CallbackQueryHandler(handle_medical_report_answer, pattern="^medrep:(yes|no)$"),
             ],
             EMERGENCY_CONFIRM: [
                 CallbackQueryHandler(handle_final_confirm, pattern="^(save|publish|edit):"),
@@ -11712,7 +11592,6 @@ def register(app):
             OPERATION_TRANSLATOR: [
                 CallbackQueryHandler(handle_translator_page_navigation, pattern="^translator_page:"),
                 CallbackQueryHandler(handle_simple_translator_choice, pattern="^simple_translator:"),
-                CallbackQueryHandler(handle_medical_report_answer, pattern="^medrep:(yes|no)$"),
             ],
             OPERATION_CONFIRM: [
                 CallbackQueryHandler(handle_final_confirm, pattern="^(save|publish|edit):"),
@@ -11762,7 +11641,6 @@ def register(app):
             PHYSICAL_THERAPY_TRANSLATOR: [
                 CallbackQueryHandler(handle_translator_page_navigation, pattern="^translator_page:"),
                 CallbackQueryHandler(handle_simple_translator_choice, pattern="^simple_translator:"),
-                CallbackQueryHandler(handle_medical_report_answer, pattern="^medrep:(yes|no)$"),
             ],
             PHYSICAL_THERAPY_CONFIRM: [
                 CallbackQueryHandler(handle_final_confirm, pattern="^(save|publish|edit):"),
@@ -11807,7 +11685,6 @@ def register(app):
             DEVICE_TRANSLATOR: [
                 CallbackQueryHandler(handle_translator_page_navigation, pattern="^translator_page:"),
                 CallbackQueryHandler(handle_simple_translator_choice, pattern="^simple_translator:"),
-                CallbackQueryHandler(handle_medical_report_answer, pattern="^medrep:(yes|no)$"),
             ],
             DEVICE_CONFIRM: [
                 CallbackQueryHandler(handle_final_confirm, pattern="^(save|publish|edit):"),
@@ -11847,7 +11724,6 @@ def register(app):
                 CallbackQueryHandler(handle_smart_back_navigation, pattern="^nav:back$"),
                 CallbackQueryHandler(handle_smart_cancel_navigation, pattern="^nav:cancel$"),
                 CallbackQueryHandler(handle_simple_translator_choice, pattern="^simple_translator:"),
-                CallbackQueryHandler(handle_medical_report_answer, pattern="^medrep:(yes|no|skip)$"),
             ],
             RADIOLOGY_CONFIRM: [
                 CallbackQueryHandler(handle_final_confirm, pattern="^(save|publish|edit):"),
@@ -11901,7 +11777,6 @@ def register(app):
             ADMISSION_TRANSLATOR: [
                 CallbackQueryHandler(handle_translator_page_navigation, pattern="^translator_page:"),
                 CallbackQueryHandler(handle_simple_translator_choice, pattern="^simple_translator:"),
-                CallbackQueryHandler(handle_medical_report_answer, pattern="^medrep:(yes|no)$"),
             ],
             ADMISSION_CONFIRM: [
                 CallbackQueryHandler(handle_final_confirm, pattern="^(save|publish|edit):"),
@@ -11959,7 +11834,6 @@ def register(app):
             DISCHARGE_TRANSLATOR: [
                 CallbackQueryHandler(handle_translator_page_navigation, pattern="^translator_page:"),
                 CallbackQueryHandler(handle_simple_translator_choice, pattern="^simple_translator:"),
-                CallbackQueryHandler(handle_medical_report_answer, pattern="^medrep:(yes|no)$"),
             ],
             DISCHARGE_CONFIRM: [
                 CallbackQueryHandler(handle_final_confirm, pattern="^(save|publish|edit):"),
@@ -12003,7 +11877,6 @@ def register(app):
             APP_RESCHEDULE_TRANSLATOR: [
                 CallbackQueryHandler(handle_translator_page_navigation, pattern="^translator_page:"),
                 CallbackQueryHandler(handle_simple_translator_choice, pattern="^simple_translator:"),
-                CallbackQueryHandler(handle_medical_report_answer, pattern="^medrep:(yes|no)$"),
             ],
             APP_RESCHEDULE_CONFIRM: [
                 CallbackQueryHandler(handle_final_confirm, pattern="^(save|publish|edit):"),
@@ -12069,7 +11942,6 @@ def register(app):
                 CallbackQueryHandler(handle_smart_cancel_navigation, pattern="^nav:cancel$"),
                 # callbacks المترجمين مع pagination
                 CallbackQueryHandler(_get_radiation_therapy_handler('handle_radiation_translator_callback'), pattern="^rad_translator"),
-                CallbackQueryHandler(handle_medical_report_answer, pattern="^medrep:(yes|no)$"),
                 CallbackQueryHandler(handle_noop, pattern="^noop$"),
             ],
             RADIATION_THERAPY_CONFIRM: [
@@ -12133,10 +12005,6 @@ def register(app):
     # ✅ ثم تسجيل ConversationHandler
     app.add_handler(conv_handler)
 
-    # 🔧 أوامر أدمن لتفعيل/إيقاف خطوة التقرير الطبي أثناء التشغيل
-    app.add_handler(CommandHandler("medrep_on", cmd_medrep_on))
-    app.add_handler(CommandHandler("medrep_off", cmd_medrep_off))
-
 
 # ================================================
 # 🆕 نظام المترجمين الجديد - مبسط وسريع
@@ -12156,54 +12024,14 @@ def load_translator_names():
         logging.getLogger(__name__).warning(f"⚠️ فشل تحميل المترجمين: {e}")
     
     # قائمة احتياطية في حالة فشل التحميل - بنفس الترتيب المطلوب
-    return ["معتز", "ادم", "هاشم", "مصطفى", "حسن", "نجم الدين", "محمد علي", 
-            "صبري", "عزي", "سعيد", "عصام", "زيد", "مهدي", "ادريس", 
-            "واصل", "عزالدين", "عبدالسلام", "يحيى العنسي", "ياسر"]
+    return ["معتز", "ادم", "هاشم", "مصطفى", "حسن", "نجم الدين", "محمد علي",
+            "صبري", "عزي", "سعيد", "عصام", "زيد", "مهدي", "ادريس",
+            "واصل", "عزالدين", "عبدالسلام", "يحيى", "ياسر"]
 
 async def show_translator_selection(message, context, flow_type, page=1):
     """
     عرض قائمة المترجمين للاختيار مع صفحات
     """
-    report_tmp = context.user_data.setdefault("report_tmp", {})
-    skip_medical_gate = bool(context.user_data.get("_skip_medical_gate_once"))
-
-    # ✅ بوابة "هل يوجد تقرير طبي؟" قبل اختيار المترجم
-    # مطلوبة لمعظم المسارات، لكن *مطلوب إزالتها فقط* لمساري:
-    # - تأجيل موعد (appointment_reschedule)
-    _flows_without_medrep_gate = {"appointment_reschedule"}
-    if (
-        flow_type not in _flows_without_medrep_gate
-        and _is_medical_report_step_enabled(context)
-        and (not skip_medical_gate)
-        and (not report_tmp.get("_medical_report_step_done"))
-    ):
-        report_tmp["_pending_translator_flow"] = flow_type
-        first_row = [
-            InlineKeyboardButton("✅ نعم", callback_data="medrep:yes"),
-            InlineKeyboardButton("❌ لا", callback_data="medrep:no"),
-        ]
-        # ✅ فقط في الأشعة والفحوصات: السماح بالتخطي مباشرة لاختيار المترجم
-        if flow_type == "radiology":
-            first_row.append(InlineKeyboardButton("⏭️ تخطي", callback_data="medrep:skip"))
-
-        keyboard = InlineKeyboardMarkup(
-            [
-                first_row,
-                [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back")],
-            ]
-        )
-        await message.reply_text(
-            "📎 **هل يوجد تقرير طبي؟**\n\n"
-            "اختر (نعم) لرفع صور التقرير الطبي، أو (لا) لكتابة سبب عدم توفره.",
-            reply_markup=keyboard,
-            parse_mode="Markdown",
-        )
-        context.user_data["_conversation_state"] = MEDICAL_REPORT_ASK
-        return MEDICAL_REPORT_ASK
-
-    # استهلاك علم التخطي لمرة واحدة فقط
-    context.user_data.pop("_skip_medical_gate_once", None)
-
     translator_names = load_translator_names()
 
     if not translator_names:
@@ -12229,13 +12057,11 @@ async def show_translator_selection(message, context, flow_type, page=1):
     row = []
 
     for name in page_names:
-        # الحصول على الـ index الحقيقي من القائمة الأصلية
-        real_index = translator_names.index(name)
-        row.append(InlineKeyboardButton(name, callback_data=f"simple_translator:{flow_type}:{real_index}"))
+        row.append(InlineKeyboardButton(name, callback_data=f"simple_translator:{flow_type}:{name}"))
         if len(row) == 3:
             keyboard_buttons.append(row)
             row = []
-    
+
     # إضافة الصف الأخير إذا كان غير مكتمل
     if row:
         keyboard_buttons.append(row)
@@ -12269,347 +12095,6 @@ async def show_translator_selection(message, context, flow_type, page=1):
         reply_markup=keyboard,
         parse_mode="Markdown"
     )
-
-
-def _parse_chat_id(value):
-    s = str(value or "").strip()
-    if not s:
-        return None
-    if re.fullmatch(r"-?\d+", s):
-        try:
-            return int(s)
-        except Exception:
-            return s
-    return s
-
-
-def _safe_filename(name: str, fallback: str = "medical_report") -> str:
-    n = (name or "").strip() or fallback
-    n = re.sub(r'[<>:"/\\|?*]+', "_", n)
-    n = re.sub(r"\s+", " ", n).strip()
-    return n[:90] if len(n) > 90 else n
-
-
-async def _images_to_pdf_bytes_simple(image_paths: list[str]) -> bytes:
-    """تحويل بسيط ومستقر للصور إلى PDF (بدون أي تحسينات ثقيلة)."""
-    try:
-        from PIL import Image, ImageOps
-    except Exception as e:
-        raise RuntimeError("Pillow غير مثبت لتحويل الصور إلى PDF") from e
-
-    imgs: list[Image.Image] = []
-    try:
-        for p in image_paths:
-            im = Image.open(p)
-            try:
-                im = ImageOps.exif_transpose(im)
-            except Exception:
-                pass
-            if im.mode != "RGB":
-                im = im.convert("RGB")
-            imgs.append(im)
-
-        if not imgs:
-            raise ValueError("لا توجد صور للتحويل")
-
-        out = io.BytesIO()
-        first, rest = imgs[0], imgs[1:]
-        first.save(out, format="PDF", save_all=True, append_images=rest, resolution=200.0)
-        return out.getvalue()
-    finally:
-        for im in imgs:
-            try:
-                im.close()
-            except Exception:
-                pass
-
-
-async def _continue_to_translator_after_medical(message, context):
-    """الانتقال لاختيار المترجم بعد إنهاء خطوة التقرير الطبي."""
-    report_tmp = context.user_data.setdefault("report_tmp", {})
-    flow_type = report_tmp.get("_pending_translator_flow") or report_tmp.get("current_flow") or "new_consult"
-    report_tmp["_medical_report_step_done"] = True
-    context.user_data["_skip_medical_gate_once"] = True
-
-    # ✅ مسار جلسة إشعاعي لديه شاشة مترجم خاصة (pagination مختلفة)
-    if flow_type == "radiation_therapy":
-        try:
-            from bot.handlers.user.user_reports_add_new_system.flows.radiation_therapy import (
-                show_radiation_translator_selection,
-            )
-            from bot.handlers.user.user_reports_add_new_system.states import RADIATION_THERAPY_TRANSLATOR
-            await show_radiation_translator_selection(message, context)
-            context.user_data["_conversation_state"] = RADIATION_THERAPY_TRANSLATOR
-            return RADIATION_THERAPY_TRANSLATOR
-        except Exception:
-            # fallback: use the default translator list
-            pass
-
-    await show_translator_selection(message, context, flow_type)
-    translator_state = get_translator_state(flow_type)
-    context.user_data["_conversation_state"] = translator_state
-    return translator_state
-
-
-async def handle_medical_report_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """معالجة اختيار وجود تقرير طبي (نعم/لا/تخطي)."""
-    query = update.callback_query
-    if not query:
-        return MEDICAL_REPORT_ASK
-    await query.answer()
-
-    report_tmp = context.user_data.setdefault("report_tmp", {})
-    data = query.data or ""
-
-    if data == "medrep:yes":
-        report_tmp["medical_report_available"] = True
-        report_tmp["medical_report_missing_reason"] = None
-        report_tmp["medical_report_photo_file_ids"] = []
-        report_tmp["medical_report_pdf_file_ids"] = []
-        report_tmp["medical_report_video_file_ids"] = []
-        report_tmp["_medical_report_step_done"] = False
-        await query.message.reply_text(
-            "📷🎥 ارسل صورة/صور **أو** ملف PDF **أو** فيديو للتقرير الطبي.\n"
-            "بعد الانتهاء ارسل /done",
-        )
-        context.user_data["_conversation_state"] = MEDICAL_REPORT_UPLOAD
-        return MEDICAL_REPORT_UPLOAD
-
-    if data == "medrep:no":
-        report_tmp["medical_report_available"] = False
-        report_tmp["medical_report_photo_file_ids"] = []
-        report_tmp["_medical_report_step_done"] = False
-        await query.message.reply_text(
-            "✍️ اكتب سبب عدم توفر التقرير الطبي:",
-        )
-        context.user_data["_conversation_state"] = MEDICAL_REPORT_REASON
-        return MEDICAL_REPORT_REASON
-
-    if data == "medrep:skip":
-        # ✅ التخطي مطلوب فقط لمسار الأشعة والفحوصات
-        flow_type = report_tmp.get("_pending_translator_flow") or report_tmp.get("current_flow") or ""
-        if flow_type != "radiology":
-            return MEDICAL_REPORT_ASK
-        report_tmp["medical_report_available"] = None
-        report_tmp["medical_report_missing_reason"] = None
-        report_tmp["medical_report_photo_file_ids"] = []
-        report_tmp["medical_report_pdf_file_ids"] = []
-        report_tmp["medical_report_video_file_ids"] = []
-        return await _continue_to_translator_after_medical(query.message, context)
-
-    return MEDICAL_REPORT_ASK
-
-
-async def handle_medical_report_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """استقبال ملفات التقرير الطبي أثناء الرفع (صور/PDF/فيديو)."""
-    msg = update.message
-    if not msg:
-        return MEDICAL_REPORT_UPLOAD
-
-    # قبول إنهاء الرفع بنص بسيط أيضاً
-    txt = (msg.text or "").strip().lower()
-    if txt in {"done", "تم", "خلص", "انتهيت"}:
-        return await handle_medical_report_done(update, context)
-
-    report_tmp = context.user_data.setdefault("report_tmp", {})
-    arr = report_tmp.setdefault("medical_report_photo_file_ids", [])
-    pdf_arr = report_tmp.setdefault("medical_report_pdf_file_ids", [])
-    vid_arr = report_tmp.setdefault("medical_report_video_file_ids", [])
-
-    if msg.photo:
-        if pdf_arr:
-            await msg.reply_text("⚠️ تم رفع PDF مسبقًا. أكمل بـ /done أو ابدأ تقريرًا جديدًا للصور.")
-            return MEDICAL_REPORT_UPLOAD
-        arr.append(msg.photo[-1].file_id)
-        if len(arr) % 3 == 0:
-            await msg.reply_text(f"✅ تم استلام {len(arr)} صور. ارسل المزيد أو /done.")
-        else:
-            await msg.reply_text(f"✅ تم استلام الصورة رقم {len(arr)}. ارسل المزيد أو /done.")
-        context.user_data["_conversation_state"] = MEDICAL_REPORT_UPLOAD
-        return MEDICAL_REPORT_UPLOAD
-
-    if msg.document and (msg.document.mime_type or "").startswith("image/"):
-        if pdf_arr:
-            await msg.reply_text("⚠️ تم رفع PDF مسبقًا. أكمل بـ /done أو ابدأ تقريرًا جديدًا للصور.")
-            return MEDICAL_REPORT_UPLOAD
-        arr.append(msg.document.file_id)
-        await msg.reply_text(f"✅ تم استلام الصورة رقم {len(arr)}. ارسل المزيد أو /done.")
-        context.user_data["_conversation_state"] = MEDICAL_REPORT_UPLOAD
-        return MEDICAL_REPORT_UPLOAD
-
-    if msg.document and (msg.document.mime_type or "").lower() == "application/pdf":
-        if arr:
-            await msg.reply_text("⚠️ تم رفع صور مسبقًا. أكمل بـ /done أو ابدأ تقريرًا جديدًا لرفع PDF.")
-            return MEDICAL_REPORT_UPLOAD
-        pdf_arr.append(msg.document.file_id)
-        await msg.reply_text(f"✅ تم استلام ملف PDF رقم {len(pdf_arr)}. ارسل المزيد أو /done.")
-        context.user_data["_conversation_state"] = MEDICAL_REPORT_UPLOAD
-        return MEDICAL_REPORT_UPLOAD
-
-    # ✅ فيديو كرسالة فيديو
-    if msg.video:
-        vid_arr.append(msg.video.file_id)
-        await msg.reply_text(f"✅ تم استلام الفيديو رقم {len(vid_arr)}. ارسل المزيد أو /done.")
-        context.user_data["_conversation_state"] = MEDICAL_REPORT_UPLOAD
-        return MEDICAL_REPORT_UPLOAD
-
-    # ✅ فيديو كملف document
-    if msg.document and (msg.document.mime_type or "").lower().startswith("video/"):
-        vid_arr.append(msg.document.file_id)
-        await msg.reply_text(f"✅ تم استلام الفيديو رقم {len(vid_arr)}. ارسل المزيد أو /done.")
-        context.user_data["_conversation_state"] = MEDICAL_REPORT_UPLOAD
-        return MEDICAL_REPORT_UPLOAD
-
-    await msg.reply_text("ارسل صورة/صور أو ملف PDF أو فيديو للتقرير الطبي، أو استخدم /done للإنهاء.")
-    return MEDICAL_REPORT_UPLOAD
-
-
-async def handle_medical_report_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """إنهاء رفع صور التقرير الطبي والانتقال لاختيار المترجم."""
-    msg = update.message
-    report_tmp = context.user_data.setdefault("report_tmp", {})
-    file_ids = report_tmp.get("medical_report_photo_file_ids") or []
-    pdf_ids = report_tmp.get("medical_report_pdf_file_ids") or []
-    vid_ids = report_tmp.get("medical_report_video_file_ids") or []
-
-    if not file_ids and not pdf_ids and not vid_ids:
-        await msg.reply_text("⚠️ لم يتم استلام صور أو PDF أو فيديو بعد. ارسل ملفًا واحدًا على الأقل أو اختر (لا).")
-        return MEDICAL_REPORT_UPLOAD
-
-    patient_name = str(report_tmp.get("patient_name") or "patient").strip()
-    pdf_name = f"{_safe_filename(patient_name, fallback='medical_report')}.pdf"
-    caption = f"📄 تقرير طبي - {patient_name}"
-
-    group_id_raw = MEDICAL_REPORTS_GROUP_ID or os.getenv("MEDICAL_REPORTS_GROUP_ID", "")
-    group_id = _parse_chat_id(group_id_raw)
-    if not group_id:
-        await msg.reply_text(
-            "⚠️ تم حفظ التقرير الطبي، لكن `MEDICAL_REPORTS_GROUP_ID` غير مضبوط، لذلك لم يتم النشر في المجموعة."
-        )
-        return await _continue_to_translator_after_medical(msg, context)
-
-    try:
-        await context.bot.get_chat(group_id)
-    except (BadRequest, Forbidden) as e:
-        await msg.reply_text(
-            "❌ لا أستطيع الوصول إلى مجموعة التقارير الطبية.\n"
-            "تأكد من إضافة البوت للمجموعة وصلاحية إرسال الملفات.\n"
-            f"السبب: {e}"
-        )
-        return MEDICAL_REPORT_UPLOAD
-
-    # ✅ إرسال الفيديوهات (إن وجدت) كملفات منفصلة للمجموعة
-    # لا ندخلها ضمن PDF، فقط ننشرها ثم نكمل نشر الـ PDF (إن وجد).
-    if vid_ids:
-        try:
-            for idx, fid in enumerate(vid_ids, start=1):
-                await context.bot.send_video(
-                    chat_id=group_id,
-                    video=fid,
-                    caption=(caption if idx == 1 and not pdf_ids and not file_ids else None),
-                )
-            await msg.reply_text("✅ تم إرسال الفيديو/الفيديوهات إلى المجموعة.")
-        except Exception as e:
-            await msg.reply_text(f"❌ فشل إرسال الفيديو للمجموعة: {e}")
-            return MEDICAL_REPORT_UPLOAD
-
-    # الحالة 1: PDF مباشر (بدون تحويل)
-    if pdf_ids:
-        try:
-            sent = None
-            tmp_pdf_dir = tempfile.mkdtemp(prefix="medrep_pdf_")
-            for idx, fid in enumerate(pdf_ids, start=1):
-                doc = await context.bot.get_file(fid)
-                local_pdf_name = pdf_name if len(pdf_ids) == 1 else f"{_safe_filename(patient_name)}_{idx:02d}.pdf"
-                local_pdf_path = os.path.join(tmp_pdf_dir, local_pdf_name)
-                await doc.download_to_drive(custom_path=local_pdf_path)
-                tmp_pdf = open(local_pdf_path, "rb")
-                sent = await context.bot.send_document(
-                    chat_id=group_id,
-                    document=tmp_pdf,
-                    filename=local_pdf_name,
-                    caption=caption if idx == 1 else None,
-                )
-                try:
-                    tmp_pdf.close()
-                except Exception:
-                    pass
-            report_tmp["medical_report_pdf_file_id"] = getattr(getattr(sent, "document", None), "file_id", None)
-            report_tmp["medical_report_group_message_id"] = getattr(sent, "message_id", None)
-            await msg.reply_text("✅ تم إرسال ملف PDF الطبي إلى المجموعة.")
-            try:
-                for f in os.listdir(tmp_pdf_dir):
-                    try:
-                        os.remove(os.path.join(tmp_pdf_dir, f))
-                    except Exception:
-                        pass
-                os.rmdir(tmp_pdf_dir)
-            except Exception:
-                pass
-        except Exception as e:
-            await msg.reply_text(f"❌ فشل إرسال PDF للمجموعة: {e}")
-            return MEDICAL_REPORT_UPLOAD
-        return await _continue_to_translator_after_medical(msg, context)
-
-    # إذا كانت فيديوهات فقط (بدون PDF/صور) نكمل مباشرة
-    if vid_ids and (not file_ids) and (not pdf_ids):
-        return await _continue_to_translator_after_medical(msg, context)
-
-    # الحالة 2: صور => تحويل PDF ثم إرسال
-    tmp_dir = tempfile.mkdtemp(prefix="medrep_simple_")
-    image_paths = []
-    try:
-        for i, fid in enumerate(file_ids, start=1):
-            f = await context.bot.get_file(fid)
-            img_path = os.path.join(tmp_dir, f"img_{i:03d}.jpg")
-            await f.download_to_drive(custom_path=img_path)
-            image_paths.append(img_path)
-
-        pdf_bytes = await _images_to_pdf_bytes_simple(image_paths)
-        pdf_file = io.BytesIO(pdf_bytes)
-        pdf_file.name = pdf_name
-        sent = await context.bot.send_document(
-            chat_id=group_id,
-            document=pdf_file,
-            filename=pdf_name,
-            caption=caption,
-        )
-        report_tmp["medical_report_pdf_file_id"] = getattr(getattr(sent, "document", None), "file_id", None)
-        report_tmp["medical_report_group_message_id"] = getattr(sent, "message_id", None)
-        await msg.reply_text("✅ تم رفع الصور وتحويلها وإرسال ملف PDF إلى المجموعة الطبية.")
-    except Exception as e:
-        await msg.reply_text(f"❌ فشل إنشاء/إرسال PDF من الصور: {e}")
-        return MEDICAL_REPORT_UPLOAD
-    finally:
-        for p in image_paths:
-            try:
-                os.remove(p)
-            except Exception:
-                pass
-        try:
-            os.rmdir(tmp_dir)
-        except Exception:
-            pass
-
-    return await _continue_to_translator_after_medical(msg, context)
-
-
-async def handle_medical_report_reason_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """حفظ سبب عدم توفر التقرير الطبي ثم المتابعة."""
-    msg = update.message
-    if not msg:
-        return MEDICAL_REPORT_REASON
-    reason = (msg.text or "").strip()
-    if not reason:
-        await msg.reply_text("⚠️ اكتب سبب عدم توفر التقرير الطبي.")
-        return MEDICAL_REPORT_REASON
-
-    report_tmp = context.user_data.setdefault("report_tmp", {})
-    report_tmp["medical_report_missing_reason"] = reason
-    report_tmp["medical_report_photo_file_ids"] = []
-    report_tmp["medical_report_video_file_ids"] = []
-    await msg.reply_text("✅ تم حفظ السبب.")
-    return await _continue_to_translator_after_medical(msg, context)
 
 async def handle_translator_page_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -12661,8 +12146,7 @@ async def handle_translator_page_navigation(update: Update, context: ContextType
         row = []
 
         for name in page_names:
-            real_index = translator_names.index(name)
-            row.append(InlineKeyboardButton(name, callback_data=f"simple_translator:{flow_type}:{real_index}"))
+            row.append(InlineKeyboardButton(name, callback_data=f"simple_translator:{flow_type}:{name}"))
             if len(row) == 3:
                 keyboard_buttons.append(row)
                 row = []
@@ -12716,19 +12200,33 @@ async def handle_simple_translator_choice(update: Update, context: ContextTypes.
         choice = parts[2]
 
         if choice == "skip":
-            # تخطي المترجم
             translator_name = "غير محدد"
             translator_id = None
-        else:
-            # اختيار مترجم من القائمة
+            _mono_logger = logging.getLogger(__name__)
+            _mono_logger.debug("translator callback: skip")
+        elif choice.lstrip('-').isdigit():
+            # ── IDX-format (legacy, draining) ──────────────────────────────
+            _mono_logger = logging.getLogger(__name__)
+            _mono_logger.debug("translator callback: IDX-format  idx=%s  flow=%s", choice, flow_type)
             translator_names = load_translator_names()
             try:
                 index = int(choice)
                 translator_name = translator_names[index]
-                translator_id = None  # لا نحتاج id للمترجمين الثابتين
-            except (IndexError, ValueError):
+                translator_id = None
+                _mono_logger.debug("translator IDX resolved: idx=%d → name=[%s]", index, translator_name)
+            except (IndexError, ValueError) as exc:
+                _mono_logger.warning(
+                    "translator callback: invalid IDX payload  choice=%r  flow=%s  error=%s",
+                    choice, flow_type, exc
+                )
                 await query.edit_message_text("❌ اختيار غير صحيح")
                 return
+        else:
+            # ── NAME-format (current protocol post-migration) ───────────────
+            _mono_logger = logging.getLogger(__name__)
+            _mono_logger.debug("translator callback: NAME-format  name=[%s]  flow=%s", choice, flow_type)
+            translator_name = choice
+            translator_id = None
 
         # حفظ اسم المترجم
         context.user_data.setdefault("report_tmp", {})
