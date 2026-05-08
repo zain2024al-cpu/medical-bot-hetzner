@@ -130,8 +130,47 @@ def get_all_hospitals() -> List[str]:
 def get_hospitals_with_details() -> List[Dict]:
     """
     الحصول على المستشفيات مع التفاصيل
-    Returns list of hospital dicts with id, name, departments, doctor_count
+    Returns list of hospital dicts with id, name, departments, doctor_count.
+    DB is authoritative for name; JSON provides supplementary fields (departments, doctor_count).
     """
+    # DB-first: build a name-keyed index from Hospital table
+    db_names = []
+    try:
+        from db.session import SessionLocal
+        from db.models import Hospital
+        with SessionLocal() as s:
+            rows = s.query(Hospital).order_by(Hospital.name).all()
+            db_names = [
+                r.name for r in rows
+                if r.name and r.name.strip() and r.name.strip() not in _INVALID_HOSPITAL_NAMES
+            ]
+    except Exception as e:
+        logger.warning("get_hospitals_with_details: DB read failed, falling back to JSON: %s", e)
+
+    if db_names:
+        # Merge with JSON supplementary data (departments, doctor_count) where available
+        json_data = _load_data()
+        json_index = {}
+        if json_data:
+            for h in json_data.get('hospitals', []):
+                key = (h.get('name') or '').strip().lower()
+                if key:
+                    json_index[key] = h
+
+        result = []
+        for name in db_names:
+            key = name.strip().lower()
+            json_entry = json_index.get(key, {})
+            result.append({
+                'id': json_entry.get('id'),
+                'name': name,
+                'name_normalized': name.lower().strip(),
+                'departments': json_entry.get('departments', []),
+                'doctor_count': json_entry.get('doctor_count', 0),
+            })
+        return result
+
+    # fallback: JSON only (no DB rows or DB unavailable)
     data = _load_data()
     return data.get('hospitals', []) if data else []
 

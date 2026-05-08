@@ -16,6 +16,7 @@ from services.hospitals_service import (
     update_hospital as service_update_hospital,
     reload_hospitals as service_reload_hospitals
 )
+from services.doctors_smart_search import reload_doctors as _reload_doctors_cache
 
 logger = logging.getLogger(__name__)
 
@@ -184,6 +185,12 @@ async def handle_hospital_name_input(update: Update, context: ContextTypes.DEFAU
         except Exception as sync_err:
             logger.warning(f"⚠️ فشل مزامنة المستشفى مع خدمة المستشفيات: {sync_err}")
 
+        try:
+            _reload_doctors_cache()
+            logger.info("doctors_smart_search cache invalidated after hospital add: %s", name)
+        except Exception as cache_err:
+            logger.warning("failed to invalidate doctors cache after hospital add: %s", cache_err)
+
         keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_hospitals")]])
         
         await update.message.reply_text(
@@ -313,6 +320,12 @@ async def handle_confirm_delete_hospital(update: Update, context: ContextTypes.D
                     logger.info(f"✅ تم مزامنة حذف المستشفى '{full_name}' مع خدمة المستشفيات")
                 except Exception as sync_err:
                     logger.warning(f"⚠️ فشل مزامنة حذف المستشفى: {sync_err}")
+
+                try:
+                    _reload_doctors_cache()
+                    logger.info("doctors_smart_search cache invalidated after hospital delete: %s", full_name)
+                except Exception as cache_err:
+                    logger.warning("failed to invalidate doctors cache after hospital delete: %s", cache_err)
 
                 # عد المستشفيات المتبقية
                 remaining = session.query(Hospital).count()
@@ -506,6 +519,12 @@ async def handle_edit_hospital_input(update: Update, context: ContextTypes.DEFAU
         except Exception as sync_err:
             logger.warning(f"⚠️ فشل مزامنة تعديل المستشفى: {sync_err}")
 
+        try:
+            _reload_doctors_cache()
+            logger.info("doctors_smart_search cache invalidated after hospital rename: %s -> %s", old_name, new_name)
+        except Exception as cache_err:
+            logger.warning("failed to invalidate doctors cache after hospital rename: %s", cache_err)
+
         # مسح البيانات المحفوظة
         context.user_data.pop('edit_hospital_id', None)
         context.user_data.pop('edit_hospital_old_name', None)
@@ -596,6 +615,12 @@ async def handle_sync_hospitals(update: Update, context: ContextTypes.DEFAULT_TY
             logger.info("✅ تم مزامنة المستشفيات مع خدمة المستشفيات (JSON)")
         except Exception as sync_err:
             logger.warning(f"⚠️ فشل مزامنة المستشفيات مع خدمة المستشفيات: {sync_err}")
+
+        try:
+            _reload_doctors_cache()
+            logger.info("doctors_smart_search cache invalidated after hospital sync")
+        except Exception as cache_err:
+            logger.warning("failed to invalidate doctors cache after hospital sync: %s", cache_err)
 
         logger.info(f"✅ تم مزامنة {added_count} مستشفى جديد إلى قاعدة البيانات")
         
