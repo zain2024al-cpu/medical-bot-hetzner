@@ -373,14 +373,14 @@ def register(app):
     sh = _monolith_shared()
 
     # --- Validate critical handlers are present ---
-    critical = [
+    # handle_final_confirm is imported directly from flows.shared — not in sh dict
+    critical_sh = [
         'handle_calendar_cancel', 'handle_smart_back_navigation',
-        'handle_final_confirm', 'handle_save_callback',
-        'handle_restart_from_start', 'debug_all_callbacks',
+        'handle_save_callback', 'handle_restart_from_start', 'debug_all_callbacks',
     ]
-    missing = [k for k in critical if not sh.get(k)]
-    if missing:
-        logger.error(f"❌ Missing critical handlers: {missing} — aborting governed register()")
+    missing = [k for k in critical_sh if not sh.get(k)]
+    if missing or not handle_final_confirm:
+        logger.error(f"❌ Missing critical handlers: {missing or ['handle_final_confirm']} — aborting governed register()")
         return orig.register(app)
 
     # --- Edit routers ---
