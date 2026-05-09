@@ -550,6 +550,7 @@ def register(app):
                 CallbackQueryHandler(sh['handle_calendar_cancel'],      pattern="^nav:cancel$"),
                 CallbackQueryHandler(handle_hospital_selection,         pattern="^hospital_idx:"),
                 CallbackQueryHandler(handle_hospital_page,              pattern="^(hospital_page|hosp_page):"),
+                CallbackQueryHandler(sh['handle_smart_back_navigation'], pattern="^go_to_patient_selection$"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_hospital_search),
             ],
             # ── DEPARTMENT ────────────────────────────────────────────────────
@@ -557,18 +558,21 @@ def register(app):
                 CallbackQueryHandler(sh['handle_calendar_cancel'],      pattern="^nav:cancel$"),
                 CallbackQueryHandler(handle_department_selection,       pattern="^dept_idx:"),
                 CallbackQueryHandler(handle_department_page,            pattern="^dept_page:"),
+                CallbackQueryHandler(sh['handle_smart_back_navigation'], pattern="^go_to_hospital_selection$"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_department_search),
             ],
             R_DEPARTMENT: [
                 CallbackQueryHandler(sh['handle_calendar_cancel'],      pattern="^nav:cancel$"),
                 CallbackQueryHandler(handle_department_selection,       pattern="^dept_idx:"),
                 CallbackQueryHandler(handle_department_page,            pattern="^dept_page:"),
+                CallbackQueryHandler(sh['handle_smart_back_navigation'], pattern="^go_to_hospital_selection$"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_department_search),
             ],
             R_SUBDEPARTMENT: [
                 CallbackQueryHandler(sh['handle_calendar_cancel'],      pattern="^nav:cancel$"),
                 CallbackQueryHandler(handle_subdepartment_choice,       pattern="^subdept(?:_idx)?:"),
                 CallbackQueryHandler(handle_subdepartment_page,         pattern="^subdept_page:"),
+                CallbackQueryHandler(sh['handle_smart_back_navigation'], pattern="^go_to_department_selection$"),
             ],
             # ── DOCTOR ────────────────────────────────────────────────────────
             STATE_SELECT_DOCTOR: [
@@ -576,6 +580,7 @@ def register(app):
                 CallbackQueryHandler(_m('handle_doctor_btn_selection'), pattern="^doctor_idx:"),
                 CallbackQueryHandler(_m('handle_doctor_page'),          pattern="^doctor_page:"),
                 CallbackQueryHandler(handle_doctor_selection,           pattern="^doctor_manual$"),
+                CallbackQueryHandler(sh['handle_smart_back_navigation'], pattern="^go_to_department_selection$"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_doctor),
             ],
             R_DOCTOR: [
@@ -583,6 +588,7 @@ def register(app):
                 CallbackQueryHandler(_m('handle_doctor_btn_selection'), pattern="^doctor_idx:"),
                 CallbackQueryHandler(_m('handle_doctor_page'),          pattern="^doctor_page:"),
                 CallbackQueryHandler(handle_doctor_selection,           pattern="^doctor_manual$"),
+                CallbackQueryHandler(sh['handle_smart_back_navigation'], pattern="^go_to_department_selection$"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_doctor),
             ],
             # ── ACTION TYPE ───────────────────────────────────────────────────

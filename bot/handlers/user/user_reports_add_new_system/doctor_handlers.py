@@ -6,6 +6,7 @@
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 import logging
+from sqlalchemy import func
 
 from .states import STATE_SELECT_DOCTOR, R_DOCTOR, R_ACTION_TYPE
 from .managers import DoctorDataManager
