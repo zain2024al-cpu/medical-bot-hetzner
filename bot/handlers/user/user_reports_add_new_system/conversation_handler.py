@@ -531,12 +531,18 @@ def register(app):
             # ── PATIENT ───────────────────────────────────────────────────────
             STATE_SELECT_PATIENT: [
                 CallbackQueryHandler(sh['handle_calendar_cancel'],      pattern="^nav:cancel$"),
+                CallbackQueryHandler(handle_patient_list_callback,      pattern="^patient:show_list:"),
+                CallbackQueryHandler(handle_patient_list_callback,      pattern="^patient:back_to_menu$"),
                 CallbackQueryHandler(handle_patient_selection,          pattern="^patient_idx:"),
+                CallbackQueryHandler(sh['handle_smart_back_navigation'], pattern="^go_to_date_selection$"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_patient),
             ],
             R_PATIENT: [
                 CallbackQueryHandler(sh['handle_calendar_cancel'],      pattern="^nav:cancel$"),
+                CallbackQueryHandler(handle_patient_list_callback,      pattern="^patient:show_list:"),
+                CallbackQueryHandler(handle_patient_list_callback,      pattern="^patient:back_to_menu$"),
                 CallbackQueryHandler(handle_patient_selection,          pattern="^patient_idx:"),
+                CallbackQueryHandler(sh['handle_smart_back_navigation'], pattern="^go_to_date_selection$"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_patient),
             ],
             # ── HOSPITAL ──────────────────────────────────────────────────────
