@@ -48,6 +48,80 @@ Recovery implementations:
 from telegram import InlineKeyboardButton
 from typing import List, Tuple
 
+# ─── حدود الطول لتقرير عرض الزر (حرف) ───────────────────────────
+_SINGLE_THRESHOLD = 22   # اسم أطول من هذا → صف منفرد
+_DISPLAY_TRUNCATE = 28   # حد اقتطاع النص داخل الزر
+
+
+def progress_bar(current: int, total: int, filled: str = "●", empty: str = "○") -> str:
+    """يبني شريط تقدم نقطي.  مثال:  ● ● ● ○ ○  الخطوة 3 من 5"""
+    bar = " ".join(filled if i < current else empty for i in range(total))
+    return f"{bar}  الخطوة {current} من {total}"
+
+
+def screen_header(icon: str, title: str, step: int, total_steps: int,
+                  count: int = 0, count_label: str = "",
+                  page: int = 0, total_pages: int = 1,
+                  context_line: str = "") -> str:
+    """
+    يبني نص الشاشة الموحّد:
+      ● ● ● ○ ○  الخطوة 3 من 5
+      ━━━━━━━━━━━━━━━━━━━━
+      🏥  اختيار المستشفى
+
+      [بطاقة السياق إن وُجدت]
+      📋 32 مستشفى  │  صفحة 1 من 4
+      ─────────────────────
+      اختر من القائمة:
+    """
+    lines = []
+    lines.append(progress_bar(step, total_steps))
+    lines.append("━━━━━━━━━━━━━━━━━━━━")
+    lines.append(f"{icon}  **{title}**")
+    if context_line:
+        lines.append("")
+        lines.append(context_line)
+    lines.append("")
+    meta_parts = []
+    if count and count_label:
+        meta_parts.append(f"📋 {count} {count_label}")
+    if total_pages > 1:
+        meta_parts.append(f"صفحة {page + 1} من {total_pages}")
+    if meta_parts:
+        lines.append("  │  ".join(meta_parts))
+    lines.append("─────────────────────")
+    lines.append("اختر من القائمة:")
+    return "\n".join(lines)
+
+
+def smart_rows(items: list, make_button) -> list:
+    """
+    يحوّل قائمة عناصر إلى صفوف ذكية:
+    - الاسم الطويل (> _SINGLE_THRESHOLD) → صف منفرد
+    - الأسماء القصيرة → اثنان في صف واحد
+
+    make_button(item) → InlineKeyboardButton
+    """
+    rows = []
+    pending = None
+    for item in items:
+        label = item if isinstance(item, str) else item.get("name", str(item))
+        btn = make_button(item)
+        if len(label) > _SINGLE_THRESHOLD:
+            if pending is not None:
+                rows.append([pending])
+                pending = None
+            rows.append([btn])
+        else:
+            if pending is None:
+                pending = btn
+            else:
+                rows.append([pending, btn])
+                pending = None
+    if pending is not None:
+        rows.append([pending])
+    return rows
+
 
 def paginate(items: list, page: int, per_page: int) -> Tuple[list, int, int]:
     """

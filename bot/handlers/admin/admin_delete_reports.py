@@ -23,6 +23,34 @@ except Exception:
 
 logger = logging.getLogger(__name__)
 
+
+def _ist_now() -> datetime:
+    """الوقت الحالي بتوقيت IST (UTC+5:30) بدون tzinfo — يطابق طريقة حفظ report_date."""
+    try:
+        from zoneinfo import ZoneInfo
+        return datetime.now(ZoneInfo("Asia/Kolkata")).replace(tzinfo=None)
+    except Exception:
+        from datetime import timezone
+        ist = timezone(timedelta(hours=5, minutes=30))
+        return datetime.now(timezone.utc).astimezone(ist).replace(tzinfo=None)
+
+
+def _day_range_ist(year: int, month: int, day: int):
+    """
+    يُرجع (start, end) بتوقيت IST ليوم واحد.
+    day=0 يعني كل الشهر.
+    """
+    if day == 0:
+        start = datetime(year, month, 1)
+        if month == 12:
+            end = datetime(year + 1, 1, 1)
+        else:
+            end = datetime(year, month + 1, 1)
+    else:
+        start = datetime(year, month, day)
+        end = start + timedelta(days=1)
+    return start, end
+
 # ============================================
 # الأيقونات والثوابت
 # ============================================
@@ -46,22 +74,39 @@ async def start_delete_reports(update: Update, context: ContextTypes.DEFAULT_TYP
     await _show_year_selection(update.message, context)
 
 
-async def _show_year_selection(message, context):
-    """عرض أزرار اختيار السنة"""
-    current_year = datetime.now().year
-    years = [current_year, current_year - 1]
+async def _year_keyboard() -> InlineKeyboardMarkup:
+    """بناء لوحة أزرار السنوات من السنوات الموجودة فعلاً في DB."""
+    from sqlalchemy import extract
+    with SessionLocal() as s:
+        db_years = [
+            int(r[0]) for r in
+            s.query(extract('year', Report.report_date))
+             .filter(Report.report_date.isnot(None))
+             .group_by(extract('year', Report.report_date))
+             .order_by(extract('year', Report.report_date).desc())
+             .all()
+        ]
+    if not db_years:
+        db_years = [_ist_now().year]
 
     buttons = []
     row = []
-    for year in years:
+    for year in db_years:
         row.append(InlineKeyboardButton(f"📅 {year}", callback_data=f"delrep:year:{year}"))
-    buttons.append(row)
+        if len(row) == 3:
+            buttons.append(row)
+            row = []
+    if row:
+        buttons.append(row)
     buttons.append([InlineKeyboardButton("❌ إلغاء", callback_data="delrep:cancel")])
+    return InlineKeyboardMarkup(buttons)
 
+
+async def _show_year_selection(message, context):
+    """عرض أزرار اختيار السنة"""
     await message.reply_text(
-        "🗑️ **حذف التقارير**\n\n"
-        "اختر السنة:",
-        reply_markup=InlineKeyboardMarkup(buttons),
+        "🗑️ **حذف التقارير**\n\nاختر السنة:",
+        reply_markup=await _year_keyboard(),
         parse_mode="Markdown"
     )
 
@@ -124,7 +169,7 @@ async def handle_month_selection(update: Update, context: ContextTypes.DEFAULT_T
         return
 
     month = int(query.data.split(":")[2])
-    year = context.user_data.get('delete_reports', {}).get('year', datetime.now().year)
+    year = context.user_data.get('delete_reports', {}).get('year', _ist_now().year)
     context.user_data.setdefault('delete_reports', {})['month'] = month
 
     months_ar = [
@@ -178,8 +223,8 @@ async def handle_day_selection(update: Update, context: ContextTypes.DEFAULT_TYP
 
     day = int(query.data.split(":")[2])
     data = context.user_data.get('delete_reports', {})
-    year = data.get('year', datetime.now().year)
-    month = data.get('month', datetime.now().month)
+    year = data.get('year', _ist_now().year)
+    month = data.get('month', _ist_now().month)
     context.user_data.setdefault('delete_reports', {})['day'] = day
     context.user_data['delete_reports']['page'] = 0
 
@@ -193,24 +238,12 @@ async def _show_reports_page(query, context, year, month, day, page=0):
         "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"
     ]
 
+    start_date, end_date = _day_range_ist(year, month, day)
+    date_label = f"{months_ar[month - 1]} {year}" if day == 0 else f"{day} {months_ar[month - 1]} {year}"
+
     with SessionLocal() as session:
-        # بناء الفلتر
-        q = session.query(Report)
-
-        if day == 0:
-            # كل الشهر
-            start_date = datetime(year, month, 1)
-            if month == 12:
-                end_date = datetime(year + 1, 1, 1)
-            else:
-                end_date = datetime(year, month + 1, 1)
-            date_label = f"{months_ar[month - 1]} {year}"
-        else:
-            start_date = datetime(year, month, day)
-            end_date = start_date + timedelta(days=1)
-            date_label = f"{day} {months_ar[month - 1]} {year}"
-
-        q = q.filter(
+        # بناء الفلتر — report_date مخزّن بـ IST لذا الحدود بـ IST أيضاً
+        q = session.query(Report).filter(
             Report.report_date >= start_date,
             Report.report_date < end_date
         ).order_by(Report.report_date.desc())
@@ -308,8 +341,8 @@ async def handle_page_navigation(update: Update, context: ContextTypes.DEFAULT_T
 
     page = int(query.data.split(":")[2])
     data = context.user_data.get('delete_reports', {})
-    year = data.get('year', datetime.now().year)
-    month = data.get('month', datetime.now().month)
+    year = data.get('year', _ist_now().year)
+    month = data.get('month', _ist_now().month)
     day = data.get('day', 0)
     context.user_data['delete_reports']['page'] = page
 
@@ -415,8 +448,8 @@ async def handle_confirm_all(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
     data = context.user_data.get('delete_reports', {})
-    year = data.get('year', datetime.now().year)
-    month = data.get('month', datetime.now().month)
+    year = data.get('year', _ist_now().year)
+    month = data.get('month', _ist_now().month)
     day = data.get('day', 0)
 
     months_ar = [
@@ -429,17 +462,9 @@ async def handle_confirm_all(update: Update, context: ContextTypes.DEFAULT_TYPE)
     else:
         date_label = f"{day} {months_ar[month - 1]} {year}"
 
-    with SessionLocal() as session:
-        if day == 0:
-            start_date = datetime(year, month, 1)
-            if month == 12:
-                end_date = datetime(year + 1, 1, 1)
-            else:
-                end_date = datetime(year, month + 1, 1)
-        else:
-            start_date = datetime(year, month, day)
-            end_date = start_date + timedelta(days=1)
+    start_date, end_date = _day_range_ist(year, month, day)
 
+    with SessionLocal() as session:
         count = session.query(Report).filter(
             Report.report_date >= start_date,
             Report.report_date < end_date
@@ -477,21 +502,13 @@ async def handle_delete_all_confirmed(update: Update, context: ContextTypes.DEFA
         return
 
     data = context.user_data.get('delete_reports', {})
-    year = data.get('year', datetime.now().year)
-    month = data.get('month', datetime.now().month)
+    year = data.get('year', _ist_now().year)
+    month = data.get('month', _ist_now().month)
     day = data.get('day', 0)
 
-    with SessionLocal() as session:
-        if day == 0:
-            start_date = datetime(year, month, 1)
-            if month == 12:
-                end_date = datetime(year + 1, 1, 1)
-            else:
-                end_date = datetime(year, month + 1, 1)
-        else:
-            start_date = datetime(year, month, day)
-            end_date = start_date + timedelta(days=1)
+    start_date, end_date = _day_range_ist(year, month, day)
 
+    with SessionLocal() as session:
         count = session.query(Report).filter(
             Report.report_date >= start_date,
             Report.report_date < end_date
@@ -550,62 +567,40 @@ async def handle_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     elif action == "back_to_year":
-        # العودة لاختيار السنة
-        current_year = datetime.now().year
-        years = [current_year, current_year - 1]
-        buttons = []
-        row = []
-        for year in years:
-            row.append(InlineKeyboardButton(f"📅 {year}", callback_data=f"delrep:year:{year}"))
-        buttons.append(row)
-        buttons.append([InlineKeyboardButton("❌ إلغاء", callback_data="delrep:cancel")])
-
         await query.edit_message_text(
-            "🗑️ **حذف التقارير**\n\n"
-            "اختر السنة:",
-            reply_markup=InlineKeyboardMarkup(buttons),
+            "🗑️ **حذف التقارير**\n\naختر السنة:",
+            reply_markup=await _year_keyboard(),
             parse_mode="Markdown"
         )
 
     elif action == "back_to_month":
         # العودة لاختيار الشهر
-        year = context.user_data.get('delete_reports', {}).get('year', datetime.now().year)
+        year = context.user_data.get('delete_reports', {}).get('year', _ist_now().year)
         # إعادة عرض الأشهر
         await _show_months(query, year)
 
     elif action == "back_to_day":
         # العودة لاختيار اليوم
         data = context.user_data.get('delete_reports', {})
-        year = data.get('year', datetime.now().year)
-        month = data.get('month', datetime.now().month)
+        year = data.get('year', _ist_now().year)
+        month = data.get('month', _ist_now().month)
         # إعادة عرض الأيام
         await _show_days(query, year, month)
 
     elif action == "back_to_list":
         # العودة لقائمة التقارير
         data = context.user_data.get('delete_reports', {})
-        year = data.get('year', datetime.now().year)
-        month = data.get('month', datetime.now().month)
+        year = data.get('year', _ist_now().year)
+        month = data.get('month', _ist_now().month)
         day = data.get('day', 0)
         page = data.get('page', 0)
         await _show_reports_page(query, context, year, month, day, page)
 
     elif action == "restart":
-        # بدء عملية حذف جديدة
         context.user_data.pop('delete_reports', None)
-        current_year = datetime.now().year
-        years = [current_year, current_year - 1]
-        buttons = []
-        row = []
-        for year in years:
-            row.append(InlineKeyboardButton(f"📅 {year}", callback_data=f"delrep:year:{year}"))
-        buttons.append(row)
-        buttons.append([InlineKeyboardButton("❌ إلغاء", callback_data="delrep:cancel")])
-
         await query.edit_message_text(
-            "🗑️ **حذف التقارير**\n\n"
-            "اختر السنة:",
-            reply_markup=InlineKeyboardMarkup(buttons),
+            "🗑️ **حذف التقارير**\n\naختر السنة:",
+            reply_markup=await _year_keyboard(),
             parse_mode="Markdown"
         )
 

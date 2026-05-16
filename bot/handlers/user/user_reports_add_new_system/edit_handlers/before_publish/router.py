@@ -5,7 +5,7 @@
 # كل flow type له handlers منفصلة تماماً
 # =============================
 
-from telegram import Update
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes, ConversationHandler
 import logging
 
@@ -187,9 +187,49 @@ async def route_edit_field_selection(update: Update, context: ContextTypes.DEFAU
             return ConversationHandler.END
         
         flow_type = parts[1]
-        
-        logger.info(f"🔀 [ROUTER] route_edit_field_selection: flow_type={flow_type}")
-        
+        field_key = parts[2] if len(parts) > 2 else ""
+
+        logger.info(f"🔀 [ROUTER] route_edit_field_selection: flow_type={flow_type}, field_key={field_key}")
+
+        # ✅ اعتراض مشترك لحقل المترجم — يُعالَج بنفس الطريقة لجميع المسارات
+        if field_key == "translator_name":
+            try:
+                from bot.handlers.user.user_reports_add_new_system.edit_handlers.draft.handlers import _render_draft_edit_translator_selection
+                context.user_data['_translator_edit_return'] = 'summary'
+                context.user_data['_conversation_state'] = "EDIT_DRAFT_TRANSLATOR"
+                return await _render_draft_edit_translator_selection(query, context)
+            except Exception as e:
+                logger.error(f"❌ [ROUTER] خطأ في عرض قائمة المترجمين: {e}", exc_info=True)
+                await query.edit_message_text("❌ حدث خطأ أثناء تحميل قائمة المترجمين")
+                return ConversationHandler.END
+
+        # ✅ اعتراض مشترك لحقل سبب عدم وجود تقرير طبي — نص حر لجميع المسارات
+        if field_key == "no_report_reason":
+            data = context.user_data.get("report_tmp", {})
+            current_value = data.get("no_report_reason", "غير محدد")
+            if isinstance(current_value, str) and len(current_value) > 200:
+                current_value_display = current_value[:200] + "..."
+            else:
+                current_value_display = str(current_value) if current_value else "غير محدد"
+            context.user_data["edit_field_key"] = "no_report_reason"
+            context.user_data["edit_flow_type"] = flow_type
+            try:
+                from bot.handlers.user.user_reports_add_new_system.flows.shared import get_confirm_state
+                confirm_state = get_confirm_state(flow_type)
+            except Exception:
+                confirm_state = ConversationHandler.END
+            await query.edit_message_text(
+                f"✏️ **تعديل سبب عدم وجود تقرير طبي**\n\n"
+                f"**القيمة الحالية:**\n{current_value_display}\n\n"
+                f"📝 أرسل السبب الجديد:",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🔙 رجوع", callback_data=f"back_to_edit_fields:{flow_type}")],
+                ]),
+                parse_mode="Markdown"
+            )
+            context.user_data['_conversation_state'] = confirm_state
+            return confirm_state
+
         # ✅ التوجيه حسب flow_type - كل flow type له handler منفصل
         if flow_type == "new_consult":
             if handle_new_consult_edit_field_selection:
@@ -411,7 +451,36 @@ async def route_edit_field_input(update: Update, context: ContextTypes.DEFAULT_T
                     parse_mode="Markdown"
                 )
             return ConversationHandler.END
-        
+
+        # ✅ اعتراض مشترك لحقل سبب عدم وجود تقرير طبي — نفس المنطق لجميع المسارات
+        field_key = context.user_data.get("edit_field_key")
+        if field_key == "no_report_reason":
+            text = update.message.text.strip() if update.message else ""
+            if not text:
+                await update.message.reply_text(
+                    "⚠️ **خطأ:** النص فارغ\n\nيرجى إرسال قيمة صحيحة.",
+                    parse_mode="Markdown"
+                )
+                try:
+                    from bot.handlers.user.user_reports_add_new_system.flows.shared import get_confirm_state
+                    return get_confirm_state(flow_type)
+                except Exception:
+                    return ConversationHandler.END
+            data = context.user_data.setdefault("report_tmp", {})
+            data["no_report_reason"] = text
+            data["_medical_report_step_done"] = True
+            context.user_data.pop("edit_field_key", None)
+            logger.info(f"✅ [ROUTER] no_report_reason updated: {text[:50]}")
+            try:
+                from bot.handlers.user.user_reports_add_new_system.flows.shared import show_final_summary, get_confirm_state
+                await show_final_summary(update.message, context, flow_type)
+                confirm_state = get_confirm_state(flow_type)
+                context.user_data['_conversation_state'] = confirm_state
+                return confirm_state
+            except Exception as e:
+                logger.error(f"❌ [ROUTER] خطأ في عرض الملخص بعد تعديل no_report_reason: {e}", exc_info=True)
+                return ConversationHandler.END
+
         logger.info(f"🔀 [ROUTER] route_edit_field_input: flow_type={flow_type}")
         
         # ✅ التوجيه حسب flow_type - كل flow type له handler منفصل

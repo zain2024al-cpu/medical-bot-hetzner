@@ -3,31 +3,13 @@
 # 🔹 لوحة تحكم الأدمن + نظام الموافقة على المستخدمين
 # ================================================
 
-import logging
-
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 from bot.shared_auth import is_admin
-from bot.keyboards import admin_main_kb, reports_group_management_kb
+from bot.keyboards import admin_main_kb, admin_main_inline_kb, reports_group_management_kb, admin_main_inline_kb_with_group
 from db.session import SessionLocal
 from db.models import Translator
 from datetime import datetime
-
-logger = logging.getLogger(__name__)
-
-
-async def send_admin_panel(update: Update, first_text: str | None = None):
-    """رسالة واحدة + لوحة المفاتيح السفلية فقط (بدون أزرار مضمّنة ثانية على الشاشة)."""
-    anchor = update.message or (update.callback_query.message if update.callback_query else None)
-    if not anchor:
-        return
-    user = update.effective_user
-    fn = (user.first_name or "أدمن") if user else "أدمن"
-    first = first_text if first_text is not None else f"👑 أهلاً {fn}! لوحة التحكم جاهزة."
-    try:
-        await anchor.reply_text(first, reply_markup=admin_main_kb())
-    except Exception as e:
-        logger.exception("send_admin_panel: %s", e)
 
 
 # 🟣 أمر /admin لفتح لوحة تحكم الأدمن
@@ -40,7 +22,10 @@ async def admin_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data:
         context.user_data.clear()
     
-    await send_admin_panel(update)
+    await update.message.reply_text(
+        f"👑 أهلاً {user.first_name}! لوحة التحكم جاهزة.",
+        reply_markup=admin_main_kb()
+    )
 
 
 # 🔄 أمر /cancel لإعادة تعيين كل شيء
@@ -59,9 +44,11 @@ async def cancel_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     
     if is_admin(user.id):
-        await send_admin_panel(
-            update,
-            first_text="✅ تم إعادة تعيين كل الحالات.\n\nيمكنك الآن استخدام أي زر من جديد.",
+        await update.message.reply_text(
+            "✅ **تم إعادة تعيين كل الحالات**\n\n"
+            "يمكنك الآن استخدام أي زر من جديد.",
+            reply_markup=admin_main_kb(),
+            parse_mode="Markdown"
         )
     else:
         await update.message.reply_text(
@@ -182,9 +169,9 @@ async def handle_back_to_main(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     # لا يمكن استخدام edit_message_text مع ReplyKeyboardMarkup
     # لذلك نرسل رسالة جديدة
-    await send_admin_panel(
-        update,
-        first_text=f"👑 أهلاً {user.first_name}! لوحة التحكم جاهزة.",
+    await query.message.reply_text(
+        f"👑 أهلاً {user.first_name}! لوحة التحكم جاهزة.",
+        reply_markup=admin_main_kb()
     )
     # محاولة حذف الرسالة القديمة
     try:
@@ -205,29 +192,13 @@ async def handle_admin_buttons(update, context):
 
     data = query.data
 
-    if data == "admin:reports_recovery":
-        await query.answer(
-            "تم إلغاء «رفع الأرشيف» من الواجهة. استخدم 📋 لصق تقرير جاهز من الأسفل.",
-            show_alert=True,
-        )
-        try:
-            await query.message.delete()
-        except Exception:
-            pass
-        return
-
     if data == "admin:refresh":
-        fn = user.first_name or ""
-        try:
-            await query.message.delete()
-        except Exception:
-            pass
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=f"🔄 تم التحديث.\n\n👑 أهلاً {fn}!",
-            reply_markup=admin_main_kb(),
+        # تحديث الصفحة الرئيسية
+        await query.edit_message_text(
+            f"👑 **لوحة تحكم الأدمن**\n\nأهلاً {user.first_name}!\nاختر العملية المطلوبة:",
+            reply_markup=admin_main_inline_kb_with_group(),
+            parse_mode="Markdown"
         )
-        return
 
     elif data == "admin:manage_group":
         # إدارة مجموعة التقارير
@@ -243,14 +214,10 @@ async def handle_admin_buttons(update, context):
         await handle_group_management(update, context)
 
     elif data.startswith("admin:"):
-        try:
-            await query.message.delete()
-        except Exception:
-            pass
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=f"⚠️ هذه الخاصية قيد التطوير: {data}",
-            reply_markup=admin_main_kb(),
+        # أزرار أخرى - يمكن إضافة معالجات إضافية هنا
+        await query.edit_message_text(
+            f"⚠️ هذه الخاصية قيد التطوير: {data}",
+            reply_markup=admin_main_inline_kb()
         )
 
 
@@ -467,13 +434,12 @@ async def handle_toggle_broadcast_button(update: Update, context: ContextTypes.D
         # تحديث لوحة المفاتيح
         status_text = "🟢 تم تفعيل إرسال التقارير للمجموعة" if final_state else "🔴 تم إيقاف إرسال التقارير للمجموعة"
         
-        await send_admin_panel(
-            update,
-            first_text=(
-                f"{status_text}\n\n"
-                f"📊 الحالة الحالية: {'مفعل' if final_state else 'معطل'}\n\n"
-                f"💡 التغيير فعال فوراً - لا حاجة لإعادة تشغيل البوت"
-            ),
+        await update.message.reply_text(
+            f"{status_text}\n\n"
+            f"📊 **الحالة الحالية:** {'✅ مفعل' if final_state else '❌ معطل'}\n\n"
+            f"💡 التغيير فعال فوراً - لا حاجة لإعادة تشغيل البوت",
+            reply_markup=admin_main_kb(),
+            parse_mode="Markdown"
         )
         logger.info("✅ handle_toggle_broadcast_button: تم التحديث بنجاح")
         
@@ -481,7 +447,7 @@ async def handle_toggle_broadcast_button(update: Update, context: ContextTypes.D
         logger.error(f"❌ خطأ في handle_toggle_broadcast_button: {e}", exc_info=True)
         await update.message.reply_text(
             f"❌ حدث خطأ: {str(e)[:100]}",
-            reply_markup=admin_main_kb(),
+            reply_markup=admin_main_kb()
         )
 
 
@@ -490,26 +456,12 @@ def register(app):
     app.add_handler(CommandHandler("admin", admin_start))
     app.add_handler(CommandHandler("cancel", cancel_all))  # ✅ أمر إعادة التعيين
     app.add_handler(MessageHandler(filters.Regex("^ℹ️ مساعدة$"), admin_start))
-    # ✅ ضمان عمل زر إدارة المستخدمين حتى لو فشل ConversationHandler (اختلافات نص/إيموجي)
-    async def _handle_manage_users_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        from bot.handlers.admin.admin_users_management import start_user_management
-        return await start_user_management(update, context)
-
-    app.add_handler(
-        MessageHandler(
-            filters.Regex(r"^(?:👥\ufe0f?\\s*)?إدارة\\s*المستخدمين\\s*$"),
-            _handle_manage_users_button,
-        )
-    )
     # ✅ معالج زر إيقاف/تفعيل إرسال التقارير من لوحة المفاتيح
     app.add_handler(MessageHandler(filters.Regex(r"^(🟢 تفعيل إرسال التقارير|🔴 إيقاف إرسال التقارير)$"), handle_toggle_broadcast_button))
     # ✅ لا نحتاج لإضافة معالج لزر "👥 إدارة المستخدمين" هنا
     # لأن ConversationHandler في admin_users_management.py يتعامل معه مباشرة
     app.add_handler(CallbackQueryHandler(handle_user_approval, pattern="^(approve|reject):"))
     app.add_handler(CallbackQueryHandler(handle_back_to_main, pattern="^back_to_main$"))
-    # ✅ استثناء الأزرار التي لها ConversationHandler خاص بها
-    # - admin:evaluation (تقييم المترجمين)
-    # - admin:manage_admins (إدارة الأدمنين)
-    # - admin:print_reports (طباعة التقارير)
-    app.add_handler(CallbackQueryHandler(handle_admin_buttons, pattern=r"^admin:(?!evaluation$|manage_admins$|print_reports$|paste_full_report$)"))
+    # ✅ استثناء admin:evaluation و admin:manage_admins لأنها تحتاج ConversationHandler
+    app.add_handler(CallbackQueryHandler(handle_admin_buttons, pattern=r"^admin:(?!evaluation$|manage_admins$)"))
     app.add_handler(CallbackQueryHandler(handle_group_settings, pattern="^settings:"))

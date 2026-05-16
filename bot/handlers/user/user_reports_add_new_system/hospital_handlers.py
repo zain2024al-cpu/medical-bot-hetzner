@@ -9,67 +9,80 @@ import logging
 
 from .states import STATE_SELECT_HOSPITAL, STATE_SELECT_DEPARTMENT
 from .navigation import nav_push
-from .ui_primitives import paginate, pagination_buttons
+from .ui_primitives import paginate, pagination_buttons, screen_header, smart_rows
+from .selector_context import SelectorContext
 
 logger = logging.getLogger(__name__)
 
-# ✅ دالة لجلب المستشفيات من قاعدة البيانات (مصدر الحقيقة)
-def get_hospitals_list():
+def _get_usage_counts() -> dict:
     """
-    جلب المستشفيات من قاعدة البيانات (Hospital table).
-    Fallback إلى ملف doctors_unified.json فقط إذا كانت قاعدة البيانات فارغة/غير متاحة.
+    يجلب عدد التقارير لكل مستشفى من جدول Report.
+    يُعيد dict: {hospital_name_lower: count}
+    """
+    try:
+        from db.session import SessionLocal
+        from db.models import Report
+        from sqlalchemy import func
+        with SessionLocal() as s:
+            rows = (
+                s.query(Report.hospital_name, func.count(Report.id))
+                .filter(Report.hospital_name.isnot(None), Report.hospital_name != "")
+                .group_by(Report.hospital_name)
+                .all()
+            )
+        return {name.strip().lower(): cnt for name, cnt in rows}
+    except Exception as e:
+        logger.warning(f"⚠️ Could not fetch usage counts: {e}")
+        return {}
+
+
+def get_hospitals_list() -> list:
+    """
+    جلب المستشفيات مرتبةً حسب الاستخدام (الأكثر استخداماً أولاً).
+    المصدر: Hospital table مع ترتيب من Report.hospital_name.
+    Fallback للأبجدية إذا لم تتوفر إحصاءات.
     """
     db_hospitals = []
-    
-    # ✅ 1. جلب المستشفيات من قاعدة البيانات (مصدر الحقيقة)
+
     try:
         from db.session import SessionLocal
         from db.models import Hospital
-        
         with SessionLocal() as s:
-            hospitals = s.query(Hospital).order_by(Hospital.name).all()
+            hospitals = s.query(Hospital).all()
             if hospitals:
                 from services.hospitals_service import _INVALID_HOSPITAL_NAMES
                 db_hospitals = [
                     h.name for h in hospitals
                     if h.name and h.name.strip() not in _INVALID_HOSPITAL_NAMES
                 ]
-                logger.info(f"✅ Loaded {len(db_hospitals)} hospitals from database")
     except Exception as e:
         logger.warning(f"⚠️ Could not load hospitals from database: {e}", exc_info=True)
 
-    # ✅ 2. إذا كانت قاعدة البيانات فارغة، نستخدم JSON كـ fallback فقط
     if not db_hospitals:
         try:
             from services.hospitals_service import get_all_hospitals
             json_hospitals = get_all_hospitals() or []
-            logger.warning(f"⚠️ Hospitals DB is empty/unavailable; using JSON fallback ({len(json_hospitals)})")
+            logger.warning(f"⚠️ Hospitals DB empty — JSON fallback ({len(json_hospitals)})")
             return list(json_hospitals)
         except Exception as e:
             logger.error(f"❌ Failed to load hospitals from JSON fallback: {e}", exc_info=True)
             return []
 
-    # ✅ 3. إزالة التكرار مع الحفاظ على ترتيب قاعدة البيانات نفسه
+    # إزالة التكرار
     seen = set()
-    final_list = []
+    unique = []
     for name in db_hospitals:
         key = name.strip().lower()
-        if key in seen:
-            continue
-        seen.add(key)
-        final_list.append(name)
+        if key not in seen:
+            seen.add(key)
+            unique.append(name)
 
-    logger.info(f"✅ Total hospitals: {len(final_list)} (DB source of truth)")
-    return final_list
+    # ترتيب حسب الاستخدام (تنازلياً) ثم أبجدياً كفاصل
+    usage = _get_usage_counts()
+    unique.sort(key=lambda n: (-usage.get(n.strip().lower(), 0), n))
 
-
-def _sort_hospitals_custom(hospitals_list):
-    """
-    تم تعطيل الترتيب التلقائي - الآن يتم الاحتفاظ بالترتيب من ملف doctors_unified.json
-    الترتيب المخصص من المستخدم محفوظ في ملف البيانات
-    """
-    # إرجاع القائمة كما هي بدون ترتيب
-    return list(hospitals_list)
+    logger.info(f"✅ Hospitals sorted by usage: {len(unique)} total")
+    return unique
 
 def _build_hospitals_keyboard(page=0, search_query="", context=None):
     """بناء لوحة مفاتيح المستشفيات مع بحث"""
@@ -87,14 +100,23 @@ def _build_hospitals_keyboard(page=0, search_query="", context=None):
     if context:
         context.user_data.setdefault("report_tmp", {})["hospitals_list"] = hospitals_list
         context.user_data["report_tmp"]["hospitals_page"] = page
+        SelectorContext.save_hospital(context, page=page, search=search_query)
 
-    keyboard = []
     start_idx = page * 8
-    for i, name in enumerate(page_items):
-        keyboard.append([InlineKeyboardButton(
-            f"🏥 {name}",
-            callback_data=f"hospital_idx:{start_idx + i}"
-        )])
+    indexed = list(enumerate(page_items))
+
+    def make_btn(item):
+        i, name = item
+        display = f"🏥 {name}"
+        return InlineKeyboardButton(display, callback_data=f"hospital_idx:{start_idx + i}")
+
+    keyboard = smart_rows(
+        [{"name": name, "_i": i} for i, name in indexed],
+        lambda item: InlineKeyboardButton(
+            f"🏥 {item['name']}",
+            callback_data=f"hospital_idx:{start_idx + item['_i']}"
+        )
+    )
 
     nav_row = pagination_buttons(page, total_pages, "hosp_page")
     if nav_row:
@@ -105,29 +127,51 @@ def _build_hospitals_keyboard(page=0, search_query="", context=None):
         InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
     ])
 
-    text = (
-        f"🏥 **اختيار المستشفى** (الخطوة 3 من 5)\n\n"
-        f"📋 **العدد:** {total} مستشفى"
+    context_line = f"🔍 نتائج: **{search_query}**" if search_query else ""
+    text = screen_header(
+        icon="🏥", title="اختيار المستشفى",
+        step=3, total_steps=6,
+        count=total, count_label="مستشفى",
+        page=page, total_pages=total_pages,
+        context_line=context_line,
     )
-    if search_query:
-        text += f"\n🔍 **البحث:** {search_query}"
-    text += f"\n📄 **الصفحة:** {page + 1} من {total_pages}\n\nاختر المستشفى:"
-
     return text, InlineKeyboardMarkup(keyboard), search_query
 
 
-async def render_hospital_selection(message, context):
-    """عرض شاشة اختيار المستشفى - rendering فقط"""
-    text, keyboard, search = _build_hospitals_keyboard(0, "", context)
-    context.user_data["report_tmp"]["hospitals_search"] = search
+async def render_hospital_selection(message, context, query=None,
+                                    page: int = 0, search: str = ""):
+    """عرض شاشة اختيار المستشفى.
+    - query  : إذا مُمرَّر يُعدَّل الرسالة الحالية (للرجوع). وإلا ترسل رسالة جديدة.
+    - page/search: استعادة السياق المحفوظ عند الرجوع.
+    """
+    text, keyboard, resolved_search = _build_hospitals_keyboard(page, search, context)
+    context.user_data.setdefault("report_tmp", {})["hospitals_search"] = resolved_search
+    if query:
+        try:
+            await query.edit_message_text(text, reply_markup=keyboard, parse_mode="Markdown")
+            return
+        except Exception:
+            pass
     await message.reply_text(text, reply_markup=keyboard, parse_mode="Markdown")
 
 
-async def show_hospitals_menu(message, context, page=0, search_query=""):
-    """Navigation wrapper - يحدث state ثم يستدعي rendering"""
+async def show_hospitals_menu(message, context, page=None, search_query=None, query=None,
+                              restore=False):
+    """Navigation wrapper - يحدث state ثم يستدعي rendering.
+    restore=True: يستعيد السياق المحفوظ (للرجوع).
+    restore=False: يبدأ من page=0 (عند الوصول الطبيعي).
+    """
     nav_push(context, STATE_SELECT_HOSPITAL)
     context.user_data['_conversation_state'] = STATE_SELECT_HOSPITAL
-    await render_hospital_selection(message, context)
+    if restore:
+        ctx = SelectorContext.load_hospital(context)
+        _page = ctx.page
+        _search = ctx.search
+    else:
+        _page = page if page is not None else 0
+        _search = search_query if search_query is not None else ""
+    await render_hospital_selection(message, context, query=query,
+                                    page=_page, search=_search)
 
 
 async def handle_hospital_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):

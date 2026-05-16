@@ -207,208 +207,92 @@ def get_hospital_departments(hospital_name: str) -> List[str]:
 
 
 def add_hospital(hospital_name: str) -> bool:
-    """
-    إضافة مستشفى جديد
-    """
-    global _HOSPITALS_DATA, _HOSPITALS_LIST
+    """إضافة مستشفى جديد — DB هي المصدر الوحيد."""
     name_clean = (hospital_name or "").strip()
     if not name_clean:
         return False
     if name_clean in _INVALID_HOSPITAL_NAMES:
-        logger.warning(f"رفض إضافة اسم غير صالح كمستشفى: {name_clean!r}")
+        logger.warning("Rejected invalid hospital name: %r", name_clean)
         return False
-
-    # ✅ المصدر الأساسي: قاعدة البيانات
     try:
         from db.session import SessionLocal
         from db.models import Hospital
         with SessionLocal() as s:
-            exists = s.query(Hospital).filter(Hospital.name == name_clean).first()
-            if not exists:
+            if not s.query(Hospital).filter(Hospital.name == name_clean).first():
                 s.add(Hospital(name=name_clean))
                 s.commit()
-        # refresh cache (optional sync will run below)
-    except Exception as e:
-        logger.warning(f"⚠️ Could not add hospital to DB, will try JSON sync: {e}")
-
-    _load_data()
-    
-    if not _HOSPITALS_DATA:
-        return False
-    
-    # Check if already exists
-    if name_clean in _HOSPITALS_LIST:
+                logger.info("Added hospital to DB: %s", name_clean)
         return True
-    
-    # Add new hospital
-    new_id = max((h.get('id', 0) for h in _HOSPITALS_DATA.get('hospitals', [])), default=0) + 1
-    
-    new_hospital = {
-        "id": new_id,
-        "name": name_clean,
-        "name_normalized": name_clean.lower().strip(),
-        "departments": [],
-        "doctor_count": 0
-    }
-    
-    _HOSPITALS_DATA['hospitals'].append(new_hospital)
-    _HOSPITALS_LIST.append(name_clean)
-    if 'statistics' in _HOSPITALS_DATA:
-        _HOSPITALS_DATA['statistics']['total_hospitals'] = len(_HOSPITALS_DATA['hospitals'])
-    
-    # Save to file
-    try:
-        data_path = _get_data_path()
-        if data_path:
-            with open(data_path, 'w', encoding='utf-8') as f:
-                json.dump(_HOSPITALS_DATA, f, ensure_ascii=False, indent=2)
-            logger.info(f"Added new hospital: {hospital_name}")
-            return True
     except Exception as e:
-        logger.error(f"Failed to save new hospital: {e}")
+        logger.error("Failed to add hospital to DB: %s", e)
         return False
-    
-    return False
 
 
 def delete_hospital(hospital_name: str) -> bool:
-    """
-    حذف مستشفى
-    """
-    global _HOSPITALS_DATA, _HOSPITALS_LIST
-
-    # ✅ المصدر الأساسي: قاعدة البيانات
+    """حذف مستشفى — DB هي المصدر الوحيد."""
+    name_clean = (hospital_name or "").strip()
+    if not name_clean:
+        return False
     try:
         from db.session import SessionLocal
         from db.models import Hospital
-
-        name_clean = (hospital_name or "").strip()
-        if name_clean:
-            with SessionLocal() as s:
-                row = s.query(Hospital).filter(Hospital.name == name_clean).first()
-                if not row:
-                    # محاولة مطابقة غير حساسة للمسافات/الحروف
-                    row = s.query(Hospital).filter(Hospital.name.ilike(name_clean)).first()
-                if row:
-                    s.delete(row)
-                    s.commit()
-                    logger.info(f"Deleted hospital from DB: {name_clean}")
-                    # مزامنة اختيارية مع JSON (لا تؤثر على نجاح الحذف)
-                    try:
-                        _HOSPITALS_DATA = None
-                        _HOSPITALS_LIST = []
-                        _load_data()
-                        _delete_hospital_from_json(name_clean)
-                    except Exception as _sync_err:
-                        logger.warning(f"⚠️ DB deleted but JSON sync failed: {_sync_err}")
-                    return True
+        with SessionLocal() as s:
+            row = s.query(Hospital).filter(Hospital.name == name_clean).first()
+            if not row:
+                row = s.query(Hospital).filter(Hospital.name.ilike(name_clean)).first()
+            if row:
+                s.delete(row)
+                s.commit()
+                logger.info("Deleted hospital from DB: %s", name_clean)
+                return True
+            logger.warning("Hospital not found for delete: %s", name_clean)
+            return False
     except Exception as e:
-        logger.warning(f"⚠️ Could not delete hospital from DB, falling back to JSON: {e}")
-
-    # fallback قديم: JSON
-    _load_data()
-    
-    if not _HOSPITALS_DATA:
+        logger.error("Failed to delete hospital from DB: %s", e)
         return False
-    
-    # Find and remove hospital
-    hospital_name_lower = hospital_name.lower().strip()
-    
-    return _delete_hospital_from_json(hospital_name)
-    
-    return False
-
-
-def _delete_hospital_from_json(hospital_name: str) -> bool:
-    """حذف من doctors_unified.json (fallback/مزامنة)"""
-    global _HOSPITALS_DATA, _HOSPITALS_LIST
-
-    _load_data()
-    if not _HOSPITALS_DATA:
-        return False
-
-    hospital_name_lower = (hospital_name or "").lower().strip()
-    for i, hospital in enumerate(_HOSPITALS_DATA.get('hospitals', [])):
-        if (hospital.get('name') or "").lower().strip() == hospital_name_lower:
-            _HOSPITALS_DATA['hospitals'].pop(i)
-            if hospital.get('name') in _HOSPITALS_LIST:
-                _HOSPITALS_LIST.remove(hospital.get('name'))
-            if 'statistics' in _HOSPITALS_DATA:
-                _HOSPITALS_DATA['statistics']['total_hospitals'] = len(_HOSPITALS_DATA['hospitals'])
-            try:
-                data_path = _get_data_path()
-                if data_path:
-                    with open(data_path, 'w', encoding='utf-8') as f:
-                        json.dump(_HOSPITALS_DATA, f, ensure_ascii=False, indent=2)
-                    logger.info(f"Deleted hospital from JSON: {hospital_name}")
-                    return True
-            except Exception as e:
-                logger.error(f"Failed to save after deleting hospital (JSON): {e}")
-                return False
-    return False
 
 
 def update_hospital(old_name: str, new_name: str) -> bool:
-    """
-    تعديل اسم مستشفى
-    """
-    global _HOSPITALS_DATA, _HOSPITALS_LIST
-    
-    _load_data()
-    
-    if not _HOSPITALS_DATA:
+    """تعديل اسم مستشفى — DB هي المصدر الوحيد."""
+    old_clean = (old_name or "").strip()
+    new_clean = (new_name or "").strip()
+    if not old_clean or not new_clean:
         return False
-    
-    old_name_lower = old_name.lower().strip()
-    
-    for hospital in _HOSPITALS_DATA.get('hospitals', []):
-        if hospital['name'].lower().strip() == old_name_lower:
-            # Update hospital name
-            old_hospital_name = hospital['name']
-            hospital['name'] = new_name
-            hospital['name_normalized'] = new_name.lower().strip()
-            
-            # Update doctors that belong to this hospital
-            for doctor in _HOSPITALS_DATA.get('doctors', []):
-                if doctor.get('hospital_name', '').lower().strip() == old_name_lower:
-                    doctor['hospital_name'] = new_name
-            
-            # Update cache
-            if old_hospital_name in _HOSPITALS_LIST:
-                idx = _HOSPITALS_LIST.index(old_hospital_name)
-                _HOSPITALS_LIST[idx] = new_name
-            
-            # Save to file
-            try:
-                data_path = _get_data_path()
-                if data_path:
-                    with open(data_path, 'w', encoding='utf-8') as f:
-                        json.dump(_HOSPITALS_DATA, f, ensure_ascii=False, indent=2)
-                    logger.info(f"Updated hospital: {old_name} -> {new_name}")
-                    return True
-            except Exception as e:
-                logger.error(f"Failed to save after updating hospital: {e}")
-                return False
-    
-    return False
+    try:
+        from db.session import SessionLocal
+        from db.models import Hospital
+        with SessionLocal() as s:
+            row = s.query(Hospital).filter(Hospital.name == old_clean).first()
+            if not row:
+                row = s.query(Hospital).filter(Hospital.name.ilike(old_clean)).first()
+            if row:
+                row.name = new_clean
+                s.commit()
+                logger.info("Updated hospital in DB: %s -> %s", old_clean, new_clean)
+                return True
+            logger.warning("Hospital not found for update: %s", old_clean)
+            return False
+    except Exception as e:
+        logger.error("Failed to update hospital in DB: %s", e)
+        return False
 
 
 def reload_hospitals():
-    """
-    إعادة تحميل البيانات
-    """
+    """إعادة تحميل البيانات — لا يوجد cache مستقل، DB تُقرأ مباشرة دائماً."""
     global _HOSPITALS_DATA, _HOSPITALS_LIST
     _HOSPITALS_DATA = None
     _HOSPITALS_LIST = []
-    _load_data()
 
 
 def get_hospitals_count() -> int:
-    """
-    عدد المستشفيات
-    """
-    _load_data()
-    return len(_HOSPITALS_LIST)
+    """عدد المستشفيات من DB."""
+    try:
+        from db.session import SessionLocal
+        from db.models import Hospital
+        with SessionLocal() as s:
+            return s.query(Hospital).count()
+    except Exception:
+        return 0
 
 
 # Alias for compatibility

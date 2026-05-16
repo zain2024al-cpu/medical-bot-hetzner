@@ -5,7 +5,8 @@
 
 from db.session import SessionLocal
 from db.models import Translator
-from config.settings import ADMIN_IDS, REPORTS_GROUP_ID as _SETTINGS_GROUP_ID
+import io
+from config.settings import ADMIN_IDS, REPORTS_GROUP_ID as _SETTINGS_GROUP_ID, MEDICAL_REPORTS_GROUP_ID as _SETTINGS_MEDICAL_GROUP_ID
 from bot.broadcast_control import is_broadcast_enabled
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
@@ -88,7 +89,8 @@ def _is_similar_text(text1: str, text2: str, threshold: float = 0.7) -> bool:
 
 
 # إعدادات المجموعة
-REPORTS_GROUP_ID = _SETTINGS_GROUP_ID or os.getenv("REPORTS_GROUP_ID", "")  # معرف المجموعة الخاصة بالتقارير
+REPORTS_GROUP_ID = _SETTINGS_GROUP_ID or os.getenv("REPORTS_GROUP_ID", "")
+MEDICAL_REPORTS_GROUP_ID = _SETTINGS_MEDICAL_GROUP_ID or os.getenv("MEDICAL_REPORTS_GROUP_ID", "")
 
 
 def _split_telegram_message(text: str, max_len: int = 3500) -> list[str]:
@@ -120,6 +122,133 @@ def _split_telegram_message(text: str, max_len: int = 3500) -> list[str]:
         remaining = remaining[split_at:].lstrip("\n")
 
     return chunks or [""]
+
+
+def _build_attachment_caption(report_data: dict) -> str:
+    parts = ["📎 مرفقات طبية"]
+    if report_data.get("patient_name"):
+        parts.append(report_data["patient_name"])
+    if report_data.get("hospital_name"):
+        parts.append(report_data["hospital_name"])
+    if report_data.get("department_name"):
+        parts.append(report_data["department_name"])
+    if report_data.get("translator_name"):
+        parts.append(report_data["translator_name"])
+    return " — ".join(parts)
+
+
+async def _photos_to_pdf(bot: Bot, photo_file_ids: list, caption_text: str):
+    """
+    تحميل الصور من Telegram، تحسينها عبر image_pipeline، ثم تحويلها لـ PDF.
+    يرجع إلى التحويل المباشر إذا فشل pipeline.
+    """
+    # --- تحميل الصور الخام ---
+    raw_images: list[bytes] = []
+    for file_id in photo_file_ids:
+        try:
+            tg_file = await bot.get_file(file_id)
+            buf = io.BytesIO()
+            await tg_file.download_to_memory(buf)
+            raw_images.append(buf.getvalue())
+        except Exception as img_err:
+            logger.warning(f"⚠️ فشل تحميل صورة {file_id}: {img_err}")
+
+    if not raw_images:
+        return None
+
+    # --- pipeline التحسين ---
+    try:
+        from image_pipeline import run_pipeline_async
+        pdf = await run_pipeline_async(raw_images)
+        logger.info(f"✅ broadcast: pipeline نجح  pages={len(raw_images)}")
+        return pdf
+    except Exception as pipeline_err:
+        logger.warning(f"⚠️ broadcast: pipeline فشل ({pipeline_err}) — fallback")
+
+    # --- Fallback مباشر ---
+    try:
+        import img2pdf
+        from PIL import Image as PILImage
+
+        img_buffers = []
+        for raw in raw_images:
+            try:
+                pil_img = PILImage.open(io.BytesIO(raw))
+                pil_img.load()
+                if pil_img.format == "JPEG" and pil_img.mode == "RGB":
+                    img_buffers.append(raw)
+                else:
+                    if pil_img.mode in ("RGBA", "P", "LA"):
+                        pil_img = pil_img.convert("RGB")
+                    jpeg_buf = io.BytesIO()
+                    pil_img.save(jpeg_buf, format="JPEG", quality=95, subsampling=0)
+                    img_buffers.append(jpeg_buf.getvalue())
+            except Exception:
+                continue
+
+        if not img_buffers:
+            return None
+        return io.BytesIO(img2pdf.convert(img_buffers))
+
+    except Exception as e:
+        logger.error(f"❌ فشل التحويل المباشر: {e}", exc_info=True)
+        return None
+
+
+async def _send_medical_attachments(bot: Bot, attachments: list, caption: str = "📎 المرفقات الطبية"):
+    """
+    إرسال الملفات الطبية:
+    - الصور → تُحوَّل لـ PDF واحد وتُرسل لـ MEDICAL_REPORTS_GROUP_ID
+    - الفيديوهات والمستندات → تُرسل لـ MEDICAL_REPORTS_GROUP_ID مباشرة
+    """
+    if not attachments:
+        return
+
+    target_group = MEDICAL_REPORTS_GROUP_ID or REPORTS_GROUP_ID
+    if not target_group:
+        logger.warning("⚠️ لا يوجد معرف مجموعة للمرفقات الطبية")
+        return
+
+    photo_ids = [a["file_id"] for a in attachments if a.get("type") == "photo"]
+    other_atts = [a for a in attachments if a.get("type") != "photo"]
+
+    # ── الصور → PDF ────────────────────────────────────────
+    if photo_ids:
+        pdf_buf = await _photos_to_pdf(bot, photo_ids, caption)
+        if pdf_buf:
+            pdf_buf.name = "medical_report.pdf"
+            try:
+                await bot.send_document(chat_id=target_group, document=pdf_buf, caption=caption)
+                logger.info(f"✅ أُرسل PDF ({len(photo_ids)} صورة) للمجموعة {target_group}")
+            except Exception as e:
+                logger.warning(f"⚠️ فشل إرسال PDF: {e}")
+        else:
+            # fallback: أرسل الصور كما هي
+            logger.warning("⚠️ فشل تحويل الصور لـ PDF، يُرسل كصور")
+            for fid in photo_ids:
+                try:
+                    await bot.send_photo(chat_id=target_group, photo=fid, caption=caption)
+                except Exception as e:
+                    logger.warning(f"⚠️ فشل إرسال صورة: {e}")
+
+    # ── فيديوهات ومستندات ───────────────────────────────────
+    for att in other_atts:
+        try:
+            ftype = att.get("type")
+            fid = att.get("file_id")
+            if not fid:
+                continue
+            cap = caption if not photo_ids else None
+            if ftype == "document":
+                await bot.send_document(chat_id=target_group, document=fid, caption=cap)
+            elif ftype == "video":
+                await bot.send_video(chat_id=target_group, video=fid, caption=cap)
+            elif ftype == "audio":
+                await bot.send_audio(chat_id=target_group, audio=fid, caption=cap)
+            elif ftype == "voice":
+                await bot.send_voice(chat_id=target_group, voice=fid, caption=cap)
+        except Exception as e:
+            logger.warning(f"⚠️ فشل إرسال مرفق ({att.get('type')}): {e}")
 
 
 async def _send_message_in_chunks(bot: Bot, chat_id, text: str, parse_mode=None, reply_markup=None):
@@ -334,23 +463,32 @@ async def broadcast_new_report(bot: Bot, report_data: dict):
                 except Exception as e:
                     logger.error(f"❌ فشل حفظ معرف الرسالة في قاعدة البيانات: {e}")
 
-            # ✅ إرسال التقرير أيضاً للمستخدم الذي أنشأه (فقط إذا كان البث مفعل)
+            # ✅ إرسال المرفقات الطبية لمجموعة المرفقات (MEDICAL_REPORTS_GROUP_ID)
+            medical_attachments = report_data.get('medical_attachments', [])
+            if medical_attachments:
+                attach_caption = _build_attachment_caption(report_data)
+                await _send_medical_attachments(bot, medical_attachments, attach_caption)
+                logger.info(f"✅ تم إرسال {len(medical_attachments)} مرفق طبي لمجموعة المرفقات")
+
+            # ✅ إرسال نسخة التقرير للمستخدم في الخلفية (لا يعطّل event loop)
             user_id = report_data.get('user_id') or report_data.get('translator_id')
             if user_id:
-                try:
-                    await _send_message_in_chunks(
-                        bot=bot,
-                        chat_id=user_id,
-                        text=message,
-                        parse_mode=ParseMode.MARKDOWN
-                    )
-                    logger.info(f"✅ تم إرسال التقرير للمستخدم في البوت: {user_id}")
-                except Exception as e:
-                    logger.warning(f"⚠️ فشل إرسال التقرير للمستخدم {user_id}: {e}")
+                import asyncio
+                header = "📋 **نسخة التقرير المنشور:**\n\n"
+                async def _send_user_copy():
+                    await asyncio.sleep(1)  # تأخير بسيط بعيداً عن المسار الرئيسي
+                    try:
+                        await _send_message_in_chunks(
+                            bot=bot,
+                            chat_id=user_id,
+                            text=header + message,
+                            parse_mode=ParseMode.MARKDOWN
+                        )
+                        logger.info(f"✅ تم إرسال نسخة التقرير للمستخدم: {user_id}")
+                    except Exception as e:
+                        logger.warning(f"⚠️ فشل إرسال نسخة التقرير للمستخدم {user_id}: {e}")
+                asyncio.create_task(_send_user_copy())
 
-            # ✅ إرسال تنبيه للمستخدم عن التقرير الجديد (فقط إذا كان البث مفعل)
-            await send_user_notification(bot, report_data)
-            
             # ✅ إرسال للأدمن دائماً (حتى عندما يكون البث للمجموعة مفعل)
             if ADMIN_IDS:
                 for admin_id in ADMIN_IDS:
@@ -376,7 +514,7 @@ async def broadcast_new_report(bot: Bot, report_data: dict):
                                 logger.error(f"❌ فشل إرسال التقرير للأدمن {admin_id}: {fallback_error}")
                     except Exception as e:
                         logger.error(f"❌ فشل إرسال التقرير للأدمن {admin_id}: {e}")
-            
+
             logger.info(f"✅ broadcast_new_report: اكتمل البث للمجموعة بنجاح")
             return  # ✅ إنهاء الدالة بعد الإرسال الناجح للمجموعة
             
@@ -468,6 +606,27 @@ async def broadcast_initial_case(bot: Bot, case_data: dict):
             print(f"فشل ارسال الى الادمن {admin_id}: {e}")
 
 
+def _build_medical_report_status(data: dict) -> list:
+    """يبني سطر حالة التقرير الطبي المرفق للإدراج في نص التقرير."""
+    attachments = data.get('medical_attachments', [])
+    # دعم الاسمين القديم والجديد للحقل
+    no_reason = data.get('no_paper_report_reason', '') or data.get('no_report_reason', '')
+
+    lines = [""]
+    if attachments:
+        lines.append(f"📎 تقرير طبي: ✅ نعم — تم الإرسال ({len(attachments)} {'ملف' if len(attachments) == 1 else 'ملفات'})")
+    elif no_reason and no_reason not in ('لا يوجد', 'None', ''):
+        lines.append(f"📎 تقرير طبي: ❌ لا — {no_reason}")
+    elif data.get('has_paper_report') == 1:
+        lines.append("📎 تقرير طبي: ✅ نعم")
+    elif data.get('has_paper_report') == 0 and not no_reason:
+        lines.append("📎 تقرير طبي: ❌ لا")
+    elif data.get('_medical_report_step_done') is not None:
+        lines.append("📎 تقرير طبي: ⏭️ لم يُحدد")
+    # إذا لم يمر بالبوابة أصلاً (تقرير معدَّل/قديم) لا نضيف شيئاً
+    return lines
+
+
 def format_report_message(data: dict) -> str:
     """
     ✅ دالة واحدة فقط لبناء نص التقرير (Report Builder)
@@ -524,59 +683,67 @@ def format_report_message(data: dict) -> str:
         lines.append("")
         lines.append("━━━━━━━━━━━━━━━━━━━━")
         lines.append("")
+        lines.extend(_build_medical_report_status(data))
         if data.get('translator_name'):
             lines.append(f"👨‍⚕️ المترجم: {data['translator_name']}")
         return "\n".join(lines)
-    
+
     elif medical_action == 'استشارة مع قرار عملية':
         lines.extend(_build_surgery_consult_fields(data))
         lines.append("")
         lines.append("━━━━━━━━━━━━━━━━━━━━")
         lines.append("")
+        lines.extend(_build_medical_report_status(data))
         if data.get('translator_name'):
             lines.append(f"👨‍⚕️ المترجم: {data['translator_name']}")
         return "\n".join(lines)
-    
+
     elif medical_action == 'أشعة وفحوصات':
         lines.extend(_build_radiology_fields(data))
+        lines.extend(_build_medical_report_status(data))
         if data.get('translator_name'):
             lines.append("")
             lines.append(f"👨‍⚕️ المترجم: {data['translator_name']}")
         return "\n".join(lines)
-    
+
     elif medical_action == 'استشارة أخيرة':
         lines.extend(_build_final_consult_fields(data))
+        lines.extend(_build_medical_report_status(data))
         if data.get('translator_name'):
             lines.append("")
             lines.append(f"👨‍⚕️ المترجم: {escape_markdown(str(data['translator_name']))}")
         return "\n".join(lines)
-    
+
     elif medical_action == 'جلسة إشعاعي':
         lines.extend(_build_radiation_therapy_fields(data))
         lines.append("")
         lines.append("━━━━━━━━━━━━━━━━━━━━")
         lines.append("")
+        lines.extend(_build_medical_report_status(data))
         if data.get('translator_name'):
             lines.append(f"👨‍⚕️ المترجم: {data['translator_name']}")
         return "\n".join(lines)
-    
+
     else:
         # ✅ معالجة الحقول العامة (new_consult, followup, emergency, etc.)
         lines.extend(_build_general_fields(data))
-    
+
     # ✅ موعد العودة وسبب العودة (للمسارات العامة)
     if medical_action not in ['تأجيل موعد', 'استشارة مع قرار عملية', 'أشعة وفحوصات', 'استشارة أخيرة', 'جلسة إشعاعي']:
         lines.extend(_build_followup_fields(data))
-    
+
     # ✅ خط فاصل نهائي
     lines.append("")
     lines.append("━━━━━━━━━━━━━━━━━━━━")
     lines.append("")
-    
-    # ✅ المترجم
+
+    # ✅ حالة التقرير الطبي أولاً
+    lines.extend(_build_medical_report_status(data))
+
+    # ✅ المترجم بعد التقرير الطبي
     if data.get('translator_name'):
         lines.append(f"👨‍⚕️ المترجم: {data['translator_name']}")
-    
+
     return "\n".join(lines)
 
 

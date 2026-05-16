@@ -198,18 +198,16 @@ async def handle_emergency_status_choice(update: Update, context: ContextTypes.D
     # إذا اختار "تم الترقيد"، نطلب الملاحظات أولاً
     if data == "admitted":
         await query.edit_message_text(
-            f"✅ تم اختيار: {status_text}\n\n"
             "📝 **ملاحظات الرقود**\n\n"
             "يرجى توضيح ماذا تم وما هي خطة الرقود:",
             reply_markup=_nav_buttons(show_back=True),
             parse_mode="Markdown"
         )
         return EMERGENCY_ADMISSION_NOTES
-    
+
     # إذا اختار "تم إجراء عملية"، نطلب تفاصيل العملية
     elif data == "operation":
         await query.edit_message_text(
-            f"✅ تم اختيار: {status_text}\n\n"
             "⚕️ **تفاصيل العملية**\n\n"
             "يرجى إدخال ماهي العملية التي تمت للحالة:",
             reply_markup=_nav_buttons(show_back=True),
@@ -243,7 +241,6 @@ async def handle_emergency_admission_notes(update: Update, context: ContextTypes
 
     context.user_data["report_tmp"]["admission_notes"] = text
 
-    # خيار نوع الترقيد
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("🏥 العناية المركزة", callback_data="emerg_admission:icu")],
         [InlineKeyboardButton("🛏️ الرقود", callback_data="emerg_admission:ward")],
@@ -252,7 +249,6 @@ async def handle_emergency_admission_notes(update: Update, context: ContextTypes
     ])
 
     await update.message.reply_text(
-        "✅ تم حفظ الملاحظات\n\n"
         "أين تم الترقيد؟",
         reply_markup=keyboard,
         parse_mode="Markdown"
@@ -277,9 +273,6 @@ async def handle_emergency_operation_details(update: Update, context: ContextTyp
 
     context.user_data["report_tmp"]["operation_details"] = text
 
-    await update.message.reply_text("✅ تم الحفظ")
-
-    # عرض تقويم تاريخ العودة (اختياري)
     await _render_followup_calendar(update.message, context)
 
     return EMERGENCY_DATE_TIME
@@ -420,6 +413,7 @@ async def handle_emergency_reason(update: Update, context: ContextTypes.DEFAULT_
     context.user_data["report_tmp"]["followup_reason"] = text
 
     await update.message.reply_text("✅ تم الحفظ")
-    await show_translator_selection(update.message, context, "emergency")
-
+    gate_result = await show_translator_selection(update.message, context, "emergency")
+    if gate_result == "MEDICAL_REPORT_ASK":
+        return gate_result
     return EMERGENCY_TRANSLATOR

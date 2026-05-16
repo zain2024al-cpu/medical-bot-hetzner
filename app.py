@@ -217,10 +217,10 @@ async def main():
     app = (
         ApplicationBuilder()
         .token(BOT_TOKEN)
-        .connect_timeout(30.0)
-        .read_timeout(30.0)
-        .write_timeout(30.0)
-        .pool_timeout(30.0)
+        .connect_timeout(15.0)
+        .read_timeout(60.0)   # وقت أطول لاستقبال الملفات الكبيرة
+        .write_timeout(60.0)  # وقت أطول لرفع الملفات
+        .pool_timeout(15.0)
         .build()
     )
     app.add_error_handler(error_handler)

@@ -290,6 +290,7 @@ async def handle_surgery_consult_followup_reason(update: Update, context: Contex
     context.user_data["report_tmp"]["followup_reason"] = text
 
     await update.message.reply_text("✅ تم الحفظ")
-    await show_translator_selection(update.message, context, "surgery_consult")
-
+    gate_result = await show_translator_selection(update.message, context, "surgery_consult")
+    if gate_result == "MEDICAL_REPORT_ASK":
+        return gate_result
     return SURGERY_CONSULT_TRANSLATOR

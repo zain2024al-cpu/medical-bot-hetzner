@@ -106,6 +106,10 @@ def register_all_handlers(app):
     user_reports_history.register(app)
     user_search_basic.register(app)
     user_help.register(app)
+
+    # 📎 المرفقات الطبية
+    from bot.handlers.user.user_medical_attachments import register as register_medical_attachments
+    register_medical_attachments(app)
     # register_schedule_view(app)  # تم تعطيله - استخدم shared_schedule بدلاً منه
     
     # 🛡️ Universal Fallback - يجب أن يكون آخر شيء يتم تسجيله

@@ -261,7 +261,7 @@ def register(app):
     # فتح من زر لوحة الأدمن (ReplyKeyboard)
     app.add_handler(
         MessageHandler(
-            filters.Regex(r"^(?:👥\ufe0f?\\s*)?إدارة\\s*المستخدمين\\s*$"),
+            filters.Regex("^👥 إدارة المستخدمين$"),
             start_user_management,
         )
     )

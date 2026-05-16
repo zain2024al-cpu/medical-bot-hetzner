@@ -12,7 +12,7 @@ from telegram.ext import ContextTypes, ConversationHandler
 
 # Imports from parent modules
 from ..states import (
-    NEW_CONSULT_COMPLAINT, NEW_CONSULT_DECISION,
+    NEW_CONSULT_COMPLAINT, NEW_CONSULT_DIAGNOSIS, NEW_CONSULT_DECISION,
     NEW_CONSULT_TESTS, NEW_CONSULT_FOLLOWUP_DATE, NEW_CONSULT_FOLLOWUP_TIME,
     NEW_CONSULT_FOLLOWUP_REASON, NEW_CONSULT_TRANSLATOR, NEW_CONSULT_CONFIRM,
     # States for other flows (used in conditional logic)
@@ -104,6 +104,33 @@ async def _render_followup_calendar(message_or_query, context, year=None, month=
     else:
         # message object
         await message_or_query.reply_text(text, reply_markup=markup, parse_mode="Markdown")
+
+
+def _build_followup_hour_keyboard() -> InlineKeyboardMarkup:
+    """لوحة اختيار الساعة لموعد العودة — 24 ساعة كاملة، 4 في كل صف"""
+    hours = []
+    for h in range(24):
+        if h == 0:
+            label = "12 صباحاً"
+        elif h < 12:
+            label = f"{h} صباحاً"
+        elif h == 12:
+            label = "12 ظهراً"
+        else:
+            label = f"{h - 12} مساءً"
+        hours.append((label, f"{h:02d}"))
+
+    keyboard = []
+    for i in range(0, len(hours), 4):
+        keyboard.append([
+            InlineKeyboardButton(label, callback_data=f"followup_time_hour:{val}")
+            for label, val in hours[i:i+4]
+        ])
+    keyboard.append([
+        InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
+        InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel"),
+    ])
+    return InlineKeyboardMarkup(keyboard)
 
 
 def _build_followup_minute_keyboard(hour: str):
@@ -491,36 +518,8 @@ async def handle_new_consult_followup_calendar_day(update: Update, context: Cont
         # ✅ حالة الإدخال العادي: حفظ في _pending_followup_date
         context.user_data["report_tmp"]["_pending_followup_date"] = date_value
 
-        # بناء لوحة مفاتيح الساعات مع callback_data صحيح
-        keyboard = []
-        # أوقات شائعة أولاً (صباحاً)
-        common_morning = [
-            ("🌅 8:00 صباحاً", "08"),
-            ("🌅 9:00 صباحاً", "09"),
-            ("🌅 10:00 صباحاً", "10"),
-            ("🌅 11:00 صباحاً", "11"),
-        ]
-        keyboard.append([InlineKeyboardButton(label,
-            callback_data=f"followup_time_hour:{val}") for label, val in common_morning])
-
-        # الظهر
-        keyboard.append([InlineKeyboardButton("☀️ 12:00 ظهراً", callback_data="followup_time_hour:12")])
-
-        # بعد الظهر
-        common_afternoon = [
-            ("🌆 1:00 مساءً", "13"),
-            ("🌆 2:00 مساءً", "14"),
-            ("🌆 3:00 مساءً", "15"),
-            ("🌆 4:00 مساءً", "16"),
-        ]
-        keyboard.append([InlineKeyboardButton(label,
-            callback_data=f"followup_time_hour:{val}") for label, val in common_afternoon])
-
-        keyboard.append([InlineKeyboardButton("🕐 أوقات أخرى", callback_data="followup_time_hour:more")])
-        keyboard.append([
-            InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
-            InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
-        ])
+        # بناء لوحة مفاتيح الساعات — 24 ساعة كاملة
+        keyboard = _build_followup_hour_keyboard()
 
         # تحديد الحالة التالية بناءً على نوع الإجراء
         current_flow = context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
@@ -551,7 +550,7 @@ async def handle_new_consult_followup_calendar_day(update: Update, context: Cont
             f"{date_str}\n\n"
             f"🕐 **الوقت** (اختياري)\n\n"
             f"اختر الساعة:",
-            reply_markup=InlineKeyboardMarkup(keyboard),
+            reply_markup=keyboard,
             parse_mode="Markdown"
         )
         return next_state
@@ -584,73 +583,10 @@ async def handle_new_consult_followup_calendar_day(update: Update, context: Cont
 
 
 async def handle_new_consult_followup_time_hour(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """معالج اختيار الساعة لتاريخ العودة"""
+    """معالج اختيار الساعة لتاريخ العودة — يحفظ مباشرة بدقائق 00"""
     query = update.callback_query
     await query.answer()
     hour = query.data.split(":", 1)[1]
-
-    # إذا كان "أوقات أخرى"، نعرض جميع الساعات
-    if hour == "more":
-        keyboard = []
-        hour_labels = []
-        hour_values = []
-        for h in range(24):
-            if h == 0:
-                hour_labels.append("12:00 صباحاً")
-                hour_values.append("00")
-            elif h < 12:
-                hour_labels.append(f"{h}:00 صباحاً")
-                hour_values.append(f"{h:02d}")
-            elif h == 12:
-                hour_labels.append("12:00 ظهراً")
-                hour_values.append("12")
-            else:
-                hour_labels.append(f"{h - 12}:00 مساءً")
-                hour_values.append(f"{h:02d}")
-
-        # تقسيم الساعات إلى صفوف (4 ساعات لكل صف)
-        for chunk_labels, chunk_values in zip(
-            _chunked(hour_labels, 4), _chunked(hour_values, 4)):
-            row = [
-                InlineKeyboardButton(label, callback_data=f"followup_time_hour:{val}")
-                for label, val in zip(chunk_labels, chunk_values)
-            ]
-            keyboard.append(row)
-        
-        keyboard.append([
-            InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
-            InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel"),
-        ])
-        
-        # تحديد الحالة التالية بناءً على نوع الإجراء
-        current_flow = context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
-        if current_flow in ["followup", "periodic_followup", "inpatient_followup"]:
-            next_state = FOLLOWUP_DATE_TIME
-        elif current_flow == "emergency":
-            next_state = EMERGENCY_DATE_TIME
-        elif current_flow == "admission":
-            next_state = ADMISSION_FOLLOWUP_DATE
-        elif current_flow == "surgery_consult":
-            next_state = SURGERY_CONSULT_FOLLOWUP_DATE
-        elif current_flow == "operation":
-            next_state = OPERATION_FOLLOWUP_DATE
-        elif current_flow == "discharge":
-            next_state = DISCHARGE_FOLLOWUP_DATE
-        elif current_flow == "rehab_physical":
-            next_state = PHYSICAL_THERAPY_FOLLOWUP_DATE
-        elif current_flow == "device":
-            next_state = DEVICE_FOLLOWUP_DATE
-        elif current_flow == "appointment_reschedule":
-            next_state = APP_RESCHEDULE_RETURN_DATE
-        else:
-            next_state = NEW_CONSULT_FOLLOWUP_TIME
-
-        await query.edit_message_text(
-            "🕐 **اختيار الساعة**\n\nاختر الساعة من القائمة:",
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode="Markdown",
-        )
-        return next_state
 
     # حفظ الوقت مباشرة بدون اختيار الدقائق (الدقائق = 00)
     minute = "00"
@@ -845,6 +781,7 @@ async def handle_new_consult_followup_time_minute(update: Update, context: Conte
             reply_markup=_nav_buttons(show_back=True),
             parse_mode="Markdown"
         )
+        context.user_data['_conversation_state'] = next_state
         return next_state
 
     # تحديد الحالة الحالية بناءً على نوع الإجراء
@@ -976,8 +913,9 @@ async def handle_new_consult_followup_reason(update: Update, context: ContextTyp
     context.user_data["report_tmp"]["followup_reason"] = text
 
     await update.message.reply_text("✅ تم الحفظ")
-    await show_translator_selection(update.message, context, "new_consult")
-
+    gate_result = await show_translator_selection(update.message, context, "new_consult")
+    if gate_result == "MEDICAL_REPORT_ASK":
+        return gate_result
     return NEW_CONSULT_TRANSLATOR
 
 

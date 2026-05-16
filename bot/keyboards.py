@@ -31,7 +31,9 @@ def user_main_kb():
         # الصف الثاني: الجدول وابدأ
         ["📅 جدول اليوم", "🚀 ابدأ"],
         # الصف الثالث: التعديل والحذف
-        ["✏️ تعديل التقارير", "🗑️ حذف التقارير"]
+        ["✏️ تعديل التقارير", "🗑️ حذف التقارير"],
+        # الصف الرابع: المرفقات الطبية
+        ["📎 المرفقات الطبية"],
     ]
     return ReplyKeyboardMarkup(
         keyboard, 
@@ -138,6 +140,7 @@ def reports_submenu():
     keyboard = [
         [InlineKeyboardButton("➕ إضافة تقرير جديد", callback_data="user_action:add_report")],
         [InlineKeyboardButton("✏️ تعديل تقارير اليوم", callback_data="user_action:edit")],
+        [InlineKeyboardButton("📎 المرفقات الطبية", callback_data="user_action:medical_attachments")],
         [InlineKeyboardButton("📜 سجل تقاريري", callback_data="user_action:history")],
         [InlineKeyboardButton("🔙 رجوع للقائمة الرئيسية", callback_data="user_action:back_main")]
     ]
@@ -165,6 +168,23 @@ def settings_submenu():
         [InlineKeyboardButton("ℹ️ مساعدة", callback_data="user_action:help")],
         [InlineKeyboardButton("🔄 تحديث الصفحة", callback_data="user_action:refresh")],
         [InlineKeyboardButton("🔙 رجوع للقائمة الرئيسية", callback_data="user_action:back_main")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+# ✅ لوحة الأدمن الرئيسية (Inline) — مستخدمة في admin_start.py
+def admin_main_inline_kb():
+    keyboard = [
+        [InlineKeyboardButton("🔄 تحديث", callback_data="admin:refresh")],
+        [InlineKeyboardButton("🏥 إدارة مجموعة التقارير", callback_data="admin:manage_group")],
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def admin_main_inline_kb_with_group():
+    keyboard = [
+        [InlineKeyboardButton("🔄 تحديث", callback_data="admin:refresh")],
+        [InlineKeyboardButton("🏥 إدارة مجموعة التقارير", callback_data="admin:manage_group")],
     ]
     return InlineKeyboardMarkup(keyboard)
 

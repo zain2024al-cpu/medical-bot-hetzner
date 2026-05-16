@@ -41,6 +41,8 @@ KNOWN_CALLBACKS = [
     r"^noop$",            # زر لا يفعل شيء
     r"^abort$",           # إلغاء
     r"^skip",             # تخطي
+    r"^medrep:",          # بوابة التقرير الطبي
+    r"^medrep_done:",     # تأكيد رفع التقرير الطبي
     
     # التدفقات (flows) - نظام التقارير
     r"^new_consult",
@@ -152,6 +154,9 @@ KNOWN_CALLBACKS = [
     # ===========================
     # واجهة المستخدم الأخرى
     # ===========================
+    r"^ma:",            # المرفقات الطبية
+    r"^ma_cal:",        # تقويم المرفقات الطبية
+    r"^user_action:",   # أزرار actions المستخدم
     r"^start_report$",
     r"^user_action:add_report$",
     r"^admin:paste_full_report$",
@@ -171,6 +176,7 @@ KNOWN_CALLBACKS = [
     r"^cancel",
     r"^save:",
     r"^publish:",
+    r"^step:",          # أزرار خطوات قديمة (غير مستخدمة حالياً)
     r"^edit:",
     r"^um:",
     r"^back_",
@@ -304,7 +310,8 @@ async def handle_any_message(update: Update, context: ContextTypes.DEFAULT_TYPE)
             "✏️ تعديل التقارير",
             "🗑️ حذف التقارير",
             "📝 إضافة تقرير جديد",
-            "❌ إلغاء العملية الحالية"
+            "❌ إلغاء العملية الحالية",
+            "📎 المرفقات الطبية",
         ]
         
         if message_text in CONVERSATION_BUTTONS:

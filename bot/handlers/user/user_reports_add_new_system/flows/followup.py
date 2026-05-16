@@ -289,6 +289,7 @@ async def handle_followup_room_floor(update: Update, context: ContextTypes.DEFAU
 
 async def handle_followup_reason(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """الحقل 5: سبب العودة"""
+    context.user_data['_conversation_state'] = FOLLOWUP_REASON
     text = update.message.text.strip()
     valid, msg = validate_text_input(text, min_length=3)
 
@@ -307,6 +308,7 @@ async def handle_followup_reason(update: Update, context: ContextTypes.DEFAULT_T
 
     # ✅ استخدام current_flow الصحيح (periodic_followup أو followup)
     current_flow = context.user_data.get("report_tmp", {}).get("current_flow", "followup")
-    await show_translator_selection(update.message, context, current_flow)
-
+    gate_result = await show_translator_selection(update.message, context, current_flow)
+    if gate_result == "MEDICAL_REPORT_ASK":
+        return gate_result
     return FOLLOWUP_TRANSLATOR

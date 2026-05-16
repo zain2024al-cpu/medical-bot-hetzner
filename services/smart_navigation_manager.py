@@ -60,7 +60,7 @@ class SmartNavigationManager:
     }
 
     @staticmethod
-    def get_previous_step(flow_type: str, current_step: str) -> Optional[str]:
+    def get_previous_step(flow_type: str, current_step: str, context=None) -> Optional[str]:
         """
         الحصول على الخطوة السابقة في التدفق
         """
@@ -104,11 +104,11 @@ class SmartNavigationManager:
         return {}
 
     @staticmethod
+    def set_search_context(search_type, query=None):
+        pass
+
+    @staticmethod
     def clear_search_context():
-        """
-        مسح سياق البحث
-        """
-        # هذه دالة مؤقتة - سيتم تطويرها لاحقاً
         pass
 
     @staticmethod
@@ -200,3 +200,6 @@ class SmartNavigationManager:
             print(f"  {status} {flow_type} - {step}: {actual_progress} (متوقع: {expected_progress})")
 
         return True
+
+
+smart_nav_manager = SmartNavigationManager()

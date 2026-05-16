@@ -3,7 +3,7 @@
 # 🎨 معالجة القائمة الـ Inline للمستخدم
 # ================================================
 
-from telegram import Update, ReplyKeyboardRemove
+from telegram import Update, ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes, CallbackQueryHandler
 from bot.keyboards import (
     user_main_inline_kb,
@@ -18,6 +18,11 @@ from db.session import SessionLocal
 from db.models import Report
 from datetime import datetime, timedelta
 from sqlalchemy import func
+
+try:
+    from bot.handlers.user.user_reports_add_new_system.date_time_handlers import start_report as _start_report
+except ImportError:
+    _start_report = None
 
 
 async def handle_user_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -79,27 +84,15 @@ async def handle_user_menu_callback(update: Update, context: ContextTypes.DEFAUL
     # معالجة الإجراءات الرئيسية
     # ================================================
     
-    if action == "add_report":
-        # إضافة تقرير جديد - تفعيل النظام الموجود
+    if action in ("add_report", "quick_add"):
+        if _start_report:
+            return await _start_report(update, context)
+        # fallback إذا فشل الاستيراد
         await query.edit_message_text(
             "📝 **إضافة تقرير جديد**\n\n"
             "يرجى الضغط على الزر أدناه في لوحة الأزرار:\n"
-            "👉 **\"📝 إضافة تقرير جديد\"**\n\n"
-            "أو استخدم الأمر: /add"
-        )
-        # إعادة عرض القائمة
-        await query.message.reply_text(
-            "اختر العملية:",
-            reply_markup=user_main_inline_kb()
-        )
-    
-    elif action == "quick_add":
-        # إضافة سريعة - نفس الإضافة العادية
-        await query.edit_message_text(
-            "⚡ **إضافة سريعة**\n\n"
-            "يرجى الضغط على:\n"
-            "👉 **\"📝 إضافة تقرير جديد\"** من لوحة الأزرار\n\n"
-            "أو استخدم: /add"
+            "👉 **\"📝 إضافة تقرير جديد\"**",
+            parse_mode="Markdown"
         )
     
     elif action == "schedule":
@@ -117,6 +110,10 @@ async def handle_user_menu_callback(update: Update, context: ContextTypes.DEFAUL
             "يرجى الضغط على:\n"
             "👉 **\"✏️ تعديل التقارير\"** من لوحة الأزرار"
         )
+
+    elif action == "medical_attachments":
+        from bot.handlers.user.user_medical_attachments import start_medical_attachments
+        await start_medical_attachments(update, context)
     
     elif action == "history":
         # سجل التقارير
@@ -332,7 +329,6 @@ async def show_user_statistics(query, user_id):
     """
     
     # أزرار إضافية
-    from telegram import InlineKeyboardMarkup, InlineKeyboardButton
     keyboard = [
         [InlineKeyboardButton("📅 تقاريري اليوم", callback_data="user_action:my_today")],
         [InlineKeyboardButton("📈 تقارير الأسبوع", callback_data="user_action:my_week")],
@@ -403,12 +399,11 @@ async def show_today_reports(query, user_id):
             text += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
             text += f"✅ **المجموع:** {len(reports)} تقرير اليوم"
     
-    from telegram import InlineKeyboardMarkup, InlineKeyboardButton
     keyboard = [
         [InlineKeyboardButton("📊 إحصائيات كاملة", callback_data="user_action:my_stats")],
         [InlineKeyboardButton("🔙 رجوع", callback_data="user_action:back_main")]
     ]
-    
+
     await query.edit_message_text(
         text,
         reply_markup=InlineKeyboardMarkup(keyboard),
@@ -466,13 +461,12 @@ async def show_week_reports(query, user_id):
             text += "   ⚠️ لا توجد تقارير هذا الأسبوع\n"
         
         text += "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    
-    from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+
     keyboard = [
         [InlineKeyboardButton("📊 إحصائيات كاملة", callback_data="user_action:my_stats")],
         [InlineKeyboardButton("🔙 رجوع", callback_data="user_action:back_main")]
     ]
-    
+
     await query.edit_message_text(
         text,
         reply_markup=InlineKeyboardMarkup(keyboard),
@@ -513,13 +507,12 @@ async def show_month_reports(query, user_id):
 
 💡 **استمر في الأداء الرائع!**
         """
-    
-    from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+
     keyboard = [
         [InlineKeyboardButton("📊 إحصائيات كاملة", callback_data="user_action:my_stats")],
         [InlineKeyboardButton("🔙 رجوع", callback_data="user_action:back_main")]
     ]
-    
+
     await query.edit_message_text(
         text,
         reply_markup=InlineKeyboardMarkup(keyboard),

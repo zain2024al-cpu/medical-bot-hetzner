@@ -13,6 +13,8 @@ from .states import STATE_SELECT_PATIENT, STATE_SELECT_HOSPITAL, R_PATIENT
 from .navigation import nav_push
 from .managers import PatientDataManager
 from .utils import MONTH_NAMES_AR
+from .selector_context import SelectorContext
+from .ui_primitives import screen_header, smart_rows, pagination_buttons
 
 
 logger = logging.getLogger(__name__)
@@ -155,54 +157,55 @@ async def patient_inline_query_handler(update: Update, context: ContextTypes.DEF
         traceback.print_exc()
 
 
-async def render_patient_selection(message, context):
-    """عرض شاشة اختيار المريض - rendering فقط"""
-    # ✅ ضبط نوع البحث على 'patient' لضمان عمل البحث بشكل صحيح
+async def render_patient_selection(message, context, query=None):
+    """عرض شاشة اختيار المريض (menu view).
+    - query: إذا مُمرَّر يُعدَّل الرسالة (للرجوع). وإلا ترسل رسالة جديدة.
+    """
     context.user_data['_current_search_type'] = 'patient'
-    
-    keyboard = []
+    # حفظ السياق: menu view (list_open=False)
+    SelectorContext.save_patient(context, list_open=False, list_page=0)
 
-    # ✅ صف الأزرار الرئيسية: عرض القائمة + البحث
-    keyboard.append([
-        InlineKeyboardButton(
-            "📋 عرض جميع الأسماء",
-            callback_data="patient:show_list:0"
-        ),
-        InlineKeyboardButton(
-                "🔍 بحث عن مريض",
-                switch_inline_query_current_chat=""
-        )
-    ])
+    keyboard = [
+        [
+            InlineKeyboardButton("📋 عرض جميع الأسماء", callback_data="patient:show_list:0"),
+            InlineKeyboardButton("🔍 بحث عن مريض", switch_inline_query_current_chat=""),
+        ],
+        [
+            InlineKeyboardButton("🔙 رجوع", callback_data="go_to_date_selection"),
+            InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel"),
+        ],
+    ]
 
-    # أزرار التنقل - استخدام زر الرجوع العادي
-    keyboard.append([
-        InlineKeyboardButton("🔙 رجوع", callback_data="go_to_date_selection"),
-        InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
-    ])
+    text = screen_header(icon="👤", title="اختيار المريض", step=2, total_steps=6)
+    text += "\n\n• 📋 **عرض جميع الأسماء** — قائمة كاملة مرتبة أبجدياً\n• 🔍 **بحث** — اكتب الاسم مباشرة"
+    markup = InlineKeyboardMarkup(keyboard)
 
-    text = "👤 **اسم المريض** (الخطوة 2 من 5)\n\n"
-    text += "**اختر طريقة البحث:**\n"
-    text += "• 📋 **عرض جميع الأسماء** - لعرض قائمة كاملة\n"
-    text += "• 🔍 **بحث عن مريض** - للبحث السريع بالاسم\n\n"
-    text += "💡 **نصيحة:** استخدم زر البحث للعثور على مريض بسرعة!"
-
-    await message.reply_text(
-        text,
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode="Markdown"
-    )
+    if query:
+        try:
+            await query.edit_message_text(text, reply_markup=markup, parse_mode="Markdown")
+            return
+        except Exception:
+            pass
+    await message.reply_text(text, reply_markup=markup, parse_mode="Markdown")
 
 
-async def show_patient_selection(message, context, search_query=""):
-    """Navigation wrapper - يحدث state ثم يستدعي rendering"""
-    # ✅ تحديث last_valid_state
+async def show_patient_selection(message, context, search_query="", query=None,
+                                 restore=False, update=None):
+    """Navigation wrapper - يحدث state ثم يستدعي rendering.
+    restore=True: يستعيد السياق المحفوظ (للرجوع) — يفتح القائمة إذا كانت مفتوحة.
+    """
     context.user_data['last_valid_state'] = 'patient_selection'
     context.user_data['_conversation_state'] = STATE_SELECT_PATIENT
-    # ✅ ضبط نوع البحث على 'patient' لضمان عمل البحث بشكل صحيح (قبل render_patient_selection)
     context.user_data['_current_search_type'] = 'patient'
-    
-    # استدعاء rendering function
-    await render_patient_selection(message, context)
+
+    if restore:
+        ctx = SelectorContext.load_patient(context)
+        if ctx.list_open and update:
+            # المستخدم كان في وضع القائمة — استعادة نفس الصفحة
+            await show_patient_list(update, context, page=ctx.list_page)
+            return
+        # كان في وضع الـmenu العادي
+    await render_patient_selection(message, context, query=query)
 
 
 # Forward declarations to avoid circular imports
@@ -266,65 +269,48 @@ async def show_patient_list(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         # ✅ ترتيب الأسماء أبجدياً من الألف إلى الياء
         unique_names.sort()
         
-        # ✅ تحديث قائمة الأسماء في context.user_data (للاستخدام لاحقاً في نفس الجلسة)
         all_patient_names = unique_names
         context.user_data.setdefault("report_tmp", {})["_patient_names_list"] = all_patient_names
-        
+
         total = len(all_patient_names)
         total_pages = max(1, (total + items_per_page - 1) // items_per_page)
         page = max(0, min(page, total_pages - 1))
+        # حفظ السياق: القائمة مفتوحة في هذه الصفحة
+        SelectorContext.save_patient(context, list_open=True, list_page=page)
         
         start_idx = page * items_per_page
         end_idx = min(start_idx + items_per_page, total)
         patients_page = all_patient_names[start_idx:end_idx]
         
-        keyboard = []
-        
-        # ✅ إضافة أزرار المرضى - عرض اسمين في كل صف
-        for i in range(0, len(patients_page), 2):
-            row = []
-            for j in range(2):  # اسمين في كل صف
-                if i + j >= len(patients_page):
-                    break  # إذا انتهت القائمة
-                
-                patient_name = patients_page[i + j]
-                
-                # ✅ عرض الاسم كاملاً (بدون تقصير إذا أمكن)
-                button_text = f"👤 {patient_name}"
-                # تقصير النص فقط إذا كان طويلاً جداً (حد Telegram هو 64 حرف، لكن نحن نضع اسمين في صف واحد، لذا نستخدم 32 حرف)
-                if len(button_text) > 32:
-                    # محاولة عرض أكبر قدر ممكن من الاسم
-                    max_name_length = 28  # 32 - 4 (👤 + مسافة)
-                    button_text = f"👤 {patient_name[:max_name_length]}..."
-                
-                # حساب الفهرس الصحيح في القائمة الكاملة
-                global_index = start_idx + i + j
-                
-                row.append(InlineKeyboardButton(
-                    button_text,
-                    callback_data=f"patient_idx:{global_index}"
-                ))
-            keyboard.append(row)
-        
-        # أزرار التنقل بين الصفحات
+        # أزرار المرضى بالتخطيط الذكي
+        keyboard = smart_rows(
+            [{"name": name, "_idx": start_idx + i} for i, name in enumerate(patients_page)],
+            lambda item: InlineKeyboardButton(
+                f"👤 {item['name']}",
+                callback_data=f"patient_idx:{item['_idx']}"
+            )
+        )
+
+        # أزرار التنقل
+        nav_row = pagination_buttons(page, total_pages, prefix="")
+        # patient handler يستخدم prefix مختلف — نبنيه يدوياً
         nav_buttons = []
         if page > 0:
             nav_buttons.append(InlineKeyboardButton("⬅️ السابق", callback_data=f"patient:show_list:{page-1}"))
+        nav_buttons.append(InlineKeyboardButton(f"📄 {page+1}/{total_pages}", callback_data="noop"))
         if page < total_pages - 1:
             nav_buttons.append(InlineKeyboardButton("التالي ➡️", callback_data=f"patient:show_list:{page+1}"))
-        
-        if nav_buttons:
+        if len(nav_buttons) > 1:
             keyboard.append(nav_buttons)
-        
-        # زر الرجوع
-        keyboard.append([
-            InlineKeyboardButton("🔙 رجوع", callback_data="patient:back_to_menu")
-        ])
-        
-        text = f"👤 **قائمة المرضى**\n\n"
-        text += f"📊 **العدد الإجمالي:** {total} مريض\n"
-        text += f"📄 **الصفحة:** {page + 1} من {total_pages}\n\n"
-        text += "اختر المريض من القائمة (مرتبة أبجدياً):"
+
+        keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="patient:back_to_menu")])
+
+        text = screen_header(
+            icon="👤", title="قائمة المرضى",
+            step=2, total_steps=6,
+            count=total, count_label="مريض",
+            page=page, total_pages=total_pages,
+        )
         
         if query:
             try:
@@ -589,3 +575,35 @@ async def handle_patient(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await show_patient_selection(update.message, context)
         return STATE_SELECT_PATIENT
 
+
+
+# Aliases for fallback registration compatibility
+handle_patient_btn_selection = handle_patient_selection
+
+
+async def handle_patient_page(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة التنقل بين صفحات المرضى (user_patient_page:N)."""
+    query = update.callback_query
+    await query.answer()
+    try:
+        page = int(query.data.split(":", 1)[1])
+    except (ValueError, IndexError):
+        page = 0
+    return await show_patient_list(update, context, page)
+
+
+async def handle_chosen_inline_result(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة اختيار مريض أو طبيب من inline query."""
+    result_id = update.chosen_inline_result.result_id
+    if result_id.startswith("patient_"):
+        try:
+            patient_id = int(result_id.split("_")[1])
+            report_tmp = context.user_data.setdefault("report_tmp", {})
+            with SessionLocal() as s:
+                patient = s.query(Patient).filter_by(id=patient_id).first()
+                if patient:
+                    report_tmp["patient_name"] = patient.full_name
+                    report_tmp["patient_id"] = patient_id
+        except Exception as e:
+            logger.error(f"handle_chosen_inline_result patient error: {e}", exc_info=True)
+    # doctor_* inline results are handled by the doctor flow

@@ -109,6 +109,23 @@ class DatabaseMaintenance:
                     # Fallback to full check if quick_check not supported
                     check = conn.execute(text("PRAGMA integrity_check")).scalar()
                 
+                # ── migrate: add new columns if missing ──
+                try:
+                    existing_cols = {
+                        row[1]
+                        for row in conn.execute(text("PRAGMA table_info(reports)")).fetchall()
+                    }
+                    if "has_paper_report" not in existing_cols:
+                        conn.execute(text("ALTER TABLE reports ADD COLUMN has_paper_report INTEGER"))
+                        conn.commit()
+                        logger.info("✅ Migration: added has_paper_report column to reports")
+                    if "no_paper_report_reason" not in existing_cols:
+                        conn.execute(text("ALTER TABLE reports ADD COLUMN no_paper_report_reason TEXT"))
+                        conn.commit()
+                        logger.info("✅ Migration: added no_paper_report_reason column to reports")
+                except Exception as mig_err:
+                    logger.warning(f"⚠️ Migration check failed (non-fatal): {mig_err}")
+
                 if check == "ok":
                     logger.info("✅ Database is healthy.")
                     return True

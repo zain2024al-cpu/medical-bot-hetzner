@@ -7,6 +7,8 @@ pytz
 alembic
 apscheduler
 reportlab
+Pillow
+opencv-python-headless
 arabic-reshaper
 python-bidi
 openpyxl

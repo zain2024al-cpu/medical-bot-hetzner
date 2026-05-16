@@ -11,6 +11,11 @@ from db.session import SessionLocal
 from db.models import ScheduleImage, DailyReportTracking, Translator
 from bot.shared_auth import is_admin
 
+try:
+    from bot.handlers.user.user_reports_add_new_system.date_time_handlers import start_report as _start_report
+except ImportError:
+    _start_report = None
+
 async def view_daily_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """عرض الجدول اليومي للمستخدم"""
     user = update.effective_user
@@ -75,8 +80,12 @@ async def handle_schedule_callback(update: Update, context: ContextTypes.DEFAULT
     await query.answer()
     
     if query.data == "add_report":
-        # توجيه لإضافة تقرير جديد
-        await query.edit_message_text("📝 **إضافة تقرير جديد**\n\nاضغط على زر '📝 إضافة تقرير جديد' في القائمة الرئيسية.")
+        if _start_report:
+            return await _start_report(update, context)
+        await query.edit_message_text(
+            "📝 **إضافة تقرير جديد**\n\nاضغط على زر '📝 إضافة تقرير جديد' في القائمة الرئيسية.",
+            parse_mode=ParseMode.MARKDOWN
+        )
     
     elif query.data == "view_my_reports":
         # توجيه لعرض التقارير

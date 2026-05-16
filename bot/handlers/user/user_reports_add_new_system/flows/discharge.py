@@ -217,6 +217,7 @@ async def handle_discharge_followup_reason(update: Update, context: ContextTypes
     context.user_data["report_tmp"]["followup_reason"] = text
 
     await update.message.reply_text("✅ تم الحفظ")
-    await show_translator_selection(update.message, context, "discharge")
-
+    gate_result = await show_translator_selection(update.message, context, "discharge")
+    if gate_result == "MEDICAL_REPORT_ASK":
+        return gate_result
     return DISCHARGE_TRANSLATOR

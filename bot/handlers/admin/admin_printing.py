@@ -647,13 +647,17 @@ def _build_report_package(start_dt, end_dt, period_name, options):
                 else:
                     query_reports = query_reports.filter(Report.patient_id == patient_id)
         
-        # فلترة حسب التاريخ
+        # فلترة حسب التاريخ — وإقصاء التقارير غير النشطة
         if start_dt and end_dt:
             query_reports = query_reports.filter(
                 Report.report_date >= start_dt,
                 Report.report_date <= end_dt
             )
-        
+
+        query_reports = query_reports.filter(
+            (Report.status == 'active') | (Report.status == None)
+        )
+
         reports = query_reports.all()
         if not reports:
             return {"empty": True, "period_name": period_name}

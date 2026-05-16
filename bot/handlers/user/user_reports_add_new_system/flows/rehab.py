@@ -156,7 +156,9 @@ async def handle_physical_therapy_followup_date_choice(update: Update, context: 
         context.user_data["report_tmp"]["followup_reason"] = "لا يوجد"
 
         await query.edit_message_text("✅ لا يوجد تاريخ عودة")
-        await show_translator_selection(query.message, context, "rehab_physical")
+        gate_result = await show_translator_selection(query.message, context, "rehab_physical")
+        if gate_result == "MEDICAL_REPORT_ASK":
+            return gate_result
         return PHYSICAL_THERAPY_TRANSLATOR
 
     elif query.data == "physical_date:yes":
@@ -210,8 +212,9 @@ async def handle_physical_therapy_followup_reason(update: Update, context: Conte
     context.user_data["report_tmp"]["followup_reason"] = text
 
     await update.message.reply_text("✅ تم الحفظ")
-    await show_translator_selection(update.message, context, "rehab_physical")
-
+    gate_result = await show_translator_selection(update.message, context, "rehab_physical")
+    if gate_result == "MEDICAL_REPORT_ASK":
+        return gate_result
     return PHYSICAL_THERAPY_TRANSLATOR
 
 
@@ -284,6 +287,7 @@ async def handle_device_followup_reason(update: Update, context: ContextTypes.DE
     context.user_data["report_tmp"]["followup_reason"] = text
 
     await update.message.reply_text("✅ تم الحفظ")
-    await show_translator_selection(update.message, context, "rehab_device")
-
+    gate_result = await show_translator_selection(update.message, context, "rehab_device")
+    if gate_result == "MEDICAL_REPORT_ASK":
+        return gate_result
     return DEVICE_TRANSLATOR

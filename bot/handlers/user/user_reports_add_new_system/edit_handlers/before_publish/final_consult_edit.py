@@ -78,8 +78,7 @@ async def handle_final_consult_edit_field_selection(update: Update, context: Con
             f"**القيمة الحالية:**\n{current_value_display}\n\n"
             f"📝 أرسل القيمة الجديدة:",
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔙 رجوع", callback_data=f"save:{flow_type}")],
-                [InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]
+                [InlineKeyboardButton("🔙 رجوع", callback_data=f"back_to_edit_fields:{flow_type}")],
             ]),
             parse_mode="Markdown"
         )

@@ -3,5 +3,6 @@
 # =============================
 
 from .conversation_handler import register
+from .date_time_handlers import start_report
 
-__all__ = ['register']
+__all__ = ['register', 'start_report']

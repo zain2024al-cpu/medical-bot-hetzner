@@ -11,6 +11,17 @@ from telegram.ext import (
 from telegram.constants import ParseMode
 from datetime import datetime, date, timedelta
 from db.session import SessionLocal
+
+
+def _ist_now() -> datetime:
+    """الوقت الحالي بتوقيت IST (UTC+5:30) — نفس منهج models.py"""
+    try:
+        from zoneinfo import ZoneInfo
+        return datetime.now(ZoneInfo("Asia/Kolkata")).replace(tzinfo=None)
+    except Exception:
+        from datetime import timezone
+        ist = timezone(timedelta(hours=5, minutes=30))
+        return datetime.now(timezone.utc).astimezone(ist).replace(tzinfo=None)
 from db.models import Report, Translator, Patient, Hospital, Department, Doctor
 from bot.shared_auth import is_admin
 from services.inline_calendar import create_calendar_keyboard, create_quick_date_buttons, MONTHS_AR
@@ -122,13 +133,17 @@ def _has_field_value_in_report(report, current_report_data, field_name):
     """
     التحقق من وجود قيمة فعلية للحقل في التقرير المنشور
     يعيد True فقط إذا كان للحقل قيمة حقيقية (ليست فارغة، None، أو "لا يوجد")
-    
+
     منطق العمل:
     1. الحقول الأساسية (report_date, patient_name, hospital_name, department_name, doctor_name) تكون دائماً موجودة
     2. الحقول الأخرى يتم التحقق منها في current_report_data أولاً
     3. إذا لم توجد في current_report_data، يتم التحقق من report مباشرة
     4. يتم التحقق من الحقول المشتقة (مثل complaint_text مقابل complaint)
     """
+    # ✅ no_paper_report_reason يظهر دائماً — المستخدم قد يريد تغيير وضع التقرير الطبي
+    if field_name == 'no_paper_report_reason':
+        return True
+
     # ✅ الحقول الأساسية تكون دائماً موجودة (لا نعرضها في قائمة التعديل لأنها غير قابلة للتعديل)
     # لكن إذا كانت في القائمة، نتحقق من وجودها
     
@@ -162,6 +177,7 @@ def _has_field_value_in_report(report, current_report_data, field_name):
         "app_reschedule_return_date": ["app_reschedule_return_date", "followup_date"],
         "app_reschedule_return_reason": ["app_reschedule_return_reason", "followup_reason"],
         "translator_name": ["translator_name"],
+        "no_paper_report_reason": ["no_paper_report_reason"],
         # ✅ حقول المسارات الخاصة
         "operation_details": ["operation_details", "notes", "doctor_decision"],
         "operation_name_en": ["operation_name_en", "notes"],
@@ -238,6 +254,7 @@ def get_editable_fields_by_action_type(medical_action):
             ('notes', '🧪 الفحوصات'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
+            ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
             ('translator_name', '👤 المترجم'),
         ]
 
@@ -255,23 +272,19 @@ def get_editable_fields_by_action_type(medical_action):
             ('tests', '🧪 الفحوصات والأشعة'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
+            ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
             ('translator_name', '👤 المترجم'),
         ]
 
-    # ===========================================
-    # 3. استشارة أخيرة - التركيز على النتائج النهائية
-    # ===========================================
     elif action_clean == 'استشارة أخيرة':
         return [
             ('diagnosis', '🔬 التشخيص'),
             ('doctor_decision', '📝 قرار الطبيب'),
             ('treatment_plan', '📋 التوصيات'),
+            ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
             ('translator_name', '👤 المترجم'),
         ]
 
-    # ===========================================
-    # 4. طوارئ - التركيز على الحالة العاجلة
-    # ===========================================
     elif action_clean == 'طوارئ':
         return [
             ('complaint_text', '💬 شكوى المريض'),
@@ -280,12 +293,10 @@ def get_editable_fields_by_action_type(medical_action):
             ('case_status', '🚨 وضع الحالة'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
+            ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
             ('translator_name', '👤 المترجم'),
         ]
 
-    # ===========================================
-    # 5. متابعة في الرقود - التركيز على المتابعة اليومية
-    # ===========================================
     elif 'متابعة في الرقود' in action_clean:
         return [
             ('complaint_text', '🛏️ حالة المريض اليومية'),
@@ -293,12 +304,10 @@ def get_editable_fields_by_action_type(medical_action):
             ('room_number', '🏥 رقم الغرفة والطابق'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
+            ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
             ('translator_name', '👤 المترجم'),
         ]
 
-    # ===========================================
-    # 6. مراجعة / عودة دورية - بدون رقم الغرفة
-    # ===========================================
     elif action_clean == 'مراجعة / عودة دورية':
         return [
             ('complaint_text', '💬 شكوى المريض'),
@@ -306,13 +315,10 @@ def get_editable_fields_by_action_type(medical_action):
             ('doctor_decision', '📝 قرار الطبيب'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
+            ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
             ('translator_name', '👤 المترجم'),
         ]
 
-    # ===========================================
-    # 7. عملية - التركيز على تفاصيل العملية
-    # ✅ لا يوجد قرار طبيب في هذا المسار
-    # ===========================================
     elif action_clean == 'عملية':
         return [
             ('operation_details', '⚕️ تفاصيل العملية'),
@@ -320,25 +326,19 @@ def get_editable_fields_by_action_type(medical_action):
             ('notes', '📝 ملاحظات'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
+            ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
             ('translator_name', '👤 المترجم'),
         ]
 
-    # ===========================================
-    # 8. علاج طبيعي وإعادة تأهيل - التركيز على العلاج
-    # ✅ لا يوجد قرار طبيب في هذا المسار
-    # ===========================================
     elif action_clean == 'علاج طبيعي وإعادة تأهيل':
         return [
             ('therapy_details', '🏃 تفاصيل جلسة العلاج الطبيعي'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
+            ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
             ('translator_name', '👤 المترجم'),
         ]
 
-    # ===========================================
-    # 9. ترقيد - التركيز على أسباب الرقود
-    # ✅ لا يوجد قرار طبيب في هذا المسار
-    # ===========================================
     elif action_clean == 'ترقيد':
         return [
             ('admission_reason', '🛏️ سبب الرقود'),
@@ -346,13 +346,10 @@ def get_editable_fields_by_action_type(medical_action):
             ('notes', '📝 ملاحظات'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
+            ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
             ('translator_name', '👤 المترجم'),
         ]
 
-    # ===========================================
-    # 10. خروج من المستشفى - التركيز على الخروج
-    # ✅ لا يوجد قرار طبيب في هذا المسار
-    # ===========================================
     elif action_clean == 'خروج من المستشفى' or action_clean == 'خروج':
         return [
             ('admission_summary', '📋 ملخص الرقود'),
@@ -360,12 +357,11 @@ def get_editable_fields_by_action_type(medical_action):
             ('operation_name_en', '🔤 اسم العملية بالإنجليزي'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
+            ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
             ('translator_name', '👤 المترجم'),
         ]
 
-    # ===========================================
-    # 11. تأجيل موعد - التركيز على سبب التأجيل
-    # ===========================================
+    # تأجيل موعد — لا يمر بالبوابة فلا يوجد no_paper_report_reason
     elif action_clean == 'تأجيل موعد':
         return [
             ('app_reschedule_reason', '📅 سبب تأجيل الموعد'),
@@ -374,43 +370,32 @@ def get_editable_fields_by_action_type(medical_action):
             ('translator_name', '👤 المترجم'),
         ]
 
-    # ===========================================
-    # 12. أشعة وفحوصات - التركيز على الفحوصات
-    # ===========================================
     elif action_clean == 'أشعة وفحوصات':
         return [
             ('radiology_type', '🔬 نوع الأشعة والفحوصات'),
             ('radiology_delivery_date', '📅 تاريخ التسليم'),
+            ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
             ('translator_name', '👤 المترجم'),
         ]
 
-    # ===========================================
-    # 13. علاج طبيعي - التركيز على الجلسة
-    # ✅ لا يوجد قرار طبيب في هذا المسار
-    # ===========================================
     elif action_clean == 'علاج طبيعي':
         return [
             ('therapy_details', '🏃 تفاصيل الجلسة'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
+            ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
             ('translator_name', '👤 المترجم'),
         ]
 
-    # ===========================================
-    # 14. أجهزة تعويضية - التركيز على الجهاز
-    # ✅ لا يوجد قرار طبيب في هذا المسار
-    # ===========================================
     elif action_clean == 'أجهزة تعويضية':
         return [
             ('device_details', '🦾 تفاصيل الجهاز'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
+            ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
             ('translator_name', '👤 المترجم'),
         ]
 
-    # ===========================================
-    # 15. جلسة إشعاعي - التركيز على العلاج الإشعاعي
-    # ===========================================
     elif action_clean == 'جلسة إشعاعي':
         return [
             ('radiation_therapy_type', '☢️ نوع الإشعاعي'),
@@ -419,12 +404,10 @@ def get_editable_fields_by_action_type(medical_action):
             ('radiation_therapy_recommendations', '📝 ملاحظات / توصيات'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
+            ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
             ('translator_name', '👤 المترجم'),
         ]
 
-    # ===========================================
-    # الحقول الافتراضية - للحالات غير المعروفة
-    # ===========================================
     else:
         logger.warning(f"⚠️ نوع إجراء غير معروف: '{action_clean}' - استخدام الحقول الافتراضية")
         print(f"⚠️ نوع إجراء غير معروف: '{action_clean}' - استخدام الحقول الافتراضية")
@@ -455,13 +438,12 @@ async def start_edit_reports(update: Update, context: ContextTypes.DEFAULT_TYPE)
             # ✅ البحث عن تقارير اليوم المقدمة من هذا المستخدم (بغض النظر عن اسم المترجم)
             today = date.today()
             
-            # ✅ إصلاح مشكلة التوقيت: توسيع النطاق ليشمل 24 ساعة الماضية + 12 ساعة قادمة
-            # هذا يضمن ظهور التقارير حتى لو كان هناك فرق كبير في التوقيت
-            now_utc = datetime.utcnow()
-            today_start = now_utc - timedelta(hours=24)
-            today_end = now_utc + timedelta(hours=12)
-            
-            logger.info(f"🔍 نطاق البحث (UTC - Expanded): من {today_start} إلى {today_end}")
+            # نطاق اليوم بتوقيت IST (نفس توقيت report_date المحفوظ في DB)
+            now_ist = _ist_now()
+            today_start = now_ist - timedelta(hours=24)
+            today_end = now_ist + timedelta(hours=12)
+
+            logger.info(f"🔍 نطاق البحث (IST): من {today_start} إلى {today_end}")
 
             # ✅ البحث بمعرف المستخدم الذي أنشأ التقرير (submitted_by_user_id)
             # هذا الحقل يتم حفظه عند إنشاء التقرير بغض النظر عن اسم المترجم المختار
@@ -590,7 +572,10 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
         if query.data == "edit_cancel":
             await query.edit_message_text("❌ **تم إلغاء عملية التعديل**")
             return ConversationHandler.END
-        
+
+        if query.data == "edit_back":
+            return await start_edit_reports_from_callback(query, context)
+
         # استخراج رقم التقرير
         report_id = int(query.data.split(':')[1])
         context.user_data['edit_report_id'] = report_id
@@ -640,6 +625,21 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
             # حفظ البيانات الحالية
             # ✅ استخراج الحقول المحددة من doctor_decision حسب نوع الإجراء
             doctor_decision_text = report.doctor_decision or ""
+
+            # ✅ استخراج قرار الطبيب الحقيقي من الحقل المركب
+            # مسارات عديدة تُخزّن "التشخيص: ...\n\nقرار الطبيب: ..." في doctor_decision
+            # نستخرج الجزء بعد "قرار الطبيب:" فقط لعرضه في الزر
+            _clean_decision = doctor_decision_text
+            if 'قرار الطبيب:' in doctor_decision_text:
+                try:
+                    _clean_decision = doctor_decision_text.split('قرار الطبيب:', 1)[1].strip()
+                    # قطع عند أي عنوان فرعي آخر (مثل "الفحوصات المطلوبة:" أو "اسم العملية:")
+                    for _sep in ['\n\nالفحوصات', '\n\nاسم العملية', '\n\nنسبة', '\n\nالتوصيات']:
+                        if _sep in _clean_decision:
+                            _clean_decision = _clean_decision.split(_sep, 1)[0].strip()
+                except Exception:
+                    _clean_decision = doctor_decision_text
+
             extracted_operation_details = "لا يوجد"
             extracted_operation_name_en = "لا يوجد"
             extracted_notes = notes_value
@@ -775,7 +775,7 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
                 'doctor_name': doctor.full_name if doctor else "لم يتم التحديد",
                 'medical_action': report.medical_action or "غير محدد",
                 'complaint_text': report.complaint_text or "لا يوجد",
-                'doctor_decision': report.doctor_decision or "لا يوجد",
+                'doctor_decision': _clean_decision or "لا يوجد",
                 'diagnosis': report.diagnosis or "لا يوجد",
                 'treatment_plan': report.treatment_plan or "لا يوجد",
                 'medications': medications_value,  # ✅ استخدام القيمة المحسّنة
@@ -790,9 +790,9 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
                 # حقول إضافية
                 'room_number': getattr(report, 'room_number', None) or "لا يوجد",
                 'radiology_type': getattr(report, 'radiology_type', None) or "لا يوجد",
-                'radiology_delivery_date': getattr(report, 'radiology_delivery_date', None),
+                'radiology_delivery_date': getattr(report, 'radiology_delivery_date', None).strftime('%Y-%m-%d') if getattr(report, 'radiology_delivery_date', None) else None,
                 'app_reschedule_reason': getattr(report, 'app_reschedule_reason', None) or "لا يوجد",
-                'app_reschedule_return_date': getattr(report, 'app_reschedule_return_date', None),
+                'app_reschedule_return_date': getattr(report, 'app_reschedule_return_date', None).strftime('%Y-%m-%d') if getattr(report, 'app_reschedule_return_date', None) else None,
                 'app_reschedule_return_reason': getattr(report, 'app_reschedule_return_reason', None) or "لا يوجد",
                 # ✅ حقول مستخرجة من doctor_decision
                 'operation_details': extracted_operation_details,
@@ -814,6 +814,7 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
                 'radiation_therapy_return_reason': getattr(report, 'radiation_therapy_return_reason', None) or "لا يوجد",
                 'radiation_therapy_final_notes': getattr(report, 'radiation_therapy_final_notes', None) or "",
                 'radiation_therapy_completed': getattr(report, 'radiation_therapy_completed', False) or False,
+                'no_paper_report_reason': getattr(report, 'no_paper_report_reason', None) or "لا يوجد",
             }
             
             # تحويل موعد العودة إلى صيغة 12 ساعة للعرض
@@ -890,25 +891,24 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
                     display_value = current_value.strftime('%Y-%m-%d')
                 elif isinstance(current_value, datetime):
                     display_value = current_value.strftime('%Y-%m-%d')
-                elif current_value and len(str(current_value)) > 15:
-                    display_value = str(current_value)[:12] + "..."
                 else:
-                    display_value = str(current_value) if current_value else ""
-                
+                    raw = str(current_value).replace('\n', ' ').replace('\r', '').strip() if current_value else ""
+                    display_value = (raw[:12] + "...") if len(raw) > 15 else raw
+
                 button_text = f"{field_display}: {display_value}"
                 keyboard.append([InlineKeyboardButton(button_text, callback_data=f"edit_field:{field_name}")])
-            
+
             # إضافة زر إعادة النشر
             keyboard.append([InlineKeyboardButton("📢 إعادة نشر التقرير", callback_data="edit_republish")])
             keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="edit_back")])
             keyboard.append([InlineKeyboardButton("❌ إلغاء", callback_data="edit_cancel")])
-            
+
             await query.edit_message_text(
                 text,
                 reply_markup=InlineKeyboardMarkup(keyboard),
                 parse_mode=ParseMode.MARKDOWN
             )
-            
+
             logger.info(f"✅ تم عرض بيانات التقرير #{report_id}")
             return SELECT_FIELD
             
@@ -928,20 +928,33 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """إعادة نشر التقرير بعد التعديل"""
     import logging
     logger = logging.getLogger(__name__)
-    
+
     query = update.callback_query
-    await query.answer()
+    if query:
+        await query.answer()
+
+    async def _reply(text, **kw):
+        """إرسال الرد سواء جاء من callback أو message"""
+        if query:
+            try:
+                await query.edit_message_text(text, **kw)
+                return
+            except Exception:
+                pass
+        msg = update.message or (update.callback_query.message if update.callback_query else None)
+        if msg:
+            await msg.reply_text(text, **kw)
     
     try:
         report_id = context.user_data.get('edit_report_id')
-        
+
         with SessionLocal() as s:
             report = s.query(Report).filter_by(id=report_id).first()
-            
+
             if not report:
-                await query.edit_message_text("⚠️ **خطأ:** لم يتم العثور على التقرير")
+                await _reply("⚠️ **خطأ:** لم يتم العثور على التقرير", parse_mode=ParseMode.MARKDOWN)
                 return ConversationHandler.END
-            
+
             # جلب البيانات الكاملة
             patient = s.query(Patient).filter_by(id=report.patient_id).first()
             hospital = s.query(Hospital).filter_by(id=report.hospital_id).first()
@@ -1111,23 +1124,36 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # - تأجيل موعد (appointment_reschedule): app_reschedule_reason (حقل مباشر)
             # - أشعة وفحوصات (radiology): radiology_type, radiology_delivery_date (حقول مباشرة)
 
+            # استخراج decision من doctor_decision للمسارات التي تحتاجه
+            extracted_decision_for_broadcast = ''
+            dd = report.doctor_decision or ''
+            action = report.medical_action or ''
+            if action in ['استشارة جديدة', 'متابعة', 'متابعة في الرقود', 'مراجعة / عودة دورية', 'طوارئ', 'استشارة أخيرة']:
+                if 'قرار الطبيب:' in dd:
+                    extracted_decision_for_broadcast = dd.split('قرار الطبيب:', 1)[1].split('\n\n')[0].strip()
+                elif dd and 'التشخيص:' not in dd and 'تفاصيل' not in dd:
+                    extracted_decision_for_broadcast = dd.strip()
+            elif action == 'استشارة مع قرار عملية':
+                if 'قرار الطبيب:' in dd:
+                    extracted_decision_for_broadcast = dd.split('قرار الطبيب:', 1)[1].split('\n\n')[0].strip()
+
             # ✅ بناء broadcast_data مع جميع الحقول المطلوبة
             broadcast_data = {
                 'report_id': report_id,
-                'report_date': report.report_date.strftime('%Y-%m-%d %H:%M') if report.report_date else datetime.now().strftime('%Y-%m-%d %H:%M'),
+                'report_date': report.report_date.strftime('%Y-%m-%d %H:%M') if report.report_date else _ist_now().strftime('%Y-%m-%d %H:%M'),
                 'patient_name': patient.full_name if patient else 'غير معروف',
                 'hospital_name': hospital.name if hospital else 'غير معروف',
                 'department_name': department.name if department else 'غير محدد',
                 'doctor_name': doctor.full_name if doctor else 'لم يتم التحديد',
                 'medical_action': report.medical_action or 'غير محدد',
-                # ✅ جميع الحقول النصية (فقط القيم غير الفارغة)
+                # الحقول النصية — doctor_decision فارغ لمنع التكرار في format_report_message
                 'complaint_text': report.complaint_text or '',
-                'complaint': report.complaint_text or '',  # نسخة للتوافق
+                'complaint': report.complaint_text or '',
                 'diagnosis': report.diagnosis or '',
-                'doctor_decision': report.doctor_decision or '',
-                'decision': '',  # ✅ يتم استخراجه تلقائياً من doctor_decision في broadcast_service لمنع التكرار
+                'doctor_decision': '',  # فارغ عمداً — القيم مستخرجة في حقول منفصلة أدناه
+                'decision': extracted_decision_for_broadcast,
                 'treatment_plan': report.treatment_plan or '',
-                'recommendations': report.treatment_plan or '',  # ✅ نسخة للتوافق مع broadcast_service
+                'recommendations': report.treatment_plan or '',
                 'notes': report.notes or '',
                 'medications': report.medications or '',
                 'case_status': report.case_status or '',
@@ -1170,48 +1196,48 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 'radiation_therapy_completed': getattr(report, 'radiation_therapy_completed', False) or False,
                 # ✅ المترجم - استخدام الاسم المحفوظ في التقرير
                 'translator_name': translator_name,
+                # ✅ حالة التقرير الطبي الورقي
+                'no_paper_report_reason': getattr(report, 'no_paper_report_reason', '') or '',
+                'has_paper_report': getattr(report, 'has_paper_report', None),
                 'is_edit': True  # علامة أن هذا تقرير معدل
             }
             
+            # حذف رسالة المجموعة القديمة قبل نشر النسخة المعدَّلة
+            old_group_message_id = getattr(report, 'group_message_id', None)
+            if old_group_message_id:
+                try:
+                    from config.settings import REPORTS_GROUP_ID as _GID
+                    if _GID:
+                        await context.bot.delete_message(chat_id=_GID, message_id=old_group_message_id)
+                        logger.info(f"✅ تم حذف رسالة المجموعة القديمة {old_group_message_id} للتقرير #{report_id}")
+                except Exception as del_err:
+                    logger.warning(f"⚠️ فشل حذف رسالة المجموعة القديمة {old_group_message_id}: {del_err}")
+                # مسح المعرف القديم حتى لا يُحذف مرة ثانية إذا فشل النشر
+                report.group_message_id = None
+                s.commit()
+
             # بث التقرير
             try:
                 from services.broadcast_service import broadcast_new_report, format_report_message
                 await broadcast_new_report(context.bot, broadcast_data)
                 
-                # ✅ عرض التقرير الكامل للمستخدم بعد التعديل
+                # عرض رسالة نجاح بسيطة للمستخدم
                 try:
                     full_report = format_report_message(broadcast_data)
-                    success_header = (
-                        f"✅ **تم إعادة نشر التقرير بنجاح!**\n\n"
-                        f"━━━━━━━━━━━━━━━━━━━━\n\n"
-                    )
-                    full_message = success_header + full_report
-                    
-                    await query.edit_message_text(
-                        full_message,
-                        parse_mode=ParseMode.MARKDOWN
-                    )
+                    full_message = "✅ **تم إعادة نشر التقرير بنجاح!**\n\n━━━━━━━━━━━━━━━━━━━━\n\n" + full_report
+                    await _reply(full_message, parse_mode=ParseMode.MARKDOWN)
                 except Exception as format_err:
                     logger.warning(f"⚠️ فشل عرض التقرير الكامل: {format_err}")
-                    # fallback to simple message
-                    await query.edit_message_text(
-                        f"✅ **تم إعادة نشر التقرير بنجاح!**\n\n"
-                        f"📋 **رقم التقرير:** #{report_id}\n"
-                        f"👤 **المريض:** {patient.full_name if patient else 'غير معروف'}\n"
-                        f"📅 **وقت النشر:** {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n"
-                        f"تم إرسال التقرير المعدل.",
+                    await _reply(
+                        f"✅ **تم إعادة نشر التقرير بنجاح!**\n\n📋 **رقم التقرير:** #{report_id}",
                         parse_mode=ParseMode.MARKDOWN
                     )
-                
+
                 logger.info(f"✅ تم إعادة نشر التقرير #{report_id}")
-                
+
             except Exception as e:
                 logger.error(f"❌ خطأ في إعادة النشر: {e}", exc_info=True)
-                await query.edit_message_text(
-                    f"❌ **حدث خطأ في إعادة النشر**\n\n"
-                    f"يرجى المحاولة مرة أخرى.",
-                    parse_mode=ParseMode.MARKDOWN
-                )
+                await _reply("❌ **حدث خطأ في إعادة النشر**\n\nيرجى المحاولة مرة أخرى.", parse_mode=ParseMode.MARKDOWN)
         
         # تنظيف البيانات
         context.user_data.clear()
@@ -1219,10 +1245,7 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     except Exception as e:
         logger.error(f"❌ خطأ في handle_republish: {e}", exc_info=True)
-        await query.edit_message_text(
-            "❌ **حدث خطأ**\n\nيرجى المحاولة مرة أخرى.",
-            parse_mode=ParseMode.MARKDOWN
-        )
+        await _reply("❌ **حدث خطأ**\n\nيرجى المحاولة مرة أخرى.", parse_mode=ParseMode.MARKDOWN)
         return ConversationHandler.END
 
 async def handle_field_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1285,6 +1308,7 @@ async def handle_field_selection(update: Update, context: ContextTypes.DEFAULT_T
             'radiation_therapy_session_number': 'رقم الجلسة',
             'radiation_therapy_remaining': 'الجلسات المتبقية',
             'radiation_therapy_recommendations': 'ملاحظات / توصيات',
+            'no_paper_report_reason': 'سبب عدم وجود تقرير طبي',
         }
         
         field_display = field_names.get(field_name, field_name)
@@ -1294,35 +1318,37 @@ async def handle_field_selection(update: Update, context: ContextTypes.DEFAULT_T
         if field_name == "translator_name":
             return await show_translator_selection_for_edit(query, context)
         
-        # إذا كان الحقل هو التاريخ، نعرض التقويم الكامل مباشرة
-        if field_name == "followup_date":
+        # حقول التاريخ — تمر جميعها بالتقويم (DateTime columns)
+        if field_name in ("followup_date", "app_reschedule_return_date", "radiology_delivery_date"):
             text = f"📅 **تعديل {field_display}**\n\n"
-            if current_value and current_value != "لا يوجد":
-                followup_time = context.user_data['current_report_data'].get('followup_time', '')
-                if followup_time:
-                    time_12h = format_time_12h(followup_time)
-                    text += f"**القيمة الحالية:** {current_value} - {time_12h}\n\n"
+            if current_value and current_value not in ("لا يوجد", None):
+                if field_name == "followup_date":
+                    followup_time = context.user_data['current_report_data'].get('followup_time', '')
+                    if followup_time:
+                        time_12h = format_time_12h(followup_time)
+                        text += f"**القيمة الحالية:** {current_value} - {time_12h}\n\n"
+                    else:
+                        text += f"**القيمة الحالية:** {current_value}\n\n"
                 else:
                     text += f"**القيمة الحالية:** {current_value}\n\n"
             else:
-                text += "**القيمة الحالية:** لا يوجد موعد\n\n"
+                text += "**القيمة الحالية:** لا يوجد تاريخ\n\n"
             text += "✅ **اختر التاريخ من التقويم أدناه:**\n"
             text += "_(لا يمكن إدخال التاريخ يدوياً)_\n"
-            
-            # عرض التقويم الكامل مباشرة
+
             now = datetime.now()
             keyboard = create_calendar_keyboard(now.year, now.month, "edit_followup", allow_future=True)
             keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="edit_back_to_fields")])
             keyboard.append([InlineKeyboardButton("❌ إلغاء", callback_data="edit_cancel")])
-            
+
             text += f"\n📆 **{MONTHS_AR[now.month]} {now.year}**"
-            
+
             await query.edit_message_text(
                 text,
                 reply_markup=InlineKeyboardMarkup(keyboard),
                 parse_mode=ParseMode.MARKDOWN
             )
-            
+
             logger.info(f"✅ تم عرض حقل التعديل: {field_name} (تاريخ) - التقويم الكامل")
             return EDIT_DATE_CALENDAR
         else:
@@ -1392,7 +1418,7 @@ async def show_translator_selection_for_edit(query, context):
         row = []
         
         for i, name in enumerate(translator_names):
-            row.append(InlineKeyboardButton(name, callback_data=f"edit_translator:{i}"))
+            row.append(InlineKeyboardButton(name, callback_data=f"edit_translator:{name}"))
             if len(row) == 3 or i == len(translator_names) - 1:
                 keyboard.append(row)
                 row = []
@@ -1431,20 +1457,13 @@ async def handle_translator_selection(update: Update, context: ContextTypes.DEFA
         if query.data == "edit_back_to_fields":
             return await show_field_selection(query, context)
         
-        # استخراج index المترجم
-        parts = query.data.split(":")
-        if len(parts) < 2:
+        # استخراج اسم المترجم من callback_data (format: edit_translator:{name})
+        parts = query.data.split(":", 1)
+        if len(parts) < 2 or not parts[1]:
             await query.edit_message_text("❌ خطأ في البيانات")
             return ConversationHandler.END
-        
-        translator_index = int(parts[1])
-        translator_names = load_translator_names()
-        
-        if translator_index < 0 or translator_index >= len(translator_names):
-            await query.edit_message_text("❌ اختيار غير صحيح")
-            return ConversationHandler.END
-        
-        new_translator_name = translator_names[translator_index]
+
+        new_translator_name = parts[1]
         
         # البحث عن المترجم في قاعدة البيانات
         report_id = context.user_data.get('edit_report_id')
@@ -1471,16 +1490,6 @@ async def handle_translator_selection(update: Update, context: ContextTypes.DEFA
                 context.user_data['current_report_data']['translator_id'] = translator_id
                 
                 logger.info(f"✅ تم تحديث المترجم للتقرير {report_id}: {new_translator_name}")
-                
-                await query.edit_message_text(
-                    f"✅ **تم تعديل المترجم بنجاح**\n\n"
-                    f"**المترجم الجديد:** {new_translator_name}",
-                    parse_mode=ParseMode.MARKDOWN
-                )
-                
-                # الانتظار قليلاً ثم العودة لقائمة الحقول
-                import asyncio
-                await asyncio.sleep(1)
                 return await show_field_selection(query, context)
             else:
                 await query.edit_message_text("❌ لم يتم العثور على التقرير")
@@ -1521,16 +1530,25 @@ async def handle_text_during_date_calendar(update: Update, context: ContextTypes
     )
     
     # إعادة عرض التقويم
-    text = f"📅 **تعديل موعد العودة**\n\n"
-    if current_value and current_value != "لا يوجد":
-        followup_time = context.user_data['current_report_data'].get('followup_time', '')
-        if followup_time:
-            time_12h = format_time_12h(followup_time)
-            text += f"**القيمة الحالية:** {current_value} - {time_12h}\n\n"
+    _date_field_labels = {
+        'followup_date': 'موعد العودة',
+        'app_reschedule_return_date': 'موعد العودة الجديد',
+        'radiology_delivery_date': 'تاريخ التسليم',
+    }
+    _label = _date_field_labels.get(field_name, 'التاريخ')
+    text = f"📅 **تعديل {_label}**\n\n"
+    if current_value and current_value not in ("لا يوجد", None):
+        if field_name == 'followup_date':
+            followup_time = context.user_data['current_report_data'].get('followup_time', '')
+            if followup_time:
+                time_12h = format_time_12h(followup_time)
+                text += f"**القيمة الحالية:** {current_value} - {time_12h}\n\n"
+            else:
+                text += f"**القيمة الحالية:** {current_value}\n\n"
         else:
             text += f"**القيمة الحالية:** {current_value}\n\n"
     else:
-        text += "**القيمة الحالية:** لا يوجد موعد\n\n"
+        text += "**القيمة الحالية:** لا يوجد تاريخ\n\n"
     text += "✅ **اختر التاريخ من التقويم أدناه:**\n"
     text += "_(لا يمكن إدخال التاريخ يدوياً)_\n"
     
@@ -1550,6 +1568,34 @@ async def handle_text_during_date_calendar(update: Update, context: ContextTypes
     
     return EDIT_DATE_CALENDAR
 
+def _build_edit_hour_keyboard():
+    """لوحة اختيار الساعة للتعديل — 24 ساعة، 4 في كل صف"""
+    hours = []
+    for h in range(24):
+        if h == 0:
+            label = "12 صباحاً"
+        elif h < 12:
+            label = f"{h} صباحاً"
+        elif h == 12:
+            label = "12 ظهراً"
+        else:
+            label = f"{h - 12} مساءً"
+        hours.append((label, f"{h:02d}:00"))
+
+    keyboard = []
+    for i in range(0, len(hours), 4):
+        chunk = hours[i:i + 4]
+        keyboard.append([
+            InlineKeyboardButton(label, callback_data=f"edit_time:{val}")
+            for label, val in chunk
+        ])
+    keyboard.append([
+        InlineKeyboardButton("🔙 رجوع", callback_data="edit_back_to_fields"),
+        InlineKeyboardButton("❌ إلغاء", callback_data="edit_cancel"),
+    ])
+    return InlineKeyboardMarkup(keyboard)
+
+
 async def handle_date_calendar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة التقويم لتحديد التاريخ"""
     query = update.callback_query
@@ -1567,35 +1613,13 @@ async def handle_date_calendar(update: Update, context: ContextTypes.DEFAULT_TYP
         date_str = query.data.split(":")[-1]
         selected_date = datetime.strptime(date_str, "%Y-%m-%d").date()
         context.user_data['selected_date'] = selected_date
-        
-        # الانتقال لاختيار الوقت
-        text = f"📅 **تم اختيار التاريخ:** {selected_date.strftime('%Y-%m-%d')}\n\n"
-        text += "اختر الوقت:"
-        
-        # أزرار الأوقات السريعة
-        keyboard = []
-        time_buttons = []
-        for hour in [9, 10, 11, 12, 13, 14, 15, 16, 17, 18]:
-            time_str = f"{hour:02d}:00"
-            time_display = f"{hour}:00" if hour < 12 else f"{hour-12}:00 مساءً" if hour > 12 else "12:00 ظهراً"
-            time_buttons.append(InlineKeyboardButton(time_display, callback_data=f"edit_time:{time_str}"))
-            if len(time_buttons) == 2:
-                keyboard.append(time_buttons)
-                time_buttons = []
-        if time_buttons:
-            keyboard.append(time_buttons)
-        
-        keyboard.append([InlineKeyboardButton("✏️ إدخال يدوي", callback_data="edit_time:manual")])
-        keyboard.append([InlineKeyboardButton("⏭️ تخطي الوقت", callback_data="edit_time:skip")])
-        keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="edit_back_to_fields")])
-        keyboard.append([InlineKeyboardButton("❌ إلغاء", callback_data="edit_cancel")])
-        
+
+        text = f"📅 **تم اختيار التاريخ:** {selected_date.strftime('%Y-%m-%d')}\n\nاختر الساعة:"
         await query.edit_message_text(
             text,
-            reply_markup=InlineKeyboardMarkup(keyboard),
+            reply_markup=_build_edit_hour_keyboard(),
             parse_mode=ParseMode.MARKDOWN
         )
-        
         return EDIT_DATE_TIME
     
     # معالجة عرض التقويم
@@ -1640,35 +1664,13 @@ async def handle_date_calendar(update: Update, context: ContextTypes.DEFAULT_TYP
         date_str = query.data.split(":")[-1]
         selected_date = datetime.strptime(date_str, "%Y-%m-%d").date()
         context.user_data['selected_date'] = selected_date
-        
-        # الانتقال لاختيار الوقت
-        text = f"📅 **تم اختيار التاريخ:** {selected_date.strftime('%Y-%m-%d')}\n\n"
-        text += "اختر الوقت:"
-        
-        # أزرار الأوقات السريعة
-        keyboard = []
-        time_buttons = []
-        for hour in [9, 10, 11, 12, 13, 14, 15, 16, 17, 18]:
-            time_str = f"{hour:02d}:00"
-            time_display = f"{hour}:00" if hour < 12 else f"{hour-12}:00 مساءً" if hour > 12 else "12:00 ظهراً"
-            time_buttons.append(InlineKeyboardButton(time_display, callback_data=f"edit_time:{time_str}"))
-            if len(time_buttons) == 2:
-                keyboard.append(time_buttons)
-                time_buttons = []
-        if time_buttons:
-            keyboard.append(time_buttons)
-        
-        keyboard.append([InlineKeyboardButton("✏️ إدخال يدوي", callback_data="edit_time:manual")])
-        keyboard.append([InlineKeyboardButton("⏭️ تخطي الوقت", callback_data="edit_time:skip")])
-        keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="edit_back_to_fields")])
-        keyboard.append([InlineKeyboardButton("❌ إلغاء", callback_data="edit_cancel")])
-        
+
+        text = f"📅 **تم اختيار التاريخ:** {selected_date.strftime('%Y-%m-%d')}\n\nاختر الساعة:"
         await query.edit_message_text(
             text,
-            reply_markup=InlineKeyboardMarkup(keyboard),
+            reply_markup=_build_edit_hour_keyboard(),
             parse_mode=ParseMode.MARKDOWN
         )
-        
         return EDIT_DATE_TIME
     
     return EDIT_DATE_CALENDAR
@@ -1683,85 +1685,71 @@ async def handle_date_time_selection(update: Update, context: ContextTypes.DEFAU
         return ConversationHandler.END
     
     if query.data == "edit_back_to_fields":
+        # العودة إلى التقويم إذا كان هناك تاريخ محدد، وإلا إلى قائمة الحقول
+        selected_date = context.user_data.get('selected_date')
+        if selected_date:
+            field_name = context.user_data.get('edit_field', 'followup_date')
+            _date_field_labels = {
+                'followup_date': 'موعد العودة',
+                'app_reschedule_return_date': 'موعد العودة الجديد',
+                'radiology_delivery_date': 'تاريخ التسليم',
+            }
+            _label = _date_field_labels.get(field_name, 'التاريخ')
+            text = f"📅 **تعديل {_label}**\n\naختر التاريخ من التقويم:"
+            now = datetime.now()
+            keyboard = create_calendar_keyboard(now.year, now.month, "edit_followup", allow_future=True)
+            keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="edit_back_to_fields")])
+            keyboard.append([InlineKeyboardButton("❌ إلغاء", callback_data="edit_cancel")])
+            text += f"\n\n📆 **{MONTHS_AR[now.month]} {now.year}**"
+            await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode=ParseMode.MARKDOWN)
+            return EDIT_DATE_CALENDAR
         return await show_field_selection(query, context)
-    
+
     selected_date = context.user_data.get('selected_date')
     if not selected_date:
         await query.answer("⚠️ لم يتم اختيار التاريخ", show_alert=True)
         return EDIT_DATE_CALENDAR
-    
-    # معالجة تخطي الوقت
-    if query.data == "edit_time:skip":
-        # حفظ التاريخ بدون وقت
-        new_value = selected_date.strftime('%Y-%m-%d')
-        context.user_data['new_value'] = new_value
-        context.user_data['new_time'] = None
-        
-        # الانتقال لتأكيد التعديل
-        await confirm_date_edit(query, context, selected_date, None)
-        return CONFIRM_EDIT
-    
-    # معالجة إدخال الوقت يدوياً
-    if query.data == "edit_time:manual":
-        context.user_data['_waiting_for_time'] = True
-        text = f"📅 **التاريخ المختار:** {selected_date.strftime('%Y-%m-%d')}\n\n"
-        text += "أرسل الوقت بالصيغة:\n"
-        text += "`HH:MM` (مثال: `14:30`)\n\n"
-        text += "أو أرسل: `تخطي` لتخطي الوقت"
-        
-        keyboard = [
-            [InlineKeyboardButton("🔙 رجوع", callback_data="edit_back_to_fields")],
-            [InlineKeyboardButton("❌ إلغاء", callback_data="edit_cancel")]
-        ]
-        
-        await query.edit_message_text(
-            text,
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode=ParseMode.MARKDOWN
-        )
-        
-        return EDIT_DATE_TIME
-    
-    # معالجة اختيار وقت من الأزرار
+
+    # اختيار ساعة من الأزرار (صيغة edit_time:HH:MM)
     if query.data.startswith("edit_time:"):
-        # استخراج الوقت بشكل صحيح (مثل edit_time:08:00 -> 08:00)
         time_str = query.data.replace("edit_time:", "", 1)
-        if time_str != "manual" and time_str != "skip":
-            context.user_data['new_time'] = time_str
-            # حفظ القيمة الكاملة
-            new_value = f"{selected_date.strftime('%Y-%m-%d')} {time_str}"
-            context.user_data['new_value'] = new_value
-            
-            # الانتقال لتأكيد التعديل
-            await confirm_date_edit(query, context, selected_date, time_str)
-            return CONFIRM_EDIT
-    
+        context.user_data['new_time'] = time_str
+        context.user_data['new_value'] = f"{selected_date.strftime('%Y-%m-%d')} {time_str}"
+        await confirm_date_edit(query, context, selected_date, time_str)
+        return CONFIRM_EDIT
+
     return EDIT_DATE_TIME
 
 async def confirm_date_edit(message_or_query, context, selected_date, selected_time):
     """تأكيد تعديل التاريخ"""
-    field_name = context.user_data.get('edit_field')
-    old_value = context.user_data['current_report_data'].get('followup_date', "لا يوجد")
-    old_time = context.user_data['current_report_data'].get('followup_time', '')
-    
-    if old_value and old_value != "لا يوجد":
-        old_display = f"{old_value}"
+    field_name = context.user_data.get('edit_field', 'followup_date')
+    old_value = context.user_data['current_report_data'].get(field_name, "لا يوجد")
+    old_time = context.user_data['current_report_data'].get('followup_time', '') if field_name == 'followup_date' else ''
+
+    field_display_names = {
+        'followup_date': 'موعد العودة',
+        'app_reschedule_return_date': 'موعد العودة الجديد',
+        'radiology_delivery_date': 'تاريخ التسليم',
+    }
+    field_label = field_display_names.get(field_name, 'التاريخ')
+
+    if old_value and old_value not in ("لا يوجد", None):
+        old_display = str(old_value)
         if old_time:
             old_display += f" الساعة {old_time}"
     else:
         old_display = "لا يوجد"
-    
+
     if selected_time:
         new_display = f"{selected_date.strftime('%Y-%m-%d')} الساعة {selected_time}"
     else:
         new_display = selected_date.strftime('%Y-%m-%d')
-    
-    # تنظيف القيم من الأحرف الخاصة بـ Markdown
-    old_display_safe = escape_markdown(str(old_display) if old_display else "لا يوجد")
-    new_display_safe = escape_markdown(str(new_display) if new_display else "")
-    
+
+    old_display_safe = escape_markdown(old_display)
+    new_display_safe = escape_markdown(new_display)
+
     text = "📝 **تأكيد التعديل**\n\n"
-    text += f"**الحقل:** موعد العودة\n\n"
+    text += f"**الحقل:** {field_label}\n\n"
     text += f"**القيمة القديمة:**\n{old_display_safe}\n\n"
     text += f"**القيمة الجديدة:**\n{new_display_safe}\n\n"
     text += "هل تريد نشر التعديل؟"
@@ -1849,66 +1837,16 @@ async def handle_new_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return EDIT_VALUE
     
-    # حفظ القيمة الجديدة
+    # حفظ القيمة في DB ثم العودة لقائمة الحقول — المستخدم ينشر بنفسه
     context.user_data['new_value'] = new_value
-    
-    # أسماء الحقول بالعربي
-    field_names = {
-        'complaint_text': 'شكوى المريض',
-        'doctor_decision': 'قرار الطبيب',
-        'diagnosis': 'التشخيص الطبي',
-        'treatment_plan': 'التوصيات / خطة العلاج',
-        'notes': 'الفحوصات والأشعة',
-        'medications': 'الأدوية',
-        'followup_date': 'موعد العودة',
-        'followup_reason': 'سبب العودة',
-        'case_status': 'حالة الطوارئ',
-        # ✅ حقول المسارات الخاصة
-        'operation_details': 'تفاصيل العملية',
-        'operation_name_en': 'اسم العملية بالإنجليزي',
-        'therapy_details': 'تفاصيل جلسة العلاج الطبيعي',
-        'device_details': 'تفاصيل الجهاز',
-        'admission_reason': 'سبب الرقود',
-        'admission_summary': 'ملخص الرقود',
-        # ✅ حقول استشارة مع قرار عملية
-        'decision': 'قرار الطبيب',
-        'success_rate': 'نسبة نجاح العملية',
-        'benefit_rate': 'نسبة الاستفادة',
-        'tests': 'الفحوصات والأشعة',
-        # ✅ حقول العلاج الإشعاعي
-        'radiation_therapy_type': 'نوع الإشعاعي',
-        'radiation_therapy_session_number': 'رقم الجلسة',
-        'radiation_therapy_remaining': 'الجلسات المتبقية',
-        'radiation_therapy_recommendations': 'ملاحظات / توصيات',
-    }
-
-    field_display = field_names.get(field_name, field_name.replace('_', ' '))
-    old_value = context.user_data['current_report_data'].get(field_name, "لا يوجد")
-    
-    # تنظيف القيم من الأحرف الخاصة بـ Markdown
-    old_value_safe = escape_markdown(str(old_value) if old_value else "لا يوجد")
-    new_value_safe = escape_markdown(str(new_value) if new_value else "")
-    
-    # عرض الملخص
-    text = "📝 **تأكيد التعديل**\n\n"
-    text += f"**الحقل:** {field_display}\n\n"
-    text += f"**القيمة القديمة:**\n{old_value_safe}\n\n"
-    text += f"**القيمة الجديدة:**\n{new_value_safe}\n\n"
-    text += "هل تريد نشر التعديل؟"
-    
-    keyboard = [
-        [InlineKeyboardButton("📢 نشر التقرير", callback_data="edit_save_and_publish")],
-        [InlineKeyboardButton("🔙 رجوع", callback_data="edit_back_to_fields")],
-        [InlineKeyboardButton("❌ إلغاء", callback_data="edit_cancel")]
-    ]
-    
-    await update.message.reply_text(
-        text,
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode=ParseMode.MARKDOWN
-    )
-    
-    return CONFIRM_EDIT
+    await save_edit_to_database(None, context)
+    # محاكاة query من message لعرض قائمة الحقول
+    class _FakeQuery:
+        def __init__(self, msg): self.message = msg; self.data = ""
+        async def answer(self): pass
+        async def edit_message_text(self, *a, **kw): await self.message.reply_text(*a, **kw)
+    fake_q = _FakeQuery(update.message)
+    return await show_field_selection(fake_q, context)
 
 async def save_edit_to_database(query, context):
     """حفظ التعديل في قاعدة البيانات (دالة مساعدة)"""
@@ -1926,25 +1864,26 @@ async def save_edit_to_database(query, context):
             return False
         
         # تحديث الحقل
-        if field_name == "followup_date":
+        if field_name in ("followup_date", "app_reschedule_return_date", "radiology_delivery_date"):
             if new_value == "لا يوجد":
-                report.followup_date = None
-                report.followup_time = None
+                setattr(report, field_name, None)
+                if field_name == "followup_date":
+                    report.followup_time = None
             else:
-                # إذا كان التاريخ يحتوي على وقت
                 if ' ' in new_value:
                     dt = datetime.strptime(new_value, '%Y-%m-%d %H:%M')
-                    report.followup_date = dt
-                    report.followup_time = dt.strftime('%H:%M')
                 else:
-                    # تاريخ فقط بدون وقت
-                    report.followup_date = datetime.strptime(new_value, '%Y-%m-%d')
-                    # حفظ الوقت إذا كان موجوداً في context
+                    dt = datetime.strptime(new_value, '%Y-%m-%d')
                     new_time = context.user_data.get('new_time')
                     if new_time:
-                        report.followup_time = new_time
-                    else:
-                        report.followup_time = None
+                        try:
+                            h, m = new_time.split(':')
+                            dt = dt.replace(hour=int(h), minute=int(m))
+                        except Exception:
+                            pass
+                setattr(report, field_name, dt)
+                if field_name == "followup_date":
+                    report.followup_time = dt.strftime('%H:%M') if (dt.hour or dt.minute) else context.user_data.get('new_time')
         elif field_name == "notes" and report.medical_action == "استشارة جديدة":
             # ✅ لحقل "استشارة جديدة": حفظ notes في medications أيضاً (لتوافق مع save_report_to_database)
             report.notes = new_value
@@ -2102,10 +2041,15 @@ async def save_edit_to_database(query, context):
             logger.info(f"✅ تم تحديث حقل العلاج الإشعاعي: {field_name} = {new_value}")
 
         elif field_name == 'followup_reason' and report.medical_action == 'جلسة إشعاعي':
-            # حفظ سبب العودة في followup_reason و radiation_therapy_return_reason
             report.followup_reason = new_value
             report.radiation_therapy_return_reason = new_value
             logger.info(f"✅ تم تحديث followup_reason + radiation_therapy_return_reason = {new_value}")
+
+        elif field_name == 'no_paper_report_reason':
+            report.no_paper_report_reason = new_value
+            # إذا أدخل سبباً يعني لا يوجد تقرير → has_paper_report=0
+            report.has_paper_report = 0
+            logger.info(f"✅ تم تحديث no_paper_report_reason = {new_value}")
 
         else:
             setattr(report, field_name, new_value)
@@ -2139,95 +2083,19 @@ async def handle_confirm_edit(update: Update, context: ContextTypes.DEFAULT_TYPE
         # ثم ننشر التقرير
         return await handle_republish(update, context)
     
-    if query.data == "edit_confirm_save":
-        # حفظ التعديل في قاعدة البيانات
-        report_id = context.user_data.get('edit_report_id')
-        field_name = context.user_data.get('edit_field')
-        new_value = context.user_data.get('new_value')
-        
-        with SessionLocal() as s:
-            report = s.query(Report).filter_by(id=report_id).first()
-            
-            if not report:
-                await query.edit_message_text("⚠️ **خطأ:** لم يتم العثور على التقرير")
-                return ConversationHandler.END
-            
-            # حفظ القيمة القديمة
-            old_value = getattr(report, field_name, "لا يوجد")
-            if isinstance(old_value, datetime):
-                old_value = old_value.strftime('%Y-%m-%d %H:%M')
-            
-            # تحديث الحقل
-            if field_name == "followup_date":
-                if new_value == "لا يوجد":
-                    report.followup_date = None
-                    report.followup_time = None
-                else:
-                    # إذا كان التاريخ يحتوي على وقت
-                    if ' ' in new_value:
-                        dt = datetime.strptime(new_value, '%Y-%m-%d %H:%M')
-                        report.followup_date = dt
-                        report.followup_time = dt.strftime('%H:%M')
-                    else:
-                        # تاريخ فقط بدون وقت
-                        report.followup_date = datetime.strptime(new_value, '%Y-%m-%d')
-                        # حفظ الوقت إذا كان موجوداً في context
-                        new_time = context.user_data.get('new_time')
-                        if new_time:
-                            report.followup_time = new_time
-                        else:
-                            report.followup_time = None
-            elif field_name == "notes" and report.medical_action == "استشارة جديدة":
-                # ✅ لحقل "استشارة جديدة": حفظ notes في medications أيضاً (لتوافق مع save_report_to_database)
-                report.notes = new_value
-                report.medications = new_value  # ✅ حفظ في medications لاسترجاع tests لاحقاً
-                logger.info(f"✅ تم حفظ notes في medications أيضاً للتقرير #{report_id} (استشارة جديدة)")
-            else:
-                setattr(report, field_name, new_value)
-            
-            # تحديث تاريخ التعديل
-            report.updated_at = datetime.now()
-            
-            s.commit()
-            
-            # أسماء الحقول بالعربي
-            field_names = {
-                'complaint_text': 'شكوى المريض',
-                'doctor_decision': 'قرار الطبيب',
-                'diagnosis': 'التشخيص الطبي',
-                'treatment_plan': 'التوصيات / خطة العلاج',
-                'medications': 'الأدوية / الفحوصات',
-                'notes': 'الملاحظات / الفحوصات',
-                'case_status': 'حالة الطوارئ',
-                'followup_date': 'موعد العودة',
-                'followup_reason': 'سبب العودة'
-            }
-            
-            field_display = field_names.get(field_name, field_name)
-            
-            # رسالة النجاح
-            success_text = f"✅ **تم حفظ التعديل بنجاح**\n\n"
-            success_text += f"📋 **رقم التقرير:** #{report_id}\n"
-            success_text += f"✏️ **الحقل المعدل:** {field_display}\n"
-            success_text += f"📅 **وقت التعديل:** {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n"
-            success_text += f"**القيمة الجديدة:**\n{new_value}"
-            
-            await query.edit_message_text(success_text, parse_mode=ParseMode.MARKDOWN)
-        
-        # تنظيف البيانات
-        context.user_data.clear()
-        
-        return ConversationHandler.END
-    
     return CONFIRM_EDIT
 
 async def show_field_selection(query, context):
     """عرض قائمة الحقول مرة أخرى"""
     report_id = context.user_data.get('edit_report_id')
-    
+
+    if not report_id:
+        # user_data was cleared (e.g. after publish) — restart from report list
+        return await start_edit_reports_from_callback(query, context)
+
     with SessionLocal() as s:
         report = s.query(Report).filter_by(id=report_id).first()
-        
+
         if not report:
             await query.edit_message_text("⚠️ **خطأ:** لم يتم العثور على التقرير")
             return ConversationHandler.END
@@ -2241,6 +2109,14 @@ async def show_field_selection(query, context):
         
         # ✅ تحديث البيانات المحفوظة - تحديث شامل لجميع الحقول المحتملة
         current_data = context.user_data.get('current_report_data', {})
+        _notes_val = report.notes or "لا يوجد"
+        _meds_val = report.medications or "لا يوجد"
+        # استشارة جديدة: tests محفوظ في medications — نسوي نفس ما يفعله handle_report_selection
+        if report.medical_action == 'استشارة جديدة':
+            if (_notes_val == "لا يوجد") and _meds_val != "لا يوجد":
+                _notes_val = _meds_val
+            elif (_meds_val == "لا يوجد") and _notes_val != "لا يوجد":
+                _meds_val = _notes_val
         current_data.update({
             'patient_name': patient.full_name if patient else "غير معروف",
             'hospital_name': hospital.name if hospital else "غير معروف",
@@ -2251,17 +2127,17 @@ async def show_field_selection(query, context):
             'doctor_decision': report.doctor_decision or "لا يوجد",
             'diagnosis': report.diagnosis or "لا يوجد",
             'treatment_plan': report.treatment_plan or "لا يوجد",
-            'medications': report.medications or "لا يوجد",
-            'notes': report.notes or "لا يوجد",
+            'medications': _meds_val,
+            'notes': _notes_val,
             'case_status': report.case_status or "لا يوجد",
             'followup_date': report.followup_date.strftime('%Y-%m-%d') if report.followup_date else None,
             'followup_time': report.followup_time,
             'followup_reason': report.followup_reason or "لا يوجد",
             'room_number': getattr(report, 'room_number', None) or "لا يوجد",
             'radiology_type': getattr(report, 'radiology_type', None) or "لا يوجد",
-            'radiology_delivery_date': getattr(report, 'radiology_delivery_date', None),
+            'radiology_delivery_date': getattr(report, 'radiology_delivery_date', None).strftime('%Y-%m-%d') if getattr(report, 'radiology_delivery_date', None) else None,
             'app_reschedule_reason': getattr(report, 'app_reschedule_reason', None) or "لا يوجد",
-            'app_reschedule_return_date': getattr(report, 'app_reschedule_return_date', None),
+            'app_reschedule_return_date': getattr(report, 'app_reschedule_return_date', None).strftime('%Y-%m-%d') if getattr(report, 'app_reschedule_return_date', None) else None,
             'app_reschedule_return_reason': getattr(report, 'app_reschedule_return_reason', None) or "لا يوجد",
             'translator_name': report.translator_name or (translator.full_name if translator else "غير محدد"),
             'translator_id': report.translator_id,
@@ -2271,10 +2147,24 @@ async def show_field_selection(query, context):
             'radiation_therapy_remaining': getattr(report, 'radiation_therapy_remaining', None) or "لا يوجد",
             'radiation_therapy_recommendations': getattr(report, 'radiation_therapy_recommendations', None) or getattr(report, 'notes', None) or "",
             'radiation_therapy_return_reason': getattr(report, 'radiation_therapy_return_reason', None) or "لا يوجد",
+            'no_paper_report_reason': getattr(report, 'no_paper_report_reason', None) or "لا يوجد",
         })
         
+        # ✅ استخراج قرار الطبيب الحقيقي من الحقل المركب (مثل "التشخيص: ...\n\nقرار الطبيب: ...")
+        _dd_raw = report.doctor_decision or ''
+        _clean_dd = _dd_raw
+        if 'قرار الطبيب:' in _dd_raw:
+            try:
+                _clean_dd = _dd_raw.split('قرار الطبيب:', 1)[1].strip()
+                for _sep in ['\n\nالفحوصات', '\n\nاسم العملية', '\n\nنسبة', '\n\nالتوصيات']:
+                    if _sep in _clean_dd:
+                        _clean_dd = _clean_dd.split(_sep, 1)[0].strip()
+            except Exception:
+                _clean_dd = _dd_raw
+        current_data['doctor_decision'] = _clean_dd or "لا يوجد"
+
         # ✅ إعادة استخراج الحقول الخاصة من doctor_decision المحدث حسب نوع الإجراء
-        dd_text = report.doctor_decision or ''
+        dd_text = _dd_raw
         
         if report.medical_action == 'استشارة مع قرار عملية':
             try:
@@ -2450,15 +2340,16 @@ async def show_field_selection(query, context):
         # ✅ عرض فقط الحقول التي لها قيمة
         for field_name, field_display in fields_with_values:
             current_value = current_data.get(field_name, "")
-            
+
             # ✅ تنسيق القيمة للعرض
-            if isinstance(current_value, (date, datetime)):
-                display_value = current_value.strftime('%Y-%m-%d') if isinstance(current_value, date) else current_value.strftime('%Y-%m-%d %H:%M')
-            elif current_value and len(str(current_value)) > 15:
-                display_value = str(current_value)[:12] + "..."
+            if isinstance(current_value, datetime):
+                display_value = current_value.strftime('%Y-%m-%d %H:%M')
+            elif isinstance(current_value, date):
+                display_value = current_value.strftime('%Y-%m-%d')
             else:
-                display_value = str(current_value) if current_value else ""
-            
+                raw = str(current_value).replace('\n', ' ').replace('\r', '').strip() if current_value else ""
+                display_value = (raw[:12] + "...") if len(raw) > 15 else raw
+
             button_text = f"{field_display}: {display_value}"
             keyboard.append([InlineKeyboardButton(button_text, callback_data=f"edit_field:{field_name}")])
         
@@ -2489,12 +2380,12 @@ async def start_edit_reports_from_callback(query, context):
         # البحث عن تقارير اليوم فقط
         today = date.today()
         
-        # ✅ إصلاح مشكلة التوقيت: توسيع النطاق ليشمل 24 ساعة الماضية + 12 ساعة قادمة
-        now_utc = datetime.utcnow()
-        today_start = now_utc - timedelta(hours=24)
-        today_end = now_utc + timedelta(hours=12)
-        
-        logger.info(f"🔍 نطاق البحث (UTC - Expanded): من {today_start} إلى {today_end}")
+        # نطاق اليوم بتوقيت IST (نفس توقيت report_date المحفوظ في DB)
+        now_ist = _ist_now()
+        today_start = now_ist - timedelta(hours=24)
+        today_end = now_ist + timedelta(hours=12)
+
+        logger.info(f"🔍 نطاق البحث (IST): من {today_start} إلى {today_end}")
         
         # ✅ البحث بمعرف المستخدم الذي أنشأ التقرير (نفس منطق start_edit_reports)
         translator = s.query(Translator).filter_by(tg_user_id=user_id).first()
@@ -2582,6 +2473,7 @@ def register(app):
         states={
             SELECT_REPORT: [
                 CallbackQueryHandler(handle_report_selection, pattern="^edit_report:"),
+                CallbackQueryHandler(handle_report_selection, pattern="^edit_back$"),
                 CallbackQueryHandler(handle_report_selection, pattern="^edit_cancel$")
             ],
             SELECT_FIELD: [

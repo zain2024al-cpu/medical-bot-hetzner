@@ -1,0 +1,11 @@
+# image_pipeline dependencies
+# Install: pip install -r image_pipeline/requirements.txt
+
+# Core (required)
+opencv-python>=4.8.0
+Pillow>=10.0.0
+numpy>=1.24.0
+img2pdf>=0.4.4
+
+# Document detection (optional — pipeline falls back gracefully without it)
+# ultralytics>=8.0.0     # YOLOv8  — uncomment to enable Stage 1

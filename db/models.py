@@ -213,6 +213,10 @@ class Report(Base):
     # ✅ حقل رقم الغرفة والطابق
     room_number = Column(String(255), nullable=True)
 
+    # ✅ حقول التقرير الطبي الورقي (1=نعم, 0=لا, None=لم يُسأل)
+    has_paper_report = Column(Integer, nullable=True)
+    no_paper_report_reason = Column(Text, nullable=True)
+
 
 # ================================================
 # Schedule Model

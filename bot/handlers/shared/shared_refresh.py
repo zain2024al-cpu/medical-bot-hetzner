@@ -21,18 +21,15 @@ async def handle_refresh_page(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     # التحقق من نوع المستخدم
     if is_admin(tg_id):
-        # للأدمن — لوحة المفاتيح السفلية فقط
         context.chat_data.clear()
-        from bot.handlers.admin.admin_start import send_admin_panel
-
-        await send_admin_panel(
-            update,
-            first_text=(
-                "🔄 تم تحديث الصفحة بنجاح!\n\n"
-                "✅ تم إلغاء جميع العمليات الجارية.\n"
-                "✅ تم مسح جميع البيانات المؤقتة.\n\n"
-                "اختر خياراً جديداً:"
-            ),
+        from bot.keyboards import admin_main_kb
+        await update.message.reply_text(
+            "🔄 تم تحديث الصفحة بنجاح!\n\n"
+            "✅ تم إلغاء جميع العمليات الجارية.\n"
+            "✅ تم مسح جميع البيانات المؤقتة.\n\n"
+            "اختر خياراً جديداً:",
+            reply_markup=admin_main_kb(),
+            parse_mode="Markdown"
         )
     else:
         # للمستخدمين العاديين

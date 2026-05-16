@@ -118,28 +118,52 @@ def _get_action_routing():
 
 
 def _build_action_type_keyboard(page=0):
-    """بناء لوحة مفاتيح أنواع الإجراءات - جميع الأزرار في صفحة واحدة"""
-    total = len(PREDEFINED_ACTIONS)
-    keyboard = []
+    """بناء لوحة مفاتيح أنواع الإجراءات - مرتّبة حسب الاستخدام، زرّان بكل صف"""
+    ORDERED_ACTIONS = [
+        ("استشارة جديدة",           "🩺"),
+        ("مراجعة / عودة دورية",      "🔄"),
+        ("متابعة في الرقود",         "🛏️"),
+        ("استشارة مع قرار عملية",    "🔬"),
+        ("عملية",                    "🔪"),
+        ("استشارة أخيرة",            "✅"),
+        ("ترقيد",                    "🏥"),
+        ("خروج من المستشفى",         "🚪"),
+        ("طوارئ",                    "🚨"),
+        ("علاج طبيعي وإعادة تأهيل", "🏃"),
+        ("أشعة وفحوصات",            "📷"),
+        ("جلسة إشعاعي",             "☢️"),
+        ("تأجيل موعد",              "📅"),
+    ]
 
-    for i in range(total):
-        action_name = PREDEFINED_ACTIONS[i]
-        callback_data = f"action_idx:{i}"
-        display = f"⚕️ {action_name[:20]}..." if len(action_name) > 20 else f"⚕️ {action_name}"
-        keyboard.append([InlineKeyboardButton(display, callback_data=callback_data)])
+    idx_map = {name: i for i, name in enumerate(PREDEFINED_ACTIONS)}
+
+    keyboard = []
+    row = []
+    for action_name, icon in ORDERED_ACTIONS:
+        idx = idx_map.get(action_name)
+        if idx is None:
+            continue
+        btn = InlineKeyboardButton(f"{icon} {action_name}", callback_data=f"action_idx:{idx}")
+        row.append(btn)
+        if len(row) == 2:
+            keyboard.append(row)
+            row = []
+    if row:
+        keyboard.append(row)
 
     keyboard.append([
         InlineKeyboardButton("🔙 رجوع", callback_data="go_to_search_doctor_screen"),
         InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
     ])
 
-    text = f"⚕️ **نوع الإجراء** (الخطوة 6 من 6)\n\nاختر نوع الإجراء من القائمة:"
-
+    text = "⚕️ **نوع الإجراء** (الخطوة 6 من 6)\n\nاختر نوع الإجراء:"
     return text, InlineKeyboardMarkup(keyboard), 1
 
 
-async def show_action_type_menu(message, context, page=0):
-    """عرض قائمة أنواع الإجراءات المتاحة - جميع الأزرار في صفحة واحدة"""
+async def show_action_type_menu(message, context, page=0, query=None):
+    """عرض قائمة أنواع الإجراءات المتاحة - جميع الأزرار في صفحة واحدة.
+    query: إذا مُمرَّر يُعدَّل الرسالة الحالية (للرجوع). وإلا ترسل رسالة جديدة.
+    """
     context.user_data['_current_search_type'] = 'action_type'
     context.user_data['last_valid_state'] = 'action_type_selection'
     context.user_data['_conversation_state'] = R_ACTION_TYPE
@@ -148,6 +172,14 @@ async def show_action_type_menu(message, context, page=0):
     logger.info(f"SHOW_ACTION_TYPE_MENU: Total actions = {len(PREDEFINED_ACTIONS)}")
 
     text, keyboard, total_pages = _build_action_type_keyboard(0)
+
+    if query:
+        try:
+            await query.edit_message_text(text, reply_markup=keyboard, parse_mode="Markdown")
+            logger.info("SHOW_ACTION_TYPE_MENU: Message edited successfully (restore path)")
+            return
+        except Exception:
+            pass
 
     try:
         await message.reply_text(text, reply_markup=keyboard, parse_mode="Markdown")
@@ -310,6 +342,9 @@ async def handle_action_type_choice(update: Update, context: ContextTypes.DEFAUL
         context.user_data["report_tmp"]["current_flow"] = flow_type
         logger.info(f"ACTION_TYPE_CHOICE: Flow type = '{flow_type}' for action '{action_name}'")
 
+        # Clear nav stack — fresh flow starts here
+        context.user_data['_nav_stack'] = []
+
         message_target = query.message if query.message else None
         if not message_target:
             logger.error("ACTION_TYPE_CHOICE: No message target available")
@@ -370,3 +405,36 @@ async def handle_action_type_choice(update: Update, context: ContextTypes.DEFAUL
         await query.answer("⚠️ خطأ في معالجة اختيار نوع الإجراء", show_alert=True)
         return R_ACTION_TYPE
 
+
+
+async def handle_restart_from_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """إعادة تعيين كاملة والعودة لشاشة البداية."""
+    from telegram.ext import ConversationHandler
+    try:
+        context.user_data.clear()
+    except Exception:
+        pass
+    try:
+        from bot.handlers.user.user_start import user_start
+        await user_start(update, context)
+    except Exception:
+        if update.message:
+            await update.message.reply_text("✅ تم إعادة البدء. اختر العملية المطلوبة.")
+    return ConversationHandler.END
+
+
+async def handle_restart_from_start_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """إعادة تعيين كاملة والعودة للقائمة الرئيسية."""
+    from telegram.ext import ConversationHandler
+    try:
+        context.user_data.clear()
+    except Exception:
+        pass
+    try:
+        from bot.handlers.user.user_start import handle_start_main_menu
+        await handle_start_main_menu(update, context)
+    except Exception:
+        if update.callback_query:
+            await update.callback_query.answer()
+            await update.callback_query.message.reply_text("✅ تم إعادة البدء. اختر العملية المطلوبة.")
+    return ConversationHandler.END

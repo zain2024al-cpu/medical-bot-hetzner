@@ -29,18 +29,17 @@ DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
 # 🚀 Create engine with high-performance settings for heavy load
 engine = create_engine(
     DATABASE_URL,
-    echo=False,  # Set to True for SQL debugging
+    echo=False,
     connect_args={
-        "check_same_thread": False,  # Allow multi-threading
-        "timeout": 60,  # 60 seconds timeout (better than 300 for fail-fast)
-        "isolation_level": None  # Enable autocommit for WAL mode
+        "check_same_thread": False,
+        "timeout": 30,
+        "isolation_level": None
     },
-    pool_pre_ping=True,  # Verify connections before using
-    pool_recycle=1800,  # Recycle connections after 30 minutes
-    pool_size=20,  # Reduced from 100 to 20 to prevent locking contention
-    max_overflow=30,  # Max overflow
-    # إعدادات إضافية للأداء العالي
-    pool_timeout=60,  # Wait up to 60s for a connection
+    pool_pre_ping=True,
+    pool_recycle=600,   # إعادة تدوير الاتصالات كل 10 دقائق
+    pool_size=5,        # SQLite ملف واحد — pool صغير يقلل الـ contention
+    max_overflow=10,
+    pool_timeout=20,
 )
 
 
@@ -54,7 +53,11 @@ def _set_sqlite_pragmas(dbapi_connection, connection_record):
         cursor.execute("PRAGMA journal_mode=WAL")
         cursor.execute("PRAGMA synchronous=NORMAL")
         cursor.execute("PRAGMA foreign_keys=OFF")
-        cursor.execute("PRAGMA busy_timeout=5000")
+        cursor.execute("PRAGMA busy_timeout=3000")
+        cursor.execute("PRAGMA cache_size=-32000")    # 32MB cache في الذاكرة
+        cursor.execute("PRAGMA temp_store=MEMORY")    # العمليات المؤقتة في RAM
+        cursor.execute("PRAGMA mmap_size=134217728")  # 128MB memory-mapped I/O
+        cursor.execute("PRAGMA wal_autocheckpoint=100")
     finally:
         cursor.close()
 

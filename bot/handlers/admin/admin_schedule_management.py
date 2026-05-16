@@ -1028,11 +1028,18 @@ async def handle_view_hospitals(update: Update, context: ContextTypes.DEFAULT_TY
         keyboard.append(nav_buttons)
     keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="manage_hospitals")])
     
-    await query.edit_message_text(
-        text,
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode=ParseMode.MARKDOWN
-    )
+    try:
+        await query.edit_message_text(
+            text,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode=ParseMode.MARKDOWN
+        )
+    except Exception:
+        await query.message.reply_text(
+            text,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode=ParseMode.MARKDOWN
+        )
 
 
 async def handle_add_hospital(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1446,48 +1453,6 @@ def register(app):
     app.add_handler(CallbackQueryHandler(handle_edit_patient_name, pattern="^edit_patient_page:\\d+$"))
     app.add_handler(CallbackQueryHandler(handle_select_edit, pattern="^edit_patient:\\d+$"))
     
-    # ================================================
-    # إضافة معالجات إدارة المستشفيات
-    # ================================================
-    
-    # دالة wrapper لإضافة مستشفى
-    async def start_add_hospital(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        return await handle_add_hospital(update, context)
-    
-    # دالة wrapper لتعديل مستشفى
-    async def start_edit_hospital(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        return await handle_select_edit_hospital(update, context)
-    
-    # ConversationHandler لإدارة المستشفيات (إضافة وتعديل)
-    hospitals_conv = ConversationHandler(
-        entry_points=[
-            CallbackQueryHandler(start_add_hospital, pattern="^add_hospital$"),
-            CallbackQueryHandler(start_edit_hospital, pattern="^select_edit_hosp:"),
-        ],
-        states={
-            "ADD_HOSPITAL": [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_hospital_name_input)
-            ],
-            "EDIT_HOSPITAL": [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_hospital_edit_input)
-            ]
-        },
-        fallbacks=[
-            CallbackQueryHandler(handle_manage_hospitals, pattern="^manage_hospitals$"),
-            CallbackQueryHandler(handle_cancel_hospital_input, pattern="^cancel_hospital_input$")
-        ],
-        per_chat=True,
-        per_user=True,
-        per_message=False,
-        name="hospitals_conv"
-    )
-    
-    app.add_handler(hospitals_conv)  # تسجيل ConversationHandler للمستشفيات
-    app.add_handler(CallbackQueryHandler(handle_manage_hospitals, pattern="^manage_hospitals$"))
-    app.add_handler(CallbackQueryHandler(handle_view_hospitals, pattern="^view_hospitals:\\d+$"))
-    app.add_handler(CallbackQueryHandler(handle_delete_hospital_menu, pattern="^delete_hospital:\\d+$"))
-    app.add_handler(CallbackQueryHandler(handle_confirm_delete_hospital, pattern="^confirm_del_hosp:\\d+$"))
-    app.add_handler(CallbackQueryHandler(handle_do_delete_hospital, pattern="^do_delete_hospital$"))
-    app.add_handler(CallbackQueryHandler(handle_edit_hospital_menu, pattern="^edit_hospital:\\d+$"))
-    
+    # إدارة المستشفيات مسجّلة في admin_hospitals_management.py فقط — لا تسجيل هنا.
+
     app.add_handler(conv)

@@ -3,7 +3,7 @@
 # دوال مساعدة للتنقل والإلغاء
 # =============================
 
-from telegram import Update
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes, ConversationHandler
 import logging
 
@@ -49,6 +49,7 @@ async def handle_cancel_navigation(update: Update, context: ContextTypes.DEFAULT
             
             # تنظيف navigation stack
             nav_clear(context)
+            context.user_data['_nav_stack'] = []
             context.user_data.pop("_current_search_type", None)
             
             # عرض التقويم مباشرة
@@ -58,9 +59,8 @@ async def handle_cancel_navigation(update: Update, context: ContextTypes.DEFAULT
             context.user_data['last_valid_state'] = 'date_selection'
             
             if query:
-                await render_date_selection(query.message, context)
+                await render_date_selection(query.message, context, query=query)
             else:
-                await update.message.reply_text("✅ تم الإلغاء - اختر التاريخ:")
                 await render_date_selection(update.message, context)
             
             logger.info("✅ CANCEL: Redirected to date selection")
@@ -103,6 +103,7 @@ async def handle_cancel_navigation(update: Update, context: ContextTypes.DEFAULT
         context.user_data.pop("_current_search_type", None)
         context.user_data.pop("history", None)
         context.user_data.pop("last_valid_state", None)
+        context.user_data['_nav_stack'] = []
         
         logger.info("✅ تم تنظيف جميع البيانات المتعلقة بالتقرير")
         
@@ -143,12 +144,8 @@ async def handle_back_navigation(update, context: ContextTypes.DEFAULT_TYPE):
 
         if not history:
             logger.warning("🔙 BACK: No history, going to start")
-            try:
-                await query.message.delete()
-            except:
-                pass
             from .date_time_handlers import render_date_selection
-            await render_date_selection(query.message, context)
+            await render_date_selection(query.message, context, query=query)
             nav_push(context, STATE_SELECT_DATE)
             context.user_data['_conversation_state'] = STATE_SELECT_DATE
             return STATE_SELECT_DATE
@@ -156,17 +153,13 @@ async def handle_back_navigation(update, context: ContextTypes.DEFAULT_TYPE):
         popped = nav_pop(context)
         previous_step = nav_peek(context)
         new_history = nav_get_history(context)
-        
+
         logger.info(f"🔙 BACK: popped={popped}, previous_step={previous_step}, new_history={new_history}")
 
         if previous_step is None:
             logger.info("🔙 BACK: No previous step, going to start")
-            try:
-                await query.message.delete()
-            except:
-                pass
             from .date_time_handlers import render_date_selection
-            await render_date_selection(query.message, context)
+            await render_date_selection(query.message, context, query=query)
             nav_push(context, STATE_SELECT_DATE)
             context.user_data['_conversation_state'] = STATE_SELECT_DATE
             return STATE_SELECT_DATE
@@ -174,68 +167,40 @@ async def handle_back_navigation(update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data['_conversation_state'] = previous_step
 
         if previous_step == STATE_SELECT_DATE:
-            try:
-                await query.message.delete()
-            except:
-                pass
             from .date_time_handlers import render_date_selection
-            await render_date_selection(query.message, context)
+            await render_date_selection(query.message, context, query=query)
             return STATE_SELECT_DATE
         elif previous_step == STATE_SELECT_PATIENT:
             PatientDataManager.clear_patient_data(context)
-            try:
-                await query.message.delete()
-            except:
-                pass
             from .patient_handlers import show_patient_selection
-            await show_patient_selection(query.message, context)
+            await show_patient_selection(query.message, context, query=query, restore=True, update=update)
             return STATE_SELECT_PATIENT
         elif previous_step == STATE_SELECT_HOSPITAL:
-            try:
-                await query.message.delete()
-            except:
-                pass
-            from .hospital_handlers import render_hospital_selection
-            await render_hospital_selection(query.message, context)
+            from .hospital_handlers import show_hospitals_menu
+            await show_hospitals_menu(query.message, context, query=query, restore=True)
             return STATE_SELECT_HOSPITAL
         elif previous_step == STATE_SELECT_DEPARTMENT:
             DepartmentDataManager.clear_department_data(context, full_clear=False)
-            try:
-                await query.message.delete()
-            except:
-                pass
-            from .department_handlers import render_department_selection
-            await render_department_selection(query.message, context)
+            from .department_handlers import show_departments_menu
+            await show_departments_menu(query.message, context, query=query, restore=True)
             return STATE_SELECT_DEPARTMENT
         elif previous_step == STATE_SELECT_SUBDEPARTMENT:
             DepartmentDataManager.clear_department_data(context, full_clear=False)
-            try:
-                await query.message.delete()
-            except:
-                pass
-            from .department_handlers import render_department_selection
-            await render_department_selection(query.message, context)
+            from .department_handlers import show_departments_menu
+            await show_departments_menu(query.message, context, query=query, restore=True)
             return STATE_SELECT_DEPARTMENT
         elif previous_step == STATE_SELECT_DOCTOR:
             DoctorDataManager.clear_doctor_data(context)
-            try:
-                await query.message.delete()
-            except:
-                pass
-            from .doctor_handlers import render_doctor_selection
-            await render_doctor_selection(query.message, context)
+            from .doctor_handlers import show_doctor_input
+            await show_doctor_input(query.message, context, query=query)
             return STATE_SELECT_DOCTOR
         elif previous_step == R_ACTION_TYPE:
             report_tmp = context.user_data.get("report_tmp", {})
             report_tmp.pop("medical_action", None)
             report_tmp.pop("action_type", None)
             report_tmp.pop("current_flow", None)
-            try:
-                await query.message.delete()
-            except:
-                pass
             from .action_type_handlers import show_action_type_menu
-            await show_action_type_menu(query.message, context)
+            await show_action_type_menu(query.message, context, query=query)
             return R_ACTION_TYPE
         else:
             logger.warning(f"🔙 BACK: Unknown state {previous_step}, using fallback")
@@ -297,22 +262,22 @@ async def handle_go_to_state(update: Update, context: ContextTypes.DEFAULT_TYPE)
         # عرض الشاشة المناسبة
         if target_state == STATE_SELECT_DATE:
             from .date_time_handlers import render_date_selection
-            await render_date_selection(query.message, context)
+            await render_date_selection(query.message, context, query=query)
         elif target_state == STATE_SELECT_PATIENT:
-            from .patient_handlers import render_patient_selection
-            await render_patient_selection(query.message, context)
+            from .patient_handlers import show_patient_selection
+            await show_patient_selection(query.message, context, query=query, restore=True, update=update)
         elif target_state == STATE_SELECT_HOSPITAL:
-            from .hospital_handlers import render_hospital_selection
-            await render_hospital_selection(query.message, context)
+            from .hospital_handlers import show_hospitals_menu
+            await show_hospitals_menu(query.message, context, query=query, restore=True)
         elif target_state == STATE_SELECT_DEPARTMENT:
-            from .department_handlers import render_department_selection
-            await render_department_selection(query.message, context)
+            from .department_handlers import show_departments_menu
+            await show_departments_menu(query.message, context, query=query, restore=True)
         elif target_state == STATE_SELECT_DOCTOR:
-            from .doctor_handlers import render_doctor_selection
-            await render_doctor_selection(query.message, context)
+            from .doctor_handlers import show_doctor_input
+            await show_doctor_input(query.message, context, query=query)
         elif target_state == R_ACTION_TYPE:
             from .action_type_handlers import show_action_type_menu
-            await show_action_type_menu(query.message, context)
+            await show_action_type_menu(query.message, context, query=query)
         else:
             await query.edit_message_text(
                 f"✅ **تم الرجوع إلى:** {state_name}\n\n"
@@ -330,3 +295,115 @@ async def handle_go_to_state(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
         return ConversationHandler.END
 
+
+
+async def handle_smart_back_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    معالج زر الرجوع الذكي — يعتمد على _nav_stack الذي تملؤه _tracked() wrappers.
+    يرجع خطوة واحدة بدقة. إذا كان الـ stack فارغاً يعود لقائمة نوع الإجراء.
+    """
+    from .states import STATE_SELECT_ACTION_TYPE
+    from .execute_smart_state_action import execute_smart_state_action
+
+    query = update.callback_query
+    if not query:
+        logger.error("❌ handle_smart_back_navigation: No query found")
+        return ConversationHandler.END
+
+    try:
+        await query.answer()
+    except Exception as e:
+        logger.warning(f"⚠️ Failed to answer callback: {e}")
+
+    try:
+        report_tmp = context.user_data.get('report_tmp', {})
+        flow_type = report_tmp.get('current_flow', 'new_consult')
+        current_conv_state = context.user_data.get('_conversation_state')
+
+        stack = context.user_data.get('_nav_stack', [])
+        logger.info(f"🔙 BACK: stack={stack}, flow={flow_type}, conv_state={current_conv_state}")
+
+        # States between content steps and translator: back from any of these returns to the gate
+        if current_conv_state in ("MEDICAL_REPORT_NO_REASON", "MEDICAL_REPORT_IMAGE", "TRANSLATOR_SELECTING"):
+            logger.info(f"🔙 BACK: from {current_conv_state} → re-show MEDICAL_REPORT_ASK gate")
+            # reset gate-related data so gate re-appears (not skipped)
+            report_tmp.pop("_medical_report_step_done", None)
+            report_tmp.pop("_medical_attachments", None)
+            report_tmp.pop("no_report_reason", None)
+            report_tmp.pop("_pending_translator_flow", None)
+            report_tmp["_pending_translator_flow"] = flow_type
+            first_row = [
+                InlineKeyboardButton("✅ نعم", callback_data="medrep:yes"),
+                InlineKeyboardButton("❌ لا", callback_data="medrep:no"),
+            ]
+            if flow_type == "radiology":
+                first_row.append(InlineKeyboardButton("⏭️ تخطي", callback_data="medrep:skip"))
+            gate_keyboard = InlineKeyboardMarkup([
+                first_row,
+                [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back")],
+            ])
+            if flow_type == "operation":
+                gate_text = "📎 **هل يوجد تقرير طبي او صور للعملية؟**\n\nاختر (نعم) إذا يوجد تقرير أو صور، أو (لا) إذا لا يوجد."
+            elif flow_type in ("rehab_physical", "rehab_device", "device"):
+                gate_text = "📎 **هل يوجد صور او فيدوهات للتمارين؟**\n\nاختر (نعم) إذا يوجد صور أو فيديوهات، أو (لا) إذا لا يوجد."
+            else:
+                gate_text = "📎 **هل يوجد تقرير طبي؟**\n\nاختر (نعم) إذا يوجد تقرير طبي، أو (لا) إذا لا يوجد."
+            try:
+                await query.edit_message_text(gate_text, reply_markup=gate_keyboard, parse_mode="Markdown")
+            except Exception:
+                await query.message.reply_text(gate_text, reply_markup=gate_keyboard, parse_mode="Markdown")
+            context.user_data["_conversation_state"] = "MEDICAL_REPORT_ASK"
+            return "MEDICAL_REPORT_ASK"
+
+        previous_step = None
+        if stack:
+            previous_step = stack.pop()
+            context.user_data['_nav_stack'] = stack
+            logger.info(f"🔙 BACK: popped {previous_step}, stack now={stack}")
+        else:
+            logger.warning("🔙 BACK: nav stack empty")
+
+        if previous_step is None:
+            logger.info("🔙 BACK: no previous step — returning to action type menu")
+            try:
+                from .action_type_handlers import show_action_type_menu
+                context.user_data['_conversation_state'] = STATE_SELECT_ACTION_TYPE
+                msg = query.message or update.effective_message
+                await show_action_type_menu(msg, context, query=query if query.message else None)
+            except Exception as e:
+                logger.error(f"Error showing action type menu: {e}", exc_info=True)
+            return STATE_SELECT_ACTION_TYPE
+
+        context.user_data['_conversation_state'] = previous_step
+        logger.info(f"🔙 BACK: rendering previous_step={previous_step}")
+
+        try:
+            await execute_smart_state_action(previous_step, flow_type, update, context)
+        except Exception as e:
+            logger.error(f"Error in execute_smart_state_action: {e}", exc_info=True)
+            try:
+                await query.edit_message_text(
+                    "❌ حدث خطأ في الرجوع\n\nيرجى المحاولة مرة أخرى",
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
+                        InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel"),
+                    ]])
+                )
+            except Exception:
+                pass
+            return previous_step
+
+        return previous_step
+
+    except Exception as e:
+        logger.error(f"❌ Error in handle_smart_back_navigation: {e}", exc_info=True)
+        try:
+            await query.edit_message_text(
+                "❌ حدث خطأ في الرجوع\n\nيرجى المحاولة مرة أخرى",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel"),
+                ]])
+            )
+        except Exception:
+            pass
+        return ConversationHandler.END

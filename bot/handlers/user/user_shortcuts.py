@@ -12,23 +12,28 @@ from db.models import Report, Translator
 from datetime import datetime, timedelta
 from sqlalchemy import func
 
+try:
+    from bot.handlers.user.user_reports_add_new_system.date_time_handlers import start_report as _start_report
+except ImportError:
+    _start_report = None
+
 
 async def cmd_add(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     اختصار /add - إضافة تقرير مباشرة
     """
     user = update.effective_user
-    
+
     if not is_user_approved(user.id):
-        await update.message.reply_text(
-            "⏳ بانتظار موافقة الإدارة."
-        )
+        await update.message.reply_text("⏳ بانتظار موافقة الإدارة.")
         return
-    
+
+    if _start_report:
+        return await _start_report(update, context)
+
+    # fallback
     await update.message.reply_text(
-        "⚡ **إضافة سريعة**\n\n"
-        "للبدء، اضغط على الزر:\n"
-        "👉 **\"📝 إضافة تقرير جديد\"** من لوحة الأزرار الرئيسية",
+        "📝 **إضافة تقرير جديد**\n\nاضغط على الزر في لوحة الأزرار الرئيسية.",
         parse_mode="Markdown",
         reply_markup=user_main_inline_kb()
     )

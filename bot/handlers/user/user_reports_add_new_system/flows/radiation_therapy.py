@@ -124,22 +124,29 @@ async def _render_radiation_calendar(message_or_query, context, year=None, month
 
 
 def _build_radiation_hour_keyboard():
-    """بناء لوحة اختيار الساعة"""
-    hours = [f"{h:02d}" for h in range(8, 20)]  # من 8 صباحاً إلى 8 مساءً
+    """بناء لوحة اختيار الساعة — 24 ساعة كاملة، 4 في كل صف"""
+    hours = []
+    for h in range(24):
+        if h == 0:
+            label = "12 صباحاً"
+        elif h < 12:
+            label = f"{h} صباحاً"
+        elif h == 12:
+            label = "12 ظهراً"
+        else:
+            label = f"{h - 12} مساءً"
+        hours.append((label, f"{h:02d}"))
+
     keyboard = []
-
-    for chunk in _chunked(hours, 4):
-        row = [
-            InlineKeyboardButton(f"{h}:00", callback_data=f"rad_time_hour:{h}")
-            for h in chunk
-        ]
-        keyboard.append(row)
-
+    for i in range(0, len(hours), 4):
+        keyboard.append([
+            InlineKeyboardButton(label, callback_data=f"rad_time_hour:{val}")
+            for label, val in hours[i:i+4]
+        ])
     keyboard.append([
         InlineKeyboardButton("🔙 رجوع", callback_data="rad_cal_back"),
         InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
     ])
-
     return InlineKeyboardMarkup(keyboard)
 
 
@@ -515,215 +522,10 @@ async def handle_radiation_therapy_return_reason(update: Update, context: Contex
 
     await update.message.reply_text("✅ تم الحفظ")
 
-    # ✅ بوابة "هل يوجد تقرير طبي؟" قبل المترجم (كانت مفقودة لهذا المسار)
-    try:
-        report_tmp = context.user_data.setdefault("report_tmp", {})
-        skip_medical_gate = bool(context.user_data.get("_skip_medical_gate_once"))
-        if (not skip_medical_gate) and (not report_tmp.get("_medical_report_step_done")):
-            report_tmp["_pending_translator_flow"] = "radiation_therapy"
-            keyboard = InlineKeyboardMarkup(
-                [
-                    [
-                        InlineKeyboardButton("✅ نعم", callback_data="medrep:yes"),
-                        InlineKeyboardButton("❌ لا", callback_data="medrep:no"),
-                    ],
-                    [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back")],
-                ]
-            )
-            await update.message.reply_text(
-                "📎 **هل يوجد تقرير طبي؟**\n\n"
-                "اختر (نعم) لرفع صور التقرير الطبي، أو (لا) لكتابة سبب عدم توفره.",
-                reply_markup=keyboard,
-                parse_mode="Markdown",
-            )
-            context.user_data["_conversation_state"] = "MEDICAL_REPORT_ASK"
-            return "MEDICAL_REPORT_ASK"
-        context.user_data.pop("_skip_medical_gate_once", None)
-    except Exception:
-        pass
-
-    # عرض المترجمين مع pagination
-    await show_radiation_translator_selection(update.message, context)
-
-    return RADIATION_THERAPY_TRANSLATOR
-
-
-# =============================
-# Translator Selection with Pagination
-# =============================
-
-async def show_radiation_translator_selection(message, context, page=0):
-    """عرض قائمة المترجمين على صفحات (حد أقصى صفحتين)"""
-    from .shared import load_translator_names
-
-    translator_names = load_translator_names()
-
-    if not translator_names:
-        await message.reply_text("❌ خطأ: لا توجد أسماء مترجمين متاحة")
-        from .shared import show_final_summary, get_confirm_state
-        await show_final_summary(message, context, "radiation_therapy")
-        confirm_state = get_confirm_state("radiation_therapy")
-        context.user_data['_conversation_state'] = confirm_state
-        return confirm_state
-
-    # تحديد عدد الصفحات إلى صفحتين فقط
-    # تقسيم جميع المترجمين على صفحتين بالتساوي
-    total_translators = len(translator_names)
-    max_pages = 2
-    items_per_page = (total_translators + max_pages - 1) // max_pages  # تقسيم المترجمين على صفحتين
-    total_pages = min(max_pages, max(1, (total_translators + items_per_page - 1) // items_per_page))
-    page = max(0, min(page, total_pages - 1))
-
-    start_idx = page * items_per_page
-    end_idx = min(start_idx + items_per_page, len(translator_names))
-    page_translators = translator_names[start_idx:end_idx]
-
-    # حفظ الصفحة الحالية
-    context.user_data.setdefault("report_tmp", {})["translator_page"] = page
-
-    # بناء لوحة المفاتيح
-    keyboard_buttons = []
-    row = []
-
-    for i, name in enumerate(page_translators):
-        actual_index = start_idx + i
-        row.append(InlineKeyboardButton(name, callback_data=f"rad_translator:{actual_index}"))
-        if len(row) == 3 or i == len(page_translators) - 1:
-            keyboard_buttons.append(row)
-            row = []
-
-    # أزرار التنقل بين الصفحات
-    nav_row = []
-    if page > 0:
-        nav_row.append(InlineKeyboardButton("◀️ السابق", callback_data=f"rad_translator_page:{page-1}"))
-
-    nav_row.append(InlineKeyboardButton(f"📄 {page+1}/{total_pages}", callback_data="noop"))
-
-    if page < total_pages - 1:
-        nav_row.append(InlineKeyboardButton("التالي ▶️", callback_data=f"rad_translator_page:{page+1}"))
-
-    if nav_row:
-        keyboard_buttons.append(nav_row)
-
-    # زر إلغاء
-    keyboard_buttons.append([
-        InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
-    ])
-
-    keyboard = InlineKeyboardMarkup(keyboard_buttons)
-
-    await message.reply_text(
-        f"👤 **اختر اسم المترجم**\n\n"
-        f"المترجم مسؤول عن ترجمة التقرير إلى اللغة المطلوبة.\n"
-        f"اختر من القائمة أدناه:",
-        reply_markup=keyboard,
-        parse_mode="Markdown"
-    )
-
-
-async def handle_radiation_translator_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """معالجة اختيار المترجم مع pagination"""
-    query = update.callback_query
-    await query.answer()
-
-    data = query.data
-
-    if data.startswith("rad_translator_page:"):
-        # تغيير الصفحة
-        page = int(data.split(":")[1])
-
-        from .shared import load_translator_names
-        translator_names = load_translator_names()
-
-        # تحديد عدد الصفحات إلى صفحتين فقط
-        # تقسيم جميع المترجمين على صفحتين بالتساوي
-        total_translators = len(translator_names)
-        max_pages = 2
-        items_per_page = (total_translators + max_pages - 1) // max_pages  # تقسيم المترجمين على صفحتين
-        total_pages = min(max_pages, max(1, (total_translators + items_per_page - 1) // items_per_page))
-        page = max(0, min(page, total_pages - 1))
-
-        start_idx = page * items_per_page
-        end_idx = min(start_idx + items_per_page, len(translator_names))
-        page_translators = translator_names[start_idx:end_idx]
-
-        context.user_data.setdefault("report_tmp", {})["translator_page"] = page
-
-        keyboard_buttons = []
-        row = []
-
-        for i, name in enumerate(page_translators):
-            actual_index = start_idx + i
-            row.append(InlineKeyboardButton(name, callback_data=f"rad_translator:{actual_index}"))
-            if len(row) == 3 or i == len(page_translators) - 1:
-                keyboard_buttons.append(row)
-                row = []
-
-        nav_row = []
-        if page > 0:
-            nav_row.append(InlineKeyboardButton("◀️ السابق", callback_data=f"rad_translator_page:{page-1}"))
-
-        nav_row.append(InlineKeyboardButton(f"📄 {page+1}/{total_pages}", callback_data="noop"))
-
-        if page < total_pages - 1:
-            nav_row.append(InlineKeyboardButton("التالي ▶️", callback_data=f"rad_translator_page:{page+1}"))
-
-        if nav_row:
-            keyboard_buttons.append(nav_row)
-
-        keyboard_buttons.append([
-            InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
-        ])
-
-        await query.edit_message_text(
-            f"👤 **اختر اسم المترجم**\n\n"
-            f"المترجم مسؤول عن ترجمة التقرير إلى اللغة المطلوبة.\n"
-            f"اختر من القائمة أدناه:",
-            reply_markup=InlineKeyboardMarkup(keyboard_buttons),
-            parse_mode="Markdown"
-        )
-        return RADIATION_THERAPY_TRANSLATOR
-
-    elif data.startswith("rad_translator:"):
-        choice = data.split(":")[1]
-
-        if choice == "skip":
-            translator_name = "غير محدد"
-            translator_id = None
-        else:
-            from .shared import load_translator_names
-            translator_names = load_translator_names()
-            try:
-                index = int(choice)
-                translator_name = translator_names[index]
-                translator_id = None
-            except (IndexError, ValueError):
-                await query.edit_message_text("❌ اختيار غير صحيح")
-                return ConversationHandler.END
-            
-            try:
-                from services.translators_service import get_translator_by_name
-                translator_info = get_translator_by_name(translator_name)
-                if translator_info:
-                    translator_id = translator_info.get("id")
-            except Exception as e:
-                logger.warning(f"⚠️ فشل تحديد معرف المترجم: {e}")
-
-        # حفظ اسم المترجم
-        report_tmp = context.user_data.setdefault("report_tmp", {})
-        report_tmp["translator_name"] = translator_name
-        report_tmp["translator_id"] = translator_id
-
-        # المتابعة للتأكيد النهائي
-        await query.edit_message_text(f"✅ تم اختيار المترجم: **{translator_name}**", parse_mode="Markdown")
-
-        from .shared import show_final_summary, get_confirm_state
-        await show_final_summary(query.message, context, "radiation_therapy")
-
-        confirm_state = get_confirm_state("radiation_therapy")
-        context.user_data['_conversation_state'] = confirm_state
-        return confirm_state
-
+    from .shared import show_translator_selection
+    gate_result = await show_translator_selection(update.message, context, "radiation_therapy")
+    if gate_result == "MEDICAL_REPORT_ASK":
+        return gate_result
     return RADIATION_THERAPY_TRANSLATOR
 
 
@@ -740,8 +542,6 @@ __all__ = [
     'handle_radiation_therapy_return_date',
     'handle_radiation_therapy_return_reason',
     'handle_radiation_calendar_callback',
-    'handle_radiation_translator_callback',
     '_render_radiation_calendar',
-    'show_radiation_translator_selection',
     'init_states',
 ]

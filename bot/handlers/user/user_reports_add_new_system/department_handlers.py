@@ -10,7 +10,8 @@ import logging
 from .states import STATE_SELECT_DEPARTMENT, STATE_SELECT_DOCTOR, R_SUBDEPARTMENT, R_DEPARTMENT
 from .navigation import nav_push
 from ..user_reports_add_helpers import PREDEFINED_DEPARTMENTS, DIRECT_DEPARTMENTS
-from .ui_primitives import paginate, pagination_buttons
+from .ui_primitives import paginate, pagination_buttons, screen_header, smart_rows
+from .selector_context import SelectorContext
 
 logger = logging.getLogger(__name__)
 
@@ -67,19 +68,22 @@ def _build_departments_keyboard(page=0, search_query="", context=None):
     if context:
         context.user_data.setdefault("report_tmp", {})["departments_list"] = all_departments
         context.user_data["report_tmp"]["departments_page"] = page
+        SelectorContext.save_department(context, page=page, search=search_query)
 
-    keyboard = []
     start_idx = page * items_per_page
-    for i, dept_name in enumerate(page_items):
-        has_subdepartments = dept_name in PREDEFINED_DEPARTMENTS
-        if has_subdepartments:
-            display = f"📁 {dept_name[:22]}..." if len(dept_name) > 22 else f"📁 {dept_name}"
-        else:
-            display = f"🏷️ {dept_name[:22]}..." if len(dept_name) > 22 else f"🏷️ {dept_name}"
-        keyboard.append([InlineKeyboardButton(
-            display,
+
+    def make_dept_btn(item):
+        i, dept_name = item["_i"], item["name"]
+        icon = "📁" if dept_name in PREDEFINED_DEPARTMENTS else "🏷️"
+        return InlineKeyboardButton(
+            f"{icon} {dept_name}",
             callback_data=f"dept_idx:{start_idx + i}"
-        )])
+        )
+
+    keyboard = smart_rows(
+        [{"name": d, "_i": i} for i, d in enumerate(page_items)],
+        make_dept_btn
+    )
 
     nav_row = pagination_buttons(page, total_pages, "dept_page")
     if nav_row:
@@ -90,36 +94,50 @@ def _build_departments_keyboard(page=0, search_query="", context=None):
         InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
     ])
 
-    text = (
-        f"🏷️ **اختيار القسم** (الخطوة 4 من 5)\n\n"
-        f"📋 **العدد:** {total} قسم"
+    context_line = f"🔍 نتائج: **{search_query}**" if search_query else ""
+    text = screen_header(
+        icon="🏷️", title="اختيار القسم",
+        step=4, total_steps=6,
+        count=total, count_label="قسم",
+        page=page, total_pages=total_pages,
+        context_line=context_line,
     )
-    if search_query:
-        text += f"\n🔍 **البحث:** {search_query}"
-    text += f"\n📄 **الصفحة:** {page + 1} من {total_pages}\n\nاختر القسم:"
-
     return text, InlineKeyboardMarkup(keyboard), search_query
 
 
-async def render_department_selection(message, context):
-    """عرض شاشة اختيار القسم - rendering فقط"""
-    text, keyboard, search = _build_departments_keyboard(0, "", context)
-    context.user_data.setdefault("report_tmp", {})["departments_search"] = search
-
-    try:
-        if hasattr(message, 'delete') and message.chat_id:
-            await message.delete()
-    except Exception:
-        pass
-
+async def render_department_selection(message, context, query=None,
+                                      page: int = 0, search: str = ""):
+    """عرض شاشة اختيار القسم.
+    - query  : إذا مُمرَّر يُعدَّل الرسالة (للرجوع). وإلا ترسل رسالة جديدة.
+    - page/search: استعادة السياق المحفوظ.
+    """
+    text, keyboard, resolved_search = _build_departments_keyboard(page, search, context)
+    context.user_data.setdefault("report_tmp", {})["departments_search"] = resolved_search
+    if query:
+        try:
+            await query.edit_message_text(text, reply_markup=keyboard, parse_mode="Markdown")
+            return
+        except Exception:
+            pass
     await message.reply_text(text, reply_markup=keyboard, parse_mode="Markdown")
 
 
-async def show_departments_menu(message, context, page=0, search_query=""):
-    """Navigation wrapper - يحدث state ثم يستدعي rendering"""
+async def show_departments_menu(message, context, page=None, search_query=None,
+                                query=None, restore=False):
+    """Navigation wrapper - يحدث state ثم يستدعي rendering.
+    restore=True: يستعيد السياق المحفوظ (للرجوع).
+    """
     context.user_data['last_valid_state'] = 'department_selection'
     context.user_data['_conversation_state'] = STATE_SELECT_DEPARTMENT
-    await render_department_selection(message, context)
+    if restore:
+        ctx = SelectorContext.load_department(context)
+        _page = ctx.page
+        _search = ctx.search
+    else:
+        _page = page if page is not None else 0
+        _search = search_query if search_query is not None else ""
+    await render_department_selection(message, context, query=query,
+                                      page=_page, search=_search)
 
 
 async def handle_department_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):

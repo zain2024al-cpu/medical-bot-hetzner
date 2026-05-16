@@ -17,15 +17,15 @@ try:
         show_final_summary,
         FOLLOWUP_CONFIRM
     )
-    from bot.handlers.user.user_reports_add_new_system.flows.new_consult import (
-        _render_followup_calendar
+    from bot.handlers.user.user_reports_add_new_system.edit_handlers.draft.handlers import (
+        _render_draft_edit_followup_calendar
     )
 except ImportError:
     logger.error("❌ Cannot import required modules for followup_edit")
     FOLLOWUP_CONFIRM = None
     get_confirm_state = lambda x: None
     show_final_summary = None
-    _render_followup_calendar = None
+    _render_draft_edit_followup_calendar = None
 
 
 async def handle_followup_edit_field_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -42,14 +42,21 @@ async def handle_followup_edit_field_selection(update: Update, context: ContextT
             return ConversationHandler.END
         
         field_key = parts[2]
-        flow_type = "followup"
-        
+
         logger.info(f"✏️ [FOLLOWUP] handle_edit_field_selection: field_key={field_key}")
-        
+
         data = context.user_data.get("report_tmp", {})
         current_value = data.get(field_key, "غير محدد")
         medical_action = data.get("medical_action", "")
-        
+
+        # تحديد flow_type الفعلي بناءً على medical_action
+        if medical_action == "مراجعة / عودة دورية":
+            flow_type = "periodic_followup"
+        elif medical_action == "متابعة في الرقود":
+            flow_type = "inpatient_followup"
+        else:
+            flow_type = "followup"
+
         # حفظ معلومات التعديل
         context.user_data["edit_field_key"] = field_key
         context.user_data["edit_flow_type"] = flow_type
@@ -85,12 +92,13 @@ async def handle_followup_edit_field_selection(update: Update, context: ContextT
         # عرض واجهة التعديل
         if field_key == "followup_date":
             # ✅ استخدام التقويم التفاعلي بدلاً من إدخال نصي
-            if _render_followup_calendar:
-                # حفظ معلومات التعديل في context للاستخدام في معالجة callbacks التقويم
-                context.user_data["edit_field_key"] = field_key
-                context.user_data["edit_flow_type"] = flow_type
-                # عرض التقويم
-                await _render_followup_calendar(query, context)
+            context.user_data["edit_field_key"] = field_key
+            context.user_data["edit_flow_type"] = flow_type
+            context.user_data['editing_draft_date'] = True
+            if _render_draft_edit_followup_calendar:
+                await _render_draft_edit_followup_calendar(query, context)
+                context.user_data['_conversation_state'] = "EDIT_DRAFT_FOLLOWUP_CALENDAR"
+                return "EDIT_DRAFT_FOLLOWUP_CALENDAR"
             else:
                 # Fallback إلى إدخال نصي إذا لم يكن التقويم متاحاً
                 await query.edit_message_text(
@@ -98,8 +106,7 @@ async def handle_followup_edit_field_selection(update: Update, context: ContextT
                     f"**القيمة الحالية:** {current_value_display}\n\n"
                     f"📝 أرسل التاريخ الجديد (مثال: 2025-01-15):",
                     reply_markup=InlineKeyboardMarkup([
-                        [InlineKeyboardButton("🔙 رجوع", callback_data=f"save:{flow_type}")],
-                        [InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]
+                        [InlineKeyboardButton("🔙 رجوع", callback_data=f"back_to_edit_fields:{flow_type}")],
                     ]),
                     parse_mode="Markdown"
                 )
@@ -109,8 +116,7 @@ async def handle_followup_edit_field_selection(update: Update, context: ContextT
                 f"**القيمة الحالية:**\n{current_value_display}\n\n"
                 f"📝 أرسل القيمة الجديدة:",
                 reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🔙 رجوع", callback_data=f"save:{flow_type}")],
-                    [InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]
+                    [InlineKeyboardButton("🔙 رجوع", callback_data=f"back_to_edit_fields:{flow_type}")],
                 ]),
                 parse_mode="Markdown"
             )
@@ -145,8 +151,8 @@ async def handle_followup_edit_field_input(update: Update, context: ContextTypes
         field_key = context.user_data.get("edit_field_key")
         flow_type = context.user_data.get("edit_flow_type")
         
-        if flow_type != "followup":
-            logger.warning(f"⚠️ [FOLLOWUP] handle_edit_field_input: flow_type={flow_type} ليس followup - تجاهل")
+        if flow_type not in ("followup", "periodic_followup", "inpatient_followup"):
+            logger.warning(f"⚠️ [FOLLOWUP] handle_edit_field_input: flow_type={flow_type} ليس followup/periodic_followup/inpatient_followup - تجاهل")
             return
         
         if not field_key:

@@ -17,15 +17,15 @@ try:
         show_final_summary,
         SURGERY_CONSULT_CONFIRM
     )
-    from bot.handlers.user.user_reports_add_new_system.flows.new_consult import (
-        _render_followup_calendar
+    from bot.handlers.user.user_reports_add_new_system.edit_handlers.draft.handlers import (
+        _render_draft_edit_followup_calendar
     )
 except ImportError:
     logger.error("❌ Cannot import required modules for surgery_consult_edit")
     SURGERY_CONSULT_CONFIRM = None
     get_confirm_state = lambda x: None
     show_final_summary = None
-    _render_followup_calendar = None
+    _render_draft_edit_followup_calendar = None
 
 
 # =============================
@@ -84,12 +84,13 @@ async def handle_surgery_consult_edit_field_selection(update: Update, context: C
         # عرض واجهة التعديل - منطق خاص لكل حقل
         if field_key == "followup_date":
             # ✅ استخدام التقويم التفاعلي بدلاً من إدخال نصي
-            if _render_followup_calendar:
-                # حفظ معلومات التعديل في context للاستخدام في معالجة callbacks التقويم
-                context.user_data["edit_field_key"] = field_key
-                context.user_data["edit_flow_type"] = flow_type
-                # عرض التقويم
-                await _render_followup_calendar(query, context)
+            context.user_data["edit_field_key"] = field_key
+            context.user_data["edit_flow_type"] = flow_type
+            context.user_data['editing_draft_date'] = True
+            if _render_draft_edit_followup_calendar:
+                await _render_draft_edit_followup_calendar(query, context)
+                context.user_data['_conversation_state'] = "EDIT_DRAFT_FOLLOWUP_CALENDAR"
+                return "EDIT_DRAFT_FOLLOWUP_CALENDAR"
             else:
                 # Fallback إلى إدخال نصي إذا لم يكن التقويم متاحاً
                 await query.edit_message_text(
@@ -97,8 +98,7 @@ async def handle_surgery_consult_edit_field_selection(update: Update, context: C
                     f"**القيمة الحالية:** {current_value_display}\n\n"
                     f"📝 أرسل التاريخ الجديد (مثال: 2025-01-15):",
                     reply_markup=InlineKeyboardMarkup([
-                        [InlineKeyboardButton("🔙 رجوع", callback_data=f"save:{flow_type}")],
-                        [InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]
+                        [InlineKeyboardButton("🔙 رجوع", callback_data=f"back_to_edit_fields:{flow_type}")],
                     ]),
                     parse_mode="Markdown"
                 )
@@ -109,8 +109,7 @@ async def handle_surgery_consult_edit_field_selection(update: Update, context: C
                 f"**القيمة الحالية:** {current_value_display}\n\n"
                 f"📝 أرسل النسبة الجديدة (مثال: 80% أو 85):",
                 reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🔙 رجوع", callback_data=f"save:{flow_type}")],
-                    [InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]
+                    [InlineKeyboardButton("🔙 رجوع", callback_data=f"back_to_edit_fields:{flow_type}")],
                 ]),
                 parse_mode="Markdown"
             )
@@ -121,8 +120,7 @@ async def handle_surgery_consult_edit_field_selection(update: Update, context: C
                 f"**القيمة الحالية:**\n{current_value_display}\n\n"
                 f"📝 أرسل القيمة الجديدة:",
                 reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🔙 رجوع", callback_data=f"save:{flow_type}")],
-                    [InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]
+                    [InlineKeyboardButton("🔙 رجوع", callback_data=f"back_to_edit_fields:{flow_type}")],
                 ]),
                 parse_mode="Markdown"
             )

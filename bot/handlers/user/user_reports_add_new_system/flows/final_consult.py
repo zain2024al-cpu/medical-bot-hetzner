@@ -142,6 +142,7 @@ async def handle_final_consult_recommendations(update: Update, context: ContextT
     context.user_data["report_tmp"]["followup_reason"] = "استشارة أخيرة - لا يوجد عودة"
 
     await update.message.reply_text("✅ تم الحفظ")
-    await show_translator_selection(update.message, context, "final_consult")
-
+    gate_result = await show_translator_selection(update.message, context, "final_consult")
+    if gate_result == "MEDICAL_REPORT_ASK":
+        return gate_result
     return FINAL_CONSULT_TRANSLATOR

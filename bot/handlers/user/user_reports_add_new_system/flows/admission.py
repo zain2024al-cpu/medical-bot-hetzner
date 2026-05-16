@@ -196,6 +196,7 @@ async def handle_admission_followup_reason(update: Update, context: ContextTypes
     context.user_data["report_tmp"]["followup_reason"] = text
 
     await update.message.reply_text("✅ تم الحفظ")
-    await show_translator_selection(update.message, context, "admission")
-
+    gate_result = await show_translator_selection(update.message, context, "admission")
+    if gate_result == "MEDICAL_REPORT_ASK":
+        return gate_result
     return ADMISSION_TRANSLATOR

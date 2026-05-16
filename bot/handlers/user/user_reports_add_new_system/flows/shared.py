@@ -273,153 +273,172 @@ def _has_field_value(data, field_key):
 
 
 def get_editable_fields_by_flow_type(flow_type):
-    """الحصول على الحقول القابلة للتعديل حسب نوع التدفق - دالة ثابتة للقوائم
-    ✅ ملاحظة: تم إزالة الحقول الأساسية (report_date, patient_name, hospital_name, department_name, doctor_name)
-    لأنها تُحدد قبل بدء المسار وليست جزءاً من الإدخال اليدوي
+    """
+    القائمة الموحدة والمرجعية للحقول القابلة للتعديل لكل نوع مسار.
+    مصدر الحقيقة الوحيد — يُستخدم من shared.py والمونوليث معاً.
+    الحقول الأساسية (اسم المريض، المستشفى، القسم، الطبيب) مُستبعدة لأنها
+    تُحدد قبل بدء المسار.
     """
     fields_map = {
         "new_consult": [
-            # ✅ الحقول المدخلة فقط في مسار استشارة جديدة
-            ("complaint", "💬 شكوى المريض"),
-            ("diagnosis", "🔬 التشخيص الطبي"),
-            ("decision", "📝 قرار الطبيب"),
-            ("tests", "🧪 الفحوصات والأشعة"),
-            ("followup_date", "📅 موعد العودة"),
-            ("followup_time", "⏰ وقت العودة"),
-            ("followup_reason", "✍️ سبب العودة"),
+            ("complaint",        "💬 شكوى المريض"),
+            ("diagnosis",        "🔬 التشخيص الطبي"),
+            ("decision",         "📝 قرار الطبيب"),
+            ("tests",            "🧪 الفحوصات والأشعة"),
+            ("followup_date",    "📅 موعد العودة"),
+            ("followup_time",    "⏰ وقت العودة"),
+            ("followup_reason",  "✍️ سبب العودة"),
+            ("no_report_reason", "📋 سبب عدم وجود تقرير طبي"),
+            ("translator_name",  "👤 المترجم"),
         ],
         "followup": [
-            # ✅ الحقول المدخلة فقط في مسار متابعة (متابعة في الرقود) - بدون تشخيص
-            ("complaint", "🛏️ حالة المريض اليومية"),
-            ("decision", "📝 قرار الطبيب اليومي"),
-            ("room_number", "🏥 رقم الغرفة والطابق"),
-            ("followup_date", "📅 موعد العودة"),
-            ("followup_time", "⏰ وقت العودة"),
-            ("followup_reason", "✍️ سبب العودة"),
+            ("complaint",        "🛏️ حالة المريض اليومية"),
+            ("decision",         "📝 قرار الطبيب اليومي"),
+            ("room_number",      "🏥 رقم الغرفة والطابق"),
+            ("followup_date",    "📅 موعد العودة"),
+            ("followup_time",    "⏰ وقت العودة"),
+            ("followup_reason",  "✍️ سبب العودة"),
+            ("no_report_reason", "📋 سبب عدم وجود تقرير طبي"),
+            ("translator_name",  "👤 المترجم"),
         ],
         "periodic_followup": [
-            # ✅ مسار "مراجعة / عودة دورية" - بدون room_number
-            ("complaint", "💬 شكوى المريض"),
-            ("diagnosis", "🔬 التشخيص الطبي"),
-            ("decision", "📝 قرار الطبيب"),
-            ("followup_date", "📅 موعد العودة"),
-            ("followup_time", "⏰ وقت العودة"),
-            ("followup_reason", "✍️ سبب العودة"),
+            ("complaint",        "💬 شكوى المريض"),
+            ("diagnosis",        "🔬 التشخيص الطبي"),
+            ("decision",         "📝 قرار الطبيب"),
+            ("followup_date",    "📅 موعد العودة"),
+            ("followup_time",    "⏰ وقت العودة"),
+            ("followup_reason",  "✍️ سبب العودة"),
+            ("no_report_reason", "📋 سبب عدم وجود تقرير طبي"),
+            ("translator_name",  "👤 المترجم"),
         ],
         "inpatient_followup": [
-            # ✅ مسار "متابعة في الرقود" - مع room_number - بدون تشخيص
-            ("complaint", "🛏️ حالة المريض اليومية"),
-            ("decision", "📝 قرار الطبيب اليومي"),
-            ("room_number", "🏥 رقم الغرفة والطابق"),
-            ("followup_date", "📅 موعد العودة"),
-            ("followup_time", "⏰ وقت العودة"),
-            ("followup_reason", "✍️ سبب العودة"),
+            ("complaint",        "🛏️ حالة المريض اليومية"),
+            ("decision",         "📝 قرار الطبيب اليومي"),
+            ("room_number",      "🏥 رقم الغرفة والطابق"),
+            ("followup_date",    "📅 موعد العودة"),
+            ("followup_time",    "⏰ وقت العودة"),
+            ("followup_reason",  "✍️ سبب العودة"),
+            ("no_report_reason", "📋 سبب عدم وجود تقرير طبي"),
+            ("translator_name",  "👤 المترجم"),
         ],
         "emergency": [
-            # ✅ الحقول المدخلة فقط في مسار طوارئ
-            ("complaint", "💬 شكوى المريض"),
-            ("diagnosis", "🔬 التشخيص الطبي"),
-            ("decision", "📝 قرار الطبيب وماذا تم"),
-            ("status", "🏥 وضع الحالة"),
-            ("room_number", "🚪 رقم الغرفة"),
-            ("followup_date", "📅 موعد العودة"),
-            ("followup_time", "⏰ وقت العودة"),
-            ("followup_reason", "✍️ سبب العودة"),
+            ("complaint",        "💬 شكوى المريض"),
+            ("diagnosis",        "🔬 التشخيص الطبي"),
+            ("decision",         "📝 قرار الطبيب وماذا تم"),
+            ("status",           "🏥 وضع الحالة"),
+            ("room_number",      "🚪 رقم الغرفة"),
+            ("followup_date",    "📅 موعد العودة"),
+            ("followup_time",    "⏰ وقت العودة"),
+            ("followup_reason",  "✍️ سبب العودة"),
+            ("no_report_reason", "📋 سبب عدم وجود تقرير طبي"),
+            ("translator_name",  "👤 المترجم"),
         ],
         "admission": [
-            # ✅ الحقول المدخلة فقط في مسار ترقيد
             ("admission_reason", "🛏️ سبب الرقود"),
-            ("room_number", "🚪 رقم الغرفة"),
-            ("notes", "📝 ملاحظات"),
-            ("followup_date", "📅 موعد العودة"),
-            ("followup_reason", "✍️ سبب العودة"),
+            ("room_number",      "🚪 رقم الغرفة"),
+            ("notes",            "📝 ملاحظات"),
+            ("followup_date",    "📅 موعد العودة"),
+            ("followup_time",    "⏰ وقت العودة"),
+            ("followup_reason",  "✍️ سبب العودة"),
+            ("no_report_reason", "📋 سبب عدم وجود تقرير طبي"),
+            ("translator_name",  "👤 المترجم"),
         ],
         "surgery_consult": [
-            # ✅ الحقول المدخلة فقط في مسار استشارة مع قرار عملية
-            ("diagnosis", "🔬 التشخيص"),
-            ("decision", "📝 قرار الطبيب وتفاصيل العملية"),
+            ("diagnosis",         "🔬 التشخيص"),
+            ("decision",          "📝 قرار الطبيب وتفاصيل العملية"),
             ("operation_name_en", "🔤 اسم العملية بالإنجليزي"),
-            ("success_rate", "📊 نسبة نجاح العملية"),
-            ("benefit_rate", "💡 نسبة الاستفادة"),
-            ("tests", "🧪 الفحوصات والأشعة"),
-            ("followup_date", "📅 موعد العودة"),
-            ("followup_time", "⏰ وقت العودة"),
-            ("followup_reason", "✍️ سبب العودة"),
+            ("success_rate",      "📊 نسبة نجاح العملية"),
+            ("benefit_rate",      "💡 نسبة الاستفادة"),
+            ("tests",             "🧪 الفحوصات والأشعة"),
+            ("followup_date",     "📅 موعد العودة"),
+            ("followup_time",     "⏰ وقت العودة"),
+            ("followup_reason",   "✍️ سبب العودة"),
+            ("no_report_reason",  "📋 سبب عدم وجود تقرير طبي"),
+            ("translator_name",   "👤 المترجم"),
         ],
         "operation": [
-            # ✅ الحقول المدخلة فقط في مسار عملية
             ("operation_details", "⚕️ تفاصيل العملية بالعربي"),
             ("operation_name_en", "🔤 اسم العملية بالإنجليزي"),
-            ("notes", "📝 ملاحظات"),
-            ("followup_date", "📅 موعد العودة"),
-            ("followup_time", "⏰ وقت العودة"),
-            ("followup_reason", "✍️ سبب العودة"),
+            ("notes",             "📝 ملاحظات"),
+            ("followup_date",     "📅 موعد العودة"),
+            ("followup_time",     "⏰ وقت العودة"),
+            ("followup_reason",   "✍️ سبب العودة"),
+            ("no_report_reason",  "📋 سبب عدم وجود تقرير طبي"),
+            ("translator_name",   "👤 المترجم"),
         ],
         "final_consult": [
-            # ✅ الحقول المدخلة فقط في مسار استشارة أخيرة
-            ("diagnosis", "🔬 التشخيص النهائي"),
-            ("decision", "📝 قرار الطبيب"),
-            ("recommendations", "💡 التوصيات الطبية"),
+            ("diagnosis",        "🔬 التشخيص النهائي"),
+            ("decision",         "📝 قرار الطبيب"),
+            ("recommendations",  "💡 التوصيات الطبية"),
+            ("no_report_reason", "📋 سبب عدم وجود تقرير طبي"),
+            ("translator_name",  "👤 المترجم"),
         ],
         "discharge": [
-            # ✅ الحقول المدخلة فقط في مسار خروج من المستشفى
-            ("discharge_type", "🚪 نوع الخروج"),
+            ("discharge_type",    "🚪 نوع الخروج"),
             ("admission_summary", "📋 ملخص الرقود"),
             ("operation_details", "⚕️ تفاصيل العملية"),
             ("operation_name_en", "🔤 اسم العملية بالإنجليزي"),
-            ("followup_date", "📅 موعد العودة"),
-            ("followup_reason", "✍️ سبب العودة"),
+            ("followup_date",     "📅 موعد العودة"),
+            ("followup_time",     "⏰ وقت العودة"),
+            ("followup_reason",   "✍️ سبب العودة"),
+            ("no_report_reason",  "📋 سبب عدم وجود تقرير طبي"),
+            ("translator_name",   "👤 المترجم"),
         ],
         "rehab_physical": [
-            # ✅ الحقول المدخلة فقط في مسار علاج طبيعي
-            ("therapy_details", "🏃 تفاصيل جلسة العلاج الطبيعي"),
-            ("followup_date", "📅 موعد العودة"),
-            ("followup_time", "⏰ وقت العودة"),
-            ("followup_reason", "✍️ سبب العودة"),
+            ("therapy_details",  "🏃 تفاصيل جلسة العلاج الطبيعي"),
+            ("followup_date",    "📅 موعد العودة"),
+            ("followup_time",    "⏰ وقت العودة"),
+            ("followup_reason",  "✍️ سبب العودة"),
+            ("no_report_reason", "📋 سبب عدم وجود تقرير طبي"),
+            ("translator_name",  "👤 المترجم"),
         ],
         "rehab_device": [
-            # ✅ الحقول المدخلة فقط في مسار أجهزة تعويضية
-            ("device_name", "🦾 اسم الجهاز والتفاصيل"),
-            ("followup_date", "📅 موعد العودة"),
-            ("followup_time", "⏰ وقت العودة"),
-            ("followup_reason", "✍️ سبب العودة"),
+            ("device_name",      "🦾 اسم الجهاز والتفاصيل"),
+            ("followup_date",    "📅 موعد العودة"),
+            ("followup_time",    "⏰ وقت العودة"),
+            ("followup_reason",  "✍️ سبب العودة"),
+            ("no_report_reason", "📋 سبب عدم وجود تقرير طبي"),
+            ("translator_name",  "👤 المترجم"),
         ],
         "radiology": [
-            # ✅ الحقول المدخلة فقط في مسار أشعة وفحوصات
-            ("radiology_type", "🔬 نوع الأشعة/الفحص"),
-            ("delivery_date", "📅 تاريخ الاستلام"),
+            ("radiology_type",   "🔬 نوع الأشعة/الفحص"),
+            ("delivery_date",    "📅 تاريخ الاستلام"),
+            ("no_report_reason", "📋 سبب عدم وجود تقرير طبي"),
+            ("translator_name",  "👤 المترجم"),
         ],
         "radiation_therapy": [
-            # ✅ الحقول المدخلة فقط في مسار جلسة إشعاعي
-            ("radiation_therapy_type", "☢️ نوع الإشعاعي"),
+            ("radiation_therapy_type",           "☢️ نوع الإشعاعي"),
             ("radiation_therapy_session_number", "🔢 رقم الجلسة"),
-            ("radiation_therapy_remaining", "📊 الجلسات المتبقية"),
-            ("radiation_therapy_recommendations", "📝 ملاحظات / توصيات"),
-            ("followup_date", "📅 تاريخ العودة"),
-            ("followup_time", "⏰ وقت العودة"),
-            ("followup_reason", "✍️ سبب العودة"),
+            ("radiation_therapy_remaining",      "📊 الجلسات المتبقية"),
+            ("radiation_therapy_recommendations","📝 ملاحظات / توصيات"),
+            ("followup_date",    "📅 تاريخ العودة"),
+            ("followup_time",    "⏰ وقت العودة"),
+            ("followup_reason",  "✍️ سبب العودة"),
+            ("no_report_reason", "📋 سبب عدم وجود تقرير طبي"),
+            ("translator_name",  "👤 المترجم"),
         ],
         "appointment_reschedule": [
-            # ✅ الحقول المدخلة فقط في مسار تأجيل موعد
-            ("app_reschedule_reason", "📅 سبب تأجيل الموعد"),
+            ("app_reschedule_reason",      "📅 سبب تأجيل الموعد"),
             ("app_reschedule_return_date", "📅 تاريخ العودة الجديد"),
-            ("app_reschedule_return_reason", "✍️ سبب العودة"),
+            ("app_reschedule_return_reason","✍️ سبب العودة"),
+            ("translator_name",            "👤 المترجم"),
         ],
         "app_reschedule": [
-            # ✅ نسخة للتوافق مع app_reschedule
-            ("app_reschedule_reason", "📅 سبب تأجيل الموعد"),
+            ("app_reschedule_reason",      "📅 سبب تأجيل الموعد"),
             ("app_reschedule_return_date", "📅 تاريخ العودة الجديد"),
-            ("app_reschedule_return_reason", "✍️ سبب العودة"),
+            ("app_reschedule_return_reason","✍️ سبب العودة"),
+            ("translator_name",            "👤 المترجم"),
         ],
         "device": [
-            # ✅ نسخة للتوافق مع device (rehab_device)
-            ("device_name", "🦾 اسم الجهاز والتفاصيل"),
-            ("followup_date", "📅 موعد العودة"),
-            ("followup_time", "⏰ وقت العودة"),
-            ("followup_reason", "✍️ سبب العودة"),
+            ("device_name",      "🦾 اسم الجهاز والتفاصيل"),
+            ("followup_date",    "📅 موعد العودة"),
+            ("followup_time",    "⏰ وقت العودة"),
+            ("followup_reason",  "✍️ سبب العودة"),
+            ("no_report_reason", "📋 سبب عدم وجود تقرير طبي"),
+            ("translator_name",  "👤 المترجم"),
         ],
     }
-    return fields_map.get(flow_type, [])
+    return list(fields_map.get(flow_type, []))
 
 
 def get_translator_state(flow_type):
@@ -515,9 +534,23 @@ async def show_translator_selection(message, context, flow_type):
                     [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back")],
                 ]
             )
+            if flow_type == "operation":
+                gate_text = (
+                    "📎 **هل يوجد تقرير طبي او صور للعملية؟**\n\n"
+                    "اختر (نعم) إذا يوجد تقرير أو صور، أو (لا) إذا لا يوجد."
+                )
+            elif flow_type in ("rehab_physical", "rehab_device", "device"):
+                gate_text = (
+                    "📎 **هل يوجد صور او فيدوهات للتمارين؟**\n\n"
+                    "اختر (نعم) إذا يوجد صور أو فيديوهات، أو (لا) إذا لا يوجد."
+                )
+            else:
+                gate_text = (
+                    "📎 **هل يوجد تقرير طبي؟**\n\n"
+                    "اختر (نعم) إذا يوجد تقرير طبي، أو (لا) إذا لا يوجد."
+                )
             await message.reply_text(
-                "📎 **هل يوجد تقرير طبي؟**\n\n"
-                "اختر (نعم) لرفع صور التقرير الطبي، أو (لا) لكتابة سبب عدم توفره.",
+                gate_text,
                 reply_markup=keyboard,
                 parse_mode="Markdown",
             )
@@ -565,6 +598,160 @@ async def show_translator_selection(message, context, flow_type):
         reply_markup=keyboard,
         parse_mode="Markdown"
     )
+    # mark that user is now on the translator list (distinct from MEDICAL_REPORT_ASK gate)
+    context.user_data["_conversation_state"] = "TRANSLATOR_SELECTING"
+
+
+async def handle_medical_report_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    معالجة بوابة 'هل يوجد تقرير طبي؟'
+    - yes/skip: انتقال مباشر لاختيار المترجم
+    - no: طلب كتابة سبب عدم وجود التقرير
+    """
+    query = update.callback_query
+    await query.answer()
+
+    report_tmp = context.user_data.setdefault("report_tmp", {})
+    flow_type = report_tmp.get("_pending_translator_flow", "new_consult")
+    context.user_data.pop("_skip_medical_gate_once", None)
+
+    choice = query.data.split(":")[1]  # yes / no / skip
+
+    if choice == "no":
+        # طلب سبب عدم وجود التقرير الطبي
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back")],
+        ])
+        await query.edit_message_text(
+            "📝 **سبب عدم وجود التقرير الطبي**\n\n"
+            "أدخل سبب عدم وجود التقرير الطبي:",
+            reply_markup=keyboard,
+            parse_mode="Markdown",
+        )
+        context.user_data["_conversation_state"] = "MEDICAL_REPORT_NO_REASON"
+        return "MEDICAL_REPORT_NO_REASON"
+
+    # skip → انتقال مباشر للمترجم بدون رفع ملفات
+    if choice == "skip":
+        report_tmp["_medical_report_step_done"] = True
+        context.user_data.pop("_skip_medical_gate_once", None)
+        await query.edit_message_text("✅ تم.")
+        await show_translator_selection(query.message, context, flow_type)
+        return get_translator_state(flow_type)
+
+    # yes → فتح شاشة رفع الملفات الطبية
+    report_tmp["_medical_attachments"] = []
+    report_tmp["_medical_report_step_done"] = False
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ انتهيت من الرفع", callback_data="medrep_done:yes")],
+        [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back")],
+    ])
+    await query.edit_message_text(
+        "📎 **أرسل الملفات الطبية**\n\n"
+        "يمكنك إرسال:\n"
+        "• صور 🖼\n"
+        "• ملفات PDF أو مستندات 📄\n"
+        "• فيديوهات 🎥\n\n"
+        "أرسل ملفاً واحداً أو أكثر، ثم اضغط **انتهيت من الرفع**.",
+        reply_markup=keyboard,
+        parse_mode="Markdown",
+    )
+    context.user_data["_conversation_state"] = "MEDICAL_REPORT_IMAGE"
+    return "MEDICAL_REPORT_IMAGE"
+
+
+async def handle_medical_report_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """استقبال ملف (صورة / مستند / فيديو) وتجميعه في report_tmp"""
+    report_tmp = context.user_data.setdefault("report_tmp", {})
+    attachments = report_tmp.setdefault("_medical_attachments", [])
+
+    msg = update.message
+    file_info = None
+
+    if msg.photo:
+        # أكبر جودة متاحة
+        photo = msg.photo[-1]
+        file_info = {"type": "photo", "file_id": photo.file_id}
+    elif msg.document:
+        file_info = {"type": "document", "file_id": msg.document.file_id,
+                     "file_name": msg.document.file_name or "document"}
+    elif msg.video:
+        file_info = {"type": "video", "file_id": msg.video.file_id}
+    elif msg.audio:
+        file_info = {"type": "audio", "file_id": msg.audio.file_id}
+    elif msg.voice:
+        file_info = {"type": "voice", "file_id": msg.voice.file_id}
+    else:
+        await msg.reply_text(
+            "⚠️ نوع الملف غير مدعوم. أرسل صورة أو ملف PDF أو فيديو.\n"
+            "أو اضغط **انتهيت من الرفع** للمتابعة.",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("✅ انتهيت من الرفع", callback_data="medrep_done:yes")],
+            ]),
+            parse_mode="Markdown",
+        )
+        return "MEDICAL_REPORT_IMAGE"
+
+    attachments.append(file_info)
+    count = len(attachments)
+
+    await msg.reply_text(
+        f"✅ تم استلام الملف ({count} {'ملف' if count == 1 else 'ملفات'} حتى الآن)\n\n"
+        "أرسل المزيد أو اضغط **انتهيت من الرفع**.",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("✅ انتهيت من الرفع", callback_data="medrep_done:yes")],
+            [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back")],
+        ]),
+        parse_mode="Markdown",
+    )
+    return "MEDICAL_REPORT_IMAGE"
+
+
+async def handle_medical_report_image_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """الانتهاء من رفع الملفات والانتقال لاختيار المترجم"""
+    query = update.callback_query
+    await query.answer()
+
+    report_tmp = context.user_data.setdefault("report_tmp", {})
+    attachments = report_tmp.get("_medical_attachments", [])
+    report_tmp["_medical_report_step_done"] = True
+
+    flow_type = report_tmp.get("_pending_translator_flow", "new_consult")
+
+    count = len(attachments)
+    if count > 0:
+        await query.edit_message_text(f"✅ تم حفظ {count} {'ملف طبي' if count == 1 else 'ملفات طبية'}.")
+    else:
+        await query.edit_message_text("✅ تم. (لم يتم رفع أي ملفات)")
+
+    await show_translator_selection(query.message, context, flow_type)
+    return get_translator_state(flow_type)
+
+
+async def handle_medical_report_no_reason(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """استقبال سبب عدم وجود التقرير الطبي ثم الانتقال لاختيار المترجم"""
+    text = update.message.text.strip() if update.message else ""
+    if not text:
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back")],
+        ])
+        await update.message.reply_text(
+            "⚠️ يرجى إدخال سبب عدم وجود التقرير الطبي:",
+            reply_markup=keyboard,
+            parse_mode="Markdown",
+        )
+        return "MEDICAL_REPORT_NO_REASON"
+
+    report_tmp = context.user_data.setdefault("report_tmp", {})
+    report_tmp["no_report_reason"] = text
+    report_tmp["_medical_report_step_done"] = True
+
+    flow_type = report_tmp.get("_pending_translator_flow", "new_consult")
+
+    await update.message.reply_text("✅ تم.")
+    await show_translator_selection(update.message, context, flow_type)
+    return get_translator_state(flow_type)
 
 
 async def handle_simple_translator_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1228,6 +1415,12 @@ async def show_final_summary(message, context, flow_type):
             await message.reply_text("❌ حدث خطأ في عرض الملخص")
             return
 
+        # ✅ توحيد مفاتيح المرفقات الطبية قبل بناء الملخص
+        # عند الملخص تكون المرفقات في _medical_attachments (مفتاح داخلي)
+        # لكن format_report_message تتوقع medical_attachments (مفتاح النشر)
+        if "_medical_attachments" in data and "medical_attachments" not in data:
+            data["medical_attachments"] = data["_medical_attachments"]
+
         # ✅ استخدام format_report_message لبناء الملخص (نفس منطق النشر)
         report_message = format_report_message(data)
         
@@ -1377,16 +1570,23 @@ async def handle_final_confirm(update: Update, context: ContextTypes.DEFAULT_TYP
         context.user_data['_conversation_state'] = confirm_state
         return confirm_state
     elif action == "publish":
+        # guard ضد التنفيذ المزدوج
+        if context.user_data.get("_publishing"):
+            logger.warning("⚠️ publish already in progress — ignoring duplicate callback")
+            return get_confirm_state(flow_type)
+        context.user_data["_publishing"] = True
         logger.info(f"💾 Starting publish process for flow_type: {flow_type}")
         try:
-            # save_report_to_database is defined in this same file (below)
             await save_report_to_database(query, context, flow_type)
             logger.info(f"Publish completed successfully for flow_type: {flow_type}")
             return ConversationHandler.END
         except Exception as e:
             logger.error(f"❌ Error in save_report_to_database: {e}", exc_info=True)
+            context.user_data.pop("_publishing", None)
             await query.answer(f"خطأ في النشر: {str(e)[:50]}", show_alert=True)
             return get_confirm_state(flow_type)
+        finally:
+            context.user_data.pop("_publishing", None)
     elif action == "save":
         logger.info(f"📋 Save button clicked (treating as review) for flow_type: {flow_type}")
         await show_review_screen(query, context, flow_type)
@@ -1957,6 +2157,14 @@ async def save_report_to_database(query, context, flow_type):
             radiation_therapy_return_reason=(data.get("radiation_therapy_return_reason") or data.get("followup_reason", "") or None) if flow_type == "radiation_therapy" else None,
             radiation_therapy_final_notes=(data.get("radiation_therapy_final_notes", "") or None) if flow_type == "radiation_therapy" else None,
             radiation_therapy_completed=(data.get("radiation_therapy_completed", False)) if flow_type == "radiation_therapy" else False,
+
+            # ✅ حقول التقرير الطبي الورقي
+            has_paper_report=(
+                1 if data.get("_medical_attachments") else 0
+            ) if data.get("_medical_report_step_done") is not None else None,
+            no_paper_report_reason=(
+                data.get("no_report_reason") or None
+            ) if data.get("_medical_report_step_done") is not None and not data.get("_medical_attachments") else None,
         )
 
         # ✅ تحقق قبل الحفظ: translator_id يجب أن يكون موجوداً
@@ -2051,7 +2259,10 @@ async def save_report_to_database(query, context, flow_type):
                 'followup_reason': data.get('followup_reason', 'لا يوجد'),
                 'translator_name': translator_name,
                 'user_id': user_id,  # إضافة معرف المستخدم
-                'translator_id': data.get("translator_id")  # إضافة معرف المترجم أيضاً
+                'translator_id': data.get("translator_id"),  # إضافة معرف المترجم أيضاً
+                'medical_attachments': data.get("_medical_attachments", []),
+                'no_report_reason': data.get("no_report_reason", ""),
+                '_medical_report_step_done': data.get("_medical_report_step_done"),
             }
             
             # ✅ إضافة التشخيص لجميع المسارات التي تحتاجه
@@ -2466,73 +2677,7 @@ async def show_edit_fields_menu(query, context, flow_type):
         logger.info(f"🔍 [EDIT_MENU] report_tmp keys: {list(data.keys())}")
         
         editable_fields = get_editable_fields_by_flow_type(flow_type)
-        logger.info(f"🔍 [EDIT_MENU] editable_fields before processing: {[fk for fk, _ in editable_fields]}")
-        
-        # ✅ إضافة room_number لمسار "متابعة في الرقود" ديناميكياً
-        # استخدام strip() لضمان تطابق النص
-        action_clean = medical_action.strip() if medical_action else ""
-        # ✅ تحسين التحقق: استخدام in بدلاً من == للتعامل مع المسافات أو الاختلافات البسيطة
-        is_inpatient_followup = (flow_type == "followup" and "متابعة في الرقود" in action_clean)
-        
-        # ✅ أو إذا كان room_number موجوداً بالفعل في البيانات (بغض النظر عن medical_action)
-        has_room_data = _has_field_value(data, "room_number")
-        
-        if is_inpatient_followup or has_room_data:
-            logger.info("✅ [EDIT_MENU] مسار 'متابعة في الرقود' أو يوجد بيانات - إضافة room_number")
-            # ✅ التحقق من وجود room_number في القائمة
-            has_room_number = any(fk == "room_number" for fk, _ in editable_fields)
-            logger.info(f"🔍 [EDIT_MENU] has_room_number: {has_room_number}")
-            
-            if not has_room_number:
-                # ✅ البحث عن موضع إدراج room_number (بعد decision وقبل followup_date)
-                room_field = ("room_number", "🏥 رقم الغرفة والطابق")
-                decision_index = None
-                followup_date_index = None
-                
-                for i, (field_key, _) in enumerate(editable_fields):
-                    if field_key == "decision":
-                        decision_index = i
-                        logger.info(f"🔍 [EDIT_MENU] Found decision at index: {decision_index}")
-                    elif field_key == "followup_date" and followup_date_index is None:
-                        followup_date_index = i
-                        logger.info(f"🔍 [EDIT_MENU] Found followup_date at index: {followup_date_index}")
-                
-                # ✅ إدراج room_number بعد decision مباشرة، أو قبل followup_date، أو في النهاية
-                if decision_index is not None:
-                    editable_fields.insert(decision_index + 1, room_field)
-                    logger.info(f"✅ [EDIT_MENU] تم إضافة room_number بعد decision (index: {decision_index + 1})")
-                elif followup_date_index is not None:
-                    editable_fields.insert(followup_date_index, room_field)
-                    logger.info(f"✅ [EDIT_MENU] تم إضافة room_number قبل followup_date (index: {followup_date_index})")
-                else:
-                    editable_fields.append(room_field)
-                    logger.info(f"✅ [EDIT_MENU] تم إضافة room_number في النهاية")
-        else:
-            logger.info(f"⚠️ [EDIT_MENU] لا يتم إضافة room_number: flow_type={flow_type}, medical_action={medical_action}")
-        
-        # ✅ إزالة room_number من مسار "مراجعة / عودة دورية" إذا كان موجوداً
-        # تحسين التحقق ليشمل المسافات والاختلافات البسيطة
-        # ✅ أيضاً إزالة room_number إذا كان flow_type == "periodic_followup"
-        is_periodic_followup = (
-            flow_type == "periodic_followup" or
-            (flow_type == "followup" and "مراجعة / عودة دورية" in (medical_action or ""))
-        )
-        if is_periodic_followup:
-            logger.info("✅ [EDIT_MENU] مسار 'عودة دورية' - إزالة room_number إذا كان موجوداً")
-            editable_fields = [(fk, fd) for fk, fd in editable_fields if fk != "room_number"]
-            logger.info(f"✅ [EDIT_MENU] تم إزالة room_number من القائمة")
-        
-        logger.info(f"🔍 [EDIT_MENU] editable_fields after processing: {[fk for fk, _ in editable_fields]}")
-        
-        # ✅ تصفية الحقول: عرض جميع الحقول (تم تعطيل التصفية بناءً على طلب المستخدم)
-        fields_with_values = []
-        for field_key, field_display in editable_fields:
-            # عرض جميع الحقول سواء كانت فارغة أم لا
-            fields_with_values.append((field_key, field_display))
-            logger.info(f"✅ [EDIT_MENU] إضافة حقل '{field_key}' للقائمة")
-        
-        editable_fields = fields_with_values
-        logger.info(f"✅ [EDIT_MENU] الحقول النهائية بعد التصفية: {[fk for fk, _ in editable_fields]}")
+        logger.info(f"🔍 [EDIT_MENU] flow_type={flow_type}, editable_fields={[fk for fk, _ in editable_fields]}")
         
         if not editable_fields:
             await query.edit_message_text(
@@ -2696,3 +2841,65 @@ async def handle_edit_before_save(query, context, flow_type=None):
             parse_mode="Markdown"
         )
         return ConversationHandler.END
+
+
+async def handle_translator_page_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة التنقل بين صفحات المترجمين (translator_page:flow:page)."""
+    query = update.callback_query
+    await query.answer()
+    try:
+        parts = query.data.split(":")
+        if len(parts) < 3:
+            return
+        flow_type = parts[1]
+        page = int(parts[2])
+
+        valid_flow_types = [
+            "new_consult", "followup", "periodic_followup", "inpatient_followup",
+            "emergency", "admission", "surgery_consult", "operation", "final_consult",
+            "discharge", "rehab_physical", "rehab_device", "device",
+            "radiology", "appointment_reschedule", "radiation_therapy",
+        ]
+        current_flow = context.user_data.get("report_tmp", {}).get("current_flow", "")
+        more_specific = {"followup": ["periodic_followup", "inpatient_followup"]}
+        if flow_type in more_specific and current_flow in more_specific[flow_type]:
+            flow_type = current_flow
+        elif flow_type not in valid_flow_types:
+            flow_type = current_flow if current_flow in valid_flow_types else "new_consult"
+
+        translator_names = load_translator_names()
+        FIRST_PAGE_COUNT = 19
+        page_names = translator_names[:FIRST_PAGE_COUNT] if page == 1 else translator_names[FIRST_PAGE_COUNT:]
+
+        keyboard_buttons = []
+        row = []
+        for name in page_names:
+            row.append(InlineKeyboardButton(name, callback_data=f"simple_translator:{flow_type}:{name}"))
+            if len(row) == 3:
+                keyboard_buttons.append(row)
+                row = []
+        if row:
+            keyboard_buttons.append(row)
+
+        nav_buttons = []
+        if page == 1 and len(translator_names) > FIRST_PAGE_COUNT:
+            nav_buttons.append(InlineKeyboardButton("⬅️ الصفحة التالية", callback_data=f"translator_page:{flow_type}:2"))
+        elif page == 2:
+            nav_buttons.append(InlineKeyboardButton("➡️ الصفحة السابقة", callback_data=f"translator_page:{flow_type}:1"))
+        if nav_buttons:
+            keyboard_buttons.append(nav_buttons)
+        keyboard_buttons.append([
+            InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
+            InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel"),
+        ])
+
+        page_text = f"(الصفحة {page} من 2)" if len(translator_names) > FIRST_PAGE_COUNT else ""
+        await query.edit_message_text(
+            f"👤 **اختر اسم المترجم** {page_text}\n\n"
+            f"المترجم مسؤول عن ترجمة التقرير إلى اللغة المطلوبة.\n"
+            f"اختر من القائمة أدناه:",
+            reply_markup=InlineKeyboardMarkup(keyboard_buttons),
+            parse_mode="Markdown"
+        )
+    except Exception as e:
+        logger.error(f"Error in handle_translator_page_navigation: {e}", exc_info=True)

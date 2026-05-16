@@ -74,18 +74,7 @@ async def start_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # تحديث الـ conversation state
         context.user_data['_conversation_state'] = STATE_SELECT_DATE
 
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("📅 إدخال التاريخ الحالي", callback_data="date:now")],
-            [InlineKeyboardButton("📅 إدخال من التقويم", callback_data="date:calendar")],
-            [InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]
-        ])
-
-        await update.message.reply_text(
-            "📅 **إضافة تقرير جديد**\n\n"
-            "اختر طريقة إدخال التاريخ:",
-            reply_markup=keyboard,
-            parse_mode="Markdown"
-        )
+        await render_date_selection(update.message, context)
         logger.info("start_report completed successfully")
         return STATE_SELECT_DATE
     except Exception as e:
@@ -98,20 +87,25 @@ async def start_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
 
 
-async def render_date_selection(message, context):
-    """عرض شاشة اختيار التاريخ - rendering فقط"""
+async def render_date_selection(message, context, query=None):
+    """عرض شاشة اختيار التاريخ - rendering فقط.
+    query: إذا مُمرَّر يُعدَّل الرسالة الحالية (للرجوع). وإلا ترسل رسالة جديدة.
+    """
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("📅 إدخال التاريخ الحالي", callback_data="date:now")],
         [InlineKeyboardButton("📅 إدخال من التقويم", callback_data="date:calendar")],
         [InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]
     ])
+    text = "📅 **إضافة تقرير جديد** (الخطوة 1 من 5)\n\nاختر طريقة إدخال التاريخ:"
 
-    await message.reply_text(
-        "📅 **إضافة تقرير جديد** (الخطوة 1 من 5)\n\n"
-        "اختر طريقة إدخال التاريخ:",
-        reply_markup=keyboard,
-        parse_mode="Markdown"
-    )
+    if query:
+        try:
+            await query.edit_message_text(text, reply_markup=keyboard, parse_mode="Markdown")
+            return
+        except Exception:
+            pass
+
+    await message.reply_text(text, reply_markup=keyboard, parse_mode="Markdown")
 
 
 def _build_main_calendar_markup(year: int, month: int):
@@ -153,7 +147,7 @@ def _build_main_calendar_markup(year: int, month: int):
         keyboard.append(row)
 
     keyboard.append([
-        get_step_back_button(),
+        InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
         InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
     ])
 
@@ -193,6 +187,11 @@ async def handle_date_choice(update: Update, context: ContextTypes.DEFAULT_TYPE)
     # معالجة زر الإلغاء
     if query.data == "nav:cancel":
         return await handle_cancel_navigation(update, context)
+
+    # رجوع من التقويم → العودة لشاشة اختيار التاريخ
+    if query.data == "nav:back":
+        await render_date_selection(query.message, context, query=query)
+        return STATE_SELECT_DATE
 
     if query.data == "date:now":
         # استخدام توقيت الهند مباشرة (IST = UTC+5:30)
@@ -339,57 +338,56 @@ async def handle_date_time_back_hour(update: Update, context: ContextTypes.DEFAU
 
 
 async def handle_date_time_hour(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """معالج اختيار الساعة عند إدخال التاريخ يدوياً"""
+    """معالج اختيار الساعة — يحفظ الوقت مباشرة بدقائق 00"""
+    from .patient_handlers import show_patient_selection
+
     query = update.callback_query
     await query.answer()
     hour = query.data.split(":", 1)[1]
 
-    # إذا كان "أوقات أخرى"، نعرض جميع الساعات
-    if hour == "more":
-        keyboard = []
-        hour_labels = []
-        hour_values = []
-        for h in range(24):
-            if h == 0:
-                hour_labels.append("12:00 صباحاً")
-                hour_values.append("00")
-            elif h < 12:
-                hour_labels.append(f"{h}:00 صباحاً")
-                hour_values.append(f"{h:02d}")
-            elif h == 12:
-                hour_labels.append("12:00 ظهراً")
-                hour_values.append("12")
-            else:
-                hour_labels.append(f"{h - 12}:00 مساءً")
-                hour_values.append(f"{h:02d}")
-
-        # تقسيم الساعات إلى صفوف (4 ساعات لكل صف)
-        for chunk_labels, chunk_values in zip(
-            _chunked(hour_labels, 4), _chunked(hour_values, 4)):
-            row = [
-                InlineKeyboardButton(
-                    label, callback_data=f"time_hour:{val}")
-                for label, val in zip(chunk_labels, chunk_values)]
-            keyboard.append(row)
-
-        keyboard.append([
-            InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel"),
-        ])
-
-        await query.edit_message_text(
-            "🕐 **اختيار الساعة**\n\nاختر الساعة من القائمة:",
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode="Markdown",
-        )
+    data_tmp = context.user_data.setdefault("report_tmp", {})
+    pending_date = data_tmp.get("_pending_date")
+    if not pending_date:
+        await query.answer("خطأ: لم يتم تحديد التاريخ", show_alert=True)
         return R_DATE_TIME
 
-    context.user_data.setdefault("report_tmp", {})["_pending_date_hour"] = hour
+    from datetime import time
+    hour_int = int(hour)
+    dt = datetime.combine(pending_date.date(), time(hour_int, 0))
+    data_tmp["report_date"] = dt
+    data_tmp.pop("_pending_date", None)
+    data_tmp.pop("_pending_date_hour", None)
+    data_tmp.setdefault("step_history", []).append(R_DATE)
+
+    # عرض الوقت بصيغة 12 ساعة
+    if hour_int == 0:
+        time_display = "12:00 صباحاً"
+    elif hour_int < 12:
+        time_display = f"{hour_int}:00 صباحاً"
+    elif hour_int == 12:
+        time_display = "12:00 ظهراً"
+    else:
+        time_display = f"{hour_int - 12}:00 مساءً"
+
+    days_ar = {
+        0: 'الاثنين', 1: 'الثلاثاء', 2: 'الأربعاء', 3: 'الخميس',
+        4: 'الجمعة', 5: 'السبت', 6: 'الأحد'
+    }
+    day_name = days_ar.get(dt.weekday(), '')
+
+    nav_push(context, STATE_SELECT_PATIENT)
+    context.user_data['_conversation_state'] = STATE_SELECT_PATIENT
+
     await query.edit_message_text(
-        f"🕐 اختر الدقائق للساعة {hour}:",
-        reply_markup=_build_minute_keyboard(hour),
-        parse_mode="Markdown",
+        f"✅ **تم اختيار التاريخ والوقت**\n\n"
+        f"📅 **التاريخ:**\n"
+        f"{dt.strftime('%d')} {MONTH_NAMES_AR.get(dt.month, dt.month)} {dt.year} ({day_name})\n\n"
+        f"🕐 **الوقت:**\n"
+        f"{time_display}",
+        parse_mode="Markdown"
     )
-    return R_DATE_TIME
+    await show_patient_selection(query.message, context)
+    return STATE_SELECT_PATIENT
 
 
 async def handle_date_time_minute(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -491,12 +489,66 @@ async def handle_date_time_skip(update: Update, context: ContextTypes.DEFAULT_TY
 async def handle_step_back_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة الرجوع من شاشة التاريخ إلى القائمة الرئيسية"""
     from .navigation_helpers import handle_cancel_navigation
-    
+
     query = update.callback_query
     if not query:
         return None
-    
+
     await query.answer()
-    
+
     # استخدام handle_cancel_navigation للرجوع إلى القائمة الرئيسية
     return await handle_cancel_navigation(update, context)
+
+
+async def handle_calendar_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """إلغاء عملية إضافة تقرير - يفوض إلى handle_cancel_navigation"""
+    from .navigation_helpers import handle_cancel_navigation
+    return await handle_cancel_navigation(update, context)
+
+
+async def handle_followup_date_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة إدخال تاريخ العودة يدوياً"""
+    from .states import (
+        NEW_CONSULT_FOLLOWUP_REASON, FOLLOWUP_REASON, EMERGENCY_REASON,
+        ADMISSION_FOLLOWUP_REASON, SURGERY_CONSULT_FOLLOWUP_REASON,
+        OPERATION_FOLLOWUP_REASON, DISCHARGE_FOLLOWUP_REASON,
+        PHYSICAL_THERAPY_FOLLOWUP_REASON, DEVICE_FOLLOWUP_REASON,
+    )
+    text = update.message.text.strip()
+
+    if not text or len(text) < 2:
+        await update.message.reply_text(
+            "⚠️ **يرجى إدخال نص صحيح**\n\n"
+            "أمثلة:\n• 15/1/2026\n• بعد أسبوع\n• الأحد القادم\n\n"
+            "أو اختر من التقويم أعلاه.",
+            parse_mode="Markdown"
+        )
+        return context.user_data.get('_conversation_state')
+
+    report_tmp = context.user_data.setdefault("report_tmp", {})
+    report_tmp["followup_date"] = text
+    report_tmp["followup_time"] = None
+
+    current_flow = report_tmp.get("current_flow", "new_consult")
+    reason_state_map = {
+        "followup":         FOLLOWUP_REASON,
+        "inpatient_followup": FOLLOWUP_REASON,
+        "periodic_followup":  FOLLOWUP_REASON,
+        "emergency":        EMERGENCY_REASON,
+        "admission":        ADMISSION_FOLLOWUP_REASON,
+        "surgery_consult":  SURGERY_CONSULT_FOLLOWUP_REASON,
+        "operation":        OPERATION_FOLLOWUP_REASON,
+        "discharge":        DISCHARGE_FOLLOWUP_REASON,
+        "rehab_physical":   PHYSICAL_THERAPY_FOLLOWUP_REASON,
+        "rehab_device":     DEVICE_FOLLOWUP_REASON,
+        "device":           DEVICE_FOLLOWUP_REASON,
+    }
+    next_state = reason_state_map.get(current_flow, NEW_CONSULT_FOLLOWUP_REASON)
+
+    await update.message.reply_text(
+        f"✅ **تم حفظ موعد العودة**\n\n📅 {text}\n\n✍️ يرجى إدخال سبب العودة:",
+        parse_mode="Markdown"
+    )
+
+    context.user_data['_conversation_state'] = next_state
+    return next_state

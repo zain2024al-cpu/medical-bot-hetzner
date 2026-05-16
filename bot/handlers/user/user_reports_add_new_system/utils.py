@@ -140,45 +140,26 @@ def format_time_12h_str(time_str) -> str | None:
 
 
 def _build_hour_keyboard():
-    """بناء لوحة اختيار الساعات بصيغة 12 ساعة"""
+    """بناء لوحة اختيار الساعات — الـ 24 ساعة كاملة، 4 في كل صف"""
+    hours = []
+    for h in range(24):
+        if h == 0:
+            label = "12 صباحاً"
+        elif h < 12:
+            label = f"{h} صباحاً"
+        elif h == 12:
+            label = "12 ظهراً"
+        else:
+            label = f"{h - 12} مساءً"
+        hours.append((label, f"{h:02d}"))
+
     keyboard = []
-    
-    # أوقات شائعة أولاً (صباحاً)
-    common_morning = [
-        ("🌅 8:00 صباحاً", "08"),
-        ("🌅 9:00 صباحاً", "09"),
-        ("🌅 10:00 صباحاً", "10"),
-        ("🌅 11:00 صباحاً", "11"),
-    ]
-    keyboard.append([InlineKeyboardButton(label, callback_data=f"time_hour:{val}") for label, val in common_morning])
-    
-    # الظهر
-    keyboard.append([
-        InlineKeyboardButton("☀️ 12:00 ظهراً", callback_data="time_hour:12")
-    ])
-    
-    # بعد الظهر
-    common_afternoon = [
-        ("🌆 1:00 مساءً", "13"),
-        ("🌆 2:00 مساءً", "14"),
-        ("🌆 3:00 مساءً", "15"),
-        ("🌆 4:00 مساءً", "16"),
-    ]
-    keyboard.append([InlineKeyboardButton(label, callback_data=f"time_hour:{val}") for label, val in common_afternoon])
-    
-    # مساءً
-    common_evening = [
-        ("🌃 5:00 مساءً", "17"),
-        ("🌃 6:00 مساءً", "18"),
-        ("🌃 7:00 مساءً", "19"),
-        ("🌃 8:00 مساءً", "20"),
-    ]
-    keyboard.append([InlineKeyboardButton(label, callback_data=f"time_hour:{val}") for label, val in common_evening])
-    
-    # زر "أوقات أخرى"
-    keyboard.append([InlineKeyboardButton("🕐 أوقات أخرى", callback_data="time_hour:more")])
-    
-    keyboard.append([InlineKeyboardButton("⏭️ بدون وقت", callback_data="time_skip")])
+    for chunk in _chunked(hours, 4):
+        keyboard.append([
+            InlineKeyboardButton(label, callback_data=f"time_hour:{val}")
+            for label, val in chunk
+        ])
+
     keyboard.append([
         InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
         InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel"),
@@ -216,8 +197,6 @@ def _build_minute_keyboard(hour: str):
                     callback_data=f"time_minute:{hour}:{m}"))
         keyboard.append(row)
 
-    keyboard.append([InlineKeyboardButton(
-        "⏭️ بدون وقت", callback_data="time_skip")])
     keyboard.append([
         InlineKeyboardButton("🔙 تغيير الساعة", callback_data="time_back_hour"),
         InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
