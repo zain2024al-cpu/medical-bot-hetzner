@@ -1,14 +1,13 @@
 # =============================
 # bot/handlers/user/user_case_summary.py
-# 📋 ملخص الحالة — عرض تاريخ المريض الطبي (قراءة فقط)
+# 📋 ملخص الحالة — structured operational summary (read-only)
 # =============================
 #
-# Uses raw SQL (text()) instead of ORM model queries so it is immune to
-# schema mismatches between the ORM model and older production databases.
-# Only the columns actually displayed are requested — no SELECT *.
+# Queries use raw SQL (sqlalchemy.text) only — never ORM model objects —
+# so the handler is immune to schema gaps between the ORM model and older
+# production databases.
 
 import logging
-from datetime import datetime
 
 from sqlalchemy import text
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
@@ -21,6 +20,7 @@ from telegram.ext import (
 )
 from bot.shared_auth import ensure_approved
 from db.session import SessionLocal
+from services.case_summary_service import build_full_summary
 
 logger = logging.getLogger(__name__)
 
@@ -30,55 +30,32 @@ CS_SHOW_SUMMARY   = 11
 
 # ─── Constants ────────────────────────────────────────────
 _PER_PAGE_PATIENTS = 10
-_PER_PAGE_REPORTS  = 5
+# Telegram hard limit is 4096; we stay safely under it
+_MAX_MSG_LEN = 3800
 
-# ─── Medical action icons ──────────────────────────────────
-_ACTION_ICONS = {
-    "استشارة جديدة": "🩺",
-    "مراجعة":        "🔄",
-    "طوارئ":         "🚨",
-    "ترقيد":         "🛏️",
-    "أشعة":          "🔬",
-    "علاج إشعاعي":   "☢️",
-    "تأجيل موعد":    "📅",
-    "فحص مخبري":     "🧪",
-}
+# ─── All report columns needed by the summary service ─────
+# Explicit list — no SELECT * — immune to schema additions.
+_REPORT_COLS = """
+    report_date, medical_action, complaint_text, doctor_decision,
+    case_status, diagnosis, treatment_plan, medications, notes,
+    hospital_name, department, doctor_name, room_number,
+    followup_date, followup_department, followup_reason,
+    followup_time,
+    app_reschedule_reason, app_reschedule_return_date,
+    app_reschedule_return_reason,
+    radiology_type, radiology_delivery_date,
+    radiation_therapy_type, radiation_therapy_session_number,
+    radiation_therapy_remaining, radiation_therapy_recommendations,
+    radiation_therapy_return_date, radiation_therapy_return_reason,
+    radiation_therapy_final_notes, radiation_therapy_completed
+""".strip()
 
-
-def _action_icon(action) -> str:
-    if not action:
-        return "📄"
-    for key, icon in _ACTION_ICONS.items():
-        if key in action:
-            return icon
-    return "📄"
-
-
-def _trunc(text_val, limit: int) -> str:
-    if not text_val:
-        return "—"
-    t = str(text_val).strip()
-    return t if len(t) <= limit else t[:limit] + "…"
+_REPORT_COL_NAMES = [c.strip() for c in _REPORT_COLS.replace("\n", "").split(",")]
 
 
-def _format_date(val) -> str:
-    if not val:
-        return "—"
-    if isinstance(val, datetime):
-        return f"{val.day}/{val.month}/{val.year}"
-    # SQLite sometimes returns strings like "2025-03-14 10:30:00"
-    try:
-        s = str(val)[:10]       # "YYYY-MM-DD"
-        parts = s.split("-")
-        return f"{int(parts[2])}/{int(parts[1])}/{parts[0]}"
-    except Exception:
-        return str(val)[:10]
-
-
-# ─── Raw SQL helpers ───────────────────────────────────────
+# ─── DB loaders (raw SQL) ─────────────────────────────────
 
 def _load_all_patients() -> list:
-    """Returns sorted list of {id, name} dicts via raw SQL."""
     sql = text(
         "SELECT id, full_name FROM patients "
         "WHERE full_name IS NOT NULL AND full_name != '' "
@@ -86,8 +63,8 @@ def _load_all_patients() -> list:
     )
     with SessionLocal() as s:
         rows = s.execute(sql).fetchall()
+    seen: set = set()
     result = []
-    seen = set()
     for row in rows:
         pid, name = row[0], (row[1] or "").strip()
         if name and name not in seen:
@@ -97,68 +74,25 @@ def _load_all_patients() -> list:
 
 
 def _load_reports(patient_id: int) -> list:
-    """
-    Returns list of plain dicts with only the fields we display.
-    Raw SQL — immune to ORM column mapping errors on older schemas.
-    """
+    """Returns list of plain dicts. Newest first."""
     sql = text(
-        "SELECT report_date, medical_action, complaint_text, "
-        "       doctor_decision, hospital_name, doctor_name "
-        "FROM reports "
-        "WHERE patient_id = :pid AND (status IS NULL OR status != 'deleted') "
+        f"SELECT {_REPORT_COLS} FROM reports "
+        "WHERE patient_id = :pid "
+        "  AND (status IS NULL OR status != 'deleted') "
         "ORDER BY report_date DESC"
     )
     with SessionLocal() as s:
         rows = s.execute(sql, {"pid": patient_id}).fetchall()
-    return [
-        {
-            "report_date":    row[0],
-            "medical_action": row[1],
-            "complaint_text": row[2],
-            "doctor_decision":row[3],
-            "hospital_name":  row[4],
-            "doctor_name":    row[5],
-        }
-        for row in rows
-    ]
+    return [dict(zip(_REPORT_COL_NAMES, row)) for row in rows]
 
 
-# ─── Formatting ────────────────────────────────────────────
-
-def _build_report_entry(r: dict) -> str:
-    icon      = _action_icon(r["medical_action"])
-    date      = _format_date(r["report_date"])
-    action    = r["medical_action"] or "—"
-    complaint = _trunc(r["complaint_text"], 60)
-    decision  = _trunc(r["doctor_decision"], 60)
-    hospital  = r["hospital_name"] or "—"
-    doctor    = r["doctor_name"] or "—"
-    return (
-        "────────────────────\n"
-        f"{icon} [{date}]  {action}\n"
-        f"📌 الشكوى: {complaint}\n"
-        f"🩺 قرار الطبيب: {decision}\n"
-        f"🏥 {hospital}  |  👨‍⚕️ {doctor}"
-    )
-
-
-def _build_summary_page(patient_name: str, reports: list, page: int) -> str:
-    total = len(reports)
-    total_pages = max(1, (total + _PER_PAGE_REPORTS - 1) // _PER_PAGE_REPORTS)
-    page = max(0, min(page, total_pages - 1))
-    start = page * _PER_PAGE_REPORTS
-    page_reports = reports[start: start + _PER_PAGE_REPORTS]
-
-    lines = [
-        "📋 **ملخص الحالة**",
-        f"👤 المريض: {patient_name}",
-        f"📊 عدد التقارير: {total}  |  الصفحة {page+1}/{total_pages}",
-        "",
-    ]
-    for r in page_reports:
-        lines.append(_build_report_entry(r))
-    lines.append("────────────────────")
-    return "\n".join(lines)
+def _patient_hospital(reports: list) -> str:
+    """Return the most recent non-empty hospital name."""
+    for r in reports:
+        h = (r.get("hospital_name") or "").strip()
+        if h and h not in ("", "None", "—"):
+            return h
+    return ""
 
 
 # ─── Keyboards ────────────────────────────────────────────
@@ -204,20 +138,11 @@ def _patient_list_keyboard(patients: list, page: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(rows)
 
 
-def _summary_keyboard(patient_id: int, page: int, total_pages: int) -> InlineKeyboardMarkup:
-    nav = []
-    if page > 0:
-        nav.append(InlineKeyboardButton("⬅️ السابق", callback_data=f"cs_rep:{patient_id}:{page-1}"))
-    nav.append(InlineKeyboardButton(f"📄 {page+1}/{total_pages}", callback_data="cs_noop"))
-    if page < total_pages - 1:
-        nav.append(InlineKeyboardButton("التالي ➡️", callback_data=f"cs_rep:{patient_id}:{page+1}"))
-
-    rows = []
-    if nav:
-        rows.append(nav)
-    rows.append([InlineKeyboardButton("🔙 اختيار مريض آخر", callback_data="cs_back_to_list")])
-    rows.append([InlineKeyboardButton("❌ إنهاء", callback_data="cs_cancel")])
-    return InlineKeyboardMarkup(rows)
+def _summary_keyboard(patient_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔙 اختيار مريض آخر", callback_data="cs_back_to_list")],
+        [InlineKeyboardButton("❌ إنهاء", callback_data="cs_cancel")],
+    ])
 
 
 # ─── Handlers ─────────────────────────────────────────────
@@ -241,7 +166,7 @@ async def start_case_summary(update: Update, context: ContextTypes.DEFAULT_TYPE)
     context.user_data["cs_page"] = 0
 
     await update.message.reply_text(
-        f"📋 **ملخص الحالة**\n\nاختر مريضاً لعرض سجله الطبي ({len(patients)} مريض):",
+        f"📋 *ملخص الحالة*\n\nاختر مريضاً لعرض ملخصه الطبي ({len(patients)} مريض):",
         reply_markup=_patient_list_keyboard(patients, 0),
         parse_mode="Markdown",
     )
@@ -253,14 +178,12 @@ async def handle_patient_page(update: Update, context: ContextTypes.DEFAULT_TYPE
     await q.answer()
 
     page = int(q.data.split(":")[1])
-    patients = context.user_data.get("cs_patients")
-    if not patients:
-        patients = _load_all_patients()
-        context.user_data["cs_patients"] = patients
-
+    patients = context.user_data.get("cs_patients") or _load_all_patients()
+    context.user_data["cs_patients"] = patients
     context.user_data["cs_page"] = page
+
     await q.edit_message_text(
-        f"📋 **ملخص الحالة**\n\nاختر مريضاً ({len(patients)} مريض):",
+        f"📋 *ملخص الحالة*\n\nاختر مريضاً ({len(patients)} مريض):",
         reply_markup=_patient_list_keyboard(patients, page),
         parse_mode="Markdown",
     )
@@ -274,12 +197,15 @@ async def handle_patient_selection(update: Update, context: ContextTypes.DEFAULT
     patient_id = int(q.data.split(":")[1])
 
     patients = context.user_data.get("cs_patients") or _load_all_patients()
-    patient_name = next((p["name"] for p in patients if p["id"] == patient_id), f"مريض #{patient_id}")
+    patient_name = next(
+        (p["name"] for p in patients if p["id"] == patient_id),
+        f"مريض #{patient_id}",
+    )
 
     try:
         reports = _load_reports(patient_id)
     except Exception as e:
-        logger.error(f"cs: load reports failed for patient {patient_id}: {e}", exc_info=True)
+        logger.error(f"cs: load reports failed patient={patient_id}: {e}", exc_info=True)
         await q.edit_message_text(
             "⚠️ خطأ في تحميل التقارير. حاول مرة أخرى.",
             reply_markup=InlineKeyboardMarkup([
@@ -299,41 +225,26 @@ async def handle_patient_selection(update: Update, context: ContextTypes.DEFAULT
         )
         return CS_SHOW_SUMMARY
 
+    hospital = _patient_hospital(reports)
+    last_date = reports[0].get("report_date")   # newest first
+
+    summary = build_full_summary(
+        patient_name=patient_name,
+        hospital_name=hospital,
+        reports=reports,
+        last_date=last_date,
+    )
+
+    # Guard against Telegram 4096-char limit
+    if len(summary) > _MAX_MSG_LEN:
+        summary = summary[:_MAX_MSG_LEN] + "\n\n…"
+
     context.user_data["cs_patient_id"] = patient_id
     context.user_data["cs_patient_name"] = patient_name
-    context.user_data["cs_reports"] = reports
-
-    total_pages = max(1, (len(reports) + _PER_PAGE_REPORTS - 1) // _PER_PAGE_REPORTS)
-    text_msg = _build_summary_page(patient_name, reports, 0)
 
     await q.edit_message_text(
-        text_msg,
-        reply_markup=_summary_keyboard(patient_id, 0, total_pages),
-        parse_mode="Markdown",
-    )
-    return CS_SHOW_SUMMARY
-
-
-async def handle_report_page(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    q = update.callback_query
-    await q.answer()
-
-    _, patient_id_str, page_str = q.data.split(":")
-    patient_id = int(patient_id_str)
-    page = int(page_str)
-
-    patient_name = context.user_data.get("cs_patient_name", f"مريض #{patient_id}")
-    reports = context.user_data.get("cs_reports")
-    if not reports:
-        reports = _load_reports(patient_id)
-        context.user_data["cs_reports"] = reports
-
-    total_pages = max(1, (len(reports) + _PER_PAGE_REPORTS - 1) // _PER_PAGE_REPORTS)
-    text_msg = _build_summary_page(patient_name, reports, page)
-
-    await q.edit_message_text(
-        text_msg,
-        reply_markup=_summary_keyboard(patient_id, page, total_pages),
+        summary,
+        reply_markup=_summary_keyboard(patient_id),
         parse_mode="Markdown",
     )
     return CS_SHOW_SUMMARY
@@ -343,14 +254,12 @@ async def handle_back_to_list(update: Update, context: ContextTypes.DEFAULT_TYPE
     q = update.callback_query
     await q.answer()
 
-    patients = context.user_data.get("cs_patients")
-    if not patients:
-        patients = _load_all_patients()
-        context.user_data["cs_patients"] = patients
-
+    patients = context.user_data.get("cs_patients") or _load_all_patients()
+    context.user_data["cs_patients"] = patients
     page = context.user_data.get("cs_page", 0)
+
     await q.edit_message_text(
-        f"📋 **ملخص الحالة**\n\nاختر مريضاً ({len(patients)} مريض):",
+        f"📋 *ملخص الحالة*\n\nاختر مريضاً ({len(patients)} مريض):",
         reply_markup=_patient_list_keyboard(patients, page),
         parse_mode="Markdown",
     )
@@ -360,7 +269,7 @@ async def handle_back_to_list(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def handle_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
-    for key in ("cs_patients", "cs_page", "cs_patient_id", "cs_patient_name", "cs_reports"):
+    for key in ("cs_patients", "cs_page", "cs_patient_id", "cs_patient_name"):
         context.user_data.pop(key, None)
     await q.edit_message_text("✅ تم إغلاق ملخص الحالة.")
     return ConversationHandler.END
@@ -380,7 +289,6 @@ def register(app):
                 CallbackQueryHandler(handle_cancel,            pattern=r"^cs_cancel$"),
             ],
             CS_SHOW_SUMMARY: [
-                CallbackQueryHandler(handle_report_page,  pattern=r"^cs_rep:\d+:\d+$"),
                 CallbackQueryHandler(handle_back_to_list, pattern=r"^cs_back_to_list$"),
                 CallbackQueryHandler(handle_cancel,       pattern=r"^cs_cancel$"),
             ],
