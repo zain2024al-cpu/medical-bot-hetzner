@@ -22,12 +22,46 @@ from typing import Callable
 
 # ─── Helpers ─────────────────────────────────────────────
 
+_JUNK_EXACT = {"", "none", "لا يوجد", "—", "لايوجد", "null", "n/a", "na", "لا", ".", "-"}
+_JUNK_PREFIX = ("لا يوجد", "لايوجد", "لا ", "لم يوجد")
+
+
+def _is_junk(text: str) -> bool:
+    t = text.strip()
+    tl = t.lower()
+    if tl in _JUNK_EXACT:
+        return True
+    for prefix in _JUNK_PREFIX:
+        if tl.startswith(prefix) and len(t) < 12:
+            return True
+    # Reject strings that are mostly emoji / UI labels (contain ✏️ 🔬 etc.)
+    # A field value with more than 2 emoji characters is UI noise
+    emoji_count = sum(1 for ch in t if ord(ch) > 0x2000)
+    if emoji_count > 2:
+        return True
+    return False
+
+
 def _v(row: dict, *keys) -> str:
     for k in keys:
         val = row.get(k)
-        if val and str(val).strip() not in ("", "None", "لا يوجد", "—"):
-            return str(val).strip()
+        if not val:
+            continue
+        first_line = str(val).strip().splitlines()[0].strip()
+        if not _is_junk(first_line) and len(first_line) > 1:
+            return first_line
     return ""
+
+
+def _v_full(row: dict, key: str) -> str:
+    """Like _v but returns full multi-line value (for decisions/notes)."""
+    val = row.get(key)
+    if not val:
+        return ""
+    t = str(val).strip()
+    if t.lower() in _JUNK or len(t) <= 1:
+        return ""
+    return t
 
 
 _MONTHS = {
@@ -55,9 +89,12 @@ def _unique(items: list[str], limit: int = 4) -> list[str]:
     seen: set[str] = set()
     out = []
     for item in items:
-        t = item.strip()
-        if t and t not in seen:
-            seen.add(t)
+        if not item:
+            continue
+        t = item.strip().rstrip(".,،")   # normalise trailing punctuation
+        key = " ".join(t.split()).lower()  # collapse whitespace for dedup key
+        if key and key not in seen and not _is_junk(t):
+            seen.add(key)
             out.append(t)
             if len(out) >= limit:
                 break
@@ -73,73 +110,95 @@ def _bullet(text: str) -> str:
 # Maps raw department strings → canonical Arabic label + icon.
 # Unrecognised departments fall through to a generic label.
 _DEPT_CANON: dict[str, tuple[str, str]] = {
-    # keyword          icon   Arabic label
-    "عظ":            ("🦴", "العظام والمفاصل"),
-    "مفص":           ("🦴", "العظام والمفاصل"),
-    "orthop":        ("🦴", "العظام والمفاصل"),
-    "مخ":            ("🧠", "المخ والأعصاب"),
-    "أعصاب":         ("🧠", "المخ والأعصاب"),
-    "عصب":           ("🧠", "المخ والأعصاب"),
-    "neuro":         ("🧠", "المخ والأعصاب"),
-    "قلب":           ("❤️", "القلب والأوعية"),
-    "heart":         ("❤️", "القلب والأوعية"),
-    "cardio":        ("❤️", "القلب والأوعية"),
-    "جراح":          ("🔴", "الجراحة العامة"),
-    "surg":          ("🔴", "الجراحة العامة"),
-    "عيون":          ("👁", "طب العيون"),
-    "ophthal":       ("👁", "طب العيون"),
-    "أطفال":         ("👶", "طب الأطفال"),
-    "pediatr":       ("👶", "طب الأطفال"),
-    "نساء":          ("🤰", "النساء والتوليد"),
-    "ولادة":         ("🤰", "النساء والتوليد"),
-    "gynaec":        ("🤰", "النساء والتوليد"),
-    "obstetr":       ("🤰", "النساء والتوليد"),
-    "باطن":          ("🩺", "الطب الباطني"),
-    "داخل":          ("🩺", "الطب الباطني"),
-    "internal":      ("🩺", "الطب الباطني"),
-    "جلد":           ("💊", "الأمراض الجلدية"),
-    "dermat":        ("💊", "الأمراض الجلدية"),
-    "أورام":         ("☢️", "الأورام والعلاج الإشعاعي"),
-    "oncol":         ("☢️", "الأورام والعلاج الإشعاعي"),
-    "إشعاع":         ("☢️", "الأورام والعلاج الإشعاعي"),
-    "أشعة":          ("🔬", "الأشعة والتصوير"),
-    "radiol":        ("🔬", "الأشعة والتصوير"),
-    "تصوير":         ("🔬", "الأشعة والتصوير"),
-    "طوارئ":         ("🚨", "الطوارئ"),
-    "emerg":         ("🚨", "الطوارئ"),
-    "مختبر":         ("🧪", "المختبر والتحاليل"),
-    "تحليل":         ("🧪", "المختبر والتحاليل"),
-    "lab":           ("🧪", "المختبر والتحاليل"),
-    "ترقيد":         ("🛏️", "الترقيد"),
-    "inpatient":     ("🛏️", "الترقيد"),
-    "عظام العمود":   ("🦴", "العظام والمفاصل"),
+    # keyword (Arabic or English, lowercased for matching)
+    "عظ":              ("🦴", "العظام والمفاصل"),
+    "مفص":             ("🦴", "العظام والمفاصل"),
+    "orthop":          ("🦴", "العظام والمفاصل"),
+    "مخ":              ("🧠", "المخ والأعصاب"),
+    "أعصاب":           ("🧠", "المخ والأعصاب"),
+    "عصب":             ("🧠", "المخ والأعصاب"),
+    "neuro":           ("🧠", "المخ والأعصاب"),
+    "قلب":             ("❤️", "القلب والأوعية"),
+    "heart":           ("❤️", "القلب والأوعية"),
+    "cardio":          ("❤️", "القلب والأوعية"),
+    "جراح":            ("🔴", "الجراحة العامة"),
+    "surg":            ("🔴", "الجراحة العامة"),
+    "عيون":            ("👁", "طب العيون"),
+    "ophthal":         ("👁", "طب العيون"),
+    "أطفال":           ("👶", "طب الأطفال"),
+    "pediatr":         ("👶", "طب الأطفال"),
+    "نساء":            ("🤰", "النساء والتوليد"),
+    "ولادة":           ("🤰", "النساء والتوليد"),
+    "gynaec":          ("🤰", "النساء والتوليد"),
+    "obstetr":         ("🤰", "النساء والتوليد"),
+    "باطن":            ("🩺", "الطب الباطني"),
+    "داخل":            ("🩺", "الطب الباطني"),
+    "internal":        ("🩺", "الطب الباطني"),
+    "جلد":             ("💊", "الأمراض الجلدية"),
+    "dermat":          ("💊", "الأمراض الجلدية"),
+    "أورام":           ("☢️", "الأورام والعلاج الإشعاعي"),
+    "oncol":           ("☢️", "الأورام والعلاج الإشعاعي"),
+    "إشعاع":           ("☢️", "الأورام والعلاج الإشعاعي"),
+    "أشعة":            ("🔬", "الأشعة والتصوير"),
+    "radiol":          ("🔬", "الأشعة والتصوير"),
+    "تصوير":           ("🔬", "الأشعة والتصوير"),
+    "imaging":         ("🔬", "الأشعة والتصوير"),
+    "طوارئ":           ("🚨", "الطوارئ"),
+    "emerg":           ("🚨", "الطوارئ"),
+    "مختبر":           ("🧪", "المختبر والتحاليل"),
+    "تحليل":           ("🧪", "المختبر والتحاليل"),
+    "lab":             ("🧪", "المختبر والتحاليل"),
+    "ترقيد":           ("🛏️", "الترقيد"),
+    "inpatient":       ("🛏️", "الترقيد"),
+    # Rehabilitation / physiotherapy
+    "تأهيل":           ("🏋️", "العلاج الطبيعي والتأهيل"),
+    "طبيعي":           ("🏋️", "العلاج الطبيعي والتأهيل"),
+    "فيزياء":          ("🏋️", "العلاج الطبيعي والتأهيل"),
+    "physiother":      ("🏋️", "العلاج الطبيعي والتأهيل"),
+    "physical ther":   ("🏋️", "العلاج الطبيعي والتأهيل"),
+    "rehab":           ("🏋️", "العلاج الطبيعي والتأهيل"),
+    # Urology
+    "بول":             ("🫘", "المسالك البولية"),
+    "urol":            ("🫘", "المسالك البولية"),
+    # Endocrine / diabetes
+    "غدد":             ("🩸", "الغدد والسكري"),
+    "سكري":            ("🩸", "الغدد والسكري"),
+    "endocrin":        ("🩸", "الغدد والسكري"),
+    # ENT
+    "أنف":             ("👂", "الأنف والأذن والحنجرة"),
+    "أذن":             ("👂", "الأنف والأذن والحنجرة"),
+    "ent":             ("👂", "الأنف والأذن والحنجرة"),
 }
 
 
 def _canonical_dept(dept: str, specialty: str) -> tuple[str, str]:
-    """Return (icon, label) for a department string, falling back to specialty."""
+    """Return (icon, label) for a department/specialty string."""
+    search = (dept + " " + specialty).lower()
     for keyword, (icon, label) in _DEPT_CANON.items():
-        if keyword in dept.lower() or keyword in dept:
+        if keyword in search:
             return icon, label
-    if specialty:
-        for keyword, (icon, label) in _DEPT_CANON.items():
-            if keyword in specialty.lower() or keyword in specialty:
-                return icon, label
-        return "🏥", specialty
-    return "🏥", dept if dept else "عام"
+    # Fall back to raw dept name (truncated) or specialty
+    display = dept or specialty
+    if display:
+        return "🏥", display[:60]
+    return "🏥", "استشارات عامة"
+
+
+# Actions that carry no clinical narrative value — excluded from summary
+_SKIP_ACTIONS = {"أشعة", "فحص مخبري", "تأجيل موعد"}
 
 
 def _group_by_department(reports: list[dict]) -> dict[tuple[str, str], list[dict]]:
-    """Group reports by (icon, canonical_label). Unknown dept → 'عام'."""
+    """Group reports by (icon, canonical_label). Skips non-clinical action types."""
     groups: dict[tuple[str, str], list[dict]] = defaultdict(list)
     for r in reports:
-        dept    = _v(r, "department")
-        spec    = _v(r, "specialty")
-        action  = _v(r, "medical_action")
-        # Radiology / radiation therapy always go to their own group
-        if action == "أشعة" or _v(r, "radiology_type"):
-            key = ("🔬", "الأشعة والتصوير")
-        elif action == "علاج إشعاعي" or _v(r, "radiation_therapy_type"):
+        action = _v(r, "medical_action")
+        # Skip radiology, lab tests, and appointment reschedule entirely
+        if action in _SKIP_ACTIONS:
+            continue
+        dept = _v(r, "department")
+        spec = _v(r, "specialty")
+        if action == "علاج إشعاعي" or _v(r, "radiation_therapy_type"):
             key = ("☢️", "الأورام والعلاج الإشعاعي")
         elif action == "طوارئ":
             key = ("🚨", "الطوارئ")
@@ -155,15 +214,17 @@ def _group_by_department(reports: list[dict]) -> dict[tuple[str, str], list[dict
 
 # ─── Narrative builders ───────────────────────────────────
 
+_MAX_FIELD_LEN = 120   # truncate any single field value at this length
+
+
+def _trim(text: str, limit: int = _MAX_FIELD_LEN) -> str:
+    return text if len(text) <= limit else text[:limit] + "…"
+
+
 def _narrate_general_dept(icon: str, label: str, reports: list[dict]) -> str:
     """
-    Builds one coherent paragraph for a group of same-department reports.
-    Strategy:
-      1. Why did patient visit? (complaints — deduplicated)
-      2. What was done? (medical actions, procedures)
-      3. What was found? (diagnoses)
-      4. Doctor decisions / outcomes
-      5. How many visits
+    Builds one coherent narrative block for a group of same-department reports.
+    Deduplicates and truncates — never dumps raw field values verbatim.
     """
     lines: list[str] = []
     n = len(reports)
@@ -179,28 +240,41 @@ def _narrate_general_dept(icon: str, label: str, reports: list[dict]) -> str:
     else:
         visit_line = f"راجع المريض هذا القسم {n} مرات"
     if doctors:
-        visit_line += f" مع {' و'.join(doctors)}"
+        visit_line += f" مع {' و'.join(doctors[:2])}"
     lines.append(_bullet(visit_line + "."))
 
     # Complaints
     if complain:
-        joined = " و".join(complain)
+        joined = " و".join(_trim(c) for c in complain)
         lines.append(_bullet(f"حضر بسبب: {joined}."))
 
-    # Actions (skip generic ones already captured above)
+    # Non-generic actions
     meaningful_actions = [a for a in actions if a not in ("استشارة جديدة", "مراجعة")]
     if meaningful_actions:
         lines.append(_bullet(f"تم: {' و'.join(meaningful_actions[:3])}."))
 
-    # Diagnoses
-    if diagnose:
-        joined = "، ".join(diagnose)
+    # Diagnoses — single bullet, comma-separated
+    real_diagnose = [d for d in diagnose if not _is_junk(d) and len(d) > 3]
+    if real_diagnose:
+        joined = "، ".join(_trim(d) for d in real_diagnose[:2])
         lines.append(_bullet(f"التشخيص: {joined}."))
 
-    # Decisions / outcomes
+    # Doctor decisions — skip if they're just restating diagnosis or junk
+    _diag_label = "التشخيص:"
+    informative = []
     for dec in decision:
-        if dec and dec not in complain and dec not in diagnose:
-            lines.append(_bullet(dec + "."))
+        if not dec or len(dec) < 6:
+            continue
+        # Strip "التشخيص: ..." prefix before checking
+        cleaned = dec[len(_diag_label):].strip() if dec.startswith(_diag_label) else dec
+        if _is_junk(cleaned):
+            continue
+        if cleaned in complain or cleaned in diagnose:
+            continue
+        informative.append(cleaned)
+    informative.sort(key=len)
+    for dec in informative[:1]:
+        lines.append(_bullet(_trim(dec) + "."))
 
     return f"{icon} {label}\n" + "\n".join(lines)
 
@@ -285,9 +359,8 @@ def _narrate_admission(icon: str, label: str, reports: list[dict]) -> str:
     return f"{icon} {label}\n" + "\n".join(lines) if lines else ""
 
 
-# Dispatch table: maps canonical label suffix → narrator
+# Dispatch table: maps canonical label → specialist narrator
 _NARRATORS: dict[str, Callable] = {
-    "الأشعة والتصوير":           _narrate_radiology,
     "الأورام والعلاج الإشعاعي":  _narrate_radiation_therapy,
     "الطوارئ":                    _narrate_emergency,
     "الترقيد":                    _narrate_admission,
@@ -338,17 +411,6 @@ def _build_followup_section(reports: list[dict]) -> str | None:
             if fdate:   parts.append(f"موعد مراجعة: {fdate}")
             if fdept:   parts.append(f"قسم {fdept}")
             if freason: parts.append(freason)
-            lines.append(_bullet("، ".join(parts) + "."))
-            break
-
-    # Latest reschedule
-    for r in reports:
-        rr = _v(r, "app_reschedule_reason")
-        rd = _date_str(r.get("app_reschedule_return_date"))
-        if rr or rd:
-            parts = ["تأجيل موعد"]
-            if rr: parts.append(rr)
-            if rd: parts.append(f"عودة {rd}")
             lines.append(_bullet("، ".join(parts) + "."))
             break
 
