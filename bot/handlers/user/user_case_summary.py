@@ -125,6 +125,12 @@ def _patient_list_keyboard(patients: list, page: int) -> InlineKeyboardMarkup:
     if pending:
         rows.append([pending])
 
+    # Search button — same inline query mechanism as add-report flow
+    rows.append([
+        InlineKeyboardButton("📋 عرض الكل", callback_data=f"cs_page:{page}"),
+        InlineKeyboardButton("🔍 بحث باسم المريض", switch_inline_query_current_chat=""),
+    ])
+
     nav = []
     if page > 0:
         nav.append(InlineKeyboardButton("⬅️ السابق", callback_data=f"cs_page:{page-1}"))
@@ -164,6 +170,7 @@ async def start_case_summary(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     context.user_data["cs_patients"] = patients
     context.user_data["cs_page"] = 0
+    context.user_data["_current_search_type"] = "patient"
 
     await update.message.reply_text(
         f"📋 *ملخص الحالة*\n\nاختر مريضاً لعرض ملخصه الطبي ({len(patients)} مريض):",
@@ -181,6 +188,7 @@ async def handle_patient_page(update: Update, context: ContextTypes.DEFAULT_TYPE
     patients = context.user_data.get("cs_patients") or _load_all_patients()
     context.user_data["cs_patients"] = patients
     context.user_data["cs_page"] = page
+    context.user_data["_current_search_type"] = "patient"
 
     await q.edit_message_text(
         f"📋 *ملخص الحالة*\n\nاختر مريضاً ({len(patients)} مريض):",
@@ -257,6 +265,7 @@ async def handle_back_to_list(update: Update, context: ContextTypes.DEFAULT_TYPE
     patients = context.user_data.get("cs_patients") or _load_all_patients()
     context.user_data["cs_patients"] = patients
     page = context.user_data.get("cs_page", 0)
+    context.user_data["_current_search_type"] = "patient"
 
     await q.edit_message_text(
         f"📋 *ملخص الحالة*\n\nاختر مريضاً ({len(patients)} مريض):",
@@ -275,6 +284,74 @@ async def handle_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 
+async def handle_inline_patient_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Receives the '__PATIENT_SELECTED__:{id}:{name}' message produced by the
+    inline query when the user picks a patient from the search results.
+    Mirrors the same protocol used in the add-report flow.
+    """
+    text_msg = update.message.text or ""
+    if not text_msg.startswith("__PATIENT_SELECTED__"):
+        return CS_SELECT_PATIENT
+
+    try:
+        parts = text_msg.split(":", 2)
+        patient_id = int(parts[1])
+        patient_name = parts[2] if len(parts) > 2 else f"مريض #{patient_id}"
+    except Exception:
+        await update.message.reply_text("⚠️ لم يتم التعرف على المريض. حاول مرة أخرى.")
+        return CS_SELECT_PATIENT
+
+    if patient_id == 0 or patient_name in ("خطأ", "لا يوجد"):
+        await update.message.reply_text("⚠️ لم يتم العثور على المريض. حاول مرة أخرى.")
+        return CS_SELECT_PATIENT
+
+    # Delete the raw __PATIENT_SELECTED__ message so it doesn't clutter the chat
+    try:
+        await update.message.delete()
+    except Exception:
+        pass
+
+    try:
+        reports = _load_reports(patient_id)
+    except Exception as e:
+        logger.error(f"cs inline: load reports failed patient={patient_id}: {e}", exc_info=True)
+        await update.message.reply_text("⚠️ خطأ في تحميل التقارير. حاول مرة أخرى.")
+        return CS_SELECT_PATIENT
+
+    if not reports:
+        await update.message.reply_text(
+            f"👤 {patient_name}\n\n⚠️ لا توجد تقارير مسجلة لهذا المريض.",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔙 اختيار مريض آخر", callback_data="cs_back_to_list")],
+                [InlineKeyboardButton("❌ إنهاء", callback_data="cs_cancel")],
+            ]),
+        )
+        return CS_SHOW_SUMMARY
+
+    hospital = _patient_hospital(reports)
+    last_date = reports[0].get("report_date")
+
+    summary = build_full_summary(
+        patient_name=patient_name,
+        hospital_name=hospital,
+        reports=reports,
+        last_date=last_date,
+    )
+    if len(summary) > _MAX_MSG_LEN:
+        summary = summary[:_MAX_MSG_LEN] + "\n\n…"
+
+    context.user_data["cs_patient_id"] = patient_id
+    context.user_data["cs_patient_name"] = patient_name
+
+    await update.message.reply_text(
+        summary,
+        reply_markup=_summary_keyboard(patient_id),
+        parse_mode="Markdown",
+    )
+    return CS_SHOW_SUMMARY
+
+
 # ─── Register ─────────────────────────────────────────────
 
 def register(app):
@@ -284,6 +361,7 @@ def register(app):
         ],
         states={
             CS_SELECT_PATIENT: [
+                MessageHandler(filters.Regex(r"^__PATIENT_SELECTED__"), handle_inline_patient_selected),
                 CallbackQueryHandler(handle_patient_page,      pattern=r"^cs_page:\d+$"),
                 CallbackQueryHandler(handle_patient_selection, pattern=r"^cs_patient:\d+$"),
                 CallbackQueryHandler(handle_cancel,            pattern=r"^cs_cancel$"),

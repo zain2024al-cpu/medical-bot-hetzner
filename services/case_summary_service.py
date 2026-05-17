@@ -132,14 +132,14 @@ def _is_junk(text: str) -> bool:
 
 
 def _v(row: dict, *keys) -> str:
-    """Return first clean single-line value."""
+    """Return first clean value (full text, not just first line)."""
     for k in keys:
         val = row.get(k)
         if not val:
             continue
-        first = str(val).strip().splitlines()[0].strip()
-        if not _is_junk(first) and len(first) > 1:
-            return first
+        full = str(val).strip()
+        if not _is_junk(full.splitlines()[0].strip()) and len(full) > 1:
+            return full
     return ""
 
 
@@ -159,7 +159,7 @@ def _unique(items: list[str], limit: int = 3) -> list[str]:
     return out
 
 
-def _trim(text: str, limit: int = 110) -> str:
+def _trim(text: str, limit: int = 300) -> str:
     return text if len(text) <= limit else text[:limit] + "…"
 
 

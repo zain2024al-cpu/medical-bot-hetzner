@@ -8,6 +8,10 @@ def register_all_handlers(app):
     تسجيل جميع الهاندلرز في التطبيق
     """
     
+    # 🔄 مقاطعة التدفق التلقائية (group=-1، قبل جميع ConversationHandlers)
+    from bot.handlers.shared.flow_interrupt import register as register_flow_interrupt
+    register_flow_interrupt(app)
+
     # 🔄 تسجيل handlers المشتركة (للجميع) - يجب أن تكون أولاً
     from bot.handlers.shared.shared_refresh import register as register_shared_refresh
     from bot.handlers.shared.shared_schedule import register as register_shared_schedule
