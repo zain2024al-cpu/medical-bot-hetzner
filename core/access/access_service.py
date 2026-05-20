@@ -22,6 +22,23 @@ _DEFAULT_TRANSLATOR_MODULE = "user_reports"
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
+def resolve_tg_user_id(entity) -> int | None:
+    """
+    Resolve the Telegram identity used by RBAC from a user-like row.
+
+    Current platform users store it in users.tg_user_id. Legacy translator
+    directory rows store the same Telegram id in translators.translator_id.
+    """
+    if entity is None:
+        return None
+
+    for attr in ("tg_user_id", "chat_id", "translator_id"):
+        value = getattr(entity, attr, None)
+        if isinstance(value, int) and value > 0:
+            return value
+
+    return None
+
 def get_user_modules(tg_user_id: int) -> list[str]:
     """
     Return ordered list of active module keys for this user.
@@ -32,7 +49,7 @@ def get_user_modules(tg_user_id: int) -> list[str]:
     """
     try:
         from db.session import SessionLocal
-        from db.models import UserModuleAccess, Translator
+        from db.models import UserModuleAccess, Translator, TranslatorDirectory
 
         with SessionLocal() as s:
             records = (
@@ -45,13 +62,32 @@ def get_user_modules(tg_user_id: int) -> list[str]:
             if records:
                 return [r.module_key for r in records]
 
-            # No records — check if user is an approved translator (lazy migration)
+            # No records — check if user is an approved platform user.
             user = s.query(Translator).filter_by(tg_user_id=tg_user_id).first()
             if user and getattr(user, "is_approved", False) and not getattr(user, "is_suspended", False):
                 _insert_access(s, tg_user_id, _DEFAULT_TRANSLATOR_MODULE, granted_by=None)
                 s.commit()
                 logger.info(
                     f"[access] lazy-migrated tg_user_id={tg_user_id} "
+                    f"→ module={_DEFAULT_TRANSLATOR_MODULE!r}"
+                )
+                return [_DEFAULT_TRANSLATOR_MODULE]
+
+            if user:
+                return []
+
+            # Legacy production compatibility: the translators directory stores
+            # Telegram user ids in translator_id for established translators.
+            directory_user = (
+                s.query(TranslatorDirectory)
+                .filter_by(translator_id=tg_user_id)
+                .first()
+            )
+            if directory_user:
+                _insert_access(s, tg_user_id, _DEFAULT_TRANSLATOR_MODULE, granted_by=None)
+                s.commit()
+                logger.info(
+                    f"[access] lazy-migrated legacy translator_id={tg_user_id} "
                     f"→ module={_DEFAULT_TRANSLATOR_MODULE!r}"
                 )
                 return [_DEFAULT_TRANSLATOR_MODULE]

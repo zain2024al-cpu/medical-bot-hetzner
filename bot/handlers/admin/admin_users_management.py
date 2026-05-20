@@ -17,6 +17,7 @@ from telegram.ext import CallbackQueryHandler, CommandHandler, ContextTypes, Mes
 from sqlalchemy import func
 
 from bot.shared_auth import is_admin
+from core.access.access_service import resolve_tg_user_id
 from db.models import Translator
 from db.session import SessionLocal
 
@@ -66,14 +67,10 @@ def _resolve_access_tg_user_id(user: Translator) -> int | None:
     """
     Return the Telegram user id required by RBAC.
 
-    Some legacy rows in users have no tg_user_id; private chat_id is a safe
-    fallback when present. If neither exists, module access cannot be managed.
+    Identity resolution lives in the RBAC layer so legacy user rows and
+    TranslatorDirectory rows follow one contract.
     """
-    for attr in ("tg_user_id", "chat_id"):
-        value = getattr(user, attr, None)
-        if isinstance(value, int) and value > 0:
-            return value
-    return None
+    return resolve_tg_user_id(user)
 
 
 def _user_actions_kb(

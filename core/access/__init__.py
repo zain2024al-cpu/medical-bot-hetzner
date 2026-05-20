@@ -5,6 +5,7 @@
 # All handlers should call these functions; no scattered permission checks.
 
 from .access_service import (
+    resolve_tg_user_id,
     get_user_modules,
     user_has_module,
     grant_module,
@@ -13,6 +14,7 @@ from .access_service import (
 )
 
 __all__ = [
+    "resolve_tg_user_id",
     "get_user_modules",
     "user_has_module",
     "grant_module",

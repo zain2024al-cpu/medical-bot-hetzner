@@ -31,7 +31,7 @@ from core.access.access_service import (
     list_user_module_access,
 )
 from core.routing.registry import registry
-from db.models import User, UserModuleAccess
+from db.models import User, UserModuleAccess, TranslatorDirectory
 
 _TG_USER = 9_000_001   # synthetic Telegram user ID
 _TG_APPROVED = 9_000_002
@@ -87,6 +87,18 @@ def test_lazy_migration_approved_translator():
     mods2 = get_user_modules(_TG_APPROVED)
     assert mods2 == mods
     print(f"lazy migration OK - modules={mods}")
+
+
+def test_lazy_migration_translator_directory_identity():
+    tg = 9_000_090
+    with _TestSessionLocal() as s:
+        if not s.query(TranslatorDirectory).filter_by(translator_id=tg).first():
+            s.add(TranslatorDirectory(translator_id=tg, name="Directory User"))
+            s.commit()
+
+    mods = get_user_modules(tg)
+    assert "user_reports" in mods, f"Expected legacy directory user to get default module, got {mods}"
+    print("lazy migration for translator directory identity OK")
 
 
 # ── Lazy migration skipped for suspended users ────────────────────────────────
@@ -248,6 +260,80 @@ def test_admin_user_actions_skips_module_access_without_tg_id():
     print("admin user actions missing-tg guard OK")
 
 
+def test_access_identity_resolves_translator_directory_id():
+    from core.access.access_service import resolve_tg_user_id
+
+    row = TranslatorDirectory(translator_id=9_000_091, name="Directory Identity")
+    assert resolve_tg_user_id(row) == 9_000_091
+    print("access identity resolves translator directory id OK")
+
+
+def test_schema_compatibility_backfills_users_from_translator_directory():
+    tg = 9_000_092
+    with _TestSessionLocal() as s:
+        if not s.query(TranslatorDirectory).filter_by(translator_id=tg).first():
+            s.add(TranslatorDirectory(translator_id=tg, name="Backfilled User"))
+            s.commit()
+
+    _db_session._ensure_schema_compatibility(_test_engine)
+
+    with _TestSessionLocal() as s:
+        user = s.query(User).filter_by(tg_user_id=tg).first()
+        assert user is not None
+        assert user.chat_id == tg
+        assert user.full_name == "Backfilled User"
+        assert user.is_approved is True
+        assert user.is_active is True
+    print("schema compatibility backfills users from translator directory OK")
+
+
+def test_schema_compatibility_adds_missing_legacy_user_columns():
+    from sqlalchemy import text
+
+    legacy_engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
+    with legacy_engine.begin() as conn:
+        conn.execute(text("CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, full_name TEXT)"))
+        conn.execute(text("CREATE TABLE translators (translator_id INTEGER PRIMARY KEY, name TEXT)"))
+        conn.execute(text("INSERT INTO users (full_name) VALUES ('Existing Legacy User')"))
+        conn.execute(text(
+            "INSERT INTO translators (translator_id, name) VALUES (9000093, 'Legacy Directory User')"
+        ))
+        conn.execute(text(
+            "INSERT INTO translators (translator_id, name) VALUES (9000094, 'Existing Legacy User')"
+        ))
+
+    _db_session._ensure_schema_compatibility(legacy_engine)
+
+    with legacy_engine.connect() as conn:
+        columns = {
+            row[1]
+            for row in conn.execute(text("PRAGMA table_info(users)")).fetchall()
+        }
+        assert "tg_user_id" in columns
+        assert "chat_id" in columns
+        assert "is_approved" in columns
+
+        row = conn.execute(text(
+            "SELECT tg_user_id, chat_id, full_name, is_approved "
+            "FROM users WHERE tg_user_id = 9000093"
+        )).fetchone()
+        assert row is not None
+        assert row[0] == 9000093
+        assert row[1] == 9000093
+        assert row[2] == "Legacy Directory User"
+        assert row[3] == 1
+
+        repaired = conn.execute(text(
+            "SELECT tg_user_id, chat_id, is_approved "
+            "FROM users WHERE full_name = 'Existing Legacy User'"
+        )).fetchone()
+        assert repaired is not None
+        assert repaired[0] == 9000094
+        assert repaired[1] == 9000094
+        assert repaired[2] == 1
+    print("schema compatibility adds missing legacy user columns OK")
+
+
 def test_admin_user_management_registers_callbacks_in_integration_group():
     from telegram.ext import CallbackQueryHandler
     from bot.handlers.admin.admin_users_management import handle_callbacks, register
@@ -310,6 +396,7 @@ if __name__ == "__main__":
     test_registry_keyboard_rows()
     test_no_modules_unapproved()
     test_lazy_migration_approved_translator()
+    test_lazy_migration_translator_directory_identity()
     test_no_lazy_migration_suspended()
     test_grant_and_revoke()
     test_regrant_after_revoke()
@@ -319,6 +406,9 @@ if __name__ == "__main__":
     test_dynamic_user_kb_single_module()
     test_admin_user_actions_exposes_module_access()
     test_admin_user_actions_skips_module_access_without_tg_id()
+    test_access_identity_resolves_translator_directory_id()
+    test_schema_compatibility_backfills_users_from_translator_directory()
+    test_schema_compatibility_adds_missing_legacy_user_columns()
     test_admin_user_management_registers_callbacks_in_integration_group()
     test_admin_user_management_callbacks_are_known_to_fallback()
     test_unique_constraint()

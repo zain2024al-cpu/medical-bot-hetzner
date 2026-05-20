@@ -68,6 +68,175 @@ SessionLocal = sessionmaker(
     bind=engine
 )
 
+
+def _table_exists(conn, table_name: str) -> bool:
+    row = conn.execute(
+        text("SELECT 1 FROM sqlite_master WHERE type='table' AND name=:name"),
+        {"name": table_name},
+    ).fetchone()
+    return row is not None
+
+
+def _table_columns(conn, table_name: str) -> set[str]:
+    if not _table_exists(conn, table_name):
+        return set()
+    return {
+        row[1]
+        for row in conn.execute(text(f"PRAGMA table_info({table_name})")).fetchall()
+    }
+
+
+def _add_column_if_missing(conn, table_name: str, columns: set[str], column_name: str, ddl: str) -> None:
+    if column_name in columns:
+        return
+    conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {ddl}"))
+    columns.add(column_name)
+
+
+def _ensure_schema_compatibility(target_engine=None) -> None:
+    """
+    Idempotent SQLite compatibility migration for older production databases.
+
+    It never drops or rewrites tables. It only adds nullable columns expected by
+    the current User model and links legacy translator-directory rows into the
+    users table when translators.translator_id already contains Telegram IDs.
+    """
+    target_engine = target_engine or engine
+    try:
+        with target_engine.begin() as conn:
+            if not _table_exists(conn, "users"):
+                return
+
+            columns = _table_columns(conn, "users")
+            for column_name, ddl in {
+                "tg_user_id": "INTEGER",
+                "chat_id": "INTEGER",
+                "first_name": "VARCHAR(255)",
+                "last_name": "VARCHAR(255)",
+                "full_name": "VARCHAR(255)",
+                "username": "VARCHAR(255)",
+                "phone_number": "VARCHAR(50)",
+                "email": "VARCHAR(255)",
+                "role": "VARCHAR(50)",
+                "status": "VARCHAR(50)",
+                "is_approved": "INTEGER",
+                "is_admin": "INTEGER",
+                "is_active": "INTEGER",
+                "is_suspended": "INTEGER",
+                "suspension_reason": "TEXT",
+                "suspended_at": "DATETIME",
+                "registration_date": "DATETIME",
+                "last_active": "DATETIME",
+                "total_reports": "INTEGER",
+                "created_at": "DATETIME",
+                "updated_at": "DATETIME",
+            }.items():
+                _add_column_if_missing(conn, "users", columns, column_name, ddl)
+
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_users_tg_user_id ON users (tg_user_id)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_users_is_approved ON users (is_approved)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_users_is_active ON users (is_active)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_users_created_at ON users (created_at)"))
+
+            if not _table_exists(conn, "translators"):
+                return
+
+            translator_columns = _table_columns(conn, "translators")
+            if not {"translator_id", "name"}.issubset(translator_columns):
+                return
+
+            # First repair existing user rows by exact unique name when safe.
+            conn.execute(text("""
+                UPDATE users
+                SET
+                    tg_user_id = (
+                        SELECT t.translator_id
+                        FROM translators t
+                        WHERE LOWER(TRIM(COALESCE(t.name, ''))) = LOWER(TRIM(COALESCE(users.full_name, '')))
+                        LIMIT 1
+                    ),
+                    chat_id = COALESCE(chat_id, (
+                        SELECT t.translator_id
+                        FROM translators t
+                        WHERE LOWER(TRIM(COALESCE(t.name, ''))) = LOWER(TRIM(COALESCE(users.full_name, '')))
+                        LIMIT 1
+                    )),
+                    is_approved = COALESCE(is_approved, 1),
+                    is_active = COALESCE(is_active, 1),
+                    is_suspended = COALESCE(is_suspended, 0),
+                    role = COALESCE(role, 'user'),
+                    status = COALESCE(status, 'approved'),
+                    created_at = COALESCE(created_at, CURRENT_TIMESTAMP),
+                    updated_at = COALESCE(updated_at, CURRENT_TIMESTAMP),
+                    registration_date = COALESCE(registration_date, CURRENT_TIMESTAMP),
+                    last_active = COALESCE(last_active, CURRENT_TIMESTAMP),
+                    total_reports = COALESCE(total_reports, 0)
+                WHERE (tg_user_id IS NULL OR tg_user_id = 0)
+                  AND full_name IS NOT NULL
+                  AND TRIM(full_name) != ''
+                  AND (
+                      SELECT COUNT(*)
+                      FROM translators t
+                      WHERE LOWER(TRIM(COALESCE(t.name, ''))) = LOWER(TRIM(COALESCE(users.full_name, '')))
+                  ) = 1
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM users existing
+                      WHERE existing.tg_user_id = (
+                          SELECT t.translator_id
+                          FROM translators t
+                          WHERE LOWER(TRIM(COALESCE(t.name, ''))) = LOWER(TRIM(COALESCE(users.full_name, '')))
+                          LIMIT 1
+                      )
+                  )
+            """))
+
+            # Then create platform user rows for remaining directory translators.
+            conn.execute(text("""
+                INSERT INTO users (
+                    tg_user_id,
+                    chat_id,
+                    full_name,
+                    role,
+                    status,
+                    is_approved,
+                    is_admin,
+                    is_active,
+                    is_suspended,
+                    registration_date,
+                    last_active,
+                    total_reports,
+                    created_at,
+                    updated_at
+                )
+                SELECT
+                    t.translator_id,
+                    t.translator_id,
+                    t.name,
+                    'user',
+                    'approved',
+                    1,
+                    0,
+                    1,
+                    0,
+                    CURRENT_TIMESTAMP,
+                    CURRENT_TIMESTAMP,
+                    0,
+                    CURRENT_TIMESTAMP,
+                    CURRENT_TIMESTAMP
+                FROM translators t
+                WHERE t.translator_id IS NOT NULL
+                  AND t.translator_id > 0
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM users u
+                      WHERE u.tg_user_id = t.translator_id
+                  )
+            """))
+    except Exception as exc:
+        logger.warning(f"⚠️ Schema compatibility migration skipped: {exc}")
+
+
 # ================================================
 # Database Initialization
 # ================================================
@@ -82,12 +251,14 @@ def init_database():
         
         # Create all tables first
         Base.metadata.create_all(bind=engine)
+        _ensure_schema_compatibility()
         logger.info(f"✅ Database tables created: {DATABASE_PATH}")
 
         try:
             from services.translators_service import seed_translators_directory, sync_reports_translator_ids
             seeded = seed_translators_directory()
             synced = sync_reports_translator_ids()
+            _ensure_schema_compatibility()
             if seeded or synced:
                 logger.info(f"✅ Translators seeded/updated: {seeded}, Reports synced: {synced}")
         except Exception as seed_error:
@@ -271,20 +442,25 @@ try:
                 shutil.copy2(initial_db_path, DATABASE_PATH)
                 db_size = os.path.getsize(DATABASE_PATH) / 1024
                 logger.info(f"✅ Database loaded from initial file: {db_size:.2f} KB")
+                Base.metadata.create_all(bind=engine)
+                _ensure_schema_compatibility()
             except Exception as copy_error:
                 logger.warning(f"⚠️ Failed to copy initial database: {copy_error}")
                 logger.info("Creating new database tables...")
                 Base.metadata.create_all(bind=engine)
+                _ensure_schema_compatibility()
                 logger.info("✅ Database tables created")
         else:
             logger.info("Creating new database tables...")
             Base.metadata.create_all(bind=engine)
+            _ensure_schema_compatibility()
             logger.info("✅ Database tables created")
     else:
         db_size = os.path.getsize(DATABASE_PATH) / 1024
         logger.info(f"✅ Database loaded: {db_size:.2f} KB")
         # Ensure all tables exist (for migrations)
         Base.metadata.create_all(bind=engine)
+        _ensure_schema_compatibility()
 except Exception as e:
     logger.warning(f"Database init warning: {e}")
     import traceback
