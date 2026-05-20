@@ -209,6 +209,45 @@ def test_dynamic_user_kb_single_module():
 
 # ── DB schema: UserModuleAccess ───────────────────────────────────────────────
 
+def test_admin_user_actions_exposes_module_access():
+    from bot.handlers.admin.admin_users_management import _user_actions_kb
+
+    kb = _user_actions_kb(
+        user_id=123,
+        approved=True,
+        suspended=False,
+        access_tg_user_id=9_123_456,
+    )
+    callbacks = [
+        button.callback_data
+        for row in kb.inline_keyboard
+        for button in row
+        if button.callback_data
+    ]
+    assert callbacks.count("amod:list:9123456") == 1
+    assert callbacks[-1] == "aum:home"
+    print("admin user actions module-access button OK")
+
+
+def test_admin_user_actions_skips_module_access_without_tg_id():
+    from bot.handlers.admin.admin_users_management import _user_actions_kb
+
+    kb = _user_actions_kb(
+        user_id=123,
+        approved=True,
+        suspended=False,
+        access_tg_user_id=None,
+    )
+    callbacks = [
+        button.callback_data
+        for row in kb.inline_keyboard
+        for button in row
+        if button.callback_data
+    ]
+    assert not any(cb.startswith("amod:list:") for cb in callbacks)
+    print("admin user actions missing-tg guard OK")
+
+
 def test_unique_constraint():
     """Duplicate (tg_user_id, module_key) is handled gracefully via grant idempotency."""
     tg = 9_000_070
@@ -232,5 +271,7 @@ if __name__ == "__main__":
     test_dynamic_user_kb_builds_rows()
     test_dynamic_user_kb_no_modules_fallback()
     test_dynamic_user_kb_single_module()
+    test_admin_user_actions_exposes_module_access()
+    test_admin_user_actions_skips_module_access_without_tg_id()
     test_unique_constraint()
     print("\nALL RBAC TESTS PASSED")

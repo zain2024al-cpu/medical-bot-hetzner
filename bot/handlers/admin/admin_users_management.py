@@ -62,11 +62,25 @@ def _list_kb(kind: str, page: int, total_pages: int, users: list[Translator]) ->
     return InlineKeyboardMarkup(kb)
 
 
+def _resolve_access_tg_user_id(user: Translator) -> int | None:
+    """
+    Return the Telegram user id required by RBAC.
+
+    Some legacy rows in users have no tg_user_id; private chat_id is a safe
+    fallback when present. If neither exists, module access cannot be managed.
+    """
+    for attr in ("tg_user_id", "chat_id"):
+        value = getattr(user, attr, None)
+        if isinstance(value, int) and value > 0:
+            return value
+    return None
+
+
 def _user_actions_kb(
     user_id: int,
     approved: bool,
     suspended: bool,
-    tg_user_id: int | None = None,
+    access_tg_user_id: int | None = None,
 ) -> InlineKeyboardMarkup:
     row1: list[InlineKeyboardButton] = []
     if not approved:
@@ -81,10 +95,10 @@ def _user_actions_kb(
 
     rows = [row1, row2]
 
-    # Module access management button (only when tg_user_id is known)
-    if tg_user_id:
+    # Module access management requires a real Telegram user id.
+    if access_tg_user_id:
         rows.append([
-            InlineKeyboardButton("🔑 إدارة الوصول", callback_data=f"amod:list:{tg_user_id}")
+            InlineKeyboardButton("🔑 إدارة الوصول", callback_data=f"amod:list:{access_tg_user_id}")
         ])
 
     rows.append([InlineKeyboardButton("🔙 رجوع", callback_data=f"{CB}:home")])
@@ -150,6 +164,7 @@ async def _render_user(query, user_id: int):
 
         name = (u.full_name or "").strip() or f"User {u.id}"
         tg = u.tg_user_id
+        access_tg_user_id = _resolve_access_tg_user_id(u)
         phone = (getattr(u, "phone_number", None) or "").strip() or "غير محدد"
         approved = bool(getattr(u, "is_approved", False))
         suspended = bool(getattr(u, "is_suspended", False))
@@ -161,7 +176,12 @@ async def _render_user(query, user_id: int):
         f"- **الهاتف**: {phone}\n"
         f"- **موافقة**: {'✅' if approved else '⏳'}\n"
         f"- **تجميد**: {'🔒' if suspended else '🔓'}\n",
-        reply_markup=_user_actions_kb(int(user_id), approved, suspended, tg_user_id=tg),
+        reply_markup=_user_actions_kb(
+            int(user_id),
+            approved,
+            suspended,
+            access_tg_user_id=access_tg_user_id,
+        ),
         parse_mode="Markdown",
     )
 
