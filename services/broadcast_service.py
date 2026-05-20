@@ -1405,6 +1405,55 @@ def _format_followup_date(followup_date, followup_time):
         return str(followup_date)
 
 
+async def broadcast_schedule(bot: Bot, photo_source, schedule_data: dict, use_file_id: bool = False) -> None:
+    """
+    بث صورة الجدول اليومي لجميع المستخدمين المعتمدين والأدمن.
+
+    Args:
+        bot: كائن البوت (أو أي كائن يحتوي على Bot)
+        photo_source: file_id (str) أو مسار ملف محلي (str)
+        schedule_data: dict يحتوي على: date, day_name, upload_time
+        use_file_id: True إذا كان photo_source هو Telegram file_id
+    """
+    bot = _resolve_bot(bot)
+    if bot is None:
+        logger.error("broadcast_schedule: لا يوجد كائن bot صالح")
+        return
+
+    now = schedule_data.get('date', '')
+    day_name = schedule_data.get('day_name', '')
+    upload_time = schedule_data.get('upload_time', '')
+    caption = f"📅 جدول اليوم — {day_name} {now}"
+    if upload_time:
+        caption += f" ({upload_time})"
+
+    async def _send_photo(chat_id):
+        try:
+            if use_file_id:
+                await bot.send_photo(chat_id=chat_id, photo=photo_source, caption=caption)
+            else:
+                with open(photo_source, 'rb') as f:
+                    await bot.send_photo(chat_id=chat_id, photo=f, caption=caption)
+        except Exception as e:
+            logger.warning(f"broadcast_schedule: فشل الإرسال إلى {chat_id}: {e}")
+
+    # إرسال لجميع المستخدمين المعتمدين والنشطين
+    with SessionLocal() as s:
+        active_users = s.query(Translator).filter_by(
+            is_approved=True,
+            is_suspended=False,
+        ).all()
+        for user in active_users:
+            if user.tg_user_id:
+                await _send_photo(user.tg_user_id)
+
+    # إرسال للأدمن
+    for admin_id in ADMIN_IDS:
+        await _send_photo(admin_id)
+
+    logger.info(f"broadcast_schedule: اكتمل البث — {day_name} {now}")
+
+
 def format_initial_case_message(case_data: dict) -> str:
     """تنسيق رسالة الحالة الأولية"""
     lines = []

@@ -32,17 +32,24 @@ class CorrectorConfig:
 @dataclass
 class EnhancerConfig:
     enabled: bool = True
-    # Denoise — NLMeans (0 = off)
-    denoise_strength: int = 5             # keep low (3–7) to preserve handwriting
-    # CLAHE contrast
-    clahe_clip_limit: float = 1.8         # 1.0–2.5; higher = more contrast
+    # Adaptive quality-based processing (recommended: True)
+    # When True, the tier-param table in enhancer.py overrides the values below.
+    # When False, the values below are used directly for every image.
+    adaptive_enhance: bool = True
+    # --- Fallback values used when adaptive_enhance=False ---
+    # Denoise — NLMeans (0 = off); keep ≤ 5 to preserve handwriting
+    denoise_strength: int = 3
+    # CLAHE contrast; 1.0–2.0 safe range for medical docs
+    clahe_clip_limit: float = 1.2
     clahe_tile_grid: tuple = (8, 8)
-    # Sharpening — unsharp mask (0.0 = off, 1.0 = strong)
-    sharpen_strength: float = 0.25        # CONSERVATIVE — preserves stamps & Arabic
-    # Gamma
-    gamma: float = 1.0                    # 1.0 = no change; < 1 brighter
-    # Illumination normalisation (removes uneven lighting)
+    # Sharpening — unsharp mask (0.0 = off); ≤ 0.20 for medical docs
+    sharpen_strength: float = 0.15
+    # Gamma (1.0 = no change; < 1.0 brightens)
+    gamma: float = 1.0
+    # Illumination normalisation blend fraction (0.0 = off, 1.0 = full replacement)
+    # Values below 0.5 preserve natural document appearance
     illumination_normalize: bool = True
+    illum_blend: float = 0.45
 
 @dataclass
 class PDFConfig:

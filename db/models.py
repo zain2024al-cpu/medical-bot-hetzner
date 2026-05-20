@@ -275,6 +275,27 @@ class UserActivity(Base):
 
 
 # ================================================
+# Healthcare — Wound Care Records
+# ================================================
+
+class WoundRecord(Base):
+    """Wound care record created by the healthcare module."""
+    __tablename__ = "wound_records"
+
+    id               = Column(Integer, primary_key=True, autoincrement=True)
+    patient_id       = Column(Integer, nullable=True, index=True)
+    patient_name     = Column(String(255), nullable=True, index=True)
+    wound_types      = Column(Text, nullable=True)         # JSON list of type IDs
+    wound_type_labels= Column(Text, nullable=True)         # JSON list of display labels
+    image_file_ids   = Column(Text, nullable=True)         # JSON list of Telegram file_ids
+    image_count      = Column(Integer, default=0, nullable=True)
+    notes            = Column(Text, nullable=True)
+    created_by       = Column(Integer, nullable=True, index=True)  # tg_user_id
+    created_at       = Column(DateTime, default=datetime.utcnow, index=True, nullable=True)
+    updated_at       = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
+
+
+# ================================================
 # Additional Models
 # ================================================
 

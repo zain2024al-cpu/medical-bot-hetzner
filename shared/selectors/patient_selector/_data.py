@@ -1,0 +1,122 @@
+# shared/selectors/patient_selector/_data.py
+# Database access layer — the only file in this selector that touches the DB.
+#
+# All functions are synchronous (run in a thread pool via asyncio.to_thread
+# if needed).  They return plain dataclass instances, never ORM objects.
+
+import logging
+from dataclasses import dataclass
+
+logger = logging.getLogger(__name__)
+
+_DB_LIMIT = 500   # max rows fetched per query — covers any realistic patient list
+
+
+@dataclass(frozen=True, slots=True)
+class PatientRecord:
+    """Immutable patient value object passed between layers."""
+    id: int | None
+    name: str
+
+
+def fetch_all() -> list[PatientRecord]:
+    """
+    Fetch every patient from the database, sorted alphabetically.
+    Duplicates (same full_name) are removed; the first occurrence wins.
+
+    Returns an empty list on any error (caller must handle gracefully).
+    """
+    try:
+        from db.session import SessionLocal
+        from db.models import Patient as _Patient
+
+        with SessionLocal() as s:
+            rows = (
+                s.query(_Patient)
+                .filter(_Patient.full_name.isnot(None), _Patient.full_name != "")
+                .order_by(_Patient.full_name)
+                .limit(_DB_LIMIT)
+                .all()
+            )
+            seen: set[str] = set()
+            records: list[PatientRecord] = []
+            for p in rows:
+                name = (p.full_name or "").strip()
+                if name and name not in seen:
+                    seen.add(name)
+                    records.append(PatientRecord(id=p.id, name=name))
+
+            records.sort(key=lambda r: r.name)
+            logger.debug(f"[patient_selector._data] fetch_all → {len(records)} records")
+            return records
+
+    except Exception as exc:
+        logger.error(f"[patient_selector._data] fetch_all error: {exc}", exc_info=True)
+        return []
+
+
+def search(query: str) -> list[PatientRecord]:
+    """
+    Search for patients whose full_name contains query (case-insensitive).
+    Falls back to fetch_all() when query is blank.
+
+    Returns an empty list on any error.
+    """
+    query = query.strip()
+    if not query:
+        return fetch_all()
+
+    try:
+        from db.session import SessionLocal
+        from db.models import Patient as _Patient
+
+        with SessionLocal() as s:
+            rows = (
+                s.query(_Patient)
+                .filter(
+                    _Patient.full_name.isnot(None),
+                    _Patient.full_name != "",
+                    _Patient.full_name.ilike(f"%{query}%"),
+                )
+                .order_by(_Patient.full_name)
+                .limit(_DB_LIMIT)
+                .all()
+            )
+            records = [
+                PatientRecord(id=p.id, name=(p.full_name or "").strip())
+                for p in rows
+                if (p.full_name or "").strip()
+            ]
+            logger.debug(
+                f"[patient_selector._data] search({query!r}) → {len(records)} records"
+            )
+            return records
+
+    except Exception as exc:
+        logger.error(f"[patient_selector._data] search error: {exc}", exc_info=True)
+        return []
+
+
+def lookup_by_name(name: str) -> PatientRecord | None:
+    """
+    Exact-match lookup by full_name.
+    Used to resolve a name chosen from the snapshot back to a DB id.
+    Returns None if not found or on error.
+    """
+    name = name.strip()
+    if not name:
+        return None
+
+    try:
+        from db.session import SessionLocal
+        from db.models import Patient as _Patient
+
+        with SessionLocal() as s:
+            p = s.query(_Patient).filter_by(full_name=name).first()
+            if p:
+                return PatientRecord(id=p.id, name=name)
+            return None
+
+    except Exception as exc:
+        logger.error(f"[patient_selector._data] lookup_by_name error: {exc}", exc_info=True)
+        return None

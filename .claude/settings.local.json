@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(python app.py:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(ssh botuser@5.223.58.71 \"pm2 logs medbot --lines 80 --nostream 2>&1 | tail -80\")",
+      "Bash(xargs grep -l \"cv2\\\\|CLAHE\\\\|sharpen\\\\|enhance_image\\\\|denoise\\\\|pdf_enhance\\\\|image_process\")"
     ]
   }
 }

@@ -8,37 +8,32 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+MAX_NAV_DEPTH = 25
+
 
 def nav_push(context, state):
     """
     إضافة state جديد إلى سجل التنقل (History Stack)
-    
+
     Args:
         context: ContextTypes.DEFAULT_TYPE
         state: State constant (مثل STATE_SELECT_HOSPITAL)
-    
+
     Returns:
         None
     """
     if 'history' not in context.user_data:
         context.user_data['history'] = []
-    
+
     history = context.user_data['history']
-    
-    # ✅ منع التكرار: لا نضيف نفس الـ state مرتين متتاليتين
+
+    # منع التكرار: لا نضيف نفس الـ state مرتين متتاليتين
     if state is not None and (not history or history[-1] != state):
         history.append(state)
-        logger.info(f"📝 NAV_PUSH: ✅ Added state {state}, history={history}")
-        # طباعة مباشرة للتحقق
-        print(f"📝 NAV_PUSH: ✅ Added state {state}")
-        print(f"📝 NAV_PUSH: Full history = {history}")
-        import sys
-        sys.stdout.flush()
-    else:
-        logger.info(f"📝 NAV_PUSH: ⚠️ Skipped duplicate state {state}, history={history}")
-        print(f"📝 NAV_PUSH: ⚠️ Skipped duplicate state {state}, history={history}")
-        import sys
-        sys.stdout.flush()
+        # Trim oldest entries to prevent unbounded growth
+        if len(history) > MAX_NAV_DEPTH:
+            del history[:len(history) - MAX_NAV_DEPTH]
+        logger.debug(f"NAV_PUSH: added={state} depth={len(history)}")
 
 
 def nav_pop(context):
@@ -54,9 +49,9 @@ def nav_pop(context):
     history = context.user_data.get('history', [])
     if history:
         popped = history.pop()
-        logger.info(f"📝 NAV_POP: Removed state {popped}, remaining history={history}")
+        logger.debug(f"NAV_POP: removed={popped} depth={len(history)}")
         return popped
-    logger.warning("📝 NAV_POP: History is empty")
+    logger.debug("NAV_POP: history empty")
     return None
 
 
@@ -103,7 +98,7 @@ def nav_clear(context):
         None
     """
     context.user_data['history'] = []
-    logger.info("📝 NAV_CLEAR: History cleared")
+    logger.debug("NAV_CLEAR: history cleared")
 
 
 def nav_get_history(context):

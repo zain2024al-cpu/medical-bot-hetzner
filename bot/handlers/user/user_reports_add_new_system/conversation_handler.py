@@ -148,12 +148,17 @@ from .flows.app_reschedule import handle_view_reschedule_callback
 # Navigation stack helpers
 # =============================
 
+_MAX_NAV_DEPTH = 25
+
+
 def _nav_push_state(context, state):
     """Push state onto the back-navigation stack."""
     history = context.user_data.setdefault('_nav_stack', [])
     if not history or history[-1] != state:
         history.append(state)
-        logger.debug(f"NAV_PUSH: {state} -> stack={history}")
+        if len(history) > _MAX_NAV_DEPTH:
+            del history[:len(history) - _MAX_NAV_DEPTH]
+        logger.debug(f"NAV_PUSH: {state} depth={len(history)}")
 
 
 def _nav_pop_state(context):

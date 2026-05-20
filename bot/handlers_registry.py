@@ -7,8 +7,18 @@ def register_all_handlers(app):
     """
     تسجيل جميع الهاندلرز في التطبيق
     """
-    
-    # 🔄 مقاطعة التدفق التلقائية (group=-1، قبل جميع ConversationHandlers)
+
+    # ── Platform bootstrap (must be first) ───────────────────────────────────
+    # Registers all modules with the core registry so the interrupt interceptor
+    # and routing system have the full module+button map at startup.
+    from core.modules_bootstrap import bootstrap_all
+    bootstrap_all()
+
+    # ── Upload message capture (group -1, before ConversationHandlers) ────────
+    from shared.uploads import collector as uploads
+    uploads.register_handler(app)
+
+    # 🔄 مقاطعة التدفق التلقائية (group=-2، قبل جميع ConversationHandlers)
     from bot.handlers.shared.flow_interrupt import register as register_flow_interrupt
     register_flow_interrupt(app)
 
@@ -120,6 +130,21 @@ def register_all_handlers(app):
     register_case_summary(app)
     # register_schedule_view(app)  # تم تعطيله - استخدم shared_schedule بدلاً منه
     
+    # ── Healthcare module (group 0: menu + notes text; group 1: wca/hc callbacks)
+    # Registered AFTER all ConversationHandlers so the notes MessageHandler
+    # is a lower-priority fallback within group 0.
+    from modules.healthcare.routing import register_all as register_healthcare
+    register_healthcare(app)
+
+    # ── Shared selector/upload callback handlers (group 1) ────────────────────
+    # Must be registered after ConversationHandlers and healthcare so group 1
+    # gets a clean slot for msel:* / sel_pat:* / upl:* callbacks.
+    from shared.selectors.patient_selector import selector as patient_selector
+    from shared.multiselect import engine as multiselect
+    patient_selector.register_handler(app)
+    multiselect.register_handler(app)
+    # Note: uploads.register_handler() already called above (group -1 msg + group 1 cb)
+
     # 🛡️ Universal Fallback - يجب أن يكون آخر شيء يتم تسجيله
     # يتعامل مع جميع الأزرار والرسائل غير المعالجة لمنع تعليق البوت
     from bot.handlers.shared.universal_fallback import register as register_universal_fallback
