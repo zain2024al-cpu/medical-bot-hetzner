@@ -296,6 +296,6 @@ def register(app):
     # فتح من أمر بديل
     app.add_handler(CommandHandler("users", start_user_management))
     # callbacks الخاصة بالشاشة الجديدة فقط
-    app.add_handler(CallbackQueryHandler(handle_callbacks, pattern=r"^aum:"))
+    app.add_handler(CallbackQueryHandler(handle_callbacks, pattern=r"^aum:"), group=1)
 
 

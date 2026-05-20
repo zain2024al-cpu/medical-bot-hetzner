@@ -248,6 +248,52 @@ def test_admin_user_actions_skips_module_access_without_tg_id():
     print("admin user actions missing-tg guard OK")
 
 
+def test_admin_user_management_registers_callbacks_in_integration_group():
+    from telegram.ext import CallbackQueryHandler
+    from bot.handlers.admin.admin_users_management import handle_callbacks, register
+
+    class FakeApp:
+        def __init__(self):
+            self.handlers = []
+
+        def add_handler(self, handler, group=0):
+            self.handlers.append((handler, group))
+
+    app = FakeApp()
+    register(app)
+
+    matches = [
+        (handler, group)
+        for handler, group in app.handlers
+        if isinstance(handler, CallbackQueryHandler)
+        and getattr(handler, "callback", None) is handle_callbacks
+    ]
+    assert len(matches) == 1
+
+    handler, group = matches[0]
+    pattern = getattr(handler, "pattern", None)
+    pattern_text = getattr(pattern, "pattern", str(pattern))
+    assert group == 1
+    assert pattern_text == "^aum:"
+    print("admin user management callback registration OK")
+
+
+def test_admin_user_management_callbacks_are_known_to_fallback():
+    from bot.handlers.shared.universal_fallback import is_known_callback
+
+    callbacks = [
+        "aum:list:all:0",
+        "aum:list:all:4",
+        "aum:home",
+        "aum:close",
+        "aum:user:123",
+        "aum:act:suspend:123",
+    ]
+    for callback_data in callbacks:
+        assert is_known_callback(callback_data), callback_data
+    print("admin user management callbacks known to fallback OK")
+
+
 def test_unique_constraint():
     """Duplicate (tg_user_id, module_key) is handled gracefully via grant idempotency."""
     tg = 9_000_070
@@ -273,5 +319,7 @@ if __name__ == "__main__":
     test_dynamic_user_kb_single_module()
     test_admin_user_actions_exposes_module_access()
     test_admin_user_actions_skips_module_access_without_tg_id()
+    test_admin_user_management_registers_callbacks_in_integration_group()
+    test_admin_user_management_callbacks_are_known_to_fallback()
     test_unique_constraint()
     print("\nALL RBAC TESTS PASSED")

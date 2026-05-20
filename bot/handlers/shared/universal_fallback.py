@@ -72,6 +72,7 @@ KNOWN_CALLBACKS = [
     r"^remove_admin:",     # حذف أدمن
     r"^confirm_remove:",   # تأكيد حذف أدمن
     r"^um:",               # إدارة المستخدمين
+    r"^aum:",              # إدارة المستخدمين الجديدة
     r"^suspend_reason:",   # أسباب التجميد
     r"^confirm_delete:",   # تأكيد الحذف
     r"^back_to_admin$",
