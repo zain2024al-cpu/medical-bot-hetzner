@@ -23,7 +23,7 @@ def admin_main_kb():
 
 
 
-# ✅ لوحة المستخدم الرئيسية - منظمة بشكل احترافي
+# ✅ لوحة المستخدم الرئيسية الثابتة — احتياطية عند عدم وجود سجلات وصول
 def user_main_kb():
     keyboard = [
         ["📝 إضافة تقرير جديد"],
@@ -33,10 +33,42 @@ def user_main_kb():
         ["🏥 الرعاية الصحية"],
     ]
     return ReplyKeyboardMarkup(
-        keyboard, 
+        keyboard,
         resize_keyboard=True,
-        one_time_keyboard=False  # يبقى مرئياً دائماً
+        one_time_keyboard=False
     )
+
+
+def dynamic_user_kb(tg_user_id: int) -> ReplyKeyboardMarkup:
+    """
+    Build a per-user keyboard from the modules activated for this user.
+
+    Module rows are assembled in registry registration order.  Falls back
+    to user_main_kb() on any error so production is never disrupted.
+    """
+    try:
+        from core.access.access_service import get_user_modules
+        from core.routing.registry import registry
+
+        modules = get_user_modules(tg_user_id)
+        rows: list[list[str]] = []
+        for module_key in modules:
+            reg = registry.get(module_key)
+            if reg and reg.keyboard_rows:
+                for row in reg.keyboard_rows:
+                    rows.append(list(row))
+
+        if not rows:
+            return user_main_kb()
+
+        return ReplyKeyboardMarkup(rows, resize_keyboard=True, one_time_keyboard=False)
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).error(
+            f"dynamic_user_kb({tg_user_id}) error: {exc}", exc_info=True
+        )
+        return user_main_kb()
+
 
 # ✅ لوحة المستخدم الجديد (بدون أزرار)
 def new_user_kb():

@@ -33,6 +33,12 @@ def bootstrap_all() -> None:
             "📋 ملخص الحالة",
             "📎 المرفقات الطبية",
         },
+        keyboard_rows=[
+            ["📝 إضافة تقرير جديد"],
+            ["✏️ تعديل التقارير", "🗑️ حذف التقارير"],
+            ["📅 جدول اليوم", "🚀 ابدأ"],
+            ["📋 ملخص الحالة", "📎 المرفقات الطبية"],
+        ],
         extra_wipe_keys={
             # Legacy report-flow keys (kept in sync with flow_interrupt._WIPE_KEYS)
             "report_tmp",
@@ -64,21 +70,27 @@ def bootstrap_all() -> None:
     registry.register(
         name="healthcare",
         menu_buttons={"🏥 الرعاية الصحية"},
+        keyboard_rows=[
+            ["🏥 الرعاية الصحية"],
+        ],
         extra_wipe_keys={"_wc_add"},
     )
 
     # ── Future modules — uncomment and fill in when ready ────────────────────
     # registry.register(
     #     name="pharmacy",
-    #     menu_buttons={"💊 الصيدلية", ...},
+    #     menu_buttons={"💊 الصيدلية"},
+    #     keyboard_rows=[["💊 الصيدلية"]],
     # )
     # registry.register(
     #     name="residency",
-    #     menu_buttons={"🏥 الإقامة", ...},
+    #     menu_buttons={"🏥 الإقامة"},
+    #     keyboard_rows=[["🏥 الإقامة"]],
     # )
     # registry.register(
     #     name="services",
-    #     menu_buttons={"🛠️ الخدمات", ...},
+    #     menu_buttons={"🛠️ الخدمات"},
+    #     keyboard_rows=[["🛠️ الخدمات"]],
     # )
 
     logger.info(

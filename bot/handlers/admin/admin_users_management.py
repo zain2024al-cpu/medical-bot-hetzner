@@ -62,7 +62,12 @@ def _list_kb(kind: str, page: int, total_pages: int, users: list[Translator]) ->
     return InlineKeyboardMarkup(kb)
 
 
-def _user_actions_kb(user_id: int, approved: bool, suspended: bool) -> InlineKeyboardMarkup:
+def _user_actions_kb(
+    user_id: int,
+    approved: bool,
+    suspended: bool,
+    tg_user_id: int | None = None,
+) -> InlineKeyboardMarkup:
     row1: list[InlineKeyboardButton] = []
     if not approved:
         row1.append(InlineKeyboardButton("✅ موافقة", callback_data=f"{CB}:act:approve:{user_id}"))
@@ -74,13 +79,16 @@ def _user_actions_kb(user_id: int, approved: bool, suspended: bool) -> InlineKey
     else:
         row2.append(InlineKeyboardButton("🔓 فك التجميد", callback_data=f"{CB}:act:unsuspend:{user_id}"))
 
-    return InlineKeyboardMarkup(
-        [
-            row1,
-            row2,
-            [InlineKeyboardButton("🔙 رجوع", callback_data=f"{CB}:home")],
-        ]
-    )
+    rows = [row1, row2]
+
+    # Module access management button (only when tg_user_id is known)
+    if tg_user_id:
+        rows.append([
+            InlineKeyboardButton("🔑 إدارة الوصول", callback_data=f"amod:list:{tg_user_id}")
+        ])
+
+    rows.append([InlineKeyboardButton("🔙 رجوع", callback_data=f"{CB}:home")])
+    return InlineKeyboardMarkup(rows)
 
 
 async def start_user_management(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -153,7 +161,7 @@ async def _render_user(query, user_id: int):
         f"- **الهاتف**: {phone}\n"
         f"- **موافقة**: {'✅' if approved else '⏳'}\n"
         f"- **تجميد**: {'🔒' if suspended else '🔓'}\n",
-        reply_markup=_user_actions_kb(int(user_id), approved, suspended),
+        reply_markup=_user_actions_kb(int(user_id), approved, suspended, tg_user_id=tg),
         parse_mode="Markdown",
     )
 

@@ -12,7 +12,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 from bot.shared_auth import ensure_translator_record, is_user_approved, register_pending_user
-from bot.keyboards import user_main_kb, start_persistent_kb
+from bot.keyboards import user_main_kb, dynamic_user_kb, start_persistent_kb
 from telegram.ext import ConversationHandler
 
 
@@ -320,10 +320,11 @@ async def handle_start_main_menu(update: Update, context: ContextTypes.DEFAULT_T
     # إعادة تعيين ConversationHandler عند الضغط على زر "ابدأ الآن"
     context.user_data.clear()
     
-    # إرسال القائمة الرئيسية (الأزرار الثابتة) مع زر /start الثابت
+    # إرسال القائمة الرئيسية بناءً على الوحدات المفعّلة للمستخدم
+    tg_user_id = update.effective_user.id if update.effective_user else 0
     await query.message.reply_text(
         "📋 اختر العملية المطلوبة:",
-        reply_markup=user_main_kb()  # user_main_kb يحتوي على الأزرار الرئيسية
+        reply_markup=dynamic_user_kb(tg_user_id)
     )
 
 

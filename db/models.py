@@ -6,7 +6,7 @@
 import logging
 from datetime import datetime, date, timedelta, timezone
 from typing import Optional
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, Text, Float, ForeignKey, create_engine
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, Text, Float, ForeignKey, UniqueConstraint, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 
 logger = logging.getLogger(__name__)
@@ -296,6 +296,30 @@ class WoundRecord(Base):
 
 
 # ================================================
+# RBAC — Module Access Control
+# ================================================
+
+class UserModuleAccess(Base):
+    """
+    Per-user module activation records.
+    One row per (tg_user_id, module_key); soft-delete via is_active.
+    """
+    __tablename__ = "user_module_access"
+    __table_args__ = (
+        UniqueConstraint("tg_user_id", "module_key", name="uq_user_module"),
+    )
+
+    id         = Column(Integer, primary_key=True, autoincrement=True)
+    tg_user_id = Column(Integer, nullable=False, index=True)
+    module_key = Column(String(100), nullable=False)
+    granted_by = Column(Integer, nullable=True)    # admin tg_user_id who granted
+    granted_at = Column(DateTime, default=datetime.utcnow, nullable=True)
+    revoked_by = Column(Integer, nullable=True)    # admin tg_user_id who revoked
+    revoked_at = Column(DateTime, nullable=True)
+    is_active  = Column(Boolean, default=True, nullable=False, index=True)
+
+
+# ================================================
 # Additional Models
 # ================================================
 
@@ -551,5 +575,7 @@ __all__ = [
     'TranslatorEvaluation',
     'MonthlyEvaluation',
     'FollowupTracking',
+    'WoundRecord',
+    'UserModuleAccess',
     'desc'
 ]

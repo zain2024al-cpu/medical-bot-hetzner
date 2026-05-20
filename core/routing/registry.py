@@ -24,6 +24,9 @@ class ModuleRegistration:
     extra_wipe_keys: frozenset = field(default_factory=frozenset)
     on_activate: Callable | None = None
     on_deactivate: Callable | None = None
+    # Ordered keyboard rows for dynamic keyboard construction.
+    # Each inner tuple is one keyboard row; buttons must be in menu_buttons.
+    keyboard_rows: tuple = field(default_factory=tuple)  # tuple[tuple[str, ...], ...]
 
 
 class ModuleRegistry:
@@ -43,6 +46,7 @@ class ModuleRegistry:
         extra_wipe_keys: set | None = None,
         on_activate: Callable | None = None,
         on_deactivate: Callable | None = None,
+        keyboard_rows: list | None = None,
     ) -> None:
         """Register a module. Safe to call multiple times (last wins)."""
         reg = ModuleRegistration(
@@ -51,6 +55,7 @@ class ModuleRegistry:
             extra_wipe_keys=frozenset(extra_wipe_keys or set()),
             on_activate=on_activate,
             on_deactivate=on_deactivate,
+            keyboard_rows=tuple(tuple(r) for r in keyboard_rows) if keyboard_rows else (),
         )
         self._modules[name] = reg
         for btn in reg.menu_buttons:

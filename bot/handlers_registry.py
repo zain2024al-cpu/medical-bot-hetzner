@@ -32,9 +32,11 @@ def register_all_handlers(app):
     from bot.handlers.admin.admin_schedule_management import register as register_schedule_management
     from bot.handlers.admin.admin_evaluation import register as register_evaluation
     from bot.handlers.admin.admin_admins import register as register_admin_admins
+    from bot.handlers.admin.admin_module_access import register as register_module_access
     register_schedule_management(app)
     register_evaluation(app)  # ✅ تسجيل ConversationHandler قبل admin_start
     register_admin_admins(app)  # ✅ إدارة الأدمنين - قبل admin_start لالتقاط admin:manage_admins
+    register_module_access(app)  # ✅ إدارة الوصول للوحدات (amod:*)
     from bot.handlers.user.user_paste_full_report import register as register_paste_full_report
     register_paste_full_report(app)  # ✅ لصق تقرير جاهز (أدمن فقط) قبل admin_start
 
