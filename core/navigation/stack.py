@@ -26,11 +26,20 @@ def push(user_data: dict, state: Any, module: str | None = None) -> None:
     """
     stack = user_data.setdefault(_KEY, [])
     entry = (module, state)
-    if not stack or stack[-1] != entry:
-        stack.append(entry)
-        if len(stack) > MAX_DEPTH:
-            del stack[:len(stack) - MAX_DEPTH]
-        logger.debug(f"[nav] push  state={state}  module={module!r}  depth={len(stack)}")
+    if stack and stack[-1] == entry:
+        return
+
+    if len(stack) >= 2 and stack[-2] == entry:
+        removed = stack.pop()
+        logger.debug(
+            f"[nav] collapse duplicate transition  removed={removed}  depth={len(stack)}"
+        )
+        return
+
+    stack.append(entry)
+    if len(stack) > MAX_DEPTH:
+        del stack[:len(stack) - MAX_DEPTH]
+    logger.debug(f"[nav] push  state={state}  module={module!r}  depth={len(stack)}")
 
 
 def pop(user_data: dict) -> tuple[str | None, Any]:

@@ -111,3 +111,9 @@ def build_error(message: str = "") -> tuple[str, InlineKeyboardMarkup]:
         [InlineKeyboardButton("🔙 رجوع", callback_data=f"{CB}:back")],
     ])
     return text, keyboard
+
+
+def build_session_lost() -> tuple[str, InlineKeyboardMarkup]:
+    """Screen shown when a stale selector button is pressed after cleanup."""
+    text = "⚠️ **انتهت جلسة اختيار المريض.**\n\nابدأ الخطوة من جديد."
+    return text, InlineKeyboardMarkup([])

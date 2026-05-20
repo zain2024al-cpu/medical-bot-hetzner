@@ -13,10 +13,11 @@
 #   await patient_selector.enter(update, context, return_to="mymodule.step.patient")
 #
 #   # 3. Your handler is called when the user picks or cancels:
-#   async def _on_patient_selected(patient: PatientRecord | None, update, context):
-#       if patient is None:
+#   async def _on_patient_selected(result: PatientSelectionResult, update, context):
+#       if result.cancelled:
 #           ...  # user pressed back / cancelled
 #       else:
+#           patient = result.patient
 #           ...  # patient.id, patient.name are available
 #
 # ── Registration ──────────────────────────────────────────────────────────────
@@ -28,7 +29,7 @@
 #
 #   sel_pat:list:{page}   — show paginated list (page 0-based)
 #   sel_pat:idx:{n}       — user selected patient at global index n in snapshot
-#   sel_pat:back          — user cancelled; route None to the caller
+#   sel_pat:back          — user cancelled; route PatientSelectionResult.cancelled_result()
 #
 # ── IDX snapshot protocol ─────────────────────────────────────────────────────
 #   Snapshot (ordered name list) is written at render time.
@@ -41,9 +42,9 @@ import logging
 from telegram import Update
 from telegram.ext import ContextTypes, CallbackQueryHandler
 
-from ._data import fetch_all, lookup_by_name, PatientRecord
+from ._data import fetch_all, lookup_by_name, PatientRecord, PatientSelectionResult
 from ._session import PatientSelectorState, save as _save, load as _load, clear as _clear
-from ._view import CB, build_list, build_empty, build_confirmation, build_error
+from ._view import CB, build_list, build_empty, build_confirmation, build_error, build_session_lost
 from shared.selectors import result_router
 
 logger = logging.getLogger(__name__)
@@ -231,7 +232,12 @@ async def _handle_selection(
         f"  return_to={return_to!r}"
     )
 
-    await result_router.route(return_to, record, update, context)
+    await result_router.route(
+        return_to,
+        PatientSelectionResult.confirmed(record),
+        update,
+        context,
+    )
 
 
 async def _handle_back(
@@ -243,8 +249,18 @@ async def _handle_back(
     return_to = state.return_to if state else ""
     _clear(context.user_data)
 
+    if not return_to:
+        logger.debug("[patient_selector] stale back callback with no return_to")
+        await _show_session_lost(query)
+        return
+
     logger.info(f"[patient_selector] cancelled  return_to={return_to!r}")
-    await result_router.route(return_to, None, update, context)
+    await result_router.route(
+        return_to,
+        PatientSelectionResult.cancelled_result(),
+        update,
+        context,
+    )
 
 
 async def _render_list(
@@ -278,5 +294,14 @@ async def _show_error(query, message: str) -> None:
     text, kb = build_error(message)
     try:
         await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
+    except Exception:
+        pass
+
+
+async def _show_session_lost(query) -> None:
+    text, kb = build_session_lost()
+    try:
+        if query:
+            await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
     except Exception:
         pass

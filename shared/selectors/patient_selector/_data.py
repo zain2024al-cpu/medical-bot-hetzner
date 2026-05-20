@@ -19,6 +19,43 @@ class PatientRecord:
     name: str
 
 
+@dataclass(frozen=True)
+class PatientSelectionResult:
+    """
+    Delivered to callers that need the shared selector result contract.
+
+    selected  - tuple with the chosen PatientRecord, or empty when cancelled.
+    cancelled - True when the user pressed Back/Cancel.
+    """
+    selected: tuple
+    cancelled: bool
+
+    @property
+    def patient(self) -> PatientRecord | None:
+        return self.selected[0] if self.selected else None
+
+    @property
+    def id(self) -> int | None:
+        patient = self.patient
+        return patient.id if patient else None
+
+    @property
+    def name(self) -> str:
+        patient = self.patient
+        return patient.name if patient else ""
+
+    def is_empty(self) -> bool:
+        return len(self.selected) == 0
+
+    @staticmethod
+    def cancelled_result() -> "PatientSelectionResult":
+        return PatientSelectionResult(selected=(), cancelled=True)
+
+    @staticmethod
+    def confirmed(patient: PatientRecord) -> "PatientSelectionResult":
+        return PatientSelectionResult(selected=(patient,), cancelled=False)
+
+
 def fetch_all() -> list[PatientRecord]:
     """
     Fetch every patient from the database, sorted alphabetically.

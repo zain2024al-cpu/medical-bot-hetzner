@@ -98,7 +98,7 @@ async def _start_add_flow(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 async def _on_patient(result, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """result_router callback: patient selector completed."""
-    if result.cancelled:
+    if result is None or getattr(result, "cancelled", False):
         await _cancel(update, context)
         return
 
@@ -106,7 +106,7 @@ async def _on_patient(result, update: Update, context: ContextTypes.DEFAULT_TYPE
     if session is None:
         session = WoundcareAddSession.create(context.user_data)
 
-    patient = result.selected[0] if result.selected else None
+    patient = result.patient if hasattr(result, "patient") else result
     session.patient_id   = patient.id   if patient else None
     session.patient_name = patient.name if patient else ""
     session.step         = STEP_WOUND_TYPE

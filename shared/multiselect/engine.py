@@ -301,7 +301,10 @@ async def _handle_cancel(
     _clear(context.user_data)
 
     logger.info(f"[multiselect] cancelled  return_to={return_to!r}")
-    await _route(return_to, MultiSelectResult.cancelled_result(), update, context)
+    if return_to:
+        await _route(return_to, MultiSelectResult.cancelled_result(), update, context)
+    else:
+        await _show_session_lost(query)
 
 
 # ── Render helpers ────────────────────────────────────────────────────────────

@@ -217,6 +217,15 @@ KNOWN_CALLBACKS = [
     r"^cs_back_to_list$",
     r"^cs_cancel$",
     r"^cs_noop$",
+
+    # Shared platform infrastructure / healthcare module callbacks.
+    # These are handled by group-1 platform handlers; the fallback still sees
+    # them later, so keep them known to avoid false "unhandled" warnings.
+    r"^hc:",
+    r"^wca:",
+    r"^sel_pat:",
+    r"^msel:",
+    r"^upl:",
 ]
 
 # ================================================

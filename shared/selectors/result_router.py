@@ -14,8 +14,8 @@
 #
 #   await route("healthcare.woundcare.patient", patient_record, update, context)
 #
-# Result value is selector-specific:
-#   PatientRecord | None  (None means the user cancelled)
+# Result value is selector-specific. Shared systems should prefer result
+# objects with a `cancelled` flag.
 
 import logging
 from typing import Awaitable, Callable, Any
@@ -51,8 +51,12 @@ async def route(
     Dispatch a selector result to the registered handler.
 
     If no handler is registered for key, logs a warning and does nothing.
-    result=None means the user cancelled / pressed back.
+    Shared systems should prefer result objects with a `cancelled` flag.
     """
+    if not key:
+        logger.debug("[result_router] empty route key ignored")
+        return
+
     handler = _registry.get(key)
     if handler is None:
         logger.warning(f"[result_router] no handler registered for key={key!r}")

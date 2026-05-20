@@ -27,13 +27,19 @@ def nav_push(context, state):
 
     history = context.user_data['history']
 
-    # منع التكرار: لا نضيف نفس الـ state مرتين متتاليتين
-    if state is not None and (not history or history[-1] != state):
-        history.append(state)
-        # Trim oldest entries to prevent unbounded growth
-        if len(history) > MAX_NAV_DEPTH:
-            del history[:len(history) - MAX_NAV_DEPTH]
-        logger.debug(f"NAV_PUSH: added={state} depth={len(history)}")
+    if state is None or (history and history[-1] == state):
+        return
+
+    if len(history) >= 2 and history[-2] == state:
+        removed = history.pop()
+        logger.debug(f"NAV_COLLAPSE: removed={removed} depth={len(history)}")
+        return
+
+    history.append(state)
+    # Trim oldest entries to prevent unbounded growth
+    if len(history) > MAX_NAV_DEPTH:
+        del history[:len(history) - MAX_NAV_DEPTH]
+    logger.debug(f"NAV_PUSH: added={state} depth={len(history)}")
 
 
 def nav_pop(context):
