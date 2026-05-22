@@ -24,13 +24,15 @@ def admin_main_kb():
 
 
 # ✅ لوحة المستخدم الرئيسية الثابتة — احتياطية عند عدم وجود سجلات وصول
+# This is the TRANSLATOR fallback keyboard only.
+# Healthcare buttons are NOT included here: they appear via dynamic_user_kb()
+# exclusively for users who have been granted the "healthcare" module.
 def user_main_kb():
     keyboard = [
         ["📝 إضافة تقرير جديد"],
         ["✏️ تعديل التقارير", "🗑️ حذف التقارير"],
         ["📅 جدول اليوم", "🚀 ابدأ"],
         ["📋 ملخص الحالة", "📎 المرفقات الطبية"],
-        ["▶️ ابدأ الآن"],
     ]
     return ReplyKeyboardMarkup(
         keyboard,

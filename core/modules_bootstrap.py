@@ -67,6 +67,10 @@ def bootstrap_all() -> None:
     )
 
     # ── Healthcare: wound care and clinical tracking ──────────────────────────
+    # The "▶️ ابدأ الآن" button is ONLY included in a user's reply keyboard
+    # when the user has been explicitly granted the "healthcare" module via
+    # core.access.access_service.grant_module().  dynamic_user_kb() enforces
+    # this — the button never appears for translators or public users.
     registry.register(
         name="healthcare",
         menu_buttons={"▶️ ابدأ الآن"},

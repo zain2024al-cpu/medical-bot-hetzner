@@ -268,34 +268,38 @@ async def user_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # ✅ إعادة تعيين ConversationHandler عند الضغط على /start
         # مسح جميع بيانات المحادثة السابقة
         context.user_data.clear()
-        
-        # ✅ عرض رسالة ترحيب متجددة مع زر "ابدأ الآن"
+
+        # ── Determine the correct landing role ────────────────────────────────
+        from core.routing.landing import resolve_user_landing_interface
+        role = resolve_user_landing_interface(tg_id)
+
+        # ── Build role-aware welcome ──────────────────────────────────────────
         date_str, time_str, greeting = get_arabic_date()
-        daily_quote = get_daily_quote()
-        
-        welcome_message = f"""╔════════════════════╗
-  🌟 مرحباً بك {user.first_name or 'المستخدم'}
-╚════════════════════╝
 
-*في بوت الرعاية الصحية الذكية*
+        if role == "healthcare":
+            subtitle = "*في بوت الرعاية الصحية الذكية*"
+        else:
+            # Translators and public see the generic system name.
+            subtitle = "*نظام إدارة التقارير الطبية*"
 
-📅 {date_str}
-⏰ {time_str}
+        welcome_message = (
+            f"╔════════════════════╗\n"
+            f"  🌟 مرحباً بك {user.first_name or 'المستخدم'}\n"
+            f"╚════════════════════╝\n\n"
+            f"{subtitle}\n\n"
+            f"📅 {date_str}\n"
+            f"⏰ {time_str}\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━"
+        )
 
-━━━━━━━━━━━━━━━━━━━━
-
-👇 اضغط على الزر أدناه للبدء:"""
-
-        # زر "ابدأ" - يظهر دائماً مع كل دخول (Inline)
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("▶️ ابدأ", callback_data="start_main_menu")]
-        ])
-        
-        # إرسال الرسالة الترحيبية مع زر "ابدأ الآن" (Inline)
+        # ── Send welcome + update the reply keyboard in one shot ──────────────
+        # dynamic_user_kb() builds a keyboard from ONLY the modules this user
+        # has access to, so healthcare buttons never appear for non-healthcare
+        # users and translator buttons never appear for healthcare-only users.
         await update.message.reply_text(
             welcome_message,
             parse_mode="Markdown",
-            reply_markup=keyboard  # InlineKeyboardMarkup للزر "ابدأ الآن"
+            reply_markup=dynamic_user_kb(tg_id),
         )
     except Exception as e:
         import logging
@@ -311,19 +315,35 @@ async def user_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 pass
 
 
-# 🎯 معالجة زر "ابدأ"
+# 🎯 معالجة زر "ابدأ" (legacy inline button — role-aware)
 async def handle_start_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """عرض قائمة الرعاية الصحية مباشرة عند الضغط على زر ابدأ"""
+    """
+    Handles the inline ▶️ ابدأ button that may appear in old welcome messages.
+
+    Routes to the correct interface based on the user's actual role so that
+    pressing this button on a stale message never sends a non-healthcare user
+    into the healthcare onboarding flow.
+    """
     query = update.callback_query
     await query.answer()
-
-    # إعادة تعيين بيانات الجلسة عند الضغط على "ابدأ"
     context.user_data.clear()
 
-    # عرض قائمة الرعاية الصحية الرئيسية مباشرة
-    from modules.healthcare.views import build_healthcare_menu
-    text, kb = build_healthcare_menu()
-    await query.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+    tg_id = update.effective_user.id
+    from core.routing.landing import resolve_user_landing_interface
+    role = resolve_user_landing_interface(tg_id)
+
+    if role == "healthcare":
+        # Healthcare user — show the healthcare module menu.
+        from modules.healthcare.views import build_healthcare_menu
+        text, kb = build_healthcare_menu()
+        await query.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+    else:
+        # Translator or public — restore the role-appropriate reply keyboard.
+        first_name = update.effective_user.first_name or "المستخدم"
+        await query.message.reply_text(
+            f"👋 {first_name}، اختر من القائمة:",
+            reply_markup=dynamic_user_kb(tg_id),
+        )
 
 
 # 🔹 تسجيل الهاندلرز الخاصة بالمستخدم

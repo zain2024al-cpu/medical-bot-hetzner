@@ -390,6 +390,54 @@ def test_unique_constraint():
     print("unique constraint / idempotency OK")
 
 
+# ── Landing resolver ──────────────────────────────────────────────────────────
+
+def test_landing_translator_only():
+    """User with only user_reports → translator landing."""
+    from core.routing.landing import resolve_user_landing_interface
+    tg = 9_001_001
+    grant_module(tg, "user_reports", granted_by=1)
+    assert resolve_user_landing_interface(tg) == "translator"
+    print("landing translator_only OK")
+
+
+def test_landing_healthcare_only():
+    """User with only healthcare module → healthcare landing."""
+    from core.routing.landing import resolve_user_landing_interface
+    tg = 9_001_002
+    grant_module(tg, "healthcare", granted_by=1)
+    assert resolve_user_landing_interface(tg) == "healthcare"
+    print("landing healthcare_only OK")
+
+
+def test_landing_both_modules_translator_wins():
+    """User with both modules → translator landing (translator takes priority)."""
+    from core.routing.landing import resolve_user_landing_interface
+    tg = 9_001_003
+    grant_module(tg, "user_reports", granted_by=1)
+    grant_module(tg, "healthcare", granted_by=1)
+    assert resolve_user_landing_interface(tg) == "translator"
+    print("landing both_modules translator_wins OK")
+
+
+def test_landing_no_modules_public():
+    """User with no modules → public landing."""
+    from core.routing.landing import resolve_user_landing_interface
+    tg = 9_001_004  # fresh, unknown user
+    assert resolve_user_landing_interface(tg) == "public"
+    print("landing no_modules_public OK")
+
+
+def test_landing_user_main_kb_has_no_healthcare_button():
+    """user_main_kb() fallback must NOT contain the healthcare ▶️ ابدأ الآن button."""
+    from bot.keyboards import user_main_kb
+    flat = [btn.text for row in user_main_kb().keyboard for btn in row]
+    assert "▶️ ابدأ الآن" not in flat, (
+        "healthcare button must not appear in the translator fallback keyboard"
+    )
+    print("user_main_kb no healthcare button OK")
+
+
 # ── Runner ────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
@@ -412,4 +460,9 @@ if __name__ == "__main__":
     test_admin_user_management_registers_callbacks_in_integration_group()
     test_admin_user_management_callbacks_are_known_to_fallback()
     test_unique_constraint()
+    test_landing_translator_only()
+    test_landing_healthcare_only()
+    test_landing_both_modules_translator_wins()
+    test_landing_no_modules_public()
+    test_landing_user_main_kb_has_no_healthcare_button()
     print("\nALL RBAC TESTS PASSED")
