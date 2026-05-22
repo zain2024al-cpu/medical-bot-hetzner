@@ -1,31 +1,68 @@
 # modules/healthcare/woundcare/views.py
-# Pure view builders for the woundcare add-record flow.
+# Pure view builders for the woundcare operational flow — official 11-step spec.
 # No I/O, no context, no DB — data in, (text, keyboard) out.
+#
+# Steps: التاريخ → المريض → القسم الطبي → اسم العملية → مرحلة المجارحة
+#        → وصف الحالة → المستلزمات → الصور → الملاحظات → اسم الصحي
+#        → مراجعة → نشر
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
+from modules.healthcare.woundcare.constants import STAFF_LIST  # noqa: F401  (re-exported for callers)
 from modules.healthcare.woundcare.session import WoundcareAddSession
+from modules.healthcare.views import format_arabic_datetime, format_image_count
 
 # ── Callback prefixes ─────────────────────────────────────────────────────────
-HC  = "hc"    # healthcare navigation
-WCA = "wca"   # woundcare add flow
+HC  = "hc"    # healthcare navigation (shared across module)
+WCA = "wca"   # woundcare flow
 
 _DIVIDER = "━━━━━━━━━━━━━━━━━━━━"
 _THIN    = "─────────────────────"
 
 
-# ── Healthcare main menu ──────────────────────────────────────────────────────
+# ── Step 1: اختيار التاريخ ────────────────────────────────────────────────────
 
-def build_healthcare_menu() -> tuple[str, InlineKeyboardMarkup]:
-    text = (
-        f"{_DIVIDER}\n"
-        f"🏥  **الرعاية الصحية**\n\n"
-        "اختر القسم:"
-    )
+def build_date_prompt() -> tuple[str, InlineKeyboardMarkup]:
+    """Date selection screen — first visible step of every woundcare entry."""
+    from datetime import datetime
+    from modules.healthcare.views import format_arabic_date
+    today_str = format_arabic_date(datetime.utcnow())
+    lines = [
+        _DIVIDER,
+        "📅  **اختر التاريخ**",
+        "",
+        f"التاريخ الحالي: *{today_str}*",
+        _THIN,
+        "",
+        "اختر طريقة تحديد تاريخ التقرير:",
+    ]
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🩹 رعاية الجروح", callback_data=f"{HC}:woundcare")],
+        [InlineKeyboardButton("✅ اختيار تاريخ اليوم", callback_data=f"{WCA}:date_today")],
+        [InlineKeyboardButton("📆 اختيار من التقويم",  callback_data=f"{WCA}:date_calendar")],
+        [InlineKeyboardButton("⬅️ رجوع",               callback_data=f"{HC}:woundcare")],
     ])
-    return text, kb
+    return "\n".join(lines), kb
+
+
+def build_date_calendar_prompt(*, error: bool = False) -> tuple[str, InlineKeyboardMarkup]:
+    """Free-text date entry — shown when user chooses manual date entry."""
+    lines = [
+        _DIVIDER,
+        "📆  **إدخال التاريخ يدوياً**",
+        "",
+    ]
+    if error:
+        lines += ["⚠️ *صيغة التاريخ غير صحيحة.* يرجى المحاولة مجدداً.", ""]
+    lines += [
+        "أرسل التاريخ بإحدى الصيغ التالية:",
+        "*يوم/شهر/سنة*  (مثال: 22/05/2026)",
+        "أو:  22-05-2026",
+    ]
+    kb = InlineKeyboardMarkup([[
+        InlineKeyboardButton("⬅️ رجوع", callback_data=f"{WCA}:start"),
+        InlineKeyboardButton("❌ إلغاء", callback_data=f"{HC}:woundcare"),
+    ]])
+    return "\n".join(lines), kb
 
 
 # ── Woundcare submenu ─────────────────────────────────────────────────────────
@@ -33,96 +70,260 @@ def build_healthcare_menu() -> tuple[str, InlineKeyboardMarkup]:
 def build_woundcare_menu() -> tuple[str, InlineKeyboardMarkup]:
     text = (
         f"{_DIVIDER}\n"
-        f"🩹  **رعاية الجروح**\n\n"
+        f"🩺  **المجارحة والعناية بالجرح**\n\n"
         "اختر العملية:"
     )
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("➕ إضافة تقرير جرح", callback_data=f"{WCA}:start")],
-        [InlineKeyboardButton("⬅️ رجوع",            callback_data=f"{HC}:main")],
+        [InlineKeyboardButton("➕ تسجيل حالة جرح جديدة", callback_data=f"{WCA}:start")],
+        [InlineKeyboardButton("⬅️ رجوع",                  callback_data=f"{HC}:main")],
     ])
     return text, kb
 
 
-# ── Notes prompt ──────────────────────────────────────────────────────────────
+# ── Step 3b: "أخرى" free-text department prompt ───────────────────────────────
 
-def build_notes_prompt(session: WoundcareAddSession) -> tuple[str, InlineKeyboardMarkup]:
-    """
-    Shown after images are collected. User may type notes or skip.
-    """
+def build_dept_other_prompt(session: WoundcareAddSession) -> tuple[str, InlineKeyboardMarkup]:
+    """Direct free-text prompt — shown when 'أخرى' was selected in department multiselect."""
+    known = [lbl for lbl in session.medical_department_labels if lbl != "أخرى"]
+    known_text = "، ".join(known) if known else "—"
     lines = [
         _DIVIDER,
-        "📝  **إضافة ملاحظات**",
+        "🏥  **إضافة قسم طبي جديد**",
         "",
         f"المريض: {session.patient_name}",
-        f"نوع الجرح: {', '.join(session.wound_type_labels)}",
-        f"الصور: {session.image_count} صورة",
+        f"🏥 القسم الطبي: {known_text}",
         _THIN,
         "",
-        "أرسل ملاحظاتك حول الجرح.",
-        "يمكنك وصف الحالة أو العلاج المقدم.",
-        "",
-        "أو اضغط **⏭️ تخطي** إذا لم يكن هناك ملاحظات.",
+        "أرسل اسم القسم الطبي لإضافته:",
+        "_(سيُحفظ ويظهر تلقائياً في المرات القادمة)_",
     ]
-    text = "\n".join(lines)
+    kb = InlineKeyboardMarkup([[
+        InlineKeyboardButton("🔙 رجوع", callback_data=f"{WCA}:back"),
+        InlineKeyboardButton("❌ إلغاء", callback_data=f"{WCA}:cancel"),
+    ]])
+    return "\n".join(lines), kb
+
+
+# ── Step 4: اسم العملية ───────────────────────────────────────────────────────
+
+def build_operation_name_prompt(session: WoundcareAddSession) -> tuple[str, InlineKeyboardMarkup]:
+    """Free-text prompt for اسم العملية — required, no skip."""
+    depts = "، ".join(session.medical_department_labels) if session.medical_department_labels else "—"
+    lines = [
+        _DIVIDER,
+        "✍️  **اسم العملية**",
+        "",
+        f"المريض: {session.patient_name}",
+        f"القسم: {depts}",
+        _THIN,
+        "",
+        "أرسل اسم العملية أو الإجراء الذي تم تنفيذه.",
+        "(مثال: شق وتصريف، تنظيف جرح وتضميد…)",
+    ]
+    kb = InlineKeyboardMarkup([[
+        InlineKeyboardButton("🔙 رجوع", callback_data=f"{WCA}:back"),
+        InlineKeyboardButton("❌ إلغاء", callback_data=f"{WCA}:cancel"),
+    ]])
+    return "\n".join(lines), kb
+
+
+# ── Step 5: مرحلة المجارحة ────────────────────────────────────────────────────
+
+def build_phase_prompt(session: WoundcareAddSession) -> tuple[str, InlineKeyboardMarkup]:
+    """Single-select: 4 phase options."""
+    lines = [
+        _DIVIDER,
+        "🩹  **مرحلة المجارحة**",
+        "",
+        f"المريض: {session.patient_name}",
+        f"العملية: {session.operation_name}",
+        _THIN,
+        "",
+        "اختر مرحلة المجارحة:",
+    ]
     kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("قبل العملية",               callback_data=f"{WCA}:phase_pre_op")],
+        [InlineKeyboardButton("الأولى بعد العملية",        callback_data=f"{WCA}:phase_post_1")],
+        [InlineKeyboardButton("بعد العملية الأخيرة",       callback_data=f"{WCA}:phase_post_last")],
+        [InlineKeyboardButton("مجارحة دورية / جرح مزمن",  callback_data=f"{WCA}:phase_chronic")],
         [
-            InlineKeyboardButton("⏭️ تخطي",  callback_data=f"{WCA}:skip_notes"),
+            InlineKeyboardButton("🔙 رجوع", callback_data=f"{WCA}:back"),
             InlineKeyboardButton("❌ إلغاء", callback_data=f"{WCA}:cancel"),
         ],
     ])
-    return text, kb
+    return "\n".join(lines), kb
 
 
-# ── Review screen ─────────────────────────────────────────────────────────────
+# ── Step 6: وصف الحالة ────────────────────────────────────────────────────────
 
-def build_review(session: WoundcareAddSession) -> tuple[str, InlineKeyboardMarkup]:
-    """
-    Full review summary before final save.
-    """
-    wound_list = "\n".join(f"  • {lbl}" for lbl in session.wound_type_labels) or "  —"
-    notes_section = (
-        f"\n📝 *الملاحظات:*\n{session.notes}"
-        if session.notes else ""
-    )
+def build_description_prompt(session: WoundcareAddSession) -> tuple[str, InlineKeyboardMarkup]:
+    """Free-text prompt for وصف الحالة — required, no skip."""
     lines = [
         _DIVIDER,
-        "🩹  **مراجعة تقرير الجرح**",
+        "📄  **وصف الحالة**",
+        "",
+        f"المريض: {session.patient_name}",
+        f"العملية: {session.operation_name}",
+        f"المرحلة: {session.phase_label}",
         _THIN,
         "",
-        f"👤 *المريض:*  {session.patient_name}",
-        "",
-        f"🩹 *نوع الجرح:*",
-        wound_list,
-        "",
-        f"📎 *الصور:*  {session.image_count} {'صورة' if session.image_count != 1 else 'صورة واحدة'} مرفوعة",
-        notes_section,
-        "",
-        _THIN,
-        "هل تريد حفظ هذا التقرير؟",
+        "صف حالة الجرح ووضعه الحالي:",
+        "(النوع، الحجم، الإفرازات، اللون، ملاحظات التئام…)",
     ]
-    text = "\n".join(lines)
+    kb = InlineKeyboardMarkup([[
+        InlineKeyboardButton("🔙 رجوع", callback_data=f"{WCA}:back"),
+        InlineKeyboardButton("❌ إلغاء", callback_data=f"{WCA}:cancel"),
+    ]])
+    return "\n".join(lines), kb
+
+
+# ── Step 7b: "أخرى" free-text supplies prompt ─────────────────────────────────
+
+def build_supplies_other_prompt(session: WoundcareAddSession) -> tuple[str, InlineKeyboardMarkup]:
+    """Direct free-text prompt — shown when 'أخرى' was selected in supplies multiselect."""
+    known = [lbl for lbl in session.supply_labels if lbl != "أخرى"]
+    known_text = "، ".join(known) if known else "—"
+    lines = [
+        _DIVIDER,
+        "🧰  **إضافة مستلزم طبي جديد**",
+        "",
+        f"المريض: {session.patient_name}",
+        f"المستلزمات المحددة: {known_text}",
+        _THIN,
+        "",
+        "أرسل اسم المستلزم الطبي لإضافته:",
+        "_(سيُحفظ ويظهر تلقائياً في المرات القادمة)_",
+    ]
+    kb = InlineKeyboardMarkup([[
+        InlineKeyboardButton("🔙 رجوع", callback_data=f"{WCA}:back"),
+        InlineKeyboardButton("❌ إلغاء", callback_data=f"{WCA}:cancel"),
+    ]])
+    return "\n".join(lines), kb
+
+
+# ── Step 9: الملاحظات ─────────────────────────────────────────────────────────
+
+def build_notes_prompt(session: WoundcareAddSession) -> tuple[str, InlineKeyboardMarkup]:
+    lines = [
+        _DIVIDER,
+        "📝  **الملاحظات السريرية**",
+        "",
+        f"المريض: {session.patient_name}",
+        f"العملية: {session.operation_name}",
+        f"المرحلة: {session.phase_label}",
+        f"الصور: {format_image_count(session.image_count)}",
+        _THIN,
+        "",
+        "أضف ملاحظاتك السريرية، أو اضغط **⏭️ تخطي**.",
+    ]
     kb = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("✅ تأكيد الحفظ", callback_data=f"{WCA}:confirm"),
-            InlineKeyboardButton("❌ إلغاء",        callback_data=f"{WCA}:cancel"),
+            InlineKeyboardButton("⏭️ تخطي",  callback_data=f"{WCA}:skip_notes"),
+            InlineKeyboardButton("🔙 رجوع",   callback_data=f"{WCA}:back"),
+            InlineKeyboardButton("❌ إلغاء",  callback_data=f"{WCA}:cancel"),
         ],
-        [InlineKeyboardButton("✏️ تعديل الملاحظات", callback_data=f"{WCA}:edit_notes")],
     ])
-    return text, kb
+    return "\n".join(lines), kb
+
+
+# ── Step 10: اسم الصحي — fixed single-select, REQUIRED ──────────────────────
+
+def build_specialist_prompt(session: WoundcareAddSession) -> tuple[str, InlineKeyboardMarkup]:
+    """
+    Fixed 3-name selector — no free-text, no skip.
+    Staff: د. فضل · د. سرور · د. زكريا
+    """
+    lines = [
+        _DIVIDER,
+        "👨‍⚕️  **اسم الصحي**",
+        "",
+        f"المريض: {session.patient_name}",
+        _THIN,
+        "",
+        "اختر اسم الصحي المسؤول عن الإجراء:",
+    ]
+    kb = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("د. فضل",   callback_data=f"{WCA}:sp_fadl"),
+            InlineKeyboardButton("د. سرور",  callback_data=f"{WCA}:sp_sarour"),
+            InlineKeyboardButton("د. زكريا", callback_data=f"{WCA}:sp_zakariya"),
+        ],
+        [
+            InlineKeyboardButton("🔙 رجوع", callback_data=f"{WCA}:back"),
+            InlineKeyboardButton("❌ إلغاء", callback_data=f"{WCA}:cancel"),
+        ],
+    ])
+    return "\n".join(lines), kb
+
+
+# ── Step 11a: مراجعة نهائية ───────────────────────────────────────────────────
+
+def build_review(session: WoundcareAddSession) -> tuple[str, InlineKeyboardMarkup]:
+    """Full review summary before final save — all 11 workflow fields."""
+    date_str    = format_arabic_datetime(session.created_at)
+    dept_list   = "\n".join(f"  • {lbl}" for lbl in session.medical_department_labels) or "  —"
+    supply_list = "\n".join(f"  • {lbl}" for lbl in session.supply_labels) or "  —"
+
+    lines = [
+        "🩺 *مراجعة تقرير المجارحة*",
+        "",
+        f"📅 *التاريخ:*  {date_str}",
+        f"👤 *المريض:*  {session.patient_name}",
+        "",
+        "🏥 *القسم الطبي:*",
+        dept_list,
+        "",
+        f"✍️ *اسم العملية:*  {session.operation_name}",
+        f"🩹 *مرحلة المجارحة:*  {session.phase_label}",
+        "",
+        "📄 *وصف الحالة:*",
+        session.condition_description or "—",
+        "",
+        "🧰 *المستلزمات الطبية:*",
+        supply_list,
+    ]
+
+    if session.image_count:
+        lines += ["", f"📎 *الصور:*  {format_image_count(session.image_count)}"]
+
+    if session.notes:
+        lines += ["", "📝 *الملاحظات:*", session.notes]
+
+    if session.specialist_name:
+        lines += ["", f"👨‍⚕️ *المختص الصحي:*  {session.specialist_name}"]
+
+    lines += ["", "هل تريد نشر هذا التقرير؟"]
+
+    kb = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("📢 نشر التقرير",     callback_data=f"{WCA}:confirm"),
+            InlineKeyboardButton("❌ إلغاء",            callback_data=f"{WCA}:cancel"),
+        ],
+        [
+            InlineKeyboardButton("✏️ تعديل الملاحظات", callback_data=f"{WCA}:edit_notes"),
+            InlineKeyboardButton("👨‍⚕️ تعديل الصحي",   callback_data=f"{WCA}:edit_specialist"),
+        ],
+    ])
+    return "\n".join(lines), kb
 
 
 # ── Success screen ────────────────────────────────────────────────────────────
 
-def build_success(record_id: int, patient_name: str, image_count: int) -> tuple[str, InlineKeyboardMarkup]:
+def build_success(
+    record_id:    int,
+    patient_name: str,
+    image_count:  int,
+) -> tuple[str, InlineKeyboardMarkup]:
     text = (
-        f"✅ *تم حفظ تقرير الجرح بنجاح*\n\n"
-        f"رقم التقرير: #{record_id}\n"
+        f"✅ *تم حفظ ونشر تقرير المجارحة بنجاح*\n\n"
+        f"رقم التقرير: `#{record_id}`\n"
         f"المريض: {patient_name}\n"
-        f"الصور المرفوعة: {image_count}"
+        f"الصور المرفوعة: {format_image_count(image_count)}\n\n"
+        f"📤 تم إرسال التقرير للمسؤولين والمجموعة الصحية."
     )
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("➕ تقرير جديد",  callback_data=f"{WCA}:start")],
-        [InlineKeyboardButton("🏥 القائمة الرئيسية", callback_data=f"{HC}:main")],
+        [InlineKeyboardButton("➕ حالة جرح جديدة",      callback_data=f"{WCA}:start")],
+        [InlineKeyboardButton("🏥 القائمة الرئيسية",    callback_data=f"{HC}:main")],
     ])
     return text, kb
 

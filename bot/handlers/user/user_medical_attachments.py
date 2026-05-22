@@ -15,6 +15,7 @@ from telegram.ext import ContextTypes, ConversationHandler, CallbackQueryHandler
 from db.session import SessionLocal
 from db.models import Report
 from config.settings import REPORTS_GROUP_ID, MEDICAL_REPORTS_GROUP_ID
+from shared.files.filename_builder import build_medical_pdf_filename
 
 logger = logging.getLogger(__name__)
 
@@ -483,9 +484,13 @@ async def _publish_attachments(query, context):
             if pdf_buf:
                 pdf_data = pdf_buf.read()
                 logger.info(f"📄 MA: حجم PDF = {len(pdf_data)} bytes")
+                _pdf_filename = build_medical_pdf_filename(
+                    patient_name=name,
+                    departments=dept,
+                )
                 def _make_pdf_buf():
                     b = io.BytesIO(pdf_data)
-                    b.name = "medical_report.pdf"
+                    b.name = _pdf_filename
                     return b
                 await _send_with_migrate(
                     lambda gid: bot.send_document(chat_id=gid, document=_make_pdf_buf(), caption=caption)

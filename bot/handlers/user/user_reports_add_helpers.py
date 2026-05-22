@@ -32,47 +32,13 @@ PREDEFINED_HOSPITALS = get_predefined_hospitals()
 
 
 # =============================
-# 🏥 الأقسام الطبية - نظام هرمي
+# 🏥 الأقسام الطبية — من السجل المركزي
 # =============================
-# الصيغة: "عربي | إنجليزي"
-# الترتيب: 1- الجراحة، 2- الباطنية، 3- طب وجراحة العيون، 4- طب الأطفال
-# تم نقل الأقسام الرئيسية إلى ملفات منفصلة
+# المصدر الوحيد للحقيقة: shared/departments.py
+# يُستورد هنا للتوافق مع جميع سير العمل (المترجم + الرعاية الصحية).
+# لإضافة قسم أو تغييره، عدّل shared/departments.py فقط.
 
-# استيراد الأقسام من الملفات المنفصلة
-from .departments_surgery import SURGERY_DEPARTMENTS
-from .departments_internal import INTERNAL_DEPARTMENTS
-from .departments_ophthalmology import OPHTHALMOLOGY_DEPARTMENTS
-from .departments_pediatrics import PEDIATRICS_DEPARTMENTS
-
-# دمج جميع الأقسام الرئيسية
-PREDEFINED_DEPARTMENTS = {}
-PREDEFINED_DEPARTMENTS.update(SURGERY_DEPARTMENTS)
-PREDEFINED_DEPARTMENTS.update(INTERNAL_DEPARTMENTS)
-PREDEFINED_DEPARTMENTS.update(OPHTHALMOLOGY_DEPARTMENTS)
-PREDEFINED_DEPARTMENTS.update(PEDIATRICS_DEPARTMENTS)
-
-
-# =============================
-# 🏥 الأقسام المباشرة (بدون فروع)
-# =============================
-# الصيغة: "عربي | إنجليزي"
-# الترتيب: الأذن والأنف والحنجرة، الأمراض الجلدية، النساء والتوليد، 
-#          علاج وإدارة الألم، الطب النفسي، الطوارئ، التخدير، العناية المركزة
-# ملاحظة: تم نقل "أشعة وفحوصات" إلى قائمة أنواع الإجراءات (PREDEFINED_ACTIONS)
-DIRECT_DEPARTMENTS = [
-    "الأذن والأنف والحنجرة | ENT",
-    "الأمراض الجلدية | Dermatology",
-    "النساء والتوليد | Obstetrics & Gynecology",
-    "الطب النووي | Nuclear Medicine",
-    "طب الأسنان | Dentistry",
-    "العلاج الطبيعي وإعادة التأهيل | Physical Therapy & Rehabilitation",
-    "علاج وإدارة الألم | Pain Management",
-    "الطب النفسي | Psychiatry",
-    "الطوارئ | Emergency",
-    "التخدير | Anesthesia",
-    "العناية المركزة | Critical Care / ICU",
-    "العلاج الإشعاعي | The radiation Therapy"
-]
+from shared.departments import PREDEFINED_DEPARTMENTS, DIRECT_DEPARTMENTS  # noqa: F401
 
 
 # =============================

@@ -274,10 +274,10 @@ async def user_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         daily_quote = get_daily_quote()
         
         welcome_message = f"""╔════════════════════╗
-  🌟 {greeting} {user.first_name or 'المترجم'}
+  🌟 مرحباً بك {user.first_name or 'المستخدم'}
 ╚════════════════════╝
 
-💭 *{daily_quote}*
+*في بوت الرعاية الصحية الذكية*
 
 📅 {date_str}
 ⏰ {time_str}
@@ -285,10 +285,10 @@ async def user_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 ━━━━━━━━━━━━━━━━━━━━
 
 👇 اضغط على الزر أدناه للبدء:"""
-        
-        # زر "ابدأ الآن" - يظهر دائماً مع كل دخول (Inline)
+
+        # زر "ابدأ" - يظهر دائماً مع كل دخول (Inline)
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🚀 ابدأ الآن", callback_data="start_main_menu")]
+            [InlineKeyboardButton("▶️ ابدأ", callback_data="start_main_menu")]
         ])
         
         # إرسال الرسالة الترحيبية مع زر "ابدأ الآن" (Inline)
@@ -311,21 +311,19 @@ async def user_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 pass
 
 
-# 🎯 معالجة زر "ابدأ الآن"
+# 🎯 معالجة زر "ابدأ"
 async def handle_start_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """عرض القائمة الرئيسية عند الضغط على زر ابدأ الآن"""
+    """عرض قائمة الرعاية الصحية مباشرة عند الضغط على زر ابدأ"""
     query = update.callback_query
-    await query.answer("تم فتح القائمة الرئيسية ✅")
-    
-    # إعادة تعيين ConversationHandler عند الضغط على زر "ابدأ الآن"
+    await query.answer()
+
+    # إعادة تعيين بيانات الجلسة عند الضغط على "ابدأ"
     context.user_data.clear()
-    
-    # إرسال القائمة الرئيسية بناءً على الوحدات المفعّلة للمستخدم
-    tg_user_id = update.effective_user.id if update.effective_user else 0
-    await query.message.reply_text(
-        "📋 اختر العملية المطلوبة:",
-        reply_markup=dynamic_user_kb(tg_user_id)
-    )
+
+    # عرض قائمة الرعاية الصحية الرئيسية مباشرة
+    from modules.healthcare.views import build_healthcare_menu
+    text, kb = build_healthcare_menu()
+    await query.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
 
 # 🔹 تسجيل الهاندلرز الخاصة بالمستخدم

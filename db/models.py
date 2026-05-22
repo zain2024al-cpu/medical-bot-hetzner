@@ -279,20 +279,25 @@ class UserActivity(Base):
 # ================================================
 
 class WoundRecord(Base):
-    """Wound care record created by the healthcare module."""
+    """Wound care record created by the healthcare module — official 11-step workflow."""
     __tablename__ = "wound_records"
 
-    id               = Column(Integer, primary_key=True, autoincrement=True)
-    patient_id       = Column(Integer, nullable=True, index=True)
-    patient_name     = Column(String(255), nullable=True, index=True)
-    wound_types      = Column(Text, nullable=True)         # JSON list of type IDs
-    wound_type_labels= Column(Text, nullable=True)         # JSON list of display labels
-    image_file_ids   = Column(Text, nullable=True)         # JSON list of Telegram file_ids
-    image_count      = Column(Integer, default=0, nullable=True)
-    notes            = Column(Text, nullable=True)
-    created_by       = Column(Integer, nullable=True, index=True)  # tg_user_id
-    created_at       = Column(DateTime, default=datetime.utcnow, index=True, nullable=True)
-    updated_at       = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
+    id                       = Column(Integer, primary_key=True, autoincrement=True)
+    patient_id               = Column(Integer, nullable=True, index=True)
+    patient_name             = Column(String(255), nullable=True, index=True)
+    medical_departments_json = Column(Text, nullable=True)           # JSON list of dept labels
+    operation_name           = Column(String(500), nullable=True)    # اسم العملية (free text)
+    phase                    = Column(String(100), nullable=True)     # phase key e.g. "phase_pre_op"
+    phase_label              = Column(String(255), nullable=True)    # e.g. "قبل العملية"
+    condition_description    = Column(Text, nullable=True)           # وصف الحالة
+    supplies_json            = Column(Text, nullable=True)           # JSON list of supply labels
+    image_file_ids           = Column(Text, nullable=True)           # JSON list of Telegram file_ids
+    image_count              = Column(Integer, default=0, nullable=True)
+    notes                    = Column(Text, nullable=True)
+    specialist_name          = Column(String(255), nullable=True)    # healthcare specialist name
+    created_by               = Column(Integer, nullable=True, index=True)  # tg_user_id
+    created_at               = Column(DateTime, default=datetime.utcnow, index=True, nullable=True)
+    updated_at               = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
 
 
 # ================================================
@@ -317,6 +322,102 @@ class UserModuleAccess(Base):
     revoked_by = Column(Integer, nullable=True)    # admin tg_user_id who revoked
     revoked_at = Column(DateTime, nullable=True)
     is_active  = Column(Boolean, default=True, nullable=False, index=True)
+
+
+# ================================================
+# Healthcare — Medical Follow-up Records
+# ================================================
+
+class MedicalFollowupRecord(Base):
+    """Medical follow-up and therapeutic procedure records — official 11-step workflow."""
+    __tablename__ = "medical_followup_records"
+
+    id                       = Column(Integer, primary_key=True, autoincrement=True)
+    patient_id               = Column(Integer, nullable=True, index=True)
+    patient_name             = Column(String(255), nullable=True, index=True)
+    medical_departments_json = Column(Text, nullable=True)    # JSON list of dept labels
+    procedure_type_json      = Column(Text, nullable=True)    # JSON list of procedure type labels
+    complaint_labels_json    = Column(Text, nullable=True)    # JSON list of complaint labels
+    vitals_temp              = Column(String(50), nullable=True)   # درجة الحرارة
+    vitals_bp                = Column(String(50), nullable=True)   # ضغط الدم
+    vitals_pulse             = Column(String(50), nullable=True)   # النبض
+    vitals_spo2              = Column(String(50), nullable=True)   # SpO2
+    meds_supply_labels_json  = Column(Text, nullable=True)    # JSON list of med/supply labels
+    image_file_ids           = Column(Text, nullable=True)    # JSON list of Telegram file_ids
+    image_count              = Column(Integer, default=0, nullable=True)
+    notes                    = Column(Text, nullable=True)
+    specialist_name          = Column(String(255), nullable=True)
+    created_by               = Column(Integer, nullable=True, index=True)
+    created_at               = Column(DateTime, default=datetime.utcnow, index=True, nullable=True)
+    updated_at               = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
+
+
+# ================================================
+# Healthcare — Medication Dispensing Records
+# ================================================
+
+class MedicationRecord(Base):
+    """Medication dispensing records."""
+    __tablename__ = "medication_records"
+
+    id                       = Column(Integer, primary_key=True, autoincrement=True)
+    patient_id               = Column(Integer, nullable=True, index=True)
+    patient_name             = Column(String(255), nullable=True, index=True)
+    medical_departments_json = Column(Text, nullable=True)     # JSON list of medical specialty labels
+    item_count               = Column(Integer, default=0, nullable=True)  # عدد الأصناف
+    image_file_ids           = Column(Text, nullable=True)
+    image_count              = Column(Integer, default=0, nullable=True)
+    notes                    = Column(Text, nullable=True)
+    specialist_name          = Column(String(255), nullable=True)
+    created_by               = Column(Integer, nullable=True, index=True)
+    created_at               = Column(DateTime, default=datetime.utcnow, index=True, nullable=True)
+    updated_at               = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
+
+
+# ================================================
+# Healthcare — Other / Miscellaneous Records
+# ================================================
+
+class OtherHealthcareRecord(Base):
+    """Catch-all healthcare record for miscellaneous actions."""
+    __tablename__ = "other_healthcare_records"
+
+    id              = Column(Integer, primary_key=True, autoincrement=True)
+    patient_id      = Column(Integer, nullable=True, index=True)
+    patient_name    = Column(String(255), nullable=True, index=True)
+    action_ids      = Column(Text, nullable=True)       # JSON list of action IDs
+    action_labels   = Column(Text, nullable=True)       # JSON list of display labels
+    image_file_ids  = Column(Text, nullable=True)
+    image_count     = Column(Integer, default=0, nullable=True)
+    notes           = Column(Text, nullable=True)
+    specialist_name = Column(String(255), nullable=True)
+    created_by      = Column(Integer, nullable=True, index=True)
+    created_at      = Column(DateTime, default=datetime.utcnow, index=True, nullable=True)
+    updated_at      = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
+
+
+# ================================================
+# Healthcare — Custom "أخرى" Options
+# ================================================
+
+class CustomOption(Base):
+    """
+    User-defined values entered via the 'أخرى' button in any healthcare multiselect.
+    Saved persistently so they appear as ready-made options the next time the same
+    multiselect is opened — no re-typing needed.
+
+    context examples: "hc_department", "wc_supplies", "fu_complaint", "fu_meds_supply"
+    """
+    __tablename__ = "custom_options"
+    __table_args__ = (
+        UniqueConstraint("context", "label", name="uq_custom_option"),
+    )
+
+    id         = Column(Integer, primary_key=True, autoincrement=True)
+    context    = Column(String(100), nullable=False, index=True)
+    label      = Column(String(255), nullable=False)
+    use_count  = Column(Integer, default=1, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=True)
 
 
 # ================================================
@@ -576,6 +677,9 @@ __all__ = [
     'MonthlyEvaluation',
     'FollowupTracking',
     'WoundRecord',
+    'MedicalFollowupRecord',
+    'MedicationRecord',
+    'OtherHealthcareRecord',
     'UserModuleAccess',
     'desc'
 ]

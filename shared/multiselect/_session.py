@@ -13,7 +13,7 @@
 # selected_ids is a Python set for O(1) toggle; serialized as a list
 # in user_data (JSON-compatible).
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field  # noqa: F401 (field used in auto_confirm_ids default)
 
 _KEY = "_msel"
 
@@ -28,18 +28,23 @@ class MultiSelectState:
     page: int = 0
     min_select: int = 0      # 0 = no minimum enforced
     max_select: int = 0      # 0 = no maximum enforced
+    auto_confirm_ids: frozenset = field(default_factory=frozenset)
+    # When a toggled-ON option id is in auto_confirm_ids, the engine
+    # immediately auto-confirms the selection (no manual ✅ needed).
+    # Use for "أخرى" / free-text options that should open text input instantly.
 
 
 def save(user_data: dict, state: MultiSelectState) -> None:
     user_data[_KEY] = {
-        "return_to":    state.return_to,
-        "title":        state.title,
-        "icon":         state.icon,
-        "options":      state.options,           # already list[dict]
-        "selected_ids": list(state.selected_ids),
-        "page":         state.page,
-        "min_select":   state.min_select,
-        "max_select":   state.max_select,
+        "return_to":       state.return_to,
+        "title":           state.title,
+        "icon":            state.icon,
+        "options":         state.options,           # already list[dict]
+        "selected_ids":    list(state.selected_ids),
+        "page":            state.page,
+        "min_select":      state.min_select,
+        "max_select":      state.max_select,
+        "auto_confirm_ids": list(state.auto_confirm_ids),
     }
 
 
@@ -56,6 +61,7 @@ def load(user_data: dict) -> MultiSelectState | None:
         page=raw.get("page", 0),
         min_select=raw.get("min_select", 0),
         max_select=raw.get("max_select", 0),
+        auto_confirm_ids=frozenset(raw.get("auto_confirm_ids", [])),
     )
 
 

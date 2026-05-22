@@ -78,18 +78,22 @@ async def open(
     min_select: int = 0,
     max_select: int = 0,
     preselected_ids: list[str] | None = None,
+    auto_confirm_ids: list[str] | None = None,
 ) -> None:
     """
     Open the multi-select engine for the given options.
 
-    title           — Arabic screen title shown in the header
-    options         — list of Option objects (caller-supplied, becomes snapshot)
-    return_to       — result_router key registered by the calling module
-    icon            — emoji shown in the header (default ☑️)
-    page            — starting page (0-based, usually 0)
-    min_select      — minimum selections required to confirm (0 = no min)
-    max_select      — maximum selections allowed (0 = no max)
-    preselected_ids — ids to mark as already selected when the screen opens
+    title            — Arabic screen title shown in the header
+    options          — list of Option objects (caller-supplied, becomes snapshot)
+    return_to        — result_router key registered by the calling module
+    icon             — emoji shown in the header (default ☑️)
+    page             — starting page (0-based, usually 0)
+    min_select       — minimum selections required to confirm (0 = no min)
+    max_select       — maximum selections allowed (0 = no max)
+    preselected_ids  — ids to mark as already selected when the screen opens
+    auto_confirm_ids — option ids that, when toggled ON, immediately auto-confirm
+                       the multiselect (no manual ✅ needed). Use for 'أخرى'-style
+                       options that should open a text-input prompt instantly.
     """
     if not options:
         logger.warning("[multiselect] open() called with empty options — routing cancelled")
@@ -106,6 +110,7 @@ async def open(
         page=page,
         min_select=min_select,
         max_select=max_select,
+        auto_confirm_ids=frozenset(auto_confirm_ids or []),
     )
     _save(context.user_data, state)
 
@@ -212,6 +217,8 @@ async def _handle_toggle(
         # Deselect
         state.selected_ids.discard(opt_id)
         logger.debug(f"[multiselect] deselected id={opt_id!r}  idx={idx}")
+        _save(context.user_data, state)
+        await _render(update, context, state)
     else:
         # Select — enforce max_select
         if state.max_select > 0 and len(state.selected_ids) >= state.max_select:
@@ -226,8 +233,15 @@ async def _handle_toggle(
         state.selected_ids.add(opt_id)
         logger.debug(f"[multiselect] selected id={opt_id!r}  idx={idx}")
 
-    _save(context.user_data, state)
-    await _render(update, context, state)
+        # Auto-confirm if this option is in auto_confirm_ids
+        if state.auto_confirm_ids and opt_id in state.auto_confirm_ids:
+            logger.debug(f"[multiselect] auto-confirm triggered for id={opt_id!r}")
+            _save(context.user_data, state)
+            await _handle_confirm(update, context)
+            return
+
+        _save(context.user_data, state)
+        await _render(update, context, state)
 
 
 async def _handle_page(
@@ -358,11 +372,12 @@ async def _route_cancelled(update, context, return_to: str) -> None:
 def _state_as_raw(state: MultiSelectState) -> dict:
     """Convert MultiSelectState back to a dict for the view layer."""
     return {
-        "return_to":  state.return_to,
-        "title":      state.title,
-        "icon":       state.icon,
-        "options":    state.options,
-        "page":       state.page,
-        "min_select": state.min_select,
-        "max_select": state.max_select,
+        "return_to":       state.return_to,
+        "title":           state.title,
+        "icon":            state.icon,
+        "options":         state.options,
+        "page":            state.page,
+        "min_select":      state.min_select,
+        "max_select":      state.max_select,
+        "auto_confirm_ids": list(state.auto_confirm_ids),
     }

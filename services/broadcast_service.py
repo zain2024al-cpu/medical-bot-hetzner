@@ -10,6 +10,7 @@ from config.settings import ADMIN_IDS, REPORTS_GROUP_ID as _SETTINGS_GROUP_ID, M
 from bot.broadcast_control import is_broadcast_enabled
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
+from shared.files.filename_builder import build_medical_pdf_filename
 import logging
 import os
 
@@ -195,7 +196,13 @@ async def _photos_to_pdf(bot: Bot, photo_file_ids: list, caption_text: str):
         return None
 
 
-async def _send_medical_attachments(bot: Bot, attachments: list, caption: str = "📎 المرفقات الطبية"):
+async def _send_medical_attachments(
+    bot: Bot,
+    attachments: list,
+    caption: str = "📎 المرفقات الطبية",
+    patient_name: str | None = None,
+    department_name: str | None = None,
+):
     """
     إرسال الملفات الطبية:
     - الصور → تُحوَّل لـ PDF واحد وتُرسل لـ MEDICAL_REPORTS_GROUP_ID
@@ -216,7 +223,10 @@ async def _send_medical_attachments(bot: Bot, attachments: list, caption: str = 
     if photo_ids:
         pdf_buf = await _photos_to_pdf(bot, photo_ids, caption)
         if pdf_buf:
-            pdf_buf.name = "medical_report.pdf"
+            pdf_buf.name = build_medical_pdf_filename(
+                patient_name=patient_name,
+                departments=department_name,
+            )
             try:
                 await bot.send_document(chat_id=target_group, document=pdf_buf, caption=caption)
                 logger.info(f"✅ أُرسل PDF ({len(photo_ids)} صورة) للمجموعة {target_group}")
@@ -467,7 +477,13 @@ async def broadcast_new_report(bot: Bot, report_data: dict):
             medical_attachments = report_data.get('medical_attachments', [])
             if medical_attachments:
                 attach_caption = _build_attachment_caption(report_data)
-                await _send_medical_attachments(bot, medical_attachments, attach_caption)
+                await _send_medical_attachments(
+                    bot,
+                    medical_attachments,
+                    attach_caption,
+                    patient_name=report_data.get("patient_name"),
+                    department_name=report_data.get("department_name"),
+                )
                 logger.info(f"✅ تم إرسال {len(medical_attachments)} مرفق طبي لمجموعة المرفقات")
 
             # ✅ إرسال نسخة التقرير للمستخدم في الخلفية (لا يعطّل event loop)

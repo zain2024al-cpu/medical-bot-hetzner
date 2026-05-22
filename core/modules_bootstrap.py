@@ -69,11 +69,16 @@ def bootstrap_all() -> None:
     # ── Healthcare: wound care and clinical tracking ──────────────────────────
     registry.register(
         name="healthcare",
-        menu_buttons={"🏥 الرعاية الصحية"},
+        menu_buttons={"▶️ ابدأ الآن"},
         keyboard_rows=[
-            ["🏥 الرعاية الصحية"],
+            ["▶️ ابدأ الآن"],
         ],
-        extra_wipe_keys={"_wc_add"},
+        extra_wipe_keys={
+            "_wc_add",      # woundcare session
+            "_hcfu_add",    # medical follow-up session
+            "_hcmed_add",   # medications session
+            "_hcoth_add",   # other healthcare session
+        },
     )
 
     # ── Future modules — uncomment and fill in when ready ────────────────────

@@ -64,7 +64,7 @@ def test_registry_keyboard_rows():
     hc = registry.get("healthcare")
     assert hc is not None
     assert hc.keyboard_rows
-    assert ("🏥 الرعاية الصحية",) in hc.keyboard_rows
+    assert ("▶️ ابدأ الآن",) in hc.keyboard_rows
     print("registry keyboard_rows OK")
 
 
@@ -187,7 +187,7 @@ def test_dynamic_user_kb_builds_rows():
     assert isinstance(kb, ReplyKeyboardMarkup)
     flat = [btn.text for row in kb.keyboard for btn in row]
     assert "📝 إضافة تقرير جديد" in flat
-    assert "🏥 الرعاية الصحية" in flat
+    assert "▶️ ابدأ الآن" in flat
     print(f"dynamic_user_kb OK - button count={len(flat)}")
 
 
@@ -214,7 +214,7 @@ def test_dynamic_user_kb_single_module():
 
     kb = dynamic_user_kb(tg)
     flat = [btn.text for row in kb.keyboard for btn in row]
-    assert "🏥 الرعاية الصحية" in flat
+    assert "▶️ ابدأ الآن" in flat
     assert "📝 إضافة تقرير جديد" not in flat
     print(f"dynamic_user_kb single-module OK - button count={len(flat)}")
 
