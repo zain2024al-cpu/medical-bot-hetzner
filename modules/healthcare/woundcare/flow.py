@@ -43,13 +43,14 @@ from modules.healthcare.custom_options import (
     CTX_HC_DEPARTMENT, CTX_WC_SUPPLIES,
 )
 from modules.healthcare.woundcare.constants import (
-    WOUNDCARE_SUPPLIES_OPTIONS, PHASE_MAP, SP_MAP,
-    DEPT_OTHER_ID, SUPPLIES_OTHER_ID,
+    WOUNDCARE_SUPPLIES_OPTIONS, WOUND_CONDITION_OPTIONS,
+    PHASE_MAP, SP_MAP,
+    DEPT_OTHER_ID, SUPPLIES_OTHER_ID, CONDITION_OTHER_ID,
 )
 from modules.healthcare.woundcare.session import (
     WoundcareAddSession,
     STEP_DATE, STEP_DATE_CUSTOM, STEP_PATIENT, STEP_DEPARTMENT, STEP_DEPT_OTHER,
-    STEP_OPERATION_NAME, STEP_PHASE, STEP_DESCRIPTION,
+    STEP_OPERATION_NAME, STEP_PHASE, STEP_DESCRIPTION, STEP_DESCRIPTION_OTHER,
     STEP_SUPPLIES, STEP_SUPPLIES_OTHER, STEP_IMAGES,
     STEP_NOTES, STEP_SPECIALIST, STEP_REVIEW,
 )
@@ -57,7 +58,7 @@ from modules.healthcare.woundcare.views import (
     HC, WCA,
     build_date_prompt, build_date_calendar_prompt, build_woundcare_menu,
     build_dept_other_prompt, build_operation_name_prompt,
-    build_phase_prompt, build_description_prompt,
+    build_phase_prompt, build_description_other_prompt,
     build_supplies_other_prompt, build_notes_prompt,
     build_specialist_prompt, build_review,
     build_success, build_cancelled, build_error,
@@ -70,10 +71,11 @@ logger = logging.getLogger(__name__)
 
 # ── Result router keys ────────────────────────────────────────────────────────
 
-_RKEY_PATIENT     = "hc.woundcare.patient"
-_RKEY_DEPARTMENTS = "hc.woundcare.departments"
-_RKEY_SUPPLIES    = "hc.woundcare.supplies"
-_RKEY_IMAGES      = "hc.woundcare.images"
+_RKEY_PATIENT      = "hc.woundcare.patient"
+_RKEY_DEPARTMENTS  = "hc.woundcare.departments"
+_RKEY_DESCRIPTION  = "hc.woundcare.description"
+_RKEY_SUPPLIES     = "hc.woundcare.supplies"
+_RKEY_IMAGES       = "hc.woundcare.images"
 
 
 # ── Step 1: start — show date confirmation screen ────────────────────────────
@@ -232,6 +234,47 @@ async def _on_department(result, update: Update, context: ContextTypes.DEFAULT_T
         logger.error(f"[woundcare] operation_name prompt failed: {exc}")
 
 
+# ── Step 6 → 6b / 7: condition selected ──────────────────────────────────────
+
+async def _on_condition(result, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if result is None or result.cancelled:
+        await _cancel(update, context)
+        return
+
+    session = WoundcareAddSession.load(context.user_data)
+    if session is None:
+        await _cancel(update, context)
+        return
+
+    session.condition_ids    = result.ids
+    session.condition_labels = result.labels
+
+    if CONDITION_OTHER_ID in result.ids:
+        session.step = STEP_DESCRIPTION_OTHER
+        session.save(context.user_data)
+        text, kb = build_description_other_prompt(session)
+        try:
+            await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+        except Exception as exc:
+            logger.error(f"[woundcare] description_other prompt failed: {exc}")
+        return
+
+    # No "أخرى" — proceed to supplies multiselect
+    session.condition_other = ""
+    session.step = STEP_SUPPLIES
+    session.save(context.user_data)
+    custom_supplies = load_custom_options(CTX_WC_SUPPLIES, icon="🧰")
+    await multiselect.open(
+        update, context,
+        title="اختر المستلزمات الطبية المستخدمة",
+        options=custom_supplies + WOUNDCARE_SUPPLIES_OPTIONS,
+        return_to=_RKEY_SUPPLIES,
+        icon="🧰",
+        min_select=1,
+        auto_confirm_ids=[SUPPLIES_OTHER_ID],
+    )
+
+
 # ── Step 7 → 7b / 8: supplies selected ───────────────────────────────────────
 
 async def _on_supplies(result, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -354,16 +397,15 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
         text, kb = build_phase_prompt(session)
         await update.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
-    elif session.step == STEP_DESCRIPTION:
-        desc = (update.message.text or "").strip()
-        if not desc:
-            text, kb = build_description_prompt(session)
+    elif session.step == STEP_DESCRIPTION_OTHER:
+        other_text = (update.message.text or "").strip()
+        if not other_text:
+            text, kb = build_description_other_prompt(session)
             await update.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
             return
-        session.condition_description = desc
-        session.step                  = STEP_SUPPLIES
+        session.condition_other = other_text
+        session.step            = STEP_SUPPLIES
         session.save(context.user_data)
-        # Inject saved custom supplies at the top of the list
         custom_supplies = load_custom_options(CTX_WC_SUPPLIES, icon="🧰")
         await multiselect.open(
             update, context,
@@ -408,7 +450,6 @@ async def _handle_select_phase(
     update: Update, context: ContextTypes.DEFAULT_TYPE, phase_key: str
 ) -> None:
     """Called when user taps one of the 4 phase buttons."""
-    query   = update.callback_query
     session = WoundcareAddSession.load(context.user_data)
     if session is None:
         await _cancel(update, context); return
@@ -416,11 +457,15 @@ async def _handle_select_phase(
     session.phase_label = PHASE_MAP[phase_key]
     session.step        = STEP_DESCRIPTION
     session.save(context.user_data)
-    text, kb = build_description_prompt(session)
-    try:
-        await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
-    except Exception:
-        await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+    await multiselect.open(
+        update, context,
+        title="وصف حالة الجرح / العملية",
+        options=WOUND_CONDITION_OPTIONS,
+        return_to=_RKEY_DESCRIPTION,
+        icon="🩹",
+        min_select=1,
+        auto_confirm_ids=[CONDITION_OTHER_ID],
+    )
 
 
 async def _handle_skip_notes(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -504,12 +549,22 @@ async def _handle_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     operation_name_snap     = session.operation_name
     phase_snap              = session.phase
     phase_label_snap        = session.phase_label
-    condition_desc_snap     = session.condition_description
+    condition_labels_snap   = list(session.condition_labels)
+    condition_other_snap    = session.condition_other
     supply_labels_snap      = list(session.supply_labels)
     images_snap             = list(session.images)
     notes_snap              = session.notes
     specialist_snap         = session.specialist_name
     date_snap               = session.created_at
+
+    # Generate condition description string for DB (replaces free-text field)
+    _cond_for_db = list(condition_labels_snap)
+    if condition_other_snap:
+        _cond_for_db = [
+            condition_other_snap if lbl == "أخرى" else lbl
+            for lbl in _cond_for_db
+        ]
+    condition_desc_for_db = "\n".join(f"• {lbl}" for lbl in _cond_for_db) if _cond_for_db else ""
 
     try:
         saved = save_wound_record(
@@ -520,7 +575,7 @@ async def _handle_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             operation_name=           session.operation_name,
             phase=                    session.phase,
             phase_label=              session.phase_label,
-            condition_description=    session.condition_description,
+            condition_description=    condition_desc_for_db,
             supply_ids=               session.supply_ids,
             supply_labels=            session.supply_labels,
             images=                   session.images,
@@ -550,14 +605,20 @@ async def _handle_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     # Build extra_sections for the published report
     dept_text   = "\n".join(f"  • {d}" for d in dept_labels_snap)   or "  —"
     supply_text = "\n".join(f"  • {s}" for s in supply_labels_snap) or "  —"
-    cond_text   = condition_desc_snap or "—"
+    _cond_pub   = list(condition_labels_snap)
+    if condition_other_snap:
+        _cond_pub = [
+            condition_other_snap if lbl == "أخرى" else lbl
+            for lbl in _cond_pub
+        ]
+    cond_text = "\n".join(f"  • {lbl}" for lbl in _cond_pub) if _cond_pub else "—"
 
     extra_sections = [
         ("🏥 *القسم الطبي:*",                         dept_text),
         (f"✍️ *اسم العملية:*  {operation_name_snap}",  ""),
         (f"🩹 *مرحلة المجارحة:*  {phase_label_snap}",  ""),
-        ("📄 *وصف الحالة:*",                           cond_text),
-        ("🧰 *المستلزمات الطبية:*",                    supply_text),
+        ("🩹 *وصف حالة الجرح:*",                       cond_text),
+        ("🧰 *المستلزمات الطبية المستخدمة:*",            supply_text),
     ]
 
     # Publish report (errors are swallowed inside publish())
@@ -623,6 +684,20 @@ async def _handle_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         session.save(context.user_data)
         text, kb = build_phase_prompt(session)
         await _edit_or_reply(text, kb)
+
+    elif session.step == STEP_DESCRIPTION_OTHER:
+        # Back to condition multiselect
+        session.step = STEP_DESCRIPTION
+        session.save(context.user_data)
+        await multiselect.open(
+            update, context,
+            title="وصف حالة الجرح / العملية",
+            options=WOUND_CONDITION_OPTIONS,
+            return_to=_RKEY_DESCRIPTION,
+            icon="🩹",
+            min_select=1,
+            auto_confirm_ids=[CONDITION_OTHER_ID],
+        )
 
     elif session.step == STEP_SUPPLIES_OTHER:
         # Back to supplies multiselect
@@ -779,13 +854,15 @@ async def _handle_hc_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
 # ── Handler registration ──────────────────────────────────────────────────────
 
 def register_result_routes() -> None:
-    _register_route(_RKEY_PATIENT,     _on_patient)
-    _register_route(_RKEY_DEPARTMENTS, _on_department)
-    _register_route(_RKEY_SUPPLIES,    _on_supplies)
-    _register_route(_RKEY_IMAGES,      _on_images)
+    _register_route(_RKEY_PATIENT,      _on_patient)
+    _register_route(_RKEY_DEPARTMENTS,  _on_department)
+    _register_route(_RKEY_DESCRIPTION,  _on_condition)
+    _register_route(_RKEY_SUPPLIES,     _on_supplies)
+    _register_route(_RKEY_IMAGES,       _on_images)
     logger.info(
         f"[woundcare] result routes registered: "
-        f"{_RKEY_PATIENT}, {_RKEY_DEPARTMENTS}, {_RKEY_SUPPLIES}, {_RKEY_IMAGES}"
+        f"{_RKEY_PATIENT}, {_RKEY_DEPARTMENTS}, {_RKEY_DESCRIPTION}, "
+        f"{_RKEY_SUPPLIES}, {_RKEY_IMAGES}"
     )
 
 

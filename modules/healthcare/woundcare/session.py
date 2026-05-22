@@ -28,7 +28,8 @@ STEP_DEPARTMENT      = "department"
 STEP_DEPT_OTHER      = "dept_other"
 STEP_OPERATION_NAME  = "operation_name"
 STEP_PHASE           = "phase"
-STEP_DESCRIPTION     = "description"
+STEP_DESCRIPTION       = "description"        # multiselect for condition
+STEP_DESCRIPTION_OTHER = "description_other"  # free-text for "أخرى" branch
 STEP_SUPPLIES        = "supplies"
 STEP_SUPPLIES_OTHER  = "supplies_other"
 STEP_IMAGES          = "images"
@@ -47,7 +48,9 @@ class WoundcareAddSession:
     operation_name:             str          # اسم العملية (free text, required)
     phase:                      str          # callback key e.g. "phase_pre_op"
     phase_label:                str          # Arabic display e.g. "قبل العملية"
-    condition_description:      str          # وصف الحالة (free text, required)
+    condition_ids:               list[str]    # multiselect option IDs
+    condition_labels:            list[str]    # display labels
+    condition_other:             str          # free-text when "أخرى" selected
     supply_ids:                 list[str]    # multiselect option IDs
     supply_labels:              list[str]    # display labels
     images:                     list[dict]   # list[UploadedFile.to_dict()]
@@ -83,7 +86,9 @@ class WoundcareAddSession:
             "operation_name":            self.operation_name,
             "phase":                     self.phase,
             "phase_label":               self.phase_label,
-            "condition_description":     self.condition_description,
+            "condition_ids":              self.condition_ids,
+            "condition_labels":           self.condition_labels,
+            "condition_other":            self.condition_other,
             "supply_ids":                self.supply_ids,
             "supply_labels":             self.supply_labels,
             "images":                    self.images,
@@ -103,7 +108,9 @@ class WoundcareAddSession:
             operation_name=            "",
             phase=                     "",
             phase_label=               "",
-            condition_description=     "",
+            condition_ids=             [],
+            condition_labels=          [],
+            condition_other=           "",
             supply_ids=                [],
             supply_labels=             [],
             images=                    [],
@@ -128,7 +135,9 @@ class WoundcareAddSession:
             operation_name=            raw.get("operation_name",            ""),
             phase=                     raw.get("phase",                     ""),
             phase_label=               raw.get("phase_label",               ""),
-            condition_description=     raw.get("condition_description",     ""),
+            condition_ids=             raw.get("condition_ids",             []),
+            condition_labels=          raw.get("condition_labels",          []),
+            condition_other=           raw.get("condition_other",           ""),
             supply_ids=                raw.get("supply_ids",                []),
             supply_labels=             raw.get("supply_labels",             []),
             images=                    raw.get("images",                    []),

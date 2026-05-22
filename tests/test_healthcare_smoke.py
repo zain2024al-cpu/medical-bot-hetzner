@@ -51,7 +51,9 @@ def test_session_roundtrip():
     session.operation_name            = "شق وتصريف"
     session.phase                     = "phase_pre_op"
     session.phase_label               = "قبل العملية"
-    session.condition_description     = "جرح عميق"
+    session.condition_ids             = ["clean", "mild_redness"]
+    session.condition_labels          = ["الجرح نظيف (لا احمرار أو إفرازات)", "احمرار بسيط حول الجرح"]
+    session.condition_other           = ""
     session.supply_ids                = ["gauze"]
     session.supply_labels             = ["شاش معقم"]
     session.images = [
@@ -67,7 +69,9 @@ def test_session_roundtrip():
     assert s2.medical_department_ids    == ["ortho"]
     assert s2.operation_name            == "شق وتصريف"
     assert s2.phase                     == "phase_pre_op"
-    assert s2.condition_description     == "جرح عميق"
+    assert s2.condition_ids             == ["clean", "mild_redness"]
+    assert s2.condition_labels          == ["الجرح نظيف (لا احمرار أو إفرازات)", "احمرار بسيط حول الجرح"]
+    assert s2.condition_other           == ""
     assert s2.supply_labels             == ["شاش معقم"]
     assert s2.image_count == 1
     assert s2.notes       == "ملاحظة اختبارية"
@@ -90,15 +94,37 @@ def test_session_get_images():
 # ── Woundcare supplies options ────────────────────────────────────────────────
 
 def test_supplies_options():
-    assert len(WOUNDCARE_SUPPLIES_OPTIONS) >= 8
-    ids = [o.id for o in WOUNDCARE_SUPPLIES_OPTIONS]
+    assert len(WOUNDCARE_SUPPLIES_OPTIONS) == 10
+    ids    = [o.id    for o in WOUNDCARE_SUPPLIES_OPTIONS]
+    labels = [o.label for o in WOUNDCARE_SUPPLIES_OPTIONS]
+    # All original IDs must still be present (DB backward-compat)
     assert "gauze"     in ids
     assert "gloves"    in ids
+    assert "med_tape"  in ids
+    assert "betadine"  in ids
+    assert "saline"    in ids
+    assert "vsl_gauze" in ids
+    assert "rolled_g"  in ids
+    assert "ab_cream"  in ids
+    assert "brush"     in ids
     assert "sup_other" in ids   # must have an "أخرى" option
+    # New label keywords
+    assert any("Sterile Gauze"   in l for l in labels)
+    assert any("Sterile Gloves"  in l for l in labels)
+    assert any("Medical Tape"    in l for l in labels)
+    assert any("Povidone-Iodine" in l for l in labels)
+    assert any("Normal Saline"   in l for l in labels)
+    assert any("Vaseline Gauze"  in l for l in labels)
+    assert any("Rolled Gauze"    in l for l in labels)
+    assert any("Antibiotic Cream" in l for l in labels)
+    assert any("Under Pad"       in l for l in labels)
+    assert "أخرى" in labels
+    # All options are well-formed
     for opt in WOUNDCARE_SUPPLIES_OPTIONS:
         assert isinstance(opt, Option)
         assert opt.id
         assert opt.label
+        assert opt.icon
     print(f"woundcare supplies OK ({len(WOUNDCARE_SUPPLIES_OPTIONS)} options)")
 
 
@@ -140,23 +166,26 @@ def test_view_notes_prompt():
 def test_view_review():
     ud = {}
     s = WoundcareAddSession.create(ud)
-    s.patient_name            = "سعيد يوسف"
-    s.operation_name          = "شق وتصريف"
-    s.phase_label             = "الأولى بعد العملية"
-    s.condition_description   = "الجرح يتحسن ببطء"
+    s.patient_name              = "سعيد يوسف"
+    s.operation_name            = "شق وتصريف"
+    s.phase_label               = "الأولى بعد العملية"
+    s.condition_ids             = ["partial_open"]
+    s.condition_labels          = ["الجرح مفتوح جزئياً"]
+    s.condition_other           = ""
     s.medical_department_labels = ["الجراحة العامة"]
-    s.supply_labels           = ["شاش معقم", "قفازات معقمة"]
-    s.images                  = [
+    s.supply_labels             = ["شاش معقم", "قفازات معقمة"]
+    s.images                    = [
         UploadedFile("f1", "u1", "image/jpeg", 100_000).to_dict(),
         UploadedFile("f2", "u2", "image/jpeg", 150_000).to_dict(),
     ]
-    s.notes = "الجرح يتحسن ببطء"
+    s.notes = "تمت المعالجة"
     text, kb = build_review(s)
     assert "مراجعة تقرير المجارحة" in text
     assert "سعيد يوسف"              in text
     assert "شق وتصريف"              in text
     assert "الأولى بعد العملية"     in text
-    assert "الجرح يتحسن ببطء"      in text
+    assert "الجرح مفتوح جزئياً"    in text
+    assert "تمت المعالجة"           in text
     kb_str = str(kb)
     assert f"{WCA}:confirm"    in kb_str
     assert f"{WCA}:cancel"     in kb_str
@@ -170,11 +199,14 @@ def test_view_review_no_notes():
     s.patient_name          = "فاطمة"
     s.operation_name        = "تنظيف جرح"
     s.phase_label           = "مجارحة دورية / جرح مزمن"
-    s.condition_description = "جرح مزمن"
+    s.condition_ids         = ["odor"]
+    s.condition_labels      = ["رائحة غير طبيعية"]
+    s.condition_other       = ""
     s.images                = [UploadedFile("f", "u", "image/jpeg", 100_000).to_dict()]
     s.notes                 = ""
     text, kb = build_review(s)
     assert "مراجعة تقرير المجارحة" in text
+    assert "رائحة غير طبيعية"      in text
     print("build_review (no notes) OK")
 
 

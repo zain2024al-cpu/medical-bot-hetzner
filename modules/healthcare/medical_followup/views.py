@@ -218,7 +218,7 @@ def build_vitals_spo2_prompt(session: MedicalFollowupSession) -> tuple[str, Inli
 
 def build_meds_supply_other_prompt(session: MedicalFollowupSession) -> tuple[str, InlineKeyboardMarkup]:
     """Direct free-text prompt — shown when 'أخرى' was selected in meds/supply multiselect."""
-    known = [lbl for lbl in session.meds_supply_labels if lbl != "أخرى"]
+    known = [lbl for lbl in session.meds_supply_labels if lbl != "Other (Specify)"]
     known_text = "، ".join(known) if known else "—"
     lines = [
         _DIVIDER,
@@ -317,7 +317,7 @@ def build_review(session: MedicalFollowupSession) -> tuple[str, InlineKeyboardMa
         "📋 *نوع الإجراء:*",
         proc_list,
         "",
-        "😷 *الشكوى الرئيسية:*",
+        "😷 *الشكوى الرئيسية / الأعراض:*",
         cmp_list,
         "",
         "❤️ *العلامات الحيوية:*",
@@ -326,7 +326,7 @@ def build_review(session: MedicalFollowupSession) -> tuple[str, InlineKeyboardMa
         f"  💓 النبض: {session.vitals_pulse or '—'}",
         f"  🫁 الأكسجين: {session.vitals_spo2 or '—'}",
         "",
-        "💊 *الأدوية والمستلزمات:*",
+        "💊 *الأدوية والمستلزمات الطبية:*",
         supply_list,
     ]
 

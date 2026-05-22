@@ -235,7 +235,7 @@ async def _on_proc_type(result, update: Update, context: ContextTypes.DEFAULT_TY
     custom_complaints = load_custom_options(CTX_FU_COMPLAINT, icon="😷")
     await multiselect.open(
         update, context,
-        title="الشكوى الرئيسية",
+        title="الشكوى الرئيسية / الأعراض",
         options=custom_complaints + COMPLAINT_OPTIONS,
         return_to=_RKEY_COMPLAINT,
         icon="😷",
@@ -392,7 +392,7 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
         custom_meds = load_custom_options(CTX_FU_MEDS_SUPPLY, icon="💊")
         await multiselect.open(
             update, context,
-            title="الأدوية والمستلزمات",
+            title="الأدوية والمستلزمات الطبية",
             options=custom_meds + MEDS_SUPPLY_OPTIONS,
             return_to=_RKEY_MEDS_SUPPLY,
             icon="💊",
@@ -404,7 +404,7 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
         if text_in:
             save_custom_option(CTX_FU_MEDS_SUPPLY, text_in)
             session.meds_supply_labels = [
-                text_in if lbl == "أخرى" else lbl
+                text_in if lbl == "Other (Specify)" else lbl
                 for lbl in session.meds_supply_labels
             ]
         session.step = STEP_IMAGES
@@ -543,9 +543,9 @@ async def _handle_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     extra_sections = [
         ("🏥 *القسم الطبي:*",             dept_text),
         ("📋 *نوع الإجراء:*",             proc_text),
-        ("😷 *الشكوى الرئيسية:*",         cmp_text),
+        ("😷 *الشكوى الرئيسية / الأعراض:*", cmp_text),
         ("❤️ *العلامات الحيوية:*",        vitals_text),
-        ("💊 *الأدوية والمستلزمات:*",     meds_text),
+        ("💊 *الأدوية والمستلزمات الطبية:*", meds_text),
     ]
 
     user = update.effective_user
@@ -611,7 +611,7 @@ async def _handle_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         session.save(context.user_data)
         custom_complaints = load_custom_options(CTX_FU_COMPLAINT, icon="😷")
         await multiselect.open(update, context,
-            title="الشكوى الرئيسية",
+            title="الشكوى الرئيسية / الأعراض",
             options=custom_complaints + COMPLAINT_OPTIONS,
             return_to=_RKEY_COMPLAINT, icon="😷", min_select=1,
             auto_confirm_ids=[COMPLAINT_OTHER_ID])

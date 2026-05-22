@@ -154,21 +154,21 @@ def build_phase_prompt(session: WoundcareAddSession) -> tuple[str, InlineKeyboar
     return "\n".join(lines), kb
 
 
-# ── Step 6: وصف الحالة ────────────────────────────────────────────────────────
+# ── Step 6b: "أخرى" free-text condition prompt ────────────────────────────────
 
-def build_description_prompt(session: WoundcareAddSession) -> tuple[str, InlineKeyboardMarkup]:
-    """Free-text prompt for وصف الحالة — required, no skip."""
+def build_description_other_prompt(session: WoundcareAddSession) -> tuple[str, InlineKeyboardMarkup]:
+    """Free-text prompt — shown when 'أخرى' was selected in condition multiselect."""
+    known = [lbl for lbl in session.condition_labels if lbl != "أخرى"]
+    known_text = "، ".join(known) if known else "—"
     lines = [
         _DIVIDER,
-        "📄  **وصف الحالة**",
+        "📝  **وصف حالة الجرح — تفاصيل إضافية**",
         "",
         f"المريض: {session.patient_name}",
-        f"العملية: {session.operation_name}",
-        f"المرحلة: {session.phase_label}",
+        f"الحالة المحددة: {known_text}",
         _THIN,
         "",
-        "صف حالة الجرح ووضعه الحالي:",
-        "(النوع، الحجم، الإفرازات، اللون، ملاحظات التئام…)",
+        "أرسل وصفاً إضافياً لحالة الجرح:",
     ]
     kb = InlineKeyboardMarkup([[
         InlineKeyboardButton("🔙 رجوع", callback_data=f"{WCA}:back"),
@@ -264,6 +264,15 @@ def build_review(session: WoundcareAddSession) -> tuple[str, InlineKeyboardMarku
     dept_list   = "\n".join(f"  • {lbl}" for lbl in session.medical_department_labels) or "  —"
     supply_list = "\n".join(f"  • {lbl}" for lbl in session.supply_labels) or "  —"
 
+    # Build condition list — replace "أخرى" placeholder with the typed free-text
+    _cond_labels = list(session.condition_labels)
+    if session.condition_other:
+        _cond_labels = [
+            session.condition_other if lbl == "أخرى" else lbl
+            for lbl in _cond_labels
+        ]
+    cond_list = "\n".join(f"  • {lbl}" for lbl in _cond_labels) or "  —"
+
     lines = [
         "🩺 *مراجعة تقرير المجارحة*",
         "",
@@ -276,10 +285,10 @@ def build_review(session: WoundcareAddSession) -> tuple[str, InlineKeyboardMarku
         f"✍️ *اسم العملية:*  {session.operation_name}",
         f"🩹 *مرحلة المجارحة:*  {session.phase_label}",
         "",
-        "📄 *وصف الحالة:*",
-        session.condition_description or "—",
+        "🩹 *وصف حالة الجرح:*",
+        cond_list,
         "",
-        "🧰 *المستلزمات الطبية:*",
+        "🧰 *المستلزمات الطبية المستخدمة:*",
         supply_list,
     ]
 

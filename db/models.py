@@ -365,6 +365,7 @@ class MedicationRecord(Base):
     patient_name             = Column(String(255), nullable=True, index=True)
     medical_departments_json = Column(Text, nullable=True)     # JSON list of medical specialty labels
     item_count               = Column(Integer, default=0, nullable=True)  # عدد الأصناف
+    dispense_source          = Column(String(50), nullable=True)           # الصيدلية / المخزن
     image_file_ids           = Column(Text, nullable=True)
     image_count              = Column(Integer, default=0, nullable=True)
     notes                    = Column(Text, nullable=True)

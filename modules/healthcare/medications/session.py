@@ -6,16 +6,17 @@ from datetime import datetime
 _KEY = "_hcmed_add"
 
 # ── Step identifiers (official workflow order) ────────────────────────────────
-STEP_DATE        = "date"         # 1. اختيار التاريخ  (first visible step)
-STEP_DATE_CUSTOM = "date_custom"  # 1b. free-text date entry
-STEP_PATIENT     = "patient"      # 2. اسم المريض
-STEP_DEPARTMENT  = "department"   # 3. القسم (medical specialty multiselect)
-STEP_DEPT_OTHER  = "dept_other"   # 3b. free-text when "أخرى" selected
-STEP_COUNT       = "count"        # 4. عدد الأصناف (numeric input)
-STEP_IMAGES      = "images"       # 5. رفع صورة الوصفة
-STEP_NOTES       = "notes"        # 6. ملاحظات
-STEP_SPECIALIST  = "specialist"   # 7. اسم الصحي (fixed 3-name single-select)
-STEP_REVIEW      = "review"       # 8. مراجعة نهائية
+STEP_DATE             = "date"             # 1.  اختيار التاريخ  (first visible step)
+STEP_DATE_CUSTOM      = "date_custom"      # 1b. free-text date entry
+STEP_PATIENT          = "patient"          # 2.  اسم المريض
+STEP_DEPARTMENT       = "department"       # 3.  القسم (medical specialty multiselect)
+STEP_DEPT_OTHER       = "dept_other"       # 3b. free-text when "أخرى" selected
+STEP_COUNT            = "count"            # 4.  عدد الأصناف (numeric input)
+STEP_IMAGES           = "images"           # 5.  رفع صورة الوصفة
+STEP_DISPENSE_SOURCE  = "dispense_source"  # 6.  جهة الصرف (الصيدلية / المخزن)
+STEP_NOTES            = "notes"            # 7.  ملاحظات
+STEP_SPECIALIST       = "specialist"       # 8.  اسم الصحي (fixed 3-name single-select)
+STEP_REVIEW           = "review"           # 9.  مراجعة نهائية
 
 
 @dataclass
