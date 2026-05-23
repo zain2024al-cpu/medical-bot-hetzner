@@ -81,6 +81,7 @@ def bootstrap_all() -> None:
             "_wc_add",      # woundcare session
             "_hcfu_add",    # medical follow-up session
             "_hcmed_add",   # medications session
+            "_hcsup_add",   # supplies session
             "_hcoth_add",   # other healthcare session
         },
     )

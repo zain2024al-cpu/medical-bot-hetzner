@@ -24,6 +24,7 @@ from modules.healthcare.medical_followup.constants import (
     PROCEDURE_TYPE_OPTIONS, COMPLAINT_OPTIONS, MEDS_SUPPLY_OPTIONS,
     SP_MAP, DEPT_OTHER_ID, COMPLAINT_OTHER_ID, MEDS_SUPPLY_OTHER_ID,
 )
+from modules.healthcare.medical_followup.review_handlers import REVIEW_EDIT_ROUTES
 from modules.healthcare.medical_followup.session import (
     MedicalFollowupSession,
     STEP_DATE, STEP_DATE_CUSTOM, STEP_PATIENT, STEP_DEPARTMENT, STEP_DEPT_OTHER,
@@ -69,6 +70,102 @@ async def _safe_reply(update: Update, text: str, kb) -> None:
         await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
     except Exception as exc:
         logger.error(f"[followup] send failed: {exc}")
+
+
+async def _go_to_review(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Return to the review screen after an edit step completes.
+    Resets edit_from_review=False and sets step=STEP_REVIEW.
+    Works for both callback (edit_message_text) and text (reply_text) paths.
+    """
+    session = MedicalFollowupSession.load(context.user_data)
+    if session is None:
+        await _cancel(update, context)
+        return
+    session.edit_from_review = False
+    session.step = STEP_REVIEW
+    session.save(context.user_data)
+    text, kb = build_review(session)
+    query = update.callback_query
+    if query:
+        try:
+            await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
+            return
+        except Exception:
+            pass
+    await _safe_reply(update, text, kb)
+
+
+async def _route_to_edit_step(
+    session: "MedicalFollowupSession",
+    step: str,
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+) -> None:
+    """
+    Render the correct UI for a given step when opened from the review editor.
+    Called by review_handlers.open_edit_step() via late import.
+    Passes preselected_ids so multiselects restore existing choices.
+    """
+    query = update.callback_query
+    if step == STEP_DEPARTMENT:
+        from modules.healthcare.views import DEPARTMENT_OPTIONS
+        custom_depts = load_custom_options(CTX_HC_DEPARTMENT, icon="🏥")
+        await multiselect.open(
+            update, context,
+            title="القسم الطبي",
+            options=custom_depts + DEPARTMENT_OPTIONS,
+            return_to=_RKEY_DEPARTMENTS,
+            icon="🏥",
+            min_select=1,
+            preselected_ids=session.medical_department_ids,
+            auto_confirm_ids=[DEPT_OTHER_ID],
+        )
+    elif step == STEP_PROC_TYPE:
+        await multiselect.open(
+            update, context,
+            title="نوع الإجراء",
+            options=PROCEDURE_TYPE_OPTIONS,
+            return_to=_RKEY_PROC_TYPE,
+            icon="📋",
+            min_select=1,
+            preselected_ids=session.procedure_type_ids,
+        )
+    elif step == STEP_COMPLAINT:
+        custom_complaints = load_custom_options(CTX_FU_COMPLAINT, icon="😷")
+        await multiselect.open(
+            update, context,
+            title="الشكوى الرئيسية / الأعراض",
+            options=custom_complaints + COMPLAINT_OPTIONS,
+            return_to=_RKEY_COMPLAINT,
+            icon="😷",
+            min_select=1,
+            preselected_ids=session.complaint_ids,
+            auto_confirm_ids=[COMPLAINT_OTHER_ID],
+        )
+    elif step == STEP_VITALS_TEMP:
+        text, kb = build_vitals_temp_prompt(session)
+        await _safe_edit(query, text, kb)
+    elif step == STEP_MEDS_SUPPLY:
+        custom_meds = load_custom_options(CTX_FU_MEDS_SUPPLY, icon="💊")
+        await multiselect.open(
+            update, context,
+            title="الأدوية والمستلزمات الطبية",
+            options=custom_meds + MEDS_SUPPLY_OPTIONS,
+            return_to=_RKEY_MEDS_SUPPLY,
+            icon="💊",
+            min_select=0,
+            preselected_ids=session.meds_supply_ids,
+            auto_confirm_ids=[MEDS_SUPPLY_OTHER_ID],
+        )
+    elif step == STEP_IMAGES:
+        await _open_images(update, context)
+    elif step == STEP_NOTES:
+        text, kb = build_notes_prompt(session)
+        await _safe_edit(query, text, kb)
+    elif step == STEP_SPECIALIST:
+        text, kb = build_specialist_prompt(session)
+        await _safe_edit(query, text, kb)
 
 
 # ── Flow steps ────────────────────────────────────────────────────────────────
@@ -186,7 +283,11 @@ async def _on_patient(result, update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def _on_department(result, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if result is None or result.cancelled:
-        await _cancel(update, context)
+        session = MedicalFollowupSession.load(context.user_data)
+        if session and session.edit_from_review:
+            await _go_to_review(update, context)
+        else:
+            await _cancel(update, context)
         return
 
     session = MedicalFollowupSession.load(context.user_data)
@@ -196,6 +297,17 @@ async def _on_department(result, update: Update, context: ContextTypes.DEFAULT_T
 
     session.medical_department_ids    = result.ids
     session.medical_department_labels = result.labels
+
+    if session.edit_from_review:
+        if DEPT_OTHER_ID in result.ids:
+            session.step = STEP_DEPT_OTHER
+            session.save(context.user_data)
+            text, kb = build_dept_other_prompt(session)
+            await _safe_reply(update, text, kb)
+        else:
+            await _go_to_review(update, context)
+        return
+
     session.step = STEP_DEPT_OTHER if DEPT_OTHER_ID in result.ids else STEP_PROC_TYPE
     session.save(context.user_data)
 
@@ -219,7 +331,11 @@ async def _open_proc_type(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 async def _on_proc_type(result, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if result is None or result.cancelled:
-        await _cancel(update, context)
+        session = MedicalFollowupSession.load(context.user_data)
+        if session and session.edit_from_review:
+            await _go_to_review(update, context)
+        else:
+            await _cancel(update, context)
         return
 
     session = MedicalFollowupSession.load(context.user_data)
@@ -229,7 +345,12 @@ async def _on_proc_type(result, update: Update, context: ContextTypes.DEFAULT_TY
 
     session.procedure_type_ids    = result.ids
     session.procedure_type_labels = result.labels
-    session.step                  = STEP_COMPLAINT
+
+    if session.edit_from_review:
+        await _go_to_review(update, context)
+        return
+
+    session.step = STEP_COMPLAINT
     session.save(context.user_data)
 
     custom_complaints = load_custom_options(CTX_FU_COMPLAINT, icon="😷")
@@ -246,7 +367,11 @@ async def _on_proc_type(result, update: Update, context: ContextTypes.DEFAULT_TY
 
 async def _on_complaint(result, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if result is None or result.cancelled:
-        await _cancel(update, context)
+        session = MedicalFollowupSession.load(context.user_data)
+        if session and session.edit_from_review:
+            await _go_to_review(update, context)
+        else:
+            await _cancel(update, context)
         return
 
     session = MedicalFollowupSession.load(context.user_data)
@@ -256,6 +381,17 @@ async def _on_complaint(result, update: Update, context: ContextTypes.DEFAULT_TY
 
     session.complaint_ids    = result.ids
     session.complaint_labels = result.labels
+
+    if session.edit_from_review:
+        if COMPLAINT_OTHER_ID in result.ids:
+            session.step = STEP_COMPLAINT_OTHER
+            session.save(context.user_data)
+            text, kb = build_complaint_other_prompt(session)
+            await _safe_reply(update, text, kb)
+        else:
+            await _go_to_review(update, context)
+        return
+
     session.step = STEP_COMPLAINT_OTHER if COMPLAINT_OTHER_ID in result.ids else STEP_VITALS_TEMP
     session.save(context.user_data)
 
@@ -269,7 +405,11 @@ async def _on_complaint(result, update: Update, context: ContextTypes.DEFAULT_TY
 
 async def _on_meds_supply(result, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if result is None or result.cancelled:
-        await _cancel(update, context)
+        session = MedicalFollowupSession.load(context.user_data)
+        if session and session.edit_from_review:
+            await _go_to_review(update, context)
+        else:
+            await _cancel(update, context)
         return
 
     session = MedicalFollowupSession.load(context.user_data)
@@ -279,6 +419,17 @@ async def _on_meds_supply(result, update: Update, context: ContextTypes.DEFAULT_
 
     session.meds_supply_ids    = result.ids
     session.meds_supply_labels = result.labels
+
+    if session.edit_from_review:
+        if MEDS_SUPPLY_OTHER_ID in result.ids:
+            session.step = STEP_MEDS_SUPPLY_OTHER
+            session.save(context.user_data)
+            text, kb = build_meds_supply_other_prompt(session)
+            await _safe_reply(update, text, kb)
+        else:
+            await _go_to_review(update, context)
+        return
+
     session.step = STEP_MEDS_SUPPLY_OTHER if MEDS_SUPPLY_OTHER_ID in result.ids else STEP_IMAGES
     session.save(context.user_data)
 
@@ -303,7 +454,11 @@ async def _open_images(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 async def _on_images(result, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if result is None or result.cancelled:
-        await _cancel(update, context)
+        session = MedicalFollowupSession.load(context.user_data)
+        if session and session.edit_from_review:
+            await _go_to_review(update, context)
+        else:
+            await _cancel(update, context)
         return
 
     session = MedicalFollowupSession.load(context.user_data)
@@ -312,7 +467,12 @@ async def _on_images(result, update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
     session.images = [f.to_dict() for f in result.files]
-    session.step   = STEP_NOTES
+
+    if session.edit_from_review:
+        await _go_to_review(update, context)
+        return
+
+    session.step = STEP_NOTES
     session.save(context.user_data)
 
     text, kb = build_notes_prompt(session)
@@ -348,6 +508,9 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 text_in if lbl == "أخرى" else lbl
                 for lbl in session.medical_department_labels
             ]
+        if session.edit_from_review:
+            await _go_to_review(update, context)
+            return
         session.step = STEP_PROC_TYPE
         session.save(context.user_data)
         await _open_proc_type(update, context)
@@ -359,6 +522,9 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 text_in if lbl == "أخرى" else lbl
                 for lbl in session.complaint_labels
             ]
+        if session.edit_from_review:
+            await _go_to_review(update, context)
+            return
         session.step = STEP_VITALS_TEMP
         session.save(context.user_data)
         text, kb = build_vitals_temp_prompt(session)
@@ -387,7 +553,11 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     elif session.step == STEP_VITALS_SPO2:
         session.vitals_spo2 = text_in
-        session.step        = STEP_MEDS_SUPPLY
+        if session.edit_from_review:
+            session.save(context.user_data)
+            await _go_to_review(update, context)
+            return
+        session.step = STEP_MEDS_SUPPLY
         session.save(context.user_data)
         custom_meds = load_custom_options(CTX_FU_MEDS_SUPPLY, icon="💊")
         await multiselect.open(
@@ -407,12 +577,19 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 text_in if lbl == "Other (Specify)" else lbl
                 for lbl in session.meds_supply_labels
             ]
+        if session.edit_from_review:
+            await _go_to_review(update, context)
+            return
         session.step = STEP_IMAGES
         session.save(context.user_data)
         await _open_images(update, context)
 
     elif session.step == STEP_NOTES:
         session.notes = text_in
+        if session.edit_from_review:
+            session.save(context.user_data)
+            await _go_to_review(update, context)
+            return
         session.step  = STEP_SPECIALIST
         session.save(context.user_data)
         text, kb = build_specialist_prompt(session)
@@ -427,6 +604,10 @@ async def _handle_skip_notes(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if session is None:
         await _cancel(update, context); return
     session.notes = ""
+    if session.edit_from_review:
+        session.save(context.user_data)
+        await _go_to_review(update, context)
+        return
     session.step  = STEP_SPECIALIST
     session.save(context.user_data)
     text, kb = build_specialist_prompt(session)
@@ -440,35 +621,11 @@ async def _handle_specialist_choice(
     session = MedicalFollowupSession.load(context.user_data)
     if session is None:
         await _cancel(update, context); return
-    session.specialist_name = SP_MAP.get(sp_key, "")
-    session.step            = STEP_REVIEW
+    session.specialist_name   = SP_MAP.get(sp_key, "")
+    session.edit_from_review  = False   # always lands on review
+    session.step              = STEP_REVIEW
     session.save(context.user_data)
     text, kb = build_review(session)
-    await _safe_edit(query, text, kb)
-
-
-async def _handle_edit_notes(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    query   = update.callback_query
-    session = MedicalFollowupSession.load(context.user_data)
-    if session is None:
-        await _cancel(update, context); return
-    session.notes = ""
-    # Do NOT clear specialist_name — if already selected, edit_notes skips re-select
-    session.step  = STEP_NOTES
-    session.save(context.user_data)
-    text, kb = build_notes_prompt(session)
-    await _safe_edit(query, text, kb)
-
-
-async def _handle_edit_specialist(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    query   = update.callback_query
-    session = MedicalFollowupSession.load(context.user_data)
-    if session is None:
-        await _cancel(update, context); return
-    session.specialist_name = ""
-    session.step            = STEP_SPECIALIST
-    session.save(context.user_data)
-    text, kb = build_specialist_prompt(session)
     await _safe_edit(query, text, kb)
 
 
@@ -586,6 +743,29 @@ async def _handle_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         except Exception:
             pass
         await _safe_reply(update, text, kb)
+
+    # While editing from review, back within the vitals sequence works normally;
+    # back from any other edit entry point returns directly to review.
+    if session.edit_from_review:
+        if session.step == STEP_VITALS_BP:
+            session.step = STEP_VITALS_TEMP
+            session.save(context.user_data)
+            text, kb = build_vitals_temp_prompt(session)
+            await _edit_or_reply(text, kb)
+        elif session.step == STEP_VITALS_PULSE:
+            session.step = STEP_VITALS_BP
+            session.save(context.user_data)
+            text, kb = build_vitals_bp_prompt(session)
+            await _edit_or_reply(text, kb)
+        elif session.step == STEP_VITALS_SPO2:
+            session.step = STEP_VITALS_PULSE
+            session.save(context.user_data)
+            text, kb = build_vitals_pulse_prompt(session)
+            await _edit_or_reply(text, kb)
+        else:
+            # Entry point of any other edit sequence — go back to review
+            await _go_to_review(update, context)
+        return
 
     if session.step in (STEP_DEPT_OTHER, STEP_PROC_TYPE):
         # Back to department multiselect
@@ -727,10 +907,12 @@ async def _handle_hcfu_callback(update: Update, context: ContextTypes.DEFAULT_TY
         await _handle_skip_notes(update, context)
     elif action in SP_MAP:
         await _handle_specialist_choice(update, context, action)
-    elif action == "edit_notes":
-        await _handle_edit_notes(update, context)
-    elif action == "edit_specialist":
-        await _handle_edit_specialist(update, context)
+    elif action in REVIEW_EDIT_ROUTES:
+        from modules.healthcare.medical_followup.review_handlers import open_edit_step
+        session = MedicalFollowupSession.load(context.user_data)
+        if session is None:
+            await _cancel(update, context); return
+        await open_edit_step(action, session, update, context)
     elif action == "confirm":
         await _handle_confirm(update, context)
     elif action == "cancel":

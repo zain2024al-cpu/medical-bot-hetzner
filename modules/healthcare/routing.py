@@ -58,6 +58,14 @@ def register_all(app) -> None:
     register_medication_handlers(app)
     register_medication_routes()
 
+    # ── Supplies (🏥) ────────────────────────────────────────────────────────
+    from modules.healthcare.supplies.flow import (
+        register_handlers as register_supplies_handlers,
+        register_result_routes as register_supplies_routes,
+    )
+    register_supplies_handlers(app)
+    register_supplies_routes()
+
     # ── Other (📝) ────────────────────────────────────────────────────────────
     from modules.healthcare.other.flow import (
         register_handlers as register_other_handlers,

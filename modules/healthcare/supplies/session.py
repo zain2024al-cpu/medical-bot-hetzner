@@ -1,37 +1,37 @@
-# modules/healthcare/medications/session.py
+# modules/healthcare/supplies/session.py
 
 from dataclasses import dataclass
 from datetime import datetime
 
-_KEY = "_hcmed_add"
+_KEY = "_hcsup_add"
 
-# ── Step identifiers (official workflow order) ────────────────────────────────
-STEP_DATE             = "date"             # 1.  اختيار التاريخ  (first visible step)
-STEP_DATE_CUSTOM      = "date_custom"      # 1b. free-text date entry
-STEP_PATIENT          = "patient"          # 2.  اسم المريض
-STEP_DEPARTMENT       = "department"       # 3.  القسم (medical specialty multiselect)
-STEP_DEPT_OTHER       = "dept_other"       # 3b. free-text when "أخرى" selected
-STEP_COUNT            = "count"            # 4.  عدد الأصناف (numeric input)
-STEP_IMAGES           = "images"           # 5.  رفع صورة الوصفة
-STEP_DISPENSE_SOURCE  = "dispense_source"  # 6.  جهة الصرف (الصيدلية / المخزن)
-STEP_NOTES            = "notes"            # 7.  ملاحظات
-STEP_SPECIALIST       = "specialist"       # 8.  اسم الصحي (fixed 3-name single-select)
-STEP_REVIEW           = "review"           # 9.  مراجعة نهائية
+# ── Step identifiers (mirrors medications workflow) ───────────────────────────
+STEP_DATE             = "date"
+STEP_DATE_CUSTOM      = "date_custom"
+STEP_PATIENT          = "patient"
+STEP_DEPARTMENT       = "department"
+STEP_DEPT_OTHER       = "dept_other"
+STEP_COUNT            = "count"
+STEP_IMAGES           = "images"
+STEP_DISPENSE_SOURCE  = "dispense_source"
+STEP_NOTES            = "notes"
+STEP_SPECIALIST       = "specialist"
+STEP_REVIEW           = "review"
 
 
 @dataclass
-class MedicationSession:
-    step:                     str
-    patient_id:               int | None
-    patient_name:             str
-    medical_department_ids:   list[str]   # multiselect IDs from DEPARTMENT step
-    medical_department_labels: list[str]  # display labels (may include free-text replacement)
-    item_count:               int         # عدد الأصناف — numeric input from COUNT step
-    dispense_source:          str         # الصيدلية / المخزن — from DISPENSE_SOURCE step
-    images:                   list[dict]
-    notes:                    str
-    specialist_name:          str         # must be one of: سرور / فضل / زكريا
-    created_at:               str
+class SuppliesSession:
+    step:                      str
+    patient_id:                int | None
+    patient_name:              str
+    medical_department_ids:    list[str]
+    medical_department_labels: list[str]
+    item_count:                int
+    dispense_source:           str
+    images:                    list[dict]
+    notes:                     str
+    specialist_name:           str
+    created_at:                str
 
     @property
     def image_count(self) -> int:
@@ -53,7 +53,7 @@ class MedicationSession:
         }
 
     @classmethod
-    def create(cls, user_data: dict) -> "MedicationSession":
+    def create(cls, user_data: dict) -> "SuppliesSession":
         session = cls(
             step=                     STEP_DATE,
             patient_id=               None,
@@ -71,7 +71,7 @@ class MedicationSession:
         return session
 
     @classmethod
-    def load(cls, user_data: dict) -> "MedicationSession | None":
+    def load(cls, user_data: dict) -> "SuppliesSession | None":
         raw = user_data.get(_KEY)
         if not raw:
             return None

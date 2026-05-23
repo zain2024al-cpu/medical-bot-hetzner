@@ -1,16 +1,16 @@
-# modules/healthcare/medications/flow.py
-# Medication dispensing — official 10-step operational workflow.
+# modules/healthcare/supplies/flow.py
+# Medical supplies dispensing — mirrors medications workflow.
 #
 #   1.  التاريخ          — auto (session.create)
 #   2.  اسم المريض       — patient_selector
-#   3.  القسم            — DEPARTMENT_OPTIONS multiselect (+ DEPT_OTHER branch for أخرى)
+#   3.  القسم            — DEPARTMENT_OPTIONS multiselect (+ DEPT_OTHER branch)
 #   4.  عدد الأصناف      — numeric text input (STEP_COUNT)
-#   5.  صورة الوصفة      — uploads (optional, 0-10)
-#   6.  جهة الصرف        — 2-button callback: الصيدلية / المخزن (REQUIRED, no skip)
+#   5.  صورة المستلزمات  — uploads (optional, 0-10)
+#   6.  جهة الصرف        — 2-button callback: الصيدلية / المخزن (REQUIRED)
 #   7.  ملاحظات          — text input (optional)
-#   8.  اسم الصحي        — fixed 3-name single-select callback (REQUIRED, no skip)
-#   9.  مراجعة نهائية   — review screen
-#   10. نشر             — DB save + publish
+#   8.  اسم الصحي        — fixed 3-name single-select callback (REQUIRED)
+#   9.  مراجعة نهائية    — review screen
+#   10. نشر              — DB save + publish
 
 import logging
 
@@ -27,16 +27,16 @@ from modules.healthcare.views import DEPARTMENT_OPTIONS
 from modules.healthcare.custom_options import (
     save_custom_option, load_custom_options, CTX_HC_DEPARTMENT,
 )
-from modules.healthcare.medications.constants import (
+from modules.healthcare.supplies.constants import (
     SP_MAP, DEPT_OTHER_ID, DISPENSE_SOURCE_MAP,
 )
-from modules.healthcare.medications.session import (
-    MedicationSession,
+from modules.healthcare.supplies.session import (
+    SuppliesSession,
     STEP_DATE, STEP_DATE_CUSTOM, STEP_PATIENT, STEP_DEPARTMENT, STEP_DEPT_OTHER,
     STEP_COUNT, STEP_IMAGES, STEP_DISPENSE_SOURCE, STEP_NOTES, STEP_SPECIALIST, STEP_REVIEW,
 )
-from modules.healthcare.medications.views import (
-    HC, HCMED,
+from modules.healthcare.supplies.views import (
+    HC, HCSUP,
     build_date_prompt, build_date_calendar_prompt, build_dept_other_prompt,
     build_count_prompt, build_dispense_source_prompt, build_notes_prompt,
     build_specialist_prompt, build_review, build_success, build_cancelled, build_error,
@@ -47,16 +47,16 @@ logger = logging.getLogger(__name__)
 
 # ── Result router keys ────────────────────────────────────────────────────────
 
-_RKEY_PATIENT     = "hc.medications.patient"
-_RKEY_DEPARTMENTS = "hc.medications.departments"
-_RKEY_IMAGES      = "hc.medications.images"
+_RKEY_PATIENT     = "hc.supplies.patient"
+_RKEY_DEPARTMENTS = "hc.supplies.departments"
+_RKEY_IMAGES      = "hc.supplies.images"
 
 
-# ── Step 1: start — show date confirmation screen ────────────────────────────
+# ── Step 1: start ─────────────────────────────────────────────────────────────
 
 async def _start_flow(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    MedicationSession.create(context.user_data)
-    logger.info(f"[medications] flow started  user={update.effective_user.id}")
+    SuppliesSession.create(context.user_data)
+    logger.info(f"[supplies] flow started  user={update.effective_user.id}")
     text, kb = build_date_prompt()
     query = update.callback_query
     try:
@@ -68,30 +68,26 @@ async def _start_flow(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
 
-# ── Step 1 → 2: date confirmed — open patient selector ───────────────────────
-
 async def _handle_date_today(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """User chose today's date — advance to patient selector."""
-    session = MedicationSession.load(context.user_data)
+    session = SuppliesSession.load(context.user_data)
     if session is None:
-        session = MedicationSession.create(context.user_data)
+        session = SuppliesSession.create(context.user_data)
     session.step = STEP_PATIENT
     session.save(context.user_data)
-    logger.info(f"[medications] date confirmed (today)  user={update.effective_user.id}")
+    logger.info(f"[supplies] date confirmed (today)  user={update.effective_user.id}")
     await patient_selector.enter(update, context, return_to=_RKEY_PATIENT)
 
 
 async def _handle_date_calendar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """User chose calendar date — show inline month calendar."""
     from datetime import datetime
     query = update.callback_query
-    session = MedicationSession.load(context.user_data)
+    session = SuppliesSession.load(context.user_data)
     if session is None:
-        session = MedicationSession.create(context.user_data)
+        session = SuppliesSession.create(context.user_data)
     session.step = STEP_DATE_CUSTOM
     session.save(context.user_data)
     now = datetime.utcnow()
-    text, kb = build_calendar(now.year, now.month, HCMED, f"{HCMED}:start")
+    text, kb = build_calendar(now.year, now.month, HCSUP, f"{HCSUP}:start")
     try:
         if query:
             await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
@@ -104,7 +100,6 @@ async def _handle_date_calendar(update: Update, context: ContextTypes.DEFAULT_TY
 async def _handle_cal_action(
     update: Update, context: ContextTypes.DEFAULT_TYPE, action: str
 ) -> None:
-    """Handle cal_prev / cal_next / cal_pick / cal_noop calendar callbacks."""
     from datetime import datetime
     query = update.callback_query
     parts = action.split(":")
@@ -115,7 +110,7 @@ async def _handle_cal_action(
 
     if kind in ("cal_prev", "cal_next"):
         y, m = int(parts[1]), int(parts[2])
-        text, kb = build_calendar(y, m, HCMED, f"{HCMED}:start")
+        text, kb = build_calendar(y, m, HCSUP, f"{HCSUP}:start")
         try:
             if query:
                 await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
@@ -127,27 +122,26 @@ async def _handle_cal_action(
 
     if kind == "cal_pick":
         y, m, d = int(parts[1]), int(parts[2]), int(parts[3])
-        session = MedicationSession.load(context.user_data)
+        session = SuppliesSession.load(context.user_data)
         if session is None:
-            session = MedicationSession.create(context.user_data)
+            session = SuppliesSession.create(context.user_data)
         session.created_at = datetime(y, m, d).isoformat()
         session.step       = STEP_PATIENT
         session.save(context.user_data)
         logger.info(
-            f"[medications] date picked: {y}-{m:02d}-{d:02d}  user={update.effective_user.id}"
+            f"[supplies] date picked: {y}-{m:02d}-{d:02d}  user={update.effective_user.id}"
         )
         await patient_selector.enter(update, context, return_to=_RKEY_PATIENT)
 
 
-# ── Step 2: patient selected ──────────────────────────────────────────────────
-
+# ── Result route handlers ─────────────────────────────────────────────────────
 
 async def _on_patient(result, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if result is None or getattr(result, "cancelled", False):
         await _cancel(update, context); return
-    session = MedicationSession.load(context.user_data)
+    session = SuppliesSession.load(context.user_data)
     if session is None:
-        session = MedicationSession.create(context.user_data)
+        session = SuppliesSession.create(context.user_data)
     patient              = result.patient if hasattr(result, "patient") else result
     session.patient_id   = patient.id   if patient else None
     session.patient_name = patient.name if patient else ""
@@ -165,12 +159,10 @@ async def _on_patient(result, update: Update, context: ContextTypes.DEFAULT_TYPE
     )
 
 
-# ── Step 3: department selected ───────────────────────────────────────────────
-
 async def _on_department(result, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if result is None or result.cancelled:
         await _cancel(update, context); return
-    session = MedicationSession.load(context.user_data)
+    session = SuppliesSession.load(context.user_data)
     if session is None:
         await _cancel(update, context); return
 
@@ -178,29 +170,25 @@ async def _on_department(result, update: Update, context: ContextTypes.DEFAULT_T
     session.medical_department_labels = result.labels
 
     if DEPT_OTHER_ID in result.ids:
-        # Branch: ask for free-text department name
         session.step = STEP_DEPT_OTHER
         session.save(context.user_data)
         text, kb = build_dept_other_prompt(session)
         try:
             await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
         except Exception as exc:
-            logger.error(f"[medications] dept_other prompt failed: {exc}")
+            logger.error(f"[supplies] dept_other prompt failed: {exc}")
         return
 
-    # No "أخرى" — proceed to count step
     session.step = STEP_COUNT
     session.save(context.user_data)
     text, kb = build_count_prompt(session)
     await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
 
-# ── Step 5: images collected ──────────────────────────────────────────────────
-
 async def _on_images(result, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if result is None or result.cancelled:
         await _cancel(update, context); return
-    session = MedicationSession.load(context.user_data)
+    session = SuppliesSession.load(context.user_data)
     if session is None:
         await _cancel(update, context); return
     session.images = [f.to_dict() for f in result.files]
@@ -210,17 +198,16 @@ async def _on_images(result, update: Update, context: ContextTypes.DEFAULT_TYPE)
     try:
         await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
     except Exception as exc:
-        logger.error(f"[medications] dispense_source prompt failed: {exc}")
+        logger.error(f"[supplies] dispense_source prompt failed: {exc}")
 
 
-# ── Step 6: dispense source selected ─────────────────────────────────────────
+# ── Step 6: dispense source ───────────────────────────────────────────────────
 
 async def _handle_dispense_source(
     update: Update, context: ContextTypes.DEFAULT_TYPE, source_label: str
 ) -> None:
-    """Called when user taps الصيدلية or المخزن button."""
     query   = update.callback_query
-    session = MedicationSession.load(context.user_data)
+    session = SuppliesSession.load(context.user_data)
     if session is None:
         await _cancel(update, context); return
     session.dispense_source = source_label
@@ -235,12 +222,10 @@ async def _handle_dispense_source(
     await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
 
-# ── Shared helper ─────────────────────────────────────────────────────────────
-
 async def _open_images_upload(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await uploads.open(
         update, context,
-        title="ارفع صورة الوصفة / الأدوية (اختياري)",
+        title="ارفع صورة المستلزمات (اختياري)",
         return_to=_RKEY_IMAGES,
         icon="📷",
         allowed_types=["photo", "image_document"],
@@ -249,14 +234,13 @@ async def _open_images_upload(update: Update, context: ContextTypes.DEFAULT_TYPE
     )
 
 
-# ── Text input handler (steps: DEPT_OTHER, COUNT, NOTES) ─────────────────────
+# ── Text input handler ────────────────────────────────────────────────────────
 
 async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    session = MedicationSession.load(context.user_data)
+    session = SuppliesSession.load(context.user_data)
     if session is None:
         return
 
-    # ── 1b. Manual date entry ──
     if session.step == STEP_DATE_CUSTOM:
         dt = parse_date_input(update.message.text or "")
         if dt is None:
@@ -266,11 +250,10 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
         session.created_at = dt.isoformat()
         session.step = STEP_PATIENT
         session.save(context.user_data)
-        logger.info(f"[medications] date set manually: {dt.date()}  user={update.effective_user.id}")
+        logger.info(f"[supplies] date set manually: {dt.date()}  user={update.effective_user.id}")
         await patient_selector.enter(update, context, return_to=_RKEY_PATIENT)
         return
 
-    # ── 3b. Department free-text ("أخرى") ──
     elif session.step == STEP_DEPT_OTHER:
         custom = (update.message.text or "").strip()
         if custom:
@@ -284,7 +267,6 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
         text, kb = build_count_prompt(session)
         await update.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
-    # ── 4. عدد الأصناف — validate positive integer ──
     elif session.step == STEP_COUNT:
         raw = (update.message.text or "").strip()
         try:
@@ -300,10 +282,8 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
         session.save(context.user_data)
         await _open_images_upload(update, context)
 
-    # ── 6. ملاحظات ──
     elif session.step == STEP_NOTES:
         session.notes = (update.message.text or "").strip()
-        # If specialist already selected (edit_notes path), go straight to review
         if session.specialist_name:
             session.step = STEP_REVIEW
             session.save(context.user_data)
@@ -319,11 +299,10 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def _handle_skip_notes(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query   = update.callback_query
-    session = MedicationSession.load(context.user_data)
+    session = SuppliesSession.load(context.user_data)
     if session is None:
         await _cancel(update, context); return
     session.notes = ""
-    # If specialist already selected (edit_notes path), go straight to review
     if session.specialist_name:
         session.step = STEP_REVIEW
         text, kb     = build_review(session)
@@ -340,9 +319,8 @@ async def _handle_skip_notes(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def _handle_select_specialist(
     update: Update, context: ContextTypes.DEFAULT_TYPE, name: str
 ) -> None:
-    """Called when user taps one of the 3 fixed staff buttons."""
     query   = update.callback_query
-    session = MedicationSession.load(context.user_data)
+    session = SuppliesSession.load(context.user_data)
     if session is None:
         await _cancel(update, context); return
     session.specialist_name = name
@@ -357,10 +335,9 @@ async def _handle_select_specialist(
 
 async def _handle_edit_notes(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query   = update.callback_query
-    session = MedicationSession.load(context.user_data)
+    session = SuppliesSession.load(context.user_data)
     if session is None:
         await _cancel(update, context); return
-    # Clear notes only; specialist stays so edit_notes → notes → review (skips re-select)
     session.notes = ""
     session.step  = STEP_NOTES
     session.save(context.user_data)
@@ -373,7 +350,7 @@ async def _handle_edit_notes(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def _handle_edit_specialist(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query   = update.callback_query
-    session = MedicationSession.load(context.user_data)
+    session = SuppliesSession.load(context.user_data)
     if session is None:
         await _cancel(update, context); return
     session.specialist_name = ""
@@ -388,7 +365,7 @@ async def _handle_edit_specialist(update: Update, context: ContextTypes.DEFAULT_
 
 async def _handle_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query   = update.callback_query
-    session = MedicationSession.load(context.user_data)
+    session = SuppliesSession.load(context.user_data)
     if session is None:
         await _cancel(update, context); return
 
@@ -399,9 +376,9 @@ async def _handle_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     dept_snap            = list(session.medical_department_labels)
     dispense_source_snap = session.dispense_source
 
-    from modules.healthcare.medications.models import save_medication_record
+    from modules.healthcare.supplies.models import save_supplies_record
     try:
-        saved = save_medication_record(
+        saved = save_supplies_record(
             patient_id=                session.patient_id,
             patient_name=              session.patient_name,
             medical_department_ids=    session.medical_department_ids,
@@ -414,7 +391,7 @@ async def _handle_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             created_by=                update.effective_user.id if update.effective_user else None,
         )
     except Exception as exc:
-        logger.error(f"[medications] DB save failed: {exc}")
+        logger.error(f"[supplies] DB save failed: {exc}")
         text, kb = build_error("فشل حفظ التقرير.")
         try:
             await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
@@ -422,7 +399,7 @@ async def _handle_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             pass
         return
 
-    MedicationSession.clear(context.user_data)
+    SuppliesSession.clear(context.user_data)
 
     text, kb = build_success(saved.record_id, saved.patient_name, saved.image_count)
     try:
@@ -430,11 +407,10 @@ async def _handle_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     except Exception:
         await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
-    # Build extra_sections for the published report
     dept_text = "\n".join(f"  • {d}" for d in dept_snap) if dept_snap else "  —"
     extra_sections = [
-        ("🏥 *القسم الطبي:*",                        dept_text),
-        (f"🔢 *عدد الأصناف:*  {saved.item_count}",   ""),
+        ("🏥 *القسم الطبي:*",                              dept_text),
+        (f"🔢 *عدد الأصناف:*  {saved.item_count}",         ""),
         (f"🏪 *جهة الصرف:*   {dispense_source_snap or '—'}", ""),
     ]
 
@@ -443,13 +419,13 @@ async def _handle_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     await _publish(
         bot=context.bot,
         data=HealthcarePublishData(
-            workflow_type=   "medications",
-            workflow_label=  "صرف الأدوية",
-            workflow_icon=   "💊",
+            workflow_type=   "supplies",
+            workflow_label=  "المستلزمات الطبية",
+            workflow_icon=   "🏥",
             record_id=       saved.record_id,
             patient_name=    saved.patient_name,
             extra_sections=  extra_sections,
-            operations=      [],          # no medication categories in official workflow
+            operations=      [],
             images=          images_snap,
             notes=           notes_snap,
             specialist_name= specialist_snap,
@@ -463,9 +439,8 @@ async def _handle_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 # ── Back navigation ───────────────────────────────────────────────────────────
 
 async def _handle_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Navigate to the previous step based on session.step."""
     query   = update.callback_query
-    session = MedicationSession.load(context.user_data)
+    session = SuppliesSession.load(context.user_data)
     if session is None:
         await _cancel(update, context); return
 
@@ -478,7 +453,6 @@ async def _handle_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
     if session.step in (STEP_DEPT_OTHER, STEP_COUNT):
-        # Back to department multiselect
         session.step = STEP_DEPARTMENT
         session.save(context.user_data)
         custom_depts = load_custom_options(CTX_HC_DEPARTMENT)
@@ -488,13 +462,11 @@ async def _handle_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             return_to=_RKEY_DEPARTMENTS, icon="🏥", min_select=1)
 
     elif session.step == STEP_DISPENSE_SOURCE:
-        # Back to images upload
         session.step = STEP_IMAGES
         session.save(context.user_data)
         await _open_images_upload(update, context)
 
     elif session.step == STEP_NOTES:
-        # Back to dispense source
         session.step = STEP_DISPENSE_SOURCE
         session.save(context.user_data)
         text, kb = build_dispense_source_prompt(session)
@@ -511,7 +483,7 @@ async def _handle_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 async def _cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    MedicationSession.clear(context.user_data)
+    SuppliesSession.clear(context.user_data)
     text, kb = build_cancelled()
     query = update.callback_query
     try:
@@ -522,8 +494,10 @@ async def _cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
         await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
     except Exception as exc:
-        logger.error(f"[medications] cancel failed: {exc}")
+        logger.error(f"[supplies] cancel failed: {exc}")
 
+
+# ── Callback dispatcher ───────────────────────────────────────────────────────
 
 async def _handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
@@ -534,19 +508,16 @@ async def _handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await query.answer()
     except Exception:
         pass
-    action = data[len(HCMED) + 1:]
+    action = data[len(HCSUP) + 1:]
 
-    # Dispense source selection (disp_pharmacy / disp_warehouse)
     if action in DISPENSE_SOURCE_MAP:
         await _handle_dispense_source(update, context, DISPENSE_SOURCE_MAP[action])
         return
 
-    # Fixed staff selection (sp_sarour / sp_fadl / sp_zakariya)
     if action in SP_MAP:
         await _handle_select_specialist(update, context, SP_MAP[action])
         return
 
-    # Calendar widget (cal_pick / cal_prev / cal_next / cal_noop)
     if action.startswith("cal_"):
         await _handle_cal_action(update, context, action)
         return
@@ -566,7 +537,7 @@ async def _handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     if handler:
         await handler(update, context)
     else:
-        logger.warning(f"[medications] unknown action: {action!r}")
+        logger.warning(f"[supplies] unknown action: {action!r}")
 
 
 # ── Registration ──────────────────────────────────────────────────────────────
@@ -575,10 +546,11 @@ def register_result_routes() -> None:
     _register_route(_RKEY_PATIENT,     _on_patient)
     _register_route(_RKEY_DEPARTMENTS, _on_department)
     _register_route(_RKEY_IMAGES,      _on_images)
-    logger.info("[medications] result routes registered")
+    logger.info("[supplies] result routes registered")
 
 
 def register_handlers(app) -> None:
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, _handle_text_input), group=4)  # unique group — avoids PTB v20 group-0 conflict
-    app.add_handler(CallbackQueryHandler(_handle_callback, pattern=rf"^{HCMED}:"), group=1)
-    logger.info("[medications] handlers registered")
+    # group 8 — unique, avoids conflict with other healthcare text handlers
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, _handle_text_input), group=8)
+    app.add_handler(CallbackQueryHandler(_handle_callback, pattern=rf"^{HCSUP}:"), group=1)
+    logger.info("[supplies] handlers registered")

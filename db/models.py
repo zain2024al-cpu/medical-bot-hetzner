@@ -376,6 +376,29 @@ class MedicationRecord(Base):
 
 
 # ================================================
+# Healthcare — Medical Supplies Records
+# ================================================
+
+class SuppliesRecord(Base):
+    """Medical supplies dispensing records (mirrors MedicationRecord structure)."""
+    __tablename__ = "supplies_records"
+
+    id                       = Column(Integer, primary_key=True, autoincrement=True)
+    patient_id               = Column(Integer, nullable=True, index=True)
+    patient_name             = Column(String(255), nullable=True, index=True)
+    medical_departments_json = Column(Text, nullable=True)     # JSON list of medical specialty labels
+    item_count               = Column(Integer, default=0, nullable=True)  # عدد الأصناف
+    dispense_source          = Column(String(50), nullable=True)           # الصيدلية / المخزن
+    image_file_ids           = Column(Text, nullable=True)
+    image_count              = Column(Integer, default=0, nullable=True)
+    notes                    = Column(Text, nullable=True)
+    specialist_name          = Column(String(255), nullable=True)
+    created_by               = Column(Integer, nullable=True, index=True)
+    created_at               = Column(DateTime, default=datetime.utcnow, index=True, nullable=True)
+    updated_at               = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
+
+
+# ================================================
 # Healthcare — Other / Miscellaneous Records
 # ================================================
 
@@ -680,6 +703,7 @@ __all__ = [
     'WoundRecord',
     'MedicalFollowupRecord',
     'MedicationRecord',
+    'SuppliesRecord',
     'OtherHealthcareRecord',
     'UserModuleAccess',
     'desc'

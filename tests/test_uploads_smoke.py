@@ -191,13 +191,29 @@ def _session_dict(**overrides):
 
 
 def test_view_waiting():
-    text, kb = build_waiting(_session_dict())
+    """min_files=1 — waiting screen shows only cancel (no skip)."""
+    text, kb = build_waiting(_session_dict())   # min_files=1
     assert "ارفع صور الجرح" in text
     assert "الصور" in text
     kb_str = str(kb)
-    assert "إلغاء" in kb_str
     assert f"{CB}:cancel" in kb_str
-    print("build_waiting OK")
+    assert f"{CB}:confirm" not in kb_str   # no skip when required
+    print("build_waiting (required) OK")
+
+
+def test_view_waiting_optional_shows_skip():
+    """min_files=0 — waiting screen must show ⏭️ تخطي mapped to upl:confirm."""
+    text, kb = build_waiting(_session_dict(min_files=0))
+    assert "ارفع صور الجرح" in text
+    kb_str = str(kb)
+    assert f"{CB}:confirm" in kb_str   # skip button present
+    assert f"{CB}:cancel"  in kb_str   # cancel still present
+    # verify button label contains تخطي
+    all_labels = [btn.text for row in kb.inline_keyboard for btn in row]
+    assert any("تخطي" in lbl for lbl in all_labels), (
+        f"Expected a 'تخطي' button, got: {all_labels}"
+    )
+    print("build_waiting (optional/skip) OK")
 
 
 def test_view_collecting():
@@ -296,6 +312,7 @@ if __name__ == "__main__":
     test_validation_too_large()
     test_validation_blocked()
     test_view_waiting()
+    test_view_waiting_optional_shows_skip()
     test_view_collecting()
     test_view_min_warning()
     test_view_session_lost()

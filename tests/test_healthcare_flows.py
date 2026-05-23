@@ -49,9 +49,10 @@ def test_db_wound_record_has_specialist_name():
 
 
 def test_db_new_tables_exist():
-    from db.models import MedicalFollowupRecord, MedicationRecord, OtherHealthcareRecord
+    from db.models import MedicalFollowupRecord, MedicationRecord, SuppliesRecord, OtherHealthcareRecord
     assert MedicalFollowupRecord.__tablename__ == "medical_followup_records"
     assert MedicationRecord.__tablename__      == "medication_records"
+    assert SuppliesRecord.__tablename__        == "supplies_records"
     assert OtherHealthcareRecord.__tablename__ == "other_healthcare_records"
     print("new healthcare tables OK")
 
@@ -67,8 +68,9 @@ def test_healthcare_menu_has_four_items():
     assert "hc:woundcare"    in buttons
     assert "hc:followup"     in buttons
     assert "hc:medications"  in buttons
+    assert "hc:supplies"     in buttons
     assert "hc:other"        in buttons
-    print(f"healthcare menu 4-item OK  button count={len(buttons)}")
+    print(f"healthcare menu 5-item OK  button count={len(buttons)}")
 
 
 def test_format_arabic_date():
@@ -771,9 +773,9 @@ def test_followup_review_procedure_type_section():
     s.specialist_name           = "د. فضل"
     s.images                    = []
     text, kb = build_review(s)
-    assert "📋 *نوع الإجراء:*"  in text
-    assert "• معاينة وصرف دواء" in text
-    assert "• حالة طارئة"       in text
+    assert "📋 *نوع الإجراء:*"   in text
+    assert "معاينة وصرف دواء"    in text   # inline (comma-separated), no bullet
+    assert "حالة طارئة"          in text
     print("review procedure_type section with new labels OK")
 
 
@@ -929,8 +931,8 @@ def test_followup_review_complaint_section_header():
     assert "😷 *الشكوى الرئيسية / الأعراض:*" in text, (
         "Review must contain '😷 *الشكوى الرئيسية / الأعراض:*'"
     )
-    assert "• حمى وقشعريرة"       in text
-    assert "• صداع وألم في الرأس" in text
+    assert "حمى وقشعريرة"         in text   # inline (comma-separated), no bullet
+    assert "صداع وألم في الرأس"   in text
     print("review complaint section header OK")
 
 
@@ -955,10 +957,10 @@ def test_followup_review_complaint_bullet_list():
     s.meds_supply_labels        = []
     s.specialist_name           = "د. سرور"
     text, kb = build_review(s)
-    assert "• ألم في الظهر"     in text
-    assert "• ألم في المفاصل"   in text
-    assert "• دوخة ودوار"       in text
-    print("review complaint bullet list OK")
+    assert "ألم في الظهر"       in text   # inline (comma-separated), no bullet
+    assert "ألم في المفاصل"     in text
+    assert "دوخة ودوار"         in text
+    print("review complaint inline list OK")
 
 
 def test_followup_complaint_other_label_replaced():
@@ -1266,8 +1268,8 @@ def test_followup_meds_no_selection_shows_dash():
     s.specialist_name           = "د. فضل"
     text, kb = build_review(s)
     assert "💊 *الأدوية والمستلزمات الطبية:*" in text
-    assert "  —" in text   # empty list renders as dash
-    print("review meds empty shows dash OK")
+    assert "➖ غير مضاف" in text   # empty optional field shows this marker
+    print("review meds empty shows غير مضاف OK")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1375,6 +1377,162 @@ def test_medication_db_save():
     assert saved.item_count == 3
     assert saved.specialist_name == "سرور"
     print(f"medication DB save OK  id={saved.record_id}")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# H2. Medication — جهة الصرف (dispense source) step
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_medication_step_dispense_source_constant():
+    """STEP_DISPENSE_SOURCE constant must exist with correct value."""
+    from modules.healthcare.medications.session import STEP_DISPENSE_SOURCE
+    assert STEP_DISPENSE_SOURCE == "dispense_source"
+    print("STEP_DISPENSE_SOURCE OK")
+
+
+def test_medication_session_dispense_source_defaults_empty():
+    """Fresh session starts with dispense_source=''."""
+    from modules.healthcare.medications.session import MedicationSession
+    ud = {}
+    s = MedicationSession.create(ud)
+    assert s.dispense_source == ""
+    print("dispense_source defaults empty OK")
+
+
+def test_medication_session_dispense_source_persistence():
+    """dispense_source survives save→load round-trip for both options."""
+    from modules.healthcare.medications.session import MedicationSession
+    for label in ("الصيدلية", "المخزن"):
+        ud = {}
+        s = MedicationSession.create(ud)
+        s.dispense_source = label
+        s.save(ud)
+        loaded = MedicationSession.load(ud)
+        assert loaded.dispense_source == label, (
+            f"Expected {label!r}, got {loaded.dispense_source!r}"
+        )
+    print("dispense_source persistence OK (both options)")
+
+
+def test_medication_dispense_source_constants():
+    """DISPENSE_SOURCE_MAP contains exactly الصيدلية and المخزن."""
+    from modules.healthcare.medications.constants import (
+        DISPENSE_SOURCE_MAP, DISPENSE_SOURCE_PHARMACY, DISPENSE_SOURCE_WAREHOUSE,
+    )
+    assert DISPENSE_SOURCE_PHARMACY  == "disp_pharmacy"
+    assert DISPENSE_SOURCE_WAREHOUSE == "disp_warehouse"
+    assert DISPENSE_SOURCE_MAP["disp_pharmacy"]  == "الصيدلية"
+    assert DISPENSE_SOURCE_MAP["disp_warehouse"] == "المخزن"
+    assert len(DISPENSE_SOURCE_MAP) == 2
+    print("DISPENSE_SOURCE_MAP constants OK")
+
+
+def test_medication_dispense_source_prompt_view():
+    """build_dispense_source_prompt shows patient name and both selection buttons."""
+    from modules.healthcare.medications.session import MedicationSession
+    from modules.healthcare.medications.views import build_dispense_source_prompt
+    ud = {}
+    s = MedicationSession.create(ud)
+    s.patient_name              = "محمد أحمد"
+    s.medical_department_ids    = ["cardio"]
+    s.medical_department_labels = ["القلب"]
+    s.item_count                = 4
+    text, kb = build_dispense_source_prompt(s)
+    assert "محمد أحمد"  in text
+    assert "جهة الصرف"  in text
+    assert "4"           in text
+    cbs = [btn.callback_data for row in kb.inline_keyboard for btn in row]
+    assert "hcmed:disp_pharmacy"  in cbs
+    assert "hcmed:disp_warehouse" in cbs
+    assert "hcmed:back"           in cbs
+    assert "hcmed:cancel"         in cbs
+    print("build_dispense_source_prompt view OK")
+
+
+def test_medication_notes_prompt_shows_dispense_source():
+    """build_notes_prompt must include جهة الصرف in its context header."""
+    from modules.healthcare.medications.session import MedicationSession
+    from modules.healthcare.medications.views import build_notes_prompt
+    ud = {}
+    s = MedicationSession.create(ud)
+    s.patient_name              = "سارة"
+    s.medical_department_labels = ["الطب العام"]
+    s.item_count                = 2
+    s.dispense_source           = "المخزن"
+    text, kb = build_notes_prompt(s)
+    assert "المخزن"      in text
+    assert "جهة الصرف"   in text
+    print("notes_prompt shows dispense_source OK")
+
+
+def test_medication_review_shows_dispense_source_pharmacy():
+    """build_review shows 🏪 جهة الصرف: الصيدلية."""
+    from modules.healthcare.medications.session import MedicationSession
+    from modules.healthcare.medications.views import build_review
+    ud = {}
+    s = MedicationSession.create(ud)
+    s.patient_name              = "خالد"
+    s.medical_department_ids    = ["ortho"]
+    s.medical_department_labels = ["العظام"]
+    s.item_count                = 3
+    s.dispense_source           = "الصيدلية"
+    s.specialist_name           = "د. فضل"
+    text, kb = build_review(s)
+    assert "الصيدلية"   in text
+    assert "جهة الصرف"  in text
+    print("review shows dispense_source=الصيدلية OK")
+
+
+def test_medication_review_shows_dispense_source_warehouse():
+    """build_review shows 🏪 جهة الصرف: المخزن."""
+    from modules.healthcare.medications.session import MedicationSession
+    from modules.healthcare.medications.views import build_review
+    ud = {}
+    s = MedicationSession.create(ud)
+    s.patient_name              = "فاطمة"
+    s.medical_department_ids    = ["gen_med"]
+    s.medical_department_labels = ["الطب العام"]
+    s.item_count                = 1
+    s.dispense_source           = "المخزن"
+    s.specialist_name           = "د. سرور"
+    text, kb = build_review(s)
+    assert "المخزن"     in text
+    assert "جهة الصرف"  in text
+    print("review shows dispense_source=المخزن OK")
+
+
+def test_medication_db_save_with_dispense_source():
+    """save_medication_record accepts and returns dispense_source correctly."""
+    from modules.healthcare.medications.models import save_medication_record
+    for src in ("الصيدلية", "المخزن"):
+        saved = save_medication_record(
+            patient_id=None, patient_name=f"اختبار {src}",
+            medical_department_ids=["gen_med"],
+            medical_department_labels=["الطب العام"],
+            item_count=2,
+            dispense_source=src,
+            images=[], notes="", specialist_name="فضل",
+            created_by=None,
+        )
+        assert saved.record_id > 0
+        assert saved.dispense_source == src
+    print("medication DB save with dispense_source OK")
+
+
+def test_medication_db_save_dispense_source_defaults():
+    """save_medication_record works when dispense_source is omitted (defaults to '')."""
+    from modules.healthcare.medications.models import save_medication_record
+    saved = save_medication_record(
+        patient_id=None, patient_name="اختبار بدون مصدر",
+        medical_department_ids=["cardio"],
+        medical_department_labels=["القلب"],
+        item_count=1,
+        images=[], notes="", specialist_name="زكريا",
+        created_by=None,
+    )
+    assert saved.record_id > 0
+    assert saved.dispense_source == ""
+    print("medication DB save dispense_source default='' OK")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1633,6 +1791,390 @@ def test_shared_translator_hierarchy_structure():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# M. Interactive Review Editor — المتابعة الطبية
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_review_editor_edit_from_review_default_false():
+    """Fresh session has edit_from_review=False."""
+    from modules.healthcare.medical_followup.session import MedicalFollowupSession
+    ud = {}
+    s = MedicalFollowupSession.create(ud)
+    assert s.edit_from_review is False, "edit_from_review must default to False"
+    print("edit_from_review default False OK")
+
+
+def test_review_editor_edit_from_review_persistence():
+    """edit_from_review=True survives save→load round-trip."""
+    from modules.healthcare.medical_followup.session import MedicalFollowupSession
+    ud = {}
+    s = MedicalFollowupSession.create(ud)
+    s.edit_from_review = True
+    s.save(ud)
+    s2 = MedicalFollowupSession.load(ud)
+    assert s2 is not None
+    assert s2.edit_from_review is True, "edit_from_review=True must persist"
+    print("edit_from_review persistence OK")
+
+
+def test_review_editor_routes_table_complete():
+    """REVIEW_EDIT_ROUTES maps all 8 edit actions to their correct steps."""
+    from modules.healthcare.medical_followup.review_handlers import REVIEW_EDIT_ROUTES
+    from modules.healthcare.medical_followup.session import (
+        STEP_DEPARTMENT, STEP_PROC_TYPE, STEP_COMPLAINT, STEP_VITALS_TEMP,
+        STEP_MEDS_SUPPLY, STEP_IMAGES, STEP_NOTES, STEP_SPECIALIST,
+    )
+    expected = {
+        "edit_dept":       STEP_DEPARTMENT,
+        "edit_proc":       STEP_PROC_TYPE,
+        "edit_complaint":  STEP_COMPLAINT,
+        "edit_vitals":     STEP_VITALS_TEMP,
+        "edit_meds":       STEP_MEDS_SUPPLY,
+        "edit_images":     STEP_IMAGES,
+        "edit_notes":      STEP_NOTES,
+        "edit_specialist": STEP_SPECIALIST,
+    }
+    assert REVIEW_EDIT_ROUTES == expected, (
+        f"REVIEW_EDIT_ROUTES mismatch:\n  got:      {REVIEW_EDIT_ROUTES}\n  expected: {expected}"
+    )
+    print("REVIEW_EDIT_ROUTES table complete OK")
+
+
+def test_review_editor_build_review_has_all_edit_buttons():
+    """build_review keyboard must contain all 8 edit_* action buttons."""
+    from modules.healthcare.medical_followup.session import MedicalFollowupSession
+    from modules.healthcare.medical_followup.views import build_review
+    from modules.healthcare.medical_followup.review_handlers import REVIEW_EDIT_ROUTES
+    ud = {}
+    s = MedicalFollowupSession.create(ud)
+    s.patient_name              = "اختبار"
+    s.medical_department_labels = ["الطب العام"]
+    s.procedure_type_labels     = ["معاينة وصرف دواء"]
+    s.complaint_labels          = ["ألم"]
+    s.vitals_temp               = "37.0"
+    s.vitals_bp                 = "120/80"
+    s.vitals_pulse              = "72"
+    s.vitals_spo2               = "98%"
+    s.meds_supply_labels        = []
+    s.specialist_name           = "د. فضل"
+    _, kb = build_review(s)
+    buttons = [btn.callback_data for row in kb.inline_keyboard for btn in row]
+    for action in REVIEW_EDIT_ROUTES:
+        assert f"hcfu:{action}" in buttons, (
+            f"Missing edit button: hcfu:{action}"
+        )
+    assert "hcfu:confirm" in buttons, "confirm button missing"
+    assert "hcfu:cancel"  in buttons, "cancel button missing"
+    print("build_review has all 8 edit buttons OK")
+
+
+def test_review_editor_empty_optional_fields_show_marker():
+    """build_review shows '➖ غير مضاف' for empty images and notes."""
+    from modules.healthcare.medical_followup.session import MedicalFollowupSession
+    from modules.healthcare.medical_followup.views import build_review
+    ud = {}
+    s = MedicalFollowupSession.create(ud)
+    s.patient_name              = "اختبار"
+    s.medical_department_labels = ["الطب العام"]
+    s.procedure_type_labels     = ["معاينة وصرف دواء"]
+    s.complaint_labels          = ["ألم"]
+    s.vitals_temp               = "37.0"
+    s.vitals_bp                 = "120/80"
+    s.vitals_pulse              = "72"
+    s.vitals_spo2               = "98%"
+    s.meds_supply_labels        = []
+    s.images                    = []          # empty optional
+    s.notes                     = ""          # empty optional
+    s.specialist_name           = "د. فضل"
+    text, _ = build_review(s)
+    assert "➖ غير مضاف" in text, (
+        "Empty optional field (images/notes/meds) must show '➖ غير مضاف'"
+    )
+    # Specifically: images, notes, and meds sections all empty → 3 markers
+    marker_count = text.count("➖ غير مضاف")
+    assert marker_count >= 3, (
+        f"Expected ≥3 '➖ غير مضاف' markers for empty images+notes+meds, got {marker_count}"
+    )
+    print(f"empty optional fields show marker OK  (markers={marker_count})")
+
+
+def test_review_editor_filled_optional_fields_no_marker():
+    """build_review does NOT show '➖ غير مضاف' when images and notes are filled."""
+    from modules.healthcare.medical_followup.session import MedicalFollowupSession
+    from modules.healthcare.medical_followup.views import build_review
+    from shared.uploads._models import UploadedFile
+    ud = {}
+    s = MedicalFollowupSession.create(ud)
+    s.patient_name              = "اختبار"
+    s.medical_department_labels = ["الطب العام"]
+    s.procedure_type_labels     = ["معاينة وصرف دواء"]
+    s.complaint_labels          = ["ألم"]
+    s.vitals_temp               = "37.0"
+    s.vitals_bp                 = "120/80"
+    s.vitals_pulse              = "72"
+    s.vitals_spo2               = "98%"
+    s.meds_supply_labels        = ["Paracetamol 1g infusion"]   # filled
+    s.images                    = [
+        UploadedFile("fid1", "uid1", "image/jpeg", 100_000).to_dict(),
+    ]
+    s.notes                     = "ملاحظة عيادية"
+    s.specialist_name           = "د. سرور"
+    text, _ = build_review(s)
+    assert "➖ غير مضاف" not in text, (
+        "Filled fields must not show '➖ غير مضاف'"
+    )
+    assert "ملاحظة عيادية" in text
+    assert "Paracetamol 1g infusion" in text
+    print("filled optional fields show values, no marker OK")
+
+
+def test_review_editor_review_shows_images_and_notes_always():
+    """build_review always renders image and notes sections — even when empty."""
+    from modules.healthcare.medical_followup.session import MedicalFollowupSession
+    from modules.healthcare.medical_followup.views import build_review
+    ud = {}
+    s = MedicalFollowupSession.create(ud)
+    s.patient_name              = "اختبار"
+    s.medical_department_labels = ["الطب العام"]
+    s.procedure_type_labels     = ["معاينة وصرف دواء"]
+    s.complaint_labels          = ["ألم"]
+    s.vitals_temp               = "37.0"
+    s.vitals_bp                 = "120/80"
+    s.vitals_pulse              = "72"
+    s.vitals_spo2               = "98%"
+    s.meds_supply_labels        = []
+    s.images                    = []
+    s.notes                     = ""
+    s.specialist_name           = "د. فضل"
+    text, _ = build_review(s)
+    assert "📎 *الصور:*"      in text, "images section must always be rendered"
+    assert "📝 *الملاحظات:*"  in text, "notes section must always be rendered"
+    print("review always renders images and notes sections OK")
+
+
+def test_review_editor_session_flag_resets_on_specialist():
+    """After specialist is chosen, edit_from_review is reset to False."""
+    from modules.healthcare.medical_followup.session import MedicalFollowupSession
+    from modules.healthcare.medical_followup.session import STEP_REVIEW
+    ud = {}
+    s = MedicalFollowupSession.create(ud)
+    s.edit_from_review  = True
+    s.specialist_name   = ""
+    s.patient_name      = "اختبار"
+    # Simulate what _handle_specialist_choice does
+    s.specialist_name  = "د. فضل"
+    s.edit_from_review = False
+    s.step             = STEP_REVIEW
+    s.save(ud)
+    loaded = MedicalFollowupSession.load(ud)
+    assert loaded.edit_from_review is False, (
+        "edit_from_review must be False after specialist choice lands on review"
+    )
+    assert loaded.step == STEP_REVIEW
+    print("edit_from_review resets on specialist choice OK")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# N. Medical Supplies module (🏥 المستلزمات الطبية)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_supplies_db_table_exists():
+    """SuppliesRecord must be mapped to 'supplies_records' table."""
+    from db.models import SuppliesRecord
+    assert SuppliesRecord.__tablename__ == "supplies_records"
+    cols = {c.name for c in SuppliesRecord.__table__.columns}
+    for required in ("id", "patient_id", "patient_name", "item_count",
+                     "dispense_source", "image_count", "notes", "specialist_name"):
+        assert required in cols, f"SuppliesRecord missing column: {required}"
+    print("SuppliesRecord table OK")
+
+
+def test_supplies_session_lifecycle():
+    """SuppliesSession create → save → load → clear round-trip."""
+    from modules.healthcare.supplies.session import SuppliesSession, STEP_DATE
+    ud = {}
+    s = SuppliesSession.create(ud)
+    assert s.step         == STEP_DATE
+    assert s.patient_name == ""
+    assert s.item_count   == 0
+    assert "_hcsup_add"   in ud
+
+    s.patient_name = "ابراهيم سعيد"
+    s.item_count   = 5
+    s.dispense_source = "الصيدلية"
+    s.save(ud)
+
+    s2 = SuppliesSession.load(ud)
+    assert s2 is not None
+    assert s2.patient_name    == "ابراهيم سعيد"
+    assert s2.item_count      == 5
+    assert s2.dispense_source == "الصيدلية"
+
+    SuppliesSession.clear(ud)
+    assert SuppliesSession.load(ud) is None
+    print("SuppliesSession lifecycle OK")
+
+
+def test_supplies_session_key_unique():
+    """SuppliesSession and MedicationSession must use different user_data keys."""
+    from modules.healthcare.supplies.session import SuppliesSession
+    from modules.healthcare.medications.session import MedicationSession
+    ud = {}
+    SuppliesSession.create(ud)
+    MedicationSession.create(ud)
+    assert "_hcsup_add" in ud,  "supplies key missing"
+    assert "_hcmed_add" in ud,  "medications key missing"
+    assert "_hcsup_add" != "_hcmed_add", "session keys must differ"
+    # Clearing one does not affect the other
+    SuppliesSession.clear(ud)
+    assert SuppliesSession.load(ud)  is None
+    assert MedicationSession.load(ud) is not None
+    print("session keys isolated OK")
+
+
+def test_supplies_constants_reuse_medications():
+    """Supplies constants re-export the same values as medications constants."""
+    from modules.healthcare.supplies.constants import (
+        SP_MAP, DEPT_OTHER_ID, DISPENSE_SOURCE_MAP,
+        DISPENSE_SOURCE_PHARMACY, DISPENSE_SOURCE_WAREHOUSE,
+    )
+    from modules.healthcare.medications.constants import (
+        SP_MAP as MED_SP_MAP, DEPT_OTHER_ID as MED_DEPT_OTHER_ID,
+        DISPENSE_SOURCE_MAP as MED_DSM,
+    )
+    assert SP_MAP            == MED_SP_MAP
+    assert DEPT_OTHER_ID     == MED_DEPT_OTHER_ID
+    assert DISPENSE_SOURCE_MAP == MED_DSM
+    assert DISPENSE_SOURCE_PHARMACY  == "disp_pharmacy"
+    assert DISPENSE_SOURCE_WAREHOUSE == "disp_warehouse"
+    print("supplies constants reuse OK")
+
+
+def test_supplies_menu_view():
+    """build_supplies_menu has start button and back-to-main button."""
+    from modules.healthcare.supplies.views import build_supplies_menu
+    text, kb = build_supplies_menu()
+    assert "المستلزمات الطبية" in text
+    buttons = [btn.callback_data for row in kb.inline_keyboard for btn in row]
+    assert "hcsup:start" in buttons
+    assert "hc:main"     in buttons
+    print("build_supplies_menu OK")
+
+
+def test_supplies_count_prompt_view():
+    """build_count_prompt renders patient name and dept, has back/cancel."""
+    from modules.healthcare.supplies.session import SuppliesSession
+    from modules.healthcare.supplies.views import build_count_prompt
+    ud = {}
+    s = SuppliesSession.create(ud)
+    s.patient_name              = "محمد حسين"
+    s.medical_department_labels = ["العظام"]
+    text, kb = build_count_prompt(s)
+    assert "محمد حسين" in text
+    assert "العظام"    in text
+    assert "عدد الأصناف" in text
+    kb_str = str(kb)
+    assert "back"   in kb_str
+    assert "cancel" in kb_str
+    print("build_count_prompt supplies OK")
+
+
+def test_supplies_dispense_source_prompt_view():
+    """build_dispense_source_prompt has الصيدلية and المخزن buttons."""
+    from modules.healthcare.supplies.session import SuppliesSession
+    from modules.healthcare.supplies.views import build_dispense_source_prompt
+    ud = {}
+    s = SuppliesSession.create(ud)
+    s.patient_name              = "خالد محمد"
+    s.medical_department_labels = ["الطب العام"]
+    s.item_count                = 3
+    text, kb = build_dispense_source_prompt(s)
+    assert "جهة الصرف" in text
+    buttons = [btn.callback_data for row in kb.inline_keyboard for btn in row]
+    assert "hcsup:disp_pharmacy"  in buttons
+    assert "hcsup:disp_warehouse" in buttons
+    assert "hcsup:back"           in buttons
+    assert "hcsup:cancel"         in buttons
+    print("build_dispense_source_prompt supplies OK")
+
+
+def test_supplies_review_view():
+    """build_review renders all key fields and confirm/cancel buttons."""
+    from modules.healthcare.supplies.session import SuppliesSession
+    from modules.healthcare.supplies.views import build_review
+    ud = {}
+    s = SuppliesSession.create(ud)
+    s.patient_name              = "فاطمة أحمد"
+    s.medical_department_labels = ["الجراحة"]
+    s.item_count                = 7
+    s.dispense_source           = "المخزن"
+    s.notes                     = "ملاحظة المستلزمات"
+    s.specialist_name           = "د. سرور"
+    text, kb = build_review(s)
+    assert "فاطمة أحمد"            in text
+    assert "الجراحة"               in text
+    assert "7"                     in text
+    assert "المخزن"                in text
+    assert "ملاحظة المستلزمات"     in text
+    assert "د. سرور"               in text
+    assert "المستلزمات الطبية"     in text
+    buttons = [btn.callback_data for row in kb.inline_keyboard for btn in row]
+    assert "hcsup:confirm"         in buttons
+    assert "hcsup:cancel"          in buttons
+    assert "hcsup:edit_notes"      in buttons
+    assert "hcsup:edit_specialist" in buttons
+    print("build_review supplies OK")
+
+
+def test_supplies_db_save():
+    """save_supplies_record persists to supplies_records table."""
+    from modules.healthcare.supplies.models import save_supplies_record
+    saved = save_supplies_record(
+        patient_id=                None,
+        patient_name=              "اختبار مستلزمات",
+        medical_department_ids=    ["gen_med"],
+        medical_department_labels= ["الطب العام"],
+        item_count=                4,
+        dispense_source=           "الصيدلية",
+        images=                    [],
+        notes=                     "اختبار",
+        specialist_name=           "د. فضل",
+        created_by=                None,
+    )
+    assert saved.record_id    > 0
+    assert saved.patient_name == "اختبار مستلزمات"
+    assert saved.item_count   == 4
+    assert saved.dispense_source == "الصيدلية"
+    assert saved.image_count  == 0
+    print(f"supplies DB save OK  id={saved.record_id}")
+
+
+def test_supplies_db_save_persisted():
+    """Record written by save_supplies_record is queryable from the DB."""
+    from modules.healthcare.supplies.models import save_supplies_record
+    from db.session import get_db
+    from db.models import SuppliesRecord
+    saved = save_supplies_record(
+        patient_id=                None,
+        patient_name=              "تحقق من الحفظ",
+        medical_department_ids=    ["ortho"],
+        medical_department_labels= ["العظام"],
+        item_count=                2,
+        dispense_source=           "المخزن",
+        images=                    [],
+        notes=                     "",
+        specialist_name=           "د. زكريا",
+        created_by=                None,
+    )
+    with get_db() as db:
+        rec = db.query(SuppliesRecord).filter(SuppliesRecord.id == saved.record_id).first()
+        assert rec is not None, "record not found in DB"
+        assert rec.patient_name    == "تحقق من الحفظ"
+        assert rec.item_count      == 2
+        assert rec.dispense_source == "المخزن"
+    print(f"supplies DB persistence OK  id={saved.record_id}")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # L. Bootstrap wipe keys include all healthcare sessions
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -1644,6 +2186,7 @@ def test_bootstrap_healthcare_wipe_keys():
     assert "_wc_add"    in wipe, "woundcare session key missing from wipe set"
     assert "_hcfu_add"  in wipe, "followup session key missing from wipe set"
     assert "_hcmed_add" in wipe, "medications session key missing from wipe set"
+    assert "_hcsup_add" in wipe, "supplies session key missing from wipe set"
     assert "_hcoth_add" in wipe, "other session key missing from wipe set"
     print(f"bootstrap wipe keys OK: {wipe}")
 
@@ -1734,6 +2277,17 @@ if __name__ == "__main__":
     test_medication_session_lifecycle()
     test_medication_session_dept_persistence()
     test_medication_db_save()
+    # H2. جهة الصرف (dispense source)
+    test_medication_step_dispense_source_constant()
+    test_medication_session_dispense_source_defaults_empty()
+    test_medication_session_dispense_source_persistence()
+    test_medication_dispense_source_constants()
+    test_medication_dispense_source_prompt_view()
+    test_medication_notes_prompt_shows_dispense_source()
+    test_medication_review_shows_dispense_source_pharmacy()
+    test_medication_review_shows_dispense_source_warehouse()
+    test_medication_db_save_with_dispense_source()
+    test_medication_db_save_dispense_source_defaults()
     test_other_session_lifecycle()
     test_other_db_save()
     test_report_publisher_build_text()
@@ -1747,4 +2301,24 @@ if __name__ == "__main__":
     test_all_healthcare_flows_share_same_departments()
     test_shared_translator_hierarchy_structure()
     test_bootstrap_healthcare_wipe_keys()
+    # N. Medical Supplies module
+    test_supplies_db_table_exists()
+    test_supplies_session_lifecycle()
+    test_supplies_session_key_unique()
+    test_supplies_constants_reuse_medications()
+    test_supplies_menu_view()
+    test_supplies_count_prompt_view()
+    test_supplies_dispense_source_prompt_view()
+    test_supplies_review_view()
+    test_supplies_db_save()
+    test_supplies_db_save_persisted()
+    # M. Interactive Review Editor
+    test_review_editor_edit_from_review_default_false()
+    test_review_editor_edit_from_review_persistence()
+    test_review_editor_routes_table_complete()
+    test_review_editor_build_review_has_all_edit_buttons()
+    test_review_editor_empty_optional_fields_show_marker()
+    test_review_editor_filled_optional_fields_no_marker()
+    test_review_editor_review_shows_images_and_notes_always()
+    test_review_editor_session_flag_resets_on_specialist()
     print("\nALL HEALTHCARE TESTS PASSED")

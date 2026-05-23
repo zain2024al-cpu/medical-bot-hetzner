@@ -839,6 +839,14 @@ async def _handle_hc_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         except Exception:
             await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
+    elif action == "supplies":
+        from modules.healthcare.supplies.views import build_supplies_menu
+        text, kb = build_supplies_menu()
+        try:
+            await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
+        except Exception:
+            await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+
     elif action == "other":
         from modules.healthcare.other.views import build_other_menu
         text, kb = build_other_menu()

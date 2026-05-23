@@ -295,15 +295,23 @@ def build_specialist_prompt(session: MedicalFollowupSession) -> tuple[str, Inlin
     return "\n".join(lines), kb
 
 
-# ── Step 11a: مراجعة نهائية ───────────────────────────────────────────────────
+# ── Step 11a: مراجعة نهائية — Interactive Editor ──────────────────────────────
 
 def build_review(session: MedicalFollowupSession) -> tuple[str, InlineKeyboardMarkup]:
-    """Full review summary before final save — all workflow fields."""
+    """
+    Interactive review editor — all fields shown with per-section edit buttons.
+    Empty optional fields (images, notes) show '➖ غير مضاف' instead of being hidden.
+    """
+    _NONE = "➖ غير مضاف"
+
     date_str    = format_arabic_datetime(session.created_at)
-    dept_list   = "\n".join(f"  • {lbl}" for lbl in session.medical_department_labels) or "  —"
-    proc_list   = "\n".join(f"  • {lbl}" for lbl in session.procedure_type_labels)     or "  —"
-    cmp_list    = "\n".join(f"  • {lbl}" for lbl in session.complaint_labels)          or "  —"
-    supply_list = "\n".join(f"  • {lbl}" for lbl in session.meds_supply_labels)        or "  —"
+    dept_text   = "، ".join(session.medical_department_labels)  or "—"
+    proc_text   = "، ".join(session.procedure_type_labels)      or "—"
+    cmp_text    = "، ".join(session.complaint_labels)           or "—"
+    supply_list = "\n".join(f"  • {lbl}" for lbl in session.meds_supply_labels) or _NONE
+    img_text    = format_image_count(session.image_count) if session.image_count else _NONE
+    notes_text  = session.notes                           if session.notes        else _NONE
+    spec_text   = session.specialist_name                 if session.specialist_name else "—"
 
     lines = [
         "📋 *مراجعة تقرير المتابعة الطبية*",
@@ -311,14 +319,11 @@ def build_review(session: MedicalFollowupSession) -> tuple[str, InlineKeyboardMa
         f"📅 *التاريخ:*  {date_str}",
         f"👤 *المريض:*  {session.patient_name}",
         "",
-        "🏥 *القسم الطبي:*",
-        dept_list,
+        f"🏥 *القسم الطبي:*  {dept_text}",
         "",
-        "📋 *نوع الإجراء:*",
-        proc_list,
+        f"📋 *نوع الإجراء:*  {proc_text}",
         "",
-        "😷 *الشكوى الرئيسية / الأعراض:*",
-        cmp_list,
+        f"😷 *الشكوى الرئيسية / الأعراض:*  {cmp_text}",
         "",
         "❤️ *العلامات الحيوية:*",
         f"  🌡️ الحرارة: {session.vitals_temp or '—'}",
@@ -328,27 +333,37 @@ def build_review(session: MedicalFollowupSession) -> tuple[str, InlineKeyboardMa
         "",
         "💊 *الأدوية والمستلزمات الطبية:*",
         supply_list,
+        "",
+        f"📎 *الصور:*  {img_text}",
+        "",
+        f"📝 *الملاحظات:*  {notes_text}",
+        "",
+        f"👨‍⚕️ *المختص الصحي:*  {spec_text}",
+        "",
+        _THIN,
+        "هل تريد نشر هذا التقرير؟",
     ]
-
-    if session.image_count:
-        lines += ["", f"📎 *الصور:*  {format_image_count(session.image_count)}"]
-
-    if session.notes:
-        lines += ["", "📝 *الملاحظات:*", session.notes]
-
-    if session.specialist_name:
-        lines += ["", f"👨‍⚕️ *المختص الصحي:*  {session.specialist_name}"]
-
-    lines += ["", "هل تريد نشر هذا التقرير؟"]
 
     kb = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("📢 نشر التقرير",     callback_data=f"{HCFU}:confirm"),
-            InlineKeyboardButton("❌ إلغاء",            callback_data=f"{HCFU}:cancel"),
+            InlineKeyboardButton("📢 نشر التقرير", callback_data=f"{HCFU}:confirm"),
+            InlineKeyboardButton("❌ إلغاء",         callback_data=f"{HCFU}:cancel"),
         ],
         [
-            InlineKeyboardButton("✏️ تعديل الملاحظات", callback_data=f"{HCFU}:edit_notes"),
-            InlineKeyboardButton("👨‍⚕️ تعديل الصحي",   callback_data=f"{HCFU}:edit_specialist"),
+            InlineKeyboardButton("✏️ القسم الطبي",   callback_data=f"{HCFU}:edit_dept"),
+            InlineKeyboardButton("✏️ نوع الإجراء",  callback_data=f"{HCFU}:edit_proc"),
+        ],
+        [
+            InlineKeyboardButton("✏️ الشكوى / الأعراض",  callback_data=f"{HCFU}:edit_complaint"),
+            InlineKeyboardButton("✏️ العلامات الحيوية",   callback_data=f"{HCFU}:edit_vitals"),
+        ],
+        [
+            InlineKeyboardButton("✏️ الأدوية / المستلزمات", callback_data=f"{HCFU}:edit_meds"),
+            InlineKeyboardButton("✏️ الصور",                  callback_data=f"{HCFU}:edit_images"),
+        ],
+        [
+            InlineKeyboardButton("✏️ الملاحظات",      callback_data=f"{HCFU}:edit_notes"),
+            InlineKeyboardButton("✏️ المختص الصحي",  callback_data=f"{HCFU}:edit_specialist"),
         ],
     ])
     return "\n".join(lines), kb

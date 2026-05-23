@@ -116,6 +116,7 @@ def build_healthcare_menu() -> tuple[str, InlineKeyboardMarkup]:
         [InlineKeyboardButton("🩺 المجارحة والعناية بالجرح",          callback_data=f"{HC}:woundcare")],
         [InlineKeyboardButton("📋 المتابعة الطبية والإجراءات العلاجية", callback_data=f"{HC}:followup")],
         [InlineKeyboardButton("💊 صرف الأدوية",                       callback_data=f"{HC}:medications")],
+        [InlineKeyboardButton("🏥 المستلزمات الطبية",                  callback_data=f"{HC}:supplies")],
         [InlineKeyboardButton("📝 إجراءات صحية أخرى",                  callback_data=f"{HC}:other")],
     ])
     return text, kb

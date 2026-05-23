@@ -38,7 +38,17 @@ def build_waiting(session_dict: dict) -> tuple[str, InlineKeyboardMarkup]:
     ]
     text = "\n".join(lines)
 
-    rows = [[InlineKeyboardButton("❌ إلغاء", callback_data=f"{CB}:cancel")]]
+    # When min_files=0 the step is optional — show a skip button so the user
+    # can proceed without uploading anything.
+    if min_f == 0:
+        rows = [
+            [
+                InlineKeyboardButton("⏭️ تخطي",  callback_data=f"{CB}:confirm"),
+                InlineKeyboardButton("❌ إلغاء", callback_data=f"{CB}:cancel"),
+            ]
+        ]
+    else:
+        rows = [[InlineKeyboardButton("❌ إلغاء", callback_data=f"{CB}:cancel")]]
     return text, InlineKeyboardMarkup(rows)
 
 

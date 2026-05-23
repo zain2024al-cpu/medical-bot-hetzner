@@ -1,4 +1,4 @@
-# modules/healthcare/medications/models.py
+# modules/healthcare/supplies/models.py
 
 import json
 import logging
@@ -8,36 +8,36 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class SavedMedicationRecord:
+class SavedSuppliesRecord:
     record_id:         int
     patient_name:      str
-    department_labels: list[str]   # medical specialty labels
-    item_count:        int         # عدد الأصناف
-    dispense_source:   str         # الصيدلية / المخزن
+    department_labels: list[str]
+    item_count:        int
+    dispense_source:   str
     image_count:       int
     specialist_name:   str
 
 
-def save_medication_record(
+def save_supplies_record(
     *,
-    patient_id:               int | None,
-    patient_name:             str,
-    medical_department_ids:   list[str],
+    patient_id:                int | None,
+    patient_name:              str,
+    medical_department_ids:    list[str],
     medical_department_labels: list[str],
-    item_count:               int,
-    dispense_source:          str = "",
-    images:                   list[dict],
-    notes:                    str,
-    specialist_name:          str,
-    created_by:               int | None,
-) -> SavedMedicationRecord:
+    item_count:                int,
+    dispense_source:           str = "",
+    images:                    list[dict],
+    notes:                     str,
+    specialist_name:           str,
+    created_by:                int | None,
+) -> SavedSuppliesRecord:
     from db.session import get_db
-    from db.models import MedicationRecord
+    from db.models import SuppliesRecord
 
     image_file_ids = [d.get("file_id", "") for d in images]
 
     with get_db() as db:
-        record = MedicationRecord(
+        record = SuppliesRecord(
             patient_id=               patient_id,
             patient_name=             patient_name,
             medical_departments_json= json.dumps(medical_department_labels, ensure_ascii=False),
@@ -54,13 +54,13 @@ def save_medication_record(
         record_id = record.id
 
     logger.info(
-        f"[medications] saved record id={record_id}"
+        f"[supplies] saved record id={record_id}"
         f"  patient={patient_name!r}"
         f"  depts={medical_department_labels}"
         f"  item_count={item_count}"
     )
 
-    return SavedMedicationRecord(
+    return SavedSuppliesRecord(
         record_id=         record_id,
         patient_name=      patient_name,
         department_labels= medical_department_labels,
