@@ -32,6 +32,96 @@ _RKEY_PATIENT    = "hc.other.patient"
 _RKEY_OPERATIONS = "hc.other.actions"
 _RKEY_IMAGES     = "hc.other.images"
 
+# ── Review edit routes ────────────────────────────────────────────────────────
+
+_REVIEW_EDIT_ROUTES: dict[str, str] = {
+    "edit_operations": STEP_OPERATIONS,
+    "edit_images":     STEP_IMAGES,
+    "edit_notes":      STEP_NOTES,
+    "edit_specialist": STEP_SPECIALIST,
+}
+
+
+# ── _go_to_review ─────────────────────────────────────────────────────────────
+
+async def _go_to_review(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    session = OtherHealthcareSession.load(context.user_data)
+    if session is None:
+        await _cancel(update, context); return
+    session.edit_from_review = False
+    session.step             = STEP_REVIEW
+    session.save(context.user_data)
+    text, kb = build_review(session)
+    query = update.callback_query
+    if query:
+        try:
+            await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown"); return
+        except Exception:
+            pass
+    await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+
+
+# ── _route_to_edit_step ───────────────────────────────────────────────────────
+
+async def _route_to_edit_step(
+    session: "OtherHealthcareSession",
+    step: str,
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+) -> None:
+    from modules.healthcare.other.constants import ACTION_OPTIONS
+    query = update.callback_query
+
+    async def _safe_edit(text, kb):
+        if query:
+            try:
+                await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown"); return
+            except Exception:
+                pass
+        await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+
+    if step == STEP_OPERATIONS:
+        await multiselect.open(
+            update, context,
+            title="اختر نوع الإجراء",
+            options=ACTION_OPTIONS,
+            return_to=_RKEY_OPERATIONS,
+            icon="📝", min_select=1,
+            preselected_ids=session.operation_ids,
+        )
+    elif step == STEP_IMAGES:
+        await uploads.open(
+            update, context,
+            title="ارفع صور / مستندات (اختياري)",
+            return_to=_RKEY_IMAGES,
+            icon="📎",
+            allowed_types=["photo", "image_document"],
+            min_files=0, max_files=10,
+        )
+    elif step == STEP_NOTES:
+        text, kb = build_notes_prompt(session)
+        await _safe_edit(text, kb)
+    elif step == STEP_SPECIALIST:
+        text, kb = build_specialist_prompt(session)
+        await _safe_edit(text, kb)
+
+
+# ── _open_edit_step ───────────────────────────────────────────────────────────
+
+async def _open_edit_step(
+    action: str, update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> None:
+    step = _REVIEW_EDIT_ROUTES.get(action)
+    if step is None:
+        return
+    session = OtherHealthcareSession.load(context.user_data)
+    if session is None:
+        await _cancel(update, context); return
+    session.edit_from_review = True
+    session.step             = step
+    session.save(context.user_data)
+    await _route_to_edit_step(session, step, update, context)
+
 
 async def _start_flow(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     OtherHealthcareSession.create(context.user_data)
@@ -139,13 +229,24 @@ async def _on_patient(result, update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def _on_operations(result, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if result is None or result.cancelled:
-        await _cancel(update, context); return
+        session = OtherHealthcareSession.load(context.user_data)
+        if session and session.edit_from_review:
+            await _go_to_review(update, context)
+        else:
+            await _cancel(update, context)
+        return
     session = OtherHealthcareSession.load(context.user_data)
     if session is None:
         await _cancel(update, context); return
     session.operation_ids    = result.ids
     session.operation_labels = result.labels
-    session.step             = STEP_IMAGES
+
+    if session.edit_from_review:
+        session.save(context.user_data)
+        await _go_to_review(update, context)
+        return
+
+    session.step = STEP_IMAGES
     session.save(context.user_data)
     await uploads.open(
         update, context,
@@ -160,12 +261,23 @@ async def _on_operations(result, update: Update, context: ContextTypes.DEFAULT_T
 
 async def _on_images(result, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if result is None or result.cancelled:
-        await _cancel(update, context); return
+        session = OtherHealthcareSession.load(context.user_data)
+        if session and session.edit_from_review:
+            await _go_to_review(update, context)
+        else:
+            await _cancel(update, context)
+        return
     session = OtherHealthcareSession.load(context.user_data)
     if session is None:
         await _cancel(update, context); return
     session.images = [f.to_dict() for f in result.files]
-    session.step   = STEP_NOTES
+
+    if session.edit_from_review:
+        session.save(context.user_data)
+        await _go_to_review(update, context)
+        return
+
+    session.step = STEP_NOTES
     session.save(context.user_data)
     text, kb = build_notes_prompt(session)
     try:
@@ -192,13 +304,21 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
     elif session.step == STEP_NOTES:
         session.notes = (update.message.text or "").strip()
-        session.step  = STEP_SPECIALIST
+        if session.edit_from_review:
+            session.save(context.user_data)
+            await _go_to_review(update, context)
+            return
+        session.step = STEP_SPECIALIST
         session.save(context.user_data)
         text, kb = build_specialist_prompt(session)
         await update.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
     elif session.step == STEP_SPECIALIST:
         session.specialist_name = (update.message.text or "").strip()
-        session.step            = STEP_REVIEW
+        if session.edit_from_review:
+            session.save(context.user_data)
+            await _go_to_review(update, context)
+            return
+        session.step = STEP_REVIEW
         session.save(context.user_data)
         text, kb = build_review(session)
         await update.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
@@ -209,7 +329,13 @@ async def _handle_skip_notes(update: Update, context: ContextTypes.DEFAULT_TYPE)
     session = OtherHealthcareSession.load(context.user_data)
     if session is None:
         await _cancel(update, context); return
-    session.notes = ""; session.step = STEP_SPECIALIST; session.save(context.user_data)
+    session.notes = ""
+    if session.edit_from_review:
+        session.save(context.user_data)
+        await _go_to_review(update, context)
+        return
+    session.step = STEP_SPECIALIST
+    session.save(context.user_data)
     text, kb = build_specialist_prompt(session)
     try:
         await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
@@ -222,7 +348,10 @@ async def _handle_skip_specialist(update: Update, context: ContextTypes.DEFAULT_
     session = OtherHealthcareSession.load(context.user_data)
     if session is None:
         await _cancel(update, context); return
-    session.specialist_name = ""; session.step = STEP_REVIEW; session.save(context.user_data)
+    session.specialist_name  = ""
+    session.edit_from_review = False   # always lands on review
+    session.step             = STEP_REVIEW
+    session.save(context.user_data)
     text, kb = build_review(session)
     try:
         await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
@@ -230,31 +359,6 @@ async def _handle_skip_specialist(update: Update, context: ContextTypes.DEFAULT_
         await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
 
-async def _handle_edit_notes(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    query = update.callback_query
-    session = OtherHealthcareSession.load(context.user_data)
-    if session is None:
-        await _cancel(update, context); return
-    session.notes = ""; session.specialist_name = ""; session.step = STEP_NOTES
-    session.save(context.user_data)
-    text, kb = build_notes_prompt(session)
-    try:
-        await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
-    except Exception:
-        await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
-
-
-async def _handle_edit_specialist(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    query = update.callback_query
-    session = OtherHealthcareSession.load(context.user_data)
-    if session is None:
-        await _cancel(update, context); return
-    session.specialist_name = ""; session.step = STEP_SPECIALIST; session.save(context.user_data)
-    text, kb = build_specialist_prompt(session)
-    try:
-        await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
-    except Exception:
-        await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
 
 async def _handle_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -338,8 +442,12 @@ async def _handle_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         except Exception as exc:
             logger.error(f"[other_hc] back reply failed: {exc}")
 
+    # ── edit-from-review: back always returns to review ──
+    if session.edit_from_review:
+        await _go_to_review(update, context)
+        return
+
     if session.step == STEP_NOTES:
-        # Back to images upload
         session.step = STEP_IMAGES
         session.save(context.user_data)
         await uploads.open(update, context,
@@ -389,6 +497,10 @@ async def _handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await _handle_cal_action(update, context, action)
         return
 
+    if action in _REVIEW_EDIT_ROUTES:
+        await _open_edit_step(action, update, context)
+        return
+
     dispatch = {
         "start":           _start_flow,
         "date_today":      _handle_date_today,
@@ -396,8 +508,6 @@ async def _handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         "back":            _handle_back,
         "skip_notes":      _handle_skip_notes,
         "skip_specialist": _handle_skip_specialist,
-        "edit_notes":      _handle_edit_notes,
-        "edit_specialist": _handle_edit_specialist,
         "confirm":         _handle_confirm,
         "cancel":          _cancel,
     }

@@ -51,6 +51,98 @@ _RKEY_PATIENT     = "hc.medications.patient"
 _RKEY_DEPARTMENTS = "hc.medications.departments"
 _RKEY_IMAGES      = "hc.medications.images"
 
+# ── Review edit routes ────────────────────────────────────────────────────────
+
+_REVIEW_EDIT_ROUTES: dict[str, str] = {
+    "edit_dept":       STEP_DEPARTMENT,
+    "edit_count":      STEP_COUNT,
+    "edit_images":     STEP_IMAGES,
+    "edit_source":     STEP_DISPENSE_SOURCE,
+    "edit_notes":      STEP_NOTES,
+    "edit_specialist": STEP_SPECIALIST,
+}
+
+
+# ── _go_to_review — shared helper ─────────────────────────────────────────────
+
+async def _go_to_review(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    session = MedicationSession.load(context.user_data)
+    if session is None:
+        await _cancel(update, context); return
+    session.edit_from_review = False
+    session.step             = STEP_REVIEW
+    session.save(context.user_data)
+    text, kb = build_review(session)
+    query = update.callback_query
+    if query:
+        try:
+            await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown"); return
+        except Exception:
+            pass
+    await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+
+
+# ── _route_to_edit_step ───────────────────────────────────────────────────────
+
+async def _route_to_edit_step(
+    session: "MedicationSession",
+    step: str,
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+) -> None:
+    query = update.callback_query
+
+    async def _safe_edit(text, kb):
+        if query:
+            try:
+                await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown"); return
+            except Exception:
+                pass
+        await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+
+    if step == STEP_DEPARTMENT:
+        custom_depts = load_custom_options(CTX_HC_DEPARTMENT)
+        await multiselect.open(
+            update, context,
+            title="اختر القسم الطبي",
+            options=custom_depts + DEPARTMENT_OPTIONS,
+            return_to=_RKEY_DEPARTMENTS,
+            icon="🏥", min_select=1,
+            auto_confirm_ids=[DEPT_OTHER_ID],
+            preselected_ids=session.medical_department_ids,
+        )
+    elif step == STEP_COUNT:
+        text, kb = build_count_prompt(session)
+        await _safe_edit(text, kb)
+    elif step == STEP_IMAGES:
+        await _open_images_upload(update, context)
+    elif step == STEP_DISPENSE_SOURCE:
+        text, kb = build_dispense_source_prompt(session)
+        await _safe_edit(text, kb)
+    elif step == STEP_NOTES:
+        text, kb = build_notes_prompt(session)
+        await _safe_edit(text, kb)
+    elif step == STEP_SPECIALIST:
+        text, kb = build_specialist_prompt(session)
+        await _safe_edit(text, kb)
+
+
+# ── _open_edit_step ───────────────────────────────────────────────────────────
+
+async def _open_edit_step(
+    action: str, update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> None:
+    step = _REVIEW_EDIT_ROUTES.get(action)
+    if step is None:
+        return
+    session = MedicationSession.load(context.user_data)
+    if session is None:
+        await _cancel(update, context); return
+    session.edit_from_review = True
+    session.step             = step
+    session.save(context.user_data)
+    await _route_to_edit_step(session, step, update, context)
+
 
 # ── Step 1: start — show date confirmation screen ────────────────────────────
 
@@ -169,7 +261,12 @@ async def _on_patient(result, update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def _on_department(result, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if result is None or result.cancelled:
-        await _cancel(update, context); return
+        session = MedicationSession.load(context.user_data)
+        if session and session.edit_from_review:
+            await _go_to_review(update, context)
+        else:
+            await _cancel(update, context)
+        return
     session = MedicationSession.load(context.user_data)
     if session is None:
         await _cancel(update, context); return
@@ -178,7 +275,6 @@ async def _on_department(result, update: Update, context: ContextTypes.DEFAULT_T
     session.medical_department_labels = result.labels
 
     if DEPT_OTHER_ID in result.ids:
-        # Branch: ask for free-text department name
         session.step = STEP_DEPT_OTHER
         session.save(context.user_data)
         text, kb = build_dept_other_prompt(session)
@@ -188,7 +284,10 @@ async def _on_department(result, update: Update, context: ContextTypes.DEFAULT_T
             logger.error(f"[medications] dept_other prompt failed: {exc}")
         return
 
-    # No "أخرى" — proceed to count step
+    if session.edit_from_review:
+        await _go_to_review(update, context)
+        return
+
     session.step = STEP_COUNT
     session.save(context.user_data)
     text, kb = build_count_prompt(session)
@@ -199,12 +298,23 @@ async def _on_department(result, update: Update, context: ContextTypes.DEFAULT_T
 
 async def _on_images(result, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if result is None or result.cancelled:
-        await _cancel(update, context); return
+        session = MedicationSession.load(context.user_data)
+        if session and session.edit_from_review:
+            await _go_to_review(update, context)
+        else:
+            await _cancel(update, context)
+        return
     session = MedicationSession.load(context.user_data)
     if session is None:
         await _cancel(update, context); return
     session.images = [f.to_dict() for f in result.files]
-    session.step   = STEP_DISPENSE_SOURCE
+
+    if session.edit_from_review:
+        session.save(context.user_data)
+        await _go_to_review(update, context)
+        return
+
+    session.step = STEP_DISPENSE_SOURCE
     session.save(context.user_data)
     text, kb = build_dispense_source_prompt(session)
     try:
@@ -224,7 +334,13 @@ async def _handle_dispense_source(
     if session is None:
         await _cancel(update, context); return
     session.dispense_source = source_label
-    session.step            = STEP_NOTES
+
+    if session.edit_from_review:
+        session.save(context.user_data)
+        await _go_to_review(update, context)
+        return
+
+    session.step = STEP_NOTES
     session.save(context.user_data)
     text, kb = build_notes_prompt(session)
     try:
@@ -279,6 +395,10 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 custom if lbl == "أخرى" else lbl
                 for lbl in session.medical_department_labels
             ]
+        if session.edit_from_review:
+            session.save(context.user_data)
+            await _go_to_review(update, context)
+            return
         session.step = STEP_COUNT
         session.save(context.user_data)
         text, kb = build_count_prompt(session)
@@ -296,14 +416,21 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await update.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
             return
         session.item_count = count
-        session.step       = STEP_IMAGES
+        if session.edit_from_review:
+            session.save(context.user_data)
+            await _go_to_review(update, context)
+            return
+        session.step = STEP_IMAGES
         session.save(context.user_data)
         await _open_images_upload(update, context)
 
-    # ── 6. ملاحظات ──
+    # ── 7. ملاحظات ──
     elif session.step == STEP_NOTES:
         session.notes = (update.message.text or "").strip()
-        # If specialist already selected (edit_notes path), go straight to review
+        if session.edit_from_review:
+            session.save(context.user_data)
+            await _go_to_review(update, context)
+            return
         if session.specialist_name:
             session.step = STEP_REVIEW
             session.save(context.user_data)
@@ -323,7 +450,10 @@ async def _handle_skip_notes(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if session is None:
         await _cancel(update, context); return
     session.notes = ""
-    # If specialist already selected (edit_notes path), go straight to review
+    if session.edit_from_review:
+        session.save(context.user_data)
+        await _go_to_review(update, context)
+        return
     if session.specialist_name:
         session.step = STEP_REVIEW
         text, kb     = build_review(session)
@@ -345,8 +475,9 @@ async def _handle_select_specialist(
     session = MedicationSession.load(context.user_data)
     if session is None:
         await _cancel(update, context); return
-    session.specialist_name = name
-    session.step            = STEP_REVIEW
+    session.specialist_name  = name
+    session.edit_from_review = False   # always lands on review
+    session.step             = STEP_REVIEW
     session.save(context.user_data)
     text, kb = build_review(session)
     try:
@@ -355,35 +486,6 @@ async def _handle_select_specialist(
         await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
 
-async def _handle_edit_notes(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    query   = update.callback_query
-    session = MedicationSession.load(context.user_data)
-    if session is None:
-        await _cancel(update, context); return
-    # Clear notes only; specialist stays so edit_notes → notes → review (skips re-select)
-    session.notes = ""
-    session.step  = STEP_NOTES
-    session.save(context.user_data)
-    text, kb = build_notes_prompt(session)
-    try:
-        await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
-    except Exception:
-        await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
-
-
-async def _handle_edit_specialist(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    query   = update.callback_query
-    session = MedicationSession.load(context.user_data)
-    if session is None:
-        await _cancel(update, context); return
-    session.specialist_name = ""
-    session.step            = STEP_SPECIALIST
-    session.save(context.user_data)
-    text, kb = build_specialist_prompt(session)
-    try:
-        await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
-    except Exception:
-        await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
 
 async def _handle_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -477,8 +579,24 @@ async def _handle_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             pass
         await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
+    # ── edit-from-review mode ──
+    if session.edit_from_review:
+        if session.step == STEP_DEPT_OTHER:
+            session.step = STEP_DEPARTMENT
+            session.save(context.user_data)
+            custom_depts = load_custom_options(CTX_HC_DEPARTMENT)
+            await multiselect.open(update, context,
+                title="اختر القسم الطبي",
+                options=custom_depts + DEPARTMENT_OPTIONS,
+                return_to=_RKEY_DEPARTMENTS, icon="🏥", min_select=1,
+                auto_confirm_ids=[DEPT_OTHER_ID],
+                preselected_ids=session.medical_department_ids)
+        else:
+            await _go_to_review(update, context)
+        return
+
+    # ── Normal back navigation ────────────────────────────────────────────────
     if session.step in (STEP_DEPT_OTHER, STEP_COUNT):
-        # Back to department multiselect
         session.step = STEP_DEPARTMENT
         session.save(context.user_data)
         custom_depts = load_custom_options(CTX_HC_DEPARTMENT)
@@ -488,13 +606,11 @@ async def _handle_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             return_to=_RKEY_DEPARTMENTS, icon="🏥", min_select=1)
 
     elif session.step == STEP_DISPENSE_SOURCE:
-        # Back to images upload
         session.step = STEP_IMAGES
         session.save(context.user_data)
         await _open_images_upload(update, context)
 
     elif session.step == STEP_NOTES:
-        # Back to dispense source
         session.step = STEP_DISPENSE_SOURCE
         session.save(context.user_data)
         text, kb = build_dispense_source_prompt(session)
@@ -551,16 +667,18 @@ async def _handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await _handle_cal_action(update, context, action)
         return
 
+    if action in _REVIEW_EDIT_ROUTES:
+        await _open_edit_step(action, update, context)
+        return
+
     dispatch = {
-        "start":           _start_flow,
-        "date_today":      _handle_date_today,
-        "date_calendar":   _handle_date_calendar,
-        "back":            _handle_back,
-        "skip_notes":      _handle_skip_notes,
-        "edit_notes":      _handle_edit_notes,
-        "edit_specialist": _handle_edit_specialist,
-        "confirm":         _handle_confirm,
-        "cancel":          _cancel,
+        "start":         _start_flow,
+        "date_today":    _handle_date_today,
+        "date_calendar": _handle_date_calendar,
+        "back":          _handle_back,
+        "skip_notes":    _handle_skip_notes,
+        "confirm":       _handle_confirm,
+        "cancel":        _cancel,
     }
     handler = dispatch.get(action)
     if handler:

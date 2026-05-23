@@ -206,9 +206,12 @@ def build_specialist_prompt(session: SuppliesSession) -> tuple[str, InlineKeyboa
 
 # ── Step 9: مراجعة نهائية ─────────────────────────────────────────────────────
 
+_NONE = "➖ غير مضاف"
+
+
 def build_review(session: SuppliesSession) -> tuple[str, InlineKeyboardMarkup]:
     date_str  = format_arabic_datetime(session.created_at)
-    dept_list = "\n".join(f"  • {lbl}" for lbl in session.medical_department_labels) or "  —"
+    dept_text = "، ".join(session.medical_department_labels) or _NONE
 
     lines = [
         "🏥 *مراجعة صرف المستلزمات الطبية*",
@@ -216,33 +219,31 @@ def build_review(session: SuppliesSession) -> tuple[str, InlineKeyboardMarkup]:
         f"📅 *التاريخ:*  {date_str}",
         f"👤 *المريض:*  {session.patient_name}",
         "",
-        "🏥 *القسم الطبي:*",
-        dept_list,
+        f"🏥 *القسم الطبي:*  {dept_text}",
         "",
-        f"🔢 *عدد الأصناف:*  {session.item_count}",
-        f"🏪 *جهة الصرف:*   {session.dispense_source or '—'}",
+        f"🔢 *عدد الأصناف:*  {session.item_count or _NONE}",
+        f"🏪 *جهة الصرف:*   {session.dispense_source or _NONE}",
+        "",
+        f"📎 *الصور:*  {format_image_count(session.image_count) if session.image_count else _NONE}",
+        "",
+        f"📝 *الملاحظات:*  {session.notes if session.notes else _NONE}",
+        "",
+        f"👨‍⚕️ *المختص الصحي:*  {session.specialist_name or _NONE}",
+        "",
+        "هل تريد نشر هذا التقرير؟",
     ]
-
-    if session.image_count:
-        lines += ["", f"📎 *الصور:*  {format_image_count(session.image_count)}"]
-
-    if session.notes:
-        lines += ["", "📝 *الملاحظات:*", session.notes]
-
-    if session.specialist_name:
-        lines += ["", f"👨‍⚕️ *المختص الصحي:*  {session.specialist_name}"]
-
-    lines += ["", "هل تريد نشر هذا التقرير؟"]
 
     kb = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("📢 نشر التقرير",     callback_data=f"{HCSUP}:confirm"),
-            InlineKeyboardButton("❌ إلغاء",            callback_data=f"{HCSUP}:cancel"),
+            InlineKeyboardButton("📢 نشر التقرير",       callback_data=f"{HCSUP}:confirm"),
+            InlineKeyboardButton("❌ إلغاء",              callback_data=f"{HCSUP}:cancel"),
         ],
-        [
-            InlineKeyboardButton("✏️ تعديل الملاحظات", callback_data=f"{HCSUP}:edit_notes"),
-            InlineKeyboardButton("👨‍⚕️ تعديل الصحي",   callback_data=f"{HCSUP}:edit_specialist"),
-        ],
+        [InlineKeyboardButton("✏️ القسم الطبي",          callback_data=f"{HCSUP}:edit_dept"),
+         InlineKeyboardButton("✏️ عدد الأصناف",          callback_data=f"{HCSUP}:edit_count")],
+        [InlineKeyboardButton("✏️ الصور",                 callback_data=f"{HCSUP}:edit_images"),
+         InlineKeyboardButton("✏️ جهة الصرف",            callback_data=f"{HCSUP}:edit_source")],
+        [InlineKeyboardButton("✏️ الملاحظات",             callback_data=f"{HCSUP}:edit_notes"),
+         InlineKeyboardButton("✏️ المختص الصحي",         callback_data=f"{HCSUP}:edit_specialist")],
     ])
     return "\n".join(lines), kb
 

@@ -258,11 +258,14 @@ def build_specialist_prompt(session: WoundcareAddSession) -> tuple[str, InlineKe
 
 # ── Step 11a: مراجعة نهائية ───────────────────────────────────────────────────
 
+_NONE = "➖ غير مضاف"
+
+
 def build_review(session: WoundcareAddSession) -> tuple[str, InlineKeyboardMarkup]:
     """Full review summary before final save — all 11 workflow fields."""
     date_str    = format_arabic_datetime(session.created_at)
-    dept_list   = "\n".join(f"  • {lbl}" for lbl in session.medical_department_labels) or "  —"
-    supply_list = "\n".join(f"  • {lbl}" for lbl in session.supply_labels) or "  —"
+    dept_text   = "، ".join(session.medical_department_labels) or _NONE
+    supply_list = "\n".join(f"  • {lbl}" for lbl in session.supply_labels) or _NONE
 
     # Build condition list — replace "أخرى" placeholder with the typed free-text
     _cond_labels = list(session.condition_labels)
@@ -271,7 +274,7 @@ def build_review(session: WoundcareAddSession) -> tuple[str, InlineKeyboardMarku
             session.condition_other if lbl == "أخرى" else lbl
             for lbl in _cond_labels
         ]
-    cond_list = "\n".join(f"  • {lbl}" for lbl in _cond_labels) or "  —"
+    cond_list = "\n".join(f"  • {lbl}" for lbl in _cond_labels) or _NONE
 
     lines = [
         "🩺 *مراجعة تقرير المجارحة*",
@@ -279,39 +282,39 @@ def build_review(session: WoundcareAddSession) -> tuple[str, InlineKeyboardMarku
         f"📅 *التاريخ:*  {date_str}",
         f"👤 *المريض:*  {session.patient_name}",
         "",
-        "🏥 *القسم الطبي:*",
-        dept_list,
+        f"🏥 *القسم الطبي:*  {dept_text}",
         "",
-        f"✍️ *اسم العملية:*  {session.operation_name}",
-        f"🩹 *مرحلة المجارحة:*  {session.phase_label}",
+        f"✍️ *اسم العملية:*  {session.operation_name or _NONE}",
+        f"🩹 *مرحلة المجارحة:*  {session.phase_label or _NONE}",
         "",
         "🩹 *وصف حالة الجرح:*",
         cond_list,
         "",
         "🧰 *المستلزمات الطبية المستخدمة:*",
         supply_list,
+        "",
+        f"📎 *الصور:*  {format_image_count(session.image_count) if session.image_count else _NONE}",
+        "",
+        f"📝 *الملاحظات:*  {session.notes if session.notes else _NONE}",
+        "",
+        f"👨‍⚕️ *المختص الصحي:*  {session.specialist_name or _NONE}",
+        "",
+        "هل تريد نشر هذا التقرير؟",
     ]
-
-    if session.image_count:
-        lines += ["", f"📎 *الصور:*  {format_image_count(session.image_count)}"]
-
-    if session.notes:
-        lines += ["", "📝 *الملاحظات:*", session.notes]
-
-    if session.specialist_name:
-        lines += ["", f"👨‍⚕️ *المختص الصحي:*  {session.specialist_name}"]
-
-    lines += ["", "هل تريد نشر هذا التقرير؟"]
 
     kb = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("📢 نشر التقرير",     callback_data=f"{WCA}:confirm"),
-            InlineKeyboardButton("❌ إلغاء",            callback_data=f"{WCA}:cancel"),
+            InlineKeyboardButton("📢 نشر التقرير",        callback_data=f"{WCA}:confirm"),
+            InlineKeyboardButton("❌ إلغاء",               callback_data=f"{WCA}:cancel"),
         ],
-        [
-            InlineKeyboardButton("✏️ تعديل الملاحظات", callback_data=f"{WCA}:edit_notes"),
-            InlineKeyboardButton("👨‍⚕️ تعديل الصحي",   callback_data=f"{WCA}:edit_specialist"),
-        ],
+        [InlineKeyboardButton("✏️ القسم الطبي",           callback_data=f"{WCA}:edit_dept"),
+         InlineKeyboardButton("✏️ اسم العملية",           callback_data=f"{WCA}:edit_operation")],
+        [InlineKeyboardButton("✏️ مرحلة المجارحة",        callback_data=f"{WCA}:edit_phase"),
+         InlineKeyboardButton("✏️ وصف الحالة",            callback_data=f"{WCA}:edit_condition")],
+        [InlineKeyboardButton("✏️ المستلزمات",             callback_data=f"{WCA}:edit_supplies"),
+         InlineKeyboardButton("✏️ الصور",                  callback_data=f"{WCA}:edit_images")],
+        [InlineKeyboardButton("✏️ الملاحظات",              callback_data=f"{WCA}:edit_notes"),
+         InlineKeyboardButton("✏️ المختص الصحي",          callback_data=f"{WCA}:edit_specialist")],
     ])
     return "\n".join(lines), kb
 

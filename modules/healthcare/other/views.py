@@ -114,9 +114,12 @@ def build_specialist_prompt(session: OtherHealthcareSession) -> tuple[str, Inlin
     return "\n".join(lines), kb
 
 
+_NONE = "➖ غير مضاف"
+
+
 def build_review(session: OtherHealthcareSession) -> tuple[str, InlineKeyboardMarkup]:
     date_str  = format_arabic_datetime(session.created_at)
-    ops_list  = "\n".join(f"  • {lbl}" for lbl in session.operation_labels) or "  —"
+    ops_list  = "\n".join(f"  • {lbl}" for lbl in session.operation_labels) or _NONE
 
     lines = [
         "📝 *مراجعة الإجراء الصحي*",
@@ -124,26 +127,27 @@ def build_review(session: OtherHealthcareSession) -> tuple[str, InlineKeyboardMa
         f"📅 *التاريخ:*  {date_str}",
         f"👤 *المريض:*  {session.patient_name}",
         "",
-        f"📝 *الإجراءات:*",
+        "📝 *الإجراءات:*",
         ops_list,
+        "",
+        f"📎 *الصور:*  {format_image_count(session.image_count) if session.image_count else _NONE}",
+        "",
+        f"📝 *الملاحظات:*  {session.notes if session.notes else _NONE}",
+        "",
+        f"👨‍⚕️ *المختص الصحي:*  {session.specialist_name if session.specialist_name else _NONE}",
+        "",
+        "هل تريد نشر هذا التقرير؟",
     ]
-    if session.image_count:
-        lines += ["", f"📎 *الصور:*  {format_image_count(session.image_count)}"]
-    if session.notes:
-        lines += ["", f"📝 *الملاحظات:*", session.notes]
-    if session.specialist_name:
-        lines += ["", f"👨‍⚕️ *المختص الصحي:*  {session.specialist_name}"]
-    lines += ["", "هل تريد نشر هذا التقرير؟"]
 
     kb = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("📢 نشر التقرير",     callback_data=f"{HCOTH}:confirm"),
-            InlineKeyboardButton("❌ إلغاء",            callback_data=f"{HCOTH}:cancel"),
+            InlineKeyboardButton("📢 نشر التقرير",       callback_data=f"{HCOTH}:confirm"),
+            InlineKeyboardButton("❌ إلغاء",              callback_data=f"{HCOTH}:cancel"),
         ],
-        [
-            InlineKeyboardButton("✏️ تعديل الملاحظات", callback_data=f"{HCOTH}:edit_notes"),
-            InlineKeyboardButton("👨‍⚕️ تعديل المختص",  callback_data=f"{HCOTH}:edit_specialist"),
-        ],
+        [InlineKeyboardButton("✏️ الإجراءات",            callback_data=f"{HCOTH}:edit_operations"),
+         InlineKeyboardButton("✏️ الصور",                 callback_data=f"{HCOTH}:edit_images")],
+        [InlineKeyboardButton("✏️ الملاحظات",             callback_data=f"{HCOTH}:edit_notes"),
+         InlineKeyboardButton("✏️ المختص الصحي",         callback_data=f"{HCOTH}:edit_specialist")],
     ])
     return "\n".join(lines), kb
 

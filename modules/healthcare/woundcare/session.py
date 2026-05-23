@@ -57,6 +57,7 @@ class WoundcareAddSession:
     notes:                      str          # optional
     specialist_name:            str          # one of: د. فضل / د. سرور / د. زكريا
     created_at:                 str          # ISO datetime string set at session creation
+    edit_from_review:           bool         # True while editing a section from review screen
 
     @property
     def image_count(self) -> int:
@@ -95,6 +96,7 @@ class WoundcareAddSession:
             "notes":                     self.notes,
             "specialist_name":           self.specialist_name,
             "created_at":                self.created_at,
+            "edit_from_review":          self.edit_from_review,
         }
 
     @classmethod
@@ -117,6 +119,7 @@ class WoundcareAddSession:
             notes=                     "",
             specialist_name=           "",
             created_at=                datetime.utcnow().isoformat(),
+            edit_from_review=          False,
         )
         session.save(user_data)
         return session
@@ -144,6 +147,7 @@ class WoundcareAddSession:
             notes=                     raw.get("notes",                     ""),
             specialist_name=           raw.get("specialist_name",           ""),
             created_at=                raw.get("created_at",                ""),
+            edit_from_review=          raw.get("edit_from_review",          False),
         )
 
     @classmethod

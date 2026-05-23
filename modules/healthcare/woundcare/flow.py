@@ -77,6 +77,124 @@ _RKEY_DESCRIPTION  = "hc.woundcare.description"
 _RKEY_SUPPLIES     = "hc.woundcare.supplies"
 _RKEY_IMAGES       = "hc.woundcare.images"
 
+# ── Review edit routes ────────────────────────────────────────────────────────
+
+_REVIEW_EDIT_ROUTES: dict[str, str] = {
+    "edit_dept":       STEP_DEPARTMENT,
+    "edit_operation":  STEP_OPERATION_NAME,
+    "edit_phase":      STEP_PHASE,
+    "edit_condition":  STEP_DESCRIPTION,
+    "edit_supplies":   STEP_SUPPLIES,
+    "edit_images":     STEP_IMAGES,
+    "edit_notes":      STEP_NOTES,
+    "edit_specialist": STEP_SPECIALIST,
+}
+
+
+# ── _go_to_review — shared helper ─────────────────────────────────────────────
+
+async def _go_to_review(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Reset edit_from_review flag, set step=REVIEW, render review screen."""
+    session = WoundcareAddSession.load(context.user_data)
+    if session is None:
+        await _cancel(update, context); return
+    session.edit_from_review = False
+    session.step             = STEP_REVIEW
+    session.save(context.user_data)
+    text, kb = build_review(session)
+    query = update.callback_query
+    if query:
+        try:
+            await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown"); return
+        except Exception:
+            pass
+    await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+
+
+# ── _route_to_edit_step — open correct UI for each step ──────────────────────
+
+async def _route_to_edit_step(
+    session: "WoundcareAddSession",
+    step: str,
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+) -> None:
+    """Open the correct UI for a given step when called from the review editor."""
+    query = update.callback_query
+
+    async def _safe_edit(text, kb):
+        if query:
+            try:
+                await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown"); return
+            except Exception:
+                pass
+        await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+
+    if step == STEP_DEPARTMENT:
+        custom_depts = load_custom_options(CTX_HC_DEPARTMENT, icon="🏥")
+        await multiselect.open(
+            update, context,
+            title="اختر القسم الطبي",
+            options=custom_depts + DEPARTMENT_OPTIONS,
+            return_to=_RKEY_DEPARTMENTS,
+            icon="🏥", min_select=1,
+            auto_confirm_ids=[DEPT_OTHER_ID],
+            preselected_ids=session.medical_department_ids,
+        )
+    elif step == STEP_OPERATION_NAME:
+        text, kb = build_operation_name_prompt(session)
+        await _safe_edit(text, kb)
+    elif step == STEP_PHASE:
+        text, kb = build_phase_prompt(session)
+        await _safe_edit(text, kb)
+    elif step == STEP_DESCRIPTION:
+        await multiselect.open(
+            update, context,
+            title="وصف حالة الجرح / العملية",
+            options=WOUND_CONDITION_OPTIONS,
+            return_to=_RKEY_DESCRIPTION,
+            icon="🩹", min_select=1,
+            auto_confirm_ids=[CONDITION_OTHER_ID],
+            preselected_ids=session.condition_ids,
+        )
+    elif step == STEP_SUPPLIES:
+        custom_supplies = load_custom_options(CTX_WC_SUPPLIES, icon="🧰")
+        await multiselect.open(
+            update, context,
+            title="اختر المستلزمات الطبية المستخدمة",
+            options=custom_supplies + WOUNDCARE_SUPPLIES_OPTIONS,
+            return_to=_RKEY_SUPPLIES,
+            icon="🧰", min_select=1,
+            auto_confirm_ids=[SUPPLIES_OTHER_ID],
+            preselected_ids=session.supply_ids,
+        )
+    elif step == STEP_IMAGES:
+        await _open_images_upload(update, context)
+    elif step == STEP_NOTES:
+        text, kb = build_notes_prompt(session)
+        await _safe_edit(text, kb)
+    elif step == STEP_SPECIALIST:
+        text, kb = build_specialist_prompt(session)
+        await _safe_edit(text, kb)
+
+
+# ── _open_edit_step — entry point from dispatcher ────────────────────────────
+
+async def _open_edit_step(
+    action: str, update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> None:
+    """Called when user taps an edit button on the review screen."""
+    step = _REVIEW_EDIT_ROUTES.get(action)
+    if step is None:
+        return
+    session = WoundcareAddSession.load(context.user_data)
+    if session is None:
+        await _cancel(update, context); return
+    session.edit_from_review = True
+    session.step             = step
+    session.save(context.user_data)
+    await _route_to_edit_step(session, step, update, context)
+
 
 # ── Step 1: start — show date confirmation screen ────────────────────────────
 
@@ -203,7 +321,11 @@ async def _on_patient(result, update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def _on_department(result, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if result is None or result.cancelled:
-        await _cancel(update, context)
+        session = WoundcareAddSession.load(context.user_data)
+        if session and session.edit_from_review:
+            await _go_to_review(update, context)
+        else:
+            await _cancel(update, context)
         return
 
     session = WoundcareAddSession.load(context.user_data)
@@ -224,7 +346,11 @@ async def _on_department(result, update: Update, context: ContextTypes.DEFAULT_T
             logger.error(f"[woundcare] dept_other prompt failed: {exc}")
         return
 
-    # No "أخرى" — proceed to operation name
+    # No "أخرى"
+    if session.edit_from_review:
+        await _go_to_review(update, context)
+        return
+
     session.step = STEP_OPERATION_NAME
     session.save(context.user_data)
     text, kb = build_operation_name_prompt(session)
@@ -238,7 +364,11 @@ async def _on_department(result, update: Update, context: ContextTypes.DEFAULT_T
 
 async def _on_condition(result, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if result is None or result.cancelled:
-        await _cancel(update, context)
+        session = WoundcareAddSession.load(context.user_data)
+        if session and session.edit_from_review:
+            await _go_to_review(update, context)
+        else:
+            await _cancel(update, context)
         return
 
     session = WoundcareAddSession.load(context.user_data)
@@ -259,8 +389,13 @@ async def _on_condition(result, update: Update, context: ContextTypes.DEFAULT_TY
             logger.error(f"[woundcare] description_other prompt failed: {exc}")
         return
 
-    # No "أخرى" — proceed to supplies multiselect
+    # No "أخرى"
     session.condition_other = ""
+    if session.edit_from_review:
+        session.save(context.user_data)
+        await _go_to_review(update, context)
+        return
+
     session.step = STEP_SUPPLIES
     session.save(context.user_data)
     custom_supplies = load_custom_options(CTX_WC_SUPPLIES, icon="🧰")
@@ -279,7 +414,11 @@ async def _on_condition(result, update: Update, context: ContextTypes.DEFAULT_TY
 
 async def _on_supplies(result, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if result is None or result.cancelled:
-        await _cancel(update, context)
+        session = WoundcareAddSession.load(context.user_data)
+        if session and session.edit_from_review:
+            await _go_to_review(update, context)
+        else:
+            await _cancel(update, context)
         return
 
     session = WoundcareAddSession.load(context.user_data)
@@ -300,7 +439,12 @@ async def _on_supplies(result, update: Update, context: ContextTypes.DEFAULT_TYP
             logger.error(f"[woundcare] supplies_other prompt failed: {exc}")
         return
 
-    # No "أخرى" — proceed to images upload
+    # No "أخرى"
+    if session.edit_from_review:
+        session.save(context.user_data)
+        await _go_to_review(update, context)
+        return
+
     session.step = STEP_IMAGES
     session.save(context.user_data)
     await _open_images_upload(update, context)
@@ -310,7 +454,11 @@ async def _on_supplies(result, update: Update, context: ContextTypes.DEFAULT_TYP
 
 async def _on_images(result, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if result is None or result.cancelled:
-        await _cancel(update, context)
+        session = WoundcareAddSession.load(context.user_data)
+        if session and session.edit_from_review:
+            await _go_to_review(update, context)
+        else:
+            await _cancel(update, context)
         return
 
     session = WoundcareAddSession.load(context.user_data)
@@ -319,11 +467,15 @@ async def _on_images(result, update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
     session.images = [f.to_dict() for f in result.files]
-    session.step   = STEP_NOTES
-    session.save(context.user_data)
-
     logger.info(f"[woundcare] images collected: {result.count}  patient={session.patient_name!r}")
 
+    if session.edit_from_review:
+        session.save(context.user_data)
+        await _go_to_review(update, context)
+        return
+
+    session.step = STEP_NOTES
+    session.save(context.user_data)
     text, kb = build_notes_prompt(session)
     try:
         await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
@@ -373,12 +525,15 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     elif session.step == STEP_DEPT_OTHER:
         custom = (update.message.text or "").strip()
         if custom:
-            # Save to DB so it appears next time in the list
             save_custom_option(CTX_HC_DEPARTMENT, custom)
             session.medical_department_labels = [
                 custom if lbl == "أخرى" else lbl
                 for lbl in session.medical_department_labels
             ]
+        if session.edit_from_review:
+            session.save(context.user_data)
+            await _go_to_review(update, context)
+            return
         session.step = STEP_OPERATION_NAME
         session.save(context.user_data)
         text, kb = build_operation_name_prompt(session)
@@ -387,12 +542,15 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     elif session.step == STEP_OPERATION_NAME:
         op = (update.message.text or "").strip()
         if not op:
-            # Re-prompt without clearing
             text, kb = build_operation_name_prompt(session)
             await update.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
             return
         session.operation_name = op
-        session.step           = STEP_PHASE
+        if session.edit_from_review:
+            session.save(context.user_data)
+            await _go_to_review(update, context)
+            return
+        session.step = STEP_PHASE
         session.save(context.user_data)
         text, kb = build_phase_prompt(session)
         await update.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
@@ -404,7 +562,11 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await update.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
             return
         session.condition_other = other_text
-        session.step            = STEP_SUPPLIES
+        if session.edit_from_review:
+            session.save(context.user_data)
+            await _go_to_review(update, context)
+            return
+        session.step = STEP_SUPPLIES
         session.save(context.user_data)
         custom_supplies = load_custom_options(CTX_WC_SUPPLIES, icon="🧰")
         await multiselect.open(
@@ -420,19 +582,25 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     elif session.step == STEP_SUPPLIES_OTHER:
         custom = (update.message.text or "").strip()
         if custom:
-            # Save to DB so it appears next time in the list
             save_custom_option(CTX_WC_SUPPLIES, custom)
             session.supply_labels = [
                 custom if lbl == "أخرى" else lbl
                 for lbl in session.supply_labels
             ]
+        if session.edit_from_review:
+            session.save(context.user_data)
+            await _go_to_review(update, context)
+            return
         session.step = STEP_IMAGES
         session.save(context.user_data)
         await _open_images_upload(update, context)
 
     elif session.step == STEP_NOTES:
         session.notes = (update.message.text or "").strip()
-        # If specialist already selected (edit_notes path), skip re-select
+        if session.edit_from_review:
+            session.save(context.user_data)
+            await _go_to_review(update, context)
+            return
         if session.specialist_name:
             session.step = STEP_REVIEW
             session.save(context.user_data)
@@ -450,12 +618,28 @@ async def _handle_select_phase(
     update: Update, context: ContextTypes.DEFAULT_TYPE, phase_key: str
 ) -> None:
     """Called when user taps one of the 4 phase buttons."""
+    query   = update.callback_query
     session = WoundcareAddSession.load(context.user_data)
     if session is None:
         await _cancel(update, context); return
     session.phase       = phase_key
     session.phase_label = PHASE_MAP[phase_key]
-    session.step        = STEP_DESCRIPTION
+
+    if session.edit_from_review:
+        # Phase changed — go straight back to review (condition/supplies kept as-is)
+        session.edit_from_review = False
+        session.step             = STEP_REVIEW
+        session.save(context.user_data)
+        text, kb = build_review(session)
+        try:
+            if query:
+                await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown"); return
+        except Exception:
+            pass
+        await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+        return
+
+    session.step = STEP_DESCRIPTION
     session.save(context.user_data)
     await multiselect.open(
         update, context,
@@ -474,7 +658,10 @@ async def _handle_skip_notes(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if session is None:
         await _cancel(update, context); return
     session.notes = ""
-    # If specialist already selected (edit_notes path), go straight to review
+    if session.edit_from_review:
+        session.save(context.user_data)
+        await _go_to_review(update, context)
+        return
     if session.specialist_name:
         session.step = STEP_REVIEW
         text, kb     = build_review(session)
@@ -496,8 +683,9 @@ async def _handle_select_specialist(
     session = WoundcareAddSession.load(context.user_data)
     if session is None:
         await _cancel(update, context); return
-    session.specialist_name = name
-    session.step            = STEP_REVIEW
+    session.specialist_name  = name
+    session.edit_from_review = False   # always lands on review
+    session.step             = STEP_REVIEW
     session.save(context.user_data)
     text, kb = build_review(session)
     try:
@@ -506,35 +694,6 @@ async def _handle_select_specialist(
         await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
 
-async def _handle_edit_notes(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    query   = update.callback_query
-    session = WoundcareAddSession.load(context.user_data)
-    if session is None:
-        await _cancel(update, context); return
-    # Clear notes only; specialist stays → edit_notes → notes → review (skips re-select)
-    session.notes = ""
-    session.step  = STEP_NOTES
-    session.save(context.user_data)
-    text, kb = build_notes_prompt(session)
-    try:
-        await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
-    except Exception:
-        await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
-
-
-async def _handle_edit_specialist(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    query   = update.callback_query
-    session = WoundcareAddSession.load(context.user_data)
-    if session is None:
-        await _cancel(update, context); return
-    session.specialist_name = ""
-    session.step            = STEP_SPECIALIST
-    session.save(context.user_data)
-    text, kb = build_specialist_prompt(session)
-    try:
-        await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
-    except Exception:
-        await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
 
 async def _handle_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -663,8 +822,43 @@ async def _handle_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             pass
         await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
+    # ── edit-from-review mode: back returns to review except within sub-branches ──
+    if session.edit_from_review:
+        if session.step == STEP_DEPT_OTHER:
+            session.step = STEP_DEPARTMENT
+            session.save(context.user_data)
+            custom_depts = load_custom_options(CTX_HC_DEPARTMENT, icon="🏥")
+            await multiselect.open(update, context,
+                title="اختر القسم الطبي",
+                options=custom_depts + DEPARTMENT_OPTIONS,
+                return_to=_RKEY_DEPARTMENTS, icon="🏥", min_select=1,
+                auto_confirm_ids=[DEPT_OTHER_ID],
+                preselected_ids=session.medical_department_ids)
+        elif session.step == STEP_DESCRIPTION_OTHER:
+            session.step = STEP_DESCRIPTION
+            session.save(context.user_data)
+            await multiselect.open(update, context,
+                title="وصف حالة الجرح / العملية",
+                options=WOUND_CONDITION_OPTIONS,
+                return_to=_RKEY_DESCRIPTION, icon="🩹", min_select=1,
+                auto_confirm_ids=[CONDITION_OTHER_ID],
+                preselected_ids=session.condition_ids)
+        elif session.step == STEP_SUPPLIES_OTHER:
+            session.step = STEP_SUPPLIES
+            session.save(context.user_data)
+            custom_supplies = load_custom_options(CTX_WC_SUPPLIES, icon="🧰")
+            await multiselect.open(update, context,
+                title="اختر المستلزمات الطبية المستخدمة",
+                options=custom_supplies + WOUNDCARE_SUPPLIES_OPTIONS,
+                return_to=_RKEY_SUPPLIES, icon="🧰", min_select=1,
+                auto_confirm_ids=[SUPPLIES_OTHER_ID],
+                preselected_ids=session.supply_ids)
+        else:
+            await _go_to_review(update, context)
+        return
+
+    # ── Normal back navigation ────────────────────────────────────────────────
     if session.step in (STEP_DEPT_OTHER, STEP_OPERATION_NAME):
-        # Back to department multiselect
         session.step = STEP_DEPARTMENT
         session.save(context.user_data)
         custom_depts = load_custom_options(CTX_HC_DEPARTMENT, icon="🏥")
@@ -686,7 +880,6 @@ async def _handle_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await _edit_or_reply(text, kb)
 
     elif session.step == STEP_DESCRIPTION_OTHER:
-        # Back to condition multiselect
         session.step = STEP_DESCRIPTION
         session.save(context.user_data)
         await multiselect.open(
@@ -694,13 +887,11 @@ async def _handle_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             title="وصف حالة الجرح / العملية",
             options=WOUND_CONDITION_OPTIONS,
             return_to=_RKEY_DESCRIPTION,
-            icon="🩹",
-            min_select=1,
+            icon="🩹", min_select=1,
             auto_confirm_ids=[CONDITION_OTHER_ID],
         )
 
     elif session.step == STEP_SUPPLIES_OTHER:
-        # Back to supplies multiselect
         session.step = STEP_SUPPLIES
         session.save(context.user_data)
         custom_supplies = load_custom_options(CTX_WC_SUPPLIES, icon="🧰")
@@ -710,7 +901,6 @@ async def _handle_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             return_to=_RKEY_SUPPLIES, icon="🧰", min_select=1)
 
     elif session.step == STEP_NOTES:
-        # Back to images upload
         session.step = STEP_IMAGES
         session.save(context.user_data)
         await _open_images_upload(update, context)
@@ -722,7 +912,6 @@ async def _handle_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await _edit_or_reply(text, kb)
 
     else:
-        # Fallback: cancel
         await _cancel(update, context)
 
 
@@ -774,16 +963,19 @@ async def _handle_wca_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         await _handle_cal_action(update, context, action)
         return
 
+    # Route any review edit button to the generic edit handler
+    if action in _REVIEW_EDIT_ROUTES:
+        await _open_edit_step(action, update, context)
+        return
+
     dispatch = {
-        "start":           _start_add_flow,
-        "date_today":      _handle_date_today,
-        "date_calendar":   _handle_date_calendar,
-        "back":            _handle_back,
-        "skip_notes":      _handle_skip_notes,
-        "edit_notes":      _handle_edit_notes,
-        "edit_specialist": _handle_edit_specialist,
-        "confirm":         _handle_confirm,
-        "cancel":          _cancel,
+        "start":         _start_add_flow,
+        "date_today":    _handle_date_today,
+        "date_calendar": _handle_date_calendar,
+        "back":          _handle_back,
+        "skip_notes":    _handle_skip_notes,
+        "confirm":       _handle_confirm,
+        "cancel":        _cancel,
     }
     handler = dispatch.get(action)
     if handler:
