@@ -670,19 +670,15 @@ def format_report_message(data: dict) -> str:
     # ✅ المعلومات الأساسية - مع escape_markdown لمنع أخطاء Markdown
     if data.get('patient_name'):
         lines.append(f"👤 اسم المريض: {escape_markdown(str(data['patient_name']))}")
-        lines.append("")
 
     if data.get('hospital_name'):
         lines.append(f"🏥 المستشفى: {escape_markdown(str(data['hospital_name']))}")
-        lines.append("")
 
     if data.get('department_name'):
         lines.append(f"🏷️ القسم: {escape_markdown(str(data['department_name']))}")
-        lines.append("")
 
     if data.get('doctor_name') and data.get('doctor_name') != 'لم يتم التحديد':
         lines.append(f"👨‍⚕️ اسم الطبيب: {escape_markdown(str(data['doctor_name']))}")
-        lines.append("")
 
     # ✅ نوع الإجراء
     if data.get('medical_action'):

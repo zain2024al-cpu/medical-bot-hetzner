@@ -233,6 +233,16 @@ def _ensure_schema_compatibility(target_engine=None) -> None:
                       WHERE u.tg_user_id = t.translator_id
                   )
             """))
+            # ── General services: arrival_status + departure link ─────────────
+            if _table_exists(conn, "gs_arrival_patients"):
+                ap_cols = _table_columns(conn, "gs_arrival_patients")
+                _add_column_if_missing(conn, "gs_arrival_patients", ap_cols, "arrival_status",      "VARCHAR(20)")
+                _add_column_if_missing(conn, "gs_arrival_patients", ap_cols, "departure_record_id", "INTEGER")
+
+            if _table_exists(conn, "gs_departure_records"):
+                dr_cols = _table_columns(conn, "gs_departure_records")
+                _add_column_if_missing(conn, "gs_departure_records", dr_cols, "arrival_patient_ids", "TEXT")
+
     except Exception as exc:
         logger.warning(f"⚠️ Schema compatibility migration skipped: {exc}")
 

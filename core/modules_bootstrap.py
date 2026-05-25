@@ -86,6 +86,20 @@ def bootstrap_all() -> None:
         },
     )
 
+    # ── General Services: arrivals, departures, public services ──────────────
+    registry.register(
+        name="general_services",
+        menu_buttons={"🔧 الخدمات العامة"},
+        keyboard_rows=[
+            ["🔧 الخدمات العامة"],
+        ],
+        extra_wipe_keys={
+            "_gsarr_add",   # arrivals session
+            "_gsdep_add",   # departures session
+            "_gspub_add",   # public services session
+        },
+    )
+
     # ── Future modules — uncomment and fill in when ready ────────────────────
     # registry.register(
     #     name="pharmacy",

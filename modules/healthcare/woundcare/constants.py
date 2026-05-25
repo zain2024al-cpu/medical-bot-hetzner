@@ -25,7 +25,7 @@ WOUNDCARE_SUPPLIES_OPTIONS: list[Option] = [
 PHASE_MAP: dict[str, str] = {
     "phase_pre_op":    "قبل العملية",
     "phase_post_1":    "الأولى بعد العملية",
-    "phase_post_last": "بعد العملية الأخيرة",
+    "phase_post_last": "بعد العملية",
     "phase_chronic":   "مجارحة دورية / جرح مزمن",
 }
 

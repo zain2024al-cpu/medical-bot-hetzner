@@ -3,7 +3,7 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from modules.healthcare.other.session import OtherHealthcareSession
-from modules.healthcare.views import format_arabic_datetime, format_image_count
+from modules.healthcare.views import format_arabic_date, format_arabic_datetime, format_image_count
 
 HC    = "hc"
 HCOTH = "hcoth"
@@ -118,23 +118,20 @@ _NONE = "➖ غير مضاف"
 
 
 def build_review(session: OtherHealthcareSession) -> tuple[str, InlineKeyboardMarkup]:
-    date_str  = format_arabic_datetime(session.created_at)
-    ops_list  = "\n".join(f"  • {lbl}" for lbl in session.operation_labels) or _NONE
+    date_str = format_arabic_date(session.created_at)
+    ops_text = "، ".join(session.operation_labels) or "—"
+    imgs     = format_image_count(session.image_count)
+    notes    = session.notes or "لا توجد ملاحظات"
 
     lines = [
         "📝 *مراجعة الإجراء الصحي*",
         "",
-        f"📅 *التاريخ:*  {date_str}",
-        f"👤 *المريض:*  {session.patient_name}",
-        "",
-        "📝 *الإجراءات:*",
-        ops_list,
-        "",
-        f"📎 *الصور:*  {format_image_count(session.image_count) if session.image_count else _NONE}",
-        "",
-        f"📝 *الملاحظات:*  {session.notes if session.notes else _NONE}",
-        "",
-        f"👨‍⚕️ *المختص الصحي:*  {session.specialist_name if session.specialist_name else _NONE}",
+        f"📅 {date_str}",
+        f"👤 {session.patient_name}",
+        f"⚕️ الإجراءات: {ops_text}",
+        f"📎 {imgs}",
+        f"📝 {notes}",
+        f"👨‍⚕️ {session.specialist_name or '—'}",
         "",
         "هل تريد نشر هذا التقرير؟",
     ]

@@ -511,7 +511,17 @@ async def handle_dp_confirm_delete_from_schedule(update: Update, context: Contex
 
 async def handle_text_input_for_patients(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة إدخال نصي لأسماء المرضى (خارج ConversationHandler)"""
-    if not context.user_data.get('waiting_for_patients'):
+    import logging as _logging
+    _log = _logging.getLogger(__name__)
+    uid = update.effective_user.id if update.effective_user else "?"
+    waiting = context.user_data.get('waiting_for_patients')
+    _log.info(
+        f"[daily_patients.text] FIRED  user={uid}"
+        f"  waiting_for_patients={waiting!r}"
+        f"  text={((update.message.text or '')[:30])!r}"
+    )
+    if not waiting:
+        _log.debug(f"[daily_patients.text] SKIP — waiting_for_patients not set  user={uid}")
         return
     
     text = update.message.text.strip()
@@ -686,10 +696,13 @@ def register(app):
     
     
     # معالج إدخال النص (منفصل عن ConversationHandler)
+    # group=9: must NOT be 10 — group 10 is owned by arrivals text handler.
+    # Within a PTB group only the first matching handler fires; using 10 silently
+    # swallows every arrivals patient-name message before it reaches flow.py.
     app.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND & ~filters.Regex("^(📋 أسماء المرضى اليومية|❌ إلغاء العملية الحالية)$"),
         handle_text_input_for_patients
-    ), group=10)
+    ), group=9)
     
     # ConversationHandler الأصلي للوصول المباشر
     conv_handler = ConversationHandler(

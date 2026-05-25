@@ -488,11 +488,11 @@ async def _on_images(result, update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def _open_images_upload(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await uploads.open(
         update, context,
-        title="ارفع صور الجرح / التوثيق (اختياري)",
+        title="ارفع صور الجرح / التوثيق",
         return_to=_RKEY_IMAGES,
         icon="📷",
         allowed_types=["photo", "image_document"],
-        min_files=0,
+        min_files=1,
         max_files=10,
     )
 

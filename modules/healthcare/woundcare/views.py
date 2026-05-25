@@ -10,7 +10,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from modules.healthcare.woundcare.constants import STAFF_LIST  # noqa: F401  (re-exported for callers)
 from modules.healthcare.woundcare.session import WoundcareAddSession
-from modules.healthcare.views import format_arabic_datetime, format_image_count
+from modules.healthcare.views import format_arabic_datetime, format_arabic_date, format_image_count
 
 # ── Callback prefixes ─────────────────────────────────────────────────────────
 HC  = "hc"    # healthcare navigation (shared across module)
@@ -117,8 +117,8 @@ def build_operation_name_prompt(session: WoundcareAddSession) -> tuple[str, Inli
         f"القسم: {depts}",
         _THIN,
         "",
-        "أرسل اسم العملية أو الإجراء الذي تم تنفيذه.",
-        "(مثال: شق وتصريف، تنظيف جرح وتضميد…)",
+        "أرسل اسم العملية / نوع الجرح.",
+        "_(مثال: عملية تطويل عظم الساق بجهاز ليزاروف)_",
     ]
     kb = InlineKeyboardMarkup([[
         InlineKeyboardButton("🔙 رجوع", callback_data=f"{WCA}:back"),
@@ -144,7 +144,7 @@ def build_phase_prompt(session: WoundcareAddSession) -> tuple[str, InlineKeyboar
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("قبل العملية",               callback_data=f"{WCA}:phase_pre_op")],
         [InlineKeyboardButton("الأولى بعد العملية",        callback_data=f"{WCA}:phase_post_1")],
-        [InlineKeyboardButton("بعد العملية الأخيرة",       callback_data=f"{WCA}:phase_post_last")],
+        [InlineKeyboardButton("بعد العملية",                callback_data=f"{WCA}:phase_post_last")],
         [InlineKeyboardButton("مجارحة دورية / جرح مزمن",  callback_data=f"{WCA}:phase_chronic")],
         [
             InlineKeyboardButton("🔙 رجوع", callback_data=f"{WCA}:back"),
@@ -263,9 +263,8 @@ _NONE = "➖ غير مضاف"
 
 def build_review(session: WoundcareAddSession) -> tuple[str, InlineKeyboardMarkup]:
     """Full review summary before final save — all 11 workflow fields."""
-    date_str    = format_arabic_datetime(session.created_at)
-    dept_text   = "، ".join(session.medical_department_labels) or _NONE
-    supply_list = "\n".join(f"  • {lbl}" for lbl in session.supply_labels) or _NONE
+    date_str  = format_arabic_date(session.created_at)
+    dept_text = "، ".join(session.medical_department_labels) or "—"
 
     # Build condition list — replace "أخرى" placeholder with the typed free-text
     _cond_labels = list(session.condition_labels)
@@ -274,30 +273,22 @@ def build_review(session: WoundcareAddSession) -> tuple[str, InlineKeyboardMarku
             session.condition_other if lbl == "أخرى" else lbl
             for lbl in _cond_labels
         ]
-    cond_list = "\n".join(f"  • {lbl}" for lbl in _cond_labels) or _NONE
+    cond_text   = "، ".join(_cond_labels) or "—"
+    supply_text = "، ".join(session.supply_labels) or "—"
+    imgs        = format_image_count(session.image_count)
+    notes       = session.notes or "لا توجد ملاحظات"
 
     lines = [
         "🩺 *مراجعة تقرير المجارحة*",
         "",
-        f"📅 *التاريخ:*  {date_str}",
-        f"👤 *المريض:*  {session.patient_name}",
-        "",
-        f"🏥 *القسم الطبي:*  {dept_text}",
-        "",
-        f"✍️ *اسم العملية:*  {session.operation_name or _NONE}",
-        f"🩹 *مرحلة المجارحة:*  {session.phase_label or _NONE}",
-        "",
-        "🩹 *وصف حالة الجرح:*",
-        cond_list,
-        "",
-        "🧰 *المستلزمات الطبية المستخدمة:*",
-        supply_list,
-        "",
-        f"📎 *الصور:*  {format_image_count(session.image_count) if session.image_count else _NONE}",
-        "",
-        f"📝 *الملاحظات:*  {session.notes if session.notes else _NONE}",
-        "",
-        f"👨‍⚕️ *المختص الصحي:*  {session.specialist_name or _NONE}",
+        f"📅 {date_str}",
+        f"👤 {session.patient_name}  •  🏥 {dept_text}",
+        f"✍️ {session.operation_name or '—'}  •  🩹 {session.phase_label or '—'}",
+        f"🩹 الحالة: {cond_text}",
+        f"🧰 المستلزمات: {supply_text}",
+        f"📎 {imgs}",
+        f"📝 {notes}",
+        f"👨‍⚕️ {session.specialist_name or '—'}",
         "",
         "هل تريد نشر هذا التقرير؟",
     ]

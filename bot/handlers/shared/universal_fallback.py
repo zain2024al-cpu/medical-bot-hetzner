@@ -227,6 +227,12 @@ KNOWN_CALLBACKS = [
     r"^sel_pat:",
     r"^msel:",
     r"^upl:",
+
+    # General services module — handled in group 15.
+    r"^gs:",
+    r"^gsa:",
+    r"^gsd:",
+    r"^gsp:",
 ]
 
 # ================================================

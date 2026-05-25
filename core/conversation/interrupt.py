@@ -20,6 +20,7 @@ from core.routing.registry import registry
 from core.conversation.lifecycle import (
     has_active_conversation,
     interrupt_and_reset,
+    wipe_session,
 )
 
 logger = logging.getLogger(__name__)
@@ -40,14 +41,33 @@ async def _intercept(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     current_module = context.user_data.get(_KEY_ACTIVE_MODULE)
 
+    # Resolve target module registration once — used in both branches.
+    target_reg = registry.get(target_module)
+    target_wipe_keys = target_reg.extra_wipe_keys if target_reg else set()
+
     if not has_active_conversation(context.application, chat_id, user_id):
-        # Nothing running — just update the active module marker and continue.
+        # No active PTB ConversationHandler.
+        # Still check for stale session-based flows (e.g. arrivals, departures,
+        # public_services) that store state directly in user_data.  Pressing any
+        # module button is a mandatory clean restart — wipe those keys too.
+        stale_keys = target_wipe_keys & set(context.user_data)
+        if stale_keys:
+            wipe_session(context.user_data, target_wipe_keys)
+            logger.info(
+                f"[interrupt] stale session wiped  user={user_id}"
+                f"  module={target_module!r}  found={stale_keys}"
+            )
+            try:
+                await update.message.reply_text("ℹ️ تم إلغاء العملية السابقة تلقائياً.")
+            except Exception as exc:
+                logger.warning(f"[interrupt] stale-session notice failed: {exc}")
         context.user_data[_KEY_ACTIVE_MODULE] = target_module
         return None
 
-    # ── Active flow detected — interrupt it ──────────────────────────────────
+    # ── Active ConversationHandler detected — full interrupt ─────────────────
     current_reg = registry.get(current_module) if current_module else None
-    extra_keys = current_reg.extra_wipe_keys if current_reg else set()
+    # Merge current-module keys + target-module keys so both are wiped atomically.
+    extra_keys = (current_reg.extra_wipe_keys if current_reg else set()) | target_wipe_keys
 
     # Fire on_deactivate hook if the current module defined one
     if current_reg and current_reg.on_deactivate:
@@ -64,7 +84,6 @@ async def _intercept(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data[_KEY_ACTIVE_MODULE] = target_module
 
     # Fire on_activate hook for the new module if defined
-    target_reg = registry.get(target_module)
     if target_reg and target_reg.on_activate:
         try:
             target_reg.on_activate(context.user_data)

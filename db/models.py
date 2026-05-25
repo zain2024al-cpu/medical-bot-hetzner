@@ -421,6 +421,103 @@ class OtherHealthcareRecord(Base):
 
 
 # ================================================
+# General Services — Arrival Batches
+# ================================================
+
+class ArrivalBatch(Base):
+    """Header record for one arrival batch (a group of patients arriving together)."""
+    __tablename__ = "gs_arrival_batches"
+
+    id               = Column(Integer, primary_key=True, autoincrement=True)
+    hospital_id      = Column(String(50),  nullable=True)
+    hospital_label   = Column(String(255), nullable=True)
+    specialist_id    = Column(String(50),  nullable=True)
+    specialist_label = Column(String(255), nullable=True)
+    patient_count    = Column(Integer, default=0, nullable=True)
+    created_by       = Column(Integer, nullable=True, index=True)
+    created_at       = Column(DateTime, default=datetime.utcnow, index=True, nullable=True)
+
+
+class ArrivalPatient(Base):
+    """One patient within an arrival batch."""
+    __tablename__ = "gs_arrival_patients"
+
+    id                  = Column(Integer, primary_key=True, autoincrement=True)
+    batch_id            = Column(Integer, nullable=True, index=True)
+    name                = Column(String(255), nullable=True, index=True)
+    visa_expiry         = Column(String(50),  nullable=True)
+    has_companion       = Column(Boolean, default=False, nullable=True)
+    passport_file_id    = Column(String(255), nullable=True)
+    visa_file_id        = Column(String(255), nullable=True)
+    residence_file_id   = Column(String(255), nullable=True)
+    residence_expiry    = Column(String(50),  nullable=True)
+    notes               = Column(Text, nullable=True)
+    arrival_status      = Column(String(20), default="active", nullable=True)
+    departure_record_id = Column(Integer, nullable=True)
+    created_at          = Column(DateTime, default=datetime.utcnow, nullable=True)
+
+
+class ArrivalCompanion(Base):
+    """Companion record attached to one ArrivalPatient."""
+    __tablename__ = "gs_arrival_companions"
+
+    id                  = Column(Integer, primary_key=True, autoincrement=True)
+    patient_id          = Column(Integer, nullable=True, index=True)
+    name                = Column(String(255), nullable=True)
+    passport_file_id    = Column(String(255), nullable=True)
+    visa_file_id        = Column(String(255), nullable=True)
+    residence_file_id   = Column(String(255), nullable=True)
+    residence_expiry    = Column(String(50),  nullable=True)
+    created_at          = Column(DateTime, default=datetime.utcnow, nullable=True)
+
+
+# ================================================
+# General Services — Departure Records
+# ================================================
+
+class DepartureRecord(Base):
+    """Single departure record — one or more patients leaving together."""
+    __tablename__ = "gs_departure_records"
+
+    id               = Column(Integer, primary_key=True, autoincrement=True)
+    patients_text    = Column(Text,        nullable=True)
+    hospital_id      = Column(String(50),  nullable=True)
+    hospital_label   = Column(String(255), nullable=True)
+    arrival_patient_ids = Column(Text,       nullable=True)   # JSON list of int
+    image_file_ids   = Column(Text,        nullable=True)   # JSON list
+    image_count      = Column(Integer, default=0, nullable=True)
+    notes            = Column(Text,        nullable=True)
+    specialist_id    = Column(String(50),  nullable=True)
+    specialist_label = Column(String(255), nullable=True)
+    created_by       = Column(Integer, nullable=True, index=True)
+    created_at       = Column(DateTime, default=datetime.utcnow, index=True, nullable=True)
+    updated_at       = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
+
+
+# ================================================
+# General Services — Public Service Records
+# ================================================
+
+class PublicServiceRecord(Base):
+    """Public / administrative service record for a patient."""
+    __tablename__ = "gs_public_service_records"
+
+    id                = Column(Integer, primary_key=True, autoincrement=True)
+    patient_id        = Column(Integer, nullable=True, index=True)
+    patient_name      = Column(String(255), nullable=True, index=True)
+    service_type_json = Column(Text,        nullable=True)   # JSON list of labels
+    item_count        = Column(Integer, default=0, nullable=True)
+    image_file_ids    = Column(Text,        nullable=True)   # JSON list
+    image_count       = Column(Integer, default=0, nullable=True)
+    notes             = Column(Text,        nullable=True)
+    specialist_id     = Column(String(50),  nullable=True)
+    specialist_label  = Column(String(255), nullable=True)
+    created_by        = Column(Integer, nullable=True, index=True)
+    created_at        = Column(DateTime, default=datetime.utcnow, index=True, nullable=True)
+    updated_at        = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
+
+
+# ================================================
 # Healthcare — Custom "أخرى" Options
 # ================================================
 
@@ -706,5 +803,10 @@ __all__ = [
     'SuppliesRecord',
     'OtherHealthcareRecord',
     'UserModuleAccess',
+    'ArrivalBatch',
+    'ArrivalPatient',
+    'ArrivalCompanion',
+    'DepartureRecord',
+    'PublicServiceRecord',
     'desc'
 ]

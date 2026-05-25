@@ -1,0 +1,83 @@
+# modules/general_services/arrivals/models.py
+
+import logging
+from dataclasses import dataclass
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class SavedArrivalBatch:
+    batch_id:         int
+    hospital_label:   str
+    specialist_label: str
+    patient_count:    int
+
+
+def save_arrival_batch(
+    *,
+    hospital_id:      str,
+    hospital_label:   str,
+    specialist_id:    str,
+    specialist_label: str,
+    patients:         list[dict],
+    created_by:       int | None,
+) -> SavedArrivalBatch:
+    """
+    Persist the batch header, all patients, and companions atomically.
+    Returns a SavedArrivalBatch with the new batch ID.
+    """
+    from db.session import get_db
+    from db.models import ArrivalBatch, ArrivalPatient, ArrivalCompanion
+
+    with get_db() as db:
+        batch = ArrivalBatch(
+            hospital_id=       hospital_id,
+            hospital_label=    hospital_label,
+            specialist_id=     specialist_id,
+            specialist_label=  specialist_label,
+            patient_count=     len(patients),
+            created_by=        created_by,
+        )
+        db.add(batch)
+        db.flush()
+        batch_id = batch.id
+
+        for p in patients:
+            patient_row = ArrivalPatient(
+                batch_id=           batch_id,
+                name=               p.get("name", ""),
+                visa_expiry=        p.get("visa_expiry", ""),
+                has_companion=      bool(p.get("has_companion", False)),
+                passport_file_id=   p.get("passport_file_id", ""),
+                visa_file_id=       p.get("visa_file_id", ""),
+                residence_file_id=  p.get("residence_file_id", ""),
+                residence_expiry=   p.get("residence_expiry", ""),
+                notes=              p.get("notes", ""),
+            )
+            db.add(patient_row)
+            db.flush()
+            patient_id = patient_row.id
+
+            for c in p.get("companions", []):
+                companion_row = ArrivalCompanion(
+                    patient_id=         patient_id,
+                    name=               c.get("name", ""),
+                    passport_file_id=   c.get("passport_file_id", ""),
+                    visa_file_id=       c.get("visa_file_id", ""),
+                    residence_file_id=  c.get("residence_file_id", ""),
+                    residence_expiry=   c.get("residence_expiry", ""),
+                )
+                db.add(companion_row)
+
+    logger.info(
+        f"[arrivals] saved batch id={batch_id}"
+        f"  hospital={hospital_label!r}  specialist={specialist_label!r}"
+        f"  patients={len(patients)}"
+    )
+    return SavedArrivalBatch(
+        batch_id=         batch_id,
+        hospital_label=   hospital_label,
+        specialist_label= specialist_label,
+        patient_count=    len(patients),
+    )

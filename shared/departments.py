@@ -24,13 +24,19 @@ from shared.multiselect import Option
 
 _MEDICAL_SPECIALTIES: list[tuple[str, str, str]] = [
     # (id,         label,                                  icon)
-    # Core/direct specialties — stable backward-compatible IDs.
-    # Labels match DIRECT_DEPARTMENTS equivalents exactly.
-    ("neuro",      "المخ والأعصاب",                        "🧠"),
-    ("urology",    "المسالك البولية",                       "🫀"),
-    ("cardio",     "القلب",                                "❤️"),
-    ("ortho",      "العظام",                               "🦴"),
+    # ── Priority 8 — most common surgical/woundcare cases (ordered by frequency)
+    # IDs are stable; renaming ortho/cardio labels deduplicates their PREDEFINED
+    # equivalents so each specialty appears only once in the multiselect.
+    ("ortho",      "جراحة العظام",                         "🦴"),
     ("oncology",   "الأورام",                              "🎗️"),
+    ("gen_surg",   "الجراحة العامة",                       "🔪"),
+    ("plastics",   "جراحة التجميل",                        "🔪"),
+    ("maxfac",     "جراحة الوجه والفكين",                  "🔪"),
+    ("neuro",      "المخ والأعصاب",                        "🧠"),
+    ("cardio",     "جراحة القلب",                          "❤️"),
+    ("gi_surg",    "جراحة الجهاز الهضمي",                  "🔪"),
+    # ── Remaining specialties ─────────────────────────────────────────────────
+    ("urology",    "المسالك البولية",                       "🫀"),
     ("peds",       "الأطفال",                              "🧒"),
     ("obgyn",      "النساء والتوليد",                       "👶"),
     ("rehab",      "العلاج الطبيعي وإعادة التأهيل",       "🏋️"),

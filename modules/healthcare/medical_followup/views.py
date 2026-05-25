@@ -10,7 +10,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from modules.healthcare.medical_followup.constants import STAFF_LIST  # noqa: F401  (re-exported for callers)
 from modules.healthcare.medical_followup.session import MedicalFollowupSession
-from modules.healthcare.views import format_arabic_datetime, format_image_count
+from modules.healthcare.views import format_arabic_datetime, format_arabic_date, format_image_count
 
 # ── Callback prefixes ─────────────────────────────────────────────────────────
 HC   = "hc"     # healthcare navigation (shared across module)
@@ -298,49 +298,33 @@ def build_specialist_prompt(session: MedicalFollowupSession) -> tuple[str, Inlin
 # ── Step 11a: مراجعة نهائية — Interactive Editor ──────────────────────────────
 
 def build_review(session: MedicalFollowupSession) -> tuple[str, InlineKeyboardMarkup]:
-    """
-    Interactive review editor — all fields shown with per-section edit buttons.
-    Empty optional fields (images, notes) show '➖ غير مضاف' instead of being hidden.
-    """
-    _NONE = "➖ غير مضاف"
+    date_str    = format_arabic_date(session.created_at)
+    dept_text   = "، ".join(session.medical_department_labels) or "—"
+    proc_text   = "، ".join(session.procedure_type_labels)     or "—"
+    cmp_text    = "، ".join(session.complaint_labels)          or "—"
+    supply_text = "، ".join(session.meds_supply_labels)        or "—"
+    imgs        = format_image_count(session.image_count)
+    notes       = session.notes or "لا توجد ملاحظات"
 
-    date_str    = format_arabic_datetime(session.created_at)
-    dept_text   = "، ".join(session.medical_department_labels)  or "—"
-    proc_text   = "، ".join(session.procedure_type_labels)      or "—"
-    cmp_text    = "، ".join(session.complaint_labels)           or "—"
-    supply_list = "\n".join(f"  • {lbl}" for lbl in session.meds_supply_labels) or _NONE
-    img_text    = format_image_count(session.image_count) if session.image_count else _NONE
-    notes_text  = session.notes                           if session.notes        else _NONE
-    spec_text   = session.specialist_name                 if session.specialist_name else "—"
+    vitals_parts = []
+    if session.vitals_temp:  vitals_parts.append(f"🌡️ {session.vitals_temp}")
+    if session.vitals_bp:    vitals_parts.append(f"🩸 {session.vitals_bp}")
+    if session.vitals_pulse: vitals_parts.append(f"💓 {session.vitals_pulse}")
+    if session.vitals_spo2:  vitals_parts.append(f"🫁 {session.vitals_spo2}")
+    vitals_txt = "  ".join(vitals_parts) or "—"
 
     lines = [
         "📋 *مراجعة تقرير المتابعة الطبية*",
         "",
-        f"📅 *التاريخ:*  {date_str}",
-        f"👤 *المريض:*  {session.patient_name}",
+        f"📅 {date_str}",
+        f"👤 {session.patient_name}  •  🏥 {dept_text}",
+        f"📋 {proc_text}  •  😷 {cmp_text}",
+        f"❤️ {vitals_txt}",
+        f"💊 المستلزمات: {supply_text}",
+        f"📎 {imgs}",
+        f"📝 {notes}",
+        f"👨‍⚕️ {session.specialist_name or '—'}",
         "",
-        f"🏥 *القسم الطبي:*  {dept_text}",
-        "",
-        f"📋 *نوع الإجراء:*  {proc_text}",
-        "",
-        f"😷 *الشكوى الرئيسية / الأعراض:*  {cmp_text}",
-        "",
-        "❤️ *العلامات الحيوية:*",
-        f"  🌡️ الحرارة: {session.vitals_temp or '—'}",
-        f"  🩸 الضغط: {session.vitals_bp or '—'}",
-        f"  💓 النبض: {session.vitals_pulse or '—'}",
-        f"  🫁 الأكسجين: {session.vitals_spo2 or '—'}",
-        "",
-        "💊 *الأدوية والمستلزمات الطبية:*",
-        supply_list,
-        "",
-        f"📎 *الصور:*  {img_text}",
-        "",
-        f"📝 *الملاحظات:*  {notes_text}",
-        "",
-        f"👨‍⚕️ *المختص الصحي:*  {spec_text}",
-        "",
-        _THIN,
         "هل تريد نشر هذا التقرير؟",
     ]
 
