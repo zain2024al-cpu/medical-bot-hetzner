@@ -206,7 +206,7 @@ def test_woundcare_review_shows_all_fields():
     assert "شاش معقم"                            in text
     assert "تمت المعالجة"                        in text
     assert "د. فضل"                              in text
-    assert "🩹 *وصف حالة الجرح:*"               in text
+    assert "🩹 الحالة:"                           in text
     buttons = [btn.callback_data for row in kb.inline_keyboard for btn in row]
     assert "wca:confirm"         in buttons
     assert "wca:edit_notes"      in buttons
@@ -330,11 +330,11 @@ def test_woundcare_review_condition_bullet_list():
     s.specialist_name           = "د. زكريا"
     s.images                    = []
     text, kb = build_review(s)
-    # New section label
-    assert "🩹 *وصف حالة الجرح:*"              in text
-    # Both labels as bullet points
-    assert "• الجرح ملتئم بالكامل"              in text
-    assert "• الجرح نظيف"                        in text
+    # Compact inline label
+    assert "🩹 الحالة:"                          in text
+    # Both labels present (comma-separated inline, no bullets)
+    assert "الجرح ملتئم بالكامل"                in text
+    assert "الجرح نظيف"                          in text
     # Old free-text label must NOT appear
     assert "📄 *وصف الحالة:*"                  not in text
     print("review condition bullet list OK")
@@ -357,8 +357,8 @@ def test_woundcare_review_condition_other_replaces_placeholder():
     s.specialist_name           = "د. فضل"
     s.images                    = []
     text, kb = build_review(s)
-    assert "• رائحة غير طبيعية"                in text
-    assert "• انتفاخ وتقيح غير اعتيادي"        in text   # condition_other replaces "أخرى"
+    assert "رائحة غير طبيعية"                   in text
+    assert "انتفاخ وتقيح غير اعتيادي"           in text   # condition_other replaces "أخرى"
     assert "• أخرى"                           not in text   # raw "أخرى" must NOT appear
     print("review condition_other replaces placeholder OK")
 
@@ -461,10 +461,10 @@ def test_woundcare_review_supplies_section_label():
     s.specialist_name           = "د. فضل"
     s.images                    = []
     text, kb = build_review(s)
-    assert "🧰 *المستلزمات الطبية المستخدمة:*"  in text
+    assert "🧰 المستلزمات:"                        in text
     assert "🧰 *المستلزمات الطبية:*"           not in text   # old label must NOT appear
-    assert "• Sterile Gauze"                      in text
-    assert "• Medical Tape"                        in text
+    assert "Sterile Gauze"                         in text
+    assert "Medical Tape"                          in text
     print("review supplies section label updated OK")
 
 
@@ -756,7 +756,7 @@ def test_followup_procedure_type_session_persistence():
 
 
 def test_followup_review_procedure_type_section():
-    """Review renders '📋 *نوع الإجراء:*' with new-label bullet points."""
+    """Review renders procedure type inline in compact format (no section header)."""
     from modules.healthcare.medical_followup.session import MedicalFollowupSession
     from modules.healthcare.medical_followup.views import build_review
     ud = {}
@@ -773,8 +773,7 @@ def test_followup_review_procedure_type_section():
     s.specialist_name           = "د. فضل"
     s.images                    = []
     text, kb = build_review(s)
-    assert "📋 *نوع الإجراء:*"   in text
-    assert "معاينة وصرف دواء"    in text   # inline (comma-separated), no bullet
+    assert "معاينة وصرف دواء"    in text   # inline (comma-separated), no section header
     assert "حالة طارئة"          in text
     print("review procedure_type section with new labels OK")
 
@@ -908,7 +907,7 @@ def test_followup_complaint_other_prompt_view():
 
 
 def test_followup_review_complaint_section_header():
-    """build_review must use '😷 *الشكوى الرئيسية / الأعراض:*' header."""
+    """build_review renders complaints inline alongside procedure type (compact style)."""
     from modules.healthcare.medical_followup.session import MedicalFollowupSession
     from modules.healthcare.medical_followup.views import build_review
     ud = {}
@@ -928,10 +927,8 @@ def test_followup_review_complaint_section_header():
     s.meds_supply_labels        = []
     s.specialist_name           = "د. فضل"
     text, kb = build_review(s)
-    assert "😷 *الشكوى الرئيسية / الأعراض:*" in text, (
-        "Review must contain '😷 *الشكوى الرئيسية / الأعراض:*'"
-    )
-    assert "حمى وقشعريرة"         in text   # inline (comma-separated), no bullet
+    assert "😷" in text, "Review must contain 😷 emoji for complaints"
+    assert "حمى وقشعريرة"         in text   # inline (comma-separated)
     assert "صداع وألم في الرأس"   in text
     print("review complaint section header OK")
 
@@ -1182,7 +1179,7 @@ def test_followup_meds_other_label_replaced():
 
 
 def test_followup_review_meds_section_header():
-    """build_review must use '💊 *الأدوية والمستلزمات الطبية:*' header."""
+    """build_review must use '💊 المستلزمات:' compact label."""
     from modules.healthcare.medical_followup.session import MedicalFollowupSession
     from modules.healthcare.medical_followup.views import build_review
     ud = {}
@@ -1206,12 +1203,12 @@ def test_followup_review_meds_section_header():
     ]
     s.specialist_name           = "د. فضل"
     text, kb = build_review(s)
-    assert "💊 *الأدوية والمستلزمات الطبية:*" in text, (
-        "Review must contain '💊 *الأدوية والمستلزمات الطبية:*'"
+    assert "💊 المستلزمات:" in text, (
+        "Review must contain '💊 المستلزمات:' compact label"
     )
-    assert "• Paracetamol 1g infusion"                  in text
-    assert "• Augmentin 625mg tab 1-1-1 for 5 days"    in text
-    assert "• IV cannula and cannula fixator"            in text
+    assert "Paracetamol 1g infusion"                    in text
+    assert "Augmentin 625mg tab 1-1-1 for 5 days"      in text
+    assert "IV cannula and cannula fixator"              in text
     print("review meds section header OK")
 
 
@@ -1240,9 +1237,9 @@ def test_followup_review_meds_bullet_list():
     ]
     s.specialist_name           = "د. زكريا"
     text, kb = build_review(s)
-    assert "• Diclofenac 75mg INJ."    in text
-    assert "• Vitamin B Complex INJ."  in text
-    assert "• IV set"                  in text
+    assert "Diclofenac 75mg INJ."       in text
+    assert "Vitamin B Complex INJ."     in text
+    assert "IV set"                     in text
     print("review meds bullet list OK")
 
 
@@ -1267,9 +1264,9 @@ def test_followup_meds_no_selection_shows_dash():
     s.meds_supply_labels        = []
     s.specialist_name           = "د. فضل"
     text, kb = build_review(s)
-    assert "💊 *الأدوية والمستلزمات الطبية:*" in text
-    assert "➖ غير مضاف" in text   # empty optional field shows this marker
-    print("review meds empty shows غير مضاف OK")
+    assert "💊 المستلزمات:" in text
+    assert "—" in text   # empty meds show "—"
+    print("review meds empty shows — OK")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1479,7 +1476,6 @@ def test_medication_review_shows_dispense_source_pharmacy():
     s.specialist_name           = "د. فضل"
     text, kb = build_review(s)
     assert "الصيدلية"   in text
-    assert "جهة الصرف"  in text
     print("review shows dispense_source=الصيدلية OK")
 
 
@@ -1497,7 +1493,6 @@ def test_medication_review_shows_dispense_source_warehouse():
     s.specialist_name           = "د. سرور"
     text, kb = build_review(s)
     assert "المخزن"     in text
-    assert "جهة الصرف"  in text
     print("review shows dispense_source=المخزن OK")
 
 
@@ -1672,8 +1667,7 @@ def test_medication_review_shows_dept_and_count():
     assert "ناصر علي"          in text
     assert "القلب"              in text
     assert "3"                  in text
-    assert "القسم الطبي"       in text
-    assert "عدد الأصناف"       in text
+    assert "أصناف"              in text   # compact: "🔢 3 أصناف  •  🏪 ..."
     assert "زكريا"              in text
     buttons = [btn.callback_data for row in kb.inline_keyboard for btn in row]
     assert "hcmed:confirm"         in buttons
@@ -1886,15 +1880,11 @@ def test_review_editor_empty_optional_fields_show_marker():
     s.notes                     = ""          # empty optional
     s.specialist_name           = "د. فضل"
     text, _ = build_review(s)
-    assert "➖ غير مضاف" in text, (
-        "Empty optional field (images/notes/meds) must show '➖ غير مضاف'"
-    )
-    # Specifically: images, notes, and meds sections all empty → 3 markers
-    marker_count = text.count("➖ غير مضاف")
-    assert marker_count >= 3, (
-        f"Expected ≥3 '➖ غير مضاف' markers for empty images+notes+meds, got {marker_count}"
-    )
-    print(f"empty optional fields show marker OK  (markers={marker_count})")
+    # Compact style: empty fields show contextual markers (not "➖ غير مضاف")
+    assert "لا توجد ملاحظات" in text,  "empty notes must show 'لا توجد ملاحظات'"
+    assert "لا توجد صور"     in text,  "empty images must show 'لا توجد صور'"
+    assert "💊 المستلزمات: —" in text,  "empty meds must show '💊 المستلزمات: —'"
+    print("empty optional fields show contextual markers OK")
 
 
 def test_review_editor_filled_optional_fields_no_marker():
@@ -1946,8 +1936,8 @@ def test_review_editor_review_shows_images_and_notes_always():
     s.notes                     = ""
     s.specialist_name           = "د. فضل"
     text, _ = build_review(s)
-    assert "📎 *الصور:*"      in text, "images section must always be rendered"
-    assert "📝 *الملاحظات:*"  in text, "notes section must always be rendered"
+    assert "📎" in text, "images section must always be rendered"
+    assert "📝" in text, "notes section must always be rendered"
     print("review always renders images and notes sections OK")
 
 
