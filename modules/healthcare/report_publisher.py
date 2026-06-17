@@ -62,9 +62,23 @@ async def publish(bot, data: HealthcarePublishData) -> None:
 
     Errors are logged and swallowed — this must never raise.
     """
-    text = _build_report_text(data)
+    # ── ENTRY LOG — first thing executed, before any I/O ─────────────────────
+    logger.info(
+        f"[report_publisher] publish ENTERED"
+        f"  workflow={data.workflow_type}"
+        f"  patient={data.patient_name!r}"
+        f"  images={len(data.images)}"
+        f"  admin_ids={ADMIN_IDS}"
+    )
+
+    try:
+        text = _build_report_text(data)
+    except Exception:
+        logger.exception("[report_publisher] _build_report_text FAILED")
+        return
 
     # 1. Notify every admin
+    logger.info(f"[report_publisher] notifying admins: {ADMIN_IDS}")
     for admin_id in ADMIN_IDS:
         try:
             await bot.send_message(
@@ -72,6 +86,7 @@ async def publish(bot, data: HealthcarePublishData) -> None:
                 text=text,
                 parse_mode="Markdown",
             )
+            logger.info(f"[report_publisher] admin notified  admin={admin_id}")
         except Exception as exc:
             logger.warning(
                 f"[report_publisher] admin notify failed  admin={admin_id}: {exc}"
@@ -79,8 +94,9 @@ async def publish(bot, data: HealthcarePublishData) -> None:
 
     # 2. Publish to healthcare documentation group
     group_id = _resolve_group_id()
+    logger.info(f"[report_publisher] group_id resolved → {group_id!r}")
     if not group_id:
-        logger.debug("[report_publisher] HEALTHCARE_GROUP_ID not configured — skipping group publish")
+        logger.warning("[report_publisher] HEALTHCARE_GROUP_ID not configured — skipping group publish")
         return
 
     try:
@@ -89,13 +105,13 @@ async def publish(bot, data: HealthcarePublishData) -> None:
             text=text,
             parse_mode="Markdown",
         )
+        logger.info(f"[report_publisher] text sent to group  group_id={group_id}")
     except Exception as exc:
         logger.warning(f"[report_publisher] group text send failed: {exc}")
 
     # 3. Convert images to PDF and send to group
     logger.info(
-        f"[report_publisher] publish  workflow={data.workflow_type}"
-        f"  patient={data.patient_name!r}  images={len(data.images)}  group_id={group_id}"
+        f"[report_publisher] images check: {len(data.images)} image(s)"
     )
     if data.images:
         await _send_pdf_to_group(bot, group_id, data)

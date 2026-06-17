@@ -800,29 +800,37 @@ async def _handle_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         ("🧰 *المستلزمات الطبية المستخدمة:*",            supply_text),
     ]
 
-    # Publish report (errors are swallowed inside publish())
+    # Publish report
     user = update.effective_user
-    from modules.healthcare.report_publisher import HealthcarePublishData, publish as _publish
-    await _publish(
-        bot=context.bot,
-        data=HealthcarePublishData(
-            workflow_type=   "woundcare",
-            workflow_label=  "المجارحة والعناية بالجرح",
-            workflow_icon=   "🩺",
-            record_id=       saved.record_id,
-            patient_name=    saved.patient_name,
-            extra_sections=  extra_sections,
-            operations=      [],   # no operations in official woundcare spec
-            images=          images_snap,
-            notes=           notes_snap,
-            specialist_name= specialist_snap,
-            created_by_id=   user.id if user else None,
-            created_by_name= (
-                user.full_name or user.username or "مجهول"
-            ) if user else "مجهول",
-            record_date=     date_snap,
-        ),
+    logger.info(
+        f"[woundcare] calling publish  record_id={saved.record_id}"
+        f"  images_snap={len(images_snap)}"
     )
+    try:
+        from modules.healthcare.report_publisher import HealthcarePublishData, publish as _publish
+        await _publish(
+            bot=context.bot,
+            data=HealthcarePublishData(
+                workflow_type=   "woundcare",
+                workflow_label=  "المجارحة والعناية بالجرح",
+                workflow_icon=   "🩺",
+                record_id=       saved.record_id,
+                patient_name=    saved.patient_name,
+                extra_sections=  extra_sections,
+                operations=      [],
+                images=          images_snap,
+                notes=           notes_snap,
+                specialist_name= specialist_snap,
+                created_by_id=   user.id if user else None,
+                created_by_name= (
+                    user.full_name or user.username or "مجهول"
+                ) if user else "مجهول",
+                record_date=     date_snap,
+            ),
+        )
+        logger.info(f"[woundcare] publish completed  record_id={saved.record_id}")
+    except Exception:
+        logger.exception(f"[woundcare] publish RAISED  record_id={saved.record_id}")
 
 
 # ── Back navigation ───────────────────────────────────────────────────────────
