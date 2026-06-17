@@ -3,18 +3,38 @@
 # =============================
 
 import os
+import logging
 from dotenv import load_dotenv
 
-# 🧭 تحميل متغيرات البيئة من ملف config.env (للتطوير المحلي فقط)
-# في الاستضافة السحابية، المتغيرات تكون متوفرة مباشرة في البيئة
-# ✅ استخدام المسار المطلق لضمان العمل بغض النظر عن مجلد التشغيل
-_CONFIG_DIR = os.path.dirname(os.path.abspath(__file__))
-_CONFIG_ENV_PATH = os.path.join(_CONFIG_DIR, '..', 'config.env')
-_CONFIG_ENV_PATH = os.path.normpath(_CONFIG_ENV_PATH)
-try:
-    load_dotenv(_CONFIG_ENV_PATH)
-except FileNotFoundError:
-    pass  # طبيعي في الاستضافة السحابية
+# ── تحميل متغيرات البيئة ─────────────────────────────────────────────────────
+# يتم تحميل كلا الملفين بالترتيب، مع override=True حتى تأخذ قيم الملف
+# الأولوية على أي قيم موجودة مسبقاً في البيئة (مثل pm2 أو system env).
+#
+# ترتيب الأولوية (الأعلى يفوز):
+#   1. config.env  (الملف الرئيسي للإعدادات)
+#   2. .env        (ملف بديل مقبول أيضاً)
+#   3. system env  (أدنى أولوية)
+#
+_CONFIG_DIR     = os.path.dirname(os.path.abspath(__file__))
+_PROJECT_ROOT   = os.path.normpath(os.path.join(_CONFIG_DIR, '..'))
+_CONFIG_ENV     = os.path.join(_PROJECT_ROOT, 'config.env')
+_DOTENV         = os.path.join(_PROJECT_ROOT, '.env')
+
+# load .env first (lower priority)
+if os.path.isfile(_DOTENV):
+    load_dotenv(_DOTENV, override=True)
+
+# load config.env second (higher priority — overrides .env)
+if os.path.isfile(_CONFIG_ENV):
+    load_dotenv(_CONFIG_ENV, override=True)
+
+_settings_logger = logging.getLogger("config.settings")
+_settings_logger.info(
+    f"[config] env loaded"
+    f"  config.env={'✅' if os.path.isfile(_CONFIG_ENV) else '❌ missing'}"
+    f"  .env={'✅' if os.path.isfile(_DOTENV) else '❌ missing'}"
+    f"  project_root={_PROJECT_ROOT}"
+)
 
 # 🧭 توكن بوت التليجرام من @BotFather
 BOT_TOKEN = os.getenv("BOT_TOKEN")

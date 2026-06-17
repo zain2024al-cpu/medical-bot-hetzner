@@ -166,13 +166,19 @@ async def _render_user(query, user_id: int):
         approved = bool(getattr(u, "is_approved", False))
         suspended = bool(getattr(u, "is_suspended", False))
 
+    # Escape user-supplied strings so stray _ * ` chars don't break Markdown v1
+    def _esc(t: str) -> str:
+        for ch in ("_", "*", "`", "["):
+            t = t.replace(ch, f"\\{ch}")
+        return t
+
     await query.edit_message_text(
-        "👤 **تفاصيل المستخدم**\n\n"
-        f"- **الاسم**: {name}\n"
-        f"- **Telegram ID**: `{tg}`\n"
-        f"- **الهاتف**: {phone}\n"
-        f"- **موافقة**: {'✅' if approved else '⏳'}\n"
-        f"- **تجميد**: {'🔒' if suspended else '🔓'}\n",
+        "👤 *تفاصيل المستخدم*\n\n"
+        f"• *الاسم:* {_esc(name)}\n"
+        f"• *Telegram ID:* `{tg}`\n"
+        f"• *الهاتف:* {_esc(phone)}\n"
+        f"• *موافقة:* {'✅' if approved else '⏳'}\n"
+        f"• *تجميد:* {'🔒' if suspended else '🔓'}\n",
         reply_markup=_user_actions_kb(
             int(user_id),
             approved,

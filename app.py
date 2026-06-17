@@ -296,6 +296,18 @@ async def main():
     logger.info("Bot is running!")
     logger.info(f"Bot: @med_reports_bot")
     logger.info("=" * 50)
+
+    # ── Startup config verification ───────────────────────────────────────────
+    from config.settings import (
+        HEALTHCARE_GROUP_ID, GENERAL_SERVICES_GROUP_ID,
+        REPORTS_GROUP_ID, ADMIN_IDS,
+    )
+    logger.info("[startup] ADMIN_IDS              = %s", ADMIN_IDS)
+    logger.info("[startup] REPORTS_GROUP_ID        = %r", REPORTS_GROUP_ID)
+    logger.info("[startup] HEALTHCARE_GROUP_ID     = %r", HEALTHCARE_GROUP_ID)
+    logger.info("[startup] GENERAL_SERVICES_GROUP_ID = %r", GENERAL_SERVICES_GROUP_ID)
+    if not HEALTHCARE_GROUP_ID:
+        logger.warning("[startup] ⚠️  HEALTHCARE_GROUP_ID is EMPTY — healthcare reports will NOT be sent to a group")
     
     # Keep running
     try:
