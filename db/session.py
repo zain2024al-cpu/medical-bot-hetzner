@@ -91,58 +91,122 @@ def _add_column_if_missing(conn, table_name: str, columns: set[str], column_name
         return
     conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {ddl}"))
     columns.add(column_name)
+    logger.info(f"[db] added column {table_name}.{column_name}")
 
 
 def _ensure_schema_compatibility(target_engine=None) -> None:
     """
     Idempotent SQLite compatibility migration for older production databases.
 
-    It never drops or rewrites tables. It only adds nullable columns expected by
-    the current User model and links legacy translator-directory rows into the
-    users table when translators.translator_id already contains Telegram IDs.
+    Structured in two independent phases so that healthcare / general-services
+    migrations always run, even when the optional `translators` table is absent.
+
+    Phase 1 — column additions (always run, no early-exit):
+        • users
+        • wound_records
+        • medication_records
+        • gs_arrival_patients
+        • gs_departure_records
+        • gs_arrival_companions (residency fields)
+
+    Phase 2 — translator link (optional, only when translators table exists):
+        • link legacy translator rows to the users table.
     """
     target_engine = target_engine or engine
     try:
+        logger.info("[db] schema compatibility check started")
         with target_engine.begin() as conn:
-            if not _table_exists(conn, "users"):
-                return
 
-            columns = _table_columns(conn, "users")
-            for column_name, ddl in {
-                "tg_user_id": "INTEGER",
-                "chat_id": "INTEGER",
-                "first_name": "VARCHAR(255)",
-                "last_name": "VARCHAR(255)",
-                "full_name": "VARCHAR(255)",
-                "username": "VARCHAR(255)",
-                "phone_number": "VARCHAR(50)",
-                "email": "VARCHAR(255)",
-                "role": "VARCHAR(50)",
-                "status": "VARCHAR(50)",
-                "is_approved": "INTEGER",
-                "is_admin": "INTEGER",
-                "is_active": "INTEGER",
-                "is_suspended": "INTEGER",
-                "suspension_reason": "TEXT",
-                "suspended_at": "DATETIME",
-                "registration_date": "DATETIME",
-                "last_active": "DATETIME",
-                "total_reports": "INTEGER",
-                "created_at": "DATETIME",
-                "updated_at": "DATETIME",
-            }.items():
-                _add_column_if_missing(conn, "users", columns, column_name, ddl)
+            # ── Phase 1a: users table ─────────────────────────────────────────
+            if _table_exists(conn, "users"):
+                usr_cols = _table_columns(conn, "users")
+                for col, ddl in {
+                    "tg_user_id":        "INTEGER",
+                    "chat_id":           "INTEGER",
+                    "first_name":        "VARCHAR(255)",
+                    "last_name":         "VARCHAR(255)",
+                    "full_name":         "VARCHAR(255)",
+                    "username":          "VARCHAR(255)",
+                    "phone_number":      "VARCHAR(50)",
+                    "email":             "VARCHAR(255)",
+                    "role":              "VARCHAR(50)",
+                    "status":            "VARCHAR(50)",
+                    "is_approved":       "INTEGER",
+                    "is_admin":          "INTEGER",
+                    "is_active":         "INTEGER",
+                    "is_suspended":      "INTEGER",
+                    "suspension_reason": "TEXT",
+                    "suspended_at":      "DATETIME",
+                    "registration_date": "DATETIME",
+                    "last_active":       "DATETIME",
+                    "total_reports":     "INTEGER",
+                    "created_at":        "DATETIME",
+                    "updated_at":        "DATETIME",
+                }.items():
+                    _add_column_if_missing(conn, "users", usr_cols, col, ddl)
 
-            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_users_tg_user_id ON users (tg_user_id)"))
-            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_users_is_approved ON users (is_approved)"))
-            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_users_is_active ON users (is_active)"))
-            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_users_created_at ON users (created_at)"))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_users_tg_user_id ON users (tg_user_id)"))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_users_is_approved ON users (is_approved)"))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_users_is_active ON users (is_active)"))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS ix_users_created_at ON users (created_at)"))
 
+            # ── Phase 1b: healthcare — wound_records ──────────────────────────
+            # Columns added when the woundcare workflow was redesigned (11-step).
+            # Old tables only had: wound_types, wound_type_labels, image_file_ids,
+            # image_count, notes, created_by, created_at, updated_at.
+            if _table_exists(conn, "wound_records"):
+                wnd_cols = _table_columns(conn, "wound_records")
+                for col, ddl in {
+                    "medical_departments_json": "TEXT",
+                    "operation_name":           "TEXT",
+                    "phase":                    "TEXT",
+                    "phase_label":              "TEXT",
+                    "condition_description":    "TEXT",
+                    "supplies_json":            "TEXT",
+                    "specialist_name":          "TEXT",
+                }.items():
+                    _add_column_if_missing(conn, "wound_records", wnd_cols, col, ddl)
+
+            # ── Phase 1c: healthcare — medication_records ─────────────────────
+            # Columns added when the medications workflow was redesigned (10-step).
+            # Old tables only had: medication_ids, medication_labels, image_file_ids,
+            # image_count, notes, specialist_name, created_by, created_at, updated_at.
+            if _table_exists(conn, "medication_records"):
+                med_cols = _table_columns(conn, "medication_records")
+                for col, ddl in {
+                    "medical_departments_json": "TEXT",
+                    "item_count":               "INTEGER",
+                    "dispense_source":          "VARCHAR(50)",
+                }.items():
+                    _add_column_if_missing(conn, "medication_records", med_cols, col, ddl)
+
+            # ── Phase 1d: general services — arrivals / departures ────────────
+            if _table_exists(conn, "gs_arrival_patients"):
+                ap_cols = _table_columns(conn, "gs_arrival_patients")
+                _add_column_if_missing(conn, "gs_arrival_patients", ap_cols, "arrival_status",      "VARCHAR(20)")
+                _add_column_if_missing(conn, "gs_arrival_patients", ap_cols, "departure_record_id", "INTEGER")
+                _add_column_if_missing(conn, "gs_arrival_patients", ap_cols, "residence_expiry",    "VARCHAR(50)")
+                _add_column_if_missing(conn, "gs_arrival_patients", ap_cols, "residence_file_id",   "VARCHAR(255)")
+
+            if _table_exists(conn, "gs_departure_records"):
+                dr_cols = _table_columns(conn, "gs_departure_records")
+                _add_column_if_missing(conn, "gs_departure_records", dr_cols, "arrival_patient_ids", "TEXT")
+
+            if _table_exists(conn, "gs_arrival_companions"):
+                ac_cols = _table_columns(conn, "gs_arrival_companions")
+                _add_column_if_missing(conn, "gs_arrival_companions", ac_cols, "residence_expiry",  "VARCHAR(50)")
+                _add_column_if_missing(conn, "gs_arrival_companions", ac_cols, "residence_file_id", "VARCHAR(255)")
+
+            # ── Phase 2: translator link (optional) ───────────────────────────
+            # This block is entirely optional — it only runs when the legacy
+            # `translators` directory table is present.  Nothing above depends on it.
             if not _table_exists(conn, "translators"):
+                logger.info("[db] schema compatibility check completed (no translators table — skipping link phase)")
                 return
 
             translator_columns = _table_columns(conn, "translators")
             if not {"translator_id", "name"}.issubset(translator_columns):
+                logger.info("[db] schema compatibility check completed (translators table has unexpected schema)")
                 return
 
             # First repair existing user rows by exact unique name when safe.
@@ -194,62 +258,28 @@ def _ensure_schema_compatibility(target_engine=None) -> None:
             # Then create platform user rows for remaining directory translators.
             conn.execute(text("""
                 INSERT INTO users (
-                    tg_user_id,
-                    chat_id,
-                    full_name,
-                    role,
-                    status,
-                    is_approved,
-                    is_admin,
-                    is_active,
-                    is_suspended,
-                    registration_date,
-                    last_active,
-                    total_reports,
-                    created_at,
-                    updated_at
+                    tg_user_id, chat_id, full_name, role, status,
+                    is_approved, is_admin, is_active, is_suspended,
+                    registration_date, last_active, total_reports,
+                    created_at, updated_at
                 )
                 SELECT
-                    t.translator_id,
-                    t.translator_id,
-                    t.name,
-                    'user',
-                    'approved',
-                    1,
-                    0,
-                    1,
-                    0,
-                    CURRENT_TIMESTAMP,
-                    CURRENT_TIMESTAMP,
-                    0,
-                    CURRENT_TIMESTAMP,
-                    CURRENT_TIMESTAMP
+                    t.translator_id, t.translator_id, t.name,
+                    'user', 'approved', 1, 0, 1, 0,
+                    CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0,
+                    CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
                 FROM translators t
                 WHERE t.translator_id IS NOT NULL
                   AND t.translator_id > 0
                   AND NOT EXISTS (
-                      SELECT 1
-                      FROM users u
-                      WHERE u.tg_user_id = t.translator_id
+                      SELECT 1 FROM users u WHERE u.tg_user_id = t.translator_id
                   )
             """))
-            # ── Healthcare: medication_records missing columns ────────────────
-            if _table_exists(conn, "medication_records"):
-                med_cols = _table_columns(conn, "medication_records")
-                _add_column_if_missing(conn, "medication_records", med_cols, "dispense_source", "VARCHAR(50)")
 
-            # ── General services: arrival_status + departure link ─────────────
-            if _table_exists(conn, "gs_arrival_patients"):
-                ap_cols = _table_columns(conn, "gs_arrival_patients")
-                _add_column_if_missing(conn, "gs_arrival_patients", ap_cols, "arrival_status",      "VARCHAR(20)")
-                _add_column_if_missing(conn, "gs_arrival_patients", ap_cols, "departure_record_id", "INTEGER")
-
-            if _table_exists(conn, "gs_departure_records"):
-                dr_cols = _table_columns(conn, "gs_departure_records")
-                _add_column_if_missing(conn, "gs_departure_records", dr_cols, "arrival_patient_ids", "TEXT")
+        logger.info("[db] schema compatibility check completed")
 
     except Exception as exc:
-        logger.warning(f"⚠️ Schema compatibility migration skipped: {exc}")
+        logger.warning(f"⚠️ Schema compatibility migration skipped: {exc}", exc_info=True)
 
 
 # ================================================
