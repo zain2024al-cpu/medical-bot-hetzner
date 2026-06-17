@@ -18,7 +18,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
 
-from telegram import InputMediaPhoto
+import io
+import re
 
 from config.settings import ADMIN_IDS, HEALTHCARE_GROUP_ID
 from modules.healthcare.views import format_arabic_datetime, format_image_count
@@ -91,9 +92,9 @@ async def publish(bot, data: HealthcarePublishData) -> None:
     except Exception as exc:
         logger.warning(f"[report_publisher] group text send failed: {exc}")
 
-    # 3. Send images to group
+    # 3. Convert images to PDF and send to group
     if data.images:
-        await _send_images_to_group(bot, group_id, data)
+        await _send_pdf_to_group(bot, group_id, data)
 
 
 # ── Per-workflow operations label ─────────────────────────────────────────────
@@ -157,55 +158,90 @@ def _build_report_text(data: HealthcarePublishData) -> str:
     return "\n".join(lines)
 
 
-async def _send_images_to_group(
+_PDF_PREFIX: dict[str, str] = {
+    "woundcare":   "WoundCare",
+    "followup":    "MedFollowup",
+    "medications": "Medication",
+    "supplies":    "Supplies",
+    "other":       "Healthcare",
+}
+
+
+async def _send_pdf_to_group(
     bot,
     group_id: int | str,
     data: HealthcarePublishData,
 ) -> None:
-    """Send all images from the record to the healthcare group."""
-    file_ids = [
-        d.get("file_id", "")
-        for d in data.images
-        if d.get("file_id")
-    ]
+    """
+    Download all images attached to the record, merge them into a single PDF
+    (one image per page, no cover or extra formatting), and send the PDF to
+    the healthcare group.
+
+    Falls back silently — any failure is logged and swallowed.
+    """
+    from PIL import Image
+
+    file_ids = [d.get("file_id", "") for d in data.images if d.get("file_id")]
     if not file_ids:
         return
 
-    caption = (
-        f"📎 {data.workflow_icon} {data.workflow_label}\n"
-        f"المريض: {data.patient_name} — التقرير #{data.record_id}"
-    )
-
-    if len(file_ids) == 1:
+    # ── 1. Download every image from Telegram ────────────────────────────────
+    pil_images: list[Image.Image] = []
+    for fid in file_ids:
         try:
-            await bot.send_photo(
-                chat_id=group_id,
-                photo=file_ids[0],
-                caption=caption,
-            )
+            tg_file = await bot.get_file(fid)
+            raw     = await tg_file.download_as_bytearray()
+            img     = Image.open(io.BytesIO(bytes(raw))).convert("RGB")
+            pil_images.append(img)
         except Exception as exc:
-            logger.warning(f"[report_publisher] single photo to group failed: {exc}")
+            logger.warning(f"[report_publisher] image download failed  fid={fid}: {exc}")
+
+    if not pil_images:
+        logger.warning("[report_publisher] all image downloads failed — PDF skipped")
         return
 
-    # Multiple images — send as media group (max 10 per Telegram API)
-    media = [
-        InputMediaPhoto(
-            media=fid,
-            caption=caption if i == 0 else "",
-        )
-        for i, fid in enumerate(file_ids[:10])
-    ]
+    # ── 2. Build PDF in memory ────────────────────────────────────────────────
+    pdf_buffer = io.BytesIO()
     try:
-        await bot.send_media_group(chat_id=group_id, media=media)
-    except Exception as exc:
-        logger.warning(
-            f"[report_publisher] media_group to group failed ({exc}) — sending individually"
+        pil_images[0].save(
+            pdf_buffer,
+            format="PDF",
+            save_all=True,
+            append_images=pil_images[1:],
+            resolution=150.0,
         )
-        for fid in file_ids[:10]:
-            try:
-                await bot.send_photo(chat_id=group_id, photo=fid)
-            except Exception as exc2:
-                logger.warning(f"[report_publisher] individual photo failed: {exc2}")
+    except Exception as exc:
+        logger.warning(f"[report_publisher] PDF generation failed: {exc}")
+        return
+    pdf_buffer.seek(0)
+
+    # ── 3. Build filename and caption ─────────────────────────────────────────
+    prefix    = _PDF_PREFIX.get(data.workflow_type, "Healthcare")
+    safe_name = re.sub(r"[^\w؀-ۿ]", "_", data.patient_name)[:20]
+    date_str  = (data.record_date or "")[:10]
+    filename  = f"{prefix}_{safe_name}_{date_str}.pdf"
+
+    caption = (
+        f"👤 {data.patient_name}\n"
+        f"📋 {data.workflow_label}\n"
+        f"👨‍⚕️ {data.specialist_name or '—'}\n"
+        f"📅 {date_str}"
+    )
+
+    # ── 4. Send PDF to group ──────────────────────────────────────────────────
+    try:
+        await bot.send_document(
+            chat_id=group_id,
+            document=pdf_buffer,
+            filename=filename,
+            caption=caption,
+        )
+        logger.info(
+            f"[report_publisher] PDF sent  file={filename}"
+            f"  pages={len(pil_images)}  patient={data.patient_name!r}"
+        )
+    except Exception as exc:
+        logger.warning(f"[report_publisher] PDF send failed: {exc}")
 
 
 def _resolve_group_id() -> int | str | None:
