@@ -93,6 +93,10 @@ async def publish(bot, data: HealthcarePublishData) -> None:
         logger.warning(f"[report_publisher] group text send failed: {exc}")
 
     # 3. Convert images to PDF and send to group
+    logger.info(
+        f"[report_publisher] publish  workflow={data.workflow_type}"
+        f"  patient={data.patient_name!r}  images={len(data.images)}  group_id={group_id}"
+    )
     if data.images:
         await _send_pdf_to_group(bot, group_id, data)
 
@@ -182,20 +186,25 @@ async def _send_pdf_to_group(
     from PIL import Image
 
     file_ids = [d.get("file_id", "") for d in data.images if d.get("file_id")]
+    logger.info(f"[report_publisher] _send_pdf_to_group  file_ids={len(file_ids)}  raw_images={len(data.images)}")
     if not file_ids:
+        logger.warning("[report_publisher] no valid file_ids found in data.images — PDF skipped")
         return
 
     # ── 1. Download every image from Telegram ────────────────────────────────
     pil_images: list[Image.Image] = []
-    for fid in file_ids:
+    for i, fid in enumerate(file_ids):
         try:
+            logger.debug(f"[report_publisher] downloading image {i+1}/{len(file_ids)}  fid={fid[:20]}...")
             tg_file = await bot.get_file(fid)
             raw     = await tg_file.download_as_bytearray()
             img     = Image.open(io.BytesIO(bytes(raw))).convert("RGB")
             pil_images.append(img)
-        except Exception as exc:
-            logger.warning(f"[report_publisher] image download failed  fid={fid}: {exc}")
+            logger.debug(f"[report_publisher] image {i+1} downloaded OK  size={img.size}")
+        except Exception:
+            logger.exception(f"[report_publisher] image download FAILED  index={i}  fid={fid[:20]}...")
 
+    logger.info(f"[report_publisher] downloaded {len(pil_images)}/{len(file_ids)} images")
     if not pil_images:
         logger.warning("[report_publisher] all image downloads failed — PDF skipped")
         return
@@ -210,10 +219,11 @@ async def _send_pdf_to_group(
             append_images=pil_images[1:],
             resolution=150.0,
         )
-    except Exception as exc:
-        logger.warning(f"[report_publisher] PDF generation failed: {exc}")
+        pdf_buffer.seek(0)
+        logger.info(f"[report_publisher] PDF built  pages={len(pil_images)}  size={pdf_buffer.getbuffer().nbytes:,} bytes")
+    except Exception:
+        logger.exception("[report_publisher] PDF generation FAILED")
         return
-    pdf_buffer.seek(0)
 
     # ── 3. Build filename and caption ─────────────────────────────────────────
     prefix    = _PDF_PREFIX.get(data.workflow_type, "Healthcare")
@@ -229,6 +239,7 @@ async def _send_pdf_to_group(
     )
 
     # ── 4. Send PDF to group ──────────────────────────────────────────────────
+    logger.info(f"[report_publisher] sending PDF  file={filename}  chat={group_id}")
     try:
         await bot.send_document(
             chat_id=group_id,
@@ -237,11 +248,11 @@ async def _send_pdf_to_group(
             caption=caption,
         )
         logger.info(
-            f"[report_publisher] PDF sent  file={filename}"
+            f"[report_publisher] PDF sent OK  file={filename}"
             f"  pages={len(pil_images)}  patient={data.patient_name!r}"
         )
-    except Exception as exc:
-        logger.warning(f"[report_publisher] PDF send failed: {exc}")
+    except Exception:
+        logger.exception(f"[report_publisher] PDF send FAILED  file={filename}")
 
 
 def _resolve_group_id() -> int | str | None:
