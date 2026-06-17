@@ -74,4 +74,8 @@ def register_all(app) -> None:
     register_other_handlers(app)
     register_other_routes()
 
+    # ── Evaluation PDF report (📊) — admin only ──────────────────────────────
+    from modules.healthcare.evaluation.flow import register_handlers as register_evaluation_handlers
+    register_evaluation_handlers(app)
+
     logger.info("[healthcare] all handlers and result routes registered")
