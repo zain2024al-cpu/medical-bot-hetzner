@@ -13,7 +13,7 @@ from calendar import monthrange
 from datetime import date, timedelta
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes, CallbackQueryHandler, CommandHandler
+from telegram.ext import ContextTypes, CallbackQueryHandler, CommandHandler, MessageHandler, filters
 
 logger = logging.getLogger(__name__)
 
@@ -265,7 +265,15 @@ def register_handlers(app) -> None:
         CallbackQueryHandler(_handle_callback, pattern=rf"^{_PREFIX}:"),
         group=1,
     )
-    logger.info("[evaluation] handlers registered  command=/eval_report")
+    # ReplyKeyboard button handler (admin main keyboard)
+    app.add_handler(
+        MessageHandler(
+            filters.Regex(r"^📊 تقرير تقييم الرعاية الصحية$"),
+            handle_evaluation_command,
+        ),
+        group=1,
+    )
+    logger.info("[evaluation] handlers registered  command=/eval_report  button=📊 تقرير تقييم الرعاية الصحية")
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

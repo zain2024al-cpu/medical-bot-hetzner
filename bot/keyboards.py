@@ -16,6 +16,7 @@ def admin_main_kb():
         ["👑 إدارة الأدمنين", "📊 تحليل البيانات"],
         ["📅 إدارة الجدول", "🗑️ حذف التقارير"],
         ["📋 لصق تقرير جاهز"],
+        ["📊 تقرير تقييم الرعاية الصحية"],
         ["🔄 تحديث الصفحة", broadcast_status]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
