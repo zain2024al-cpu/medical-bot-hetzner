@@ -219,7 +219,10 @@ async def _handle_callback(
     parts  = action.split(":")
     today  = date.today()
 
-    if parts[0] == "specialist":
+    if parts[0] == "start":
+        await _show_specialist_list(update, context)
+
+    elif parts[0] == "specialist":
         await _show_period_selection(update, context, ":".join(parts[1:]))
 
     elif parts[0] == "month" and len(parts) == 3:

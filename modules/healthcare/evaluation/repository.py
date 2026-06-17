@@ -100,8 +100,8 @@ def get_evaluation_data(
     from db.models import (
         WoundRecord, MedicationRecord,
         MedicalFollowupRecord, SuppliesRecord,
+        OtherHealthcareRecord,
     )
-    # MedicalFollowupRecord alias for clarity
     ExamModel = MedicalFollowupRecord
 
     data = EvaluationData(
@@ -218,6 +218,32 @@ def get_evaluation_data(
                 created_at=   r.created_at,
             ))
 
+        # ── OtherHealthcareRecord ─────────────────────────────────────────────
+        try:
+            other_qs = (
+                db.query(OtherHealthcareRecord)
+                .filter(
+                    OtherHealthcareRecord.specialist_name == specialist_name,
+                    OtherHealthcareRecord.created_at >= dt_start,
+                    OtherHealthcareRecord.created_at <= dt_end,
+                )
+                .order_by(OtherHealthcareRecord.created_at.asc())
+                .all()
+            )
+            for r in other_qs:
+                rows.append(CaseRow(
+                    record_id=    r.id,
+                    service_type= "other",
+                    service_label="إجراء صحي",
+                    patient_name= r.patient_name or "—",
+                    departments=  _parse_json_list(getattr(r, "medical_departments_json", None)),
+                    detail=       "—",
+                    image_count=  r.image_count or 0,
+                    created_at=   r.created_at,
+                ))
+        except Exception as exc:
+            logger.warning(f"[evaluation.repo] OtherHealthcareRecord query failed: {exc}")
+
     # Sort all rows chronologically
     rows.sort(key=lambda r: r.created_at)
     data.cases = rows
@@ -303,35 +329,36 @@ def _aggregate(data: EvaluationData, rows: list[CaseRow]) -> None:
 
 
 def list_specialist_names() -> list[str]:
-    """Return all distinct specialist names found across all healthcare tables."""
+    """Return all distinct specialist names found across ALL five healthcare tables."""
     from db.session import get_db
-    from db.models import WoundRecord, MedicationRecord, SuppliesRecord
+    from db.models import (
+        WoundRecord, MedicationRecord, SuppliesRecord,
+        MedicalFollowupRecord, OtherHealthcareRecord,
+    )
 
     names: set[str] = set()
     with get_db() as db:
-        for Model in (WoundRecord, MedicationRecord, SuppliesRecord):
-            rows = (
-                db.query(Model.specialist_name)
-                .filter(Model.specialist_name.isnot(None), Model.specialist_name != "")
-                .distinct()
-                .all()
-            )
-            for (name,) in rows:
-                if name and name.strip():
-                    names.add(name.strip())
-        try:
-            from db.models import MedicalFollowupRecord
-            rows = (
-                db.query(MedicalFollowupRecord.specialist_name)
-                .filter(MedicalFollowupRecord.specialist_name.isnot(None),
-                        MedicalFollowupRecord.specialist_name != "")
-                .distinct()
-                .all()
-            )
-            for (name,) in rows:
-                if name and name.strip():
-                    names.add(name.strip())
-        except Exception:
-            pass
+        for Model in (
+            WoundRecord, MedicationRecord, SuppliesRecord,
+            MedicalFollowupRecord, OtherHealthcareRecord,
+        ):
+            try:
+                rows = (
+                    db.query(Model.specialist_name)
+                    .filter(
+                        Model.specialist_name.isnot(None),
+                        Model.specialist_name != "",
+                    )
+                    .distinct()
+                    .all()
+                )
+                for (name,) in rows:
+                    if name and name.strip():
+                        names.add(name.strip())
+            except Exception as exc:
+                logger.debug(
+                    f"[evaluation.repo] list_specialist_names"
+                    f"  skip {getattr(Model, '__tablename__', str(Model))}: {exc}"
+                )
 
     return sorted(names)

@@ -208,6 +208,7 @@ def admin_main_inline_kb():
     keyboard = [
         [InlineKeyboardButton("🔄 تحديث", callback_data="admin:refresh")],
         [InlineKeyboardButton("🏥 إدارة مجموعة التقارير", callback_data="admin:manage_group")],
+        [InlineKeyboardButton("📊 تقرير تقييم الرعاية الصحية", callback_data="hceval:start")],
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -216,6 +217,7 @@ def admin_main_inline_kb_with_group():
     keyboard = [
         [InlineKeyboardButton("🔄 تحديث", callback_data="admin:refresh")],
         [InlineKeyboardButton("🏥 إدارة مجموعة التقارير", callback_data="admin:manage_group")],
+        [InlineKeyboardButton("📊 تقرير تقييم الرعاية الصحية", callback_data="hceval:start")],
     ]
     return InlineKeyboardMarkup(keyboard)
 
