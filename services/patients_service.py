@@ -272,6 +272,57 @@ def get_patients_paginated(page: int = 0, per_page: int = 10) -> tuple:
         return [], 0, 0
 
 
+def sync_arrivals_to_patient_registry(patients: list) -> tuple:
+    """
+    Upsert arrival patient names into the Master Patient Registry (patients table).
+
+    Each dict in `patients` must have at least a "name" key.
+    Companions inside each patient's "companions" list are also upserted.
+
+    Returns (added_count, skipped_count).
+    add_patient() already handles upsert: it returns the existing id when the
+    name already exists, so we count "added" only when the record is truly new.
+    """
+    added   = 0
+    skipped = 0
+
+    for p in patients:
+        name = (p.get("name") or "").strip()
+        if not name:
+            continue
+        try:
+            # Check existence before inserting so we can count accurately.
+            existing = get_patient_by_name(name)
+            add_patient(name)
+            if existing:
+                skipped += 1
+            else:
+                added += 1
+        except Exception as exc:
+            logger.error(f"[patients_service] sync upsert failed for {name!r}: {exc}")
+
+        # Companions — same upsert logic
+        for c in p.get("companions", []):
+            c_name = (c.get("name") or "").strip()
+            if not c_name:
+                continue
+            try:
+                existing_c = get_patient_by_name(c_name)
+                add_patient(c_name)
+                if existing_c:
+                    skipped += 1
+                else:
+                    added += 1
+            except Exception as exc:
+                logger.error(f"[patients_service] sync upsert failed for companion {c_name!r}: {exc}")
+
+    logger.info(
+        f"[patients_service] sync_arrivals_to_patient_registry"
+        f"  added={added}  skipped={skipped}"
+    )
+    return added, skipped
+
+
 def sync_file_to_database() -> int:
     """
     مزامنة المرضى من الملف إلى قاعدة البيانات
@@ -319,6 +370,7 @@ __all__ = [
     'update_patient',
     'delete_patient',
     'search_patients',
+    'sync_arrivals_to_patient_registry',
     'sync_file_to_database',
     'get_patients_count',
     'get_patients_paginated',

@@ -163,16 +163,18 @@ def build_specialist_prompt(session: DepartureSession) -> tuple[str, InlineKeybo
 # ── Review ────────────────────────────────────────────────────────────────────
 
 def build_review(session: DepartureSession) -> tuple[str, InlineKeyboardMarkup]:
-    date_str = format_arabic_date(session.created_at)
+    date_str = format_arabic_datetime(session.created_at)
     imgs     = format_image_count(session.image_count)
     notes    = session.notes or "لا توجد ملاحظات"
     lines = [
         "🛫 *مراجعة تقرير المغادرة*",
-        "",
-        f"📅 {date_str}",
+        _DIVIDER,
+        f"📅 *التاريخ:*  {date_str}",
         f"👥 *المغادرون:*  {session.patients_text or _NONE}",
-        f"🏥 {session.hospital_label or _NONE}  •  👨‍⚕️ {session.specialist_label or _NONE}",
-        f"📎 {imgs}",
+        f"🏥 *الجهة الموصلة:*  {session.hospital_label or _NONE}",
+        f"👨‍⚕️ *المسؤول:*  {session.specialist_label or _NONE}",
+        f"📎 *الوثائق:*  {imgs}",
+        _THIN,
         f"📝 *الملاحظات:*  {notes}",
         "",
         "هل تريد نشر هذا التقرير؟",

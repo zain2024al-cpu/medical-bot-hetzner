@@ -233,6 +233,11 @@ def _ensure_schema_compatibility(target_engine=None) -> None:
                       WHERE u.tg_user_id = t.translator_id
                   )
             """))
+            # ── Healthcare: medication_records missing columns ────────────────
+            if _table_exists(conn, "medication_records"):
+                med_cols = _table_columns(conn, "medication_records")
+                _add_column_if_missing(conn, "medication_records", med_cols, "dispense_source", "VARCHAR(50)")
+
             # ── General services: arrival_status + departure link ─────────────
             if _table_exists(conn, "gs_arrival_patients"):
                 ap_cols = _table_columns(conn, "gs_arrival_patients")

@@ -36,6 +36,13 @@ def save_medication_record(
 
     image_file_ids = [d.get("file_id", "") for d in images]
 
+    logger.debug(
+        "[healthcare.publish] save_medication_record entering DB write"
+        f"  patient_id={patient_id}  item_count={item_count}"
+        f"  dispense_source={dispense_source!r}"
+        f"  depts={medical_department_labels}"
+    )
+
     with get_db() as db:
         record = MedicationRecord(
             patient_id=               patient_id,

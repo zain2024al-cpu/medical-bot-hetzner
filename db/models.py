@@ -612,7 +612,7 @@ class DailySchedule(Base):
 class DailyPatient(Base):
     """Daily patient tracking"""
     __tablename__ = "daily_patients"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     translator_id = Column(Integer, nullable=True)
     translator_name = Column(String(255), nullable=True)
@@ -620,6 +620,89 @@ class DailyPatient(Base):
     patient_count = Column(Integer, default=0, nullable=True)
     date = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=True)
+
+
+# ================================================
+# Residency — Lifecycle Management
+# ================================================
+
+class ResidencyProfile(Base):
+    """
+    Master residency record for one patient.
+    Created automatically from an ArrivalBatch (source='arrivals')
+    or manually by staff (source='manual').
+    """
+    __tablename__ = "res_profiles"
+
+    id                       = Column(Integer, primary_key=True, autoincrement=True)
+    # Link back to arrivals (nullable — manual entries have no arrival record)
+    arrival_patient_id       = Column(Integer, nullable=True, index=True)
+    source                   = Column(String(20),  default="arrivals")   # "arrivals" | "manual"
+    name                     = Column(String(255), nullable=False, index=True)
+    # Status lifecycle:
+    # active → expiring → renewal_submitted → issued → (dependent_pending) → …
+    status                   = Column(String(30),  default="active", index=True)
+    # Document numbers / dates
+    residency_number         = Column(String(100), default="")
+    issue_date               = Column(String(50),  default="")   # ISO date string YYYY-MM-DD
+    expiry_date              = Column(String(50),  default="")   # ISO date string YYYY-MM-DD
+    # Latest known Telegram file_ids for each document
+    passport_file_id         = Column(String(255), default="")
+    visa_file_id             = Column(String(255), default="")
+    latest_residency_file_id = Column(String(255), default="")
+    # Extra
+    notes                    = Column(Text, default="")
+    created_by               = Column(Integer, nullable=True, index=True)
+    created_at               = Column(DateTime, default=datetime.utcnow, index=True, nullable=True)
+    updated_at               = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
+
+
+class ResidencyCompanion(Base):
+    """
+    One companion attached to a ResidencyProfile.
+    Created from arrival companions automatically, or added manually.
+    """
+    __tablename__ = "res_companions"
+
+    id                       = Column(Integer, primary_key=True, autoincrement=True)
+    profile_id               = Column(Integer, nullable=False, index=True)   # FK → res_profiles.id
+    arrival_companion_id     = Column(Integer, nullable=True)                # FK → gs_arrival_companions.id
+    name                     = Column(String(255), nullable=False, index=True)
+    status                   = Column(String(30),  default="active", index=True)
+    residency_number         = Column(String(100), default="")
+    issue_date               = Column(String(50),  default="")
+    expiry_date              = Column(String(50),  default="")
+    passport_file_id         = Column(String(255), default="")
+    visa_file_id             = Column(String(255), default="")
+    latest_residency_file_id = Column(String(255), default="")
+    notes                    = Column(Text, default="")
+    created_at               = Column(DateTime, default=datetime.utcnow, nullable=True)
+    updated_at               = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
+
+
+class ResidencyUpdate(Base):
+    """
+    Append-only audit / timeline log for every status change or document update
+    on a ResidencyProfile or its companions.
+    """
+    __tablename__ = "res_updates"
+
+    id               = Column(Integer, primary_key=True, autoincrement=True)
+    profile_id       = Column(Integer, nullable=False, index=True)   # FK → res_profiles.id
+    companion_id     = Column(Integer, nullable=True)                # FK → res_companions.id (companion event)
+    # action_type values:
+    #   profile_created | manual_add | renewal_submitted | issued
+    #   companion_issued | companion_skipped | status_changed | note_added
+    action_type      = Column(String(50),  nullable=False)
+    action_label     = Column(String(255), default="")
+    old_status       = Column(String(30),  default="")
+    new_status       = Column(String(30),  default="")
+    old_expiry_date  = Column(String(50),  default="")
+    new_expiry_date  = Column(String(50),  default="")
+    residency_file_id = Column(String(255), default="")
+    notes            = Column(Text, default="")
+    performed_by     = Column(Integer, nullable=True)
+    created_at       = Column(DateTime, default=datetime.utcnow, index=True, nullable=True)
 
 
 class DailyReportTracking(Base):

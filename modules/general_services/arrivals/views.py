@@ -71,7 +71,7 @@ def build_hospital_prompt() -> tuple[str, InlineKeyboardMarkup]:
         for hid, label in HOSPITAL_MAP.items()
     ]
     rows.append([
-        InlineKeyboardButton("⬅️ رجوع", callback_data=f"{GSA}:start"),
+        InlineKeyboardButton("⬅️ رجوع", callback_data=f"{GSA}:back_to_batch_notes"),
         InlineKeyboardButton("❌ إلغاء", callback_data=f"{GS}:arrivals"),
     ])
     return "\n".join(lines), InlineKeyboardMarkup(rows)
@@ -99,10 +99,6 @@ def build_patient_count_prompt(session: ArrivalSession) -> tuple[str, InlineKeyb
         _DIVIDER,
         "👥  **عدد المرضى في الدفعة**",
         "",
-        f"الجهة الموصلة: {session.hospital_label}",
-        f"المختص: {session.specialist_label}",
-        _THIN,
-        "",
         "اختر عدد المرضى في الدفعة:",
     ]
     # Numbers 1–20 in rows of 5
@@ -112,7 +108,7 @@ def build_patient_count_prompt(session: ArrivalSession) -> tuple[str, InlineKeyb
         [InlineKeyboardButton(str(n), callback_data=f"{GSA}:count_{n}") for n in range(11, 16)],
         [InlineKeyboardButton(str(n), callback_data=f"{GSA}:count_{n}") for n in range(16, 21)],
         [
-            InlineKeyboardButton("⬅️ رجوع", callback_data=f"{GSA}:back_to_specialist"),
+            InlineKeyboardButton("⬅️ رجوع", callback_data=f"{GSA}:start"),
             InlineKeyboardButton("❌ إلغاء", callback_data=f"{GS}:arrivals"),
         ],
     ]
@@ -127,9 +123,6 @@ def build_p_name_prompt(session: ArrivalSession) -> tuple[str, InlineKeyboardMar
     lines = [
         _DIVIDER,
         f"👤  **المريض {idx} من {total}**",
-        "",
-        f"الجهة الموصلة: {session.hospital_label}",
-        _THIN,
         "",
         f"✏️ اكتب اسم المريض {idx}:",
     ]
@@ -254,14 +247,16 @@ def build_p_residence_expiry_prompt(session: ArrivalSession) -> tuple[str, Inlin
         f"المريض: {name}",
         _THIN,
         "",
-        "✏️ ردّ على هذه الرسالة بتاريخ انتهاء الإقامة  (مثال: 22/05/2026)،",
-        "أو اضغط **⏭️ تخطي**.",
+        "اختر تاريخ انتهاء الإقامة:",
     ]
-    kb = InlineKeyboardMarkup([[
-        InlineKeyboardButton("⏭️ تخطي", callback_data=f"{GSA}:skip_p_residence_expiry"),
-        InlineKeyboardButton("⬅️ رجوع", callback_data=f"{GSA}:back_p_residence"),
-        InlineKeyboardButton("❌ إلغاء", callback_data=f"{GS}:arrivals"),
-    ]])
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📆 اختيار من التقويم", callback_data=f"{GSA}:p_residence_expiry_cal")],
+        [
+            InlineKeyboardButton("⏭️ تخطي", callback_data=f"{GSA}:skip_p_residence_expiry"),
+            InlineKeyboardButton("⬅️ رجوع", callback_data=f"{GSA}:back_p_residence"),
+        ],
+        [InlineKeyboardButton("❌ إلغاء", callback_data=f"{GS}:arrivals")],
+    ])
     return "\n".join(lines), kb
 
 
@@ -270,7 +265,6 @@ def build_batch_notes_prompt(session: ArrivalSession) -> tuple[str, InlineKeyboa
         _DIVIDER,
         "📝  **ملاحظات عامة للدفعة**",
         "",
-        f"الجهة الموصلة: {session.hospital_label}",
         f"عدد المرضى: {session.patient_count}",
         _THIN,
         "",
@@ -311,12 +305,12 @@ def build_c_visa_expiry_prompt(session: ArrivalSession) -> tuple[str, InlineKeyb
     name = session.current_companion.get("name", "—")
     lines = [
         _DIVIDER,
-        f"📋  **مرافق المريض {idx} — تاريخ انتهاء التأشيرة**",
+        f"📋  **مرافق المريض {idx} — تاريخ انتهاء الإقامة**",
         "",
         f"المرافق: {name}",
         _THIN,
         "",
-        "اختر تاريخ انتهاء التأشيرة:",
+        "اختر تاريخ انتهاء الإقامة:",
     ]
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("📆 اختيار من التقويم", callback_data=f"{GSA}:c_visa_expiry_cal")],
@@ -361,35 +355,42 @@ def build_c_visa_prompt(session: ArrivalSession) -> tuple[str, InlineKeyboardMar
 # ── Review ────────────────────────────────────────────────────────────────────
 
 def build_review(session: ArrivalSession) -> tuple[str, InlineKeyboardMarkup]:
-    date_str = format_arabic_date(session.created_at)
+    date_str = format_arabic_datetime(session.created_at)
     count    = len(session.completed_patients)
     lines = [
         "🛬 *مراجعة دفعة الوصول*",
-        "",
-        f"📅 {date_str}",
-        f"🏥 {session.hospital_label or _NONE}  •  👨‍⚕️ {session.specialist_label or _NONE}",
+        _DIVIDER,
+        f"📅 *التاريخ:*  {date_str}",
+        f"🏥 *الجهة الموصلة:*  {session.hospital_label or _NONE}",
+        f"👨‍⚕️ *المسؤول:*  {session.specialist_label or _NONE}",
         f"👥 *عدد المرضى:*  {count}",
+        _THIN,
+        "*قائمة المرضى:*",
     ]
     for i, p in enumerate(session.completed_patients):
-        pname    = p.get("name", "—")
-        vis_exp  = p.get("visa_expiry") or "—"
+        pname     = p.get("name", "—")
+        vis_exp   = p.get("visa_expiry") or "—"
         comp_icon = "✅" if p.get("has_companion") else "❌"
-        p_pass = "✅" if p.get("passport_file_id")  else "⬜"
-        p_visa = "✅" if p.get("visa_file_id")       else "⬜"
-        p_res  = "✅" if p.get("residence_file_id")  else "⬜"
+        p_pass    = "✅" if p.get("passport_file_id")  else "⬜"
+        p_visa    = "✅" if p.get("visa_file_id")       else "⬜"
+        p_res     = "✅" if p.get("residence_file_id")  else "⬜"
         lines += [
             "",
             f"*{i + 1}.* {pname}",
-            f"تأشيرة: {vis_exp}  •  مرافق: {comp_icon}",
-            f"📎 {p_pass} جواز  {p_visa} تأشيرة  {p_res} إقامة",
+            f"   📋 تأشيرة: {vis_exp}   🤝 مرافق: {comp_icon}",
+            f"   📎 جواز {p_pass}   تأشيرة {p_visa}   إقامة {p_res}",
         ]
         for c in p.get("companions", []):
             c_pass = "✅" if c.get("passport_file_id") else "⬜"
             c_visa = "✅" if c.get("visa_file_id")     else "⬜"
-            lines.append(f"↳ {c.get('name', '—')}  📎 {c_pass} جواز  {c_visa} تأشيرة")
+            lines += [
+                f"   ↳ *{c.get('name', '—')}*",
+                f"      📎 جواز {c_pass}   تأشيرة {c_visa}",
+            ]
 
     lines += [
         "",
+        _THIN,
         f"📝 *الملاحظات:*  {session.batch_notes or 'لا توجد ملاحظات'}",
         "",
         "هل تريد نشر هذا التقرير؟",
@@ -400,7 +401,10 @@ def build_review(session: ArrivalSession) -> tuple[str, InlineKeyboardMarkup]:
             InlineKeyboardButton("❌ إلغاء",          callback_data=f"{GSA}:cancel"),
         ],
         [
-            InlineKeyboardButton("✏️ تعديل الملاحظات", callback_data=f"{GSA}:back_to_batch_notes"),
+            InlineKeyboardButton("✏️ تعديل الملاحظات",     callback_data=f"{GSA}:back_to_batch_notes"),
+        ],
+        [
+            InlineKeyboardButton("✏️ تعديل الجهة والمختص", callback_data=f"{GSA}:back_to_hospital"),
         ],
     ])
     return "\n".join(lines), kb

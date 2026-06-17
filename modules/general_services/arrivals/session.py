@@ -131,6 +131,7 @@ class ArrivalSession:
             "passport_file_id":  "",
             "visa_file_id":      "",
             "residence_file_id": "",
+            "residence_expiry":  "",
             "companions":        [],
         }
         self.current_companion = {}

@@ -725,6 +725,22 @@ async def _handle_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         ]
     condition_desc_for_db = "\n".join(f"• {lbl}" for lbl in _cond_for_db) if _cond_for_db else ""
 
+    _created_by = update.effective_user.id if update.effective_user else None
+    logger.info(
+        "[healthcare.publish] model=WoundRecord  payload:"
+        f"  patient_id={session.patient_id}"
+        f"  patient_name={session.patient_name!r}"
+        f"  depts={session.medical_department_labels}"
+        f"  operation_name={session.operation_name!r}"
+        f"  phase={session.phase!r}"
+        f"  phase_label={session.phase_label!r}"
+        f"  condition={condition_desc_for_db!r}"
+        f"  supplies={session.supply_labels}"
+        f"  images={len(session.images)}"
+        f"  notes={session.notes!r}"
+        f"  specialist={session.specialist_name!r}"
+        f"  created_by={_created_by}"
+    )
     try:
         saved = save_wound_record(
             patient_id=               session.patient_id,
@@ -740,10 +756,14 @@ async def _handle_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             images=                   session.images,
             notes=                    session.notes,
             specialist_name=          session.specialist_name,
-            created_by=               update.effective_user.id if update.effective_user else None,
+            created_by=               _created_by,
         )
-    except Exception as exc:
-        logger.error(f"[woundcare] DB save failed: {exc}")
+        logger.info(f"[healthcare.publish] save OK  model=WoundRecord  id={saved.record_id}  patient={saved.patient_name!r}")
+    except Exception:
+        logger.exception(
+            f"[healthcare.publish] FAILED  model=WoundRecord"
+            f"  patient_id={session.patient_id}  patient_name={session.patient_name!r}"
+        )
         text, kb = build_error("فشل حفظ التقرير. يرجى المحاولة مرة أخرى.")
         try:
             await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")

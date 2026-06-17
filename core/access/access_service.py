@@ -113,6 +113,7 @@ def grant_module(tg_user_id: int, module_key: str, granted_by: int | None = None
     try:
         from db.session import SessionLocal
         from db.models import UserModuleAccess
+        from sqlalchemy.exc import IntegrityError
 
         with SessionLocal() as s:
             existing = (
@@ -133,7 +134,27 @@ def grant_module(tg_user_id: int, module_key: str, granted_by: int | None = None
             else:
                 _insert_access(s, tg_user_id, module_key, granted_by)
 
-            s.commit()
+            try:
+                s.commit()
+            except IntegrityError:
+                # Race condition: a concurrent call inserted the row between our
+                # SELECT and INSERT. Roll back and activate the existing record.
+                s.rollback()
+                s.query(UserModuleAccess).filter_by(
+                    tg_user_id=tg_user_id, module_key=module_key
+                ).update({
+                    "is_active": True,
+                    "granted_by": granted_by,
+                    "granted_at": datetime.utcnow(),
+                    "revoked_by": None,
+                    "revoked_at": None,
+                })
+                s.commit()
+                logger.info(
+                    f"[access] grant_module recovered from race condition "
+                    f"module={module_key!r} tg_user_id={tg_user_id}"
+                )
+
             logger.info(
                 f"[access] granted module={module_key!r} "
                 f"to tg_user_id={tg_user_id} by admin={granted_by}"

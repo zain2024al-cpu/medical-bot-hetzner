@@ -100,16 +100,24 @@ def bootstrap_all() -> None:
         },
     )
 
+    # ── Residency: lifecycle management ──────────────────────────────────────
+    registry.register(
+        name="residency",
+        menu_buttons={"🪪 الإقامة"},
+        keyboard_rows=[["🪪 الإقامة"]],
+        extra_wipe_keys={
+            "_res_add",    # add-new-patient session
+            "_res_ren",    # renewal session
+            "_res_search_active",
+            "_res_archive_page",
+        },
+    )
+
     # ── Future modules — uncomment and fill in when ready ────────────────────
     # registry.register(
     #     name="pharmacy",
     #     menu_buttons={"💊 الصيدلية"},
     #     keyboard_rows=[["💊 الصيدلية"]],
-    # )
-    # registry.register(
-    #     name="residency",
-    #     menu_buttons={"🏥 الإقامة"},
-    #     keyboard_rows=[["🏥 الإقامة"]],
     # )
     # registry.register(
     #     name="services",

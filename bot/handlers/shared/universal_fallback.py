@@ -233,6 +233,15 @@ KNOWN_CALLBACKS = [
     r"^gsa:",
     r"^gsd:",
     r"^gsp:",
+
+    # Residency module — handled in groups 16 and 20.
+    r"^rn:",
+    r"^rna:",
+    r"^rnf:",
+    r"^rnr:",
+
+    # Admin module access management — handled in group 1.
+    r"^amod:",
 ]
 
 # ================================================

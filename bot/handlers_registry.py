@@ -142,6 +142,10 @@ def register_all_handlers(app):
     from modules.general_services.routing import register_all as register_general_services
     register_general_services(app)
 
+    # ── Residency module (groups 16, 20: text/callback handlers)
+    from modules.residency.routing import register_all as register_residency
+    register_residency(app)
+
     # ── Shared selector/upload callback handlers (group 1) ────────────────────
     # Must be registered after ConversationHandlers and healthcare so group 1
     # gets a clean slot for msel:* / sel_pat:* / upl:* callbacks.

@@ -186,19 +186,21 @@ def build_specialist_prompt(session: PublicServiceSession) -> tuple[str, InlineK
 # ── Review ────────────────────────────────────────────────────────────────────
 
 def build_review(session: PublicServiceSession) -> tuple[str, InlineKeyboardMarkup]:
-    date_str  = format_arabic_date(session.created_at)
+    date_str  = format_arabic_datetime(session.created_at)
     svc       = session.service_type_labels[0] if session.service_type_labels else _NONE
     imgs      = format_image_count(session.image_count)
     notes     = session.notes or "لا توجد ملاحظات"
     lines = [
         "🧾 *مراجعة الخدمة العامة*",
-        "",
-        f"📅 {date_str}",
+        _DIVIDER,
+        f"📅 *التاريخ:*  {date_str}",
         f"👤 *المريض:*  {session.patient_name or _NONE}",
-        f"🧾 *الخدمة:*  {svc}",
-        f"🔢 *البنود:*  {session.item_count or _NONE}  •  📎 {imgs}",
-        f"📝 *الملاحظات:*  {notes}",
+        f"🧾 *نوع الخدمة:*  {svc}",
+        f"🔢 *عدد البنود:*  {session.item_count or _NONE}",
+        f"📎 *الوثائق:*  {imgs}",
         f"👨‍⚕️ *المختص:*  {session.specialist_label or _NONE}",
+        _THIN,
+        f"📝 *الملاحظات:*  {notes}",
         "",
         "هل تريد نشر هذا التقرير؟",
     ]

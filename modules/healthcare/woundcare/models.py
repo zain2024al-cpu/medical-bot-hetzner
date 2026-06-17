@@ -50,6 +50,13 @@ def save_wound_record(
 
     image_file_ids = [d.get("file_id", "") for d in images]
 
+    logger.debug(
+        "[healthcare.publish] save_wound_record entering DB write"
+        f"  patient_id={patient_id}  images={len(images)}"
+        f"  depts={medical_department_labels}"
+        f"  op={operation_name!r}  phase={phase!r}"
+    )
+
     with get_db() as db:
         record = WoundRecord(
             patient_id=               patient_id,

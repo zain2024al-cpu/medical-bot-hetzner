@@ -125,8 +125,6 @@ async def _open_images_upload(update, context):
         await _cancel(update, context); return
     session.step = STEP_IMAGES
     session.save(context.user_data)
-    text, kb = build_images_prompt(session)
-    await _safe_edit(update, text, kb)
     await uploads.open(
         update,
         context,
@@ -390,8 +388,10 @@ async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         user  = update.effective_user
         body  = [
             f"👥 *المغادرون:*  {session.patients_text or '—'}",
-            f"🏥 {session.hospital_label or '—'}  •  👨‍⚕️ {session.specialist_label or '—'}",
-            f"📎 {imgs}",
+            f"🏥 *الجهة الموصلة:*  {session.hospital_label or '—'}",
+            f"👨‍⚕️ *المسؤول:*  {session.specialist_label or '—'}",
+            f"📎 *الوثائق:*  {imgs}",
+            "─────────────────",
             f"📝 *الملاحظات:*  {notes}",
         ]
 

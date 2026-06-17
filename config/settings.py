@@ -43,6 +43,9 @@ HEALTHCARE_GROUP_ID = os.getenv("HEALTHCARE_GROUP_ID", "")
 # 🔧 معرف مجموعة الخدمات العامة (نشر تقارير الوصول والمغادرة والخدمات)
 GENERAL_SERVICES_GROUP_ID = os.getenv("GENERAL_SERVICES_GROUP_ID", "")
 
+# 🪪 معرف مجموعة الإقامات (نشر أحداث الإقامات)
+RESIDENCY_GROUP_ID = os.getenv("RESIDENCY_GROUP_ID", "")
+
 # 🗂️ مسار قاعدة البيانات
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "..", "db", "medical_reports.db")

@@ -27,7 +27,7 @@ from modules.general_services.public_services.views import (
     build_public_services_menu,
     build_date_prompt, build_date_calendar_prompt,
     build_patient_prompt, build_service_type_prompt,
-    build_count_prompt, build_images_prompt, build_notes_prompt,
+    build_count_prompt, build_notes_prompt,
     build_specialist_prompt,
     build_review, build_success, build_cancelled, build_error,
 )
@@ -112,8 +112,6 @@ async def _open_images_upload(update, context):
         await _cancel(update, context); return
     session.step = STEP_IMAGES
     session.save(context.user_data)
-    text, kb = build_images_prompt(session)
-    await _safe_edit(update, text, kb)
     await uploads.open(
         update,
         context,
@@ -361,10 +359,12 @@ async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         user  = update.effective_user
         body  = [
             f"👤 *المريض:*  {session.patient_name or '—'}",
-            f"🧾 *الخدمة:*  {svc}",
-            f"🔢 *البنود:*  {session.item_count}  •  📎 {imgs}",
-            f"📝 *الملاحظات:*  {notes}",
+            f"🧾 *نوع الخدمة:*  {svc}",
+            f"🔢 *عدد البنود:*  {session.item_count}",
+            f"📎 *الوثائق:*  {imgs}",
             f"👨‍⚕️ *المختص:*  {session.specialist_label or '—'}",
+            "─────────────────",
+            f"📝 *الملاحظات:*  {notes}",
         ]
 
         from modules.general_services.report_publisher import GSPublishData, publish as _publish

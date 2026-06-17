@@ -501,6 +501,19 @@ async def _handle_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     dept_snap            = list(session.medical_department_labels)
     dispense_source_snap = session.dispense_source
 
+    _created_by = update.effective_user.id if update.effective_user else None
+    logger.info(
+        "[healthcare.publish] model=MedicationRecord  payload:"
+        f"  patient_id={session.patient_id}"
+        f"  patient_name={session.patient_name!r}"
+        f"  depts={session.medical_department_labels}"
+        f"  item_count={session.item_count}"
+        f"  dispense_source={session.dispense_source!r}"
+        f"  images={len(session.images)}"
+        f"  notes={session.notes!r}"
+        f"  specialist={session.specialist_name!r}"
+        f"  created_by={_created_by}"
+    )
     from modules.healthcare.medications.models import save_medication_record
     try:
         saved = save_medication_record(
@@ -513,10 +526,15 @@ async def _handle_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             images=                    session.images,
             notes=                     session.notes,
             specialist_name=           session.specialist_name,
-            created_by=                update.effective_user.id if update.effective_user else None,
+            created_by=                _created_by,
         )
-    except Exception as exc:
-        logger.error(f"[medications] DB save failed: {exc}")
+        logger.info(f"[healthcare.publish] save OK  model=MedicationRecord  id={saved.record_id}  patient={saved.patient_name!r}")
+    except Exception:
+        logger.exception(
+            f"[healthcare.publish] FAILED  model=MedicationRecord"
+            f"  patient_id={session.patient_id}  patient_name={session.patient_name!r}"
+            f"  dispense_source={session.dispense_source!r}"
+        )
         text, kb = build_error("فشل حفظ التقرير.")
         try:
             await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")

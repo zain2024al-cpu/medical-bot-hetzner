@@ -209,7 +209,14 @@ async def _show_review(update, context, session):
 
 
 async def _advance_after_patient_uploads(update, context, session):
-    """After patient's last upload (residence): go to companion loop or finish patient."""
+    """After patient's last upload (residence photo): show residence expiry step."""
+    session.step = STEP_P_RESIDENCE_EXPIRY
+    session.save(context.user_data)
+    await _show_p_residence_expiry(update, context, session)
+
+
+async def _advance_after_p_residence_expiry(update, context, session):
+    """After patient's residence expiry date is set/skipped: go to companion loop or finish patient."""
     if session.current_patient.get("has_companion"):
         session.step = STEP_C_NAME
         session.save(context.user_data)
@@ -321,10 +328,10 @@ async def _dispatch_callback_inner(
             await _cancel(update, context); return
         from datetime import datetime
         session.created_at = datetime.utcnow().isoformat()
-        session.step = STEP_HOSPITAL
+        session.step = STEP_PATIENT_COUNT
         session.save(context.user_data)
-        logger.info(f"[arrivals.cb] date_today → STEP_HOSPITAL  user={uid}")
-        await _show_hospital(update, context)
+        logger.info(f"[arrivals.cb] date_today → STEP_PATIENT_COUNT  user={uid}")
+        await _show_patient_count(update, context, session)
         return
 
     if action == "date_calendar":
@@ -397,6 +404,36 @@ async def _dispatch_callback_inner(
         await _show_c_visa_expiry(update, context, session)
         return
 
+    # ── Patient residence expiry calendar ─────────────────────────────────────
+    if action == "p_residence_expiry_cal":
+        session = ArrivalSession.load(context.user_data)
+        if session is None:
+            logger.warning(f"[arrivals.cb] p_residence_expiry_cal — no session  user={uid}")
+            await _cancel(update, context); return
+        session.step = STEP_P_RESIDENCE_EXPIRY
+        session.save(context.user_data)
+        logger.info(f"[arrivals.cb] p_residence_expiry_cal → calendar shown  user={uid}")
+        from datetime import datetime as _dt
+        now = _dt.utcnow()
+        cal_text, cal_kb = build_calendar(
+            year=now.year, month=now.month,
+            callback_prefix=GSA,
+            back_callback=f"{GSA}:p_residence_expiry_prompt",
+        )
+        await query.edit_message_text(cal_text, reply_markup=cal_kb, parse_mode="Markdown")
+        return
+
+    if action == "p_residence_expiry_prompt":
+        session = ArrivalSession.load(context.user_data)
+        if session is None:
+            logger.warning(f"[arrivals.cb] p_residence_expiry_prompt — no session  user={uid}")
+            await _cancel(update, context); return
+        session.step = STEP_P_RESIDENCE_EXPIRY
+        session.save(context.user_data)
+        logger.info(f"[arrivals.cb] p_residence_expiry_prompt → re-show  user={uid}")
+        await _show_p_residence_expiry(update, context, session)
+        return
+
     if action.startswith("cal_nav:"):
         parts = action.split(":")
         try:
@@ -408,6 +445,8 @@ async def _dispatch_callback_inner(
         _nav_session = ArrivalSession.load(context.user_data)
         if _nav_session and _nav_session.step == STEP_P_VISA_EXPIRY:
             _back_cb = f"{GSA}:visa_expiry_prompt"
+        elif _nav_session and _nav_session.step == STEP_P_RESIDENCE_EXPIRY:
+            _back_cb = f"{GSA}:p_residence_expiry_prompt"
         elif _nav_session and _nav_session.step == STEP_C_VISA_EXPIRY:
             _back_cb = f"{GSA}:c_visa_expiry_prompt"
         else:
@@ -433,7 +472,7 @@ async def _dispatch_callback_inner(
         if session is None:
             logger.warning(f"[arrivals.cb] cal_pick — no session  user={uid}")
             await _cancel(update, context); return
-        # Dispatch by step: patient visa expiry / companion visa expiry / arrival date.
+        # Dispatch by step: patient visa expiry / patient residence expiry / companion residence expiry / arrival date.
         if session.step == STEP_P_VISA_EXPIRY:
             session.current_patient["visa_expiry"] = dt.strftime("%d/%m/%Y")
             session.step = STEP_P_HAS_COMPANION
@@ -442,20 +481,27 @@ async def _dispatch_callback_inner(
                 f"[arrivals.cb] cal_pick p_visa_expiry={dt.date()} → STEP_P_HAS_COMPANION  user={uid}"
             )
             await _show_p_has_companion(update, context, session)
+        elif session.step == STEP_P_RESIDENCE_EXPIRY:
+            session.current_patient["residence_expiry"] = dt.strftime("%Y-%m-%d")
+            session.save(context.user_data)
+            logger.info(
+                f"[arrivals.cb] cal_pick p_residence_expiry={dt.date()} → _advance_after_p_residence_expiry  user={uid}"
+            )
+            await _advance_after_p_residence_expiry(update, context, session)
         elif session.step == STEP_C_VISA_EXPIRY:
-            session.current_companion["visa_expiry"] = dt.strftime("%d/%m/%Y")
+            session.current_companion["residence_expiry"] = dt.strftime("%Y-%m-%d")
             session.step = STEP_C_PASSPORT
             session.save(context.user_data)
             logger.info(
-                f"[arrivals.cb] cal_pick c_visa_expiry={dt.date()} → STEP_C_PASSPORT  user={uid}"
+                f"[arrivals.cb] cal_pick c_residence_expiry={dt.date()} → STEP_C_PASSPORT  user={uid}"
             )
             await _show_c_passport(update, context, session)
         else:
             session.created_at = dt.isoformat()
-            session.step = STEP_HOSPITAL
+            session.step = STEP_PATIENT_COUNT
             session.save(context.user_data)
-            logger.info(f"[arrivals.cb] cal_pick date={dt.date()} → STEP_HOSPITAL  user={uid}")
-            await _show_hospital(update, context)
+            logger.info(f"[arrivals.cb] cal_pick date={dt.date()} → STEP_PATIENT_COUNT  user={uid}")
+            await _show_patient_count(update, context, session)
         return
 
     # ── Hospital ──────────────────────────────────────────────────────────────
@@ -490,12 +536,12 @@ async def _dispatch_callback_inner(
             await _cancel(update, context); return
         session.specialist_id    = sid
         session.specialist_label = label
-        session.step             = STEP_PATIENT_COUNT
+        session.step             = STEP_REVIEW
         session.save(context.user_data)
         logger.info(
-            f"[arrivals.cb] specialist={sid!r} ({label!r}) → STEP_PATIENT_COUNT  user={uid}"
+            f"[arrivals.cb] specialist={sid!r} ({label!r}) → STEP_REVIEW  user={uid}"
         )
-        await _show_patient_count(update, context, session)
+        await _show_review(update, context, session)
         return
 
     # ── Patient count (inline button 1–20) ───────────────────────────────────
@@ -562,15 +608,25 @@ async def _dispatch_callback_inner(
         await _advance_after_patient_uploads(update, context, session)
         return
 
+    if action == "skip_p_residence_expiry":
+        session = ArrivalSession.load(context.user_data)
+        if session is None:
+            await _cancel(update, context); return
+        session.current_patient["residence_expiry"] = ""
+        session.save(context.user_data)
+        logger.info(f"[arrivals.cb] skip_p_residence_expiry → _advance_after_p_residence_expiry  user={uid}")
+        await _advance_after_p_residence_expiry(update, context, session)
+        return
+
     if action == "skip_batch_notes":
         session = ArrivalSession.load(context.user_data)
         if session is None:
             await _cancel(update, context); return
         session.batch_notes = ""
-        session.step = STEP_REVIEW
+        session.step = STEP_HOSPITAL
         session.save(context.user_data)
-        logger.info(f"[arrivals.cb] skip_batch_notes → STEP_REVIEW  user={uid}")
-        await _show_review(update, context, session)
+        logger.info(f"[arrivals.cb] skip_batch_notes → STEP_HOSPITAL  user={uid}")
+        await _show_hospital(update, context)
         return
 
     if action == "skip_c_passport":
@@ -747,29 +803,82 @@ async def _dispatch_callback_inner(
             f"[arrivals.cb] batch saved  batch_id={saved.batch_id}"
             f"  patient_count={saved.patient_count}  user={uid}"
         )
+
+        # ── Auto-create residency profiles (fire-and-forget, never breaks arrivals) ──
+        try:
+            from modules.residency.profiles.models import create_profiles_from_arrival_batch
+            created = create_profiles_from_arrival_batch(
+                batch_id=   saved.batch_id,
+                patients=   session.completed_patients,
+                created_by= update.effective_user.id if update.effective_user else None,
+            )
+            logger.info(
+                f"[arrivals.cb] residency profiles auto-created: {created}"
+                f"  batch_id={saved.batch_id}"
+            )
+        except Exception:
+            logger.exception(
+                f"[arrivals.cb] residency profile creation FAILED (non-fatal)"
+                f"  batch_id={saved.batch_id}"
+            )
+
+        # ── Sync patient names to Master Patient Registry (fire-and-forget) ──
+        try:
+            from services.patients_service import sync_arrivals_to_patient_registry
+            added, skipped = sync_arrivals_to_patient_registry(session.completed_patients)
+            logger.info(
+                f"[arrivals.cb] patient registry sync"
+                f"  added={added}  skipped={skipped}"
+                f"  batch_id={saved.batch_id}"
+            )
+        except Exception:
+            logger.exception(
+                f"[arrivals.cb] patient registry sync FAILED (non-fatal)"
+                f"  batch_id={saved.batch_id}"
+            )
+
         user  = update.effective_user
         count = len(session.completed_patients)
-        body  = [
-            f"🏥 {session.hospital_label}  •  👨‍⚕️ {session.specialist_label}",
-            f"👥 *عدد المرضى:*  {count}",
+
+        # ── Header ────────────────────────────────────────────────────────────
+        with_companion = sum(1 for p in session.completed_patients if p.get("has_companion"))
+        companion_note = f"  (منهم {with_companion} بمرافق)" if with_companion else ""
+        body = [
+            f"🏥 *الجهة الموصلة:*  {session.hospital_label}",
+            f"👨‍⚕️ *المسؤول:*  {session.specialist_label}",
+            f"👥 *إجمالي المرضى:*  {count}{companion_note}",
+            "─────────────────",
+            "*قائمة المرضى:*",
+            "",
         ]
+
+        # ── Patient list ──────────────────────────────────────────────────────
         for i, p in enumerate(session.completed_patients):
-            p_pass   = "✅" if p.get("passport_file_id")  else "⬜"
-            p_visa   = "✅" if p.get("visa_file_id")       else "⬜"
-            p_res    = "✅" if p.get("residence_file_id")  else "⬜"
-            vis_exp  = p.get("visa_expiry") or "—"
+            p_pass    = "✅" if p.get("passport_file_id")  else "⬜"
+            p_visa    = "✅" if p.get("visa_file_id")       else "⬜"
+            p_res     = "✅" if p.get("residence_file_id")  else "⬜"
+            vis_exp   = p.get("visa_expiry") or "—"
             comp_icon = "✅" if p.get("has_companion") else "❌"
             body += [
-                "",
                 f"*{i + 1}.* {p.get('name', '—')}",
-                f"تأشيرة: {vis_exp}  •  مرافق: {comp_icon}",
-                f"📎 {p_pass} جواز  {p_visa} تأشيرة  {p_res} إقامة",
+                f"   📋 تأشيرة: {vis_exp}   🤝 مرافق: {comp_icon}",
+                f"   📎 جواز {p_pass}   تأشيرة {p_visa}   إقامة {p_res}",
+                "",
             ]
             for c in p.get("companions", []):
                 c_pass = "✅" if c.get("passport_file_id") else "⬜"
                 c_visa = "✅" if c.get("visa_file_id")     else "⬜"
-                body.append(f"↳ {c.get('name', '—')}  📎 {c_pass} جواز  {c_visa} تأشيرة")
-        body += ["", f"📝 *الملاحظات:*  {session.batch_notes or 'لا توجد ملاحظات'}"]
+                body += [
+                    f"   ↳ *{c.get('name', '—')}*",
+                    f"      📎 جواز {c_pass}   تأشيرة {c_visa}",
+                    "",
+                ]
+
+        # ── Notes ─────────────────────────────────────────────────────────────
+        body += [
+            "─────────────────",
+            f"📝 *الملاحظات:*  {session.batch_notes or 'لا توجد ملاحظات'}",
+        ]
 
         from modules.general_services.report_publisher import GSPublishData, publish as _publish
         await _publish(
@@ -857,13 +966,13 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 await update.message.reply_text(prompt, reply_markup=kb, parse_mode="Markdown")
                 return
             session.created_at = dt.isoformat()
-            session.step = STEP_HOSPITAL
+            session.step = STEP_PATIENT_COUNT
             session.save(context.user_data)
             logger.info(
-                f"[arrivals.text] STEP_DATE_CUSTOM → STEP_HOSPITAL"
+                f"[arrivals.text] STEP_DATE_CUSTOM → STEP_PATIENT_COUNT"
                 f"  date={dt.date()}  user={uid}"
             )
-            await _show_hospital(update, context)
+            await _show_patient_count(update, context, session)
         except Exception:
             logger.exception(
                 f"[arrivals.text] EXCEPTION in STEP_DATE_CUSTOM"
@@ -895,13 +1004,13 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if step == STEP_BATCH_NOTES:
         try:
             session.batch_notes = text
-            session.step = STEP_REVIEW
+            session.step = STEP_HOSPITAL
             session.save(context.user_data)
             logger.info(
-                f"[arrivals.text] STEP_BATCH_NOTES → STEP_REVIEW"
+                f"[arrivals.text] STEP_BATCH_NOTES → STEP_HOSPITAL"
                 f"  notes={text[:40]!r}  user={uid}"
             )
-            await _show_review(update, context, session)
+            await _show_hospital(update, context)
         except Exception:
             logger.exception(
                 f"[arrivals.text] EXCEPTION in STEP_BATCH_NOTES  user={uid}"
