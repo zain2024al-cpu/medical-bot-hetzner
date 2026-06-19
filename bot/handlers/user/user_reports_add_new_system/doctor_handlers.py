@@ -541,25 +541,13 @@ async def render_doctor_selection(message, context, query=None):
                             name = doc.full_name or doc.name
                             if name and name not in doctor_names:
                                 doctor_names.append(name)
-                        
+
                         logger.info(f"✅ تم جلب {len(doctor_names)} طبيب من قاعدة البيانات للمستشفى '{hospital_name}' والقسم '{department_name}'")
                 except Exception as db_error:
                     logger.error(f"❌ خطأ في جلب الأطباء من قاعدة البيانات: {db_error}", exc_info=True)
             
-            # ✅ ثانياً: البحث في services.doctors_smart_search (للبحث عن أطباء إضافيين)
-            try:
-                from services.doctors_smart_search import get_doctors_for_hospital_dept
-                doctors_list = get_doctors_for_hospital_dept(hospital_name, department_name)
-                
-                # إضافة الأسماء من services إلى القائمة (بدون تكرار)
-                for doctor in doctors_list:
-                    name = doctor.get('name', '') or doctor.get('full_name', '')
-                    if name and name not in doctor_names:
-                        doctor_names.append(name)
-                
-                logger.info(f"✅ تم إضافة {len(doctors_list)} طبيب من services للمستشفى '{hospital_name}' والقسم '{department_name}'")
-            except Exception as e:
-                logger.error(f"❌ خطأ في جلب الأطباء من services: {e}", exc_info=True)
+            # ── doctors_unified.json no longer used at runtime ────────────────
+            # SQLite is the single source of truth. JSON is seed/backup only.
         except Exception as e:
             logger.error(f"❌ خطأ في جلب الأطباء: {e}", exc_info=True)
 
@@ -774,69 +762,126 @@ async def handle_doctor(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["report_tmp"].pop("doctor_manual_mode", None)
         logger.info(f"✅ تم حفظ اسم الطبيب يدوياً: {text}")
         
-        # ✅ حفظ الطبيب في قاعدة البيانات مع المستشفى والقسم
+        # ✅ حفظ الطبيب في SQLite — المصدر الوحيد والدائم
         try:
             from db.session import SessionLocal
             from db.models import Doctor, Hospital, Department
-            
-            report_tmp = context.user_data.get("report_tmp", {})
-            hospital_name = report_tmp.get("hospital_name", "")
+            from sqlalchemy import or_, func as sqlfunc
+
+            report_tmp      = context.user_data.get("report_tmp", {})
+            hospital_name   = report_tmp.get("hospital_name", "")
             department_name = report_tmp.get("department_name", "")
-            
+
             with SessionLocal() as s:
-                # البحث عن الطبيب أولاً (البحث بـ full_name أو name)
-                from sqlalchemy import or_
-                doctor = s.query(Doctor).filter(
-                    or_(
-                        Doctor.full_name == text,
-                        Doctor.name == text
+
+                # ── 1. Resolve hospital (variants + substring) ────────────────
+                resolved_hospital = None
+                if hospital_name:
+                    for variant in _hospital_name_variants(hospital_name):
+                        resolved_hospital = (
+                            s.query(Hospital)
+                            .filter(sqlfunc.lower(sqlfunc.trim(Hospital.name)) == _norm(variant))
+                            .first()
+                        )
+                        if resolved_hospital:
+                            break
+                    if not resolved_hospital:
+                        norm_h = _norm(hospital_name)
+                        for h in s.query(Hospital).all():
+                            if norm_h in _norm(h.name) or _norm(h.name) in norm_h:
+                                resolved_hospital = h
+                                break
+
+                # ── 2. Abort if hospital not found ────────────────────────────
+                if not resolved_hospital:
+                    logger.error(
+                        f"[doctor_handlers] SAVE ABORTED — hospital not found in DB: '{hospital_name}'"
                     )
-                ).first()
-                
+                    await update.message.reply_text(
+                        "⚠️ *تعذّر حفظ الطبيب*\n\n"
+                        f"لم يتم العثور على المستشفى «{hospital_name}» في قاعدة البيانات.\n\n"
+                        "يرجى العودة واختيار المستشفى من القائمة مجدداً.",
+                        parse_mode="Markdown",
+                    )
+                    # Keep the same state so user can retry
+                    context.user_data["report_tmp"].pop("doctor_manual_mode", None)
+                    return STATE_SELECT_DOCTOR
+
+                logger.info(
+                    f"[doctor_handlers] Hospital resolved: '{hospital_name}'"
+                    f" → id={resolved_hospital.id} '{resolved_hospital.name}'"
+                )
+
+                # ── 3. Resolve department (contains match within hospital) ─────
+                resolved_dept = None
+                if department_name:
+                    en_dept = (
+                        department_name.split("|", 1)[-1].strip()
+                        if "|" in department_name else department_name.strip()
+                    )
+                    resolved_dept = (
+                        s.query(Department)
+                        .filter(
+                            Department.hospital_id == resolved_hospital.id,
+                            sqlfunc.lower(Department.name).contains(_norm(en_dept)),
+                        )
+                        .first()
+                    )
+                    if not resolved_dept:
+                        # Looser: any dept in hospital whose name overlaps
+                        norm_d = _norm(en_dept)
+                        for d in s.query(Department).filter(Department.hospital_id == resolved_hospital.id).all():
+                            if norm_d in _norm(d.name) or _norm(d.name) in norm_d:
+                                resolved_dept = d
+                                break
+                    if resolved_dept:
+                        logger.info(
+                            f"[doctor_handlers] Department resolved: '{department_name}'"
+                            f" → id={resolved_dept.id} '{resolved_dept.name}'"
+                        )
+                    else:
+                        logger.warning(
+                            f"[doctor_handlers] Department NOT resolved: '{department_name}'"
+                            f" — doctor will be saved without department_id"
+                        )
+
+                # ── 4. Upsert doctor with guaranteed hospital_id ───────────────
+                doctor = (
+                    s.query(Doctor)
+                    .filter(
+                        or_(Doctor.full_name == text, Doctor.name == text),
+                        Doctor.hospital_id == resolved_hospital.id,
+                    )
+                    .first()
+                )
+
                 if not doctor:
-                    # إنشاء طبيب جديد
                     doctor = Doctor(
                         name=text,
-                        full_name=text
+                        full_name=text,
+                        hospital_id=resolved_hospital.id,
+                        department_id=resolved_dept.id if resolved_dept else None,
                     )
-                    
-                    # محاولة ربطه بالمستشفى إذا كان موجوداً
-                    if hospital_name:
-                        hospital = s.query(Hospital).filter(Hospital.name == hospital_name).first()
-                        if hospital:
-                            doctor.hospital_id = hospital.id
-                    
-                    # محاولة ربطه بالقسم إذا كان موجوداً
-                    if department_name:
-                        department = s.query(Department).filter(Department.name == department_name).first()
-                        if department:
-                            doctor.department_id = department.id
-                    
                     s.add(doctor)
                     s.commit()
-                    logger.info(f"✅ تم حفظ الطبيب في قاعدة البيانات: {text} (مستشفى: {hospital_name}, قسم: {department_name})")
+                    logger.info(
+                        f"[doctor_handlers] NEW doctor saved: '{text}'"
+                        f"  hospital_id={resolved_hospital.id}"
+                        f"  department_id={resolved_dept.id if resolved_dept else None}"
+                    )
                 else:
-                    # ✅ تحديث معلومات المستشفى والقسم إذا لم تكن موجودة
                     updated = False
-                    if hospital_name and not doctor.hospital_id:
-                        hospital = s.query(Hospital).filter(Hospital.name == hospital_name).first()
-                        if hospital:
-                            doctor.hospital_id = hospital.id
-                            updated = True
-                    
-                    if department_name and not doctor.department_id:
-                        department = s.query(Department).filter(Department.name == department_name).first()
-                        if department:
-                            doctor.department_id = department.id
-                            updated = True
-                    
+                    if resolved_dept and not doctor.department_id:
+                        doctor.department_id = resolved_dept.id
+                        updated = True
                     if updated:
                         s.commit()
-                        logger.info(f"✅ تم تحديث معلومات الطبيب: {text}")
+                        logger.info(f"[doctor_handlers] Doctor updated: '{text}'  dept_id={doctor.department_id}")
                     else:
-                        logger.info(f"ℹ️ الطبيب موجود بالفعل في قاعدة البيانات: {text}")
+                        logger.info(f"[doctor_handlers] Doctor already exists: '{text}'  hospital_id={doctor.hospital_id}")
+
         except Exception as e:
-            logger.error(f"❌ خطأ في حفظ الطبيب في قاعدة البيانات: {e}", exc_info=True)
+            logger.error(f"[doctor_handlers] Save failed: {e}", exc_info=True)
 
         context.user_data['last_valid_state'] = 'action_type_selection'
         context.user_data['_conversation_state'] = R_ACTION_TYPE

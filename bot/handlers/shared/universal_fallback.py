@@ -219,11 +219,17 @@ KNOWN_CALLBACKS = [
     r"^cs_cancel$",
     r"^cs_noop$",
 
-    # Shared platform infrastructure / healthcare module callbacks.
-    # These are handled by group-1 platform handlers; the fallback still sees
-    # them later, so keep them known to avoid false "unhandled" warnings.
-    r"^hc:",
-    r"^wca:",
+    # Healthcare module — all sub-module prefixes handled in group 1/2.
+    # The fallback (group 999) still receives them due to PTB propagation,
+    # so list them here to suppress false "unhandled" warnings.
+    r"^hc:",       # shared healthcare navigation
+    r"^wca:",      # woundcare flow
+    r"^hcfu:",     # medical follow-up flow
+    r"^hcmed:",    # medications / pharmacy flow
+    r"^hcsup:",    # medical supplies flow
+    r"^hcoth:",    # other healthcare flow
+    r"^hceval:",   # healthcare evaluation PDF report
+    # Shared platform infrastructure
     r"^sel_pat:",
     r"^msel:",
     r"^upl:",

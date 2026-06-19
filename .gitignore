@@ -154,3 +154,6 @@ db_backups/
 # Windows reserved names
 nul
 git
+
+# doctors_unified.json is a one-time seed — not tracked after initial import
+data/doctors_unified.json
