@@ -7,6 +7,10 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 from db.models import Report
 
+# Configure logging FIRST - before any logger usage
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # WeasyPrint يعمل فقط على Linux (Cloud Run)
 # على Windows: نستخدم نسخة بديلة للاختبار
 IS_WINDOWS = sys.platform.startswith('win')
@@ -32,10 +36,6 @@ else:
 # ============================================================
 # 🧾 وحدة إنشاء ملفات PDF من تقارير المرضى (WeasyPrint)
 # ============================================================
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 # Directory paths (absolute to avoid Docker context issues)
 BASE_DIR = Path(__file__).resolve().parent.parent
