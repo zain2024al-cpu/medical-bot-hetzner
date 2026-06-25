@@ -105,7 +105,7 @@ def _get_reports_sync(
 ) -> list[dict]:
     """Fetch reports with optional filtering."""
     from db.session import SessionLocal
-    from db.models import Report
+    from db.models import Report, Hospital
 
     results = []
     try:
@@ -126,14 +126,23 @@ def _get_reports_sync(
 
             rows = q.order_by(Report.report_date.asc()).all()
 
+            # Build a hospital_id -> name mapping
+            hospitals = s.query(Hospital).all()
+            hospital_map = {h.id: h.name for h in hospitals if h.id and h.name}
+
             for r in rows:
+                # Get hospital name - try report field first, then lookup table
+                hospital_name = r.hospital_name or ""
+                if not hospital_name and r.hospital_id:
+                    hospital_name = hospital_map.get(r.hospital_id, "")
+
                 results.append({
                     "id":              r.id,
                     "patient_id":      r.patient_id,
                     "patient_name":    r.patient_name or "",
                     "patient_file":    r.patient_file_number or "",
                     "hospital_id":     r.hospital_id,
-                    "hospital_name":   r.hospital_name or "",
+                    "hospital_name":   hospital_name,
                     "department":      r.department or "",
                     "doctor_name":     r.doctor_name or "",
                     "medical_action":  r.medical_action or "",
@@ -198,9 +207,11 @@ def aggregate_by_hospital(reports: list[dict]) -> dict[str, int]:
     """Returns {hospital_name: count}."""
     agg: dict[str, int] = defaultdict(int)
     for r in reports:
-        h = (r.get("hospital_name") or "—").strip()
-        if h:
-            agg[h] += 1
+        h = (r.get("hospital_name") or "").strip()
+        # Use hospital name if available, else mark as unknown
+        if not h:
+            h = "غير محدد"  # "Not specified" in Arabic
+        agg[h] += 1
     return dict(sorted(agg.items(), key=lambda x: -x[1]))
 
 
