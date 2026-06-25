@@ -27,7 +27,9 @@ from datetime import date, timedelta
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
-from telegram.ext import ContextTypes, ConversationHandler
+from telegram.ext import (
+    ContextTypes, ConversationHandler, CallbackQueryHandler
+)
 
 from bot.shared_auth import is_admin
 from shared.selectors.patient_selector import selector as patient_selector
@@ -440,7 +442,30 @@ def register(app) -> None:
     # Register patient_selector completion callback
     result_router.register(_RKEY_PATIENT, _on_patient_selected)
 
-    # Patient_selector.register_handler() should be called in handlers_registry
-    # before this handler is registered.
+    # Create and register ConversationHandler
+    conv = ConversationHandler(
+        entry_points=[],  # Entry is through result_router callback
+        states={
+            PR_SHOW_SELECTOR: [
+                # Waits for patient_selector to call result_router callback
+            ],
+            PR_DEPTS: [
+                CallbackQueryHandler(handle_departments, pattern=rf"^{_PFX}:"),
+            ],
+            PR_ACTIONS: [
+                CallbackQueryHandler(handle_actions, pattern=rf"^{_PFX}:"),
+            ],
+            PR_PERIOD: [
+                CallbackQueryHandler(handle_period, pattern=rf"^{_PFX}:"),
+            ],
+        },
+        fallbacks=[],
+        name="patient_report_v2_conv",
+        per_chat=True,
+        per_user=True,
+        per_message=False,
+        allow_reentry=False,
+    )
 
-    logger.info("[patient_report_v2] Registered with patient_selector integration")
+    app.add_handler(conv)
+    logger.info("[patient_report_v2] ConversationHandler registered with states: SELECTOR → DEPTS → ACTIONS → PERIOD")
