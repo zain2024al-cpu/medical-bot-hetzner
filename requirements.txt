@@ -124,8 +124,6 @@ python-dateutil==2.9.0.post0
 python-dotenv==1.2.1
 python-pptx==1.0.2
 python-telegram-bot==20.6
-python-telegram-bot-calendar==1.0.0
-pytokenize==0.3.0
 pytz==2025.2
 PyYAML==6.0.3
 rapidfuzz==3.6.1
