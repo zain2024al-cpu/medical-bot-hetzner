@@ -48,6 +48,8 @@ async def start_reports_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
     """
     نقطة الدخول الرئيسية - عرض الزرين الرئيسيين
     """
+    logger.info("=== NEW REPORTS MENU ENTERED ===")
+    logger.info("🟢 start_reports_menu fired")
     user = update.effective_user
     
     if not user or not is_admin(user.id):
@@ -462,5 +464,5 @@ def register_new_reports_handlers(dispatcher):
         ],
     )
     
-    dispatcher.add_handler(conv_handler)
+    dispatcher.add_handler(conv_handler, group=8)
     logger.info("✅ تم تسجيل معالجات التقارير بنجاح")
