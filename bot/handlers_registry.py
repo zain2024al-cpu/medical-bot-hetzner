@@ -44,13 +44,13 @@ def register_all_handlers(app):
     register_reports_recovery(app) # ✅ استعادة التقارير (ConversationHandler)
     register_translator_status(app) # ✅ لوحة متابعة المترجمين (/translators_status)
 
-    # ✅ نظام التقارير الجديد — 2 أنواع احترافية: شامل + مريض واحد
+    # ✅ نظام التقارير الجديد — 2 أنواع احترافية: شامل + مريض واحد (مع patient_selector)
     from bot.handlers.admin.admin_reports_menu import register as register_reports_menu
     from bot.handlers.admin.admin_comprehensive_report import register as register_comprehensive_report
-    from bot.handlers.admin.admin_patient_report import register as register_patient_report
+    from bot.handlers.admin.admin_patient_report_v2 import register as register_patient_report_v2
     register_reports_menu(app)              # Entry point: "🖨️ طباعة التقارير" button
     register_comprehensive_report(app)      # Comprehensive report callbacks (cr:*)
-    register_patient_report(app)            # Patient report conversation (pr:*)
+    register_patient_report_v2(app)         # Patient report v2 with patient_selector (pr2:*)
     from bot.handlers.user.user_paste_full_report import register as register_paste_full_report
     register_paste_full_report(app)  # ✅ لصق تقرير جاهز (أدمن فقط) قبل admin_start
 

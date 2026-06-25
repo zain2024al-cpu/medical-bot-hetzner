@@ -271,7 +271,8 @@ KNOWN_CALLBACKS = [
 
     # New reporting system (admin_reports_menu + patient + comprehensive)
     r"^report_menu:",      # Main reports menu dispatcher
-    r"^pr:",               # Patient report ConversationHandler — pr:* callbacks
+    r"^pr:",               # Patient report (v1 - deprecated)
+    r"^pr2:",              # Patient report v2 with patient_selector
     r"^cr:",               # Comprehensive report — cr:* callbacks
 ]
 

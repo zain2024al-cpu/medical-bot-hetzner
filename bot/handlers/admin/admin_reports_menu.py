@@ -96,13 +96,11 @@ async def handle_type_selection(
         return ConversationHandler.END
 
     if data == f"{_PFX}:patient":
-        # Delegate to patient report handler
+        # Delegate to patient report handler (v2 with patient_selector)
         context.user_data["_report_type"] = "patient"
-        from . import admin_patient_report
-        # Show patient search - this handler will take over from here
-        await admin_patient_report.show_patient_search(update, context)
-        # End this conversation, patient_report handler takes over
-        return ConversationHandler.END
+        from . import admin_patient_report_v2
+        # Show patient selector - this handler will take over from here
+        return await admin_patient_report_v2.show_patient_selector(update, context)
 
     return MENU_CHOOSE_TYPE
 
