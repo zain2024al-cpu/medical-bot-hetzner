@@ -217,11 +217,12 @@ async def handle_departments(
         await patient_selector.enter(update, context, return_to=_RKEY_PATIENT)
         return PR_SHOW_SELECTOR
 
-    # Parse department choice
+    # Parse department choice: pr2:depts:all:{patient_id}
     parts = data.split(":")
-    if len(parts) >= 3:
-        action = parts[1]  # "all" or "select"
-        patient_id = int(parts[2])
+    if len(parts) >= 4:
+        # parts[0]="pr2", parts[1]="depts", parts[2]=action, parts[3]=patient_id
+        action = parts[2]  # "all" or "select"
+        patient_id = int(parts[3])
 
         if action == "all":
             context.user_data["_pr_depts"] = None  # None = all departments
@@ -266,11 +267,12 @@ async def handle_actions(
         context.user_data.clear()
         return ConversationHandler.END
 
-    # Parse action choice
+    # Parse action choice: pr2:actions:all:{patient_id}
     parts = data.split(":")
-    if len(parts) >= 3:
-        action = parts[1]  # "all" or "select"
-        patient_id = int(parts[2]) if len(parts) > 2 else context.user_data.get("_patient_id")
+    if len(parts) >= 4:
+        # parts[0]="pr2", parts[1]="actions", parts[2]=action, parts[3]=patient_id
+        action = parts[2]  # "all" or "select"
+        patient_id = int(parts[3])
 
         if data.startswith(f"{_PFX}:back_depts"):
             # Go back to departments
@@ -328,126 +330,131 @@ async def handle_period(
         context.user_data.clear()
         return ConversationHandler.END
 
-    # Parse period
+    # Parse period: pr2:period:{patient_id}:{period_code}
     parts = data.split(":")
+
+    if data.startswith(f"{_PFX}:back_actions"):
+        # Go back to actions - extract patient_id from context
+        patient_id = context.user_data.get("_patient_id")
+        try:
+            await query.edit_message_text(
+                f"👤 *{context.user_data.get('_patient_name', '')}*\n\n"
+                f"📋 اختر الإجراءات:",
+                reply_markup=_actions_kb(patient_id),
+                parse_mode=ParseMode.MARKDOWN,
+            )
+        except Exception:
+            pass
+        return PR_ACTIONS
+
+    # Extract patient_id and period_code
     if len(parts) >= 4:
         patient_id = int(parts[2])
         period_code = parts[3]  # "1m" | "3m" | "year" | "custom"
+    else:
+        # Fallback to context
+        patient_id = context.user_data.get("_patient_id")
+        period_code = "1m"
 
-        if data.startswith(f"{_PFX}:back_actions"):
-            # Go back to actions
-            try:
-                await query.edit_message_text(
-                    f"👤 *{context.user_data.get('_patient_name', '')}*\n\n"
-                    f"📋 اختر الإجراءات:",
-                    reply_markup=_actions_kb(patient_id),
-                    parse_mode=ParseMode.MARKDOWN,
-                )
-            except Exception:
-                pass
-            return PR_ACTIONS
+    # Resolve period
+    await query.edit_message_text("⏳ جارٍ إعداد التقرير...")
 
-        # Resolve period
-        await query.edit_message_text("⏳ جارٍ إعداد التقرير...")
+    try:
+        from services.reports_repository import get_reports
+        from services.patient_report_pdf import build_patient_pdf
 
-        try:
-            from services.reports_repository import get_reports
-            from services.patient_report_pdf import build_patient_pdf
+        # Compute date range
+        today = date.today()
+        if period_code == "1m":
+            period_start = today - timedelta(days=30)
+            period_label = "آخر شهر"
+        elif period_code == "3m":
+            period_start = today - timedelta(days=90)
+            period_label = "آخر 3 أشهر"
+        elif period_code == "year":
+            period_start = today.replace(month=1, day=1)
+            period_label = f"السنة {today.year}"
+        else:
+            period_start = date(1900, 1, 1)
+            period_label = "كل الفترة"
 
-            # Compute date range
-            today = date.today()
-            if period_code == "1m":
-                period_start = today - timedelta(days=30)
-                period_label = "آخر شهر"
-            elif period_code == "3m":
-                period_start = today - timedelta(days=90)
-                period_label = "آخر 3 أشهر"
-            elif period_code == "year":
-                period_start = today.replace(month=1, day=1)
-                period_label = f"السنة {today.year}"
-            else:
-                period_start = date(1900, 1, 1)
-                period_label = "كل الفترة"
+        depts = context.user_data.get("_pr_depts")
+        actions = context.user_data.get("_pr_actions")
 
-            depts = context.user_data.get("_pr_depts")
-            actions = context.user_data.get("_pr_actions")
+        reports = await get_reports(
+            start=period_start,
+            end=today,
+            patient_id=patient_id,
+            depts=depts,
+            actions=actions,
+        )
 
-            reports = await get_reports(
-                start=period_start,
-                end=today,
-                patient_id=patient_id,
-                depts=depts,
-                actions=actions,
-            )
+        patient_name = context.user_data.get("_patient_name", "")
 
-            patient_name = context.user_data.get("_patient_name", "")
-
-            if not reports:
-                await query.edit_message_text(
-                    f"⚠️ لا توجد تقارير للمريض *{patient_name}* في هذه الفترة.",
-                    parse_mode=ParseMode.MARKDOWN,
-                )
-                return PR_PERIOD
-
-            # Build PDF
-            from db.session import SessionLocal
-            from db.models import Patient
-
-            with SessionLocal() as s:
-                patient_obj = s.query(Patient).filter_by(id=patient_id).first()
-                patient_data = {
-                    "id": patient_id,
-                    "name": patient_name,
-                    "file_number": getattr(patient_obj, "file_number", "") if patient_obj else "",
-                    "nationality": getattr(patient_obj, "nationality", "") if patient_obj else "",
-                    "disease": getattr(patient_obj, "disease", "") if patient_obj else "",
-                }
-
-            pdf_buf = build_patient_pdf(patient_data, reports, depts, period_label)
-
-            # Send PDF
-            filename = f"Patient_{patient_id}_{period_code}.pdf"
-            caption = (
-                f"👤 *تقرير المريض*\n"
-                f"📝 {patient_name}\n"
-                f"📅 {period_label}\n"
-                f"📋 {len(reports)} تقرير"
-            )
-
-            try:
-                await query.delete_message()
-            except Exception:
-                pass
-
-            await context.bot.send_document(
-                chat_id=update.effective_chat.id,
-                document=pdf_buf,
-                filename=filename,
-                caption=caption,
+        if not reports:
+            await query.edit_message_text(
+                f"⚠️ لا توجد تقارير للمريض *{patient_name}* في هذه الفترة.",
                 parse_mode=ParseMode.MARKDOWN,
             )
+            return PR_PERIOD
 
-            logger.info(
-                f"[patient_report_v2] PDF sent  patient_id={patient_id}  "
-                f"period={period_code}  reports={len(reports)}"
+        # Build PDF
+        from db.session import SessionLocal
+        from db.models import Patient
+
+        with SessionLocal() as s:
+            patient_obj = s.query(Patient).filter_by(id=patient_id).first()
+            patient_data = {
+                "id": patient_id,
+                "name": patient_name,
+                "file_number": getattr(patient_obj, "file_number", "") if patient_obj else "",
+                "nationality": getattr(patient_obj, "nationality", "") if patient_obj else "",
+                "disease": getattr(patient_obj, "disease", "") if patient_obj else "",
+            }
+
+        pdf_buf = build_patient_pdf(patient_data, reports, depts, period_label)
+
+        # Send PDF
+        filename = f"Patient_{patient_id}_{period_code}.pdf"
+        caption = (
+            f"👤 *تقرير المريض*\n"
+            f"📝 {patient_name}\n"
+            f"📅 {period_label}\n"
+            f"📋 {len(reports)} تقرير"
+        )
+
+        try:
+            await query.delete_message()
+        except Exception:
+            pass
+
+        await context.bot.send_document(
+            chat_id=update.effective_chat.id,
+            document=pdf_buf,
+            filename=filename,
+            caption=caption,
+            parse_mode=ParseMode.MARKDOWN,
+        )
+
+        logger.info(
+            f"[patient_report_v2] PDF sent  patient_id={patient_id}  "
+            f"period={period_code}  reports={len(reports)}"
+        )
+
+    except Exception as exc:
+        logger.exception("[patient_report_v2] PDF generation failed")
+        try:
+            await query.edit_message_text(
+                "❌ حدث خطأ أثناء إعداد التقرير.",
+                parse_mode=ParseMode.MARKDOWN,
             )
+        except Exception:
+            pass
 
-        except Exception as exc:
-            logger.exception("[patient_report_v2] PDF generation failed")
-            try:
-                await query.edit_message_text(
-                    "❌ حدث خطأ أثناء إعداد التقرير.",
-                    parse_mode=ParseMode.MARKDOWN,
-                )
-            except Exception:
-                pass
+    finally:
+        context.user_data.clear()
 
-        finally:
-            context.user_data.clear()
-
-        return ConversationHandler.END
-
-    return PR_PERIOD
+    return ConversationHandler.END
 
 
 # ── Registration ──────────────────────────────────────────────────────────────
