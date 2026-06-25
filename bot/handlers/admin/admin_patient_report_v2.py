@@ -104,14 +104,17 @@ def _period_kb(patient_id: int) -> InlineKeyboardMarkup:
 async def show_patient_selector(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
-    """Open patient_selector when user chooses 👤 تقرير مريض."""
+    """
+    Entry point when user chooses 👤 تقرير مريض.
+    Returns PR_SHOW_SELECTOR to signal ConversationHandler is now active.
+    """
     query = update.callback_query
     try:
         await query.answer()
     except Exception:
         pass
 
-    # Store report type in context
+    # Initialize context for patient report flow
     context.user_data["_report_type"] = "patient"
     context.user_data["_patient_id"] = None
     context.user_data["_patient_name"] = None
@@ -119,8 +122,11 @@ async def show_patient_selector(
     context.user_data["_pr_actions"] = None
 
     # Open patient selector
+    # Note: result_router will call _on_patient_selected when done
     await patient_selector.enter(update, context, return_to=_RKEY_PATIENT)
 
+    # Tell ConversationHandler we're now in PR_SHOW_SELECTOR state
+    # and waiting for patient_selector to complete
     return PR_SHOW_SELECTOR
 
 
@@ -132,6 +138,11 @@ async def _on_patient_selected(
     """
     Called by result_router when patient_selector completes.
     result: PatientSelectionResult
+
+    This callback is NOT a ConversationHandler state handler.
+    It only handles the result and updates the message.
+    The ConversationHandler remains inactive until a callback
+    with pattern pr2:* is received.
     """
     if result.cancelled:
         # User pressed back/cancel in patient_selector
@@ -142,6 +153,8 @@ async def _on_patient_selected(
             )
         except Exception:
             pass
+        # Clear context for clean state
+        context.user_data.clear()
         return
 
     # Patient selected
@@ -161,15 +174,18 @@ async def _on_patient_selected(
             parse_mode=ParseMode.MARKDOWN,
         )
     except Exception:
-        await query.message.reply_text(
-            f"👤 *{patient_name}*\n\n"
-            f"📋 اختر الأقسام:",
-            reply_markup=_depts_kb(patient_id, patient_name),
-            parse_mode=ParseMode.MARKDOWN,
-        )
+        try:
+            await query.message.reply_text(
+                f"👤 *{patient_name}*\n\n"
+                f"📋 اختر الأقسام:",
+                reply_markup=_depts_kb(patient_id, patient_name),
+                parse_mode=ParseMode.MARKDOWN,
+            )
+        except Exception:
+            pass
 
-    # Continue conversation in PR_DEPTS state
-    context.user_data["_state"] = "depts"
+    # Set state for ConversationHandler to enter PR_DEPTS
+    context._conversation_state = PR_DEPTS
 
 
 # ── Callback handlers ─────────────────────────────────────────────────────────
@@ -437,35 +453,39 @@ async def handle_period(
 # ── Registration ──────────────────────────────────────────────────────────────
 
 def register(app) -> None:
-    """Register patient report v2 handler with patient_selector integration."""
+    """
+    Register patient report v2 as regular CallbackQueryHandlers (no ConversationHandler).
+
+    This avoids conflicts with admin_reports_menu's ConversationHandler.
+    State is managed through context.user_data instead.
+    """
 
     # Register patient_selector completion callback
     result_router.register(_RKEY_PATIENT, _on_patient_selected)
 
-    # Create and register ConversationHandler
-    conv = ConversationHandler(
-        entry_points=[],  # Entry is through result_router callback
-        states={
-            PR_SHOW_SELECTOR: [
-                # Waits for patient_selector to call result_router callback
-            ],
-            PR_DEPTS: [
-                CallbackQueryHandler(handle_departments, pattern=rf"^{_PFX}:"),
-            ],
-            PR_ACTIONS: [
-                CallbackQueryHandler(handle_actions, pattern=rf"^{_PFX}:"),
-            ],
-            PR_PERIOD: [
-                CallbackQueryHandler(handle_period, pattern=rf"^{_PFX}:"),
-            ],
-        },
-        fallbacks=[],
-        name="patient_report_v2_conv",
-        per_chat=True,
-        per_user=True,
-        per_message=False,
-        allow_reentry=False,
+    # Register all pr2:* callbacks as simple handlers (group 0, low priority)
+    # This allows them to be called from anywhere, including from within
+    # another ConversationHandler.
+    app.add_handler(
+        CallbackQueryHandler(
+            handle_departments,
+            pattern=rf"^{_PFX}:depts:",
+        ),
+        group=0,
+    )
+    app.add_handler(
+        CallbackQueryHandler(
+            handle_actions,
+            pattern=rf"^{_PFX}:actions:",
+        ),
+        group=0,
+    )
+    app.add_handler(
+        CallbackQueryHandler(
+            handle_period,
+            pattern=rf"^{_PFX}:period:",
+        ),
+        group=0,
     )
 
-    app.add_handler(conv)
-    logger.info("[patient_report_v2] ConversationHandler registered with states: SELECTOR → DEPTS → ACTIONS → PERIOD")
+    logger.info("[patient_report_v2] CallbackQueryHandlers registered (no ConversationHandler)")

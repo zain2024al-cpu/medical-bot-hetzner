@@ -99,10 +99,11 @@ async def handle_type_selection(
         # Delegate to patient report handler (v2 with patient_selector)
         context.user_data["_report_type"] = "patient"
         from . import admin_patient_report_v2
-        # Show patient selector - this handler will take over from here
-        await admin_patient_report_v2.show_patient_selector(update, context)
-        # End this conversation, delegated handler takes over
-        return ConversationHandler.END
+        # Show patient selector and let patient_report_v2 handler take over
+        result = await admin_patient_report_v2.show_patient_selector(update, context)
+        # Return the state from patient_report_v2, don't end here
+        # (This allows the ConversationHandler there to manage the flow)
+        return result
 
     return MENU_CHOOSE_TYPE
 
