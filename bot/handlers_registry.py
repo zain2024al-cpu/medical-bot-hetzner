@@ -71,8 +71,7 @@ def register_all_handlers(app):
     )
     from bot.handlers.admin.admin_users_management import register as register_users_management
     register_users_management(app)
-    from telegram.ext import CommandHandler
-    app.add_handler(CommandHandler("print_patient", handle_print_patient_command))
+    # NOTE: /print_patient command is handled by new reporting system
 
     # ✅ هذه الدوال كانت تُستدعى بدون استيرادها (سبب NameError على السيرفر)
     from bot.handlers.admin.admin_daily_patients import register as register_daily_patients

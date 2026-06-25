@@ -161,7 +161,10 @@ def build_patient_pdf(
     styles = getSampleStyleSheet()
 
     def S(name, **kw):
-        return ParagraphStyle(name, parent=styles["Normal"], fontName=FN, **kw)
+        # Use FN as default fontName, but allow override via kw
+        if "fontName" not in kw:
+            kw["fontName"] = FN
+        return ParagraphStyle(name, parent=styles["Normal"], **kw)
 
     ST = {
         "cover_title":  S("ct",  fontSize=22, leading=28, alignment=TA_CENTER, textColor=C["white"],    fontName=FNB),

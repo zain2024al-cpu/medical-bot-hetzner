@@ -90,17 +90,19 @@ async def handle_type_selection(
         # Delegate to comprehensive report handler
         context.user_data["_report_type"] = "comprehensive"
         from . import admin_comprehensive_report
-        # admin_comprehensive_report.show_period_menu expects query.callback_query
-        # and shows inline buttons that call admin_comprehensive_report handlers
-        return await admin_comprehensive_report.show_period_menu(update, context)
+        # Show period menu - this handler will take over from here
+        await admin_comprehensive_report.show_period_menu(update, context)
+        # End this conversation, comprehensive_report handler takes over
+        return ConversationHandler.END
 
     if data == f"{_PFX}:patient":
         # Delegate to patient report handler
-        # admin_patient_report.show_patient_search expects query.callback_query
-        # and continues with PR_SEARCH state
         context.user_data["_report_type"] = "patient"
         from . import admin_patient_report
-        return await admin_patient_report.show_patient_search(update, context)
+        # Show patient search - this handler will take over from here
+        await admin_patient_report.show_patient_search(update, context)
+        # End this conversation, patient_report handler takes over
+        return ConversationHandler.END
 
     return MENU_CHOOSE_TYPE
 
