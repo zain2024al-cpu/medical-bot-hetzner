@@ -269,8 +269,10 @@ KNOWN_CALLBACKS = [
     # Admin notes ConversationHandler — inline cancel button.
     r"^admin_cancel$",
 
-    # Patient report ConversationHandler — pr:* callbacks.
-    r"^pr:",
+    # New reporting system (admin_reports_menu + patient + comprehensive)
+    r"^report_menu:",      # Main reports menu dispatcher
+    r"^pr:",               # Patient report ConversationHandler — pr:* callbacks
+    r"^cr:",               # Comprehensive report — cr:* callbacks
 ]
 
 # ================================================

@@ -1,20 +1,24 @@
 # bot/handlers/admin/admin_patient_report.py
 #
-# نظام تقرير المريض الاحترافي — مسار نظيف ومحدد
+# Patient report handler — single patient with multiselect filters.
 #
-# المسار:
-#   🖨️ طباعة التقارير
-#       ↓  start_patient_report()
-#   ✏️ اكتب اسم المريض
+# Dialog flow:
+#   👤 Patient Report selected in admin_reports_menu
+#       ↓  show_patient_search()
+#   ✏️ Type patient name
 #       ↓  handle_patient_search()
-#   قائمة نتائج البحث (أزرار)
+#   Pick patient from results
 #       ↓  handle_patient_picked()
-#   اختر الفترة: الكل / آخر شهر / آخر 3 أشهر
+#   📅 Select departments (all or specific)
+#       ↓  handle_depts_picked()
+#   📋 Select procedure types (all or specific)
+#       ↓  handle_actions_picked()
+#   📅 Select period
 #       ↓  handle_period_picked()
-#   التقرير الكامل
+#   Generate & send professional PDF
 #
-# Callback prefix:  pr:
-# States:           PR_SEARCH → PR_PICK → PR_PERIOD → END
+# Callback prefix: pr:
+# States: PR_SEARCH → PR_PICK → PR_DEPTS → PR_ACTIONS → PR_PERIOD → END
 #
 from __future__ import annotations
 
@@ -33,9 +37,11 @@ from bot.shared_auth import is_admin
 logger = logging.getLogger(__name__)
 
 # ── ConversationHandler states ────────────────────────────────────────────────
-PR_SEARCH = 700
-PR_PICK   = 701
-PR_PERIOD = 702
+PR_SEARCH  = 700
+PR_PICK    = 701
+PR_DEPTS   = 702
+PR_ACTIONS = 703
+PR_PERIOD  = 704
 
 _PFX = "pr"   # callback prefix
 
@@ -50,29 +56,72 @@ def _cancel_kb(back_cb: str | None = None) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([row])
 
 
+def _depts_kb() -> InlineKeyboardMarkup:
+    """Departments selection."""
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ كل الأقسام", callback_data=f"{_PFX}:depts:all")],
+        [InlineKeyboardButton("🔍 اختيار محدد", callback_data=f"{_PFX}:depts:select")],
+        [InlineKeyboardButton("⬅️ رجوع",       callback_data=f"{_PFX}:back_patient")],
+        [InlineKeyboardButton("❌ إلغاء",       callback_data=f"{_PFX}:cancel")],
+    ])
+
+
+def _actions_kb() -> InlineKeyboardMarkup:
+    """Procedure types selection."""
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ كل الإجراءات", callback_data=f"{_PFX}:actions:all")],
+        [InlineKeyboardButton("🔍 اختيار محدد", callback_data=f"{_PFX}:actions:select")],
+        [InlineKeyboardButton("⬅️ رجوع",         callback_data=f"{_PFX}:back_depts")],
+        [InlineKeyboardButton("❌ إلغاء",         callback_data=f"{_PFX}:cancel")],
+    ])
+
+
 def _period_kb(patient_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("📋 كل التقارير",    callback_data=f"{_PFX}:period:{patient_id}:all")],
         [InlineKeyboardButton("📅 آخر 3 أشهر",    callback_data=f"{_PFX}:period:{patient_id}:3m")],
         [InlineKeyboardButton("📅 آخر شهر",        callback_data=f"{_PFX}:period:{patient_id}:1m")],
-        [InlineKeyboardButton("⬅️ رجوع",           callback_data=f"{_PFX}:back_search")],
+        [InlineKeyboardButton("⬅️ رجوع",           callback_data=f"{_PFX}:back_actions")],
         [InlineKeyboardButton("❌ إلغاء",           callback_data=f"{_PFX}:cancel")],
     ])
 
 
 # ── Entry — show search prompt ─────────────────────────────────────────────────
 
+async def show_patient_search(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> int:
+    """Entry from admin_reports_menu. Show search prompt."""
+    # NOTE: Called from admin_reports_menu via delegation, not as ConversationHandler entry
+    query = update.callback_query
+    try:
+        await query.edit_message_text(
+            "👤 *تقرير المريض*\n\n"
+            "✏️ اكتب اسم المريض أو جزءاً منه للبحث:",
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=_cancel_kb(),
+        )
+    except Exception:
+        await query.message.reply_text(
+            "👤 *تقرير المريض*\n\n"
+            "✏️ اكتب اسم المريض أو جزءاً منه للبحث:",
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=_cancel_kb(),
+        )
+    return PR_SEARCH
+
+
 async def start_patient_report(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
-    """Entry from ReplyKeyboard button '🖨️ طباعة التقارير'."""
+    """Deprecated: kept for backward compatibility. Use show_patient_search instead."""
     user = update.effective_user
     if not user or not is_admin(user.id):
         return ConversationHandler.END
 
     context.user_data.clear()
     await update.message.reply_text(
-        "🖨️ *تقرير المريض*\n\n"
+        "👤 *تقرير المريض*\n\n"
         "✏️ اكتب اسم المريض أو جزءاً منه للبحث:",
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=_cancel_kb(),
@@ -168,11 +217,110 @@ async def handle_patient_picked(
 
     await query.edit_message_text(
         f"👤 *{patient_name}*\n\n"
-        f"📅 اختر الفترة الزمنية للتقرير:",
+        f"📋 اختر الأقسام المطلوبة:",
         parse_mode=ParseMode.MARKDOWN,
-        reply_markup=_period_kb(patient_id),
+        reply_markup=_depts_kb(),
     )
-    return PR_PERIOD
+    return PR_DEPTS
+
+
+# ── State PR_DEPTS — user chose departments ───────────────────────────────────
+
+async def handle_depts_picked(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> int:
+    """User selected departments (all or specific)."""
+    query = update.callback_query
+    await query.answer()
+
+    data = query.data or ""
+
+    if data == f"{_PFX}:cancel":
+        await query.edit_message_text("✅ تم الإلغاء.")
+        return ConversationHandler.END
+
+    if data == f"{_PFX}:back_patient":
+        await query.edit_message_text(
+            "✏️ اكتب اسم المريض:",
+            reply_markup=_cancel_kb(),
+        )
+        return PR_SEARCH
+
+    if data == f"{_PFX}:depts:all":
+        context.user_data["pr_depts"] = None  # None = all departments
+        await query.edit_message_text(
+            "✅ تم تحديد: كل الأقسام\n\n"
+            "📋 اختر الإجراءات المطلوبة:",
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=_actions_kb(),
+        )
+        return PR_ACTIONS
+
+    if data == f"{_PFX}:depts:select":
+        # TODO: implement multiselect UI for departments
+        # For now, fallback to "all"
+        context.user_data["pr_depts"] = None
+        await query.edit_message_text(
+            "⚠️ اختيار محدد - قريباً\n"
+            "الآن: كل الأقسام\n\n"
+            "📋 اختر الإجراءات:",
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=_actions_kb(),
+        )
+        return PR_ACTIONS
+
+    return PR_DEPTS
+
+
+# ── State PR_ACTIONS — user chose procedure types ──────────────────────────────
+
+async def handle_actions_picked(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> int:
+    """User selected procedure types (all or specific)."""
+    query = update.callback_query
+    await query.answer()
+
+    data = query.data or ""
+
+    if data == f"{_PFX}:cancel":
+        await query.edit_message_text("✅ تم الإلغاء.")
+        return ConversationHandler.END
+
+    if data == f"{_PFX}:back_depts":
+        await query.edit_message_text(
+            "📋 اختر الأقسام:",
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=_depts_kb(),
+        )
+        return PR_DEPTS
+
+    patient_id = context.user_data.get("pr_patient_id")
+
+    if data == f"{_PFX}:actions:all":
+        context.user_data["pr_actions"] = None  # None = all actions
+        await query.edit_message_text(
+            "✅ تم تحديد: كل الإجراءات\n\n"
+            "📅 اختر الفترة الزمنية:",
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=_period_kb(patient_id),
+        )
+        return PR_PERIOD
+
+    if data == f"{_PFX}:actions:select":
+        # TODO: implement multiselect UI for actions
+        # For now, fallback to "all"
+        context.user_data["pr_actions"] = None
+        await query.edit_message_text(
+            "⚠️ اختيار محدد - قريباً\n"
+            "الآن: كل الإجراءات\n\n"
+            "📅 اختر الفترة:",
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=_period_kb(patient_id),
+        )
+        return PR_PERIOD
+
+    return PR_ACTIONS
 
 
 # ── State PR_PERIOD — user chose a time range ─────────────────────────────────
@@ -186,15 +334,20 @@ async def handle_period_picked(
     data = query.data or ""
 
     if data == f"{_PFX}:cancel":
-        await query.edit_message_text("✅ تم إلغاء العملية.")
+        try:
+            await query.edit_message_text("✅ تم الإلغاء.")
+        except Exception:
+            pass
+        context.user_data.clear()
         return ConversationHandler.END
 
-    if data == f"{_PFX}:back_search":
+    if data == f"{_PFX}:back_actions":
         await query.edit_message_text(
-            "✏️ اكتب اسم المريض:",
-            reply_markup=_cancel_kb(),
+            "📋 اختر الإجراءات:",
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=_actions_kb(),
         )
-        return PR_SEARCH
+        return PR_ACTIONS
 
     # pr:period:<patient_id>:<range>
     parts  = data.split(":")
@@ -208,34 +361,77 @@ async def handle_period_picked(
     await query.edit_message_text("⏳ جارٍ إعداد التقرير...")
 
     period_start = _resolve_period_start(period_code)
-    reports      = await _fetch_patient_reports(patient_id, period_start)
-    patient      = await _get_patient_by_id(patient_id)
+    period_label = _period_label(period_code)
 
-    if not reports:
-        period_label = _period_label(period_code)
-        await query.edit_message_text(
-            f"⚠️ لا توجد تقارير للمريض *{patient['name'] if patient else ''}*"
-            f" في {period_label}.",
-            parse_mode=ParseMode.MARKDOWN,
-            reply_markup=_period_kb(patient_id),
-        )
-        return PR_PERIOD
+    # Get filters from context
+    depts   = context.user_data.get("pr_depts")    # None or list
+    actions = context.user_data.get("pr_actions")  # None or list
 
-    # Build and send the report
-    messages = _build_patient_report(patient, reports, period_code)
-
-    # Delete the "جارٍ إعداد..." message first
     try:
-        await query.delete_message()
-    except Exception:
-        pass
+        from services.reports_repository import get_reports
+        from services.patient_report_pdf import build_patient_pdf
 
-    for msg in messages:
-        await query.get_bot().send_message(
-            chat_id=query.message.chat_id,
-            text=msg,
+        # Fetch patient reports with filters
+        reports = await get_reports(
+            start=period_start,
+            end=date.today(),
+            patient_id=patient_id,
+            depts=depts,
+            actions=actions,
+        )
+        patient = await _get_patient_by_id(patient_id)
+
+        if not reports:
+            await query.edit_message_text(
+                f"⚠️ لا توجد تقارير للمريض *{patient['name'] if patient else ''}*"
+                f" في {period_label}.",
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=_period_kb(patient_id),
+            )
+            return PR_PERIOD
+
+        # Build professional PDF
+        pdf_buf = build_patient_pdf(patient, reports, depts, period_label)
+
+        # Send PDF
+        filename = f"Patient_{patient_id}_{period_code}.pdf"
+        caption = (
+            f"👤 *تقرير المريض*\n"
+            f"📝 {patient['name']}\n"
+            f"📅 {period_label}\n"
+            f"📋 {len(reports)} تقرير"
+        )
+
+        try:
+            await query.delete_message()
+        except Exception:
+            pass
+
+        await context.bot.send_document(
+            chat_id=update.effective_chat.id,
+            document=pdf_buf,
+            filename=filename,
+            caption=caption,
             parse_mode=ParseMode.MARKDOWN,
         )
+
+        logger.info(
+            f"[patient_report] PDF sent  patient_id={patient_id}  period={period_code}"
+            f"  reports={len(reports)}"
+        )
+
+    except Exception as exc:
+        logger.exception("[patient_report] PDF generation failed")
+        try:
+            await query.edit_message_text(
+                "❌ حدث خطأ أثناء إعداد التقرير.",
+                parse_mode=ParseMode.MARKDOWN,
+            )
+        except Exception:
+            pass
+
+    finally:
+        context.user_data.clear()
 
     return ConversationHandler.END
 
@@ -516,13 +712,15 @@ def _fetch_reports_sync(patient_id: int, since: date | None) -> list[dict]:
 
 # ── Utilities ─────────────────────────────────────────────────────────────────
 
-def _resolve_period_start(code: str) -> date | None:
+def _resolve_period_start(code: str) -> date:
+    """Resolve period code to start date."""
     today = date.today()
     if code == "1m":
         return today - timedelta(days=30)
     if code == "3m":
         return today - timedelta(days=90)
-    return None   # "all"
+    # "all" — return very old date
+    return date(1900, 1, 1)
 
 
 def _period_label(code: str) -> str:
@@ -540,8 +738,16 @@ def _fmt_date(d) -> str:
 # ── Registration ──────────────────────────────────────────────────────────────
 
 def register(app) -> None:
+    """
+    Register patient report handler.
+
+    NOTE: Entry point (message button) is in admin_reports_menu.
+    This registers the full conversation flow for patient reports,
+    delegated to from the menu.
+    """
     conv = ConversationHandler(
         entry_points=[
+            # Backward compatibility: allow direct message button (deprecated)
             MessageHandler(
                 filters.Regex(r"^🖨️ طباعة التقارير$"),
                 start_patient_report,
@@ -555,8 +761,14 @@ def register(app) -> None:
             PR_PICK: [
                 CallbackQueryHandler(handle_patient_picked, pattern=rf"^{_PFX}:(pick:|back_search|cancel|noop)"),
             ],
+            PR_DEPTS: [
+                CallbackQueryHandler(handle_depts_picked, pattern=rf"^{_PFX}:(depts:|back_patient|cancel)"),
+            ],
+            PR_ACTIONS: [
+                CallbackQueryHandler(handle_actions_picked, pattern=rf"^{_PFX}:(actions:|back_depts|cancel)"),
+            ],
             PR_PERIOD: [
-                CallbackQueryHandler(handle_period_picked, pattern=rf"^{_PFX}:(period:|back_search|cancel)"),
+                CallbackQueryHandler(handle_period_picked, pattern=rf"^{_PFX}:(period:|back_actions|cancel)"),
             ],
         },
         fallbacks=[
@@ -569,4 +781,4 @@ def register(app) -> None:
         allow_reentry=True,
     )
     app.add_handler(conv)
-    logger.info("[patient_report] ConversationHandler registered  button=🖨️ طباعة التقارير")
+    logger.info("[patient_report] ConversationHandler registered  prefix=pr:")
