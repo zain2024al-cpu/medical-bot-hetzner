@@ -167,7 +167,7 @@ def build_comprehensive_pdf(
         from reportlab.lib.enums import TA_RIGHT, TA_CENTER
         from reportlab.platypus import (
             SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
-            PageBreak, Image, HRFlowable,
+            PageBreak, Image, HRFlowable, Flowable,
         )
     except ImportError as e:
         logger.error(f"[comprehensive_pdf] reportlab missing: {e}")
@@ -231,21 +231,24 @@ def build_comprehensive_pdf(
     story = []
 
     # Cover
-    class CoverBand:
-        def __init__(self):
-            self.width, self.height = 540, 120
+    class CoverBand(Flowable):
+        def __init__(self, period_label):
+            Flowable.__init__(self)
+            self.width = 540
+            self.height = 120
+            self.period_label = period_label
 
-        def drawOn(self, canvas, x, y):
-            canvas.setFillColor(C["primary"])
-            canvas.roundRect(x, y, self.width, self.height, 10, stroke=0, fill=1)
-            canvas.setFillColor(C["white"])
-            canvas.setFont(FNB, 20)
-            canvas.drawRightString(x + self.width - 15, y + self.height - 38, _ar("التقرير الشامل"))
-            canvas.setFont(FN, 11)
-            canvas.setFillColor(C["light_bg"])
-            canvas.drawRightString(x + self.width - 15, y + 18, _ar(f"الفترة: {period_label}"))
+        def draw(self):
+            self.canv.setFillColor(C["primary"])
+            self.canv.roundRect(0, 0, self.width, self.height, 10, stroke=0, fill=1)
+            self.canv.setFillColor(C["white"])
+            self.canv.setFont(FNB, 20)
+            self.canv.drawRightString(self.width - 15, self.height - 38, _ar("التقرير الشامل"))
+            self.canv.setFont(FN, 11)
+            self.canv.setFillColor(C["light_bg"])
+            self.canv.drawRightString(self.width - 15, 18, _ar(f"الفترة: {self.period_label}"))
 
-    story.append(CoverBand())
+    story.append(CoverBand(period_label))
     story.append(Spacer(1, 0.4 * cm))
 
     # ── Summary stats ─────────────────────────────────────────────────────────
