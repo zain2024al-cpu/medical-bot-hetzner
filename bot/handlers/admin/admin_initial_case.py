@@ -8,9 +8,14 @@ from telegram.ext import (
     filters,
 )
 from db.models import Report, Patient, InitialCase
-from services.pdf_generator import generate_pdf_report
 from bot.shared_utils import format_datetime, parse_date
 from datetime import datetime
+
+# Lazy import to handle missing weasyprint
+try:
+    from services.pdf_generator import generate_pdf_report
+except ImportError:
+    generate_pdf_report = None
 
 
 # ================================================

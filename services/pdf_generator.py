@@ -12,9 +12,16 @@ from db.models import Report
 IS_WINDOWS = sys.platform.startswith('win')
 
 if not IS_WINDOWS:
-    from weasyprint import HTML, CSS
-    from weasyprint.text.fonts import FontConfiguration
-    font_config = FontConfiguration()
+    try:
+        from weasyprint import HTML, CSS
+        from weasyprint.text.fonts import FontConfiguration
+        font_config = FontConfiguration()
+    except ImportError:
+        # If weasyprint is not installed, disable it
+        HTML = None
+        CSS = None
+        font_config = None
+        logger.warning("weasyprint not installed - PDF generation disabled")
 else:
     # على Windows: تعطيل WeasyPrint
     HTML = None
