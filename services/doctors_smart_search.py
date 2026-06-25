@@ -9,11 +9,41 @@
 import json
 import os
 import re
-from rapidfuzz import fuzz, process
 import logging
 from typing import List, Dict, Optional
 
 logger = logging.getLogger(__name__)
+
+# محاولة استيراد rapidfuzz (اختياري)
+try:
+    from rapidfuzz import fuzz, process
+    RAPIDFUZZ_AVAILABLE = True
+except ImportError:
+    RAPIDFUZZ_AVAILABLE = False
+    logger.warning("⚠️ rapidfuzz غير مثبتة - البحث الذكي معطل")
+
+    # Fallback class for fuzz when rapidfuzz is not available
+    class FuzzFallback:
+        @staticmethod
+        def ratio(s1: str, s2: str) -> int:
+            """Simple string matching fallback - returns 0-100."""
+            s1 = s1.lower().strip()
+            s2 = s2.lower().strip()
+            if not s1 or not s2:
+                return 0
+            # Simple substring matching
+            if s1 in s2 or s2 in s1:
+                return 85
+            # Character overlap check
+            matches = sum(1 for c in s1 if c in s2)
+            return int((matches / max(len(s1), len(s2))) * 100)
+
+        @staticmethod
+        def WRatio(s1: str, s2: str) -> int:
+            """Weighted ratio - just use ratio."""
+            return FuzzFallback.ratio(s1, s2)
+
+    fuzz = FuzzFallback()
 
 # محاولة استيراد OpenAI للترتيب الذكي (اختياري)
 try:
