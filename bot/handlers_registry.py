@@ -65,7 +65,7 @@ def register_all_handlers(app):
     # 🔸 تسجيل handlers الأدمن المتخصصة
     from bot.handlers.admin import (
         admin_initial_case,
-        admin_reports,
+        # admin_reports,  # DEPRECATED: old reporting system, use admin_reports_menu instead
         admin_ai,
         admin_notes,
     )

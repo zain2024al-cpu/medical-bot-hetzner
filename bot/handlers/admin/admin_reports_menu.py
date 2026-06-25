@@ -137,6 +137,8 @@ def register(app) -> None:
             MENU_CHOOSE_TYPE: [
                 CallbackQueryHandler(handle_type_selection, pattern=rf"^{_PFX}:"),
             ],
+            # Note: PR_SHOW_SELECTOR and other states from delegated handlers
+            # are NOT defined here - those handlers manage their own states
         },
         fallbacks=[
             CallbackQueryHandler(cancel_reports_menu, pattern=rf"^{_PFX}:cancel$"),
