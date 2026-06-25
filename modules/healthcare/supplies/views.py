@@ -194,7 +194,10 @@ def build_specialist_prompt(session: SuppliesSession) -> tuple[str, InlineKeyboa
         [
             InlineKeyboardButton("د. فضل",    callback_data=f"{HCSUP}:sp_fadl"),
             InlineKeyboardButton("د. سرور",   callback_data=f"{HCSUP}:sp_sarour"),
+        ],
+        [
             InlineKeyboardButton("د. زكريا",  callback_data=f"{HCSUP}:sp_zakariya"),
+            InlineKeyboardButton("د. مبروك",  callback_data=f"{HCSUP}:sp_mabrook"),
         ],
         [
             InlineKeyboardButton("🔙 رجوع", callback_data=f"{HCSUP}:back"),

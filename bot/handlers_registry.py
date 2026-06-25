@@ -33,10 +33,18 @@ def register_all_handlers(app):
     from bot.handlers.admin.admin_evaluation import register as register_evaluation
     from bot.handlers.admin.admin_admins import register as register_admin_admins
     from bot.handlers.admin.admin_module_access import register as register_module_access
+    from bot.handlers.admin.admin_notes import register as register_admin_notes
+    from bot.handlers.admin.admin_reports_recovery import register as register_reports_recovery
+    from bot.handlers.admin.admin_translator_status import register as register_translator_status
+    from bot.handlers.admin.admin_patient_report import register as register_patient_report
     register_schedule_management(app)
-    register_evaluation(app)  # ✅ تسجيل ConversationHandler قبل admin_start
-    register_admin_admins(app)  # ✅ إدارة الأدمنين - قبل admin_start لالتقاط admin:manage_admins
-    register_module_access(app)  # ✅ إدارة الوصول للوحدات (amod:*)
+    register_evaluation(app)       # ✅ ConversationHandler قبل admin_start
+    register_admin_admins(app)     # ✅ إدارة الأدمنين
+    register_module_access(app)    # ✅ إدارة الوصول للوحدات (amod:*)
+    register_admin_notes(app)      # ✅ الملاحظات الإدارية (ConversationHandler)
+    register_reports_recovery(app) # ✅ استعادة التقارير (ConversationHandler)
+    register_translator_status(app) # ✅ لوحة متابعة المترجمين (/translators_status)
+    register_patient_report(app)   # ✅ تقرير المريض الاحترافي (🖨️ طباعة التقارير)
     from bot.handlers.user.user_paste_full_report import register as register_paste_full_report
     register_paste_full_report(app)  # ✅ لصق تقرير جاهز (أدمن فقط) قبل admin_start
 

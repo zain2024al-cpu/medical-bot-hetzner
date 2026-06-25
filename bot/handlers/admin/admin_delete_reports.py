@@ -568,7 +568,7 @@ async def handle_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif action == "back_to_year":
         await query.edit_message_text(
-            "🗑️ **حذف التقارير**\n\naختر السنة:",
+            "🗑️ **حذف التقارير**\n\nاختر السنة:",
             reply_markup=await _year_keyboard(),
             parse_mode="Markdown"
         )
@@ -599,7 +599,7 @@ async def handle_navigation(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif action == "restart":
         context.user_data.pop('delete_reports', None)
         await query.edit_message_text(
-            "🗑️ **حذف التقارير**\n\naختر السنة:",
+            "🗑️ **حذف التقارير**\n\nاختر السنة:",
             reply_markup=await _year_keyboard(),
             parse_mode="Markdown"
         )

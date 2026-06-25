@@ -28,11 +28,20 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 import os
 import logging
-import arabic_reshaper
-from bidi.algorithm import get_display
 
-# pdfkit معطل (نستخدم WeasyPrint)
-# import pdfkit
+try:
+    import arabic_reshaper
+    from bidi.algorithm import get_display
+    _ARABIC_SUPPORT = True
+except ImportError:
+    logger_tmp = logging.getLogger(__name__)
+    logger_tmp.warning("⚠️ arabic_reshaper/bidi not installed — Arabic chart text will not be shaped correctly")
+    _ARABIC_SUPPORT = False
+    def arabic_reshaper_stub(t): return t
+    def get_display(t): return t  # noqa: F811
+    class arabic_reshaper:  # noqa: N801
+        @staticmethod
+        def reshape(t): return t
 
 # Logger
 logger = logging.getLogger(__name__)

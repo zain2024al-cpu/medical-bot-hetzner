@@ -7,7 +7,7 @@ Translators Status Dashboard
 
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes, ConversationHandler, CallbackQueryHandler
-from bot.shared_auth import ensure_admin
+from bot.shared_auth import is_admin
 from services.translator_reminders import get_translator_status
 from db.session import SessionLocal
 from db.models import Translator
@@ -15,7 +15,10 @@ from datetime import datetime
 
 async def show_translators_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """عرض حالة جميع المترجمين"""
-    if not await ensure_admin(update, context):
+    user = update.effective_user
+    if not user or not is_admin(user.id):
+        if update.callback_query:
+            await update.callback_query.answer("🚫 للأدمن فقط.", show_alert=True)
         return ConversationHandler.END
     
     try:

@@ -248,6 +248,29 @@ KNOWN_CALLBACKS = [
 
     # Admin module access management — handled in group 1.
     r"^amod:",
+
+    # Delete reports module — all delrep:* callbacks.
+    r"^delrep:",
+
+    # Daily patients from schedule management — dp_*_from_schedule callbacks.
+    r"^dp_add_from_schedule$",
+    r"^dp_view_from_schedule$",
+    r"^dp_delete_from_schedule$",
+    r"^dp_confirm_delete_from_schedule$",
+    r"^dp_save_from_schedule$",
+
+    # Translator status dashboard — translator:* callbacks.
+    r"^translator:",
+
+    # Reports recovery ConversationHandler — recovery:* and entry callback.
+    r"^recovery:",
+    r"^admin:reports_recovery$",
+
+    # Admin notes ConversationHandler — inline cancel button.
+    r"^admin_cancel$",
+
+    # Patient report ConversationHandler — pr:* callbacks.
+    r"^pr:",
 ]
 
 # ================================================

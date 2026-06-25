@@ -1,0 +1,8 @@
+reportlab
+matplotlib
+arabic_reshaper
+python-bidi
+PyMuPDF
+Pillow
+SQLAlchemy
+PyPDF2

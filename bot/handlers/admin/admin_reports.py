@@ -1667,17 +1667,13 @@ async def confirm_export(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 raise Exception(f"فشل في إنشاء ملف {format_name}")
             
     except Exception as e:
-        import traceback
-        tb = traceback.format_exc()
-        logger.error(f"❌ حدث خطأ أثناء إنشاء {format_name}: {e}\n{tb}")
-        # نرسل مقتطف من التتبع للمستخدم للمساعدة في التشخيص
-        short_tb = tb if len(tb) <= 1500 else tb[-1500:]
-        error_msg = f"❌ حدث خطأ أثناء إنشاء {format_name}:\n{e}\n\nTraceback (truncated):\n{short_tb}"
+        logger.error(f"❌ حدث خطأ أثناء إنشاء {format_name}: {e}", exc_info=True)
+        # نعرض رسالة مختصرة للمستخدم بدون traceback (معلومات حساسة)
+        error_msg = f"❌ حدث خطأ أثناء إنشاء {format_name}.\nيرجى المحاولة مرة أخرى أو مراجعة السجلات."
         if q:
             try:
                 await q.edit_message_text(error_msg)
             except Exception:
-                # إذا فشل تعديل الرسالة (مثلاً انتهت صلاحية callback) أرسل رسالة عادية
                 await q.get_bot().send_message(chat_id=q.message.chat_id, text=error_msg)
         else:
             await update.message.reply_text(error_msg)
@@ -1690,23 +1686,26 @@ async def cancel_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("❌ تم إلغاء المحادثة.")
     return ConversationHandler.END
 
-async def handle_department_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """معالجة اختيار القسم من القائمة"""
+async def handle_dept_standalone_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    معالجة اختيار القسم في مسار الفلترة المستقلة (بدون مستشفى).
+    يحفظ القسم في filter_value ويذهب مباشرة لاختيار صيغة التصدير.
+    مُستخدَم في: ConversationHandler عندما نوع الفلتر = "department".
+    """
     q = update.callback_query
     await q.answer()
-    
+
     dept_name = q.data.split(":", 1)[1]
     context.user_data["filter_value"] = dept_name
-    
-    # اختيار الصيغة
+
     await q.edit_message_text(
         f"🏢 **تم اختيار القسم:** {dept_name}\n\n"
         f"📋 اختر صيغة التصدير:",
         reply_markup=_confirm_kb(),
         parse_mode="Markdown"
     )
-    
     return CONFIRM_EXPORT
+
 
 async def handle_hospital_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة اختيار المستشفى من القائمة"""
@@ -3609,6 +3608,5 @@ def register(app):
     )
     app.add_handler(conv)
     
-    # ✅ تسجيل أمر /print_patient للبحث الفوري
-    from telegram.ext import CommandHandler
-    app.add_handler(CommandHandler("print_patient", handle_print_patient_command))
+    # NOTE: /print_patient command is registered centrally in handlers_registry.py
+    # Do NOT register it here to avoid double-registration.

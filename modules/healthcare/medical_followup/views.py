@@ -285,7 +285,10 @@ def build_specialist_prompt(session: MedicalFollowupSession) -> tuple[str, Inlin
         [
             InlineKeyboardButton("د. فضل",   callback_data=f"{HCFU}:sp_fadl"),
             InlineKeyboardButton("د. سرور",  callback_data=f"{HCFU}:sp_sarour"),
+        ],
+        [
             InlineKeyboardButton("د. زكريا", callback_data=f"{HCFU}:sp_zakariya"),
+            InlineKeyboardButton("د. مبروك", callback_data=f"{HCFU}:sp_mabrook"),
         ],
         [
             InlineKeyboardButton("🔙 رجوع", callback_data=f"{HCFU}:back"),

@@ -203,7 +203,10 @@ def build_specialist_prompt(session: MedicationSession) -> tuple[str, InlineKeyb
         [
             InlineKeyboardButton("د. فضل",    callback_data=f"{HCMED}:sp_fadl"),
             InlineKeyboardButton("د. سرور",   callback_data=f"{HCMED}:sp_sarour"),
+        ],
+        [
             InlineKeyboardButton("د. زكريا",  callback_data=f"{HCMED}:sp_zakariya"),
+            InlineKeyboardButton("د. مبروك",  callback_data=f"{HCMED}:sp_mabrook"),
         ],
         [
             InlineKeyboardButton("🔙 رجوع", callback_data=f"{HCMED}:back"),

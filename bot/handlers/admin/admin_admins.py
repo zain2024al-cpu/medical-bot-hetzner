@@ -208,20 +208,31 @@ async def handle_add_admin_input(update: Update, context: ContextTypes.DEFAULT_T
         )
         return AA_START
 
-    # إضافة الأدمن الجديد
+    # إضافة الأدمن الجديد في الذاكرة
     ADMIN_IDS.append(new_admin_id)
 
-    # حفظ في ملف البيئة (إذا أمكن)
+    # حفظ في ملف البيئة
+    save_ok = True
     try:
         _save_admin_ids_to_env()
+        logger.info(f"✅ Admin {new_admin_id} saved permanently to config.env")
     except Exception as e:
-        logger.warning(f"فشل حفظ الأدمنين في ملف البيئة: {e}")
+        logger.error(f"❌ فشل حفظ الأدمن {new_admin_id} في ملف البيئة: {e}", exc_info=True)
+        save_ok = False
+
+    persistence_note = (
+        "\n\n💾 تم حفظ التغيير بشكل دائم في ملف الإعدادات."
+        if save_ok else
+        "\n\n⚠️ *تحذير:* فشل حفظ التغيير في ملف الإعدادات.\n"
+        "الصلاحية مفعّلة الآن لكنها ستضيع عند إعادة تشغيل البوت.\n"
+        "يرجى مراجعة config.env يدوياً."
+    )
 
     await update.message.reply_text(
         f"✅ **تم إضافة الأدمن بنجاح**\n\n"
         f"👤 المعرف: `{new_admin_id}`\n"
-        f"📅 التاريخ: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n"
-        f"🎉 تم منح صلاحيات الأدمن لهذا المستخدم!\n\n"
+        f"📅 التاريخ: {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+        f"{persistence_note}\n\n"
         f"👑 إدارة الأدمنين:",
         reply_markup=_admin_management_kb(),
         parse_mode="Markdown"
