@@ -699,8 +699,9 @@ def register(app):
     # group=9: must NOT be 10 — group 10 is owned by arrivals text handler.
     # Within a PTB group only the first matching handler fires; using 10 silently
     # swallows every arrivals patient-name message before it reaches flow.py.
+    # Exclude report buttons and other admin menu buttons
     app.add_handler(MessageHandler(
-        filters.TEXT & ~filters.COMMAND & ~filters.Regex("^(📋 أسماء المرضى اليومية|❌ إلغاء العملية الحالية)$"),
+        filters.TEXT & ~filters.COMMAND & ~filters.Regex("^(📋 أسماء المرضى اليومية|❌ إلغاء العملية الحالية|🖨️ طباعة التقارير)$"),
         handle_text_input_for_patients
     ), group=9)
     
