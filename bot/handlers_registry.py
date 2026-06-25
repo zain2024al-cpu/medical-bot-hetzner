@@ -44,6 +44,8 @@ def register_all_handlers(app):
     register_admin_notes(app)      # ✅ الملاحظات الإدارية (ConversationHandler)
     register_reports_recovery(app) # ✅ استعادة التقارير (ConversationHandler)
     register_translator_status(app) # ✅ لوحة متابعة المترجمين (/translators_status)
+    from bot.handlers.admin.admin_printing import register as register_admin_printing  # ✅ معالج الطباعة
+    register_admin_printing(app)  # ✅ نظام الطباعة الاحترافي الموحد
     register_patient_report(app)   # ✅ تقرير المريض الاحترافي (🖨️ طباعة التقارير)
     from bot.handlers.user.user_paste_full_report import register as register_paste_full_report
     register_paste_full_report(app)  # ✅ لصق تقرير جاهز (أدمن فقط) قبل admin_start
@@ -64,19 +66,7 @@ def register_all_handlers(app):
         admin_notes,
     )
     from bot.handlers.admin.admin_users_management import register as register_users_management
-    from bot.handlers.admin.admin_printing import register as register_admin_printing  # ✅ معالج الطباعة
-    
-    # ✅ تسجيل نظام الطباعة الاحترافي (يحتوي الآن على الفلترة المتقدمة مدمجة)
-    register_admin_printing(app)  # ✅ نظام الطباعة الاحترافي الموحد
-
-    # ✅ إدارة المستخدمين للأدمن (يجب أن تكون مسجلة حتى تعمل callbacks الخاصة بها)
     register_users_management(app)
-    
-    admin_initial_case.register(app)
-    # admin_reports.register(app)  # ❌ تم الدمج في admin_printing
-    
-    # تسجيل أمر /print_patient من admin_reports بشكل منفصل
-    from bot.handlers.admin.admin_reports import handle_print_patient_command
     from telegram.ext import CommandHandler
     app.add_handler(CommandHandler("print_patient", handle_print_patient_command))
 
