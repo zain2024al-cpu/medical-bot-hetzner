@@ -434,6 +434,10 @@ def register_new_reports_handlers(dispatcher):
                 filters.COMMAND & filters.Regex("^/reports_new$"),
                 start_reports_menu
             ),
+            MessageHandler(
+                filters.Regex("^🖨️ طباعة التقارير$"),
+                start_reports_menu
+            ),
         ],
         states={
             States.REPORT_TYPE: [
