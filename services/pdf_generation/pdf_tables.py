@@ -9,7 +9,7 @@ from reportlab.platypus import Table, TableStyle, Paragraph
 from reportlab.lib import colors
 from reportlab.lib.units import mm, cm, inch
 
-from .pdf_styles import PDFColors
+from .pdf_styles import PDFColors, FONT_FAMILY
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ class TableRenderer:
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
             ('VALIGN', (0, 0), (-1, 0), 'MIDDLE'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Tahoma'),
+            ('FONTNAME', (0, 0), (-1, 0), FONT_FAMILY),
             ('FONTSIZE', (0, 0), (-1, 0), 12),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
             ('TOPPADDING', (0, 0), (-1, 0), 8),
@@ -57,7 +57,7 @@ class TableRenderer:
             # ستايل الخلايا
             ('ALIGN', (0, 1), (-1, -1), 'CENTER'),
             ('VALIGN', (0, 1), (-1, -1), 'MIDDLE'),
-            ('FONTNAME', (0, 1), (-1, -1), 'Tahoma'),
+            ('FONTNAME', (0, 1), (-1, -1), FONT_FAMILY),
             ('FONTSIZE', (0, 1), (-1, -1), 10),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, PDFColors.LIGHT_BG]),
             ('GRID', (0, 0), (-1, -1), 1, PDFColors.GRID),
@@ -109,7 +109,7 @@ class TableRenderer:
         style = [
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('FONTNAME', (0, 0), (-1, -1), 'Tahoma'),
+            ('FONTNAME', (0, 0), (-1, -1), FONT_FAMILY),
             ('FONTSIZE', (0, 0), (-1, -1), 11),
             ('BACKGROUND', (0, 0), (-1, -1), PDFColors.LIGHT_BG),
             ('GRID', (0, 0), (-1, -1), 1, PDFColors.GRID),

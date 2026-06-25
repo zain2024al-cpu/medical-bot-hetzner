@@ -15,6 +15,10 @@ from telegram.ext import ContextTypes, ConversationHandler, MessageHandler, Call
 from bot.shared_auth import is_admin
 from bot.decorators import admin_handler
 from shared.report_constants import ReportType, DateRangePreset
+from shared.selectors.patient_selector import selector as patient_selector
+from shared.selectors.result_router import register as _register_route
+from shared.multiselect import engine as multiselect
+from shared.multiselect import Option
 from services.reporting_engine.report_engine import ReportEngine
 from services.reporting_engine.filters import (
     CompositeFilter, DateRangeFilter, HospitalFilter,
@@ -22,7 +26,6 @@ from services.reporting_engine.filters import (
 )
 from services.export_handlers.export_factory import ExportFactory
 from shared.report_constants import ExportFormat
-from db.repositories.patient_repository import PatientRepository
 from db.repositories.statistics_repository import StatisticsRepository
 
 logger = logging.getLogger(__name__)
@@ -38,6 +41,10 @@ class States:
     DEPARTMENT_SELECTION = 103
     ACTION_SELECTION = 104
     GENERATING = 105
+
+_RKEY_PATIENT = "admin.reports.patient"
+_RKEY_DEPARTMENTS = "admin.reports.departments"
+_RKEY_ACTIONS = "admin.reports.actions"
 
 
 # ========================================
@@ -164,192 +171,122 @@ async def handle_date_selection(update: Update, context: ContextTypes.DEFAULT_TY
 # Patient Report - Patient Selection
 # ========================================
 
-async def show_patient_selection(query, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """طلب اسم المريض"""
-    
-    await query.edit_message_text(
-        "👤 *ابحث عن المريض*\n\n"
-        "اكتب اسم المريض أو جزءاً منه:",
-        parse_mode=ParseMode.MARKDOWN,
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("❌ إلغاء", callback_data="cancel")],
-        ]),
-    )
-    
+async def show_patient_selection(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """فتح محدد المرضى المشترك في نظام المترجمين"""
+    await patient_selector.enter(update, context, return_to=_RKEY_PATIENT)
     return States.PATIENT_SELECTION
 
 
-async def handle_patient_search(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """معالجة البحث عن المريض"""
-    
-    search_text = (update.message.text or "").strip()
-    
-    if not search_text:
-        await update.message.reply_text("⚠️ يرجى كتابة اسم المريض")
-        return States.PATIENT_SELECTION
-    
-    # البحث عن المريض
-    patient_repo = PatientRepository()
-    patients = patient_repo.search_by_name(search_text, limit=20)
-    
-    if not patients:
-        await update.message.reply_text(
-            f"⚠️ لم يُعثر على مريض يطابق *{search_text}*",
-            parse_mode=ParseMode.MARKDOWN,
-        )
-        return States.PATIENT_SELECTION
-    
-    # عرض النتائج
-    keyboard = []
-    for p in patients:
-        keyboard.append([
-            InlineKeyboardButton(
-                f"👤 {p.full_name}",
-                callback_data=f"patient:{p.id}"
-            )
-        ])
-    
-    keyboard.append([InlineKeyboardButton("❌ إلغاء", callback_data="cancel")])
-    
-    await update.message.reply_text(
-        f"🔍 نتائج البحث ({len(patients)} مريض):",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-    )
-    
-    return States.PATIENT_SELECTION
+async def _on_patient_selected(result, update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """معالجة نتيجة اختيار المريض من patient_selector"""
+    if result.cancelled:
+        await update.effective_chat.send_message("✅ تم إلغاء العملية")
+        return
+
+    patient = result.patient
+    if patient is None:
+        await update.effective_chat.send_message("⚠️ حدث خطأ في اختيار المريض. يرجى المحاولة مرة أخرى.")
+        return
+
+    context.user_data["patient_id"] = patient.id
+    context.user_data["patient_name"] = patient.name
+    logger.info(f"👤 المريض المختار: {patient.id} ({patient.name})")
+
+    await show_department_selection(update, context)
 
 
-async def handle_patient_selected(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """معالجة اختيار المريض"""
-    
-    query = update.callback_query
-    await query.answer()
-    
-    data = query.data or ""
-    
-    if data == "cancel":
-        await query.edit_message_text("✅ تم إلغاء العملية")
-        return ConversationHandler.END
-    
-    # استخراج معرف المريض
-    patient_id = int(data.split(":")[1])
-    context.user_data["patient_id"] = patient_id
-    
-    # جلب بيانات المريض
-    patient_repo = PatientRepository()
-    patient = patient_repo.get_by_id(patient_id)
-    
-    if patient:
-        context.user_data["patient_name"] = patient.full_name
-    
-    logger.info(f"👤 المريض المختار: {patient_id}")
-    
-    # عرض خيارات الأقسام
-    return await show_department_selection(query, context)
-
-
-async def show_department_selection(query, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """عرض خيارات الأقسام"""
-    
-    # جلب قائمة الأقسام من قاعدة البيانات
+async def show_department_selection(update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """فتح قائمة اختيار الأقسام المتعددة"""
     stats_repo = StatisticsRepository()
     filters = CompositeFilter()
     filters.add("patient", PatientFilter(patient_id=context.user_data.get("patient_id")))
-    
     departments = stats_repo.get_department_statistics(filters)
-    
-    keyboard = [
-        [InlineKeyboardButton("🏥 جميع الأقسام", callback_data="dept:all")],
+
+    options = [
+        Option(id="all_departments", label="كل الأقسام", icon="🏥"),
     ]
-    
-    for dept in departments[:10]:  # أعلى 10 أقسام
-        keyboard.append([
-            InlineKeyboardButton(f"🏢 {dept['name']}", callback_data=f"dept:{dept['id']}")
-        ])
-    
-    keyboard.append([InlineKeyboardButton("❌ إلغاء", callback_data="cancel")])
-    
-    await query.edit_message_text(
-        "🏢 *اختر الأقسام*",
-        parse_mode=ParseMode.MARKDOWN,
-        reply_markup=InlineKeyboardMarkup(keyboard),
+    options.extend(
+        Option(id=str(dept["id"]), label=dept["name"], icon="🏥")
+        for dept in departments
     )
-    
+
+    await multiselect.open(
+        update,
+        context,
+        title="🏢 اختر الأقسام",
+        options=options,
+        return_to=_RKEY_DEPARTMENTS,
+        icon="🏥",
+        min_select=0,
+    )
+
     return States.DEPARTMENT_SELECTION
 
 
-async def handle_department_selection(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """معالجة اختيار الأقسام"""
-    
-    query = update.callback_query
-    await query.answer()
-    
-    data = query.data or ""
-    
-    if data == "cancel":
-        await query.edit_message_text("✅ تم إلغاء العملية")
-        return ConversationHandler.END
-    
-    # استخراج معرف القسم
-    dept_id = data.split(":")[1]
-    context.user_data["department_id"] = dept_id if dept_id != "all" else None
-    
-    logger.info(f"🏢 القسم المختار: {dept_id}")
-    
-    # عرض خيارات الإجراءات
-    return await show_action_selection(query, context)
+async def _on_departments_selected(result, update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """معالجة نتيجة اختيار الأقسام من multiselect"""
+    if result.cancelled:
+        await update.effective_chat.send_message("✅ تم إلغاء العملية")
+        return
+
+    ids = result.ids
+    if not ids or "all_departments" in ids:
+        context.user_data["department_ids"] = None
+        logger.info("🏢 الأقسام المختارة: الكل")
+    else:
+        context.user_data["department_ids"] = [int(dept_id) for dept_id in ids]
+        logger.info(f"🏢 الأقسام المختارة: {context.user_data['department_ids']}")
+
+    await show_action_selection(update, context)
 
 
-async def show_action_selection(query, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """عرض خيارات الإجراءات"""
-    
-    keyboard = [
-        [InlineKeyboardButton("💉 جميع الإجراءات", callback_data="action:all")],
-    ]
-    
-    # جلب قائمة الإجراءات
+async def show_action_selection(update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """فتح قائمة اختيار الإجراءات المتعددة"""
     stats_repo = StatisticsRepository()
     filters = CompositeFilter()
     filters.add("patient", PatientFilter(patient_id=context.user_data.get("patient_id")))
-    
     actions = stats_repo.get_action_statistics(filters)
-    
-    for action in actions[:10]:  # أعلى 10 إجراءات
-        keyboard.append([
-            InlineKeyboardButton(f"💉 {action['name']}", callback_data=f"action:{action['name']}")
-        ])
-    
-    keyboard.append([InlineKeyboardButton("❌ إلغاء", callback_data="cancel")])
-    
-    await query.edit_message_text(
-        "💉 *اختر الإجراءات*",
-        parse_mode=ParseMode.MARKDOWN,
-        reply_markup=InlineKeyboardMarkup(keyboard),
+
+    options = [
+        Option(id="all_actions", label="كل الإجراءات", icon="💉"),
+    ]
+    options.extend(
+        Option(id=action["name"], label=action["name"], icon="💉")
+        for action in actions
     )
-    
+
+    await multiselect.open(
+        update,
+        context,
+        title="💉 اختر الإجراءات",
+        options=options,
+        return_to=_RKEY_ACTIONS,
+        icon="💉",
+        min_select=0,
+    )
+
     return States.ACTION_SELECTION
 
 
-async def handle_action_selection(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """معالجة اختيار الإجراءات"""
-    
+async def _on_actions_selected(result, update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """معالجة نتيجة اختيار الإجراءات من multiselect"""
+    if result.cancelled:
+        await update.effective_chat.send_message("✅ تم إلغاء العملية")
+        return
+
+    ids = result.ids
+    if not ids or "all_actions" in ids:
+        context.user_data["action_names"] = None
+        logger.info("💉 الإجراءات المختارة: الكل")
+    else:
+        context.user_data["action_names"] = ids
+        logger.info(f"💉 الإجراءات المختارة: {context.user_data['action_names']}")
+
     query = update.callback_query
-    await query.answer()
-    
-    data = query.data or ""
-    
-    if data == "cancel":
-        await query.edit_message_text("✅ تم إلغاء العملية")
-        return ConversationHandler.END
-    
-    # استخراج الإجراء
-    action = data.split(":")[1]
-    context.user_data["action"] = action if action != "all" else None
-    
-    logger.info(f"💉 الإجراء المختار: {action}")
-    
-    # عرض خيارات الفترة الزمنية
-    return await show_date_selection(query, context)
+    if query:
+        await show_date_selection(query, context)
+    else:
+        await show_date_selection(update, context)
 
 
 # ========================================

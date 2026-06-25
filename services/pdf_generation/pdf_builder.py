@@ -20,7 +20,7 @@ from reportlab.lib import colors
 from reportlab.lib.styles import ParagraphStyle
 
 from services.reporting_engine.report_data import ReportData
-from .pdf_styles import PDFConfig, PDFColors, get_styles, setup_arabic_fonts
+from .pdf_styles import PDFConfig, PDFColors, FONT_FAMILY, get_styles, setup_arabic_fonts
 from .pdf_tables import TableRenderer
 from .pdf_charts import ChartRenderer
 from .pdf_renderer_arabic import ArabicTextRenderer
@@ -204,11 +204,7 @@ class PDFBuilder:
                 ('BACKGROUND', (0, 0), (-1, -1), PDFColors.LIGHT_BG),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                 ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ('FONTNAME', (0, 0), (-1, -1), 'Tahoma'),
-                ('FONTSIZE', (0, 0), (-1, -1), 11),
-                ('GRID', (0, 0), (-1, -1), 1, PDFColors.GRID),
-                ('TOPPADDING', (0, 0), (-1, -1), 8),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                    ('FONTNAME', (0, 0), (-1, -1), FONT_FAMILY),
             ]))
             
             self.elements.append(metrics_table)
@@ -316,7 +312,7 @@ class PDFBuilder:
             timeline_table.setStyle(TableStyle([
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                 ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ('FONTNAME', (0, 0), (-1, -1), 'Tahoma'),
+                ('FONTNAME', (0, 0), (-1, -1), FONT_FAMILY),
                 ('FONTSIZE', (0, 0), (-1, -1), 10),
                 ('GRID', (0, 0), (-1, -1), 1, PDFColors.GRID),
                 ('TOPPADDING', (0, 0), (-1, -1), 6),

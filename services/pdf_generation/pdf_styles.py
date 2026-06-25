@@ -12,28 +12,18 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 import os
 
+from .font_manager import FontManager
+
 # ========================================
 # تسجيل الخطوط العربية
 # ========================================
 
+FONT_FAMILY = FontManager.FONT_FAMILY
+
+
 def setup_arabic_fonts():
     """إعداد الخطوط العربية"""
-    font_candidates = [
-        ("C:\\Windows\\Fonts\\tahoma.ttf", "Tahoma"),
-        ("C:\\Windows\\Fonts\\tahomabd.ttf", "TahomaBd"),
-        ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "DejaVu"),
-        ("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "DejaVuBd"),
-    ]
-    
-    for font_path, font_name in font_candidates:
-        if os.path.isfile(font_path):
-            try:
-                if "Bold" in font_name or "bd" in font_path.lower():
-                    pdfmetrics.registerFont(TTFont(font_name, font_path))
-                else:
-                    pdfmetrics.registerFont(TTFont(font_name, font_path))
-            except:
-                pass
+    FontManager.register_all_fonts()
 
 
 # ========================================
@@ -75,7 +65,7 @@ def get_styles():
         fontSize=28,
         leading=36,
         textColor=PDFColors.PRIMARY,
-        fontName='Tahoma',
+        fontName=FONT_FAMILY,
         alignment=2,  # RTL
         spaceAfter=12,
         bold=True,
@@ -87,7 +77,7 @@ def get_styles():
         fontSize=20,
         leading=24,
         textColor=PDFColors.PRIMARY,
-        fontName='Tahoma',
+        fontName=FONT_FAMILY,
         alignment=2,  # RTL
         spaceAfter=10,
         bold=True,
@@ -99,7 +89,7 @@ def get_styles():
         fontSize=14,
         leading=18,
         textColor=PDFColors.ACCENT,
-        fontName='Tahoma',
+        fontName=FONT_FAMILY,
         alignment=2,  # RTL
         spaceAfter=8,
         bold=True,
@@ -111,7 +101,7 @@ def get_styles():
         fontSize=12,
         leading=16,
         textColor=PDFColors.TEXT_DARK,
-        fontName='Tahoma',
+        fontName=FONT_FAMILY,
         alignment=2,  # RTL
         spaceAfter=6,
     ))
@@ -122,7 +112,7 @@ def get_styles():
         fontSize=10,
         leading=12,
         textColor=PDFColors.TEXT_GRAY,
-        fontName='Tahoma',
+        fontName=FONT_FAMILY,
         alignment=2,  # RTL
         spaceAfter=4,
     ))
