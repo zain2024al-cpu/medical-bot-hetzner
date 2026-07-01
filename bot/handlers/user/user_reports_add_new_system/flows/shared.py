@@ -2187,6 +2187,24 @@ async def save_report_to_database(query, context, flow_type):
             f"action={final_medical_action}"
         )
 
+        # ✅ حفظ التقرير المعلق إذا كان لا يوجد تقرير طبي
+        no_report_reason = data.get("no_report_reason")
+        if no_report_reason and data.get("_medical_report_step_done"):
+            try:
+                from services.pending_reports_service import add_pending_report
+                add_pending_report(
+                    report_id=report_id,
+                    patient_id=patient.id,
+                    patient_name=patient_name,
+                    department=final_dept_name or dept_name or "غير محدد",
+                    translator_id=actual_translator_id,
+                    translator_name=actual_translator_name,
+                    no_report_reason=no_report_reason
+                )
+                logger.info(f"✅ Pending report created for report_id={report_id}, patient={patient_name}")
+            except Exception as e:
+                logger.error(f"⚠️ Failed to create pending report: {e}", exc_info=True)
+
         # الحصول على اسم المترجم (من data أولاً، ثم من translator_id)
         translator_name = data.get("translator_name", "غير محدد")
         if (not translator_name or translator_name == "غير محدد") and data.get("translator_id"):

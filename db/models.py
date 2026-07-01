@@ -828,7 +828,7 @@ class MonthlyEvaluation(Base):
 class FollowupTracking(Base):
     """Follow-up tracking"""
     __tablename__ = "followup_tracking"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     report_id = Column(Integer, nullable=True)
     patient_id = Column(Integer, nullable=True)
@@ -842,6 +842,31 @@ class FollowupTracking(Base):
     reminder_sent = Column(Boolean, default=False, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
+
+
+class PendingReport(Base):
+    """تتبع التقارير الطبية المعلقة (التي بدون مرافقات جاهزة)
+
+    عند إرفاق التقرير والمترجم يقول "لا يوجد تقارير طبية"
+    نحفظ المعلومات هنا لمتابعتها
+    """
+    __tablename__ = "pending_reports"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    report_id = Column(Integer, nullable=True, index=True)
+    patient_id = Column(Integer, nullable=True)
+    patient_name = Column(String(255), nullable=True, index=True)
+    department = Column(String(255), nullable=True)
+    translator_id = Column(Integer, nullable=True)
+    translator_name = Column(String(255), nullable=True, index=True)
+    no_report_reason = Column(Text, nullable=True)  # السبب لعدم وجود التقرير
+    status = Column(String(50), default="pending", nullable=True, index=True)  # pending, completed, cancelled
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=True, index=True)
+    completed_at = Column(DateTime, nullable=True)  # متى تم إكمال المرافقات
+    days_waiting = Column(Integer, default=0, nullable=True)  # عدد الأيام في الانتظار
+
+    def __repr__(self):
+        return f"<PendingReport(id={self.id}, patient={self.patient_name}, dept={self.department}, status={self.status})>"
 
 
 # Helper function for backward compatibility
@@ -880,6 +905,7 @@ __all__ = [
     'TranslatorEvaluation',
     'MonthlyEvaluation',
     'FollowupTracking',
+    'PendingReport',
     'WoundRecord',
     'MedicalFollowupRecord',
     'MedicationRecord',

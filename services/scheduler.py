@@ -118,6 +118,16 @@ async def _tomorrow_appointments_job(app):
     except Exception as e:
         print(f"Error in tomorrow appointments job: {e}")
 
+async def _pending_reports_daily_job(app):
+    """مهمة إرسال تقرير يومي بالتقارير الطبية المعلقة"""
+    try:
+        from services.pending_reports_service import send_pending_reports_daily_report
+        from config.settings import ADMIN_IDS
+        if app and hasattr(app, 'bot'):
+            await send_pending_reports_daily_report(app.bot, ADMIN_IDS)
+    except Exception as e:
+        print(f"Error in pending reports daily job: {e}")
+
 async def _sqlite_quick_backup_job():
     """مهمة النسخ الاحتياطي السريع كل 10 دقائق"""
     try:
@@ -256,6 +266,19 @@ def start_scheduler(app=None):
                 print("✅ Tomorrow appointments notification: 8:00 PM (India Time) daily")
             except UnicodeEncodeError:
                 print("[OK] Tomorrow appointments notification: 8:00 PM (India Time) daily")
+
+            # 3.6. تقرير يومي بالتقارير الطبية المعلقة (9:00 مساءً توقيت الهند)
+            # 9:00 PM الهند = 3:30 PM UTC (14:30 + 60 دقيقة)
+            scheduler.add_job(
+                _pending_reports_daily_job,
+                trigger=CronTrigger(hour=15, minute=30, timezone='UTC'),  # 3:30 PM UTC = 9:00 PM الهند
+                args=[app],
+                id='pending_reports_daily'
+            )
+            try:
+                print("✅ Pending reports daily report: 9:00 PM (India Time) daily")
+            except UnicodeEncodeError:
+                print("[OK] Pending reports daily report: 9:00 PM (India Time) daily")
         
         # 4. النسخ الاحتياطي السريع كل 10 دقائق
         scheduler.add_job(
