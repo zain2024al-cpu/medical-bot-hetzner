@@ -4,6 +4,20 @@
 # يفتح قائمة بخيارين:
 # 1. تقييم المترجمين
 # 2. تقرير تقييم الرعاية الصحية
+#
+# ✅ ملاحظة معمارية:
+# هذه القائمة عبارة عن "موزّع" (dispatcher) بسيط فقط — لا تحتوي على أي
+# منطق عمل خاص بها ولا تحتاج لتتبع حالة محادثة (ConversationHandler).
+# الأزرار تشير مباشرة إلى نقاط الدخول الحقيقية للأنظمة المسؤولة فعلياً:
+#   - "admin:evaluation" → نقطة دخول translator_evaluation_conv (admin_evaluation.py)
+#   - "hceval:start"     → نقطة دخول تقييم الرعاية الصحية (modules/healthcare/evaluation/flow.py)
+# بهذا الشكل يحافظ كل نظام على تتبعه الداخلي الصحيح دون أي "تفويض" يدوي
+# قد يستدعي دوالاً غير موجودة أو يكسر تتبع الحالة.
+#
+# تم تعمّد عدم استخدام ConversationHandler هنا: لو استُخدم، كان سيبقى
+# "عالقاً" في حالة القائمة (MENU) إلى الأبد بعد الضغط على أي من الزرين،
+# لأن callback_data الخاص بهما لا يطابق نمط "eval_menu:" الذي تتوقعه
+# محادثة القائمة، فلا تصل أبداً لإرجاع ConversationHandler.END.
 
 from __future__ import annotations
 
@@ -11,19 +25,11 @@ import logging
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
-from telegram.ext import (
-    ContextTypes, ConversationHandler, CallbackQueryHandler, MessageHandler,
-    filters
-)
+from telegram.ext import ContextTypes, CallbackQueryHandler, MessageHandler, filters
 
 from bot.shared_auth import is_admin
 
 logger = logging.getLogger(__name__)
-
-# ── States ─────────────────────────────────────────────────────────────────────
-(
-    MENU,
-) = range(1)
 
 _PFX = "eval_menu"
 
@@ -33,8 +39,8 @@ _PFX = "eval_menu"
 def _menu_kb() -> InlineKeyboardMarkup:
     """Evaluation menu options."""
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("📊 تقييم المترجمين", callback_data=f"{_PFX}:translators")],
-        [InlineKeyboardButton("📊 تقرير تقييم الرعاية الصحية", callback_data=f"{_PFX}:healthcare")],
+        [InlineKeyboardButton("📊 تقييم المترجمين", callback_data="admin:evaluation")],
+        [InlineKeyboardButton("📊 تقرير تقييم الرعاية الصحية", callback_data="hceval:start")],
         [InlineKeyboardButton("❌ إلغاء", callback_data=f"{_PFX}:cancel")],
     ])
 
@@ -43,13 +49,11 @@ def _menu_kb() -> InlineKeyboardMarkup:
 
 async def start_evaluation_menu(
     update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> int:
-    """Show evaluation menu."""
+) -> None:
+    """Show evaluation menu (entry point — plain MessageHandler, no conversation state)."""
     user = update.effective_user
     if not user or not is_admin(user.id):
-        return ConversationHandler.END
-
-    context.user_data.clear()
+        return
 
     try:
         await update.message.reply_text(
@@ -61,110 +65,38 @@ async def start_evaluation_menu(
     except Exception as exc:
         logger.error(f"[eval_menu] Failed to show menu: {exc}")
 
-    return MENU
 
-
-async def handle_menu_choice(
+async def handle_menu_cancel(
     update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> int:
-    """Handle evaluation choice - delegate to appropriate handler."""
+) -> None:
+    """Handle the cancel button only.
+
+    الأزرار الأخرى ("admin:evaluation" و "hceval:start") لا تصل إلى هذه
+    الدالة أبداً لأن نمط التسجيل أدناه محدد بـ "^eval_menu:cancel$" فقط —
+    تُترك لتيليجرام لتمريرها مباشرة لمعالجاتها الحقيقية المسجّلة بشكل
+    مستقل في أماكن أخرى.
+    """
     query = update.callback_query
+    if not query:
+        return
     try:
         await query.answer()
     except Exception:
         pass
-
-    data = query.data or ""
-
-    if data == f"{_PFX}:cancel":
-        try:
-            await query.edit_message_text("✅ تم الإلغاء.")
-        except Exception:
-            pass
-        context.user_data.clear()
-        return ConversationHandler.END
-
-    if data == f"{_PFX}:translators":
-        # Delegate to translator evaluation
-        try:
-            from bot.handlers.admin.admin_evaluation import _show_month_selection
-
-            # Call the year selection directly
-            await query.edit_message_text("📊 *تقييم المترجمين*\n\nاختر السنة:")
-            await _show_month_selection(query.message, context, None)
-        except Exception as exc:
-            logger.error(f"[eval_menu] Failed to delegate to translator evaluation: {exc}")
-            try:
-                await query.edit_message_text("❌ فشل تحميل تقييم المترجمين.\n\nحاول مرة أخرى.")
-            except Exception:
-                pass
-
-        return ConversationHandler.END
-
-    if data == f"{_PFX}:healthcare":
-        # Delegate to healthcare evaluation
-        try:
-            await query.edit_message_text("⏳ جارٍ تحميل تقييم الرعاية الصحية...")
-        except Exception:
-            pass
-
-        try:
-            from modules.healthcare.evaluation.flow import handle_callback
-            await handle_callback(update, context)
-        except ImportError:
-            try:
-                await query.edit_message_text("❌ نظام تقييم الرعاية الصحية غير متاح.")
-            except Exception:
-                pass
-        except Exception as exc:
-            logger.error(f"[eval_menu] Healthcare evaluation error: {exc}")
-            try:
-                await query.edit_message_text("❌ خطأ في تقييم الرعاية الصحية.")
-            except Exception:
-                pass
-
-        return ConversationHandler.END
-
-    return MENU
-
-
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Cancel handler."""
-    query = update.callback_query
-    if query:
-        try:
-            await query.answer()
-            await query.edit_message_text("✅ تم الإلغاء.")
-        except Exception:
-            pass
-    context.user_data.clear()
-    return ConversationHandler.END
+    try:
+        await query.edit_message_text("✅ تم الإلغاء.")
+    except Exception:
+        pass
 
 
 # ── Registration ───────────────────────────────────────────────────────────────
 
 def register(app) -> None:
-    """Register evaluation menu handler."""
-    conv = ConversationHandler(
-        entry_points=[
-            MessageHandler(
-                filters.Regex(r"^📊 التقييم$"),
-                start_evaluation_menu,
-            ),
-        ],
-        states={
-            MENU: [
-                CallbackQueryHandler(handle_menu_choice, pattern=rf"^{_PFX}:"),
-            ],
-        },
-        fallbacks=[
-            CallbackQueryHandler(cancel, pattern=rf"^{_PFX}:cancel$"),
-        ],
-        name="evaluation_menu_conv",
-        per_chat=True,
-        per_user=True,
-        per_message=False,
+    """Register evaluation menu handlers (plain handlers, no ConversationHandler)."""
+    app.add_handler(
+        MessageHandler(filters.Regex(r"^📊 التقييم$"), start_evaluation_menu)
     )
-
-    app.add_handler(conv)
-    logger.info("[eval_menu] ConversationHandler registered for evaluation menu")
+    app.add_handler(
+        CallbackQueryHandler(handle_menu_cancel, pattern=rf"^{_PFX}:cancel$")
+    )
+    logger.info("[eval_menu] Evaluation menu handlers registered")

@@ -280,6 +280,7 @@ KNOWN_CALLBACKS = [
 
     # Evaluation menu system
     r"^eval_menu:",        # Evaluation menu dispatcher — eval_menu:* callbacks
+    r"^admin:evaluation$", # Translator evaluation entry point (triggered from eval_menu button)
 
     # Delete reports menu system
     r"^del_menu:",         # Delete reports menu dispatcher — del_menu:* callbacks
