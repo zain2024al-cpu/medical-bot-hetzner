@@ -130,6 +130,21 @@ async def handle_menu_choice(
     return ConversationHandler.END
 
 
+def _healthcare_models():
+    """جميع جداول الرعاية الصحية الخمسة (وليس فقط 'أخرى').
+
+    ✅ نظام الرعاية الصحية يحفظ التقارير في 5 جداول منفصلة حسب نوع الإجراء
+    (جروح / متابعة طبية / أدوية / مستلزمات / أخرى). أي عملية حذف أو عدّ
+    يجب أن تمر على الخمسة معاً وإلا ستظهر تقارير "غير موجودة" رغم وجودها
+    فعلياً في أحد الجداول الأخرى.
+    """
+    from db.models import (
+        WoundRecord, MedicalFollowupRecord, MedicationRecord,
+        SuppliesRecord, OtherHealthcareRecord,
+    )
+    return [WoundRecord, MedicalFollowupRecord, MedicationRecord, SuppliesRecord, OtherHealthcareRecord]
+
+
 async def _delete_healthcare_reports(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
@@ -138,19 +153,23 @@ async def _delete_healthcare_reports(
     from datetime import datetime
     from sqlalchemy import extract
     from db.session import SessionLocal
-    from db.models import OtherHealthcareRecord
 
     try:
-        # Get years from healthcare records
+        # Get years across ALL healthcare tables (union)
         with SessionLocal() as s:
-            db_years = [
-                int(r[0]) for r in
-                s.query(extract('year', OtherHealthcareRecord.created_at))
-                 .filter(OtherHealthcareRecord.created_at.isnot(None))
-                 .group_by(extract('year', OtherHealthcareRecord.created_at))
-                 .order_by(extract('year', OtherHealthcareRecord.created_at).desc())
-                 .all()
-            ]
+            years_set = set()
+            for model in _healthcare_models():
+                rows = (
+                    s.query(extract('year', model.created_at))
+                     .filter(model.created_at.isnot(None))
+                     .group_by(extract('year', model.created_at))
+                     .all()
+                )
+                for r in rows:
+                    if r[0] is not None:
+                        years_set.add(int(r[0]))
+
+        db_years = sorted(years_set, reverse=True)
 
         if not db_years:
             db_years = [datetime.now().year]
@@ -295,16 +314,16 @@ async def handle_healthcare_callback(
         year = int(parts[2])
         month = int(parts[3])
 
-        from datetime import datetime
         from db.session import SessionLocal
-        from db.models import OtherHealthcareRecord
         from sqlalchemy import extract
 
         with SessionLocal() as s:
-            count = s.query(OtherHealthcareRecord).filter(
-                extract('year', OtherHealthcareRecord.created_at) == year,
-                extract('month', OtherHealthcareRecord.created_at) == month,
-            ).count()
+            count = 0
+            for model in _healthcare_models():
+                count += s.query(model).filter(
+                    extract('year', model.created_at) == year,
+                    extract('month', model.created_at) == month,
+                ).count()
 
         month_name = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
                      "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"][month-1]
@@ -335,15 +354,16 @@ async def handle_healthcare_callback(
         month = int(parts[3])
 
         from db.session import SessionLocal
-        from db.models import OtherHealthcareRecord
         from sqlalchemy import extract
 
         try:
             with SessionLocal() as s:
-                deleted = s.query(OtherHealthcareRecord).filter(
-                    extract('year', OtherHealthcareRecord.created_at) == year,
-                    extract('month', OtherHealthcareRecord.created_at) == month,
-                ).delete()
+                deleted = 0
+                for model in _healthcare_models():
+                    deleted += s.query(model).filter(
+                        extract('year', model.created_at) == year,
+                        extract('month', model.created_at) == month,
+                    ).delete(synchronize_session=False)
                 s.commit()
 
             month_name = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
