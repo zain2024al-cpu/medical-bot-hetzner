@@ -86,14 +86,44 @@ async def handle_menu_choice(
 
     if data == f"{_PFX}:translators":
         # Delegate to translator evaluation
-        # We simulate pressing the original button by calling the handler directly
-        from bot.handlers.admin.admin_evaluation import start_evaluation
-        await start_evaluation(update, context)
+        try:
+            await query.edit_message_text("⏳ جارٍ تحميل تقييم المترجمين...")
+        except Exception:
+            pass
+
+        # Send a message to trigger the translator evaluation handler
+        try:
+            from telegram import Chat, User, Message
+            from datetime import datetime
+
+            # Create a fake message update to trigger the handler
+            fake_message = Message(
+                message_id=1,
+                date=datetime.now(),
+                chat=Chat(id=update.effective_chat.id, type="private"),
+                from_user=update.effective_user,
+                text="📊 تقييم المترجمين"
+            )
+            fake_update = Update(update_id=update.update_id, message=fake_message)
+
+            from bot.handlers.admin.admin_evaluation import start_evaluation
+            await start_evaluation(fake_update, context)
+        except Exception as exc:
+            logger.error(f"[eval_menu] Failed to delegate to translator evaluation: {exc}")
+            try:
+                await query.edit_message_text("❌ فشل تحميل تقييم المترجمين.")
+            except Exception:
+                pass
+
         return ConversationHandler.END
 
     if data == f"{_PFX}:healthcare":
         # Delegate to healthcare evaluation
-        # Get the healthcare evaluation handler from modules
+        try:
+            await query.edit_message_text("⏳ جارٍ تحميل تقييم الرعاية الصحية...")
+        except Exception:
+            pass
+
         try:
             from modules.healthcare.evaluation.flow import handle_callback
             await handle_callback(update, context)
@@ -102,6 +132,13 @@ async def handle_menu_choice(
                 await query.edit_message_text("❌ نظام تقييم الرعاية الصحية غير متاح.")
             except Exception:
                 pass
+        except Exception as exc:
+            logger.error(f"[eval_menu] Healthcare evaluation error: {exc}")
+            try:
+                await query.edit_message_text("❌ خطأ في تقييم الرعاية الصحية.")
+            except Exception:
+                pass
+
         return ConversationHandler.END
 
     return MENU
