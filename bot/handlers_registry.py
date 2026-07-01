@@ -81,6 +81,7 @@ def register_all_handlers(app):
     from bot.handlers.admin.admin_translators_management import register as register_translators_management
     from bot.handlers.admin.admin_delete_reports import register as register_admin_delete_reports
     from bot.handlers.admin.admin_backup_commands import register as register_admin_backup_commands
+    from bot.handlers.admin.admin_upcoming_appointments import register as register_upcoming_appointments
 
     register_daily_patients(app)  # ✅ إدارة أسماء المرضى اليومية
     register_data_analysis(app)  # ✅ نظام تحليل البيانات الشامل
@@ -88,6 +89,7 @@ def register_all_handlers(app):
     register_translators_management(app)  # ✅ إدارة المترجمين
     register_admin_delete_reports(app)  # ✅ حذف التقارير للأدمن
     register_admin_backup_commands(app)  # ✅ أوامر /backup و /logs للأدمن
+    register_upcoming_appointments(app)  # ✅ عرض المواعيد القادمة
     # تم حذف register_patient_management - نظام بسيط
 
     # 🔹 تسجيل handlers المستخدم المتخصصة
