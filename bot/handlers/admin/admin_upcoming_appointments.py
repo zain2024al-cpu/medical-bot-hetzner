@@ -42,23 +42,44 @@ def _menu_kb() -> InlineKeyboardMarkup:
 
 
 def _calendar_kb() -> InlineKeyboardMarkup:
-    """7-day calendar for date selection."""
+    """Calendar view for date selection - month view."""
+    from calendar import monthcalendar, day_name
+
     today = date.today()
     buttons = []
 
-    # Header: Current week
-    buttons.append([InlineKeyboardButton("📅 اختر يوماً", callback_data=f"{_PFX}:dummy")])
+    # Header with month and year
+    month_names = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+                   "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"]
+    month_label = f"{month_names[today.month - 1]} {today.year}"
+    buttons.append([InlineKeyboardButton(f"📅 {month_label}", callback_data=f"{_PFX}:dummy")])
 
-    # 7 days starting from today
-    for i in range(7):
-        d = today + timedelta(days=i)
-        day_name = ["الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت", "الأحد"][d.weekday()]
-        label = f"{day_name}\n{d.day}/{d.month}"
-        callback = f"{_PFX}:date:{d.year}-{d.month}-{d.day}"
-        buttons.append([InlineKeyboardButton(label, callback_data=callback)])
+    # Day headers (abbreviated)
+    day_headers = ["إ", "ث", "ع", "خ", "ج", "س", "ح"]  # أول حرف من كل يوم
+    buttons.append([InlineKeyboardButton(d, callback_data=f"{_PFX}:dummy") for d in day_headers])
 
-    # Back button
-    buttons.append([InlineKeyboardButton("⬅️ رجوع", callback_data=f"{_PFX}:back")])
+    # Calendar days
+    cal = monthcalendar(today.year, today.month)
+    for week in cal:
+        week_buttons = []
+        for day_num in week:
+            if day_num == 0:
+                # Empty cell for days outside current month
+                week_buttons.append(InlineKeyboardButton(" ", callback_data=f"{_PFX}:dummy"))
+            else:
+                d = date(today.year, today.month, day_num)
+                # Mark today with ⭐
+                label = f"⭐{day_num}" if d == today else str(day_num)
+                callback = f"{_PFX}:date:{d.year}-{d.month}-{d.day}"
+                week_buttons.append(InlineKeyboardButton(label, callback_data=callback))
+        buttons.append(week_buttons)
+
+    # Navigation and back buttons
+    buttons.append([
+        InlineKeyboardButton("⬅️ الشهر السابق", callback_data=f"{_PFX}:prev_month"),
+        InlineKeyboardButton("الشهر التالي ➡️", callback_data=f"{_PFX}:next_month")
+    ])
+    buttons.append([InlineKeyboardButton("🔙 رجوع", callback_data=f"{_PFX}:back")])
 
     return InlineKeyboardMarkup(buttons)
 
@@ -198,28 +219,46 @@ async def _show_appointments(query, target_date: date) -> None:
             )
 
         # Format date
-        day_name = ["الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت", "الأحد"][
-            target_date.weekday()
-        ]
+        day_names = ["الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت", "الأحد"]
+        day_name = day_names[target_date.weekday()]
         date_label = f"{day_name} - {target_date.day}/{target_date.month}/{target_date.year}"
 
         if not appointments:
-            text = f"📭 *لا توجد مواعيد في* {date_label}"
+            text = (
+                f"📭 *لا توجد مواعيد في* {date_label}\n\n"
+                "💡 يمكنك:\n"
+                "• اختيار يوم آخر من التقويم\n"
+                "• العودة للقائمة الرئيسية"
+            )
         else:
-            text = f"📅 *المواعيد في* {date_label}\n\n"
-            for apt in appointments:
+            text = f"📅 *المواعيد في* {date_label}\n"
+            text += f"━━━━━━━━━━━━━━━━━━━━\n\n"
+
+            for idx, apt in enumerate(appointments, 1):
                 time_str = apt.followup_date.strftime("%H:%M") if apt.followup_date else "—"
                 patient_name = apt.patient_name or "مريض غير معروف"
-                status = "✅" if apt.status == "completed" else "⏳"
 
-                text += f"{status} *{time_str}* - {patient_name}\n"
+                # Status emoji
+                if apt.status == "completed":
+                    status = "✅"
+                elif apt.status == "pending":
+                    status = "⏳"
+                elif apt.status == "cancelled":
+                    status = "❌"
+                else:
+                    status = "📌"
+
+                text += f"{idx}. {status} *{time_str}* - {patient_name}\n"
 
                 if apt.department:
-                    text += f"   📋 القسم: {apt.department}\n"
+                    text += f"   📋 {apt.department}\n"
                 if apt.status and apt.status != "completed":
-                    text += f"   📊 الحالة: {apt.status}\n"
+                    text += f"   💬 {apt.status}\n"
 
                 text += "\n"
+
+            text += f"━━━━━━━━━━━━━━━━━━━━\n"
+            text += f"📊 المجموع: {len(appointments)} موعد"
 
         try:
             await query.edit_message_text(
