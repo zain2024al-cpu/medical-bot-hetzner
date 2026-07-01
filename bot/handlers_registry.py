@@ -44,6 +44,10 @@ def register_all_handlers(app):
     register_reports_recovery(app) # ✅ استعادة التقارير (ConversationHandler)
     register_translator_status(app) # ✅ لوحة متابعة المترجمين (/translators_status)
 
+    # ✅ نظام التقييم — قائمة موحدة للتقييمات المختلفة
+    from bot.handlers.admin.admin_evaluation_menu import register as register_evaluation_menu
+    register_evaluation_menu(app)           # Entry point: "📊 التقييم" button
+
     # ✅ نظام التقارير الجديد — 2 أنواع احترافية: شامل + مريض واحد (مع patient_selector)
     from bot.handlers.admin.admin_reports_menu import register as register_reports_menu
     from bot.handlers.admin.admin_comprehensive_report import register as register_comprehensive_report

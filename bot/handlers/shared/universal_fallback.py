@@ -277,6 +277,9 @@ KNOWN_CALLBACKS = [
 
     # Appointments system
     r"^apt:",              # Upcoming appointments — apt:* callbacks
+
+    # Evaluation menu system
+    r"^eval_menu:",        # Evaluation menu dispatcher — eval_menu:* callbacks
 ]
 
 # ================================================
