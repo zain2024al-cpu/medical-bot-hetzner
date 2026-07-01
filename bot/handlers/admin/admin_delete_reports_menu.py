@@ -185,7 +185,7 @@ async def _delete_healthcare_reports(
         if row:
             buttons.append(row)
 
-        buttons.append([InlineKeyboardButton("❌ إلغاء", callback_data=f"{_PFX}:cancel")])
+        buttons.append([InlineKeyboardButton("❌ إلغاء", callback_data="del_hc:cancel")])
 
         await query.edit_message_text(
             "🏥 *حذف تقارير الرعاية الصحية*\n\n"
@@ -237,7 +237,7 @@ async def _delete_services_reports(
         if row:
             buttons.append(row)
 
-        buttons.append([InlineKeyboardButton("❌ إلغاء", callback_data=f"{_PFX}:cancel")])
+        buttons.append([InlineKeyboardButton("❌ إلغاء", callback_data="del_svc:cancel")])
 
         await query.edit_message_text(
             "🛠️ *حذف تقارير الخدمات العامة*\n\n"
@@ -268,6 +268,161 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 # ── Callback handlers for healthcare and services ────────────────────────────
 
+_MONTHS_AR = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+              "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"]
+
+# رموز مختصرة لكل جدول رعاية صحية (تُستخدم داخل callback_data المحدود بـ 64 حرفاً)
+_HC_TABLE_CODES = {
+    "wr": ("👁️ جرح", "WoundRecord"),
+    "mf": ("🩺 متابعة طبية", "MedicalFollowupRecord"),
+    "md": ("💊 أدوية", "MedicationRecord"),
+    "sp": ("📦 مستلزمات", "SuppliesRecord"),
+    "oh": ("📁 أخرى", "OtherHealthcareRecord"),
+}
+
+_HC_ITEMS_PER_PAGE = 6
+
+
+def _hc_model_by_code(code: str):
+    """إرجاع الكلاس (model) المطابق لرمز الجدول المختصر."""
+    from db.models import (
+        WoundRecord, MedicalFollowupRecord, MedicationRecord,
+        SuppliesRecord, OtherHealthcareRecord,
+    )
+    mapping = {
+        "wr": WoundRecord,
+        "mf": MedicalFollowupRecord,
+        "md": MedicationRecord,
+        "sp": SuppliesRecord,
+        "oh": OtherHealthcareRecord,
+    }
+    return mapping.get(code)
+
+
+async def _show_hc_months(query, year: int) -> None:
+    """عرض قائمة الأشهر لسنة معينة (رعاية صحية)."""
+    buttons = []
+    months = list(range(1, 13))
+    for i in range(0, len(months), 3):
+        row = []
+        for month in months[i:i + 3]:
+            row.append(InlineKeyboardButton(
+                _MONTHS_AR[month - 1], callback_data=f"del_hc:month:{year}:{month}"
+            ))
+        buttons.append(row)
+
+    buttons.append([InlineKeyboardButton("🔙 رجوع للسنوات", callback_data="del_hc:back_year")])
+    buttons.append([InlineKeyboardButton("❌ إلغاء", callback_data="del_hc:cancel")])
+
+    try:
+        await query.edit_message_text(
+            f"🏥 *اختر الشهر* - {year}",
+            reply_markup=InlineKeyboardMarkup(buttons),
+            parse_mode=ParseMode.MARKDOWN,
+        )
+    except Exception:
+        pass
+
+
+async def _show_hc_list(query, year: int, month: int, page: int = 0) -> None:
+    """عرض قائمة التقارير التفصيلية لشهر معين (كل الجداول الخمسة مجمّعة) مع أزرار حذف فردية."""
+    from db.session import SessionLocal
+    from sqlalchemy import extract
+
+    month_name = _MONTHS_AR[month - 1]
+
+    items = []  # (code, id, created_at, patient_name, specialist_name, notes)
+    with SessionLocal() as s:
+        for code, (label, _) in _HC_TABLE_CODES.items():
+            model = _hc_model_by_code(code)
+            rows = s.query(model).filter(
+                extract('year', model.created_at) == year,
+                extract('month', model.created_at) == month,
+            ).all()
+            for r in rows:
+                items.append({
+                    "code": code,
+                    "id": r.id,
+                    "created_at": r.created_at,
+                    "patient_name": getattr(r, "patient_name", None) or "غير محدد",
+                    "specialist_name": getattr(r, "specialist_name", None) or "-",
+                    "notes": (getattr(r, "notes", None) or "").strip(),
+                })
+
+    items.sort(key=lambda x: x["created_at"] or 0, reverse=True)
+    total_count = len(items)
+
+    if total_count == 0:
+        buttons = [
+            [InlineKeyboardButton("🔙 رجوع للأشهر", callback_data=f"del_hc:back_month:{year}")],
+            [InlineKeyboardButton("❌ إلغاء", callback_data="del_hc:cancel")],
+        ]
+        try:
+            await query.edit_message_text(
+                f"🏥 *حذف تقارير الرعاية الصحية*\n\n"
+                f"📅 {month_name} {year}\n\n"
+                f"⚠️ لا توجد تقارير في هذا الشهر.",
+                reply_markup=InlineKeyboardMarkup(buttons),
+                parse_mode=ParseMode.MARKDOWN,
+            )
+        except Exception:
+            pass
+        return
+
+    total_pages = (total_count + _HC_ITEMS_PER_PAGE - 1) // _HC_ITEMS_PER_PAGE
+    page = max(0, min(page, total_pages - 1))
+    page_items = items[page * _HC_ITEMS_PER_PAGE: (page + 1) * _HC_ITEMS_PER_PAGE]
+
+    text = (
+        f"🏥 *حذف تقارير الرعاية الصحية*\n\n"
+        f"📅 {month_name} {year}\n"
+        f"📊 عدد التقارير: *{total_count}*\n"
+        f"📄 الصفحة: {page + 1}/{total_pages}\n\n"
+    )
+
+    buttons = []
+    for it in page_items:
+        type_label = _HC_TABLE_CODES[it["code"]][0]
+        time_str = it["created_at"].strftime("%d/%m %H:%M") if it["created_at"] else ""
+        note_preview = (it["notes"][:30] + "…") if len(it["notes"]) > 30 else it["notes"]
+
+        text += (
+            f"📌 *#{it['id']}* ({type_label}) - {time_str}\n"
+            f"   👤 {it['patient_name']} | 🧑‍⚕️ {it['specialist_name']}\n"
+        )
+        if note_preview:
+            text += f"   📝 {note_preview}\n"
+        text += "\n"
+
+        buttons.append([InlineKeyboardButton(
+            f"🗑️ حذف #{it['id']} - {it['patient_name'][:15]} ({type_label})",
+            callback_data=f"del_hc:item:{it['code']}:{it['id']}:{year}:{month}:{page}",
+        )])
+
+    nav_row = []
+    if page > 0:
+        nav_row.append(InlineKeyboardButton("◀️ السابق", callback_data=f"del_hc:page:{year}:{month}:{page - 1}"))
+    if page < total_pages - 1:
+        nav_row.append(InlineKeyboardButton("التالي ▶️", callback_data=f"del_hc:page:{year}:{month}:{page + 1}"))
+    if nav_row:
+        buttons.append(nav_row)
+
+    buttons.append([InlineKeyboardButton(
+        f"⚠️ حذف الكل ({total_count} تقرير)", callback_data=f"del_hc:delall:{year}:{month}"
+    )])
+    buttons.append([InlineKeyboardButton("🔙 رجوع للأشهر", callback_data=f"del_hc:back_month:{year}")])
+    buttons.append([InlineKeyboardButton("❌ إلغاء", callback_data="del_hc:cancel")])
+
+    try:
+        await query.edit_message_text(
+            text,
+            reply_markup=InlineKeyboardMarkup(buttons),
+            parse_mode=ParseMode.MARKDOWN,
+        )
+    except Exception as exc:
+        logger.error(f"[del_menu] Failed to render healthcare list: {exc}")
+
+
 async def handle_healthcare_callback(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
@@ -280,64 +435,147 @@ async def handle_healthcare_callback(
 
     data = query.data or ""
 
+    if data == "del_hc:cancel":
+        try:
+            await query.edit_message_text("✅ تم الإلغاء.")
+        except Exception:
+            pass
+        context.user_data.pop("_delete_type", None)
+        context.user_data.pop("_hc_year", None)
+        return
+
+    if data == "del_hc:back_year":
+        await _delete_healthcare_reports(update, context)
+        return
+
+    if data.startswith("del_hc:back_month:"):
+        year = int(data.split(":")[2])
+        await _show_hc_months(query, year)
+        return
+
     if data.startswith("del_hc:year:"):
         # Year selected - show months
         year = int(data.split(":")[2])
         context.user_data["_hc_year"] = year
+        await _show_hc_months(query, year)
+        return
 
-        from datetime import datetime
+    if data.startswith("del_hc:month:"):
+        # Month selected - show detailed report list (not just a count)
+        parts = data.split(":")
+        year = int(parts[2])
+        month = int(parts[3])
+        await _show_hc_list(query, year, month, page=0)
+        return
 
-        buttons = []
-        months = list(range(1, 13))
-        for i in range(0, len(months), 3):
-            row = []
-            for month in months[i:i+3]:
-                month_name = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
-                             "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"][month-1]
-                row.append(InlineKeyboardButton(month_name, callback_data=f"del_hc:month:{year}:{month}"))
-            buttons.append(row)
+    if data.startswith("del_hc:page:"):
+        parts = data.split(":")
+        year, month, page = int(parts[2]), int(parts[3]), int(parts[4])
+        await _show_hc_list(query, year, month, page=page)
+        return
 
-        buttons.append([InlineKeyboardButton("❌ إلغاء", callback_data=f"{_PFX}:cancel")])
+    if data.startswith("del_hc:item:"):
+        # Show confirmation for a single record
+        parts = data.split(":")
+        code, rec_id, year, month, page = parts[2], int(parts[3]), int(parts[4]), int(parts[5]), int(parts[6])
 
+        from db.session import SessionLocal
+        model = _hc_model_by_code(code)
+        if model is None:
+            try:
+                await query.edit_message_text("❌ نوع تقرير غير معروف.")
+            except Exception:
+                pass
+            return
+
+        with SessionLocal() as s:
+            rec = s.query(model).filter_by(id=rec_id).first()
+            if not rec:
+                try:
+                    await query.edit_message_text("⚠️ التقرير غير موجود أو تم حذفه مسبقاً.")
+                except Exception:
+                    pass
+                return
+            patient = getattr(rec, "patient_name", None) or "غير محدد"
+            specialist = getattr(rec, "specialist_name", None) or "غير محدد"
+            date_str = rec.created_at.strftime("%Y-%m-%d %H:%M") if rec.created_at else "غير محدد"
+
+        type_label = _HC_TABLE_CODES[code][0]
+        buttons = [
+            [
+                InlineKeyboardButton("✅ نعم، احذف", callback_data=f"del_hc:idel:{code}:{rec_id}:{year}:{month}:{page}"),
+                InlineKeyboardButton("❌ لا، رجوع", callback_data=f"del_hc:page:{year}:{month}:{page}"),
+            ]
+        ]
         try:
             await query.edit_message_text(
-                f"🏥 *اختر الشهر* - {year}",
+                f"⚠️ *تأكيد حذف تقرير*\n\n"
+                f"📌 رقم التقرير: #{rec_id}\n"
+                f"📋 النوع: {type_label}\n"
+                f"👤 المريض: {patient}\n"
+                f"🧑‍⚕️ الأخصائي: {specialist}\n"
+                f"📅 التاريخ: {date_str}\n\n"
+                f"⚠️ *هذا الإجراء لا يمكن التراجع عنه!*",
                 reply_markup=InlineKeyboardMarkup(buttons),
                 parse_mode=ParseMode.MARKDOWN,
             )
         except Exception:
             pass
+        return
 
-    elif data.startswith("del_hc:month:"):
-        # Month selected - confirm deletion
+    if data.startswith("del_hc:idel:"):
+        # Execute single-record deletion then refresh the list
         parts = data.split(":")
-        year = int(parts[2])
-        month = int(parts[3])
+        code, rec_id, year, month, page = parts[2], int(parts[3]), int(parts[4]), int(parts[5]), int(parts[6])
+
+        from db.session import SessionLocal
+        model = _hc_model_by_code(code)
+        deleted_ok = False
+        if model is not None:
+            with SessionLocal() as s:
+                rec = s.query(model).filter_by(id=rec_id).first()
+                if rec:
+                    s.delete(rec)
+                    s.commit()
+                    deleted_ok = True
+
+        if deleted_ok:
+            logger.info(f"[del_menu] Deleted healthcare record #{rec_id} (type={code})")
+        else:
+            try:
+                await query.answer("⚠️ التقرير غير موجود أو تم حذفه مسبقاً.", show_alert=True)
+            except Exception:
+                pass
+
+        await _show_hc_list(query, year, month, page=page)
+        return
+
+    if data.startswith("del_hc:delall:"):
+        # Confirm bulk deletion for the whole month
+        parts = data.split(":")
+        year, month = int(parts[2]), int(parts[3])
 
         from db.session import SessionLocal
         from sqlalchemy import extract
 
         with SessionLocal() as s:
             count = 0
-            for model in _healthcare_models():
-                count += s.query(model).filter(
-                    extract('year', model.created_at) == year,
-                    extract('month', model.created_at) == month,
+            for m in _healthcare_models():
+                count += s.query(m).filter(
+                    extract('year', m.created_at) == year,
+                    extract('month', m.created_at) == month,
                 ).count()
 
-        month_name = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
-                     "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"][month-1]
-
+        month_name = _MONTHS_AR[month - 1]
         buttons = [
             [
                 InlineKeyboardButton("✅ نعم، احذف الكل", callback_data=f"del_hc:confirm:{year}:{month}"),
-                InlineKeyboardButton("❌ رجوع", callback_data=f"{_PFX}:cancel")
+                InlineKeyboardButton("❌ رجوع للقائمة", callback_data=f"del_hc:page:{year}:{month}:0"),
             ]
         ]
-
         try:
             await query.edit_message_text(
-                f"⚠️ *تأكيد حذف تقارير الرعاية الصحية*\n\n"
+                f"⚠️ *تأكيد حذف كل تقارير الشهر*\n\n"
                 f"📅 {month_name} {year}\n"
                 f"📊 عدد التقارير: {count}\n\n"
                 f"⚠️ هذا الإجراء **لا يمكن التراجع عنه!**",
@@ -346,9 +584,10 @@ async def handle_healthcare_callback(
             )
         except Exception:
             pass
+        return
 
-    elif data.startswith("del_hc:confirm:"):
-        # Confirm deletion
+    if data.startswith("del_hc:confirm:"):
+        # Confirm bulk deletion of the entire month across all tables
         parts = data.split(":")
         year = int(parts[2])
         month = int(parts[3])
@@ -366,14 +605,18 @@ async def handle_healthcare_callback(
                     ).delete(synchronize_session=False)
                 s.commit()
 
-            month_name = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
-                         "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"][month-1]
+            month_name = _MONTHS_AR[month - 1]
+            buttons = [
+                [InlineKeyboardButton("🔙 رجوع للأشهر", callback_data=f"del_hc:back_month:{year}")],
+                [InlineKeyboardButton("❌ إنهاء", callback_data="del_hc:cancel")],
+            ]
 
             await query.edit_message_text(
                 f"✅ *تم الحذف بنجاح*\n\n"
                 f"🏥 تقارير الرعاية الصحية\n"
                 f"📅 {month_name} {year}\n"
                 f"🗑️ عدد التقارير المحذوفة: {deleted}",
+                reply_markup=InlineKeyboardMarkup(buttons),
                 parse_mode=ParseMode.MARKDOWN,
             )
 
@@ -398,6 +641,23 @@ async def handle_services_callback(
 
     data = query.data or ""
 
+    if data == "del_svc:cancel":
+        try:
+            await query.edit_message_text("✅ تم الإلغاء.")
+        except Exception:
+            pass
+        context.user_data.pop("_delete_type", None)
+        context.user_data.pop("_svc_year", None)
+        return
+
+    if data == "del_svc:back_year":
+        await _delete_services_reports(update, context)
+        return
+
+    if data.startswith("del_svc:back_month:"):
+        year = int(data.split(":")[2])
+        data = f"del_svc:year:{year}"  # fall through to the year branch below to re-render months
+
     if data.startswith("del_svc:year:"):
         # Year selected - show months
         year = int(data.split(":")[2])
@@ -413,7 +673,8 @@ async def handle_services_callback(
                 row.append(InlineKeyboardButton(f"{month_name[:3]}", callback_data=f"del_svc:month:{year}:{month}"))
             buttons.append(row)
 
-        buttons.append([InlineKeyboardButton("❌ إلغاء", callback_data=f"{_PFX}:cancel")])
+        buttons.append([InlineKeyboardButton("🔙 رجوع للسنوات", callback_data="del_svc:back_year")])
+        buttons.append([InlineKeyboardButton("❌ إلغاء", callback_data="del_svc:cancel")])
 
         try:
             await query.edit_message_text(
@@ -446,7 +707,7 @@ async def handle_services_callback(
         buttons = [
             [
                 InlineKeyboardButton("✅ نعم، احذف الكل", callback_data=f"del_svc:confirm:{year}:{month}"),
-                InlineKeyboardButton("❌ رجوع", callback_data=f"{_PFX}:cancel")
+                InlineKeyboardButton("❌ رجوع", callback_data=f"del_svc:back_month:{year}")
             ]
         ]
 
@@ -483,11 +744,17 @@ async def handle_services_callback(
             month_name = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
                          "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"][month-1]
 
+            buttons = [
+                [InlineKeyboardButton("🔙 رجوع للأشهر", callback_data=f"del_svc:back_month:{year}")],
+                [InlineKeyboardButton("❌ إنهاء", callback_data="del_svc:cancel")],
+            ]
+
             await query.edit_message_text(
                 f"✅ *تم الحذف بنجاح*\n\n"
                 f"🛠️ تقارير الخدمات العامة\n"
                 f"📅 {month_name} {year}\n"
                 f"🗑️ عدد التقارير المحذوفة: {deleted}",
+                reply_markup=InlineKeyboardMarkup(buttons),
                 parse_mode=ParseMode.MARKDOWN,
             )
 
