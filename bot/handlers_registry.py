@@ -70,6 +70,7 @@ def register_all_handlers(app):
         admin_notes,
     )
     from bot.handlers.admin.admin_users_management import register as register_users_management
+    admin_initial_case.register(app)  # ✅ Register initial case handler
     register_users_management(app)
     # NOTE: /print_patient command is handled by new reporting system
 
