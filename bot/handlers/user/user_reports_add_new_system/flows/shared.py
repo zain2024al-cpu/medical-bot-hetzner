@@ -525,7 +525,10 @@ async def show_translator_selection(message, context, flow_type):
                 InlineKeyboardButton("✅ نعم", callback_data="medrep:yes"),
                 InlineKeyboardButton("❌ لا", callback_data="medrep:no"),
             ]
-            if flow_type == "radiology":
+            # ✅ إضافة زر "تخطي" للمسارات التي لا تحتاج تقرير فوري
+            # radiology: قد لا تكون النتائج جاهزة
+            # followup/inpatient_followup: المريض مرقد ولا يمكن عمل تقرير الآن
+            if flow_type in ("radiology", "followup", "inpatient_followup", "periodic_followup"):
                 first_row.append(InlineKeyboardButton("⏭️ تخطي", callback_data="medrep:skip"))
 
             keyboard = InlineKeyboardMarkup(
@@ -537,7 +540,17 @@ async def show_translator_selection(message, context, flow_type):
             if flow_type == "operation":
                 gate_text = (
                     "📎 **هل يوجد تقرير طبي او صور للعملية؟**\n\n"
-                    "اختر (نعم) إذا يوجد تقرير أو صور، أو (لا) إذا لا يوجد."
+                    "اختر (نعم) إذا يوجد تقرير أو صور، أو (لا) إذا لا يوجد، أو (تخطي) إذا كنت ستحضره لاحقاً."
+                )
+            elif flow_type in ("followup", "inpatient_followup"):
+                gate_text = (
+                    "📎 **هل يوجد تقرير طبي؟**\n\n"
+                    "اختر (نعم) إذا يوجد تقرير، أو (لا) إذا لا يوجد، أو (تخطي) لأن المريض مرقد."
+                )
+            elif flow_type == "periodic_followup":
+                gate_text = (
+                    "📎 **هل يوجد تقرير طبي؟**\n\n"
+                    "اختر (نعم) إذا يوجد تقرير، أو (لا) إذا لا يوجد، أو (تخطي) للمتابعة بدون تقرير."
                 )
             elif flow_type in ("rehab_physical", "rehab_device", "device"):
                 gate_text = (
