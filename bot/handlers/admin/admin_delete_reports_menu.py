@@ -123,39 +123,105 @@ async def handle_menu_choice(
 async def _delete_healthcare_reports(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
-    """Delete healthcare reports."""
+    """Delete healthcare reports - show year selection."""
     query = update.callback_query
+    from datetime import datetime
+    from sqlalchemy import extract
+    from db.session import SessionLocal
+    from db.models import OtherHealthcareRecord
+
     try:
+        # Get years from healthcare records
+        with SessionLocal() as s:
+            db_years = [
+                int(r[0]) for r in
+                s.query(extract('year', OtherHealthcareRecord.created_at))
+                 .filter(OtherHealthcareRecord.created_at.isnot(None))
+                 .group_by(extract('year', OtherHealthcareRecord.created_at))
+                 .order_by(extract('year', OtherHealthcareRecord.created_at).desc())
+                 .all()
+            ]
+
+        if not db_years:
+            db_years = [datetime.now().year]
+
+        # Build year buttons
+        buttons = []
+        row = []
+        for year in db_years:
+            row.append(InlineKeyboardButton(f"📅 {year}", callback_data=f"del_hc:year:{year}"))
+            if len(row) == 3:
+                buttons.append(row)
+                row = []
+        if row:
+            buttons.append(row)
+
+        buttons.append([InlineKeyboardButton("❌ إلغاء", callback_data=f"{_PFX}:cancel")])
+
         await query.edit_message_text(
             "🏥 *حذف تقارير الرعاية الصحية*\n\n"
-            "اختر السنة أولاً:",
+            "اختر السنة:",
+            reply_markup=InlineKeyboardMarkup(buttons),
+            parse_mode=ParseMode.MARKDOWN,
         )
-    except Exception:
-        pass
-
-    # TODO: Implement healthcare reports deletion interface
-    # This will be similar to the translator reports deletion
-    # but for healthcare module's report tables
-    logger.info("[del_menu] Healthcare reports deletion not yet implemented")
+    except Exception as exc:
+        logger.error(f"[del_menu] Healthcare year selection failed: {exc}")
+        try:
+            await query.edit_message_text("❌ خطأ في تحميل السنوات.")
+        except Exception:
+            pass
 
 
 async def _delete_services_reports(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
-    """Delete general services reports."""
+    """Delete services reports - show year selection."""
     query = update.callback_query
+    from datetime import datetime
+    from sqlalchemy import extract
+    from db.session import SessionLocal
+    from db.models import PublicServiceRecord
+
     try:
+        # Get years from service records
+        with SessionLocal() as s:
+            db_years = [
+                int(r[0]) for r in
+                s.query(extract('year', PublicServiceRecord.created_at))
+                 .filter(PublicServiceRecord.created_at.isnot(None))
+                 .group_by(extract('year', PublicServiceRecord.created_at))
+                 .order_by(extract('year', PublicServiceRecord.created_at).desc())
+                 .all()
+            ]
+
+        if not db_years:
+            db_years = [datetime.now().year]
+
+        # Build year buttons
+        buttons = []
+        row = []
+        for year in db_years:
+            row.append(InlineKeyboardButton(f"📅 {year}", callback_data=f"del_svc:year:{year}"))
+            if len(row) == 3:
+                buttons.append(row)
+                row = []
+        if row:
+            buttons.append(row)
+
+        buttons.append([InlineKeyboardButton("❌ إلغاء", callback_data=f"{_PFX}:cancel")])
+
         await query.edit_message_text(
             "🛠️ *حذف تقارير الخدمات العامة*\n\n"
-            "اختر السنة أولاً:",
+            "اختر السنة:",
+            reply_markup=InlineKeyboardMarkup(buttons),
+            parse_mode=ParseMode.MARKDOWN,
         )
-    except Exception:
-        pass
-
-    # TODO: Implement general services reports deletion interface
-    # This will be similar to the translator reports deletion
-    # but for general services module's report tables
-    logger.info("[del_menu] Services reports deletion not yet implemented")
+    except Exception as exc:
+        logger.error(f"[del_menu] Services year selection failed: {exc}")
+        try:
+            await query.edit_message_text("❌ خطأ في تحميل السنوات.")
+        except Exception:
+            pass
 
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -169,6 +235,239 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             pass
     context.user_data.clear()
     return ConversationHandler.END
+
+
+# ── Callback handlers for healthcare and services ────────────────────────────
+
+async def handle_healthcare_callback(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> None:
+    """Handle healthcare deletion callbacks (del_hc:*)"""
+    query = update.callback_query
+    try:
+        await query.answer()
+    except Exception:
+        pass
+
+    data = query.data or ""
+
+    if data.startswith("del_hc:year:"):
+        # Year selected - show months
+        year = int(data.split(":")[2])
+        context.user_data["_hc_year"] = year
+
+        from datetime import datetime
+
+        buttons = []
+        months = list(range(1, 13))
+        for i in range(0, len(months), 3):
+            row = []
+            for month in months[i:i+3]:
+                month_name = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+                             "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"][month-1]
+                row.append(InlineKeyboardButton(f"{month_name[:3]}", callback_data=f"del_hc:month:{year}:{month}"))
+            buttons.append(row)
+
+        buttons.append([InlineKeyboardButton("❌ إلغاء", callback_data=f"{_PFX}:cancel")])
+
+        try:
+            await query.edit_message_text(
+                f"🏥 *اختر الشهر* - {year}",
+                reply_markup=InlineKeyboardMarkup(buttons),
+                parse_mode=ParseMode.MARKDOWN,
+            )
+        except Exception:
+            pass
+
+    elif data.startswith("del_hc:month:"):
+        # Month selected - confirm deletion
+        parts = data.split(":")
+        year = int(parts[2])
+        month = int(parts[3])
+
+        from datetime import datetime
+        from db.session import SessionLocal
+        from db.models import OtherHealthcareRecord
+        from sqlalchemy import extract
+
+        with SessionLocal() as s:
+            count = s.query(OtherHealthcareRecord).filter(
+                extract('year', OtherHealthcareRecord.created_at) == year,
+                extract('month', OtherHealthcareRecord.created_at) == month,
+            ).count()
+
+        month_name = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+                     "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"][month-1]
+
+        buttons = [
+            [
+                InlineKeyboardButton("✅ نعم، احذف الكل", callback_data=f"del_hc:confirm:{year}:{month}"),
+                InlineKeyboardButton("❌ رجوع", callback_data=f"{_PFX}:cancel")
+            ]
+        ]
+
+        try:
+            await query.edit_message_text(
+                f"⚠️ *تأكيد حذف تقارير الرعاية الصحية*\n\n"
+                f"📅 {month_name} {year}\n"
+                f"📊 عدد التقارير: {count}\n\n"
+                f"⚠️ هذا الإجراء **لا يمكن التراجع عنه!**",
+                reply_markup=InlineKeyboardMarkup(buttons),
+                parse_mode=ParseMode.MARKDOWN,
+            )
+        except Exception:
+            pass
+
+    elif data.startswith("del_hc:confirm:"):
+        # Confirm deletion
+        parts = data.split(":")
+        year = int(parts[2])
+        month = int(parts[3])
+
+        from db.session import SessionLocal
+        from db.models import OtherHealthcareRecord
+        from sqlalchemy import extract
+
+        try:
+            with SessionLocal() as s:
+                deleted = s.query(OtherHealthcareRecord).filter(
+                    extract('year', OtherHealthcareRecord.created_at) == year,
+                    extract('month', OtherHealthcareRecord.created_at) == month,
+                ).delete()
+                s.commit()
+
+            month_name = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+                         "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"][month-1]
+
+            await query.edit_message_text(
+                f"✅ *تم الحذف بنجاح*\n\n"
+                f"🏥 تقارير الرعاية الصحية\n"
+                f"📅 {month_name} {year}\n"
+                f"🗑️ عدد التقارير المحذوفة: {deleted}",
+                parse_mode=ParseMode.MARKDOWN,
+            )
+
+            logger.info(f"[del_menu] Deleted {deleted} healthcare records for {month}/{year}")
+        except Exception as exc:
+            logger.error(f"[del_menu] Healthcare deletion failed: {exc}")
+            try:
+                await query.edit_message_text("❌ فشل الحذف. حاول مرة أخرى.")
+            except Exception:
+                pass
+
+
+async def handle_services_callback(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> None:
+    """Handle services deletion callbacks (del_svc:*)"""
+    query = update.callback_query
+    try:
+        await query.answer()
+    except Exception:
+        pass
+
+    data = query.data or ""
+
+    if data.startswith("del_svc:year:"):
+        # Year selected - show months
+        year = int(data.split(":")[2])
+        context.user_data["_svc_year"] = year
+
+        buttons = []
+        months = list(range(1, 13))
+        for i in range(0, len(months), 3):
+            row = []
+            for month in months[i:i+3]:
+                month_name = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+                             "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"][month-1]
+                row.append(InlineKeyboardButton(f"{month_name[:3]}", callback_data=f"del_svc:month:{year}:{month}"))
+            buttons.append(row)
+
+        buttons.append([InlineKeyboardButton("❌ إلغاء", callback_data=f"{_PFX}:cancel")])
+
+        try:
+            await query.edit_message_text(
+                f"🛠️ *اختر الشهر* - {year}",
+                reply_markup=InlineKeyboardMarkup(buttons),
+                parse_mode=ParseMode.MARKDOWN,
+            )
+        except Exception:
+            pass
+
+    elif data.startswith("del_svc:month:"):
+        # Month selected - confirm deletion
+        parts = data.split(":")
+        year = int(parts[2])
+        month = int(parts[3])
+
+        from db.session import SessionLocal
+        from db.models import PublicServiceRecord
+        from sqlalchemy import extract
+
+        with SessionLocal() as s:
+            count = s.query(PublicServiceRecord).filter(
+                extract('year', PublicServiceRecord.created_at) == year,
+                extract('month', PublicServiceRecord.created_at) == month,
+            ).count()
+
+        month_name = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+                     "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"][month-1]
+
+        buttons = [
+            [
+                InlineKeyboardButton("✅ نعم، احذف الكل", callback_data=f"del_svc:confirm:{year}:{month}"),
+                InlineKeyboardButton("❌ رجوع", callback_data=f"{_PFX}:cancel")
+            ]
+        ]
+
+        try:
+            await query.edit_message_text(
+                f"⚠️ *تأكيد حذف تقارير الخدمات*\n\n"
+                f"📅 {month_name} {year}\n"
+                f"📊 عدد التقارير: {count}\n\n"
+                f"⚠️ هذا الإجراء **لا يمكن التراجع عنه!**",
+                reply_markup=InlineKeyboardMarkup(buttons),
+                parse_mode=ParseMode.MARKDOWN,
+            )
+        except Exception:
+            pass
+
+    elif data.startswith("del_svc:confirm:"):
+        # Confirm deletion
+        parts = data.split(":")
+        year = int(parts[2])
+        month = int(parts[3])
+
+        from db.session import SessionLocal
+        from db.models import PublicServiceRecord
+        from sqlalchemy import extract
+
+        try:
+            with SessionLocal() as s:
+                deleted = s.query(PublicServiceRecord).filter(
+                    extract('year', PublicServiceRecord.created_at) == year,
+                    extract('month', PublicServiceRecord.created_at) == month,
+                ).delete()
+                s.commit()
+
+            month_name = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+                         "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"][month-1]
+
+            await query.edit_message_text(
+                f"✅ *تم الحذف بنجاح*\n\n"
+                f"🛠️ تقارير الخدمات العامة\n"
+                f"📅 {month_name} {year}\n"
+                f"🗑️ عدد التقارير المحذوفة: {deleted}",
+                parse_mode=ParseMode.MARKDOWN,
+            )
+
+            logger.info(f"[del_menu] Deleted {deleted} service records for {month}/{year}")
+        except Exception as exc:
+            logger.error(f"[del_menu] Services deletion failed: {exc}")
+            try:
+                await query.edit_message_text("❌ فشل الحذف. حاول مرة أخرى.")
+            except Exception:
+                pass
 
 
 # ── Registration ───────────────────────────────────────────────────────────────
@@ -197,4 +496,11 @@ def register(app) -> None:
     )
 
     app.add_handler(conv)
+
+    # Register healthcare deletion callbacks
+    app.add_handler(CallbackQueryHandler(handle_healthcare_callback, pattern=r"^del_hc:"))
+
+    # Register services deletion callbacks
+    app.add_handler(CallbackQueryHandler(handle_services_callback, pattern=r"^del_svc:"))
+
     logger.info("[del_menu] ConversationHandler registered for delete menu")

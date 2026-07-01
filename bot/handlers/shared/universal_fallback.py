@@ -283,6 +283,8 @@ KNOWN_CALLBACKS = [
 
     # Delete reports menu system
     r"^del_menu:",         # Delete reports menu dispatcher — del_menu:* callbacks
+    r"^del_hc:",           # Healthcare reports deletion — del_hc:* callbacks
+    r"^del_svc:",          # Services reports deletion — del_svc:* callbacks
 ]
 
 # ================================================
