@@ -111,25 +111,15 @@ async def handle_menu_choice(
     # Delegate to the appropriate delete handler
     if context.user_data.get("_delete_type") == "translators":
         try:
-            from telegram import Chat, User, Message
-            from datetime import datetime as dt
+            from bot.handlers.admin.admin_delete_reports import _year_keyboard, _show_year_selection
 
-            # Create a fake message update to trigger the handler
-            fake_message = Message(
-                message_id=1,
-                date=dt.now(),
-                chat=Chat(id=update.effective_chat.id, type="private"),
-                from_user=update.effective_user,
-                text="🗑️ حذف التقارير"
-            )
-            fake_update = Update(update_id=update.update_id, message=fake_message)
-
-            from bot.handlers.admin.admin_delete_reports import start_delete_reports as delete_translators
-            await delete_translators(fake_update, context)
+            # Call the year selection directly
+            await query.edit_message_text("🗑️ *حذف تقارير المترجمين*\n\nاختر السنة:")
+            await _show_year_selection(query.message, context)
         except Exception as exc:
             logger.error(f"[del_menu] Failed to delegate to delete reports: {exc}")
             try:
-                await query.edit_message_text("❌ فشل تحميل حذف التقارير.")
+                await query.edit_message_text("❌ فشل تحميل حذف التقارير.\n\nحاول مرة أخرى.")
             except Exception:
                 pass
     elif context.user_data.get("_delete_type") == "healthcare":
