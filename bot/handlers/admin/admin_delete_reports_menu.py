@@ -110,8 +110,28 @@ async def handle_menu_choice(
 
     # Delegate to the appropriate delete handler
     if context.user_data.get("_delete_type") == "translators":
-        from bot.handlers.admin.admin_delete_reports import start_delete_reports as delete_translators
-        await delete_translators(update, context)
+        try:
+            from telegram import Chat, User, Message
+            from datetime import datetime as dt
+
+            # Create a fake message update to trigger the handler
+            fake_message = Message(
+                message_id=1,
+                date=dt.now(),
+                chat=Chat(id=update.effective_chat.id, type="private"),
+                from_user=update.effective_user,
+                text="🗑️ حذف التقارير"
+            )
+            fake_update = Update(update_id=update.update_id, message=fake_message)
+
+            from bot.handlers.admin.admin_delete_reports import start_delete_reports as delete_translators
+            await delete_translators(fake_update, context)
+        except Exception as exc:
+            logger.error(f"[del_menu] Failed to delegate to delete reports: {exc}")
+            try:
+                await query.edit_message_text("❌ فشل تحميل حذف التقارير.")
+            except Exception:
+                pass
     elif context.user_data.get("_delete_type") == "healthcare":
         await _delete_healthcare_reports(update, context)
     elif context.user_data.get("_delete_type") == "services":
@@ -265,7 +285,7 @@ async def handle_healthcare_callback(
             for month in months[i:i+3]:
                 month_name = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
                              "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"][month-1]
-                row.append(InlineKeyboardButton(f"{month_name[:3]}", callback_data=f"del_hc:month:{year}:{month}"))
+                row.append(InlineKeyboardButton(month_name, callback_data=f"del_hc:month:{year}:{month}"))
             buttons.append(row)
 
         buttons.append([InlineKeyboardButton("❌ إلغاء", callback_data=f"{_PFX}:cancel")])
