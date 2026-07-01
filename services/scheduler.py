@@ -244,17 +244,18 @@ def start_scheduler(app=None):
             except UnicodeEncodeError:
                 print("[OK] Daily followups extraction: 9:00 PM daily")
             
-            # 3.5. تنبيه بمواعيد الغد للأدمن (8:00 مساءً)
+            # 3.5. تنبيه بمواعيد الغد للأدمن (8:00 مساءً توقيت الهند)
+            # 8:00 PM الهند (IST = UTC+5:30) = 2:30 PM UTC (14:30)
             scheduler.add_job(
                 _tomorrow_appointments_job,
-                trigger=CronTrigger(hour=20, minute=0, timezone='UTC'),  # 8:00 PM
+                trigger=CronTrigger(hour=14, minute=30, timezone='UTC'),  # 2:30 PM UTC = 8:00 PM الهند
                 args=[app],
                 id='tomorrow_appointments'
             )
             try:
-                print("✅ Tomorrow appointments notification: 8:00 PM daily")
+                print("✅ Tomorrow appointments notification: 8:00 PM (India Time) daily")
             except UnicodeEncodeError:
-                print("[OK] Tomorrow appointments notification: 8:00 PM daily")
+                print("[OK] Tomorrow appointments notification: 8:00 PM (India Time) daily")
         
         # 4. النسخ الاحتياطي السريع كل 10 دقائق
         scheduler.add_job(
