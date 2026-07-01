@@ -177,17 +177,23 @@ async def _show_appointments(query, target_date: date) -> None:
     """Fetch and display appointments for a given date."""
     try:
         from db.session import SessionLocal
-        from db.models import Schedule
+        from db.models import Followup
+        from datetime import datetime
 
         with SessionLocal() as s:
-            # Query appointments for the target date
+            # Query followup appointments for the target date
+            # followup_date contains full datetime, so we filter by date range
+            start_of_day = datetime.combine(target_date, datetime.min.time())
+            end_of_day = datetime.combine(target_date, datetime.max.time())
+
             appointments = (
-                s.query(Schedule)
+                s.query(Followup)
                 .filter(
-                    Schedule.appointment_date == target_date,
-                    Schedule.patient_id.isnot(None),
+                    Followup.followup_date >= start_of_day,
+                    Followup.followup_date <= end_of_day,
+                    Followup.patient_id.isnot(None),
                 )
-                .order_by(Schedule.appointment_time.asc())
+                .order_by(Followup.followup_date.asc())
                 .all()
             )
 
@@ -202,16 +208,16 @@ async def _show_appointments(query, target_date: date) -> None:
         else:
             text = f"📅 *المواعيد في* {date_label}\n\n"
             for apt in appointments:
-                time_str = apt.appointment_time.strftime("%H:%M") if apt.appointment_time else "—"
+                time_str = apt.followup_date.strftime("%H:%M") if apt.followup_date else "—"
                 patient_name = apt.patient_name or "مريض غير معروف"
-                status = "✅" if apt.is_completed else "⏳"
+                status = "✅" if apt.status == "completed" else "⏳"
 
                 text += f"{status} *{time_str}* - {patient_name}\n"
 
                 if apt.department:
                     text += f"   📋 القسم: {apt.department}\n"
-                if apt.notes:
-                    text += f"   📝 ملاحظات: {apt.notes}\n"
+                if apt.status and apt.status != "completed":
+                    text += f"   📊 الحالة: {apt.status}\n"
 
                 text += "\n"
 
@@ -221,10 +227,13 @@ async def _show_appointments(query, target_date: date) -> None:
                 parse_mode=ParseMode.MARKDOWN,
             )
         except Exception:
-            await query.message.reply_text(
-                text,
-                parse_mode=ParseMode.MARKDOWN,
-            )
+            try:
+                await query.message.reply_text(
+                    text,
+                    parse_mode=ParseMode.MARKDOWN,
+                )
+            except Exception:
+                pass
 
     except Exception as exc:
         logger.error(f"[upcoming_apt] Failed to show appointments: {exc}")
