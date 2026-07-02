@@ -89,20 +89,30 @@ def _calendar_kb() -> InlineKeyboardMarkup:
 async def start_upcoming_appointments(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
-    """Entry point: show menu."""
+    """Entry point: show menu.
+
+    ✅ يدعم الاستدعاء من زر نصي (update.message) ومن زر inline
+    (update.callback_query) — لإتاحة الدخول من قائمة "🛠️ إدارة النظام"
+    الجديدة دون كسر المسار النصي القديم.
+    """
     user = update.effective_user
     if not user or not is_admin(user.id):
         return ConversationHandler.END
 
     context.user_data.clear()
 
+    text = "📅 *المواعيد القادمة*\n\nاختر طريقة عرض المواعيد:"
+
     try:
-        await update.message.reply_text(
-            "📅 *المواعيد القادمة*\n\n"
-            "اختر طريقة عرض المواعيد:",
-            reply_markup=_menu_kb(),
-            parse_mode=ParseMode.MARKDOWN,
-        )
+        if update.callback_query:
+            query = update.callback_query
+            await query.answer()
+            try:
+                await query.edit_message_text(text, reply_markup=_menu_kb(), parse_mode=ParseMode.MARKDOWN)
+            except Exception:
+                await query.message.reply_text(text, reply_markup=_menu_kb(), parse_mode=ParseMode.MARKDOWN)
+        elif update.message:
+            await update.message.reply_text(text, reply_markup=_menu_kb(), parse_mode=ParseMode.MARKDOWN)
     except Exception as exc:
         logger.error(f"[upcoming_apt] Failed to show menu: {exc}")
 
@@ -305,6 +315,8 @@ def register(app) -> None:
                 filters.Regex(r"^📅 المواعيد القادمة$"),
                 start_upcoming_appointments,
             ),
+            # ✅ نقطة دخول إضافية من قائمة "🛠️ إدارة النظام" الجديدة (admin_system_menu.py)
+            CallbackQueryHandler(start_upcoming_appointments, pattern=r"^goto:appointments$"),
         ],
         states={
             SHOW_MENU: [

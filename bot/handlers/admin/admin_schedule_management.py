@@ -23,31 +23,52 @@ logger = logging.getLogger(__name__)
 # حالات المحادثة
 UPLOAD_SCHEDULE, CONFIRM_SCHEDULE, VIEW_SCHEDULE = range(3)
 
-async def start_schedule_management(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """بدء إدارة الجدول"""
-    user = update.effective_user
-    
-    # التحقق من أن المستخدم أدمن
-    if not is_admin(user.id):
-        await update.message.reply_text("🚫 هذه الخاصية مخصصة للإدمن فقط.")
-        return ConversationHandler.END
+def _schedule_menu_kb() -> InlineKeyboardMarkup:
+    """لوحة مفاتيح قائمة إدارة الجدول (مشتركة بين نقطة الدخول وزر 'العودة').
 
-    keyboard = InlineKeyboardMarkup([
+    ✅ تقتصر الآن على رفع/عرض الجدول فقط. أزرار "تتبع التقارير اليومية"
+    و"إرسال تنبيهات" أُزيلت من هذه القائمة (بقرار صريح)، وأزرار
+    "أسماء المرضى"/"إدارة المستشفيات" انتقلت إلى قائمة "🛠️ إدارة النظام"
+    الجديدة (admin_system_menu.py) — الدوال والـ callbacks الخاصة بكل
+    هذه الأزرار لا تزال موجودة وتعمل، فقط لم تعد أزراراً هنا.
+    """
+    return InlineKeyboardMarkup([
         [InlineKeyboardButton("📤 رفع جدول جديد", callback_data="upload_schedule")],
         [InlineKeyboardButton("📋 عرض الجدول الحالي", callback_data="view_schedule")],
-        [InlineKeyboardButton("📊 تتبع التقارير اليومية", callback_data="track_reports")],
-        [InlineKeyboardButton("🔔 إرسال تنبيهات", callback_data="send_notifications")],
-        [InlineKeyboardButton("📝 أسماء المرضى", callback_data="manage_patients")],
-        [InlineKeyboardButton("🏥 إدارة المستشفيات", callback_data="manage_hospitals")],
         [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_main")]
     ])
 
-    await update.message.reply_text(
-        "📅 **إدارة جدول المترجمين**\n\n"
-        "اختر العملية المطلوبة:",
-        reply_markup=keyboard,
-        parse_mode=ParseMode.MARKDOWN
-    )
+
+async def start_schedule_management(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """بدء إدارة الجدول.
+
+    ✅ يدعم الاستدعاء من زر نصي (update.message) ومن زر inline
+    (update.callback_query) على حدٍ سواء — بنفس الأسلوب المُستخدم في
+    admin_admins.py::start_admin_management — لإتاحة الدخول من قائمة
+    "🛠️ إدارة النظام" الجديدة دون كسر المسار النصي القديم.
+    """
+    user = update.effective_user
+
+    # التحقق من أن المستخدم أدمن
+    if not is_admin(user.id):
+        if update.callback_query:
+            await update.callback_query.answer("🚫 هذه الخاصية مخصصة للإدمن فقط.", show_alert=True)
+        elif update.message:
+            await update.message.reply_text("🚫 هذه الخاصية مخصصة للإدمن فقط.")
+        return ConversationHandler.END
+
+    text = "📅 **إدارة جدول المترجمين**\n\nاختر العملية المطلوبة:"
+    keyboard = _schedule_menu_kb()
+
+    if update.callback_query:
+        query = update.callback_query
+        await query.answer()
+        try:
+            await query.edit_message_text(text, reply_markup=keyboard, parse_mode=ParseMode.MARKDOWN)
+        except Exception:
+            await query.message.reply_text(text, reply_markup=keyboard, parse_mode=ParseMode.MARKDOWN)
+    elif update.message:
+        await update.message.reply_text(text, reply_markup=keyboard, parse_mode=ParseMode.MARKDOWN)
 
 async def handle_schedule_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة اختيار العملية"""
@@ -466,21 +487,11 @@ async def back_to_schedule_menu(update: Update, context: ContextTypes.DEFAULT_TY
     """العودة لقائمة إدارة الجدول"""
     query = update.callback_query
     await query.answer()
-    
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("📤 رفع جدول جديد", callback_data="upload_schedule")],
-        [InlineKeyboardButton("📋 عرض الجدول الحالي", callback_data="view_schedule")],
-        [InlineKeyboardButton("📊 تتبع التقارير اليومية", callback_data="track_reports")],
-        [InlineKeyboardButton("🔔 إرسال تنبيهات", callback_data="send_notifications")],
-        [InlineKeyboardButton("📝 أسماء المرضى", callback_data="manage_patients")],
-        [InlineKeyboardButton("🏥 إدارة المستشفيات", callback_data="manage_hospitals")],
-        [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_main")]
-    ])
 
     await query.edit_message_text(
         "📅 **إدارة جدول المترجمين**\n\n"
         "اختر العملية المطلوبة:",
-        reply_markup=keyboard,
+        reply_markup=_schedule_menu_kb(),
         parse_mode=ParseMode.MARKDOWN
     )
 
@@ -1383,6 +1394,8 @@ def register(app):
     conv = ConversationHandler(
         entry_points=[
             MessageHandler(filters.Regex("^📅 إدارة الجدول$"), start_schedule_management),
+            # ✅ نقطة دخول إضافية من قائمة "🛠️ إدارة النظام" الجديدة (admin_system_menu.py)
+            CallbackQueryHandler(start_schedule_management, pattern=r"^goto:schedule$"),
             CallbackQueryHandler(handle_schedule_choice, pattern="^upload_schedule$|^view_schedule$|^track_reports$|^send_notifications$|^daily_patients$|^back_to_main$")
         ],
         states={

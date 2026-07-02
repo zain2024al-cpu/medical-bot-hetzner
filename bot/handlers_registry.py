@@ -48,6 +48,10 @@ def register_all_handlers(app):
     from bot.handlers.admin.admin_evaluation_menu import register as register_evaluation_menu
     register_evaluation_menu(app)           # Entry point: "📊 التقييم" button
 
+    # ✅ قائمة إدارة النظام — موزّع لأدوات الإدارة التأسيسية (مستشفيات/مرضى/جداول/حسابات/مواعيد)
+    from bot.handlers.admin.admin_system_menu import register as register_system_menu
+    register_system_menu(app)               # Entry point: "🛠️ إدارة النظام" button
+
     # ✅ نظام التقارير الجديد — 2 أنواع احترافية: شامل + مريض واحد (مع patient_selector)
     from bot.handlers.admin.admin_reports_menu import register as register_reports_menu
     from bot.handlers.admin.admin_comprehensive_report import register as register_comprehensive_report

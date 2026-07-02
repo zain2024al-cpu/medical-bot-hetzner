@@ -286,6 +286,11 @@ KNOWN_CALLBACKS = [
     r"^del_menu:",         # Delete reports menu dispatcher — del_menu:* callbacks
     r"^del_hc:",           # Healthcare reports deletion — del_hc:* callbacks
     r"^del_svc:",          # Services reports deletion — del_svc:* callbacks
+
+    # System management menu (admin_system_menu.py) — groups hospitals/patients/
+    # schedule/accounts/appointments under "🛠️ إدارة النظام".
+    r"^sys_menu:",         # System menu dispatcher — sys_menu:* callbacks
+    r"^goto:",             # Direct entry points reused by the system menu (goto:schedule, goto:appointments)
 ]
 
 # ================================================
