@@ -230,17 +230,16 @@ def start_scheduler(app=None):
             except UnicodeEncodeError:
                 print("[OK] Translator reminders: 2 PM, 4 PM, 6 PM daily")
 
-            # 2.5. التنبيهات اليومية للمتابعة (4:00 عصرًا)
-            scheduler.add_job(
-                _daily_reminder_job,
-                trigger=CronTrigger(hour=16, minute=0, timezone='UTC'),  # 4:00 PM (16:00 UTC)
-                args=[app],
-                id='daily_reminder'
-            )
-            try:
-                print("✅ Daily reminder system: 4:00 PM daily")
-            except UnicodeEncodeError:
-                print("[OK] Daily reminder system: 4:00 PM daily")
+            # ⚠️ ملاحظة: كانت هناك مهمة "2.5. التنبيهات اليومية للمتابعة"
+            # تستدعي دالة _daily_reminder_job غير موجودة إطلاقاً في هذا
+            # الملف (NameError) — وبما أن هذا السطر داخل try/except عام
+            # يُغلّف كل استدعاءات scheduler.add_job، كان الخطأ يوقف تنفيذ
+            # start_scheduler() بالكامل عند هذه النقطة بصمت، فلا تُسجَّل
+            # أي مهمة بعدها إطلاقاً: رفع المواعيد، تنبيه مواعيد الغد
+            # (8 مساءً)، تقرير التقارير المعلقة (9 مساءً)، وحتى النسخ
+            # الاحتياطي التلقائي! تمت إزالة هذه المهمة المعطوبة (وظيفتها
+            # المعلنة "تنبيهات المتابعة" مغطاة أصلاً بمهمة
+            # _followup_reminder_job الساعة 6 مساءً أعلاه).
 
             # 3. رفع مواعيد المرضى من تقارير اليوم (9:00 مساءً)
             scheduler.add_job(
