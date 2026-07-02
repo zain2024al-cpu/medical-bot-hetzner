@@ -103,10 +103,22 @@ async def handle_schedule_choice(update: Update, context: ContextTypes.DEFAULT_T
         return await handle_manage_hospitals(update, context)
     
     elif choice == "back_to_main":
-        await query.edit_message_text(
-            "🔙 العودة للقائمة الرئيسية",
-            reply_markup=admin_main_kb()
-        )
+        # ✅ تيليجرام لا يسمح بإرفاق ReplyKeyboardMarkup عبر edit_message_text
+        # (فقط InlineKeyboardMarkup مسموح هناك) — كان هذا يسبب
+        # "BadRequest: Inline keyboard expected". الحل: تعديل الرسالة
+        # الحالية بدون لوحة مفاتيح، ثم إرسال رسالة جديدة منفصلة تحمل
+        # admin_main_kb() — نفس النمط المستخدم في admin_delete_reports.py.
+        try:
+            await query.edit_message_text("🔙 تم الرجوع للقائمة الرئيسية.")
+        except Exception:
+            pass
+        try:
+            await query.message.reply_text(
+                "اختر من القائمة الرئيسية:",
+                reply_markup=admin_main_kb()
+            )
+        except Exception:
+            pass
         return ConversationHandler.END
 
 async def upload_schedule_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
