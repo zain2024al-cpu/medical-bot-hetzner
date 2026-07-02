@@ -13,7 +13,9 @@
 #   - "goto:appointments" → admin_upcoming_appointments.py (entry_point جديد أُضيف لهذا الغرض)
 #   - "aum:home"          → admin_users_management.py (CallbackQueryHandler مستقل، group=1)
 #   - "admin:manage_admins" → admin_admins.py (CallbackQueryHandler مستقل ضمن ConversationHandler الخاص به)
-#   - "aum:list:approved:0" → admin_users_management.py (نفس معالج aum:)
+#   - "aum:permlist:0"    → admin_users_management.py (قائمة مستخدمين مخصَّصة
+#     لإدارة الصلاحيات مباشرة — اختيار اسم يفتح amod:list:<tg_id> مباشرة
+#     بدون المرور بشاشة قبول/رفض/تجميد الخاصة بـ"إدارة المستخدمين" العادية)
 #
 # استُخدمت بادئة "sys_menu:" و"goto:" (وليس "admin:") لتفادي تصادم مع
 # المعالج العام في admin_start.py (`^admin:(?!evaluation$|manage_admins$)`)
@@ -53,7 +55,7 @@ def _accounts_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("👥 إدارة المستخدمين", callback_data="aum:home")],
         [InlineKeyboardButton("👑 إدارة الأدمنين", callback_data="admin:manage_admins")],
-        [InlineKeyboardButton("🔐 إدارة الصلاحيات", callback_data="aum:list:approved:0")],
+        [InlineKeyboardButton("🔐 إدارة الصلاحيات", callback_data="aum:permlist:0")],
         [InlineKeyboardButton("🔙 رجوع", callback_data=f"{_PFX}:back")],
     ])
 

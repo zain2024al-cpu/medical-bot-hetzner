@@ -63,6 +63,39 @@ def _list_kb(kind: str, page: int, total_pages: int, users: list[Translator]) ->
     return InlineKeyboardMarkup(kb)
 
 
+def _perm_list_kb(page: int, total_pages: int, users: list[Translator]) -> InlineKeyboardMarkup:
+    """
+    ✅ قائمة مستخدمين مخصَّصة لمسار "🔐 إدارة الصلاحيات" (من قائمة
+    إدارة النظام → إدارة الحسابات). الضغط على أي اسم يفتح شاشة صلاحياته
+    (amod:list:<tg_id>) مباشرة — بدون المرور بشاشة "تفاصيل المستخدم"
+    وأزرار الموافقة/الرفض/التجميد الخاصة بمسار "إدارة المستخدمين"
+    العادي، لأن هذه الأزرار لا معنى لها هنا.
+    """
+    kb: list[list[InlineKeyboardButton]] = []
+    for u in users:
+        name = (u.full_name or f"User {u.id}").strip()
+        access_tg_user_id = _resolve_access_tg_user_id(u)
+        if access_tg_user_id:
+            kb.append([InlineKeyboardButton(f"🔐 {name}", callback_data=f"amod:list:{access_tg_user_id}")])
+        else:
+            # لا يوجد معرف تليجرام حقيقي لهذا المستخدم — لا يمكن إدارة صلاحياته
+            kb.append([InlineKeyboardButton(f"⚠️ {name} (لا يوجد معرف)", callback_data="noop")])
+
+    nav: list[InlineKeyboardButton] = []
+    if total_pages > 1 and page > 0:
+        nav.append(InlineKeyboardButton("⬅️", callback_data=f"{CB}:permlist:{page-1}"))
+    if total_pages > 1:
+        nav.append(InlineKeyboardButton(f"📄 {page+1}/{total_pages}", callback_data="noop"))
+    if total_pages > 1 and page < total_pages - 1:
+        nav.append(InlineKeyboardButton("➡️", callback_data=f"{CB}:permlist:{page+1}"))
+    if nav:
+        kb.append(nav)
+
+    # الرجوع هنا يعيد لقائمة "إدارة الحسابات" (الأب الفعلي لهذا المسار)
+    kb.append([InlineKeyboardButton("🔙 رجوع", callback_data="sys_menu:accounts")])
+    return InlineKeyboardMarkup(kb)
+
+
 def _resolve_access_tg_user_id(user: Translator) -> int | None:
     """
     Return the Telegram user id required by RBAC.
@@ -148,6 +181,32 @@ async def _render_list(query, kind: str, page: int):
     await query.edit_message_text(
         f"👥 **قائمة المستخدمين**\n\nالنوع: `{kind}`\nالعدد: {total}\n\nاختر مستخدمًا:",
         reply_markup=_list_kb(kind, page, total_pages, users),
+        parse_mode="Markdown",
+    )
+
+
+async def _render_perm_list(query, page: int):
+    """
+    ✅ قائمة المستخدمين المعتمدين لمسار "🔐 إدارة الصلاحيات" — اختيار
+    اسم هنا يفتح شاشة صلاحياته مباشرة (بدون شاشة تفاصيل المستخدم).
+    """
+    per_page = 10
+    with SessionLocal() as s:
+        base = s.query(Translator).filter(Translator.is_approved.is_(True))
+
+        total = int(base.with_entities(func.count(Translator.id)).scalar() or 0)
+        total_pages = max(1, (total + per_page - 1) // per_page)
+        page = max(0, min(int(page), total_pages - 1))
+        users = (
+            base.order_by(Translator.created_at.desc())
+            .offset(page * per_page)
+            .limit(per_page)
+            .all()
+        )
+
+    await query.edit_message_text(
+        f"🔐 **إدارة الصلاحيات**\n\nالعدد: {total}\n\nاختر مستخدمًا لعرض/تعديل صلاحياته:",
+        reply_markup=_perm_list_kb(page, total_pages, users),
         parse_mode="Markdown",
     )
 
@@ -277,6 +336,10 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
         kind = parts[2]
         page = int(parts[3] or 0)
         await _render_list(query, kind, page)
+        return
+    if len(parts) >= 3 and parts[1] == "permlist":
+        page = int(parts[2] or 0)
+        await _render_perm_list(query, page)
         return
     if len(parts) >= 3 and parts[1] == "user":
         await _render_user(query, int(parts[2]))
