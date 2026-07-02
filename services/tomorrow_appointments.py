@@ -8,7 +8,7 @@ Tomorrow's Appointments Admin Notification System
 import logging
 from datetime import datetime, timedelta
 from db.session import SessionLocal
-from db.models import FollowupTracking
+from db.models import Report
 from sqlalchemy import func
 
 logger = logging.getLogger(__name__)
@@ -16,20 +16,27 @@ logger = logging.getLogger(__name__)
 async def notify_admins_of_tomorrow_appointments(bot, admin_ids):
     """
     إرسال تنبيه لجميع الأدمن بمواعيد يوم غد
+
+    ✅ يقرأ من Report.followup_date مباشرة (وليس من FollowupTracking).
+    FollowupTracking فارغ دائماً في قاعدة البيانات — الدالة الوحيدة التي
+    كانت تُفترض أنها تملأه (services/followup_appointments.py) تُمرّر
+    حقولاً غير موجودة في النموذج (followup_type/priority/notes) فتفشل
+    بصمت في كل مرة. كل مواعيد المتابعة الحقيقية محفوظة مباشرة على حقل
+    followup_date في جدول التقارير عند إنشاء كل تقرير.
     """
     try:
         # تحديد تاريخ الغد
         tomorrow = (datetime.now() + timedelta(days=1)).date()
         tomorrow_str = tomorrow.strftime('%Y-%m-%d')
-        
+
         db = SessionLocal()
         try:
             # جلب المواعيد المجدولة لتاريخ الغد
             # نستخدم func.date() للتحقق من التاريخ فقط بغض النظر عن الوقت
-            appointments = db.query(FollowupTracking).filter(
-                func.date(FollowupTracking.followup_date) == tomorrow
+            appointments = db.query(Report).filter(
+                func.date(Report.followup_date) == tomorrow
             ).all()
-            
+
             if not appointments:
                 # إذا لم توجد مواعيد، يمكن إرسال رسالة تفيد بذلك أو عدم الإرسال
                 # حسب رغبة المستخدم "ياخذ المواعيد من تاريخ العوده من خلال التقارير"
@@ -46,8 +53,13 @@ async def notify_admins_of_tomorrow_appointments(bot, admin_ids):
             for i, appt in enumerate(appointments, 1):
                 p_name = appt.patient_name or "غير محدد"
                 dept = appt.department or "غير محدد"
-                # محاولة الحصول على الوقت إذا كان موجوداً
-                time_str = appt.followup_date.strftime("%H:%M") if appt.followup_date and appt.followup_date.hour != 0 else "غير محدد"
+                # ✅ الوقت: نُفضّل followup_time (نص مُدخل يدوياً) وإلا نأخذه من ساعة followup_date
+                if appt.followup_time:
+                    time_str = appt.followup_time
+                elif appt.followup_date and (appt.followup_date.hour or appt.followup_date.minute):
+                    time_str = appt.followup_date.strftime("%H:%M")
+                else:
+                    time_str = "غير محدد"
                 translator = appt.translator_name or "غير محدد"
                 
                 message += f"{i}. 👤 **المريض:** {p_name}\n"

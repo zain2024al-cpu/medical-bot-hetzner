@@ -205,26 +205,31 @@ async def handle_date_selection(
 
 
 async def _show_appointments(query, target_date: date) -> None:
-    """Fetch and display appointments for a given date."""
+    """Fetch and display appointments for a given date.
+
+    ✅ يقرأ من Report.followup_date مباشرة (نفس المصدر المستخدم فعلياً
+    وبنجاح في services/followup_reminder.py). النموذجان Followup
+    و FollowupTracking فارغان دائماً في قاعدة البيانات الفعلية (لا يوجد
+    أي مكان في المشروع يُدرج فيهما بشكل صحيح)، لذا لا يصح الاعتماد
+    عليهما لعرض المواعيد — كل مواعيد المتابعة الحقيقية تُحفظ مباشرة على
+    حقل followup_date في جدول التقارير عند إنشاء كل تقرير.
+    """
     try:
         from db.session import SessionLocal
-        from db.models import Followup
+        from db.models import Report
         from datetime import datetime
 
         with SessionLocal() as s:
-            # Query followup appointments for the target date
-            # followup_date contains full datetime, so we filter by date range
             start_of_day = datetime.combine(target_date, datetime.min.time())
             end_of_day = datetime.combine(target_date, datetime.max.time())
 
             appointments = (
-                s.query(Followup)
+                s.query(Report)
                 .filter(
-                    Followup.followup_date >= start_of_day,
-                    Followup.followup_date <= end_of_day,
-                    Followup.patient_id.isnot(None),
+                    Report.followup_date >= start_of_day,
+                    Report.followup_date <= end_of_day,
                 )
-                .order_by(Followup.followup_date.asc())
+                .order_by(Report.followup_date.asc())
                 .all()
             )
 
@@ -245,25 +250,24 @@ async def _show_appointments(query, target_date: date) -> None:
             text += f"━━━━━━━━━━━━━━━━━━━━\n\n"
 
             for idx, apt in enumerate(appointments, 1):
-                time_str = apt.followup_date.strftime("%H:%M") if apt.followup_date else "—"
+                # ✅ الوقت: نُفضّل followup_time (نص مُدخل يدوياً) وإلا نأخذه من ساعة followup_date
+                if apt.followup_time:
+                    time_str = apt.followup_time
+                elif apt.followup_date and (apt.followup_date.hour or apt.followup_date.minute):
+                    time_str = apt.followup_date.strftime("%H:%M")
+                else:
+                    time_str = "—"
+
                 patient_name = apt.patient_name or "مريض غير معروف"
 
-                # Status emoji
-                if apt.status == "completed":
-                    status = "✅"
-                elif apt.status == "pending":
-                    status = "⏳"
-                elif apt.status == "cancelled":
-                    status = "❌"
-                else:
-                    status = "📌"
-
-                text += f"{idx}. {status} *{time_str}* - {patient_name}\n"
+                text += f"{idx}. 📌 *{time_str}* - {patient_name}\n"
 
                 if apt.department:
                     text += f"   📋 {apt.department}\n"
-                if apt.status and apt.status != "completed":
-                    text += f"   💬 {apt.status}\n"
+                if apt.translator_name:
+                    text += f"   👨‍🏫 {apt.translator_name}\n"
+                if apt.followup_reason and apt.followup_reason not in ("لا يوجد", ""):
+                    text += f"   💬 {apt.followup_reason}\n"
 
                 text += "\n"
 
