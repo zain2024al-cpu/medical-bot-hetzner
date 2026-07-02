@@ -142,17 +142,19 @@ async def handle_admin_actions(update: Update, context: ContextTypes.DEFAULT_TYP
         return AA_START
 
     elif data == "back":
-        # لا يمكن استخدام edit_message_text مع ReplyKeyboardMarkup
-        # لذلك نرسل رسالة جديدة
-        await query.message.reply_text(
-            "👑 لوحة التحكم جاهزة.",
-            reply_markup=admin_main_kb()
-        )
-        # محاولة حذف الرسالة القديمة
+        # ✅ يعود لقائمة "👥 إدارة الحسابات" (الأب الفعلي لهذه الشاشة —
+        # تُفتح إدارة الأدمنين من هناك عبر "🛠️ إدارة النظام") بدل القفز
+        # مباشرة للقائمة الرئيسية للأدمن. القائمة inline حقيقية فيمكن
+        # تعديل الرسالة الحالية مباشرة دون الحاجة لرسالة جديدة منفصلة.
         try:
-            await query.message.delete()
-        except:
-            pass
+            from bot.handlers.admin.admin_system_menu import _accounts_kb
+            await query.edit_message_text(
+                "👥 *إدارة الحسابات*\n\nاختر القسم المطلوب:",
+                reply_markup=_accounts_kb(),
+                parse_mode="Markdown",
+            )
+        except Exception as exc:
+            logger.error(f"[aa:back] Failed to show accounts submenu: {exc}")
         return ConversationHandler.END
     
     elif data == "cancel":

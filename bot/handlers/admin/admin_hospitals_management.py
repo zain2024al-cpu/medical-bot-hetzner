@@ -47,7 +47,7 @@ async def handle_manage_hospitals(update: Update, context: ContextTypes.DEFAULT_
         [InlineKeyboardButton("📋 عرض جميع المستشفيات", callback_data="view_hospitals")],
         [InlineKeyboardButton("✏️ تعديل مستشفى", callback_data="edit_hospital")],
         [InlineKeyboardButton("🗑️ حذف مستشفى", callback_data="delete_hospital")],
-        [InlineKeyboardButton("🔙 رجوع", callback_data="back_to_schedule")]
+        [InlineKeyboardButton("🔙 رجوع", callback_data="sys_menu:back")]
     ])
     
     await query.edit_message_text(
@@ -504,7 +504,7 @@ async def handle_cancel_hospital_input(update: Update, context: ContextTypes.DEF
         [InlineKeyboardButton("📋 عرض جميع المستشفيات", callback_data="view_hospitals")],
         [InlineKeyboardButton("✏️ تعديل مستشفى", callback_data="edit_hospital")],
         [InlineKeyboardButton("🗑️ حذف مستشفى", callback_data="delete_hospital")],
-        [InlineKeyboardButton("🔙 رجوع", callback_data="back_to_schedule")]
+        [InlineKeyboardButton("🔙 رجوع", callback_data="sys_menu:back")]
     ])
 
     try:

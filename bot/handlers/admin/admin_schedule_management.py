@@ -35,7 +35,9 @@ def _schedule_menu_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("📤 رفع جدول جديد", callback_data="upload_schedule")],
         [InlineKeyboardButton("📋 عرض الجدول الحالي", callback_data="view_schedule")],
-        [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_main")]
+        # ✅ يعود لقائمة "🛠️ إدارة النظام" (الأب الفعلي لهذه الشاشة الآن)
+        # بدل القفز مباشرة للقائمة الرئيسية للأدمن.
+        [InlineKeyboardButton("🔙 العودة لإدارة النظام", callback_data="sys_menu:back")]
     ])
 
 
@@ -520,7 +522,7 @@ async def start_daily_patients_from_schedule(update: Update, context: ContextTyp
         [InlineKeyboardButton("👀 عرض أسماء مرضى اليوم", callback_data="dp_view_from_schedule")],
         [InlineKeyboardButton("🗑️ حذف جميع أسماء اليوم", callback_data="dp_delete_from_schedule")],
         [InlineKeyboardButton("🔙 العودة لإدارة الجدول", callback_data="back_to_schedule")],
-        [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back_to_main")]
+        [InlineKeyboardButton("🔙 العودة لإدارة النظام", callback_data="sys_menu:back")]
     ])
     
     text = "🧍‍♂️ **إدارة أسماء المرضى اليومية**\n\n"
@@ -560,9 +562,9 @@ async def handle_manage_patients(update: Update, context: ContextTypes.DEFAULT_T
         [InlineKeyboardButton("📋 عرض جميع الأسماء", callback_data="view_patient_names")],
         [InlineKeyboardButton("✏️ تعديل اسم", callback_data="edit_patient_name")],
         [InlineKeyboardButton("🗑️ حذف اسم", callback_data="delete_patient_name")],
-        [InlineKeyboardButton("🔙 رجوع", callback_data="back_to_schedule")]
+        [InlineKeyboardButton("🔙 رجوع", callback_data="sys_menu:back")]
     ])
-    
+
     await query.edit_message_text(
         f"📝 **إدارة أسماء المرضى**\n\n"
         f"📊 **عدد الأسماء:** {count}\n\n"
@@ -989,7 +991,7 @@ async def handle_manage_hospitals(update: Update, context: ContextTypes.DEFAULT_
         [InlineKeyboardButton("➕ إضافة مستشفى جديد", callback_data="add_hospital")],
         [InlineKeyboardButton("✏️ تعديل مستشفى", callback_data="edit_hospital:0")],
         [InlineKeyboardButton("🗑️ حذف مستشفى", callback_data="delete_hospital:0")],
-        [InlineKeyboardButton("🔙 رجوع", callback_data="back_to_schedule")]
+        [InlineKeyboardButton("🔙 رجوع", callback_data="sys_menu:back")]
     ])
     
     await query.edit_message_text(
