@@ -463,6 +463,38 @@ def build_evaluation_pdf(data) -> io.BytesIO:
     else:
         story.append(Paragraph(_ar("لا توجد بيانات أقسام."), S["body"]))
 
+    # ── 4.5 Specialist breakdown (comprehensive report only) ──────────────────
+    # ✅ تظهر فقط في التقرير الشامل (أكثر من صحي واحد في البيانات) —
+    # في تقرير الصحي الفردي يكون specialist_counts دائماً عنصراً واحداً.
+    if len(data.specialist_counts) > 1:
+        story.append(Spacer(1, 0.5*cm))
+        story.append(Paragraph(_ar("التوزيع حسب الصحي"), S["section"]))
+
+        spec_rows = [[
+            _p(_ar("الصحي"),         S["table_header"]),
+            _p(_ar("عدد الحالات"),   S["table_header"]),
+            _p(_ar("النسبة"),        S["table_header"]),
+        ]]
+        spec_total = sum(data.specialist_counts.values())
+        for spec_name, cnt in data.specialist_counts.items():
+            pct = f"{cnt/spec_total*100:.1f}%" if spec_total else "—"
+            spec_rows.append([
+                _p(_ar(spec_name), S["table_cell"]),
+                _p(str(cnt),       S["table_cell_c"]),
+                _p(pct,            S["table_cell_c"]),
+            ])
+        story.append(_make_table(spec_rows, [10*cm, 3.5*cm, 3.5*cm]))
+
+        spec_chart_buf = _bar_chart(data.specialist_counts, "التوزيع حسب الصحي", color="#1E8449")
+        if spec_chart_buf:
+            story.append(Spacer(1, 0.4*cm))
+            img = Image(
+                spec_chart_buf, width=15*cm,
+                height=min(12*cm, max(3*cm, len(data.specialist_counts)*0.55*cm)),
+            )
+            img.hAlign = "CENTER"
+            story.append(img)
+
     # ── 5. Documentation analysis ─────────────────────────────────────────────
     story.append(Spacer(1, 0.5*cm))
     story.append(Paragraph(_ar("تحليل التوثيق"), S["section"]))

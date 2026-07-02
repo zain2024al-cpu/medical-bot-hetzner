@@ -24,6 +24,7 @@ class CaseRow:
     detail:       str          # operation / procedure / dispense_source / etc.
     image_count:  int
     created_at:   datetime
+    specialist_name: str = ""  # ✅ يُملأ دائماً — يُستخدم لتوزيع "حسب الصحي" في التقرير الشامل
 
 
 @dataclass
@@ -66,6 +67,11 @@ class EvaluationData:
     # Medication dispense source
     dispense_source_counts: dict[str, int] = field(default_factory=dict)
 
+    # ✅ توزيع الحالات حسب الصحي — يُملأ ذا معنى فقط في التقرير الشامل
+    # (عندما specialist_name=None عند الاستدعاء). في تقرير صحي فردي يحتوي
+    # دائماً على عنصر واحد فقط، فتُخفى هذه الفقرة في الـ PDF تلقائياً.
+    specialist_counts: dict[str, int] = field(default_factory=dict)
+
     # Full case rows for detail table
     cases: list[CaseRow] = field(default_factory=list)
 
@@ -87,13 +93,21 @@ _SERVICE_LABELS = {
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
+_ALL_SPECIALISTS_LABEL = "جميع الصحيين"
+
+
 def get_evaluation_data(
-    specialist_name: str,
+    specialist_name: str | None,
     period_start:    date,
     period_end:      date,
 ) -> EvaluationData:
     """
-    Query all records for the given specialist within [period_start, period_end].
+    Query records within [period_start, period_end].
+
+    ✅ specialist_name=None → التقرير الشامل: يجمع سجلات كل الصحيين معاً
+    (بدون فلترة بالاسم) ويملأ data.specialist_counts بتوزيع الحالات حسب
+    كل صحي. specialist_name="اسم" → السلوك الأصلي (تقرير فردي).
+
     Returns a fully-populated EvaluationData ready for PDF rendering.
     """
     from db.session import get_db
@@ -102,10 +116,11 @@ def get_evaluation_data(
         MedicalFollowupRecord, SuppliesRecord,
         OtherHealthcareRecord,
     )
-    ExamModel = MedicalFollowupRecord
+
+    is_comprehensive = specialist_name is None
 
     data = EvaluationData(
-        specialist_name=specialist_name,
+        specialist_name=_ALL_SPECIALISTS_LABEL if is_comprehensive else specialist_name,
         period_start=period_start,
         period_end=period_end,
         generated_at=datetime.utcnow(),
@@ -116,12 +131,18 @@ def get_evaluation_data(
 
     rows: list[CaseRow] = []
 
+    def _spec_filter(Model):
+        """شرط الفلترة بالصحي — فارغ (بدون فلترة) في وضع التقرير الشامل."""
+        if is_comprehensive:
+            return []
+        return [Model.specialist_name == specialist_name]
+
     with get_db() as db:
         # ── WoundRecord ───────────────────────────────────────────────────────
         wound_qs = (
             db.query(WoundRecord)
             .filter(
-                WoundRecord.specialist_name == specialist_name,
+                *_spec_filter(WoundRecord),
                 WoundRecord.created_at >= dt_start,
                 WoundRecord.created_at <= dt_end,
             )
@@ -138,6 +159,7 @@ def get_evaluation_data(
                 detail=       r.phase_label or "—",
                 image_count=  r.image_count or 0,
                 created_at=   r.created_at,
+                specialist_name= r.specialist_name or "—",
             ))
             # Phase distribution
             if r.phase_label:
@@ -147,7 +169,7 @@ def get_evaluation_data(
         med_qs = (
             db.query(MedicationRecord)
             .filter(
-                MedicationRecord.specialist_name == specialist_name,
+                *_spec_filter(MedicationRecord),
                 MedicationRecord.created_at >= dt_start,
                 MedicationRecord.created_at <= dt_end,
             )
@@ -164,6 +186,7 @@ def get_evaluation_data(
                 detail=       r.dispense_source or "—",
                 image_count=  r.image_count or 0,
                 created_at=   r.created_at,
+                specialist_name= r.specialist_name or "—",
             ))
             if r.dispense_source:
                 src = r.dispense_source
@@ -174,7 +197,7 @@ def get_evaluation_data(
             exam_qs = (
                 db.query(MedicalFollowupRecord)
                 .filter(
-                    MedicalFollowupRecord.specialist_name == specialist_name,
+                    *_spec_filter(MedicalFollowupRecord),
                     MedicalFollowupRecord.created_at >= dt_start,
                     MedicalFollowupRecord.created_at <= dt_end,
                 )
@@ -191,6 +214,7 @@ def get_evaluation_data(
                     detail=       _parse_json_list(r.procedure_type_json, limit=1),
                     image_count=  r.image_count or 0,
                     created_at=   r.created_at,
+                    specialist_name= r.specialist_name or "—",
                 ))
         except Exception as exc:
             logger.warning(f"[evaluation.repo] MedicalFollowupRecord query failed: {exc}")
@@ -199,7 +223,7 @@ def get_evaluation_data(
         sup_qs = (
             db.query(SuppliesRecord)
             .filter(
-                SuppliesRecord.specialist_name == specialist_name,
+                *_spec_filter(SuppliesRecord),
                 SuppliesRecord.created_at >= dt_start,
                 SuppliesRecord.created_at <= dt_end,
             )
@@ -216,6 +240,7 @@ def get_evaluation_data(
                 detail=       f"{r.item_count or 0} صنف",
                 image_count=  r.image_count or 0,
                 created_at=   r.created_at,
+                specialist_name= r.specialist_name or "—",
             ))
 
         # ── OtherHealthcareRecord ─────────────────────────────────────────────
@@ -223,7 +248,7 @@ def get_evaluation_data(
             other_qs = (
                 db.query(OtherHealthcareRecord)
                 .filter(
-                    OtherHealthcareRecord.specialist_name == specialist_name,
+                    *_spec_filter(OtherHealthcareRecord),
                     OtherHealthcareRecord.created_at >= dt_start,
                     OtherHealthcareRecord.created_at <= dt_end,
                 )
@@ -240,6 +265,7 @@ def get_evaluation_data(
                     detail=       "—",
                     image_count=  r.image_count or 0,
                     created_at=   r.created_at,
+                    specialist_name= r.specialist_name or "—",
                 ))
         except Exception as exc:
             logger.warning(f"[evaluation.repo] OtherHealthcareRecord query failed: {exc}")
@@ -301,6 +327,11 @@ def _aggregate(data: EvaluationData, rows: list[CaseRow]) -> None:
             if dept:
                 data.department_counts[dept] = data.department_counts.get(dept, 0) + 1
 
+        # ✅ توزيع حسب الصحي (ذو معنى فقط في التقرير الشامل — سيحتوي على
+        # عنصر واحد فقط في تقرير فردي، وتُخفى هذه الفقرة عندها في الـ PDF)
+        if row.specialist_name and row.specialist_name != "—":
+            data.specialist_counts[row.specialist_name] = data.specialist_counts.get(row.specialist_name, 0) + 1
+
         # Activity
         if row.created_at:
             day_str = row.created_at.strftime("%Y-%m-%d")
@@ -325,6 +356,11 @@ def _aggregate(data: EvaluationData, rows: list[CaseRow]) -> None:
     # Sort department_counts descending
     data.department_counts = dict(
         sorted(data.department_counts.items(), key=lambda x: x[1], reverse=True)
+    )
+
+    # Sort specialist_counts descending
+    data.specialist_counts = dict(
+        sorted(data.specialist_counts.items(), key=lambda x: x[1], reverse=True)
     )
 
 
