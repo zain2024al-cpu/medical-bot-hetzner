@@ -15,7 +15,7 @@ from telegram.ext import ContextTypes, ConversationHandler, CallbackQueryHandler
 from db.session import SessionLocal
 from db.models import Report
 from config.settings import REPORTS_GROUP_ID, MEDICAL_REPORTS_GROUP_ID
-from shared.files.filename_builder import build_medical_pdf_filename
+from shared.files.filename_builder import build_medical_pdf_filename, build_medical_attachment_filename
 
 logger = logging.getLogger(__name__)
 
@@ -404,19 +404,21 @@ async def handle_ma_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
     attachments = ma.setdefault("attachments", [])
 
+    original_name = None
     if msg.photo:
         file_id   = msg.photo[-1].file_id
         file_type = "photo"
     elif msg.document:
         file_id   = msg.document.file_id
         file_type = "document"
+        original_name = msg.document.file_name  # ✅ لحفظ الامتداد الأصلي عند إعادة التسمية لاحقاً
     elif msg.video:
         file_id   = msg.video.file_id
         file_type = "video"
     else:
         return
 
-    attachments.append({"file_id": file_id, "type": file_type})
+    attachments.append({"file_id": file_id, "type": file_type, "file_name": original_name})
     count = len(attachments)
 
     keyboard = InlineKeyboardMarkup([
@@ -454,9 +456,11 @@ async def _publish_attachments(query, context):
     hospital   = report.get("hospital_name", "—")
     dept       = report.get("department_name", "—")
     translator = report.get("translator_name", "—")
+    action     = report.get("medical_action", "—")
     caption    = (
         f"📎 إضافة مرفقات طبية\n"
-        f"👤 {name} | 🏥 {hospital} | 🏢 {dept} | 👨‍💼 {translator}"
+        f"👤 {name} | 🏥 {hospital} | 🏢 {dept} | 👨‍💼 {translator}\n"
+        f"📋 نوع الإجراء: {action}"
     )
 
     try:
@@ -487,6 +491,7 @@ async def _publish_attachments(query, context):
                 _pdf_filename = build_medical_pdf_filename(
                     patient_name=name,
                     departments=dept,
+                    workflow_type=action,
                 )
                 def _make_pdf_buf():
                     b = io.BytesIO(pdf_data)
@@ -515,14 +520,52 @@ async def _publish_attachments(query, context):
 
         # ── الفيديوهات والملفات → ترسل كما هي ──────────────────────────
         if other_atts:
+            # ✅ إعادة تسمية ملفات "document" — تيليجرام لا يسمح بتغيير اسم
+            # ملف يُعاد إرساله بنفس file_id، لذا نُنزّل بايتات الملف مرة
+            # واحدة هنا ونرفعه من جديد باسم يحتوي على المريض/القسم/نوع
+            # الإجراء بدل الاسم الأصلي القادم من هاتف المترجم (مثل
+            # DOC-20260628-WA0046.pdf). الفيديوهات لا تُعاد تسميتها لأن
+            # تيليجرام لا يعرض اسم ملف لرسائل الفيديو أصلاً.
+            doc_payloads: dict[int, tuple[bytes, str]] = {}
+            for i, att in enumerate(other_atts):
+                if att["type"] != "document":
+                    continue
+                try:
+                    tg_file = await bot.get_file(att["file_id"])
+                    dl_buf = io.BytesIO()
+                    await tg_file.download_to_memory(dl_buf)
+                    new_name = build_medical_attachment_filename(
+                        patient_name=name,
+                        departments=dept,
+                        workflow_type=action,
+                        original_filename=att.get("file_name"),
+                    )
+                    doc_payloads[i] = (dl_buf.getvalue(), new_name)
+                except Exception as dl_err:
+                    logger.error(
+                        f"❌ MA: فشل تحميل مستند لإعادة تسميته (index={i}): {dl_err}",
+                        exc_info=True,
+                    )
+                    # سيُرسل بالاسم/الـ file_id الأصلي كـ fallback إن فشل التنزيل
+
             if len(other_atts) == 1:
                 att = other_atts[0]
                 first_cap = caption if not photo_ids else None
                 if att["type"] == "document":
-                    fid = att["file_id"]
-                    await _send_with_migrate(
-                        lambda gid: bot.send_document(chat_id=gid, document=fid, caption=first_cap)
-                    )
+                    if 0 in doc_payloads:
+                        doc_data, doc_name = doc_payloads[0]
+                        def _make_doc_buf():
+                            b = io.BytesIO(doc_data)
+                            b.name = doc_name
+                            return b
+                        await _send_with_migrate(
+                            lambda gid: bot.send_document(chat_id=gid, document=_make_doc_buf(), caption=first_cap)
+                        )
+                    else:
+                        fid = att["file_id"]
+                        await _send_with_migrate(
+                            lambda gid: bot.send_document(chat_id=gid, document=fid, caption=first_cap)
+                        )
                 elif att["type"] == "video":
                     fid = att["file_id"]
                     await _send_with_migrate(
@@ -533,7 +576,13 @@ async def _publish_attachments(query, context):
                 for i, att in enumerate(other_atts):
                     cap = (caption if (i == 0 and not photo_ids) else None)
                     if att["type"] == "document":
-                        media_group.append(InputMediaDocument(media=att["file_id"], caption=cap))
+                        if i in doc_payloads:
+                            doc_data, doc_name = doc_payloads[i]
+                            doc_buf = io.BytesIO(doc_data)
+                            doc_buf.name = doc_name
+                            media_group.append(InputMediaDocument(media=doc_buf, caption=cap))
+                        else:
+                            media_group.append(InputMediaDocument(media=att["file_id"], caption=cap))
                     elif att["type"] == "video":
                         media_group.append(InputMediaVideo(media=att["file_id"], caption=cap))
                 if media_group:

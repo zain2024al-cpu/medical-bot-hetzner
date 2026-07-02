@@ -1,16 +1,23 @@
 # shared/files/filename_builder.py
 # Shared utility: build deterministic, human-readable filenames for
-# bot-generated medical PDFs.
+# bot-generated medical PDFs, and for renaming translator-uploaded medical
+# attachments (documents) so they carry the patient/department/action in
+# their displayed filename instead of the phone's original export name.
 #
 # ── Rules ────────────────────────────────────────────────────────────────────
-# • User-uploaded files KEEP their original filenames.
-#   Call this ONLY for PDFs that the bot generates itself.
+# • build_medical_pdf_filename():        for PDFs the bot generates itself —
+#   always returns a ".pdf" filename.
+# • build_medical_attachment_filename(): for re-uploading a file the user
+#   actually sent (bot.handlers.user.user_medical_attachments) — preserves
+#   the ORIGINAL file extension (Telegram does not allow renaming a file
+#   resent by file_id, so the caller must download + re-upload the bytes
+#   with this new name).
 # • Arabic text is preserved as-is (Unicode NFC) — safe on all modern systems.
 # • Invalid filesystem characters are stripped.
 # • Whitespace and hyphens are collapsed to underscores.
-# • Result is capped at MAX_BASE_LEN characters (before ".pdf").
-# • Always returns a string ending in ".pdf".
-# • Fallback: "medical_report.pdf" when all inputs are empty after sanitization.
+# • Result is capped at MAX_BASE_LEN characters (before the extension).
+# • Fallback: "medical_report.pdf" / "مرفق_طبي.<ext>" when all inputs are
+#   empty after sanitization.
 #
 # ── Usage ────────────────────────────────────────────────────────────────────
 #   from shared.files.filename_builder import build_medical_pdf_filename
@@ -60,6 +67,50 @@ def _sanitize_part(text: str) -> str:
     return text
 
 
+def _build_base_name(
+    patient_name: Union[str, None],
+    departments: Union[str, list, None],
+    workflow_type: Union[str, None],
+) -> str:
+    """Shared part-joining logic used by both filename builders below."""
+    parts: list[str] = []
+
+    # ── patient name ─────────────────────────────────────────────────────────
+    if patient_name:
+        p = _sanitize_part(str(patient_name))
+        if p:
+            parts.append(p)
+
+    # ── department(s) ─────────────────────────────────────────────────────────
+    if departments:
+        if isinstance(departments, str):
+            d = _sanitize_part(departments)
+            if d:
+                parts.append(d)
+        else:
+            for dept in departments:
+                d = _sanitize_part(str(dept))
+                if d:
+                    parts.append(d)
+
+    # ── optional workflow tag (e.g. medical action type) ───────────────────────
+    if workflow_type:
+        w = _sanitize_part(str(workflow_type))
+        if w:
+            parts.append(w)
+
+    if not parts:
+        return ""
+
+    base = "_".join(parts)
+
+    # Truncate to avoid filesystem limits (leave room for the extension).
+    if len(base) > _MAX_BASE_LEN:
+        base = base[:_MAX_BASE_LEN].rstrip("_")
+
+    return base
+
+
 def build_medical_pdf_filename(
     patient_name: Union[str, None] = None,
     departments: Union[str, list, None] = None,
@@ -84,39 +135,56 @@ def build_medical_pdf_filename(
             "سارة_علي_الطوارئ_مرفقات.pdf"
             "medical_report.pdf"   ← fallback when all inputs are empty
     """
-    parts: list[str] = []
+    base = _build_base_name(patient_name, departments, workflow_type)
+    return f"{base}.pdf" if base else "medical_report.pdf"
 
-    # ── patient name ─────────────────────────────────────────────────────────
-    if patient_name:
-        p = _sanitize_part(str(patient_name))
-        if p:
-            parts.append(p)
 
-    # ── department(s) ─────────────────────────────────────────────────────────
-    if departments:
-        if isinstance(departments, str):
-            d = _sanitize_part(departments)
-            if d:
-                parts.append(d)
-        else:
-            for dept in departments:
-                d = _sanitize_part(str(dept))
-                if d:
-                    parts.append(d)
+def build_medical_attachment_filename(
+    patient_name: Union[str, None] = None,
+    departments: Union[str, list, None] = None,
+    workflow_type: Union[str, None] = None,
+    original_filename: Union[str, None] = None,
+) -> str:
+    """
+    Build a human-readable filename for a translator-uploaded medical
+    attachment (document sent via the "📎 المرفقات الطبية" flow), while
+    preserving the ORIGINAL file extension (.pdf, .docx, .jpg, ...) so the
+    file still opens correctly on the recipient's device.
 
-    # ── optional workflow tag ─────────────────────────────────────────────────
-    if workflow_type:
-        w = _sanitize_part(str(workflow_type))
-        if w:
-            parts.append(w)
+    Unlike build_medical_pdf_filename(), this is meant for re-uploading a
+    file the user actually sent (not a bot-generated PDF) — the caller is
+    expected to download the original bytes and re-upload them with this
+    name, since Telegram does not allow renaming a file resent by file_id.
 
-    if not parts:
-        return "medical_report.pdf"
+    Args:
+        patient_name:      Patient name.
+        departments:        Department name(s).
+        workflow_type:      Optional tag — pass the medical action type here,
+                            e.g. "متابعة في الرقود", so the filename also
+                            reflects what kind of procedure the attachment
+                            belongs to.
+        original_filename:  The original filename as uploaded by the user
+                            (e.g. "DOC-20260628-WA0046.pdf") — only its
+                            extension is used; the rest is discarded.
 
-    base = "_".join(parts)
+    Returns:
+        A safe, non-empty filename string ending in the original extension
+        (or ".dat" if none could be detected).
 
-    # Truncate to avoid filesystem limits (leave room for ".pdf").
-    if len(base) > _MAX_BASE_LEN:
-        base = base[:_MAX_BASE_LEN].rstrip("_")
+        Example:
+            build_medical_attachment_filename(
+                "انور محمد", "جراحة الأورام", "متابعة في الرقود",
+                "DOC-20260628-WA0046.pdf",
+            )
+            → "انور_محمد_جراحة_الأورام_متابعة_في_الرقود.pdf"
+    """
+    base = _build_base_name(patient_name, departments, workflow_type) or "مرفق_طبي"
 
-    return f"{base}.pdf"
+    ext = ""
+    if original_filename and "." in original_filename:
+        ext = "." + original_filename.rsplit(".", 1)[-1].strip().lower()
+    # Guard against a pathological/overlong "extension" (e.g. no real dot found).
+    if not ext or len(ext) > 10:
+        ext = ".dat"
+
+    return f"{base}{ext}"
