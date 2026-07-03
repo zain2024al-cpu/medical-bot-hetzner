@@ -869,6 +869,31 @@ class PendingReport(Base):
         return f"<PendingReport(id={self.id}, patient={self.patient_name}, dept={self.department}, status={self.status})>"
 
 
+class MedicalAttachmentFile(Base):
+    """سجل كل ملف طبي مُرفق بتقرير — لدعم زر "📂 فتح التقارير الطبية".
+
+    يُنشأ سطر واحد لكل ملف عند إرساله الفعلي (بعد الحصول على الـ
+    file_id النهائي من رسالة تيليجرام المُرسلة)، وليس عند الرفع
+    المؤقت من المستخدم — لأن بعض المسارات (الصور → PDF، المستندات
+    المعاد رفعها بعد تنزيلها) تُنتج file_id جديداً مختلفاً عن الأصلي.
+    """
+    __tablename__ = "medical_attachment_files"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    report_id = Column(Integer, nullable=False, index=True)
+    file_id = Column(String(255), nullable=False)
+    file_type = Column(String(50), nullable=True)       # photo|document|video|audio|voice
+    file_name = Column(String(500), nullable=True)
+    uploaded_by = Column(String(255), nullable=True)
+    uploaded_by_tg_id = Column(Integer, nullable=True)
+    source = Column(String(50), nullable=True)          # "creation" | "late_upload"
+    upload_order = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=True, index=True)
+
+    def __repr__(self):
+        return f"<MedicalAttachmentFile(id={self.id}, report_id={self.report_id}, type={self.file_type})>"
+
+
 # Helper function for backward compatibility
 def desc(field):
     """SQLAlchemy desc() compatibility"""

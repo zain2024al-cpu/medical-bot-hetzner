@@ -436,6 +436,42 @@ async def handle_ma_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # النشر للمجموعة
 # ─────────────────────────────────────────────
 
+def _persist_ma_sent_files(sent, report_id, uploaded_by, uploaded_by_tg_id, order_start, filename_override=None):
+    """يحفظ سجل ملف طبي لكل رسالة مُرسلة فعلياً (Message واحدة أو قائمة من
+    send_media_group). best-effort — فشل الحفظ لا يوقف تدفق النشر أبداً.
+    يعيد عدد السجلات المحفوظة (لتحديث عداد الترتيب الخارجي)."""
+    if not report_id or sent is None:
+        return 0
+    try:
+        from shared.files.filename_builder import extract_sent_file_info
+        from services.medical_attachment_files_service import add_medical_attachment_file
+    except Exception as e:
+        logger.warning(f"⚠️ MA: تعذّر استيراد أدوات حفظ الملفات الطبية: {e}")
+        return 0
+
+    messages = sent if isinstance(sent, list) else [sent]
+    saved = 0
+    for i, msg in enumerate(messages):
+        try:
+            file_id, file_type, file_name = extract_sent_file_info(msg)
+            if not file_id:
+                continue
+            add_medical_attachment_file(
+                report_id=report_id,
+                file_id=file_id,
+                file_type=file_type,
+                file_name=(filename_override if (filename_override and len(messages) == 1) else file_name),
+                uploaded_by=uploaded_by,
+                uploaded_by_tg_id=uploaded_by_tg_id,
+                source="late_upload",
+                upload_order=order_start + i,
+            )
+            saved += 1
+        except Exception as e:
+            logger.warning(f"⚠️ MA: فشل حفظ سجل ملف طبي (report_id={report_id}): {e}")
+    return saved
+
+
 async def _publish_attachments(query, context):
     ma = context.user_data.get("ma_state", {})
     attachments = ma.get("attachments", [])
@@ -462,6 +498,12 @@ async def _publish_attachments(query, context):
         f"👤 {name} | 🏥 {hospital} | 🏢 {dept} | 👨‍💼 {translator}\n"
         f"📋 نوع الإجراء: {action}"
     )
+
+    # بيانات لحفظ سجلات الملفات الطبية بعد إرسالها فعلياً
+    report_id_for_persist = report.get("id")
+    uploaded_by_name = getattr(query.from_user, "full_name", None) or getattr(query.from_user, "first_name", None)
+    uploaded_by_tg_id = getattr(query.from_user, "id", None)
+    _persist_order = 0
 
     try:
         from telegram import InputMediaDocument, InputMediaVideo, error as tg_error
@@ -497,8 +539,12 @@ async def _publish_attachments(query, context):
                     b = io.BytesIO(pdf_data)
                     b.name = _pdf_filename
                     return b
-                await _send_with_migrate(
+                sent = await _send_with_migrate(
                     lambda gid: bot.send_document(chat_id=gid, document=_make_pdf_buf(), caption=caption)
+                )
+                _persist_order += _persist_ma_sent_files(
+                    sent, report_id_for_persist, uploaded_by_name, uploaded_by_tg_id, _persist_order,
+                    filename_override=_pdf_filename,
                 )
                 logger.info(f"✅ MA: تم إرسال {len(photo_ids)} صورة كـ PDF للمجموعة")
             else:
@@ -506,16 +552,22 @@ async def _publish_attachments(query, context):
                 from telegram import InputMediaPhoto
                 if len(photo_ids) == 1:
                     pid = photo_ids[0]
-                    await _send_with_migrate(
+                    sent = await _send_with_migrate(
                         lambda gid: bot.send_photo(chat_id=gid, photo=pid, caption=caption)
+                    )
+                    _persist_order += _persist_ma_sent_files(
+                        sent, report_id_for_persist, uploaded_by_name, uploaded_by_tg_id, _persist_order,
                     )
                 else:
                     media_group = [
                         InputMediaPhoto(media=fid, caption=(caption if i == 0 else None))
                         for i, fid in enumerate(photo_ids)
                     ]
-                    await _send_with_migrate(
+                    sent = await _send_with_migrate(
                         lambda gid: bot.send_media_group(chat_id=gid, media=media_group)
+                    )
+                    _persist_order += _persist_ma_sent_files(
+                        sent, report_id_for_persist, uploaded_by_name, uploaded_by_tg_id, _persist_order,
                     )
 
         # ── الفيديوهات والملفات → ترسل كما هي ──────────────────────────
@@ -558,18 +610,28 @@ async def _publish_attachments(query, context):
                             b = io.BytesIO(doc_data)
                             b.name = doc_name
                             return b
-                        await _send_with_migrate(
+                        sent = await _send_with_migrate(
                             lambda gid: bot.send_document(chat_id=gid, document=_make_doc_buf(), caption=first_cap)
+                        )
+                        _persist_order += _persist_ma_sent_files(
+                            sent, report_id_for_persist, uploaded_by_name, uploaded_by_tg_id, _persist_order,
+                            filename_override=doc_name,
                         )
                     else:
                         fid = att["file_id"]
-                        await _send_with_migrate(
+                        sent = await _send_with_migrate(
                             lambda gid: bot.send_document(chat_id=gid, document=fid, caption=first_cap)
+                        )
+                        _persist_order += _persist_ma_sent_files(
+                            sent, report_id_for_persist, uploaded_by_name, uploaded_by_tg_id, _persist_order,
                         )
                 elif att["type"] == "video":
                     fid = att["file_id"]
-                    await _send_with_migrate(
+                    sent = await _send_with_migrate(
                         lambda gid: bot.send_video(chat_id=gid, video=fid, caption=first_cap)
+                    )
+                    _persist_order += _persist_ma_sent_files(
+                        sent, report_id_for_persist, uploaded_by_name, uploaded_by_tg_id, _persist_order,
                     )
             else:
                 media_group = []
@@ -586,24 +648,55 @@ async def _publish_attachments(query, context):
                     elif att["type"] == "video":
                         media_group.append(InputMediaVideo(media=att["file_id"], caption=cap))
                 if media_group:
-                    await _send_with_migrate(
+                    sent = await _send_with_migrate(
                         lambda gid: bot.send_media_group(chat_id=gid, media=media_group)
+                    )
+                    _persist_order += _persist_ma_sent_files(
+                        sent, report_id_for_persist, uploaded_by_name, uploaded_by_tg_id, _persist_order,
                     )
 
         logger.info(f"✅ MA: نُشرت {len(attachments)} مرفقات للتقرير {report.get('id')} في المجموعة {group_id}")
 
         # تحديث has_paper_report = 1 حتى تُحتسب ضمن "تقارير طبية: نعم" في التقييم
         report_id = report.get("id")
+        report_medical_action = report.get("medical_action")
         if report_id:
             try:
                 with SessionLocal() as s:
                     r = s.query(Report).filter_by(id=report_id).first()
                     if r:
                         r.has_paper_report = 1
+                        report_medical_action = r.medical_action
                         s.commit()
                         logger.info(f"✅ MA: تم تحديث has_paper_report=1 للتقرير #{report_id}")
             except Exception as db_err:
                 logger.warning(f"⚠️ MA: فشل تحديث has_paper_report للتقرير #{report_id}: {db_err}")
+
+        # ✅ محاولة تحديث زر بطاقة الحالة الأصلية لإظهار "📂 فتح التقارير الطبية"
+        # (best-effort — الرسالة قد تكون قديمة/محذوفة/بلا صلاحية تعديل، هذا غير حرج)
+        if report_id:
+            try:
+                original_group_message_id = report.get("group_message_id")
+                if original_group_message_id and REPORTS_GROUP_ID:
+                    from services.medical_attachment_files_service import count_medical_attachment_files
+
+                    if count_medical_attachment_files(report_id) > 0:
+                        card_rows = []
+                        if report_medical_action == "تأجيل موعد":
+                            card_rows.append([InlineKeyboardButton(
+                                "📅 عرض سبب التأجيل", callback_data=f"view_reschedule:{report_id}"
+                            )])
+                        card_rows.append([InlineKeyboardButton(
+                            "📂 فتح التقارير الطبية", callback_data=f"medfiles:{report_id}"
+                        )])
+                        await bot.edit_message_reply_markup(
+                            chat_id=REPORTS_GROUP_ID,
+                            message_id=original_group_message_id,
+                            reply_markup=InlineKeyboardMarkup(card_rows),
+                        )
+                        logger.info(f"✅ MA: تم تحديث زر بطاقة التقرير #{report_id}")
+            except Exception as edit_err:
+                logger.info(f"ℹ️ MA: تعذّر تحديث زر بطاقة التقرير #{report_id} (best-effort, غير حرج): {edit_err}")
 
         # تنظيف الجلسة
         context.user_data.pop("ma_state", None)

@@ -188,3 +188,30 @@ def build_medical_attachment_filename(
         ext = ".dat"
 
     return f"{base}{ext}"
+
+
+def extract_sent_file_info(sent_message) -> tuple[Union[str, None], Union[str, None], Union[str, None]]:
+    """
+    Extract (file_id, file_type, file_name) from an already-sent telegram.Message.
+
+    Used after a medical attachment is actually sent to a group (not from the
+    user's original upload) — for photo-batches converted to a single PDF, or
+    documents re-uploaded under a new name, the resend-able file_id only
+    exists on the message Telegram returns from the send call itself.
+
+    Returns (None, None, None) if the message carries none of the recognized
+    media types.
+    """
+    if sent_message is None:
+        return None, None, None
+    if sent_message.document:
+        return sent_message.document.file_id, "document", sent_message.document.file_name
+    if sent_message.photo:
+        return sent_message.photo[-1].file_id, "photo", None
+    if sent_message.video:
+        return sent_message.video.file_id, "video", None
+    if sent_message.audio:
+        return sent_message.audio.file_id, "audio", None
+    if sent_message.voice:
+        return sent_message.voice.file_id, "voice", None
+    return None, None, None

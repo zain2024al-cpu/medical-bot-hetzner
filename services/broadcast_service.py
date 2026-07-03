@@ -196,12 +196,40 @@ async def _photos_to_pdf(bot: Bot, photo_file_ids: list, caption_text: str):
         return None
 
 
+def _persist_sent_medical_file(sent_message, report_id, uploaded_by, uploaded_by_tg_id, order, source="creation"):
+    """حفظ سجل ملف طبي واحد بعد إرساله فعلياً (best-effort — لا يوقف تدفق الإرسال أبداً)."""
+    if not report_id or sent_message is None:
+        return
+    try:
+        from shared.files.filename_builder import extract_sent_file_info
+        from services.medical_attachment_files_service import add_medical_attachment_file
+
+        file_id, file_type, file_name = extract_sent_file_info(sent_message)
+        if not file_id:
+            return
+        add_medical_attachment_file(
+            report_id=report_id,
+            file_id=file_id,
+            file_type=file_type,
+            file_name=file_name,
+            uploaded_by=uploaded_by,
+            uploaded_by_tg_id=uploaded_by_tg_id,
+            source=source,
+            upload_order=order,
+        )
+    except Exception as e:
+        logger.warning(f"⚠️ فشل حفظ سجل ملف طبي (report_id={report_id}): {e}")
+
+
 async def _send_medical_attachments(
     bot: Bot,
     attachments: list,
     caption: str = "📎 المرفقات الطبية",
     patient_name: str | None = None,
     department_name: str | None = None,
+    report_id: int | None = None,
+    uploaded_by: str | None = None,
+    uploaded_by_tg_id: int | None = None,
 ):
     """
     إرسال الملفات الطبية:
@@ -218,6 +246,7 @@ async def _send_medical_attachments(
 
     photo_ids = [a["file_id"] for a in attachments if a.get("type") == "photo"]
     other_atts = [a for a in attachments if a.get("type") != "photo"]
+    _persist_order = 0
 
     # ── الصور → PDF ────────────────────────────────────────
     if photo_ids:
@@ -228,8 +257,10 @@ async def _send_medical_attachments(
                 departments=department_name,
             )
             try:
-                await bot.send_document(chat_id=target_group, document=pdf_buf, caption=caption)
+                sent_msg = await bot.send_document(chat_id=target_group, document=pdf_buf, caption=caption)
                 logger.info(f"✅ أُرسل PDF ({len(photo_ids)} صورة) للمجموعة {target_group}")
+                _persist_sent_medical_file(sent_msg, report_id, uploaded_by, uploaded_by_tg_id, _persist_order)
+                _persist_order += 1
             except Exception as e:
                 logger.warning(f"⚠️ فشل إرسال PDF: {e}")
         else:
@@ -237,7 +268,9 @@ async def _send_medical_attachments(
             logger.warning("⚠️ فشل تحويل الصور لـ PDF، يُرسل كصور")
             for fid in photo_ids:
                 try:
-                    await bot.send_photo(chat_id=target_group, photo=fid, caption=caption)
+                    sent_msg = await bot.send_photo(chat_id=target_group, photo=fid, caption=caption)
+                    _persist_sent_medical_file(sent_msg, report_id, uploaded_by, uploaded_by_tg_id, _persist_order)
+                    _persist_order += 1
                 except Exception as e:
                     logger.warning(f"⚠️ فشل إرسال صورة: {e}")
 
@@ -249,14 +282,19 @@ async def _send_medical_attachments(
             if not fid:
                 continue
             cap = caption if not photo_ids else None
+            sent_msg = None
             if ftype == "document":
-                await bot.send_document(chat_id=target_group, document=fid, caption=cap)
+                sent_msg = await bot.send_document(chat_id=target_group, document=fid, caption=cap)
             elif ftype == "video":
-                await bot.send_video(chat_id=target_group, video=fid, caption=cap)
+                sent_msg = await bot.send_video(chat_id=target_group, video=fid, caption=cap)
             elif ftype == "audio":
-                await bot.send_audio(chat_id=target_group, audio=fid, caption=cap)
+                sent_msg = await bot.send_audio(chat_id=target_group, audio=fid, caption=cap)
             elif ftype == "voice":
-                await bot.send_voice(chat_id=target_group, voice=fid, caption=cap)
+                sent_msg = await bot.send_voice(chat_id=target_group, voice=fid, caption=cap)
+
+            if sent_msg is not None:
+                _persist_sent_medical_file(sent_msg, report_id, uploaded_by, uploaded_by_tg_id, _persist_order)
+                _persist_order += 1
         except Exception as e:
             logger.warning(f"⚠️ فشل إرسال مرفق ({att.get('type')}): {e}")
 
@@ -376,9 +414,29 @@ async def broadcast_new_report(bot: Bot, report_data: dict):
                     except Exception as e:
                         logger.debug(f"broadcast_service: failed to resolve report_id via DB: {e}")
 
+                keyboard_rows = []
+
                 if report_data.get('medical_action') == 'تأجيل موعد' and report_id:
-                    btn = InlineKeyboardButton("📅 عرض سبب التأجيل", callback_data=f"view_reschedule:{report_id}")
-                    reply_markup = InlineKeyboardMarkup([[btn]])
+                    keyboard_rows.append([InlineKeyboardButton(
+                        "📅 عرض سبب التأجيل", callback_data=f"view_reschedule:{report_id}"
+                    )])
+
+                if report_id:
+                    has_fresh_attachments = bool(report_data.get('medical_attachments'))
+                    has_persisted_attachments = False
+                    if not has_fresh_attachments:
+                        try:
+                            from services.medical_attachment_files_service import count_medical_attachment_files
+                            has_persisted_attachments = count_medical_attachment_files(report_id) > 0
+                        except Exception:
+                            has_persisted_attachments = False
+                    if has_fresh_attachments or has_persisted_attachments:
+                        keyboard_rows.append([InlineKeyboardButton(
+                            "📂 فتح التقارير الطبية", callback_data=f"medfiles:{report_id}"
+                        )])
+
+                if keyboard_rows:
+                    reply_markup = InlineKeyboardMarkup(keyboard_rows)
             except Exception:
                 reply_markup = None
 
@@ -459,7 +517,9 @@ async def broadcast_new_report(bot: Bot, report_data: dict):
                 raise Exception("فشل إرسال التقرير للمجموعة")
             
             # إرجاع معرف الرسالة لحفظه في قاعدة البيانات
-            report_id = report_data.get('report_id')
+            # ✅ نحافظ على report_id المُستخرج سابقاً (عبر البحث الاحتياطي في DB إن
+            # لزم الأمر أعلاه) بدل استبداله دائماً بـ report_data.get فقط
+            report_id = report_data.get('report_id') or report_id
             if report_id and group_message_id:
                 try:
                     from db.session import SessionLocal
@@ -483,6 +543,9 @@ async def broadcast_new_report(bot: Bot, report_data: dict):
                     attach_caption,
                     patient_name=report_data.get("patient_name"),
                     department_name=report_data.get("department_name"),
+                    report_id=report_id,
+                    uploaded_by=report_data.get("translator_name"),
+                    uploaded_by_tg_id=report_data.get("user_id") or report_data.get("translator_id"),
                 )
                 logger.info(f"✅ تم إرسال {len(medical_attachments)} مرفق طبي لمجموعة المرفقات")
 

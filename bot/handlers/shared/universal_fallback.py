@@ -291,6 +291,8 @@ KNOWN_CALLBACKS = [
     # schedule/accounts/appointments under "🛠️ إدارة النظام".
     r"^sys_menu:",         # System menu dispatcher — sys_menu:* callbacks
     r"^goto:",             # Direct entry points reused by the system menu (goto:schedule, goto:appointments)
+
+    r"^medfiles:",         # Medical files quick-access button — medfiles:{report_id}
 ]
 
 # ================================================

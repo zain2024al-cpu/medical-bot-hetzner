@@ -492,6 +492,12 @@ def register(app):
         pass
 
     try:
+        from bot.handlers.shared.medical_files_access import handle_medical_files_callback
+        app.add_handler(CallbackQueryHandler(handle_medical_files_callback, pattern="^medfiles:"))
+    except Exception as e:
+        logger.warning(f"⚠️ Cannot register medical_files_access handler: {e}")
+
+    try:
         from .flows.shared import ensure_default_translators
         ensure_default_translators()
     except Exception as e:
