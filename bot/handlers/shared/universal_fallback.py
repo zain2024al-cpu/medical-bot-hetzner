@@ -293,6 +293,7 @@ KNOWN_CALLBACKS = [
     r"^goto:",             # Direct entry points reused by the system menu (goto:schedule, goto:appointments)
 
     r"^medfiles:",         # Medical files quick-access button — medfiles:{report_id}
+    r"^pndrep:",           # Pending medical reports screen (system menu) — pndrep:*
 ]
 
 # ================================================

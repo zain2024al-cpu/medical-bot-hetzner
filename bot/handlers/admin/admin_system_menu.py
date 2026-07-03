@@ -16,6 +16,8 @@
 #   - "aum:permlist:0"    → admin_users_management.py (قائمة مستخدمين مخصَّصة
 #     لإدارة الصلاحيات مباشرة — اختيار اسم يفتح amod:list:<tg_id> مباشرة
 #     بدون المرور بشاشة قبول/رفض/تجميد الخاصة بـ"إدارة المستخدمين" العادية)
+#   - "pndrep:page:0"     → admin_pending_reports.py (شاشة متابعة يدوية
+#     للتقارير الطبية المعلقة — بديل/مكمّل لتنبيه الساعة 9 مساءً التلقائي)
 #
 # استُخدمت بادئة "sys_menu:" و"goto:" (وليس "admin:") لتفادي تصادم مع
 # المعالج العام في admin_start.py (`^admin:(?!evaluation$|manage_admins$)`)
@@ -46,6 +48,7 @@ def _menu_kb() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("📅 إدارة الجداول", callback_data="goto:schedule")],
         [InlineKeyboardButton("👥 إدارة الحسابات", callback_data=f"{_PFX}:accounts")],
         [InlineKeyboardButton("📆 المواعيد القادمة", callback_data="goto:appointments")],
+        [InlineKeyboardButton("📋 التقارير المعلقة", callback_data="pndrep:page:0")],
         [InlineKeyboardButton("❌ إغلاق", callback_data=f"{_PFX}:close")],
     ])
 

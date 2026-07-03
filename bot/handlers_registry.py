@@ -52,6 +52,10 @@ def register_all_handlers(app):
     from bot.handlers.admin.admin_system_menu import register as register_system_menu
     register_system_menu(app)               # Entry point: "🛠️ إدارة النظام" button
 
+    # ✅ شاشة متابعة التقارير الطبية المعلقة (زر "📋 التقارير المعلقة" داخل إدارة النظام)
+    from bot.handlers.admin.admin_pending_reports import register as register_pending_reports
+    register_pending_reports(app)
+
     # ✅ نظام التقارير الجديد — 2 أنواع احترافية: شامل + مريض واحد (مع patient_selector)
     from bot.handlers.admin.admin_reports_menu import register as register_reports_menu
     from bot.handlers.admin.admin_comprehensive_report import register as register_comprehensive_report
