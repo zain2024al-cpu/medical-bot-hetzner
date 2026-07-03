@@ -152,6 +152,7 @@ def build_comprehensive_pdf(
     reports: list[dict],
     stats: dict,
     period_label: str,
+    filters_summary: dict | None = None,
 ) -> io.BytesIO:
     """
     Build a comprehensive PDF report covering all cases in a date range.
@@ -159,6 +160,16 @@ def build_comprehensive_pdf(
     reports — list of report dicts from get_reports()
     stats   — dict from compute_stats()
     period_label — human-readable period string
+    filters_summary — optional dict describing the applied filters, rendered
+        as a "معايير البحث" section on the first page. Shape:
+        {
+            "hospitals":   list[str] | None,   # None/empty → "جميع المستشفيات"
+            "departments": list[str] | None,
+            "doctors":     list[str] | None,
+            "actions":     list[str] | None,
+        }
+        Backward compatible: omitting this parameter entirely reproduces the
+        exact previous PDF output (no filters section rendered).
     """
     try:
         from reportlab.lib.pagesizes import A4
@@ -250,6 +261,33 @@ def build_comprehensive_pdf(
 
     story.append(CoverBand(period_label))
     story.append(Spacer(1, 0.4 * cm))
+
+    # ── Search criteria (معايير البحث) ────────────────────────────────────────
+    # ✅ يظهر فقط عند تمرير filters_summary — التوليد القديم بدون هذا المعامل
+    # ينتج نفس الملف السابق تماماً بدون أي تغيير.
+    if filters_summary is not None:
+        story.append(P("معايير البحث", "section"))
+        gen_at = filters_summary.get("generated_at") or datetime.utcnow()
+        crit_lines = [
+            f"تاريخ إنشاء التقرير: {gen_at.strftime('%Y-%m-%d %H:%M')}",
+            f"الفترة: {period_label}",
+            "المستشفيات: " + ("، ".join(filters_summary.get("hospitals") or []) or "جميع المستشفيات"),
+            "الأقسام: " + ("، ".join(filters_summary.get("departments") or []) or "جميع الأقسام"),
+            "الأطباء: " + ("، ".join(filters_summary.get("doctors") or []) or "جميع الأطباء"),
+            "أنواع الإجراءات: " + ("، ".join(filters_summary.get("actions") or []) or "جميع الأنواع"),
+        ]
+        crit_rows = [[P(line, "body")] for line in crit_lines]
+        crit_table = Table(crit_rows, colWidths=[18 * cm], hAlign="RIGHT")
+        crit_table.setStyle(TableStyle([
+            ("BACKGROUND",    (0, 0), (-1, -1), C["light_bg"]),
+            ("GRID",          (0, 0), (-1, -1), 0.4, C["grid"]),
+            ("TOPPADDING",    (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 8),
+        ]))
+        story.append(crit_table)
+        story.append(Spacer(1, 0.4 * cm))
 
     # ── Summary stats ─────────────────────────────────────────────────────────
     stat_rows = [[
@@ -363,6 +401,55 @@ def build_comprehensive_pdf(
             story.append(Spacer(1, 0.3 * cm))
             story.append(P("التوزيع الزمني", "section"))
             story.append(img)
+
+    # ── Case-by-case detail table ─────────────────────────────────────────────
+    def _trunc(text: str, n: int) -> str:
+        text = (text or "").strip()
+        return text if len(text) <= n else text[: n - 1].rstrip() + "…"
+
+    if reports:
+        story.append(PageBreak())
+        story.append(P("تفاصيل الحالات", "section"))
+
+        detail_rows = [[
+            P("التاريخ",     "th"), P("المريض",   "th"), P("المستشفى", "th"),
+            P("القسم",       "th"), P("الطبيب",   "th"), P("الإجراء",  "th"),
+            P("تفاصيل الحالة", "th"), P("ملاحظات", "th"),
+        ]]
+        for r in reports:
+            detail_rows.append([
+                P(_fmt_date(r.get("report_date")),           "td_c"),
+                P(_trunc(r.get("patient_name", ""), 20),      "td_r"),
+                P(_trunc(r.get("hospital_name", ""), 20),     "td_r"),
+                P(_trunc(r.get("department", ""), 18),        "td_r"),
+                P(_trunc(r.get("doctor_name", ""), 16),       "td_r"),
+                P(_trunc(r.get("medical_action", ""), 16),    "td_r"),
+                P(_trunc(r.get("doctor_decision", ""), 40),   "td_r"),
+                P(_trunc(r.get("notes", ""), 30),             "td_r"),
+            ])
+
+        detail_table = Table(
+            detail_rows,
+            colWidths=[1.8*cm, 2.6*cm, 2.6*cm, 2.2*cm, 2.2*cm, 2.2*cm, 3.6*cm, 2.6*cm],
+            hAlign="CENTER",
+            repeatRows=1,
+        )
+        detail_table.setStyle(TableStyle([
+            ("BACKGROUND",     (0, 0), (-1, 0),  C["primary"]),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [C["white"], C["light_bg"]]),
+            ("GRID",           (0, 0), (-1, -1), 0.4, C["grid"]),
+            ("VALIGN",         (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING",     (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING",  (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING",   (0, 0), (-1, -1), 4),
+            ("LEFTPADDING",    (0, 0), (-1, -1), 4),
+        ]))
+        story.append(detail_table)
+    else:
+        # ✅ لا يُنشئ تقريراً فارغاً — رسالة واضحة بدل جدول فارغ
+        story.append(PageBreak())
+        story.append(P("تفاصيل الحالات", "section"))
+        story.append(P("لا توجد حالات مطابقة لمعايير البحث المحددة.", "body"))
 
     # ── Build PDF ─────────────────────────────────────────────────────────────
     doc.build(story, onFirstPage=_on_page, onLaterPages=_on_page)

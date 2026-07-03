@@ -9,11 +9,11 @@
 #       ↓
 #   User picks patient
 #       ↓
-#   Select departments (all / single / multi-select)
+#   Select departments (all / multi-select — options scoped to this patient's own reports)
 #       ↓
-#   Select procedure types (all / single / multi-select)
+#   Select procedure types (all / multi-select — scoped to patient + selected departments)
 #       ↓
-#   Select period (last month / 3mo / year / custom date range)
+#   Select period (last month / 3mo / year / custom date range via calendar)
 #       ↓
 #   Generate PDF
 #
@@ -23,6 +23,7 @@
 from __future__ import annotations
 
 import logging
+from calendar import monthrange
 from datetime import date, timedelta
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -50,8 +51,14 @@ _RKEY_PATIENT = "admin.patient_report.patient"
 
 _PFX = "pr2"
 
+_MONTH_AR = {
+    1: "يناير", 2: "فبراير", 3: "مارس",    4: "أبريل",
+    5: "مايو",  6: "يونيو",  7: "يوليو",   8: "أغسطس",
+    9: "سبتمبر",10: "أكتوبر",11: "نوفمبر", 12: "ديسمبر",
+}
 
-# ── Keyboards ──────────────────────────────────────────────────────────────────
+
+# ── Keyboards: entry screens (unchanged) ────────────────────────────────────────
 
 def _depts_kb(patient_id: int, patient_name: str) -> InlineKeyboardMarkup:
     """Departments selection keyboard."""
@@ -99,6 +106,44 @@ def _period_kb(patient_id: int) -> InlineKeyboardMarkup:
     ])
 
 
+# ── Generic multi-select keyboard (مُعاد استخدام نفس فكرة admin_comprehensive_report) ─
+
+def _multi_select_kb(
+    options: list[dict], selected: set[str], cb: str, patient_id: int, page: int,
+) -> InlineKeyboardMarkup:
+    per_page = 8
+    total_pages = max(1, (len(options) + per_page - 1) // per_page)
+    page = max(0, min(page, total_pages - 1))
+    page_items = options[page * per_page: (page + 1) * per_page]
+
+    buttons = []
+    for local_idx, opt in enumerate(page_items):
+        global_idx = page * per_page + local_idx
+        checked = "✅" if opt["name"] in selected else "◻️"
+        label = f"{checked} {opt['name']} ({opt['count']})"
+        if len(label) > 60:
+            label = label[:57] + "…"
+        buttons.append([InlineKeyboardButton(
+            label, callback_data=f"{_PFX}:{cb}:toggle:{patient_id}:{global_idx}",
+        )])
+
+    nav = []
+    if total_pages > 1 and page > 0:
+        nav.append(InlineKeyboardButton("⬅️", callback_data=f"{_PFX}:{cb}:page:{patient_id}:{page - 1}"))
+    if total_pages > 1:
+        nav.append(InlineKeyboardButton(f"📄 {page + 1}/{total_pages}", callback_data=f"{_PFX}:noop"))
+    if total_pages > 1 and page < total_pages - 1:
+        nav.append(InlineKeyboardButton("➡️", callback_data=f"{_PFX}:{cb}:page:{patient_id}:{page + 1}"))
+    if nav:
+        buttons.append(nav)
+
+    n = len(selected)
+    done_label = f"✅ متابعة ({n} محدد)" if n else "✅ متابعة (لا شيء محدد = الكل)"
+    buttons.append([InlineKeyboardButton(done_label, callback_data=f"{_PFX}:{cb}:done:{patient_id}")])
+    buttons.append([InlineKeyboardButton("❌ إلغاء", callback_data=f"{_PFX}:cancel")])
+    return InlineKeyboardMarkup(buttons)
+
+
 # ── Entry: Show patient selector ──────────────────────────────────────────────
 
 async def show_patient_selector(
@@ -120,6 +165,11 @@ async def show_patient_selector(
     context.user_data["_patient_name"] = None
     context.user_data["_pr_depts"] = None
     context.user_data["_pr_actions"] = None
+    context.user_data["_pr_dept_options"] = []
+    context.user_data["_pr_selected_depts"] = set()
+    context.user_data["_pr_action_options"] = []
+    context.user_data["_pr_selected_actions"] = set()
+    context.user_data["_pr_cal_start"] = None
 
     # Open patient selector
     # Note: result_router will call _on_patient_selected when done
@@ -188,6 +238,133 @@ async def _on_patient_selected(
     context._conversation_state = PR_DEPTS
 
 
+# ── Departments: multi-select screens ───────────────────────────────────────────
+
+async def _show_depts_multiselect(query, context: ContextTypes.DEFAULT_TYPE, patient_id: int, page: int = 0) -> None:
+    options = context.user_data.get("_pr_dept_options") or []
+    if not options:
+        from services.reports_repository import get_patient_departments
+        options = await get_patient_departments(patient_id)
+        context.user_data["_pr_dept_options"] = options
+
+    if not options:
+        # ✅ لا توجد أقسام لهذا المريض إطلاقاً — نتخطى الشاشة تلقائياً
+        context.user_data["_pr_depts"] = None
+        try:
+            await query.edit_message_text(
+                f"👤 *{context.user_data.get('_patient_name', '')}*\n\n📋 اختر الإجراءات:",
+                reply_markup=_actions_kb(patient_id), parse_mode=ParseMode.MARKDOWN,
+            )
+        except Exception:
+            pass
+        return
+
+    selected = context.user_data.get("_pr_selected_depts", set())
+    try:
+        await query.edit_message_text(
+            f"👤 *{context.user_data.get('_patient_name', '')}*\n\n"
+            f"📋 اختر الأقسام المطلوبة (يظهر عدد التقارير بجانب كل قسم):",
+            reply_markup=_multi_select_kb(options, selected, "depts", patient_id, page),
+            parse_mode=ParseMode.MARKDOWN,
+        )
+    except Exception as exc:
+        logger.error(f"[patient_report_v2] depts multiselect render failed: {exc}")
+
+
+# ── Actions: multi-select screens ────────────────────────────────────────────────
+
+async def _show_actions_multiselect(query, context: ContextTypes.DEFAULT_TYPE, patient_id: int, page: int = 0) -> None:
+    options = context.user_data.get("_pr_action_options") or []
+    if not options:
+        from services.reports_repository import get_patient_actions
+        depts = context.user_data.get("_pr_depts")  # None = all
+        options = await get_patient_actions(patient_id, depts=depts)
+        context.user_data["_pr_action_options"] = options
+
+    if not options:
+        context.user_data["_pr_actions"] = None
+        try:
+            await query.edit_message_text(
+                f"👤 *{context.user_data.get('_patient_name', '')}*\n\n📅 اختر الفترة الزمنية:",
+                reply_markup=_period_kb(patient_id), parse_mode=ParseMode.MARKDOWN,
+            )
+        except Exception:
+            pass
+        return
+
+    selected = context.user_data.get("_pr_selected_actions", set())
+    try:
+        await query.edit_message_text(
+            f"👤 *{context.user_data.get('_patient_name', '')}*\n\n"
+            f"📋 اختر أنواع الإجراءات (يظهر عدد التقارير بجانب كل نوع):",
+            reply_markup=_multi_select_kb(options, selected, "actions", patient_id, page),
+            parse_mode=ParseMode.MARKDOWN,
+        )
+    except Exception as exc:
+        logger.error(f"[patient_report_v2] actions multiselect render failed: {exc}")
+
+
+# ── Custom date-range calendar (نفس فكرة admin_comprehensive_report، بادئة pr2:) ──
+
+def _calendar_kb(year: int, month: int, step: str, patient_id: int) -> InlineKeyboardMarkup:
+    from calendar import monthcalendar
+
+    today = date.today()
+    buttons = []
+
+    prev_year, prev_month = (year - 1, 12) if month == 1 else (year, month - 1)
+    next_year, next_month = (year + 1, 1) if month == 12 else (year, month + 1)
+
+    nav_row = [
+        InlineKeyboardButton("◀️", callback_data=f"{_PFX}:cal:{step}:{patient_id}:navmonth:{prev_year}-{prev_month}"),
+        InlineKeyboardButton(f"{_MONTH_AR[month]} {year}", callback_data=f"{_PFX}:noop"),
+    ]
+    if (year, month) < (today.year, today.month):
+        nav_row.append(InlineKeyboardButton("▶️", callback_data=f"{_PFX}:cal:{step}:{patient_id}:navmonth:{next_year}-{next_month}"))
+    buttons.append(nav_row)
+
+    buttons.append([InlineKeyboardButton(d, callback_data=f"{_PFX}:noop") for d in ["إ", "ث", "ع", "خ", "ج", "س", "ح"]])
+
+    for week in monthcalendar(year, month):
+        row = []
+        for day_num in week:
+            if day_num == 0:
+                row.append(InlineKeyboardButton(" ", callback_data=f"{_PFX}:noop"))
+                continue
+            d = date(year, month, day_num)
+            if d > today:
+                row.append(InlineKeyboardButton(" ", callback_data=f"{_PFX}:noop"))
+            else:
+                label = f"⭐{day_num}" if d == today else str(day_num)
+                row.append(InlineKeyboardButton(
+                    label, callback_data=f"{_PFX}:cal:{step}:{patient_id}:select:{d.isoformat()}",
+                ))
+        buttons.append(row)
+
+    buttons.append([InlineKeyboardButton("⬅️ رجوع لاختيار الفترة", callback_data=f"{_PFX}:back_actions:{patient_id}")])
+    buttons.append([InlineKeyboardButton("❌ إلغاء", callback_data=f"{_PFX}:cancel")])
+    return InlineKeyboardMarkup(buttons)
+
+
+async def _show_calendar(
+    query, context: ContextTypes.DEFAULT_TYPE, step: str, patient_id: int,
+    year: int | None = None, month: int | None = None,
+) -> None:
+    today = date.today()
+    year = year or today.year
+    month = month or today.month
+    label = "تاريخ البداية" if step == "start" else "تاريخ النهاية"
+    patient_name = context.user_data.get("_patient_name", "")
+    try:
+        await query.edit_message_text(
+            f"👤 *{patient_name}*\n\n📆 فترة مخصصة — اختر {label}:",
+            reply_markup=_calendar_kb(year, month, step, patient_id),
+            parse_mode=ParseMode.MARKDOWN,
+        )
+    except Exception as exc:
+        logger.error(f"[patient_report_v2] calendar render failed: {exc}")
+
+
 # ── Callback handlers ─────────────────────────────────────────────────────────
 
 async def handle_departments(
@@ -217,32 +394,53 @@ async def handle_departments(
         await patient_selector.enter(update, context, return_to=_RKEY_PATIENT)
         return PR_SHOW_SELECTOR
 
-    # Parse department choice: pr2:depts:all:{patient_id}
     parts = data.split(":")
+    # pr2:depts:{action}:{patient_id}[:extra]
     if len(parts) >= 4:
-        # parts[0]="pr2", parts[1]="depts", parts[2]=action, parts[3]=patient_id
-        action = parts[2]  # "all" or "select"
+        action = parts[2]
+
+        if action in ("toggle", "page", "done"):
+            patient_id = int(parts[3])
+            if action == "toggle":
+                idx = int(parts[4])
+                options = context.user_data.get("_pr_dept_options") or []
+                if 0 <= idx < len(options):
+                    name = options[idx]["name"]
+                    sel = context.user_data.setdefault("_pr_selected_depts", set())
+                    sel.symmetric_difference_update({name})
+                await _show_depts_multiselect(query, context, patient_id)
+            elif action == "page":
+                page = int(parts[4])
+                await _show_depts_multiselect(query, context, patient_id, page=page)
+            elif action == "done":
+                sel = context.user_data.get("_pr_selected_depts") or set()
+                context.user_data["_pr_depts"] = list(sel) if sel else None
+                context.user_data["_pr_action_options"] = []  # reset — scope changed
+                context.user_data["_pr_selected_actions"] = set()
+                await _show_actions_multiselect(query, context, patient_id)
+            return PR_ACTIONS if action == "done" else PR_DEPTS
+
+        # action == "all" or "select"
         patient_id = int(parts[3])
 
         if action == "all":
             context.user_data["_pr_depts"] = None  # None = all departments
-        else:
-            # TODO: implement multi-select UI for departments
-            # For now, default to "all"
-            context.user_data["_pr_depts"] = None
+            try:
+                await query.edit_message_text(
+                    f"👤 *{context.user_data.get('_patient_name', '')}*\n\n"
+                    f"📋 اختر الإجراءات:",
+                    reply_markup=_actions_kb(patient_id),
+                    parse_mode=ParseMode.MARKDOWN,
+                )
+            except Exception:
+                pass
+            return PR_ACTIONS
 
-        # Show actions selection
-        try:
-            await query.edit_message_text(
-                f"👤 *{context.user_data.get('_patient_name', '')}*\n\n"
-                f"📋 اختر الإجراءات:",
-                reply_markup=_actions_kb(patient_id),
-                parse_mode=ParseMode.MARKDOWN,
-            )
-        except Exception:
-            pass
-
-        return PR_ACTIONS
+        # action == "select" → افتح شاشة الاختيار المتعدد الفعلية
+        context.user_data["_pr_selected_depts"] = set()
+        context.user_data["_pr_dept_options"] = []
+        await _show_depts_multiselect(query, context, patient_id)
+        return PR_DEPTS
 
     return PR_DEPTS
 
@@ -267,123 +465,92 @@ async def handle_actions(
         context.user_data.clear()
         return ConversationHandler.END
 
-    # Parse action choice: pr2:actions:all:{patient_id}
+    if data.startswith(f"{_PFX}:back_depts"):
+        patient_id = int(data.split(":")[-1])
+        try:
+            await query.edit_message_text(
+                f"👤 *{context.user_data.get('_patient_name', '')}*\n\n"
+                f"📋 اختر الأقسام:",
+                reply_markup=_depts_kb(patient_id, context.user_data.get("_patient_name", "")),
+                parse_mode=ParseMode.MARKDOWN,
+            )
+        except Exception:
+            pass
+        return PR_DEPTS
+
     parts = data.split(":")
     if len(parts) >= 4:
-        # parts[0]="pr2", parts[1]="actions", parts[2]=action, parts[3]=patient_id
-        action = parts[2]  # "all" or "select"
+        action = parts[2]
+
+        if action in ("toggle", "page", "done"):
+            patient_id = int(parts[3])
+            if action == "toggle":
+                idx = int(parts[4])
+                options = context.user_data.get("_pr_action_options") or []
+                if 0 <= idx < len(options):
+                    name = options[idx]["name"]
+                    sel = context.user_data.setdefault("_pr_selected_actions", set())
+                    sel.symmetric_difference_update({name})
+                await _show_actions_multiselect(query, context, patient_id)
+            elif action == "page":
+                page = int(parts[4])
+                await _show_actions_multiselect(query, context, patient_id, page=page)
+            elif action == "done":
+                sel = context.user_data.get("_pr_selected_actions") or set()
+                context.user_data["_pr_actions"] = list(sel) if sel else None
+                try:
+                    await query.edit_message_text(
+                        f"👤 *{context.user_data.get('_patient_name', '')}*\n\n"
+                        f"📅 اختر الفترة الزمنية:",
+                        reply_markup=_period_kb(patient_id), parse_mode=ParseMode.MARKDOWN,
+                    )
+                except Exception:
+                    pass
+                return PR_PERIOD
+            return PR_ACTIONS
+
+        action_val = action  # "all" or "select"
         patient_id = int(parts[3])
 
-        if data.startswith(f"{_PFX}:back_depts"):
-            # Go back to departments
+        if action_val == "all":
+            context.user_data["_pr_actions"] = None  # None = all actions
             try:
                 await query.edit_message_text(
                     f"👤 *{context.user_data.get('_patient_name', '')}*\n\n"
-                    f"📋 اختر الأقسام:",
-                    reply_markup=_depts_kb(patient_id, context.user_data.get("_patient_name", "")),
+                    f"📅 اختر الفترة الزمنية:",
+                    reply_markup=_period_kb(patient_id),
                     parse_mode=ParseMode.MARKDOWN,
                 )
             except Exception:
                 pass
-            return PR_DEPTS
+            return PR_PERIOD
 
-        if action == "all":
-            context.user_data["_pr_actions"] = None  # None = all actions
-        else:
-            # TODO: implement multi-select UI for actions
-            # For now, default to "all"
-            context.user_data["_pr_actions"] = None
-
-        # Show period selection
-        try:
-            await query.edit_message_text(
-                f"👤 *{context.user_data.get('_patient_name', '')}*\n\n"
-                f"📅 اختر الفترة الزمنية:",
-                reply_markup=_period_kb(patient_id),
-                parse_mode=ParseMode.MARKDOWN,
-            )
-        except Exception:
-            pass
-
-        return PR_PERIOD
+        # action_val == "select" → افتح شاشة الاختيار المتعدد الفعلية
+        context.user_data["_pr_selected_actions"] = set()
+        context.user_data["_pr_action_options"] = []
+        await _show_actions_multiselect(query, context, patient_id)
+        return PR_ACTIONS
 
     return PR_ACTIONS
 
 
-async def handle_period(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
+async def _finalize_and_generate(
+    update: Update, context: ContextTypes.DEFAULT_TYPE,
+    query, patient_id: int, period_start: date, period_end: date, period_label: str,
 ) -> int:
-    """User selected time period."""
-    query = update.callback_query
-    try:
-        await query.answer()
-    except Exception:
-        pass
-
-    data = query.data or ""
-
-    if data == f"{_PFX}:cancel":
-        try:
-            await query.edit_message_text("✅ تم الإلغاء.")
-        except Exception:
-            pass
-        context.user_data.clear()
-        return ConversationHandler.END
-
-    # Parse period: pr2:period:{patient_id}:{period_code}
-    parts = data.split(":")
-
-    if data.startswith(f"{_PFX}:back_actions"):
-        # Go back to actions - extract patient_id from context
-        patient_id = context.user_data.get("_patient_id")
-        try:
-            await query.edit_message_text(
-                f"👤 *{context.user_data.get('_patient_name', '')}*\n\n"
-                f"📋 اختر الإجراءات:",
-                reply_markup=_actions_kb(patient_id),
-                parse_mode=ParseMode.MARKDOWN,
-            )
-        except Exception:
-            pass
-        return PR_ACTIONS
-
-    # Extract patient_id and period_code
-    if len(parts) >= 4:
-        patient_id = int(parts[2])
-        period_code = parts[3]  # "1m" | "3m" | "year" | "custom"
-    else:
-        # Fallback to context
-        patient_id = context.user_data.get("_patient_id")
-        period_code = "1m"
-
-    # Resolve period
+    """Fetch reports for the resolved period + filters, build PDF, and send it."""
     await query.edit_message_text("⏳ جارٍ إعداد التقرير...")
 
     try:
         from services.reports_repository import get_reports
         from services.patient_report_pdf import build_patient_pdf
 
-        # Compute date range
-        today = date.today()
-        if period_code == "1m":
-            period_start = today - timedelta(days=30)
-            period_label = "آخر شهر"
-        elif period_code == "3m":
-            period_start = today - timedelta(days=90)
-            period_label = "آخر 3 أشهر"
-        elif period_code == "year":
-            period_start = today.replace(month=1, day=1)
-            period_label = f"السنة {today.year}"
-        else:
-            period_start = date(1900, 1, 1)
-            period_label = "كل الفترة"
-
         depts = context.user_data.get("_pr_depts")
         actions = context.user_data.get("_pr_actions")
 
         reports = await get_reports(
             start=period_start,
-            end=today,
+            end=period_end,
             patient_id=patient_id,
             depts=depts,
             actions=actions,
@@ -393,12 +560,11 @@ async def handle_period(
 
         if not reports:
             await query.edit_message_text(
-                f"⚠️ لا توجد تقارير للمريض *{patient_name}* في هذه الفترة.",
+                f"⚠️ لا توجد تقارير للمريض *{patient_name}* في هذه الفترة/المعايير.",
                 parse_mode=ParseMode.MARKDOWN,
             )
             return PR_PERIOD
 
-        # Build PDF
         from db.session import SessionLocal
         from db.models import Patient
 
@@ -414,8 +580,7 @@ async def handle_period(
 
         pdf_buf = build_patient_pdf(patient_data, reports, depts, period_label)
 
-        # Send PDF
-        filename = f"Patient_{patient_id}_{period_code}.pdf"
+        filename = f"Patient_{patient_id}_{period_start}_{period_end}.pdf"
         caption = (
             f"👤 *تقرير المريض*\n"
             f"📝 {patient_name}\n"
@@ -438,10 +603,10 @@ async def handle_period(
 
         logger.info(
             f"[patient_report_v2] PDF sent  patient_id={patient_id}  "
-            f"period={period_code}  reports={len(reports)}"
+            f"period={period_label}  reports={len(reports)}"
         )
 
-    except Exception as exc:
+    except Exception:
         logger.exception("[patient_report_v2] PDF generation failed")
         try:
             await query.edit_message_text(
@@ -455,6 +620,98 @@ async def handle_period(
         context.user_data.clear()
 
     return ConversationHandler.END
+
+
+async def handle_period(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> int:
+    """User selected time period."""
+    query = update.callback_query
+    try:
+        await query.answer()
+    except Exception:
+        pass
+
+    data = query.data or ""
+
+    if data == f"{_PFX}:cancel":
+        try:
+            await query.edit_message_text("✅ تم الإلغاء.")
+        except Exception:
+            pass
+        context.user_data.clear()
+        return ConversationHandler.END
+
+    if data == f"{_PFX}:noop":
+        return PR_PERIOD
+
+    if data.startswith(f"{_PFX}:back_actions"):
+        patient_id = int(data.split(":")[-1])
+        try:
+            await query.edit_message_text(
+                f"👤 *{context.user_data.get('_patient_name', '')}*\n\n"
+                f"📋 اختر الإجراءات:",
+                reply_markup=_actions_kb(patient_id),
+                parse_mode=ParseMode.MARKDOWN,
+            )
+        except Exception:
+            pass
+        return PR_ACTIONS
+
+    # ── Custom date-range calendar callbacks: pr2:cal:{step}:{patient_id}:{sub}[:extra] ─
+    if data.startswith(f"{_PFX}:cal:"):
+        parts = data.split(":")
+        step = parts[2]
+        patient_id = int(parts[3])
+        sub = parts[4]
+
+        if sub == "navmonth":
+            y_str, m_str = parts[5].split("-")
+            await _show_calendar(query, context, step=step, patient_id=patient_id, year=int(y_str), month=int(m_str))
+        elif sub == "select":
+            selected = date.fromisoformat(parts[5])
+            if step == "start":
+                context.user_data["_pr_cal_start"] = selected
+                await _show_calendar(query, context, step="end", patient_id=patient_id, year=selected.year, month=selected.month)
+            else:
+                start_d = context.user_data.get("_pr_cal_start") or selected
+                end_d = selected
+                if end_d < start_d:
+                    start_d, end_d = end_d, start_d
+                end_d = min(end_d, date.today())
+                period_label = f"{start_d.strftime('%d/%m/%Y')} إلى {end_d.strftime('%d/%m/%Y')}"
+                return await _finalize_and_generate(update, context, query, patient_id, start_d, end_d, period_label)
+        return PR_PERIOD
+
+    # Parse period: pr2:period:{patient_id}:{period_code}
+    parts = data.split(":")
+    if len(parts) >= 4:
+        patient_id = int(parts[2])
+        period_code = parts[3]  # "1m" | "3m" | "year" | "custom"
+    else:
+        patient_id = context.user_data.get("_patient_id")
+        period_code = "1m"
+
+    if period_code == "custom":
+        context.user_data["_pr_cal_start"] = None
+        await _show_calendar(query, context, step="start", patient_id=patient_id)
+        return PR_PERIOD
+
+    today = date.today()
+    if period_code == "1m":
+        period_start = today - timedelta(days=30)
+        period_label = "آخر شهر"
+    elif period_code == "3m":
+        period_start = today - timedelta(days=90)
+        period_label = "آخر 3 أشهر"
+    elif period_code == "year":
+        period_start = today.replace(month=1, day=1)
+        period_label = f"السنة {today.year}"
+    else:
+        period_start = date(1900, 1, 1)
+        period_label = "كل الفترة"
+
+    return await _finalize_and_generate(update, context, query, patient_id, period_start, today, period_label)
 
 
 # ── Registration ──────────────────────────────────────────────────────────────
@@ -473,24 +730,31 @@ def register(app) -> None:
     # Register all pr2:* callbacks as simple handlers (group 0, low priority)
     # This allows them to be called from anywhere, including from within
     # another ConversationHandler.
+    #
+    # ✅ ملاحظة إصلاح: الأنماط الأصلية كانت تُسجَّل بادئة واحدة فقط لكل معالج
+    # (^pr2:depts:, ^pr2:actions:, ^pr2:period:) بينما كل دالة تحتوي فعلياً
+    # على كود لمعالجة زر "رجوع" بـcallback_data مختلف (pr2:back_patient،
+    # pr2:back_depts:*، pr2:back_actions:*) لا يطابق نمط تسجيلها — أي أن
+    # أزرار "⬅️" الثلاثة كانت معطَّلة تماماً منذ إنشاء الملف. تم توسيع كل
+    # نمط هنا ليغطي كل الحالات التي تعالجها الدالة فعلياً.
     app.add_handler(
         CallbackQueryHandler(
             handle_departments,
-            pattern=rf"^{_PFX}:depts:",
+            pattern=rf"^{_PFX}:(depts:|back_patient)",
         ),
         group=0,
     )
     app.add_handler(
         CallbackQueryHandler(
             handle_actions,
-            pattern=rf"^{_PFX}:actions:",
+            pattern=rf"^{_PFX}:(actions:|back_depts:)",
         ),
         group=0,
     )
     app.add_handler(
         CallbackQueryHandler(
             handle_period,
-            pattern=rf"^{_PFX}:period:",
+            pattern=rf"^{_PFX}:(period:|cal:|back_actions:|noop$)",
         ),
         group=0,
     )

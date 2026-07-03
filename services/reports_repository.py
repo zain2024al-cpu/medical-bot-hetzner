@@ -35,11 +35,65 @@ async def get_reports(
     patient_id: Optional[int] = None,
     depts: Optional[list[str]] = None,
     actions: Optional[list[str]] = None,
+    hospitals: Optional[list[str]] = None,
+    doctors: Optional[list[str]] = None,
 ) -> list[dict]:
-    """Fetch reports. Optional filtering by patient, departments, actions."""
+    """Fetch reports. Optional filtering by patient, hospitals, departments, doctors, actions."""
     return await asyncio.to_thread(
-        _get_reports_sync, start, end, patient_id, depts, actions
+        _get_reports_sync, start, end, patient_id, depts, actions, hospitals, doctors
     )
+
+
+# ── Scoped "available options" queries (for cascading dynamic filters) ─────────
+# كل دالة تُرجع فقط الخيارات التي لها بيانات فعلياً ضمن الفترة + الفلاتر السابقة،
+# مع عدد الحالات لكل خيار — تُستخدم لبناء شاشات الاختيار المتسلسلة في التقرير
+# الشامل (ومستقبلاً أي مسار آخر يحتاج فلترة ديناميكية مشابهة).
+
+async def get_hospitals_in_scope(start: date, end: date) -> list[dict]:
+    """المستشفيات التي لها حالات فعلياً ضمن الفترة، مع العدد. [{"name": str, "count": int}]"""
+    return await asyncio.to_thread(_get_hospitals_in_scope_sync, start, end)
+
+
+async def get_departments_in_scope(
+    start: date, end: date, hospitals: Optional[list[str]] = None
+) -> list[dict]:
+    """الأقسام ضمن الفترة + المستشفيات المختارة (إن وُجدت)، مع العدد."""
+    return await asyncio.to_thread(_get_departments_in_scope_sync, start, end, hospitals)
+
+
+async def get_doctors_in_scope(
+    start: date, end: date,
+    hospitals: Optional[list[str]] = None,
+    departments: Optional[list[str]] = None,
+) -> list[dict]:
+    """الأطباء ضمن الفترة + المستشفيات + الأقسام المختارة (إن وُجدت)، مع العدد."""
+    return await asyncio.to_thread(_get_doctors_in_scope_sync, start, end, hospitals, departments)
+
+
+async def get_actions_in_scope(
+    start: date, end: date,
+    hospitals: Optional[list[str]] = None,
+    departments: Optional[list[str]] = None,
+    doctors: Optional[list[str]] = None,
+) -> list[dict]:
+    """أنواع الإجراءات ضمن الفترة + كل الفلاتر السابقة (إن وُجدت)، مع العدد."""
+    return await asyncio.to_thread(
+        _get_actions_in_scope_sync, start, end, hospitals, departments, doctors
+    )
+
+
+# ── Patient-scoped options (لتقرير المريض الفردي — الفترة تُختار لاحقاً) ───────
+
+async def get_patient_departments(patient_id: int) -> list[dict]:
+    """الأقسام التي للمريض تقارير فيها (كل الوقت)، مع العدد."""
+    return await asyncio.to_thread(_get_patient_departments_sync, patient_id)
+
+
+async def get_patient_actions(
+    patient_id: int, depts: Optional[list[str]] = None
+) -> list[dict]:
+    """أنواع الإجراءات التي للمريض تقارير فيها، مع فلترة اختيارية بالأقسام المختارة."""
+    return await asyncio.to_thread(_get_patient_actions_sync, patient_id, depts)
 
 
 # ── Sync implementations ──────────────────────────────────────────────────────
@@ -102,6 +156,8 @@ def _get_reports_sync(
     patient_id: Optional[int] = None,
     depts: Optional[list[str]] = None,
     actions: Optional[list[str]] = None,
+    hospitals: Optional[list[str]] = None,
+    doctors: Optional[list[str]] = None,
 ) -> list[dict]:
     """Fetch reports with optional filtering."""
     from db.session import SessionLocal
@@ -124,11 +180,25 @@ def _get_reports_sync(
             if actions:
                 q = q.filter(Report.medical_action.in_(actions))
 
-            rows = q.order_by(Report.report_date.asc()).all()
+            if doctors:
+                q = q.filter(Report.doctor_name.in_(doctors))
 
-            # Build a hospital_id -> name mapping
-            hospitals = s.query(Hospital).all()
-            hospital_map = {h.id: h.name for h in hospitals if h.id and h.name}
+            # Build a hospital_id -> name mapping (used both for display fallback
+            # below and for resolving the "hospitals" filter, since hospital_name
+            # is sometimes empty on the report row itself).
+            hospital_rows = s.query(Hospital).all()
+            hospital_map = {h.id: h.name for h in hospital_rows if h.id and h.name}
+
+            if hospitals:
+                hospitals_set = set(hospitals)
+                matching_ids = [hid for hid, hname in hospital_map.items() if hname in hospitals_set]
+                from sqlalchemy import or_
+                cond = Report.hospital_name.in_(hospitals)
+                if matching_ids:
+                    cond = or_(cond, Report.hospital_id.in_(matching_ids))
+                q = q.filter(cond)
+
+            rows = q.order_by(Report.report_date.asc()).all()
 
             for r in rows:
                 # Get hospital name - try report field first, then lookup table
@@ -154,11 +224,234 @@ def _get_reports_sync(
                     "followup_date":   (r.followup_date.date() if r.followup_date else None),
                     "diagnosis":       r.diagnosis or "",
                     "treatment_plan":  r.treatment_plan or "",
+                    "notes":           r.notes or "",
                 })
     except Exception as exc:
         logger.error(f"[reports_repo] get_reports_sync failed: {exc}", exc_info=True)
 
     return results
+
+
+# ── Sync implementations: scoped "available options" queries ───────────────────
+
+def _get_hospitals_in_scope_sync(start: date, end: date) -> list[dict]:
+    """المستشفيات التي لها حالات فعلياً ضمن الفترة، مع العدد لكل واحدة.
+
+    يعتمد على hospital_name المُقيَّم مباشرة على التقرير (المصدر المستخدم في
+    كل مكان آخر بالمشروع)، مع استكمال الاسم عبر hospital_id → Hospital.name
+    عندما يكون hospital_name فارغاً على صف التقرير نفسه (نفس منطق fallback
+    المستخدم أصلاً في _get_reports_sync لعرض اسم المستشفى).
+    """
+    from db.session import SessionLocal
+    from db.models import Report, Hospital
+    from collections import defaultdict
+
+    counts: dict[str, int] = defaultdict(int)
+    try:
+        with SessionLocal() as s:
+            hospital_map = {h.id: h.name for h in s.query(Hospital).all() if h.id and h.name}
+
+            rows = (
+                s.query(Report.hospital_name, Report.hospital_id)
+                .filter(Report.report_date >= start, Report.report_date <= end)
+                .all()
+            )
+            for hname, hid in rows:
+                name = (hname or "").strip()
+                if not name and hid:
+                    name = hospital_map.get(hid, "")
+                if name:
+                    counts[name] += 1
+    except Exception as exc:
+        logger.error(f"[reports_repo] get_hospitals_in_scope failed: {exc}", exc_info=True)
+        return []
+
+    return [
+        {"name": name, "count": cnt}
+        for name, cnt in sorted(counts.items(), key=lambda x: -x[1])
+    ]
+
+
+def _get_departments_in_scope_sync(
+    start: date, end: date, hospitals: Optional[list[str]] = None
+) -> list[dict]:
+    """الأقسام ضمن الفترة + المستشفيات المختارة (إن وُجدت)، مع العدد."""
+    from db.session import SessionLocal
+    from db.models import Report, Hospital
+    from collections import defaultdict
+
+    counts: dict[str, int] = defaultdict(int)
+    try:
+        with SessionLocal() as s:
+            q = s.query(Report.department).filter(
+                Report.report_date >= start,
+                Report.report_date <= end,
+                Report.department.isnot(None),
+                Report.department != "",
+            )
+            if hospitals:
+                hospital_map = {h.id: h.name for h in s.query(Hospital).all() if h.id and h.name}
+                matching_ids = [hid for hid, hname in hospital_map.items() if hname in set(hospitals)]
+                from sqlalchemy import or_
+                cond = Report.hospital_name.in_(hospitals)
+                if matching_ids:
+                    cond = or_(cond, Report.hospital_id.in_(matching_ids))
+                q = q.filter(cond)
+
+            for (dept,) in q.all():
+                if dept:
+                    counts[dept.strip()] += 1
+    except Exception as exc:
+        logger.error(f"[reports_repo] get_departments_in_scope failed: {exc}", exc_info=True)
+        return []
+
+    return [
+        {"name": name, "count": cnt}
+        for name, cnt in sorted(counts.items(), key=lambda x: -x[1])
+    ]
+
+
+def _get_doctors_in_scope_sync(
+    start: date, end: date,
+    hospitals: Optional[list[str]] = None,
+    departments: Optional[list[str]] = None,
+) -> list[dict]:
+    """الأطباء ضمن الفترة + المستشفيات + الأقسام المختارة (إن وُجدت)، مع العدد."""
+    from db.session import SessionLocal
+    from db.models import Report, Hospital
+    from collections import defaultdict
+
+    counts: dict[str, int] = defaultdict(int)
+    try:
+        with SessionLocal() as s:
+            q = s.query(Report.doctor_name).filter(
+                Report.report_date >= start,
+                Report.report_date <= end,
+                Report.doctor_name.isnot(None),
+                Report.doctor_name != "",
+            )
+            if hospitals:
+                hospital_map = {h.id: h.name for h in s.query(Hospital).all() if h.id and h.name}
+                matching_ids = [hid for hid, hname in hospital_map.items() if hname in set(hospitals)]
+                from sqlalchemy import or_
+                cond = Report.hospital_name.in_(hospitals)
+                if matching_ids:
+                    cond = or_(cond, Report.hospital_id.in_(matching_ids))
+                q = q.filter(cond)
+            if departments:
+                q = q.filter(Report.department.in_(departments))
+
+            for (doc,) in q.all():
+                if doc:
+                    counts[doc.strip()] += 1
+    except Exception as exc:
+        logger.error(f"[reports_repo] get_doctors_in_scope failed: {exc}", exc_info=True)
+        return []
+
+    return [
+        {"name": name, "count": cnt}
+        for name, cnt in sorted(counts.items(), key=lambda x: -x[1])
+    ]
+
+
+def _get_actions_in_scope_sync(
+    start: date, end: date,
+    hospitals: Optional[list[str]] = None,
+    departments: Optional[list[str]] = None,
+    doctors: Optional[list[str]] = None,
+) -> list[dict]:
+    """أنواع الإجراءات ضمن الفترة + كل الفلاتر السابقة (إن وُجدت)، مع العدد."""
+    from db.session import SessionLocal
+    from db.models import Report, Hospital
+    from collections import defaultdict
+
+    counts: dict[str, int] = defaultdict(int)
+    try:
+        with SessionLocal() as s:
+            q = s.query(Report.medical_action).filter(
+                Report.report_date >= start,
+                Report.report_date <= end,
+                Report.medical_action.isnot(None),
+                Report.medical_action != "",
+            )
+            if hospitals:
+                hospital_map = {h.id: h.name for h in s.query(Hospital).all() if h.id and h.name}
+                matching_ids = [hid for hid, hname in hospital_map.items() if hname in set(hospitals)]
+                from sqlalchemy import or_
+                cond = Report.hospital_name.in_(hospitals)
+                if matching_ids:
+                    cond = or_(cond, Report.hospital_id.in_(matching_ids))
+                q = q.filter(cond)
+            if departments:
+                q = q.filter(Report.department.in_(departments))
+            if doctors:
+                q = q.filter(Report.doctor_name.in_(doctors))
+
+            for (action,) in q.all():
+                if action:
+                    counts[action.strip()] += 1
+    except Exception as exc:
+        logger.error(f"[reports_repo] get_actions_in_scope failed: {exc}", exc_info=True)
+        return []
+
+    return [
+        {"name": name, "count": cnt}
+        for name, cnt in sorted(counts.items(), key=lambda x: -x[1])
+    ]
+
+
+def _get_patient_departments_sync(patient_id: int) -> list[dict]:
+    """الأقسام التي للمريض تقارير فيها (كل الوقت)، مع العدد."""
+    from db.session import SessionLocal
+    from db.models import Report
+    from collections import defaultdict
+
+    counts: dict[str, int] = defaultdict(int)
+    try:
+        with SessionLocal() as s:
+            rows = (
+                s.query(Report.department)
+                .filter(
+                    Report.patient_id == patient_id,
+                    Report.department.isnot(None),
+                    Report.department != "",
+                )
+                .all()
+            )
+            for (dept,) in rows:
+                if dept:
+                    counts[dept.strip()] += 1
+    except Exception as exc:
+        logger.error(f"[reports_repo] get_patient_departments failed: {exc}", exc_info=True)
+        return []
+
+    return [{"name": n, "count": c} for n, c in sorted(counts.items(), key=lambda x: -x[1])]
+
+
+def _get_patient_actions_sync(patient_id: int, depts: Optional[list[str]] = None) -> list[dict]:
+    """أنواع الإجراءات التي للمريض تقارير فيها، مع فلترة اختيارية بالأقسام."""
+    from db.session import SessionLocal
+    from db.models import Report
+    from collections import defaultdict
+
+    counts: dict[str, int] = defaultdict(int)
+    try:
+        with SessionLocal() as s:
+            q = s.query(Report.medical_action).filter(
+                Report.patient_id == patient_id,
+                Report.medical_action.isnot(None),
+                Report.medical_action != "",
+            )
+            if depts:
+                q = q.filter(Report.department.in_(depts))
+            for (action,) in q.all():
+                if action:
+                    counts[action.strip()] += 1
+    except Exception as exc:
+        logger.error(f"[reports_repo] get_patient_actions failed: {exc}", exc_info=True)
+        return []
+
+    return [{"name": n, "count": c} for n, c in sorted(counts.items(), key=lambda x: -x[1])]
 
 
 def get_all_departments() -> list[str]:
