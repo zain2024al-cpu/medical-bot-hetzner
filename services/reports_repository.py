@@ -547,6 +547,70 @@ def aggregate_by_translator(reports: list[dict]) -> dict[str, int]:
     return dict(sorted(agg.items(), key=lambda x: -x[1]))
 
 
+def aggregate_by_doctor(reports: list[dict]) -> dict[str, int]:
+    """Returns {doctor_name: count}."""
+    agg: dict[str, int] = defaultdict(int)
+    for r in reports:
+        d = (r.get("doctor_name") or "غير محدد").strip()
+        if d:
+            agg[d] += 1
+    return dict(sorted(agg.items(), key=lambda x: -x[1]))
+
+
+def aggregate_cross(reports: list[dict], key1: str, key2: str) -> dict[str, dict[str, int]]:
+    """
+    جدول تقاطع عام: {key1_value: {key2_value: count}}.
+
+    مُعاد استخدامه لكل الجداول المتقاطعة المطلوبة في تحليل البيانات
+    (قسم←إجراء، طبيب←إجراء، إجراء←مستشفى، إجراء←طبيب) بدل كتابة دالة
+    منفصلة لكل تركيبة. key1/key2 أي من مفاتيح قاموس report (مثل
+    "department", "medical_action", "hospital_name", "doctor_name").
+    """
+    agg: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    for r in reports:
+        v1 = (r.get(key1) or "غير محدد").strip() or "غير محدد"
+        v2 = (r.get(key2) or "غير محدد").strip() or "غير محدد"
+        agg[v1][v2] += 1
+    # فرز كل مستوى تنازلياً حسب المجموع
+    result: dict[str, dict[str, int]] = {}
+    for v1, inner in sorted(agg.items(), key=lambda x: -sum(x[1].values())):
+        result[v1] = dict(sorted(inner.items(), key=lambda x: -x[1]))
+    return result
+
+
+async def get_earliest_report_dates(patient_ids: list[int]) -> dict[int, date]:
+    """
+    أول تاريخ تقرير (على الإطلاق، بغض النظر عن أي فترة) لكل مريض من
+    القائمة — يُستخدم لتصنيف "مريض جديد" (أول تقرير له يقع ضمن الفترة
+    المختارة) مقابل "مريض متكرر" (له تقارير أقدم من بداية الفترة).
+    """
+    return await asyncio.to_thread(_get_earliest_report_dates_sync, patient_ids)
+
+
+def _get_earliest_report_dates_sync(patient_ids: list[int]) -> dict[int, date]:
+    from db.session import SessionLocal
+    from db.models import Report
+    from sqlalchemy import func
+
+    if not patient_ids:
+        return {}
+    result: dict[int, date] = {}
+    try:
+        with SessionLocal() as s:
+            rows = (
+                s.query(Report.patient_id, func.min(Report.report_date))
+                .filter(Report.patient_id.in_(patient_ids))
+                .group_by(Report.patient_id)
+                .all()
+            )
+            for pid, min_dt in rows:
+                if pid is not None and min_dt is not None:
+                    result[pid] = min_dt.date() if hasattr(min_dt, "date") else min_dt
+    except Exception as exc:
+        logger.error(f"[reports_repo] get_earliest_report_dates failed: {exc}", exc_info=True)
+    return result
+
+
 # ── Statistics ────────────────────────────────────────────────────────────────
 
 def compute_stats(reports: list[dict]) -> dict:
