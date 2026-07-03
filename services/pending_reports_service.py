@@ -17,6 +17,27 @@ from db.models import PendingReport, Report
 logger = logging.getLogger(__name__)
 
 
+# ✅ فلترة: أسباب تعني "لا يوجد تقرير قادم أصلاً" (وليس مجرد تأخير) — لا
+# يجب تتبعها كـ"معلقة" ولا إظهارها في تنبيه الساعة 9 مساءً. النطاق حالياً
+# مقصور على عائلة "لا يحتاج/غير مطلوب" فقط بناءً على توجيه صريح، ولا يشمل
+# حالات أخرى مثل "استشارة هاتفية" أو "متابعة دورية" حتى تُؤكَّد لاحقاً.
+_NO_REPORT_NEEDED_KEYWORDS = [
+    "لا يحتاج", "لا تحتاج", "لا يحتاجون",
+    "غير مطلوب", "غير مطلوبة",
+    "لا حاجة", "لا داعي",
+    "لا يلزم", "لا تلزم",
+]
+
+
+def _reason_indicates_no_report_needed(reason: str | None) -> bool:
+    """True إذا كان نص السبب يدل على أن الحالة لا تحتاج تقريراً أصلاً
+    (استُبعِدَت من التتبع)، وليس مجرد تأخير مؤقت."""
+    if not reason:
+        return False
+    normalized = reason.strip()
+    return any(kw in normalized for kw in _NO_REPORT_NEEDED_KEYWORDS)
+
+
 def add_pending_report(
     report_id: int,
     patient_id: int,
@@ -26,7 +47,14 @@ def add_pending_report(
     translator_name: str,
     no_report_reason: str
 ) -> bool:
-    """إضافة تقرير معلق جديد"""
+    """إضافة تقرير معلق جديد — تُستبعَد الحالات التي يدل سببها على أن لا
+    تقرير قادم أصلاً (انظر _reason_indicates_no_report_needed)."""
+    if _reason_indicates_no_report_needed(no_report_reason):
+        logger.info(
+            f"⏭️ Pending report skipped (reason indicates no report needed): "
+            f"patient={patient_name}, reason={no_report_reason!r}"
+        )
+        return False
     try:
         with SessionLocal() as session:
             # تحقق من عدم وجود سجل معلق نشط لنفس التقرير
