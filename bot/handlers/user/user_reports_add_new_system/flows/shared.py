@@ -647,6 +647,17 @@ async def handle_medical_report_choice(update: Update, context: ContextTypes.DEF
     # skip → انتقال مباشر للمترجم بدون رفع ملفات
     if choice == "skip":
         report_tmp["_medical_report_step_done"] = True
+        # ✅ يجب تسجيل سبب واضح هنا وإلا فلن يُنشأ سجل "تقرير معلق" عند
+        # الحفظ (الشرط في مكان الحفظ يتطلب no_report_reason غير فارغ) —
+        # وهذا بالضبط ما يجعل زر "تخطي" (المريض مرقد وغيرها) يظهر لاحقاً
+        # في تقرير التقارير المعلقة الساعة 9 مساءً.
+        _skip_reasons = {
+            "radiology": "تم التخطي - نتائج الأشعة غير جاهزة بعد",
+            "followup": "تم التخطي - المريض مرقد",
+            "inpatient_followup": "تم التخطي - المريض مرقد",
+            "periodic_followup": "تم التخطي - متابعة دورية بدون تقرير",
+        }
+        report_tmp["no_report_reason"] = _skip_reasons.get(flow_type, "تم التخطي - سيتم إحضار التقرير لاحقاً")
         context.user_data.pop("_skip_medical_gate_once", None)
         await query.edit_message_text("✅ تم.")
         await show_translator_selection(query.message, context, flow_type)

@@ -672,6 +672,14 @@ async def _publish_attachments(query, context):
             except Exception as db_err:
                 logger.warning(f"⚠️ MA: فشل تحديث has_paper_report للتقرير #{report_id}: {db_err}")
 
+            # ✅ إغلاق سجل "تقرير معلق" إن وُجد لهذه الحالة — حتى لا يبقى
+            # يظهر في تقرير التقارير المعلقة الساعة 9 مساءً بعد إحضار الملف فعلياً
+            try:
+                from services.pending_reports_service import mark_report_completed
+                mark_report_completed(report_id)
+            except Exception as pr_err:
+                logger.warning(f"⚠️ MA: فشل إغلاق سجل التقرير المعلق للتقرير #{report_id}: {pr_err}")
+
         # ✅ محاولة تحديث زر بطاقة الحالة الأصلية لإظهار "📂 فتح التقارير الطبية"
         # (best-effort — الرسالة قد تكون قديمة/محذوفة/بلا صلاحية تعديل، هذا غير حرج)
         if report_id:
