@@ -56,7 +56,7 @@ async def check_and_send_reminders(bot):
                     # لم ينزل أي تقرير
                     if current_time >= REMINDER_TIME_1 and current_time < REMINDER_TIME_2:
                         # تنبيه أول (2 PM)
-                        if not tracking or not tracking.reminded_at:
+                        if not tracking or not tracking.reminder_sent:
                             needs_reminder = True
                             reminder_message = f"""
 ⏰ تنبيه أول
@@ -106,10 +106,10 @@ async def check_and_send_reminders(bot):
 """
                 
                 # إرسال التنبيه
-                if needs_reminder and translator.telegram_id:
+                if needs_reminder and translator.tg_user_id:
                     try:
                         await bot.send_message(
-                            chat_id=translator.telegram_id,
+                            chat_id=translator.tg_user_id,
                             text=reminder_message
                         )
                         
@@ -118,11 +118,11 @@ async def check_and_send_reminders(bot):
                             tracking = DailyReportTracking(
                                 translator_id=translator.id,
                                 date=today,
-                                reminded_at=datetime.now()
+                                reminder_sent=True
                             )
                             db.add(tracking)
                         else:
-                            tracking.reminded_at = datetime.now()
+                            tracking.reminder_sent = True
                         
                         db.commit()
                         logger.info(f"✅ تم إرسال تنبيه لـ {translator.full_name}")
@@ -237,7 +237,7 @@ def get_translator_status() -> dict:
                     stats['pending'] += 1
                     stats['late'].append({
                         'name': translator.full_name,
-                        'telegram_id': translator.telegram_id
+                        'telegram_id': translator.tg_user_id
                     })
             
             return stats
