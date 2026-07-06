@@ -4,7 +4,7 @@
 #   1.  التاريخ          — auto (session.create)
 #   2.  اسم المريض       — patient_selector
 #   3.  القسم            — DEPARTMENT_OPTIONS multiselect (+ DEPT_OTHER branch)
-#   4.  عدد الأصناف      — numeric text input (STEP_COUNT)
+#   4.  عدد المستلزمات    — numeric text input (STEP_COUNT)
 #   5.  صورة المستلزمات  — uploads (optional, 0-10)
 #   6.  جهة الصرف        — 2-button callback: الصيدلية / المخزن (REQUIRED)
 #   7.  ملاحظات          — text input (optional)
@@ -144,20 +144,14 @@ async def _open_edit_step(
     await _route_to_edit_step(session, step, update, context)
 
 
-# ── Step 1: start ─────────────────────────────────────────────────────────────
+# ── Step 1: start — date is auto-stamped (today), no manual selection ───────
 
 async def _start_flow(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    SuppliesSession.create(context.user_data)
+    session = SuppliesSession.create(context.user_data)
     logger.info(f"[supplies] flow started  user={update.effective_user.id}")
-    text, kb = build_date_prompt()
-    query = update.callback_query
-    try:
-        if query:
-            await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
-            return
-    except Exception:
-        pass
-    await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+    session.step = STEP_PATIENT
+    session.save(context.user_data)
+    await patient_selector.enter(update, context, return_to=_RKEY_PATIENT)
 
 
 async def _handle_date_today(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -304,13 +298,13 @@ async def _on_images(result, update: Update, context: ContextTypes.DEFAULT_TYPE)
         await _go_to_review(update, context)
         return
 
-    session.step = STEP_DISPENSE_SOURCE
+    session.step = STEP_NOTES
     session.save(context.user_data)
-    text, kb = build_dispense_source_prompt(session)
+    text, kb = build_notes_prompt(session)
     try:
         await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
     except Exception as exc:
-        logger.error(f"[supplies] dispense_source prompt failed: {exc}")
+        logger.error(f"[supplies] notes prompt failed: {exc}")
 
 
 # ── Step 6: dispense source ───────────────────────────────────────────────────
@@ -329,15 +323,9 @@ async def _handle_dispense_source(
         await _go_to_review(update, context)
         return
 
-    session.step = STEP_NOTES
+    session.step = STEP_IMAGES
     session.save(context.user_data)
-    text, kb = build_notes_prompt(session)
-    try:
-        if query:
-            await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown"); return
-    except Exception:
-        pass
-    await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+    await _open_images_upload(update, context)
 
 
 async def _open_images_upload(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -404,9 +392,10 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
             session.save(context.user_data)
             await _go_to_review(update, context)
             return
-        session.step = STEP_IMAGES
+        session.step = STEP_DISPENSE_SOURCE
         session.save(context.user_data)
-        await _open_images_upload(update, context)
+        text, kb = build_dispense_source_prompt(session)
+        await update.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
     elif session.step == STEP_NOTES:
         session.notes = (update.message.text or "").strip()
@@ -517,7 +506,7 @@ async def _handle_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     dept_text = "\n".join(f"  • {d}" for d in dept_snap) if dept_snap else "  —"
     extra_sections = [
         ("🏥 *القسم الطبي:*",                              dept_text),
-        (f"🔢 *عدد الأصناف:*  {saved.item_count}",         ""),
+        (f"🔢 *عدد المستلزمات:*  {saved.item_count}",         ""),
         (f"🏪 *جهة الصرف:*   {dispense_source_snap or '—'}", ""),
     ]
 
@@ -584,15 +573,15 @@ async def _handle_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             return_to=_RKEY_DEPARTMENTS, icon="🏥", min_select=1)
 
     elif session.step == STEP_DISPENSE_SOURCE:
+        session.step = STEP_COUNT
+        session.save(context.user_data)
+        text, kb = build_count_prompt(session)
+        await _edit_or_reply(text, kb)
+
+    elif session.step == STEP_NOTES:
         session.step = STEP_IMAGES
         session.save(context.user_data)
         await _open_images_upload(update, context)
-
-    elif session.step == STEP_NOTES:
-        session.step = STEP_DISPENSE_SOURCE
-        session.save(context.user_data)
-        text, kb = build_dispense_source_prompt(session)
-        await _edit_or_reply(text, kb)
 
     elif session.step == STEP_SPECIALIST:
         session.step = STEP_NOTES

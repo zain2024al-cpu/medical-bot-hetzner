@@ -144,20 +144,14 @@ async def _open_edit_step(
     await _route_to_edit_step(session, step, update, context)
 
 
-# ── Step 1: start — show date confirmation screen ────────────────────────────
+# ── Step 1: start — date is auto-stamped (today), no manual selection ───────
 
 async def _start_flow(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    MedicationSession.create(context.user_data)
+    session = MedicationSession.create(context.user_data)
     logger.info(f"[medications] flow started  user={update.effective_user.id}")
-    text, kb = build_date_prompt()
-    query = update.callback_query
-    try:
-        if query:
-            await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
-            return
-    except Exception:
-        pass
-    await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+    session.step = STEP_PATIENT
+    session.save(context.user_data)
+    await patient_selector.enter(update, context, return_to=_RKEY_PATIENT)
 
 
 # ── Step 1 → 2: date confirmed — open patient selector ───────────────────────
@@ -314,13 +308,13 @@ async def _on_images(result, update: Update, context: ContextTypes.DEFAULT_TYPE)
         await _go_to_review(update, context)
         return
 
-    session.step = STEP_DISPENSE_SOURCE
+    session.step = STEP_NOTES
     session.save(context.user_data)
-    text, kb = build_dispense_source_prompt(session)
+    text, kb = build_notes_prompt(session)
     try:
         await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
     except Exception as exc:
-        logger.error(f"[medications] dispense_source prompt failed: {exc}")
+        logger.error(f"[medications] notes prompt failed: {exc}")
 
 
 # ── Step 6: dispense source selected ─────────────────────────────────────────
@@ -340,15 +334,9 @@ async def _handle_dispense_source(
         await _go_to_review(update, context)
         return
 
-    session.step = STEP_NOTES
+    session.step = STEP_IMAGES
     session.save(context.user_data)
-    text, kb = build_notes_prompt(session)
-    try:
-        if query:
-            await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown"); return
-    except Exception:
-        pass
-    await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+    await _open_images_upload(update, context)
 
 
 # ── Shared helper ─────────────────────────────────────────────────────────────
@@ -420,9 +408,10 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
             session.save(context.user_data)
             await _go_to_review(update, context)
             return
-        session.step = STEP_IMAGES
+        session.step = STEP_DISPENSE_SOURCE
         session.save(context.user_data)
-        await _open_images_upload(update, context)
+        text, kb = build_dispense_source_prompt(session)
+        await update.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
     # ── 7. ملاحظات ──
     elif session.step == STEP_NOTES:
@@ -624,15 +613,15 @@ async def _handle_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             return_to=_RKEY_DEPARTMENTS, icon="🏥", min_select=1)
 
     elif session.step == STEP_DISPENSE_SOURCE:
+        session.step = STEP_COUNT
+        session.save(context.user_data)
+        text, kb = build_count_prompt(session)
+        await _edit_or_reply(text, kb)
+
+    elif session.step == STEP_NOTES:
         session.step = STEP_IMAGES
         session.save(context.user_data)
         await _open_images_upload(update, context)
-
-    elif session.step == STEP_NOTES:
-        session.step = STEP_DISPENSE_SOURCE
-        session.save(context.user_data)
-        text, kb = build_dispense_source_prompt(session)
-        await _edit_or_reply(text, kb)
 
     elif session.step == STEP_SPECIALIST:
         session.step = STEP_NOTES

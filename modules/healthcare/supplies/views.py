@@ -1,7 +1,7 @@
 # modules/healthcare/supplies/views.py
 # Pure view builders for the medical supplies dispensing flow.
 # Workflow (mirrors medications):
-#   1. التاريخ | 2. المريض | 3. القسم | 4. عدد الأصناف
+#   1. التاريخ | 2. المريض | 3. القسم | 4. عدد المستلزمات
 #   5. الصور | 6. جهة الصرف | 7. ملاحظات | 8. اسم الصحي | 9. مراجعة | 10. نشر
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -98,7 +98,7 @@ def build_dept_other_prompt(session: SuppliesSession) -> tuple[str, InlineKeyboa
     return "\n".join(lines), kb
 
 
-# ── Step 4: عدد الأصناف ───────────────────────────────────────────────────────
+# ── Step 4: عدد المستلزمات ─────────────────────────────────────────────────────
 
 def build_count_prompt(
     session: SuppliesSession, *, error: bool = False
@@ -106,7 +106,7 @@ def build_count_prompt(
     depts = "، ".join(session.medical_department_labels) if session.medical_department_labels else "—"
     lines = [
         _DIVIDER,
-        "🔢  **عدد الأصناف**",
+        "🔢  **عدد المستلزمات**",
         "",
         f"المريض: {session.patient_name}",
         f"القسم: {depts}",
@@ -115,7 +115,7 @@ def build_count_prompt(
     ]
     if error:
         lines += ["⚠️ *الرجاء إدخال رقم صحيح وموجب.*  (مثال: 3)", ""]
-    lines += ["أرسل عدد أصناف المستلزمات المصروفة (رقم موجب، مثال: 3)."]
+    lines += ["أرسل عدد المستلزمات الطبية المصروفة (رقم موجب، مثال: 3)."]
     kb = InlineKeyboardMarkup([[
         InlineKeyboardButton("🔙 رجوع", callback_data=f"{HCSUP}:back"),
         InlineKeyboardButton("❌ إلغاء", callback_data=f"{HCSUP}:cancel"),
@@ -133,7 +133,7 @@ def build_dispense_source_prompt(session: SuppliesSession) -> tuple[str, InlineK
         "",
         f"المريض: {session.patient_name}",
         f"القسم: {depts}",
-        f"عدد الأصناف: {session.item_count}",
+        f"عدد المستلزمات: {session.item_count}",
         _THIN,
         "",
         "اختر جهة صرف المستلزمات:",
@@ -161,7 +161,7 @@ def build_notes_prompt(session: SuppliesSession) -> tuple[str, InlineKeyboardMar
         "",
         f"المريض: {session.patient_name}",
         f"القسم: {depts}",
-        f"عدد الأصناف: {session.item_count}",
+        f"عدد المستلزمات: {session.item_count}",
         f"جهة الصرف: {session.dispense_source or '—'}",
         f"الصور: {format_image_count(session.image_count)}",
         _THIN,
@@ -223,7 +223,7 @@ def build_review(session: SuppliesSession) -> tuple[str, InlineKeyboardMarkup]:
         "",
         f"📅 {date_str}",
         f"👤 {session.patient_name}  •  🏥 {dept_text}",
-        f"🔢 {session.item_count or '—'} أصناف  •  🏪 {session.dispense_source or '—'}",
+        f"🔢 {session.item_count or '—'} مستلزمات  •  🏪 {session.dispense_source or '—'}",
         f"📎 {imgs}",
         f"📝 {notes}",
         f"👨‍⚕️ {session.specialist_name or '—'}",
@@ -237,7 +237,7 @@ def build_review(session: SuppliesSession) -> tuple[str, InlineKeyboardMarkup]:
             InlineKeyboardButton("❌ إلغاء",              callback_data=f"{HCSUP}:cancel"),
         ],
         [InlineKeyboardButton("✏️ القسم الطبي",          callback_data=f"{HCSUP}:edit_dept"),
-         InlineKeyboardButton("✏️ عدد الأصناف",          callback_data=f"{HCSUP}:edit_count")],
+         InlineKeyboardButton("✏️ عدد المستلزمات",       callback_data=f"{HCSUP}:edit_count")],
         [InlineKeyboardButton("✏️ الصور",                 callback_data=f"{HCSUP}:edit_images"),
          InlineKeyboardButton("✏️ جهة الصرف",            callback_data=f"{HCSUP}:edit_source")],
         [InlineKeyboardButton("✏️ الملاحظات",             callback_data=f"{HCSUP}:edit_notes"),
