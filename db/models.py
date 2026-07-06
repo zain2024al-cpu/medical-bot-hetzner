@@ -399,6 +399,35 @@ class SuppliesRecord(Base):
 
 
 # ================================================
+# Healthcare — Pharmacy Financial Records
+# ================================================
+
+class PharmacyFinancialRecord(Base):
+    """
+    البيانات المالية المرتبطة 1:1 بعملية صرف محدَّدة (MedicationRecord أو
+    SuppliesRecord) كانت جهة صرفها "الصيدلية". بدون ForeignKey (نفس نمط
+    المشروع) — source_type/source_record_id يُحلّان عبر استعلام صريح.
+    """
+    __tablename__ = "pharmacy_financial_records"
+
+    id               = Column(Integer, primary_key=True, autoincrement=True)
+    source_type       = Column(String(20), nullable=False, index=True)   # "medication" | "supplies"
+    source_record_id  = Column(Integer, nullable=False, index=True)      # MedicationRecord.id / SuppliesRecord.id
+    invoice_number    = Column(String(100), nullable=True)               # رقم الفاتورة
+    expense_item      = Column(String(255), nullable=True)               # بند الصرف
+    invoice_total     = Column(Float, nullable=True)                     # إجمالي الفاتورة
+    discount_percent  = Column(Float, nullable=True)                     # نسبة التخفيض %
+    discount_amount   = Column(Float, nullable=True)                     # مبلغ الخصم (محسوب في بايثون)
+    net_amount        = Column(Float, nullable=True)                     # صافي المبلغ (محسوب في بايثون)
+    created_by        = Column(Integer, nullable=True, index=True)
+    created_at        = Column(DateTime, default=datetime.utcnow, index=True, nullable=True)
+    updated_at        = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
+
+    def __repr__(self):
+        return f"<PharmacyFinancialRecord(id={self.id}, {self.source_type}#{self.source_record_id}, net={self.net_amount})>"
+
+
+# ================================================
 # Healthcare — Other / Miscellaneous Records
 # ================================================
 

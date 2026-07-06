@@ -113,12 +113,28 @@ def bootstrap_all() -> None:
         },
     )
 
+    # ── Pharmacy financial report (💰) ─────────────────────────────────────────
+    # Granted by admins to a designated "pharmacist" user via the existing
+    # "🔑 إدارة الصلاحيات" screen — admin sees this button regardless (hardcoded
+    # in admin_main_kb()), the grant only controls non-admin visibility here.
+    registry.register(
+        name="pharmacy_finance",
+        menu_buttons={"💰 التقرير المالي"},
+        keyboard_rows=[["💰 التقرير المالي"]],
+        extra_wipe_keys={"_hcphfin_add"},
+    )
+
+    # ── Pharmacy evacuation ledger print (🖨️) ──────────────────────────────────
+    # Deliberately a SEPARATE module_key from pharmacy_finance — an admin may
+    # want to grant one without the other.
+    registry.register(
+        name="pharmacy_print",
+        menu_buttons={"🖨️ طباعة مسير الإخلاء"},
+        keyboard_rows=[["🖨️ طباعة مسير الإخلاء"]],
+        extra_wipe_keys={"_hcphprint_ledger"},
+    )
+
     # ── Future modules — uncomment and fill in when ready ────────────────────
-    # registry.register(
-    #     name="pharmacy",
-    #     menu_buttons={"💊 الصيدلية"},
-    #     keyboard_rows=[["💊 الصيدلية"]],
-    # )
     # registry.register(
     #     name="services",
     #     menu_buttons={"🛠️ الخدمات"},

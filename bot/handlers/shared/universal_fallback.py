@@ -229,6 +229,8 @@ KNOWN_CALLBACKS = [
     r"^hcsup:",    # medical supplies flow
     r"^hcoth:",    # other healthcare flow
     r"^hceval:",   # healthcare evaluation PDF report
+    r"^hcphfin:",  # pharmacy financial report
+    r"^hcphprint:", # pharmacy evacuation ledger print
     # Shared platform infrastructure
     r"^sel_pat:",
     r"^msel:",

@@ -78,4 +78,8 @@ def register_all(app) -> None:
     from modules.healthcare.evaluation.flow import register_handlers as register_evaluation_handlers
     register_evaluation_handlers(app)
 
+    # ── Pharmacy financial report (💰) — admin + designated pharmacist only ──
+    from modules.healthcare.pharmacy_finance.flow import register_handlers as register_pharmacy_finance_handlers
+    register_pharmacy_finance_handlers(app)
+
     logger.info("[healthcare] all handlers and result routes registered")
