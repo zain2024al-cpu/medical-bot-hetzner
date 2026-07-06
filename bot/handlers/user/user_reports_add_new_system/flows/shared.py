@@ -2220,7 +2220,11 @@ async def save_report_to_database(query, context, flow_type):
                     report_id=report_id,
                     patient_id=patient.id,
                     patient_name=patient_name,
-                    department=final_dept_name or dept_name or "غير محدد",
+                    # ✅ final_dept_name يُحسب لاحقاً في الدالة (بعد هذه الكتلة) —
+                    # استخدام dept_name_for_display مباشرة (نفس القيمة المصدرية)
+                    # بدل الإشارة لمتغيّر غير مُعرَّف بعد (كان يسبب UnboundLocalError
+                    # صامتاً يمنع إنشاء السجل المعلق دائماً).
+                    department=dept_name_for_display or dept_name or "غير محدد",
                     translator_id=actual_translator_id,
                     translator_name=actual_translator_name,
                     no_report_reason=no_report_reason
