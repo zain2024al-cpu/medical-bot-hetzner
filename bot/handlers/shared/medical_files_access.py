@@ -1,16 +1,12 @@
 # ================================================
 # bot/handlers/shared/medical_files_access.py
-# 📂 زر "فتح التقارير الطبية" — إرسال الملفات الطبية لأي مستخدم يضغط الزر
+# 📂 زر "فتح التقارير الطبية" — إرسال الملفات في نفس المحادثة لكل من يضغط الزر
 # ================================================
 #
-# ✅ ملاحظة مهمة (سبب عدم عمل الزر إلا للأدمن): تيليجرام يمنع أي بوت من
-# إرسال أول رسالة خاصة لمستخدم لم يبدأ معه محادثة خاصة أصلاً (/start).
-# الأدمن يمتلك محادثة خاصة مفتوحة مع البوت دائماً (يستخدم قوائمه مباشرة)،
-# لكن أي مترجم/موظف يتعامل فقط عبر المجموعة لم يُنشئ هذه المحادثة أبداً،
-# فتفشل محاولة الإرسال الخاص له تحديداً — هذا قيد من منصة تيليجرام نفسها
-# ولا يمكن تجاوزه برمجياً. الحل: عند فشل الإرسال الخاص، نرسل الملف مباشرة
-# في نفس المحادثة التي ضُغط فيها الزر (المجموعة) بدل تجاهله، فيضمن هذا أن
-# "الضغط على الزر = وصول الملف دائماً" لكل المستخدمين.
+# ✅ التصميم: الملفات تُرسَل دائماً في نفس المحادثة التي ضُغط فيها الزر
+# (وليس خاصةً)، بحيث يعمل الزر بنفس الطريقة تماماً للأدمن ولأي مستخدم
+# آخر — بلا اعتماد على ما إذا كان الشخص قد بدأ محادثة خاصة مع البوت من
+# قبل أم لا (قيد منصة تيليجرام لا يمكن تجاوزه لولا هذا التصميم).
 
 import logging
 
@@ -35,8 +31,8 @@ async def _send_one_medical_file(bot, chat_id, file_type, file_id):
 
 async def handle_medical_files_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """عند الضغط على '📂 فتح التقارير الطبية' في بطاقة الحالة —
-    يرسل كل الملفات الطبية المرتبطة بهذا التقرير لمن ضغط الزر (خاصةً إن
-    أمكن، وإلا في نفس المحادثة التي ضُغط فيها الزر)، باستخدام الـfile_id
+    يرسل كل الملفات الطبية المرتبطة بهذا التقرير في نفس المحادثة التي
+    ضُغط فيها الزر (لكل المستخدمين بلا استثناء)، باستخدام الـfile_id
     المحفوظ مسبقاً (بدون بحث في مجموعة الملفات)."""
     query = update.callback_query
     if not query or not query.data:
@@ -65,59 +61,27 @@ async def handle_medical_files_callback(update: Update, context: ContextTypes.DE
         # عادية عبر send_message وليس عبر query.answer() مرة ثانية.
         await query.answer()
 
-        clicker_id = query.from_user.id
-        fallback_chat_id = query.message.chat.id if query.message else None
+        target_chat_id = query.message.chat.id if query.message else query.from_user.id
 
-        dm_available = True
-        used_fallback = False
         sent_count = 0
-
         for f in files:  # بترتيب الرفع الأصلي — for عادي وليس gather
             ftype = f.get("file_type")
             fid = f.get("file_id")
             if not fid:
                 continue
-
-            sent_ok = False
-
-            if dm_available:
-                try:
-                    await _send_one_medical_file(context.bot, clicker_id, ftype, fid)
-                    sent_ok = True
-                except Exception as dm_err:
-                    logger.info(
-                        f"medical_files_access: تعذّر الإرسال الخاص للمستخدم {clicker_id} "
-                        f"(سيُرسَل بدلاً منه في نفس المحادثة): {dm_err}"
-                    )
-                    dm_available = False  # لا داعي لتكرار محاولة فاشلة لبقية الملفات
-
-            if not sent_ok and fallback_chat_id is not None:
-                try:
-                    await _send_one_medical_file(context.bot, fallback_chat_id, ftype, fid)
-                    sent_ok = True
-                    used_fallback = True
-                except Exception as fallback_err:
-                    logger.warning(
-                        f"⚠️ medical_files_access: فشل الإرسال الاحتياطي أيضاً "
-                        f"(report_id={report_id}, type={ftype}): {fallback_err}"
-                    )
-
-            if sent_ok:
+            try:
+                await _send_one_medical_file(context.bot, target_chat_id, ftype, fid)
                 sent_count += 1
+            except Exception as send_err:
+                logger.warning(
+                    f"⚠️ medical_files_access: فشل إرسال ملف (report_id={report_id}, type={ftype}): {send_err}"
+                )
 
         if sent_count == 0:
             try:
                 await context.bot.send_message(
-                    chat_id=fallback_chat_id or clicker_id,
+                    chat_id=target_chat_id,
                     text="⚠️ تعذّر إرسال الملفات حالياً. حاول لاحقاً.",
-                )
-            except Exception:
-                pass
-        elif used_fallback and fallback_chat_id is not None:
-            try:
-                await context.bot.send_message(
-                    chat_id=fallback_chat_id,
-                    text="ℹ️ لاستلام الملفات في محادثة خاصة لاحقاً، اضغط /start في محادثة خاصة مع البوت أولاً.",
                 )
             except Exception:
                 pass
