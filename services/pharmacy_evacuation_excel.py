@@ -44,8 +44,8 @@ def build_evacuation_excel(rows: list[dict], start_date: date, end_date: date) -
 
     header_font = Font(name="Arial", bold=True, color="FFFFFF", size=11)
     header_fill = PatternFill(start_color="1565C0", end_color="1565C0", fill_type="solid")
-    bismillah_font = Font(name="Arial", bold=True, size=17, color="1A237E")
-    title_font = Font(name="Arial", bold=True, size=16, color="1565C0")
+    bismillah_font = Font(name="Arial", bold=True, size=22, color="1A237E")
+    title_font = Font(name="Arial", bold=True, size=20, color="1565C0")
     band_font = Font(name="Arial", bold=True, size=11, color="1A237E")
     band_fill = PatternFill(start_color="F0F4F8", end_color="F0F4F8", fill_type="solid")
     period_font = Font(name="Arial", size=10, color="777777")
@@ -66,9 +66,11 @@ def build_evacuation_excel(rows: list[dict], start_date: date, end_date: date) -
     headers = ["م", "المبلغ", "الاسم", "رقم الفاتورة", "بند الصرف", "البيان", "التاريخ"]
     last_col = get_column_letter(len(headers))
     n = len(headers)
+    col_widths = [6, 24, 22, 13.26953125, 7.1796875, 26, 14]
 
     # ── بسم الله الرحمن الرحيم — خط أكبر، ورُفعت لأعلى بمساحة أوسع ────────────
     ws.row_dimensions[1].height = 10  # هامش علوي فارغ فوق البسملة
+    ws["A1"] = "؛"
     ws.merge_cells(f"A2:{last_col}2")
     ws["A2"] = "بسم الله الرحمن الرحيم"
     ws["A2"].font = bismillah_font
@@ -91,7 +93,7 @@ def build_evacuation_excel(rows: list[dict], start_date: date, end_date: date) -
     # طويلاً قد يُقتَطع)، مع مساحة فارغة واضحة (خانة) بجانب كل تسمية،
     # وحقل التاريخ يحصل على قالب "20__/__/__" جاهز للتعبئة اليدوية ──────────
     band_row = 6
-    ws.row_dimensions[band_row].height = 24
+    ws.row_dimensions[band_row].height = 30.5
     # نفس منطق توزيع صف التوقيعات: العمود 1 يظهر أقصى اليمين تلقائياً
     # بفضل rightToLeft=True، فتُقرأ المجموعات بترتيبها الطبيعي من العمود 1.
     cols_per_group = n / 3
@@ -151,6 +153,8 @@ def build_evacuation_excel(rows: list[dict], start_date: date, end_date: date) -
             cell.alignment = center_align  # ✅ كل الأعمدة موسَّطة لمظهر أفضل وأكثر اتساقاً
             if col == len(headers):  # عمود التاريخ — نصّ صرف دائماً، لا يُعاد تفسيره كرقم
                 cell.number_format = _TEXT_FORMAT
+            elif col == 2:  # عمود المبلغ — نفس تنسيق العملة من العينة المرجعية (بلا أثر مرئي لأن القيمة نص)
+                cell.number_format = "[$₹-439]#,##0.00"
 
     # ✅ قيمة الإجمالي تظهر تحت عمود "المبلغ" (العمود 2) تحديداً فقط —
     # لا تمتد عبر الجدول كاملاً. عمود "م" (1) يُترك فارغاً بنفس التظليل،
@@ -178,24 +182,47 @@ def build_evacuation_excel(rows: list[dict], start_date: date, end_date: date) -
     # لذا تُوزَّع التسميات بترتيبها الطبيعي بدءاً من العمود 1 (وليس معكوسة
     # كما في PDF، حيث لا يوجد انعكاس تلقائي مماثل)، فيظهر "مستلم العهدة"
     # في أقصى اليمين تلقائياً بلا أي حساب عكسي.
+    # ✅ التجميع هنا يعتمد على عرض الأعمدة الفعلي (col_widths) وليس عددها —
+    # عمود "بند الصرف" (E) ضيّق جداً (7.18) مقارنة ببقية الأعمدة، فتجميع
+    # متساوي العدد كان يترك "المسؤول المالي" وحيداً بالكامل في هذا العمود
+    # الضيق فيختفي تماماً عند الطباعة (تأكَّدنا من هذا مباشرة على عينة
+    # حقيقية مرفوعة من المستخدم). التجميع بالعرض التراكمي (أقرب عمود لكل
+    # ربع من إجمالي العرض) يضمن أن كل توقيع يحصل على مساحة كافية دائماً.
     footer_row_idx = total_row_idx + 3
     footer_labels_rtl = ["مستلم العهدة", "المراجعة", "المسؤول المالي", "مسؤول العمليات"]
-    cols_per_label = n / 4
+    cum = []
+    running = 0.0
+    for w in col_widths:
+        running += w
+        cum.append(running)
+    quarter = cum[-1] / 4
+    boundaries = []
+    prev = 0
+    for k in (1, 2, 3):
+        target = k * quarter
+        search_range = range(prev, n - (3 - k))
+        best_idx = min(search_range, key=lambda idx: abs(cum[idx] - target))
+        boundaries.append(best_idx)
+        prev = best_idx + 1
     col_ranges = []
-    for i in range(4):
-        start = int(round(i * cols_per_label)) + 1
-        end = int(round((i + 1) * cols_per_label))
-        col_ranges.append((start, max(start, end)))
+    start = 1
+    for b in boundaries:
+        col_ranges.append((start, b + 1))
+        start = b + 2
+    col_ranges.append((start, n))
+
+    # ✅ خط تسليم متقطّع كنصّ داخل الخلية نفسها (وليس Border) — نفس الأسلوب
+    # المُعتمَد في نموذج المستخدم المرجعي، وأكثر ضماناً عبر تطبيقات الجداول
+    # المختلفة من خط حدود قد لا يظهر في بعض المستوردين.
+    dash_counts = {"مستلم العهدة": 23, "المراجعة": 20, "المسؤول المالي": 24, "مسؤول العمليات": 24}
     for label, (c_start, c_end) in zip(footer_labels_rtl, col_ranges):
-        if c_end > c_start:
-            ws.merge_cells(start_row=footer_row_idx, start_column=c_start, end_row=footer_row_idx, end_column=c_end)
-        cell = ws.cell(row=footer_row_idx, column=c_start, value=label)
+        ws.merge_cells(start_row=footer_row_idx, start_column=c_start, end_row=footer_row_idx + 1, end_column=c_end)
+        cell = ws.cell(row=footer_row_idx, column=c_start, value=f"{label}\n{'-' * dash_counts[label]}")
         cell.font = footer_font
         cell.alignment = center_align
-        cell.border = Border(bottom=Side(style="thin", color="999999"))
-    ws.row_dimensions[footer_row_idx + 1].height = 24  # فراغ فارغ للتوقيع الفعلي
+    ws.row_dimensions[footer_row_idx].height = 14.5
+    ws.row_dimensions[footer_row_idx + 1].height = 24
 
-    col_widths = [6, 12, 22, 16, 18, 26, 14]
     for i, width in enumerate(col_widths, 1):
         ws.column_dimensions[get_column_letter(i)].width = width
 
