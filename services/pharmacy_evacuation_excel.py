@@ -8,9 +8,14 @@
 # عند فتح الملف وتُعيد تفسيره كرقم/تاريخ حسب إعداداتها الخاصة عند
 # الاستيراد — حتى لو كانت الخلية مُخزَّنة فعلياً كنص صرف (data_type='s')
 # مع number_format='@' في ملف openpyxl (بعض المستوردين يتجاهلون هذا
-# التلميح تماماً). الحل الأكثر ضماناً عبر كل التطبيقات: إدراج حرف
-# Left-to-Right Mark غير مرئي (U+200E) داخل النص لكسر نمط "يشبه
-# تاريخاً" الذي تبحث عنه هذه المستوردات، دون أي تغيير في المظهر المرئي.
+# التلميح تماماً). حرف LRM غير المرئي وحده لم يكن كافياً لكل التطبيقات
+# (تأكَّدنا من هذا فعلياً: بعضها ما زال يتعرّف على النمط ويُعيد عرضه
+# مضغوطاً كـ"20260621"). الحل الأكثر ضماناً: استبدال الشرطة العادية "-"
+# بفاصل "／" (FULLWIDTH SOLIDUS، U+FF0F) — يبدو مطابقاً تقريباً لعلامة
+# "/" العادية بصرياً، لكنه ليس الحرف الفعلي الذي تبحث عنه أنماط regex
+# للتعرف على التواريخ (yyyy-mm-dd / yyyy/mm/dd)، فيكسر الالتقاط تماماً
+# مع الحفاظ على المظهر المطلوب "2026/06/21"، مع الإبقاء على LRM كطبقة
+# حماية إضافية.
 
 import io
 import logging
@@ -19,17 +24,17 @@ from datetime import date, datetime
 logger = logging.getLogger(__name__)
 
 _TEXT_FORMAT = "@"
-_LRM = "‎"  # Left-to-Right Mark — غير مرئي، يكسر نمط التعرف التلقائي على التواريخ
+_LRM = "‎"  # Left-to-Right Mark — غير مرئي، طبقة حماية إضافية
+_FW_SLASH = "／"  # FULLWIDTH SOLIDUS — يبدو كـ"/" لكنه ليس حرف التاريخ الذي تبحث عنه المستوردات
 
 
 def _safe_date_text(dt) -> str:
     """نص تاريخ لا يمكن لأي تطبيق جداول إعادة تفسيره كرقم/تاريخ فعلي —
-    نفس الشكل المرئي تماماً (YYYY-MM-DD) لكن بحرف LRM غير مرئي مُدرَج
-    بعد السنة يكسر نمط الالتقاط التلقائي."""
-    text = dt.strftime("%Y-%m-%d") if isinstance(dt, date) else str(dt)
-    if len(text) >= 4:
-        return text[:4] + _LRM + text[4:]
-    return text
+    يبدو "2026/06/21" لكن الفاصل فاصلة عريضة (FULLWIDTH SOLIDUS) وليس
+    شرطة مائلة حقيقية، فلا تلتقطه أنماط regex للتعرف على التواريخ."""
+    if isinstance(dt, date):
+        return f"{dt.year:04d}{_LRM}{_FW_SLASH}{dt.month:02d}{_FW_SLASH}{dt.day:02d}"
+    return str(dt or "")
 
 
 def build_evacuation_excel(rows: list[dict], start_date: date, end_date: date) -> io.BytesIO:

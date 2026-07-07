@@ -226,7 +226,7 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
     for chunk_idx, chunk in enumerate(chunks):
         table_data = [HEADER_ROW]
         for r in chunk:
-            date_str = r["date"].strftime("%Y-%m-%d") if isinstance(r["date"], date) else str(r["date"])
+            date_str = r["date"].strftime("%Y/%m/%d") if isinstance(r["date"], date) else str(r["date"])
             table_data.append([
                 P(date_str, "td_c"),
                 P(r["statement"], "td_c"),
