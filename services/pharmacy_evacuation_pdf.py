@@ -24,7 +24,7 @@ import io
 import logging
 import os
 import re
-from datetime import date, datetime
+from datetime import date
 
 logger = logging.getLogger(__name__)
 
@@ -257,7 +257,6 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
         canvas.setFillColor(C["text_gray"])
         canvas.setFont(FN, 8)
         canvas.drawRightString(w - 1.8 * cm, 0.7 * cm, _ar(f"صفحة {doc.page}"))
-        canvas.drawString(1.8 * cm, 0.7 * cm, _ar(datetime.utcnow().strftime("%Y-%m-%d")))
         canvas.restoreState()
 
     buf = io.BytesIO()
