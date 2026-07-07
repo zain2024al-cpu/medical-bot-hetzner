@@ -28,13 +28,13 @@ from datetime import date, datetime
 logger = logging.getLogger(__name__)
 
 _FONT_CANDIDATES = [
+    ("C:\\Windows\\Fonts\\arial.ttf",    "Arial"),   # ✅ نفس خط ملف Excel المرجعي بالضبط
     ("C:\\Windows\\Fonts\\tahoma.ttf",   "Tahoma"),
-    ("C:\\Windows\\Fonts\\arial.ttf",    "Arial"),
     ("/usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf", "NotoAr"),
 ]
 _FONT_BOLD_CANDIDATES = [
-    ("C:\\Windows\\Fonts\\tahomabd.ttf", "TahomaBd"),
     ("C:\\Windows\\Fonts\\arialbd.ttf",  "ArialBd"),
+    ("C:\\Windows\\Fonts\\tahomabd.ttf", "TahomaBd"),
 ]
 
 _ROWS_PER_PAGE = 15
@@ -85,11 +85,10 @@ def _colors():
     return {
         "primary":   colors.HexColor("#1565C0"),
         "light_bg":  colors.HexColor("#F0F4F8"),
-        "grid":      colors.HexColor("#D0D9E8"),
+        "grid":      colors.HexColor("#CCCCCC"),  # ✅ نفس لون حدود الجدول في Excel المرجعي
         "text_dark": colors.HexColor("#1A237E"),
-        "text_gray": colors.HexColor("#546E7A"),
+        "text_gray": colors.HexColor("#777777"),  # ✅ نفس لون سطر "الفترة" في Excel المرجعي
         "white":     colors.white,
-        "signature_line": colors.HexColor("#455A64"),
     }
 
 
@@ -140,8 +139,10 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
             c = self.canv
 
             # بسم الله الرحمن الرحيم — خط أكبر ومرفوعة لأعلى، توسيط تام (لا تتغير)
+            # ✅ نفس لون العنوان الرئيسي بالضبط (1565C0) — مطابق لملف Excel المرجعي
+            # حيث يستخدم الحقلان نفس درجة الأزرق (وليس لونَين مختلفَين).
             c.setFont(FNB, 18)
-            c.setFillColor(C["text_dark"])
+            c.setFillColor(C["primary"])
             c.drawCentredString(self.width / 2, self.height - 0.6 * cm, _ar("بسم الله الرحمن الرحيم"))
 
             # العنوان الرئيسي — يبقى في المنتصف، خط واضح وكبير (لا يتغير)
@@ -238,7 +239,9 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
         t = Table(table_data, colWidths=col_widths, hAlign="CENTER", repeatRows=1)
         t.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), C["primary"]),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [C["white"], C["light_bg"]]),
+            # ✅ بلا تظليل متبادل بين الصفوف — نفس مظهر Excel المرجعي (صفوف بيضاء
+            # صرفة مفصولة بخطوط شبكة رفيعة فقط، بدون تلوين متبادل).
+            ("BACKGROUND", (0, 1), (-1, -1), C["white"]),
             ("GRID", (0, 0), (-1, -1), 0.4, C["grid"]),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("TOPPADDING", (0, 0), (-1, -1), 5), ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
@@ -270,18 +273,24 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
     # ── صف تذييل التوقيعات (مرة واحدة، آخر الوثيقة، فارغ دائماً) ──────────────
     # ✅ الترتيب معكوس هنا صراحة (نفس سبب عكس أعمدة الجدول أعلاه): يُرسَم
     # من اليسار لليمين بترتيب القائمة، فـ"مستلم العهدة" آخر القائمة كي
-    # يظهر في أقصى يمين الصفحة كأول عنصر يُقرأ. خطوط التوقيع أوضح الآن
-    # (أغمق وأكثر سماكة) لتكون جاهزة فعلياً للتوقيع اليدوي بعد الطباعة.
+    # يظهر في أقصى يمين الصفحة كأول عنصر يُقرأ.
+    # ✅ خط تسليم متقطّع كنصّ داخل نفس الفقرة (سطر ثانٍ عبر <br/>) بدل خط
+    # Border — نفس أسلوب ملف Excel المرجعي بالضبط. الشرطات لا تُمرَّر عبر
+    # _ar() لأنها محايدة أصلاً (لا حروف عربية فيها لتُعاد تشكيلها).
     story.append(Spacer(1, 1.3 * cm))
     footer_labels = ["مسؤول العمليات", "المسؤول المالي", "المراجعة", "مستلم العهدة"]
+    dash_counts = {"مستلم العهدة": 23, "المراجعة": 20, "المسؤول المالي": 24, "مسؤول العمليات": 24}
+
+    def _footer_cell(label: str) -> Paragraph:
+        return Paragraph(f"{_ar(label)}<br/>{'-' * dash_counts[label]}", ST["footer"])
+
     footer_table = Table(
-        [[P(lbl, "footer") for lbl in footer_labels], ["", "", "", ""]],
-        colWidths=[content_width / 4] * 4, hAlign="CENTER", rowHeights=[0.8 * cm, 1.5 * cm],
+        [[_footer_cell(lbl) for lbl in footer_labels]],
+        colWidths=[content_width / 4] * 4, hAlign="CENTER",
     )
     footer_table.setStyle(TableStyle([
-        ("LINEBELOW", (0, 1), (-1, 1), 1.0, C["signature_line"]),
         ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-        ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 16),
     ]))
     story.append(footer_table)
 
