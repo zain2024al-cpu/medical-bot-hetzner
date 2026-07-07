@@ -23,9 +23,17 @@ from __future__ import annotations
 import io
 import logging
 import os
+import re
 from datetime import date, datetime
 
 logger = logging.getLogger(__name__)
+
+# نطاقات يونيكود العربية (الأساسية + الملحقة + أشكال العرض) — أي نص لا
+# يحتوي ولو حرفاً واحداً من هذه النطاقات لا علاقة له بإعادة التشكيل/bidi
+# إطلاقاً (تواريخ، أرقام فواتير، مبالغ، رموز، نص لاتيني).
+_ARABIC_RE = re.compile(
+    "[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿]"
+)
 
 _FONT_CANDIDATES = [
     ("C:\\Windows\\Fonts\\arial.ttf",    "Arial"),   # ✅ نفس خط ملف Excel المرجعي بالضبط
@@ -72,12 +80,18 @@ def _pick_font(candidates: list[tuple[str, str]], fallback: str = "Helvetica") -
 
 
 def _ar(text) -> str:
+    """يُطبِّق reshape+bidi على النص العربي فقط. أي نص لا يحتوي ولو حرفاً
+    عربياً واحداً (تاريخ، رقم فاتورة، مبلغ، رمز، نص لاتيني) يُعاد كما هو
+    دون أي معالجة — فلا يخضع لإعادة ترتيب bidi إطلاقاً، مهما كان شكله."""
+    s = str(text or "")
+    if not _ARABIC_RE.search(s):
+        return s
     try:
         import arabic_reshaper
         from bidi.algorithm import get_display
-        return get_display(arabic_reshaper.reshape(str(text or "")))
+        return get_display(arabic_reshaper.reshape(s))
     except Exception:
-        return str(text or "")
+        return s
 
 
 def _colors():
@@ -158,23 +172,69 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
             text_y = band_top - band_h / 2 - 0.15 * cm
             c.setFont(FN, 10)
             c.setFillColor(C["text_dark"])
-            c.drawRightString(self.width - 0.4 * cm, text_y, _ar("رقم سند الصرف: ____________"))
-            c.drawCentredString(self.width / 2, text_y, _ar("رقم القيد: ____________"))
 
-            # ✅ "تاريخ تسليم المسير: 20__م / __ / __" — لا تُمرَّر كنص واحد عبر
-            # _ar(): خوارزمية bidi تُعيد ترتيب سلسلة أرقام "20" ضمن سياق
-            # عربي محيط بها، فينتقل "20" لنهاية الحقل الرقمي بدل بدايته
-            # (تأكَّدتُ من هذا مباشرة). الحل: رسم التسمية والقالب الرقمي
-            # كنصّين منفصلين متجاورين، فيبقى القالب الرقمي بترتيبه الصحيح.
-            # حرف "م" (رمز التقويم الميلادي) يُرسَم هنا كجزء من القالب مباشرة
-            # (وليس عبر _ar()) لأنه يقف منفرداً بلا حروف عربية مجاورة تحتاج
-            # وصلاً، فيظهر بشكله المنفصل الصحيح دون أي حاجة لإعادة التشكيل.
-            date_placeholder = "20__م / __ / __"
-            date_label = _ar("تاريخ تسليم المسير: ")
-            placeholder_w = c.stringWidth(date_placeholder, FN, 10)
+            # ✅ خطوط كتابة حقيقية (canvas.line) بدل underscore/dash: الشرطة
+            # السفلية "_" حرف نصّي عادي — بعضها لا يظهر بمحاذاة صحيحة مع خط
+            # عربي مُعاد تشكيله (يرتفع/ينخفض عن خط الأساس حسب الخط المُستخدَم)،
+            # بينما الخط المرسوم كائن رسومي مستقل تماماً عن النص، فيظهر بمحاذاة
+            # ثابتة ونظيفة دائماً بصرف النظر عن الخط.
+            def blank_line(x_left: float, width_pt: float, y: float) -> None:
+                c.saveState()
+                c.setStrokeColor(C["text_dark"])
+                c.setLineWidth(0.7)
+                y_line = y - 0.08 * cm
+                c.line(x_left, y_line, x_left + width_pt, y_line)
+                c.restoreState()
+
+            def group_width(parts) -> float:
+                total = 0.0
+                for kind, val in parts:
+                    total += c.stringWidth(val, FN, 10) if kind == "text" else val
+                return total
+
+            def rtl_group(parts, right_x: float, y: float) -> None:
+                """يرسم عناصر بترتيب القراءة من اليمين لليسار: أول عنصر
+                بالقائمة يُرسَم أقصى اليمين (right_x)، وكل عنصر تالٍ يسار
+                سابقه مباشرة. parts: [("text", s)] أو [("blank", width_pt)]."""
+                cursor_right = right_x
+                for kind, val in parts:
+                    w = c.stringWidth(val, FN, 10) if kind == "text" else val
+                    if kind == "text":
+                        c.drawString(cursor_right - w, y, val)
+                    else:
+                        blank_line(cursor_right - w, w, y)
+                    cursor_right -= w
+
+            BLANK_W = 2.4 * cm
+
+            sanad_parts = [("text", _ar("رقم سند الصرف:")), ("blank", BLANK_W)]
+            rtl_group(sanad_parts, self.width - 0.4 * cm, text_y)
+
+            qaid_parts = [("text", _ar("رقم القيد:")), ("blank", BLANK_W)]
+            qw = group_width(qaid_parts)
+            rtl_group(qaid_parts, self.width / 2 + qw / 2, text_y)
+
+            # ✅ "تاريخ تسليم المسير: 20[خط]م / [خط] / [خط]" — "20" و"م" نصّ
+            # ظاهر (رمز بداية السنة والتقويم الميلادي)، والفراغات الثلاثة
+            # (آخر رقمين من السنة/الشهر/اليوم) خطوط حقيقية للكتابة اليدوية.
+            # القيمة كلها تُرسَم كوحدة LTR واحدة (نفس أسلوب الإصدار السابق)
+            # ثم التسمية بعدها منفصلة — لا يمر أيٌّ منهما عبر _ar() هنا لأن
+            # "20"/"م"/"/" لا تحتاج أي إعادة تشكيل أو ترتيب bidi.
+            date_value_parts = [
+                ("text", "20"), ("blank", 0.55 * cm), ("text", "م"),
+                ("text", "/"), ("blank", 0.55 * cm),
+                ("text", "/"), ("blank", 0.55 * cm),
+            ]
             zone_x = 0.4 * cm
-            c.drawString(zone_x, text_y, date_placeholder)
-            c.drawString(zone_x + placeholder_w, text_y, date_label)
+            cursor = zone_x
+            for kind, val in date_value_parts:
+                if kind == "text":
+                    c.drawString(cursor, text_y, val)
+                    cursor += c.stringWidth(val, FN, 10)
+                else:
+                    blank_line(cursor, val, text_y)
+                    cursor += val
+            c.drawString(cursor, text_y, _ar("تاريخ تسليم المسير: "))
 
     def _on_page(canvas, doc):
         canvas.saveState()
@@ -268,23 +328,20 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
     # ✅ الترتيب معكوس هنا صراحة (نفس سبب عكس أعمدة الجدول أعلاه): يُرسَم
     # من اليسار لليمين بترتيب القائمة، فـ"مستلم العهدة" آخر القائمة كي
     # يظهر في أقصى يمين الصفحة كأول عنصر يُقرأ.
-    # ✅ خط تسليم متقطّع كنصّ داخل نفس الفقرة (سطر ثانٍ عبر <br/>) بدل خط
-    # Border — نفس أسلوب ملف Excel المرجعي بالضبط. الشرطات لا تُمرَّر عبر
-    # _ar() لأنها محايدة أصلاً (لا حروف عربية فيها لتُعاد تشكيلها).
+    # ✅ خط توقيع حقيقي (LINEBELOW) بدل شرطات نصّية "----": ReportLab يرسم
+    # هذا الخط عبر canvas.line داخلياً، وهو كائن رسومي مستقل تماماً عن
+    # النص — يظهر دائماً بمحاذاة نظيفة وثابتة بصرف النظر عن الخط المُستخدَم،
+    # بعكس شرطات "-" النصّية التي قد لا تتناسق مع نص عربي مُعاد تشكيله.
     story.append(Spacer(1, 1.3 * cm))
     footer_labels = ["مسؤول العمليات", "المسؤول المالي", "المراجعة", "مستلم العهدة"]
-    dash_counts = {"مستلم العهدة": 23, "المراجعة": 20, "المسؤول المالي": 24, "مسؤول العمليات": 24}
-
-    def _footer_cell(label: str) -> Paragraph:
-        return Paragraph(f"{_ar(label)}<br/>{'-' * dash_counts[label]}", ST["footer"])
-
     footer_table = Table(
-        [[_footer_cell(lbl) for lbl in footer_labels]],
-        colWidths=[content_width / 4] * 4, hAlign="CENTER",
+        [[P(lbl, "footer") for lbl in footer_labels], ["", "", "", ""]],
+        colWidths=[content_width / 4] * 4, hAlign="CENTER", rowHeights=[0.8 * cm, 1.2 * cm],
     )
     footer_table.setStyle(TableStyle([
+        ("LINEBELOW", (0, 1), (-1, 1), 1.0, C["text_dark"]),
         ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-        ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 16),
+        ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
     ]))
     story.append(footer_table)
 
