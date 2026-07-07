@@ -113,6 +113,7 @@ def _colors():
         "text_dark": colors.HexColor("#1A237E"),
         "text_gray": colors.HexColor("#777777"),  # ✅ نفس لون سطر "الفترة" في Excel المرجعي
         "white":     colors.white,
+        "frame":     colors.HexColor("#333333"),  # إطار الصفحة — رمادي غامق جداً وهادئ
     }
 
 
@@ -254,6 +255,20 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
     def _on_page(canvas, doc):
         canvas.saveState()
         w, h = A4
+        # ✅ إطار احترافي خفيف يحيط الصفحة من الداخل (canvas.rect، وليس حدود
+        # جدول) — يُرسَم عند 0.5سم من حافة الصفحة، أي بعيداً تماماً عن هامش
+        # المحتوى الفعلي (2سم) بفارق 1.5سم لا يلمس أبداً العنوان/الجدول/
+        # التوقيعات، وبفارق ~0.2سم فقط عن رقم الصفحة (يبقى رقم الصفحة داخل
+        # الإطار كما في النماذج الرسمية، دون ملامسته). هوامش المحتوى نفسها
+        # (margin/content_width) لم تتغيّر إطلاقاً.
+        frame_margin = 0.5 * cm
+        canvas.setStrokeColor(C["frame"])
+        canvas.setLineWidth(0.6)
+        canvas.rect(
+            frame_margin, frame_margin,
+            w - 2 * frame_margin, h - 2 * frame_margin,
+            fill=0, stroke=1,
+        )
         canvas.setFillColor(C["text_gray"])
         canvas.setFont(FN, 8)
         canvas.drawRightString(w - 1.8 * cm, 0.7 * cm, _ar(f"صفحة {doc.page}"))
