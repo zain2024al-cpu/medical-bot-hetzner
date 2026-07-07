@@ -96,7 +96,7 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
         "th":     S("th",  fontSize=9,  leading=12, alignment=TA_CENTER, textColor=C["white"], fontName=FNB),
         "td_r":   S("tdr", fontSize=8,  leading=11, alignment=TA_RIGHT, textColor=C["text_dark"]),
         "td_c":   S("tdc", fontSize=8,  leading=11, alignment=TA_CENTER, textColor=C["text_dark"]),
-        "total_lbl": S("totl", fontSize=10, leading=13, alignment=TA_RIGHT,  textColor=C["white"], fontName=FNB),
+        "total_lbl": S("totl", fontSize=10, leading=13, alignment=TA_CENTER, textColor=C["white"], fontName=FNB),
         "total_val": S("totv", fontSize=11, leading=14, alignment=TA_CENTER, textColor=C["white"], fontName=FNB),
         "footer": S("ft",  fontSize=9,  leading=12, alignment=TA_CENTER, textColor=C["text_dark"], fontName=FNB),
     }
@@ -187,10 +187,10 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
             date_str = r["date"].strftime("%Y-%m-%d") if isinstance(r["date"], date) else str(r["date"])
             table_data.append([
                 P(date_str, "td_c"),
-                P(r["statement"], "td_r"),
-                P(r["expense_item"], "td_r"),
+                P(r["statement"], "td_c"),
+                P(r["expense_item"], "td_c"),
                 P(r["invoice_number"], "td_c"),
-                P(r["name"], "td_r"),
+                P(r["name"], "td_c"),
                 P(f'{r["amount"]:.2f}', "td_c"),
                 P(str(r["_row_number"]), "td_c"),
             ])
@@ -216,7 +216,7 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
     total_table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, -1), C["primary"]),
         ("SPAN", (0, 0), (AMOUNT_COL_IDX - 1, 0)),
-        ("ALIGN", (0, 0), (0, 0), "RIGHT"),
+        ("ALIGN", (0, 0), (0, 0), "CENTER"),
         ("ALIGN", (AMOUNT_COL_IDX, 0), (AMOUNT_COL_IDX, 0), "CENTER"),
         ("TOPPADDING", (0, 0), (-1, -1), 8), ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
         ("RIGHTPADDING", (0, 0), (-1, -1), 4), ("LEFTPADDING", (0, 0), (-1, -1), 4),
@@ -224,8 +224,11 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
     story.append(total_table)
 
     # ── صف تذييل التوقيعات (مرة واحدة، آخر الوثيقة، فارغ دائماً) ──────────────
+    # ✅ الترتيب معكوس هنا صراحة (نفس سبب عكس أعمدة الجدول أعلاه): يُرسَم
+    # من اليسار لليمين بترتيب القائمة، فـ"مستلم العهدة" آخر القائمة كي
+    # يظهر في أقصى يمين الصفحة كأول عنصر يُقرأ.
     story.append(Spacer(1, 1.2 * cm))
-    footer_labels = ["مستلم العهدة", "المراجعة", "المسؤول المالي", "مسؤول العمليات"]
+    footer_labels = ["مسؤول العمليات", "المسؤول المالي", "المراجعة", "مستلم العهدة"]
     footer_table = Table(
         [[P(lbl, "footer") for lbl in footer_labels], ["", "", "", ""]],
         colWidths=[sum(col_widths) / 4] * 4, hAlign="RIGHT", rowHeights=[0.8 * cm, 1.4 * cm],
