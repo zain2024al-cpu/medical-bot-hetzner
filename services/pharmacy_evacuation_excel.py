@@ -8,14 +8,13 @@
 # عند فتح الملف وتُعيد تفسيره كرقم/تاريخ حسب إعداداتها الخاصة عند
 # الاستيراد — حتى لو كانت الخلية مُخزَّنة فعلياً كنص صرف (data_type='s')
 # مع number_format='@' في ملف openpyxl (بعض المستوردين يتجاهلون هذا
-# التلميح تماماً). حرف LRM غير المرئي وحده لم يكن كافياً لكل التطبيقات
-# (تأكَّدنا من هذا فعلياً: بعضها ما زال يتعرّف على النمط ويُعيد عرضه
-# مضغوطاً كـ"20260621"). الحل الأكثر ضماناً: استبدال الشرطة العادية "-"
-# بفاصل "／" (FULLWIDTH SOLIDUS، U+FF0F) — يبدو مطابقاً تقريباً لعلامة
-# "/" العادية بصرياً، لكنه ليس الحرف الفعلي الذي تبحث عنه أنماط regex
-# للتعرف على التواريخ (yyyy-mm-dd / yyyy/mm/dd)، فيكسر الالتقاط تماماً
-# مع الحفاظ على المظهر المطلوب "2026/06/21"، مع الإبقاء على LRM كطبقة
-# حماية إضافية.
+# التلميح تماماً). لا حرف LRM بعد السنة فقط ولا فاصل FULLWIDTH كانا
+# كافيَين لكل التطبيقات (تأكَّدنا فعلياً: بعضها يتجاهل نوع الفاصل تماماً
+# ويبحث فقط عن أي 8 أرقام متتالية بعد حذف كل ما هو غير رقم، ثم يعيد
+# عرضها بتنسيقه الافتراضي المضغوط "20260621"). الحل الأكثر ضماناً: تبعيث
+# حرف LRM بين كل رقمين على حدة (وليس مرة واحدة فقط) — فلا يوجد رقمان
+# متتاليان بلا حرف غير مرئي بينهما، فيستحيل على أي نمط \d{2,} أن يلتقط
+# التاريخ كوحدة واحدة مهما كان الفاصل الظاهري.
 
 import io
 import logging
@@ -24,16 +23,23 @@ from datetime import date, datetime
 logger = logging.getLogger(__name__)
 
 _TEXT_FORMAT = "@"
-_LRM = "‎"  # Left-to-Right Mark — غير مرئي، طبقة حماية إضافية
-_FW_SLASH = "／"  # FULLWIDTH SOLIDUS — يبدو كـ"/" لكنه ليس حرف التاريخ الذي تبحث عنه المستوردات
+_LRM = "‎"  # Left-to-Right Mark — غير مرئي
+_FW_SLASH = "／"  # FULLWIDTH SOLIDUS — يبدو كـ"/" لكنه ليس حرف الفاصل الذي تبحث عنه المستوردات
+
+
+def _scatter(segment: str) -> str:
+    """يُدرِج LRM بين كل رقمين متتاليَين — يكسر أي محاولة التقاط تعتمد
+    على تجميع خانات متتالية بعد تجاهل الفواصل الظاهرة."""
+    return _LRM.join(segment)
 
 
 def _safe_date_text(dt) -> str:
     """نص تاريخ لا يمكن لأي تطبيق جداول إعادة تفسيره كرقم/تاريخ فعلي —
-    يبدو "2026/06/21" لكن الفاصل فاصلة عريضة (FULLWIDTH SOLIDUS) وليس
-    شرطة مائلة حقيقية، فلا تلتقطه أنماط regex للتعرف على التواريخ."""
+    يبدو "2026/06/21" لكن كل رقمين مفصولان بـLRM غير مرئي، وكل فاصل
+    ظاهر هو FULLWIDTH SOLIDUS وليس شرطة مائلة حقيقية."""
     if isinstance(dt, date):
-        return f"{dt.year:04d}{_LRM}{_FW_SLASH}{dt.month:02d}{_FW_SLASH}{dt.day:02d}"
+        y, m, d = _scatter(f"{dt.year:04d}"), _scatter(f"{dt.month:02d}"), _scatter(f"{dt.day:02d}")
+        return f"{y}{_FW_SLASH}{m}{_FW_SLASH}{d}"
     return str(dt or "")
 
 
@@ -107,10 +113,15 @@ def build_evacuation_excel(rows: list[dict], start_date: date, end_date: date) -
         end = int(round((i + 1) * cols_per_group))
         group_ranges.append((start, max(start, end)))
 
+    # ✅ "20__‎م" وليس "20__م": إكسل يطبّق خوارزمية bidi تلقائياً على كل نص RTL
+    # (بعكس PDF حيث نرسم يدوياً بلا bidi إطلاقاً) — وجود حرف عربي قوي (م)
+    # ملاصقاً مباشرة لرقمين جزئيين وشرطتين سفليتين قد يجعل bidi إكسل يُعيد
+    # ترتيب موضع "م" بالنسبة لـ"20". فاصل LRM هنا يُثبّت اتجاه رقم السنة
+    # صراحة ويمنع أي تفاعل مع الحرف الذي يليه.
     band_fields = [
         ("رقم سند الصرف:", "____________"),
         ("رقم القيد:", "____________"),
-        ("تاريخ تسليم المسير:", "20__م / __ / __"),
+        ("تاريخ تسليم المسير:", f"20__{_LRM}م / __ / __"),
     ]
     for (label, blank), (c_start, c_end) in zip(band_fields, group_ranges):
         if c_end > c_start:
@@ -205,17 +216,24 @@ def build_evacuation_excel(rows: list[dict], start_date: date, end_date: date) -
         start = b + 2
     col_ranges.append((start, n))
 
-    # ✅ خط تسليم متقطّع كنصّ داخل الخلية نفسها (وليس Border) — نفس الأسلوب
-    # المُعتمَد في نموذج المستخدم المرجعي، وأكثر ضماناً عبر تطبيقات الجداول
-    # المختلفة من خط حدود قد لا يظهر في بعض المستوردين.
+    # ✅ خط تسليم متقطّع كصفّ مستقل بذاته (وليس سطر ثانٍ عبر "\n" داخل نفس
+    # الخلية) — الاعتماد على wrap_text + ارتفاع صف يدوي لعرض سطرين داخل
+    # خلية واحدة تبيَّن أنه غير موثوق عبر كل عارضات الجداول (بعضها يعرض
+    # السطر الأول فقط ويقتطع الثاني). كل صف هنا سطر واحد بسيط بارتفاعه
+    # الطبيعي، فلا يعتمد على أي حساب التفاف إطلاقاً.
     dash_counts = {"مستلم العهدة": 23, "المراجعة": 20, "المسؤول المالي": 24, "مسؤول العمليات": 24}
     for label, (c_start, c_end) in zip(footer_labels_rtl, col_ranges):
-        ws.merge_cells(start_row=footer_row_idx, start_column=c_start, end_row=footer_row_idx + 1, end_column=c_end)
-        cell = ws.cell(row=footer_row_idx, column=c_start, value=f"{label}\n{'-' * dash_counts[label]}")
-        cell.font = footer_font
-        cell.alignment = center_align
-    ws.row_dimensions[footer_row_idx].height = 14.5
-    ws.row_dimensions[footer_row_idx + 1].height = 24
+        ws.merge_cells(start_row=footer_row_idx, start_column=c_start, end_row=footer_row_idx, end_column=c_end)
+        label_cell = ws.cell(row=footer_row_idx, column=c_start, value=label)
+        label_cell.font = footer_font
+        label_cell.alignment = center_align
+
+        ws.merge_cells(start_row=footer_row_idx + 1, start_column=c_start, end_row=footer_row_idx + 1, end_column=c_end)
+        dash_cell = ws.cell(row=footer_row_idx + 1, column=c_start, value="-" * dash_counts[label])
+        dash_cell.font = footer_font
+        dash_cell.alignment = center_align
+    ws.row_dimensions[footer_row_idx].height = 18
+    ws.row_dimensions[footer_row_idx + 1].height = 18
 
     for i, width in enumerate(col_widths, 1):
         ws.column_dimensions[get_column_letter(i)].width = width
