@@ -105,6 +105,16 @@ async def _handle_pick(update: Update, context: ContextTypes.DEFAULT_TYPE, sourc
 
 # ── Text input ───────────────────────────────────────────────────────────────
 
+async def _reply(update: Update, text_and_kb: tuple) -> None:
+    """يرسل رسالة رد جديدة (وليس تعديل) — يُستخدم لكل خطوات الإدخال
+    النصي. ✅ لا تُستخدم *unpacking هنا: Message.reply_text()'s ثاني
+    وسيط موضعي هو parse_mode وليس reply_markup (كان هذا يسبب
+    TypeError: got multiple values for argument 'parse_mode' فعلياً في
+    الإنتاج)."""
+    text, kb = text_and_kb
+    await update.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+
+
 async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     session = PharmacyFinanceSession.load(context.user_data)
     if session is None:
@@ -123,7 +133,7 @@ async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             return
         session.step = STEP_EXPENSE_ITEM
         session.save(context.user_data)
-        await update.message.reply_text(*build_expense_item_prompt(session), parse_mode="Markdown")
+        await _reply(update, build_expense_item_prompt(session))
 
     elif session.step == STEP_EXPENSE_ITEM:
         session.expense_item = text
@@ -133,7 +143,7 @@ async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             return
         session.step = STEP_INVOICE_TOTAL
         session.save(context.user_data)
-        await update.message.reply_text(*build_invoice_total_prompt(session), parse_mode="Markdown")
+        await _reply(update, build_invoice_total_prompt(session))
 
     elif session.step == STEP_INVOICE_TOTAL:
         try:
@@ -141,7 +151,7 @@ async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             if total <= 0:
                 raise ValueError("non-positive")
         except ValueError:
-            await update.message.reply_text(*build_invoice_total_prompt(session, error=True), parse_mode="Markdown")
+            await _reply(update, build_invoice_total_prompt(session, error=True))
             return
         session.invoice_total = total
         if session.edit_from_review:
@@ -151,7 +161,7 @@ async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             return
         session.step = STEP_DISCOUNT_PERCENT
         session.save(context.user_data)
-        await update.message.reply_text(*build_discount_percent_prompt(session), parse_mode="Markdown")
+        await _reply(update, build_discount_percent_prompt(session))
 
     elif session.step == STEP_DISCOUNT_PERCENT:
         try:
@@ -159,14 +169,14 @@ async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             if percent < 0 or percent > 100:
                 raise ValueError("out of range")
         except ValueError:
-            await update.message.reply_text(*build_discount_percent_prompt(session, error=True), parse_mode="Markdown")
+            await _reply(update, build_discount_percent_prompt(session, error=True))
             return
         session.discount_percent = percent
         _recompute(session)
         session.edit_from_review = False
         session.step = STEP_REVIEW
         session.save(context.user_data)
-        await update.message.reply_text(*build_review(session), parse_mode="Markdown")
+        await _reply(update, build_review(session))
 
 
 def _recompute(session: PharmacyFinanceSession) -> None:
