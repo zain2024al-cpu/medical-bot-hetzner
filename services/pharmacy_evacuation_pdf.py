@@ -7,10 +7,16 @@
 # بالضبط لكل صفحة وترقيم متصل للعمود "م".
 #
 # ✅ ملاحظة مهمة حول اتجاه الجدول: reportlab لا يعكس ترتيب الأعمدة تلقائياً
-# لمستندات RTL — hAlign="RIGHT" يُحاذي الجدول كَكُتلة فقط، لكن الأعمدة
-# داخله تُرسَم من اليسار لليمين بنفس ترتيب القائمة المُعطاة. لذلك يجب
-# تعريف الأعمدة بترتيب معكوس صراحة (التاريخ أولاً... حتى "م" أخيراً) حتى
-# يظهر "م" في أقصى اليمين كما يُقرأ طبيعياً بالعربية.
+# لمستندات RTL — hAlign يُحاذي الجدول كَكُتلة فقط، لكن الأعمدة داخله
+# تُرسَم من اليسار لليمين بنفس ترتيب القائمة المُعطاة. لذلك يجب تعريف
+# الأعمدة بترتيب معكوس صراحة (التاريخ أولاً... حتى "م" أخيراً) حتى يظهر
+# "م" في أقصى اليمين كما يُقرأ طبيعياً بالعربية.
+#
+# ✅ ملاحظة توازن الجدول: عرض الأعمدة الآن يُحسب دائماً من CONTENT_WIDTH
+# (عرض الصفحة ناقص الهامشين) بدل قيم ثابتة قد تتجاوز المساحة المتاحة —
+# هذا هو السبب الفعلي الذي كان يجعل الجدول يبدو "غير متوازن"/ملتصقاً
+# بحافة الصفحة سابقاً (كان مجموع الأعمدة 19.5 سم بينما المساحة المتاحة
+# بين الهامشين كانت 18 سم فقط).
 
 from __future__ import annotations
 
@@ -32,6 +38,23 @@ _FONT_BOLD_CANDIDATES = [
 ]
 
 _ROWS_PER_PAGE = 15
+
+# ✅ نِسَب عرض الأعمدة المطلوبة (بالترتيب المنطقي: م/المبلغ/الاسم/رقم
+# الفاتورة/بند الصرف/البيان/التاريخ) — تُطبَّق لاحقاً على الترتيب
+# المعكوس فعلياً في الرسم. مجموعها 100%. مُعدَّلة قليلاً عن الاقتراح
+# الأصلي (بصلاحية "تعديل النسب إذا احتاج التصميم") بعد اختبار فعلي:
+# "التاريخ" و"المبلغ" كانا يلتفّان بشكل قبيح منتصف الرقم لضيق العرض.
+_COL_PERCENTAGES = {
+    "م": 0.05,
+    "المبلغ": 0.15,
+    "الاسم": 0.26,
+    "رقم الفاتورة": 0.13,
+    "بند الصرف": 0.11,
+    "البيان": 0.16,
+    "التاريخ": 0.14,
+}
+
+_MARGIN_CM = 2.0  # هوامش متساوية يميناً ويساراً — مساحة طباعة احترافية
 
 
 def _pick_font(candidates: list[tuple[str, str]], fallback: str = "Helvetica") -> str:
@@ -66,6 +89,7 @@ def _colors():
         "text_dark": colors.HexColor("#1A237E"),
         "text_gray": colors.HexColor("#546E7A"),
         "white":     colors.white,
+        "signature_line": colors.HexColor("#455A64"),
     }
 
 
@@ -87,16 +111,18 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
     FN = _pick_font(_FONT_CANDIDATES)
     FNB = _pick_font(_FONT_BOLD_CANDIDATES, FN)
 
+    margin = _MARGIN_CM * cm
+    content_width = A4[0] - (2 * margin)  # ✅ مصدر واحد للحقيقة لعرض كل العناصر أدناه
+
     def S(name, **kw):
         kw.setdefault("fontName", FN)
         return ParagraphStyle(name, **kw)
 
     ST = {
-        "body":   S("bd",  fontSize=10, leading=14, alignment=TA_RIGHT, textColor=C["text_dark"]),
+        "body":   S("bd",  fontSize=11, leading=15, alignment=TA_CENTER, textColor=C["text_dark"]),
         "th":     S("th",  fontSize=9,  leading=12, alignment=TA_CENTER, textColor=C["white"], fontName=FNB),
-        "td_r":   S("tdr", fontSize=8,  leading=11, alignment=TA_RIGHT, textColor=C["text_dark"]),
         "td_c":   S("tdc", fontSize=8,  leading=11, alignment=TA_CENTER, textColor=C["text_dark"]),
-        "total_lbl": S("totl", fontSize=10, leading=13, alignment=TA_CENTER, textColor=C["white"], fontName=FNB),
+        "total_lbl": S("totl", fontSize=11, leading=14, alignment=TA_CENTER, textColor=C["white"], fontName=FNB),
         "total_val": S("totv", fontSize=11, leading=14, alignment=TA_CENTER, textColor=C["white"], fontName=FNB),
         "footer": S("ft",  fontSize=9,  leading=12, alignment=TA_CENTER, textColor=C["text_dark"], fontName=FNB),
     }
@@ -108,17 +134,17 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
     class EvacuationHeaderBand(Flowable):
         def __init__(self):
             Flowable.__init__(self)
-            self.width, self.height = 19 * cm, 5.8 * cm
+            self.width, self.height = content_width, 5.8 * cm
 
         def draw(self):
             c = self.canv
 
-            # بسم الله الرحمن الرحيم — خط أكبر ومرفوعة لأعلى، توسيط تام
+            # بسم الله الرحمن الرحيم — خط أكبر ومرفوعة لأعلى، توسيط تام (لا تتغير)
             c.setFont(FNB, 18)
             c.setFillColor(C["text_dark"])
             c.drawCentredString(self.width / 2, self.height - 0.6 * cm, _ar("بسم الله الرحمن الرحيم"))
 
-            # فراغ فاصل واضح قبل العنوان الرئيسي
+            # العنوان الرئيسي — يبقى في المنتصف، خط واضح وكبير (لا يتغير)
             c.setFont(FNB, 19)
             c.setFillColor(C["primary"])
             c.drawCentredString(self.width / 2, self.height - 2.3 * cm, _ar("مسير إخلاء الأدوية والمستلزمات الطبية"))
@@ -158,17 +184,22 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
         buf, pagesize=A4,
-        leftMargin=1.5 * cm, rightMargin=1.5 * cm,
-        topMargin=1.5 * cm, bottomMargin=1.5 * cm,
+        leftMargin=margin, rightMargin=margin,
+        topMargin=margin, bottomMargin=margin,
     )
     story = []
 
     story.append(EvacuationHeaderBand())
-    story.append(Spacer(1, 0.3 * cm))
-    story.append(P(
-        f"الفترة: من {start_date.strftime('%Y-%m-%d')} إلى {end_date.strftime('%Y-%m-%d')}", "body"
-    ))
-    story.append(Spacer(1, 0.3 * cm))
+    story.append(Spacer(1, 0.4 * cm))
+
+    # ✅ تنسيق الفترة الجديد: يوم/شهر/سنة بخط واحد مرتب، مع الحفاظ على RTL
+    # (اختبرتُ هذا التركيب تحديداً: لا يعاني من مشكلة إعادة ترتيب bidi
+    # التي أثّرت على حقل "20__/__/__" لأن كل تاريخ هنا رقم كامل غير مجزَّأ).
+    period_text = (
+        f"الفترة: {start_date.strftime('%d/%m/%Y')}  —  {end_date.strftime('%d/%m/%Y')}"
+    )
+    story.append(P(period_text, "body"))
+    story.append(Spacer(1, 0.4 * cm))
 
     if not rows:
         story.append(P("لا توجد بيانات مطابقة لمعايير البحث المحددة.", "body"))
@@ -182,14 +213,13 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
 
     # ✅ الأعمدة مُعرَّفة هنا بترتيب معكوس (التاريخ أولاً ... م أخيراً) حتى
     # يظهر "م" في أقصى يمين الصفحة كما يُقرأ طبيعياً بالعربية — العمود
-    # الأخير في هذه القائمة = العمود الأيمن على الصفحة.
-    HEADER_ROW = [
-        P("التاريخ", "th"), P("البيان", "th"), P("بند الصرف", "th"),
-        P("رقم الفاتورة", "th"), P("الاسم", "th"), P("المبلغ", "th"), P("م", "th"),
-    ]
-    col_widths = [2.2 * cm, 4.5 * cm, 3.0 * cm, 2.5 * cm, 3.7 * cm, 2.3 * cm, 1.3 * cm]
-    # فهرس عمود "المبلغ" ضمن الترتيب المعكوس أعلاه (يُستخدم لاحقاً لمحاذاة سطر الإجمالي)
-    AMOUNT_COL_IDX = 5
+    # الأخير في هذه القائمة = العمود الأيمن على الصفحة. النِّسَب مأخوذة من
+    # _COL_PERCENTAGES ومُطبَّقة على content_width فتُجمَع دائماً إلى نفس
+    # عرض الصفحة المتاح تماماً (لا التصاق بالحواف ولا تجاوز للهامش).
+    REVERSED_LABELS = ["التاريخ", "البيان", "بند الصرف", "رقم الفاتورة", "الاسم", "المبلغ", "م"]
+    HEADER_ROW = [P(lbl, "th") for lbl in REVERSED_LABELS]
+    col_widths = [content_width * _COL_PERCENTAGES[lbl] for lbl in REVERSED_LABELS]
+    AMOUNT_COL_IDX = REVERSED_LABELS.index("المبلغ")
 
     chunks = [rows[i:i + _ROWS_PER_PAGE] for i in range(0, len(rows), _ROWS_PER_PAGE)]
     for chunk_idx, chunk in enumerate(chunks):
@@ -205,48 +235,51 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
                 P(f'{r["amount"]:.2f}', "td_c"),
                 P(str(r["_row_number"]), "td_c"),
             ])
-        t = Table(table_data, colWidths=col_widths, hAlign="RIGHT", repeatRows=1)
+        t = Table(table_data, colWidths=col_widths, hAlign="CENTER", repeatRows=1)
         t.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), C["primary"]),
             ("ROWBACKGROUNDS", (0, 1), (-1, -1), [C["white"], C["light_bg"]]),
             ("GRID", (0, 0), (-1, -1), 0.4, C["grid"]),
-            ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 4), ("LEFTPADDING", (0, 0), (-1, -1), 4),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING", (0, 0), (-1, -1), 5), ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 5), ("LEFTPADDING", (0, 0), (-1, -1), 5),
         ]))
         story.append(t)
         if chunk_idx < len(chunks) - 1:
             story.append(PageBreak())
 
-    # ── إجمالي المبلغ — القيمة تحت عمود "المبلغ" فقط، وليس عرض الجدول كاملاً ──
+    # ── إجمالي المبلغ — القيمة تحت عمود "المبلغ" فقط، بنفس عرض الجدول كاملاً،
+    # وبنفس أسلوب صف الإجمالي في Excel (خانة القيمة + تسمية ممتدة) ──────────
     total_amount = sum(r["amount"] for r in rows)
-    story.append(Spacer(1, 0.3 * cm))
+    story.append(Spacer(1, 0.35 * cm))
     total_row = [""] * len(col_widths)
     total_row[0] = P("إجمالي المبلغ", "total_lbl")
     total_row[AMOUNT_COL_IDX] = P(f'{total_amount:,.2f}', "total_val")
-    total_table = Table([total_row], colWidths=col_widths, hAlign="RIGHT")
+    total_table = Table([total_row], colWidths=col_widths, hAlign="CENTER")
     total_table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, -1), C["primary"]),
         ("SPAN", (0, 0), (AMOUNT_COL_IDX - 1, 0)),
         ("ALIGN", (0, 0), (0, 0), "CENTER"),
         ("ALIGN", (AMOUNT_COL_IDX, 0), (AMOUNT_COL_IDX, 0), "CENTER"),
-        ("TOPPADDING", (0, 0), (-1, -1), 8), ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 4), ("LEFTPADDING", (0, 0), (-1, -1), 4),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 9), ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 5), ("LEFTPADDING", (0, 0), (-1, -1), 5),
     ]))
     story.append(total_table)
 
     # ── صف تذييل التوقيعات (مرة واحدة، آخر الوثيقة، فارغ دائماً) ──────────────
     # ✅ الترتيب معكوس هنا صراحة (نفس سبب عكس أعمدة الجدول أعلاه): يُرسَم
     # من اليسار لليمين بترتيب القائمة، فـ"مستلم العهدة" آخر القائمة كي
-    # يظهر في أقصى يمين الصفحة كأول عنصر يُقرأ.
-    story.append(Spacer(1, 1.2 * cm))
+    # يظهر في أقصى يمين الصفحة كأول عنصر يُقرأ. خطوط التوقيع أوضح الآن
+    # (أغمق وأكثر سماكة) لتكون جاهزة فعلياً للتوقيع اليدوي بعد الطباعة.
+    story.append(Spacer(1, 1.3 * cm))
     footer_labels = ["مسؤول العمليات", "المسؤول المالي", "المراجعة", "مستلم العهدة"]
     footer_table = Table(
         [[P(lbl, "footer") for lbl in footer_labels], ["", "", "", ""]],
-        colWidths=[sum(col_widths) / 4] * 4, hAlign="RIGHT", rowHeights=[0.8 * cm, 1.4 * cm],
+        colWidths=[content_width / 4] * 4, hAlign="CENTER", rowHeights=[0.8 * cm, 1.5 * cm],
     )
     footer_table.setStyle(TableStyle([
-        ("LINEBELOW", (0, 0), (-1, 0), 0.6, C["grid"]),
-        ("LINEBELOW", (0, 1), (-1, 1), 0.6, C["text_gray"]),
+        ("LINEBELOW", (0, 1), (-1, 1), 1.0, C["signature_line"]),
         ("ALIGN", (0, 0), (-1, -1), "CENTER"),
         ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
     ]))
