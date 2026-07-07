@@ -45,6 +45,16 @@ _FONT_BOLD_CANDIDATES = [
     ("C:\\Windows\\Fonts\\tahomabd.ttf", "TahomaBd"),
 ]
 
+# ✅ عمود "التاريخ" حصراً يستخدم نفس الخط المُثبَت نجاحه في تقرير تقييم
+# المترجمين (modules/healthcare/evaluation/pdf_builder.py) — خط عربي مخصّص
+# مضمَّن، وليس خط النظام Arial/Tahoma المستخدَم لبقية أعمدة هذا الجدول.
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_EVAL_FONTS_DIR = os.path.normpath(os.path.join(_HERE, "..", "assets", "fonts"))
+_DATE_FONT_CANDIDATES = [
+    (os.path.join(_EVAL_FONTS_DIR, "Arabic-Regular.ttf"), "EvacDateFont"),
+    ("C:\\Windows\\Fonts\\arial.ttf", "Arial"),
+]
+
 _ROWS_PER_PAGE = 15
 
 # ✅ نِسَب عرض الأعمدة المطلوبة (بالترتيب المنطقي: م/المبلغ/الاسم/رقم
@@ -123,6 +133,8 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
     C = _colors()
     FN = _pick_font(_FONT_CANDIDATES)
     FNB = _pick_font(_FONT_BOLD_CANDIDATES, FN)
+    # ✅ عمود "التاريخ" فقط — نفس خط تقرير تقييم المترجمين المُثبَت نجاحه
+    FN_DATE = _pick_font(_DATE_FONT_CANDIDATES, FN)
 
     margin = _MARGIN_CM * cm
     content_width = A4[0] - (2 * margin)  # ✅ مصدر واحد للحقيقة لعرض كل العناصر أدناه
@@ -135,6 +147,9 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
         "body":   S("bd",  fontSize=11, leading=15, alignment=TA_CENTER, textColor=C["text_dark"]),
         "th":     S("th",  fontSize=9,  leading=12, alignment=TA_CENTER, textColor=C["white"], fontName=FNB),
         "td_c":   S("tdc", fontSize=8,  leading=11, alignment=TA_CENTER, textColor=C["text_dark"]),
+        # ✅ نفس نمط "td_c" تماماً، فقط بخط عمود التاريخ المطابق لتقرير
+        # تقييم المترجمين (FN_DATE بدل FN) — بقية الأعمدة لم تتغيّر إطلاقاً.
+        "td_date": S("tdd", fontSize=8, leading=11, alignment=TA_CENTER, textColor=C["text_dark"], fontName=FN_DATE),
         "total_lbl": S("totl", fontSize=11, leading=14, alignment=TA_CENTER, textColor=C["white"], fontName=FNB),
         "total_val": S("totv", fontSize=11, leading=14, alignment=TA_CENTER, textColor=C["white"], fontName=FNB),
         "footer": S("ft",  fontSize=9,  leading=12, alignment=TA_CENTER, textColor=C["text_dark"], fontName=FNB),
@@ -280,9 +295,12 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
     for chunk_idx, chunk in enumerate(chunks):
         table_data = [HEADER_ROW]
         for r in chunk:
-            date_str = r["date"].strftime("%Y/%m/%d") if isinstance(r["date"], date) else str(r["date"])
+            # ✅ نفس تنسيق strftime ("%Y-%m-%d") ونفس نمط الخط المستخدَمين في
+            # عمود التاريخ بتقرير تقييم المترجمين (modules/healthcare/
+            # evaluation/pdf_builder.py) تحديداً — بقية الأعمدة لم تتغيّر.
+            date_str = r["date"].strftime("%Y-%m-%d") if isinstance(r["date"], date) else str(r["date"])
             table_data.append([
-                P(date_str, "td_c"),
+                P(date_str, "td_date"),
                 P(r["statement"], "td_c"),
                 P(r["expense_item"], "td_c"),
                 P(r["invoice_number"], "td_c"),
