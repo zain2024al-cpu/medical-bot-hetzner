@@ -108,32 +108,43 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
     class EvacuationHeaderBand(Flowable):
         def __init__(self):
             Flowable.__init__(self)
-            self.width, self.height = 19 * cm, 5.4 * cm
+            self.width, self.height = 19 * cm, 5.8 * cm
 
         def draw(self):
             c = self.canv
 
-            # بسم الله الرحمن الرحيم — خط أكبر، توسيط تام
-            c.setFont(FNB, 15)
+            # بسم الله الرحمن الرحيم — خط أكبر ومرفوعة لأعلى، توسيط تام
+            c.setFont(FNB, 18)
             c.setFillColor(C["text_dark"])
-            c.drawCentredString(self.width / 2, self.height - 0.75 * cm, _ar("بسم الله الرحمن الرحيم"))
+            c.drawCentredString(self.width / 2, self.height - 0.6 * cm, _ar("بسم الله الرحمن الرحيم"))
 
             # فراغ فاصل واضح قبل العنوان الرئيسي
             c.setFont(FNB, 19)
             c.setFillColor(C["primary"])
-            c.drawCentredString(self.width / 2, self.height - 2.15 * cm, _ar("مسير إخلاء الأدوية والمستلزمات الطبية"))
+            c.drawCentredString(self.width / 2, self.height - 2.3 * cm, _ar("مسير إخلاء الأدوية والمستلزمات الطبية"))
 
             # صف واحد مظلَّل يجمع الحقول الثلاثة (تُملأ يدوياً — لا تُعبَّأ برمجياً أبداً)
-            band_top = self.height - 3.0 * cm
-            band_h = 1.0 * cm
+            band_top = self.height - 3.2 * cm
+            band_h = 1.1 * cm
             c.setFillColor(C["light_bg"])
             c.rect(0, band_top - band_h, self.width, band_h, fill=1, stroke=0)
             text_y = band_top - band_h / 2 - 0.15 * cm
             c.setFont(FN, 10)
             c.setFillColor(C["text_dark"])
-            c.drawRightString(self.width - 0.4 * cm, text_y, _ar("رقم سند الصرف: ________________"))
-            c.drawCentredString(self.width / 2, text_y, _ar("رقم القيد: ________________"))
-            c.drawString(0.4 * cm, text_y, _ar("تاريخ تسليم المسير: ________________"))
+            c.drawRightString(self.width - 0.4 * cm, text_y, _ar("رقم سند الصرف: ____________"))
+            c.drawCentredString(self.width / 2, text_y, _ar("رقم القيد: ____________"))
+
+            # ✅ "تاريخ تسليم المسير: 20__ / __ / __" — لا تُمرَّر كنص واحد عبر
+            # _ar(): خوارزمية bidi تُعيد ترتيب سلسلة أرقام "20" ضمن سياق
+            # عربي محيط بها، فينتقل "20" لنهاية الحقل الرقمي بدل بدايته
+            # (تأكَّدتُ من هذا مباشرة). الحل: رسم التسمية والقالب الرقمي
+            # كنصّين منفصلين متجاورين، فيبقى القالب الرقمي بترتيبه الصحيح.
+            date_placeholder = "20__ / __ / __"
+            date_label = _ar("تاريخ تسليم المسير: ")
+            placeholder_w = c.stringWidth(date_placeholder, FN, 10)
+            zone_x = 0.4 * cm
+            c.drawString(zone_x, text_y, date_placeholder)
+            c.drawString(zone_x + placeholder_w, text_y, date_label)
 
     def _on_page(canvas, doc):
         canvas.saveState()
