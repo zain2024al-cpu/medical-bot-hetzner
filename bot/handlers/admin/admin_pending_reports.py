@@ -75,7 +75,7 @@ async def _render_list(query, page: int) -> None:
                 reply_markup=_list_kb(0, 1),
             )
         except Exception as exc:
-            logger.error(f"[pndrep] Failed to render empty list: {exc}")
+            await _handle_render_error(query, exc, page=0)
         return
 
     per_page = _PER_PAGE
@@ -92,7 +92,20 @@ async def _render_list(query, page: int) -> None:
             reply_markup=_list_kb(page, total_pages),
         )
     except Exception as exc:
-        logger.error(f"[pndrep] Failed to render list (page={page}): {exc}")
+        await _handle_render_error(query, exc, page=page)
+
+
+async def _handle_render_error(query, exc: Exception, page: int) -> None:
+    """تيليجرام يرفض edit_message_text إن كان المحتوى الجديد مطابقاً
+    تماماً للحالي (مثال: ضغط 'تحديث' على قائمة لم تتغيّر) — هذا سلوك
+    طبيعي متوقَّع وليس خطأ، فنعرض تنبيهاً خفيفاً بدل تسجيله كـERROR."""
+    if "message is not modified" in str(exc).lower():
+        try:
+            await query.answer("✅ القائمة محدَّثة بالفعل.")
+        except Exception:
+            pass
+        return
+    logger.error(f"[pndrep] Failed to render list (page={page}): {exc}")
 
 
 async def handle_pending_reports_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

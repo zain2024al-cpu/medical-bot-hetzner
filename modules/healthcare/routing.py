@@ -4,15 +4,25 @@
 #
 # Handler group allocation:
 #   group  0  — woundcare text-input handler  (MessageHandler TEXT)
-#   group  1  — all CallbackQueryHandlers (wca:, hcfu:, hcmed:, hcoth:, hc:)
+#   group  1  — all CallbackQueryHandlers (wca:, hcfu:, hcmed:, hcoth:, hc:,
+#               hcphfin:, hcphprint:)
 #   group  2  — medical_followup text-input handler  (MessageHandler TEXT)
 #   group  4  — medications text-input handler        (MessageHandler TEXT)
 #   group  6  — other_hc text-input handler           (MessageHandler TEXT)
+#   group  8  — supplies text-input handler           (MessageHandler TEXT)
+#   group 10  — pharmacy_finance entry button + text-input handler
+#   group 11  — pharmacy_print entry button
 #
 #   IMPORTANT (PTB v20): within a single group, the FIRST matching handler wins
 #   and stops further processing in that group. Text handlers MUST each occupy a
 #   unique group number so they all receive every message independently and can
-#   each check their own session key without blocking one another.
+#   each check their own session key without blocking one another. This bit a
+#   real bug once already: pharmacy_finance/pharmacy_print's entry-point
+#   MessageHandlers were first registered with no explicit group (defaulting to
+#   0), silently colliding with woundcare's broad catch-all there — the button
+#   presses were swallowed with zero response. Any NEW button/text handler
+#   added to this module MUST get its own explicit group number, never rely on
+#   the default.
 #
 # The hc: dispatcher lives in woundcare/flow.py and is the single handler for all
 # hc:* navigation callbacks.  It uses late-binding imports for sub-module menu

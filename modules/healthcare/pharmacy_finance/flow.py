@@ -322,7 +322,13 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 # ── Registration ─────────────────────────────────────────────────────────────
 
 def register_handlers(app) -> None:
-    app.add_handler(MessageHandler(filters.Regex(r"^💰 التقرير المالي$"), start_pharmacy_finance))
+    # ✅ group=10 صراحةً (وليس الافتراضي 0) — group 0 تحتوي على معالج
+    # نصوص woundcare العام (filters.TEXT & ~filters.COMMAND) المسجَّل
+    # قبل هذه الوحدة؛ تيليجرام يستدعي أول معالج مطابق فقط لكل مجموعة،
+    # فكان زر "💰 التقرير المالي" (وأي نص آخر) يُبتلَع صامتاً هناك قبل
+    # أن يصل لهذه الوحدة إطلاقاً. مسجَّل هنا أولاً ضمن نفس المجموعة قبل
+    # handle_text_input العام، فيُطابَق التطابق الدقيق أولاً بلا تعارض.
+    app.add_handler(MessageHandler(filters.Regex(r"^💰 التقرير المالي$"), start_pharmacy_finance), group=10)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_input), group=10)
     app.add_handler(CallbackQueryHandler(handle_callback, pattern=rf"^{HCPHFIN}:"), group=1)
     logger.info("[pharmacy_finance] handlers registered")

@@ -287,6 +287,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 # ── Registration ─────────────────────────────────────────────────────────────
 
 def register_handlers(app) -> None:
-    app.add_handler(MessageHandler(filters.Regex(r"^🖨️ طباعة مسير الإخلاء$"), start_pharmacy_print))
-    app.add_handler(CallbackQueryHandler(handle_callback, pattern=rf"^{_PFX}:"))
+    # ✅ group=11 صراحةً (وليس الافتراضي 0) — نفس سبب pharmacy_finance:
+    # group 0 يحوي معالج نصوص woundcare العام الذي يبتلع أي رسالة نصية
+    # قبل وصولها لهذه الوحدة. group=1 لكل CallbackQueryHandler بنفس
+    # اتفاقية باقي وحدات الرعاية الصحية (hc:, hcmed:, hcsup:, ...).
+    app.add_handler(MessageHandler(filters.Regex(r"^🖨️ طباعة مسير الإخلاء$"), start_pharmacy_print), group=11)
+    app.add_handler(CallbackQueryHandler(handle_callback, pattern=rf"^{_PFX}:"), group=1)
     logger.info("[pharmacy_print] handlers registered")
