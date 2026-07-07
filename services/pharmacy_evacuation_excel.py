@@ -53,7 +53,6 @@ def build_evacuation_excel(rows: list[dict], start_date: date, end_date: date) -
     title_font = Font(name="Arial", bold=True, size=20, color="1565C0")
     band_font = Font(name="Arial", bold=True, size=11, color="1A237E")
     band_fill = PatternFill(start_color="F0F4F8", end_color="F0F4F8", fill_type="solid")
-    period_font = Font(name="Arial", size=10, color="777777")
     normal_font = Font(name="Arial", size=10)
     total_font = Font(name="Arial", bold=True, size=11, color="FFFFFF")
     total_fill = PatternFill(start_color="1565C0", end_color="1565C0", fill_type="solid")
@@ -111,7 +110,7 @@ def build_evacuation_excel(rows: list[dict], start_date: date, end_date: date) -
     band_fields = [
         ("رقم سند الصرف:", "____________"),
         ("رقم القيد:", "____________"),
-        ("تاريخ تسليم المسير:", "20__ / __ / __"),
+        ("تاريخ تسليم المسير:", "20__م / __ / __"),
     ]
     for (label, blank), (c_start, c_end) in zip(band_fields, group_ranges):
         if c_end > c_start:
@@ -126,16 +125,6 @@ def build_evacuation_excel(rows: list[dict], start_date: date, end_date: date) -
                 ws.cell(row=band_row, column=col).border = band_border
 
     ws.row_dimensions[7].height = 10
-
-    # ── الفترة ────────────────────────────────────────────────────────────────
-    ws.merge_cells(f"A8:{last_col}8")
-    period_cell = ws["A8"]
-    period_cell.value = (
-        f"الفترة: من {_safe_date_text(start_date)} إلى {_safe_date_text(end_date)}"
-    )
-    period_cell.font = period_font
-    period_cell.alignment = center_align
-    period_cell.number_format = _TEXT_FORMAT
 
     header_row_idx = 10
     for col, header in enumerate(headers, 1):

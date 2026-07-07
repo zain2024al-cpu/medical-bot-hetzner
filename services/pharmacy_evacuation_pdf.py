@@ -161,12 +161,15 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
             c.drawRightString(self.width - 0.4 * cm, text_y, _ar("رقم سند الصرف: ____________"))
             c.drawCentredString(self.width / 2, text_y, _ar("رقم القيد: ____________"))
 
-            # ✅ "تاريخ تسليم المسير: 20__ / __ / __" — لا تُمرَّر كنص واحد عبر
+            # ✅ "تاريخ تسليم المسير: 20__م / __ / __" — لا تُمرَّر كنص واحد عبر
             # _ar(): خوارزمية bidi تُعيد ترتيب سلسلة أرقام "20" ضمن سياق
             # عربي محيط بها، فينتقل "20" لنهاية الحقل الرقمي بدل بدايته
             # (تأكَّدتُ من هذا مباشرة). الحل: رسم التسمية والقالب الرقمي
             # كنصّين منفصلين متجاورين، فيبقى القالب الرقمي بترتيبه الصحيح.
-            date_placeholder = "20__ / __ / __"
+            # حرف "م" (رمز التقويم الميلادي) يُرسَم هنا كجزء من القالب مباشرة
+            # (وليس عبر _ar()) لأنه يقف منفرداً بلا حروف عربية مجاورة تحتاج
+            # وصلاً، فيظهر بشكله المنفصل الصحيح دون أي حاجة لإعادة التشكيل.
+            date_placeholder = "20__م / __ / __"
             date_label = _ar("تاريخ تسليم المسير: ")
             placeholder_w = c.stringWidth(date_placeholder, FN, 10)
             zone_x = 0.4 * cm
@@ -191,16 +194,7 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
     story = []
 
     story.append(EvacuationHeaderBand())
-    story.append(Spacer(1, 0.4 * cm))
-
-    # ✅ تنسيق الفترة الجديد: يوم/شهر/سنة بخط واحد مرتب، مع الحفاظ على RTL
-    # (اختبرتُ هذا التركيب تحديداً: لا يعاني من مشكلة إعادة ترتيب bidi
-    # التي أثّرت على حقل "20__/__/__" لأن كل تاريخ هنا رقم كامل غير مجزَّأ).
-    period_text = (
-        f"الفترة: {start_date.strftime('%d/%m/%Y')}  —  {end_date.strftime('%d/%m/%Y')}"
-    )
-    story.append(P(period_text, "body"))
-    story.append(Spacer(1, 0.4 * cm))
+    story.append(Spacer(1, 0.6 * cm))
 
     if not rows:
         story.append(P("لا توجد بيانات مطابقة لمعايير البحث المحددة.", "body"))
