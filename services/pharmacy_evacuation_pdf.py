@@ -5,6 +5,12 @@
 # arabic_reshaper + python-bidi للنص العربي RTL، مع تقسيم صريح لكل 15 صفاً
 # في جدول منفصل (وليس الاعتماد على repeatRows التلقائي) لضمان 15 صفاً
 # بالضبط لكل صفحة وترقيم متصل للعمود "م".
+#
+# ✅ ملاحظة مهمة حول اتجاه الجدول: reportlab لا يعكس ترتيب الأعمدة تلقائياً
+# لمستندات RTL — hAlign="RIGHT" يُحاذي الجدول كَكُتلة فقط، لكن الأعمدة
+# داخله تُرسَم من اليسار لليمين بنفس ترتيب القائمة المُعطاة. لذلك يجب
+# تعريف الأعمدة بترتيب معكوس صراحة (التاريخ أولاً... حتى "م" أخيراً) حتى
+# يظهر "م" في أقصى اليمين كما يُقرأ طبيعياً بالعربية.
 
 from __future__ import annotations
 
@@ -90,7 +96,8 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
         "th":     S("th",  fontSize=9,  leading=12, alignment=TA_CENTER, textColor=C["white"], fontName=FNB),
         "td_r":   S("tdr", fontSize=8,  leading=11, alignment=TA_RIGHT, textColor=C["text_dark"]),
         "td_c":   S("tdc", fontSize=8,  leading=11, alignment=TA_CENTER, textColor=C["text_dark"]),
-        "total":  S("tot", fontSize=11, leading=14, alignment=TA_CENTER, textColor=C["white"], fontName=FNB),
+        "total_lbl": S("totl", fontSize=10, leading=13, alignment=TA_RIGHT,  textColor=C["white"], fontName=FNB),
+        "total_val": S("totv", fontSize=11, leading=14, alignment=TA_CENTER, textColor=C["white"], fontName=FNB),
         "footer": S("ft",  fontSize=9,  leading=12, alignment=TA_CENTER, textColor=C["text_dark"], fontName=FNB),
     }
 
@@ -101,24 +108,32 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
     class EvacuationHeaderBand(Flowable):
         def __init__(self):
             Flowable.__init__(self)
-            self.width, self.height = 19 * cm, 4.6 * cm
+            self.width, self.height = 19 * cm, 5.4 * cm
 
         def draw(self):
             c = self.canv
-            c.setFont(FN, 12)
+
+            # بسم الله الرحمن الرحيم — خط أكبر، توسيط تام
+            c.setFont(FNB, 15)
             c.setFillColor(C["text_dark"])
-            c.drawCentredString(self.width / 2, self.height - 0.6 * cm, _ar("بسم الله الرحمن الرحيم"))
-            c.setFont(FNB, 16)
+            c.drawCentredString(self.width / 2, self.height - 0.75 * cm, _ar("بسم الله الرحمن الرحيم"))
+
+            # فراغ فاصل واضح قبل العنوان الرئيسي
+            c.setFont(FNB, 19)
             c.setFillColor(C["primary"])
-            c.drawCentredString(self.width / 2, self.height - 1.4 * cm, _ar("مسير إخلاء الأدوية والمستلزمات الطبية"))
+            c.drawCentredString(self.width / 2, self.height - 2.15 * cm, _ar("مسير إخلاء الأدوية والمستلزمات الطبية"))
+
+            # صف واحد مظلَّل يجمع الحقول الثلاثة (تُملأ يدوياً — لا تُعبَّأ برمجياً أبداً)
+            band_top = self.height - 3.0 * cm
+            band_h = 1.0 * cm
+            c.setFillColor(C["light_bg"])
+            c.rect(0, band_top - band_h, self.width, band_h, fill=1, stroke=0)
+            text_y = band_top - band_h / 2 - 0.15 * cm
             c.setFont(FN, 10)
             c.setFillColor(C["text_dark"])
-            y = self.height - 2.4 * cm
-            for label in ("رقم سند الصرف: ______________________",
-                          "رقم القيد: ___________________________",
-                          "تاريخ تسليم المسير: __________________"):
-                c.drawRightString(self.width, y, _ar(label))
-                y -= 0.6 * cm
+            c.drawRightString(self.width - 0.4 * cm, text_y, _ar("رقم سند الصرف: ________________"))
+            c.drawCentredString(self.width / 2, text_y, _ar("رقم القيد: ________________"))
+            c.drawString(0.4 * cm, text_y, _ar("تاريخ تسليم المسير: ________________"))
 
     def _on_page(canvas, doc):
         canvas.saveState()
@@ -154,11 +169,16 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
     for i, r in enumerate(rows, start=1):
         r["_row_number"] = i
 
+    # ✅ الأعمدة مُعرَّفة هنا بترتيب معكوس (التاريخ أولاً ... م أخيراً) حتى
+    # يظهر "م" في أقصى يمين الصفحة كما يُقرأ طبيعياً بالعربية — العمود
+    # الأخير في هذه القائمة = العمود الأيمن على الصفحة.
     HEADER_ROW = [
-        P("م", "th"), P("المبلغ", "th"), P("الاسم", "th"),
-        P("رقم الفاتورة", "th"), P("بند الصرف", "th"), P("البيان", "th"), P("التاريخ", "th"),
+        P("التاريخ", "th"), P("البيان", "th"), P("بند الصرف", "th"),
+        P("رقم الفاتورة", "th"), P("الاسم", "th"), P("المبلغ", "th"), P("م", "th"),
     ]
-    col_widths = [1.3 * cm, 2.3 * cm, 3.7 * cm, 2.5 * cm, 3.0 * cm, 4.5 * cm, 2.2 * cm]
+    col_widths = [2.2 * cm, 4.5 * cm, 3.0 * cm, 2.5 * cm, 3.7 * cm, 2.3 * cm, 1.3 * cm]
+    # فهرس عمود "المبلغ" ضمن الترتيب المعكوس أعلاه (يُستخدم لاحقاً لمحاذاة سطر الإجمالي)
+    AMOUNT_COL_IDX = 5
 
     chunks = [rows[i:i + _ROWS_PER_PAGE] for i in range(0, len(rows), _ROWS_PER_PAGE)]
     for chunk_idx, chunk in enumerate(chunks):
@@ -166,13 +186,13 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
         for r in chunk:
             date_str = r["date"].strftime("%Y-%m-%d") if isinstance(r["date"], date) else str(r["date"])
             table_data.append([
-                P(str(r["_row_number"]), "td_c"),
-                P(f'{r["amount"]:.2f}', "td_c"),
-                P(r["name"], "td_r"),
-                P(r["invoice_number"], "td_c"),
-                P(r["expense_item"], "td_r"),
-                P(r["statement"], "td_r"),
                 P(date_str, "td_c"),
+                P(r["statement"], "td_r"),
+                P(r["expense_item"], "td_r"),
+                P(r["invoice_number"], "td_c"),
+                P(r["name"], "td_r"),
+                P(f'{r["amount"]:.2f}', "td_c"),
+                P(str(r["_row_number"]), "td_c"),
             ])
         t = Table(table_data, colWidths=col_widths, hAlign="RIGHT", repeatRows=1)
         t.setStyle(TableStyle([
@@ -186,17 +206,20 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
         if chunk_idx < len(chunks) - 1:
             story.append(PageBreak())
 
-    # ── إجمالي المبلغ ─────────────────────────────────────────────────────────
+    # ── إجمالي المبلغ — القيمة تحت عمود "المبلغ" فقط، وليس عرض الجدول كاملاً ──
     total_amount = sum(r["amount"] for r in rows)
     story.append(Spacer(1, 0.3 * cm))
-    total_table = Table(
-        [[P(f"إجمالي المبلغ: {total_amount:,.2f}", "total")]],
-        colWidths=[sum(col_widths)], hAlign="RIGHT",
-    )
+    total_row = [""] * len(col_widths)
+    total_row[0] = P("إجمالي المبلغ", "total_lbl")
+    total_row[AMOUNT_COL_IDX] = P(f'{total_amount:,.2f}', "total_val")
+    total_table = Table([total_row], colWidths=col_widths, hAlign="RIGHT")
     total_table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, -1), C["primary"]),
-        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("SPAN", (0, 0), (AMOUNT_COL_IDX - 1, 0)),
+        ("ALIGN", (0, 0), (0, 0), "RIGHT"),
+        ("ALIGN", (AMOUNT_COL_IDX, 0), (AMOUNT_COL_IDX, 0), "CENTER"),
         ("TOPPADDING", (0, 0), (-1, -1), 8), ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4), ("LEFTPADDING", (0, 0), (-1, -1), 4),
     ]))
     story.append(total_table)
 

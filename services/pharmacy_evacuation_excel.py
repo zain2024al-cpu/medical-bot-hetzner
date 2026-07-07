@@ -65,15 +65,26 @@ def build_evacuation_excel(rows: list[dict], start_date: date, end_date: date) -
             cell.border = thin_border
             cell.alignment = center_align if col in (1, 2, 4, 7) else right_align
 
+    # ✅ قيمة الإجمالي تظهر تحت عمود "المبلغ" (العمود 2) تحديداً فقط —
+    # لا تمتد عبر الجدول كاملاً. عمود "م" (1) يُترك فارغاً بنفس التظليل،
+    # والتسمية "إجمالي المبلغ" تمتد من "الاسم" حتى "التاريخ" (الأعمدة 3-7).
     total_row_idx = header_row_idx + len(rows) + 1
-    ws.merge_cells(f"A{total_row_idx}:{get_column_letter(len(headers) - 1)}{total_row_idx}")
-    ws.cell(row=total_row_idx, column=1, value="إجمالي المبلغ").font = total_font
-    ws.cell(row=total_row_idx, column=1).fill = total_fill
-    ws.cell(row=total_row_idx, column=1).alignment = center_align
-    total_cell = ws.cell(row=total_row_idx, column=len(headers), value=f"{total_amount:,.2f}")
-    total_cell.font = total_font
-    total_cell.fill = total_fill
-    total_cell.alignment = center_align
+
+    empty_cell = ws.cell(row=total_row_idx, column=1, value="")
+    empty_cell.fill = total_fill
+
+    amount_cell = ws.cell(row=total_row_idx, column=2, value=f"{total_amount:,.2f}")
+    amount_cell.font = total_font
+    amount_cell.fill = total_fill
+    amount_cell.alignment = center_align
+
+    ws.merge_cells(f"C{total_row_idx}:{get_column_letter(len(headers))}{total_row_idx}")
+    label_cell = ws.cell(row=total_row_idx, column=3, value="إجمالي المبلغ")
+    label_cell.font = total_font
+    label_cell.fill = total_fill
+    label_cell.alignment = right_align
+    for col in range(4, len(headers) + 1):
+        ws.cell(row=total_row_idx, column=col).fill = total_fill
 
     col_widths = [6, 12, 22, 16, 18, 26, 14]
     for i, width in enumerate(col_widths, 1):
