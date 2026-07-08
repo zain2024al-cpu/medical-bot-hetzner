@@ -208,7 +208,24 @@ async def main():
         return
     
     logger.info("Token found")
-    
+
+    # ✅ تهيئة/ترحيل قاعدة البيانات — يجب أن يعمل هذا فعلياً في كل إقلاع حقيقي
+    # للبوت، وليس فقط في سكربتات اختبار منفصلة. كان هذا الاستدعاء غائباً
+    # تماماً عن app.py سابقاً، فكانت أي عمود جديد (مثل patient_type) يُضاف
+    # في db/models.py لا يصل أبداً لقاعدة البيانات الفعلية مهما أُعيد تشغيل
+    # البوت — لأن الدالة التي تضيفه (init_database/check_db_health_startup)
+    # لم تكن تُستدعى من أي مكان في المسار الحقيقي للتشغيل. آمنة للاستدعاء
+    # في كل مرة (create_all لا يكرر الجداول الموجودة، وفحص كل عمود مستقل
+    # ومتحقق من وجوده أولاً قبل أي ALTER).
+    try:
+        from db.session import init_database
+        if init_database():
+            logger.info("✅ Database initialized/verified successfully.")
+        else:
+            logger.error("❌ Database initialization reported failure — check logs above.")
+    except Exception as db_init_error:
+        logger.critical(f"❌ Database initialization crashed: {db_init_error}", exc_info=True)
+
     # Create application with increased timeouts
     from telegram.ext import ApplicationBuilder
     from config.settings import TIMEZONE

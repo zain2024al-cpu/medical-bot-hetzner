@@ -12,6 +12,31 @@ from db.session import engine, DATABASE_PATH, get_db
 
 logger = logging.getLogger(__name__)
 
+
+def _migrate_column(conn, table: str, column: str, sql_type: str) -> None:
+    """يفحص عموداً واحداً ويضيفه إن كان ناقصاً، مع طباعة صريحة في الـ log
+    لكل حالة (موجود مسبقاً / أُضيف بنجاح / فشلت إضافته) — بمعزل تام عن أي
+    عمود آخر، حتى تكون نتيجة كل عمود مرئية دائماً بدل تحذير عام واحد يُخفي
+    التفاصيل."""
+    try:
+        existing_cols = {row[1] for row in conn.execute(text(f"PRAGMA table_info({table})")).fetchall()}
+    except Exception as exc:
+        logger.error(f"❌ Migration: failed to read schema for table '{table}': {exc}")
+        return
+
+    if column in existing_cols:
+        logger.info(f"✅ Migration: column '{table}.{column}' already exists — skipping.")
+        return
+
+    logger.info(f"⚠️ Migration: column '{table}.{column}' NOT FOUND — adding it now...")
+    try:
+        conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {sql_type}"))
+        conn.commit()
+        logger.info(f"✅ Migration: added column '{table}.{column}' successfully.")
+    except Exception as exc:
+        logger.error(f"❌ Migration: FAILED to add column '{table}.{column}': {exc}", exc_info=True)
+
+
 class DatabaseMaintenance:
     """
     Tools to strengthen, repair, and maintain the SQLite database.
@@ -110,33 +135,19 @@ class DatabaseMaintenance:
                     check = conn.execute(text("PRAGMA integrity_check")).scalar()
                 
                 # ── migrate: add new columns if missing ──
-                try:
-                    existing_cols = {
-                        row[1]
-                        for row in conn.execute(text("PRAGMA table_info(reports)")).fetchall()
-                    }
-                    if "has_paper_report" not in existing_cols:
-                        conn.execute(text("ALTER TABLE reports ADD COLUMN has_paper_report INTEGER"))
-                        conn.commit()
-                        logger.info("✅ Migration: added has_paper_report column to reports")
-                    if "no_paper_report_reason" not in existing_cols:
-                        conn.execute(text("ALTER TABLE reports ADD COLUMN no_paper_report_reason TEXT"))
-                        conn.commit()
-                        logger.info("✅ Migration: added no_paper_report_reason column to reports")
-
-                    # ✅ نوع ظهور المريض — عمود جديد في patients. كل الصفوف
-                    # الحالية تحصل على NULL تلقائياً (= general = يظهر للجميع)،
-                    # فلا يختفي أي مريض ولا يتغيّر أي سلوك قائم.
-                    existing_patient_cols = {
-                        row[1]
-                        for row in conn.execute(text("PRAGMA table_info(patients)")).fetchall()
-                    }
-                    if "patient_type" not in existing_patient_cols:
-                        conn.execute(text("ALTER TABLE patients ADD COLUMN patient_type VARCHAR(30)"))
-                        conn.commit()
-                        logger.info("✅ Migration: added patient_type column to patients")
-                except Exception as mig_err:
-                    logger.warning(f"⚠️ Migration check failed (non-fatal): {mig_err}")
+                # ✅ كل عمود يُفحص ويُضاف بشكل مستقل تماماً داخل try/except خاص
+                # به (وليس كتلة واحدة مشتركة) — حتى لو فشل عمود واحد لأي سبب،
+                # بقية الأعمدة تُفحص وتُضاف بشكل طبيعي، وكل نتيجة (موجود/أُضيف/
+                # فشل) تُطبع صراحةً في الـ log بدل الاكتفاء بتحذير عام واحد عند
+                # أي استثناء يُخفي أي عمود تحديداً تأثّر.
+                logger.info(f"🔎 Migration check starting for DB: {DATABASE_PATH}")
+                _migrate_column(conn, "reports", "has_paper_report", "INTEGER")
+                _migrate_column(conn, "reports", "no_paper_report_reason", "TEXT")
+                # ✅ نوع ظهور المريض — عمود جديد في patients. كل الصفوف
+                # الحالية تحصل على NULL تلقائياً (= general = يظهر للجميع)،
+                # فلا يختفي أي مريض ولا يتغيّر أي سلوك قائم.
+                _migrate_column(conn, "patients", "patient_type", "VARCHAR(30)")
+                logger.info("🔎 Migration check finished.")
 
                 if check == "ok":
                     logger.info("✅ Database is healthy.")
