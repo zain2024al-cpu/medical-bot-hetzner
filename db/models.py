@@ -77,6 +77,11 @@ class Patient(Base):
     age = Column(Integer, nullable=True)
     disease = Column(Text, nullable=True)
     nationality = Column(String(100), nullable=True)
+    # ✅ نوع ظهور المريض:
+    #   NULL أو "general" → يظهر في كل شاشات اختيار المرضى (السلوك الحالي).
+    #   "pharmacy_only"   → يظهر فقط داخل 💊 صرف الأدوية و🩺 المستلزمات الطبية.
+    # كل المرضى الحاليين NULL تلقائياً = general، فلا يتغيّر أي سلوك قائم.
+    patient_type = Column(String(30), nullable=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow, index=True, nullable=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
 

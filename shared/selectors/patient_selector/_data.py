@@ -11,6 +11,18 @@ logger = logging.getLogger(__name__)
 
 _DB_LIMIT = 500   # max rows fetched per query — covers any realistic patient list
 
+# ✅ نوع ظهور المريض: مرضى "pharmacy_only" يظهرون فقط عندما يطلب المستدعي
+# ذلك صراحةً (include_pharmacy=True — زرّا صرف الأدوية والمستلزمات الطبية).
+# كل المستدعين الآخرين يحصلون على الافتراضي False فيرون مرضى general فقط
+# (NULL أو "general") — وهذا يحفظ سلوك كل المرضى الحاليين (NULL) كما هو.
+_PHARMACY_ONLY = "pharmacy_only"
+
+
+def _type_visible(patient_type, include_pharmacy: bool) -> bool:
+    if include_pharmacy:
+        return True
+    return (patient_type or "general") != _PHARMACY_ONLY
+
 
 @dataclass(frozen=True, slots=True)
 class PatientRecord:
@@ -56,10 +68,14 @@ class PatientSelectionResult:
         return PatientSelectionResult(selected=(patient,), cancelled=False)
 
 
-def fetch_all() -> list[PatientRecord]:
+def fetch_all(include_pharmacy: bool = False) -> list[PatientRecord]:
     """
     Fetch every patient from the database, sorted alphabetically.
     Duplicates (same full_name) are removed; the first occurrence wins.
+
+    include_pharmacy — False (الافتراضي): مرضى general فقط (كل الشاشات).
+                       True: يشمل أيضاً مرضى "pharmacy_only" (زرّا صرف
+                       الأدوية والمستلزمات الطبية فقط).
 
     Returns an empty list on any error (caller must handle gracefully).
     """
@@ -78,6 +94,8 @@ def fetch_all() -> list[PatientRecord]:
             seen: set[str] = set()
             records: list[PatientRecord] = []
             for p in rows:
+                if not _type_visible(p.patient_type, include_pharmacy):
+                    continue
                 name = (p.full_name or "").strip()
                 if name and name not in seen:
                     seen.add(name)
@@ -92,16 +110,18 @@ def fetch_all() -> list[PatientRecord]:
         return []
 
 
-def search(query: str) -> list[PatientRecord]:
+def search(query: str, include_pharmacy: bool = False) -> list[PatientRecord]:
     """
     Search for patients whose full_name contains query (case-insensitive).
     Falls back to fetch_all() when query is blank.
+
+    include_pharmacy — نفس دلالة fetch_all().
 
     Returns an empty list on any error.
     """
     query = query.strip()
     if not query:
-        return fetch_all()
+        return fetch_all(include_pharmacy=include_pharmacy)
 
     try:
         from db.session import SessionLocal
@@ -123,6 +143,7 @@ def search(query: str) -> list[PatientRecord]:
                 PatientRecord(id=p.id, name=(p.full_name or "").strip())
                 for p in rows
                 if (p.full_name or "").strip()
+                and _type_visible(p.patient_type, include_pharmacy)
             ]
             logger.debug(
                 f"[patient_selector._data] search({query!r}) → {len(records)} records"

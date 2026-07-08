@@ -606,7 +606,9 @@ async def handle_view_patient_names(update: Update, context: ContextTypes.DEFAUL
         text += f"📄 **الصفحة:** {page + 1} من {total_pages}\n\n"
         
         for i, patient in enumerate(patients, start_num):
-            text += f"{i}. {patient['name']}\n"
+            # ✅ وسم مرضى صرف الأدوية/المستلزمات حتى يميّزهم الأدمن في القائمة
+            marker = " 💊" if patient.get('patient_type') == "pharmacy_only" else ""
+            text += f"{i}. {patient['name']}{marker}\n"
     
     # أزرار التنقل
     nav_buttons = []
@@ -627,19 +629,52 @@ async def handle_view_patient_names(update: Update, context: ContextTypes.DEFAUL
     )
 
 async def handle_add_patient_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """بدء إضافة اسم مريض جديد"""
+    """بدء إضافة اسم مريض جديد — أولاً اختيار نوع ظهور المريض"""
     query = update.callback_query
     await query.answer()
 
     keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🌍 جميع المستخدمين", callback_data="ptype:general")],
+        [InlineKeyboardButton("💊 مرضى صرف الأدوية والمستلزمات الطبية", callback_data="ptype:pharmacy")],
         [InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")],
         [InlineKeyboardButton("❌ إلغاء", callback_data="cancel_patient_input")]
     ])
 
     await query.edit_message_text(
-        "➕ **إضافة اسم مريض جديد**\n\n"
-        "📝 اكتب الاسم الكامل للمريض:\n"
-        "مثال: أحمد محمد",
+        "➕ **إضافة مريض جديد**\n\n"
+        "👁️ **أين يظهر اسم هذا المريض؟**\n\n"
+        "🌍 **جميع المستخدمين** — يظهر في كل الأقسام والتقارير (كالمعتاد).\n\n"
+        "💊 **مرضى صرف الأدوية والمستلزمات الطبية** — يظهر فقط داخل "
+        "💊 صرف الأدوية و🩺 المستلزمات الطبية، ولا يظهر لأي قسم آخر.",
+        reply_markup=keyboard,
+        parse_mode=ParseMode.MARKDOWN
+    )
+    return "ADD_PATIENT_TYPE"
+
+
+async def handle_patient_type_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة اختيار نوع ظهور المريض ثم طلب الاسم"""
+    query = update.callback_query
+    await query.answer()
+
+    choice = (query.data or "").split(":", 1)[-1]
+    if choice == "pharmacy":
+        context.user_data['new_patient_type'] = "pharmacy_only"
+        type_label = "💊 مرضى صرف الأدوية والمستلزمات الطبية"
+    else:
+        context.user_data['new_patient_type'] = None  # general — الافتراضي
+        type_label = "🌍 جميع المستخدمين"
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔙 رجوع", callback_data="add_patient_name")],
+        [InlineKeyboardButton("❌ إلغاء", callback_data="cancel_patient_input")]
+    ])
+
+    await query.edit_message_text(
+        f"➕ **إضافة اسم مريض جديد**\n\n"
+        f"👁️ **النوع:** {type_label}\n\n"
+        f"📝 اكتب الاسم الكامل للمريض:\n"
+        f"مثال: أحمد محمد",
         reply_markup=keyboard,
         parse_mode=ParseMode.MARKDOWN
     )
@@ -649,6 +684,7 @@ async def handle_cancel_patient_input(update: Update, context: ContextTypes.DEFA
     query = update.callback_query
     if query:
         await query.answer()
+    context.user_data.pop('new_patient_type', None)
     await handle_manage_patients(update, context)
     return ConversationHandler.END
 
@@ -672,7 +708,15 @@ async def handle_patient_name_input(update: Update, context: ContextTypes.DEFAUL
     # إضافة الاسم باستخدام الخدمة الموحدة
     try:
         from services.patients_service import add_patient, get_patient_by_name
-        
+
+        # ✅ نوع ظهور المريض المُختار في الخطوة السابقة (None = general)
+        patient_type = context.user_data.pop('new_patient_type', None)
+        type_label = (
+            "💊 مرضى صرف الأدوية والمستلزمات الطبية"
+            if patient_type == "pharmacy_only"
+            else "🌍 جميع المستخدمين"
+        )
+
         # التحقق من عدم التكرار
         existing = get_patient_by_name(name)
         if existing:
@@ -683,13 +727,14 @@ async def handle_patient_name_input(update: Update, context: ContextTypes.DEFAUL
                 parse_mode=ParseMode.MARKDOWN
             )
             return ConversationHandler.END
-        
-        patient_id = add_patient(name)
-        
+
+        patient_id = add_patient(name, patient_type=patient_type)
+
         if patient_id:
             keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")]])
             await update.message.reply_text(
-                f"✅ **تم إضافة الاسم:** {name}\n\n"
+                f"✅ **تم إضافة الاسم:** {name}\n"
+                f"👁️ **النوع:** {type_label}\n\n"
                 f"📝 يمكنك إضافة المزيد أو الرجوع للقائمة",
                 reply_markup=keyboard,
                 parse_mode=ParseMode.MARKDOWN
@@ -1451,8 +1496,15 @@ def register(app):
             "EDIT_NAME_INPUT": [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_edit_name_input)
             ],
+            # ✅ خطوة جديدة قبل إدخال الاسم: اختيار نوع ظهور المريض
+            # (🌍 جميع المستخدمين / 💊 صرف الأدوية والمستلزمات فقط)
+            "ADD_PATIENT_TYPE": [
+                CallbackQueryHandler(handle_patient_type_choice, pattern="^ptype:(general|pharmacy)$")
+            ],
             "ADD_PATIENT_NAME": [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_patient_name_input)
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_patient_name_input),
+                # 🔙 رجوع من شاشة إدخال الاسم → العودة لشاشة اختيار النوع
+                CallbackQueryHandler(start_add_patient_name, pattern="^add_patient_name$")
             ]
         },
         fallbacks=[

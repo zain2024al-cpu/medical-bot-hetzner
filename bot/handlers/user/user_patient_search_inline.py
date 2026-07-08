@@ -65,6 +65,20 @@ async def patient_search_inline_handler(update: Update, context: ContextTypes.DE
         
         results = []
 
+        # ✅ نوع ظهور المريض: مرضى "pharmacy_only" يظهرون في نتائج البحث
+        # inline فقط عندما تكون جلسة مُنتقي المرضى المشترك نشطة بوضع
+        # include_pharmacy=True (أي أن المستخدم داخل زرّي صرف الأدوية أو
+        # المستلزمات الطبية تحديداً). في كل الحالات الأخرى (بحث المترجمين
+        # أو أي جلسة مُنتقي أخرى) يُعرض مرضى general فقط.
+        include_pharmacy = False
+        try:
+            from shared.selectors.patient_selector._session import load as _sel_load
+            _sel_state = _sel_load(context.user_data)
+            if _sel_state is not None:
+                include_pharmacy = _sel_state.include_pharmacy
+        except Exception:
+            pass
+
         # ✅ البحث مباشرة من قاعدة البيانات
         with SessionLocal() as s:
             try:
@@ -85,6 +99,12 @@ async def patient_search_inline_handler(update: Update, context: ContextTypes.DE
                     ).order_by(Patient.created_at.desc(), Patient.full_name).limit(50).all()
 
                     logger.info(f"✅ عرض آخر {len(patients)} مريض (بدون بحث)")
+
+                if not include_pharmacy:
+                    patients = [
+                        p for p in patients
+                        if (p.patient_type or "general") != "pharmacy_only"
+                    ]
 
                 # ✅ إنشاء النتائج
                 for idx, patient in enumerate(patients):

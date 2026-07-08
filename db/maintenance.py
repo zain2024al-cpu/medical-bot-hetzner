@@ -123,6 +123,18 @@ class DatabaseMaintenance:
                         conn.execute(text("ALTER TABLE reports ADD COLUMN no_paper_report_reason TEXT"))
                         conn.commit()
                         logger.info("✅ Migration: added no_paper_report_reason column to reports")
+
+                    # ✅ نوع ظهور المريض — عمود جديد في patients. كل الصفوف
+                    # الحالية تحصل على NULL تلقائياً (= general = يظهر للجميع)،
+                    # فلا يختفي أي مريض ولا يتغيّر أي سلوك قائم.
+                    existing_patient_cols = {
+                        row[1]
+                        for row in conn.execute(text("PRAGMA table_info(patients)")).fetchall()
+                    }
+                    if "patient_type" not in existing_patient_cols:
+                        conn.execute(text("ALTER TABLE patients ADD COLUMN patient_type VARCHAR(30)"))
+                        conn.commit()
+                        logger.info("✅ Migration: added patient_type column to patients")
                 except Exception as mig_err:
                     logger.warning(f"⚠️ Migration check failed (non-fatal): {mig_err}")
 

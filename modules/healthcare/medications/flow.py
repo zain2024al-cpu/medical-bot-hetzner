@@ -151,7 +151,7 @@ async def _start_flow(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     logger.info(f"[medications] flow started  user={update.effective_user.id}")
     session.step = STEP_PATIENT
     session.save(context.user_data)
-    await patient_selector.enter(update, context, return_to=_RKEY_PATIENT)
+    await patient_selector.enter(update, context, return_to=_RKEY_PATIENT, include_pharmacy=True)
 
 
 # ── Step 1 → 2: date confirmed — open patient selector ───────────────────────
@@ -164,7 +164,7 @@ async def _handle_date_today(update: Update, context: ContextTypes.DEFAULT_TYPE)
     session.step = STEP_PATIENT
     session.save(context.user_data)
     logger.info(f"[medications] date confirmed (today)  user={update.effective_user.id}")
-    await patient_selector.enter(update, context, return_to=_RKEY_PATIENT)
+    await patient_selector.enter(update, context, return_to=_RKEY_PATIENT, include_pharmacy=True)
 
 
 async def _handle_date_calendar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -222,7 +222,7 @@ async def _handle_cal_action(
         logger.info(
             f"[medications] date picked: {y}-{m:02d}-{d:02d}  user={update.effective_user.id}"
         )
-        await patient_selector.enter(update, context, return_to=_RKEY_PATIENT)
+        await patient_selector.enter(update, context, return_to=_RKEY_PATIENT, include_pharmacy=True)
 
 
 # ── Step 2: patient selected ──────────────────────────────────────────────────
@@ -371,7 +371,7 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
         session.step = STEP_PATIENT
         session.save(context.user_data)
         logger.info(f"[medications] date set manually: {dt.date()}  user={update.effective_user.id}")
-        await patient_selector.enter(update, context, return_to=_RKEY_PATIENT)
+        await patient_selector.enter(update, context, return_to=_RKEY_PATIENT, include_pharmacy=True)
         return
 
     # ── 3b. Department free-text ("أخرى") ──

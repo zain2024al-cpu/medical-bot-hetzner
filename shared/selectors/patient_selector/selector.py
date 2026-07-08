@@ -68,6 +68,7 @@ async def enter(
     return_to: str,
     search_query: str = "",
     page: int = 0,
+    include_pharmacy: bool = False,
 ) -> None:
     """
     Open the patient selector.
@@ -75,12 +76,15 @@ async def enter(
     return_to   — result_router key registered by the calling module
     search_query — pre-filter (usually empty on first open)
     page        — starting page (usually 0)
+    include_pharmacy — True فقط لزرّي صرف الأدوية/المستلزمات الطبية:
+                       يشمل مرضى "pharmacy_only" إضافةً لمرضى general.
+                       الافتراضي False = مرضى general فقط (كل الشاشات الأخرى).
 
     Fetches patient list from DB, saves session state, and renders the
     list screen.  All further interaction is handled by handle_callback().
     """
     records = await asyncio.get_event_loop().run_in_executor(
-        None, fetch_all
+        None, lambda: fetch_all(include_pharmacy=include_pharmacy)
     )
     names = [r.name for r in records]
 
@@ -88,6 +92,7 @@ async def enter(
         return_to=return_to,
         page=page,
         search_query=search_query,
+        include_pharmacy=include_pharmacy,
         snapshot=names,
     )
     _save(context.user_data, state)
@@ -297,10 +302,17 @@ async def _handle_selection(
         logger.warning(
             "[patient_selector] snapshot empty at idx-consume time — re-fetching list"
         )
-        records = await asyncio.get_event_loop().run_in_executor(None, fetch_all)
+        # ✅ إعادة الجلب تحترم include_pharmacy الأصلي من الجلسة — حتى لا
+        # يتسرب مريض pharmacy_only لشاشة غير مخوَّلة (أو يختفي من مخوَّلة)
+        # أثناء إعادة البناء بعد فقدان الـsnapshot.
+        _inc = state.include_pharmacy
+        records = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: fetch_all(include_pharmacy=_inc)
+        )
         state = PatientSelectorState(
             return_to=state.return_to,   # preserved from existing session
             page=0,
+            include_pharmacy=_inc,
             snapshot=[r.name for r in records],
         )
         _save(context.user_data, state)

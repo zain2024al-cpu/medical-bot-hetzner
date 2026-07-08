@@ -19,16 +19,21 @@ class PatientSelectorState:
     return_to: str              # result_router key: e.g. "healthcare.woundcare.patient"
     page: int = 0               # current list page (0-based)
     search_query: str = ""      # active search filter (empty = no filter)
+    # ✅ True فقط لزرّي صرف الأدوية/المستلزمات الطبية — يُظهر مرضى "pharmacy_only"
+    # إضافةً لمرضى general. يُحفظ في الجلسة حتى تحترمه إعادة الجلب عند فقدان
+    # الـsnapshot وبحث inline النشط.
+    include_pharmacy: bool = False
     # names-only snapshot for idx resolution (avoids re-querying on every tap)
     snapshot: list[str] = field(default_factory=list)
 
 
 def save(user_data: dict, state: PatientSelectorState) -> None:
     user_data[_KEY] = {
-        "return_to":    state.return_to,
-        "page":         state.page,
-        "search_query": state.search_query,
-        "snapshot":     state.snapshot,
+        "return_to":        state.return_to,
+        "page":             state.page,
+        "search_query":     state.search_query,
+        "include_pharmacy": state.include_pharmacy,
+        "snapshot":         state.snapshot,
     }
 
 
@@ -40,6 +45,7 @@ def load(user_data: dict) -> PatientSelectorState | None:
         return_to=raw.get("return_to", ""),
         page=raw.get("page", 0),
         search_query=raw.get("search_query", ""),
+        include_pharmacy=raw.get("include_pharmacy", False),
         snapshot=raw.get("snapshot", []),
     )
 

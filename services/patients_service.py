@@ -141,29 +141,32 @@ def get_patient_by_id(patient_id: int) -> Optional[Dict]:
     return None
 
 
-def add_patient(name: str) -> Optional[int]:
+def add_patient(name: str, patient_type: Optional[str] = None) -> Optional[int]:
     """
     إضافة مريض جديد
+    patient_type: None/"general" = يظهر للجميع (الافتراضي)،
+                  "pharmacy_only" = يظهر فقط في صرف الأدوية والمستلزمات الطبية.
+    إن كان الاسم موجوداً مسبقاً يُعاد id الموجود دون تغيير نوعه.
     Returns patient id or None
     """
     try:
         from db.session import SessionLocal
         from db.models import Patient
-        
+
         with SessionLocal() as session:
             # Check if exists
             existing = session.query(Patient).filter_by(full_name=name).first()
             if existing:
                 logger.info(f"Patient already exists: {name}")
                 return existing.id
-            
-            new_patient = Patient(full_name=name)
+
+            new_patient = Patient(full_name=name, patient_type=patient_type)
             session.add(new_patient)
             session.commit()
-            
-            logger.info(f"Added new patient: {name}")
+
+            logger.info(f"Added new patient: {name}  type={patient_type or 'general'}")
             return new_patient.id
-            
+
     except Exception as e:
         logger.error(f"Error adding patient: {e}")
         return None
@@ -258,13 +261,14 @@ def get_patients_paginated(page: int = 0, per_page: int = 10) -> tuple:
             patients = session.query(Patient).order_by(
                 Patient.created_at.desc()
             ).offset(page * per_page).limit(per_page).all()
-            
+
             result = [{
                 'id': p.id,
                 'name': p.full_name,
+                'patient_type': p.patient_type,
                 'created_at': p.created_at
             } for p in patients]
-            
+
             return result, total_count, total_pages
             
     except Exception as e:

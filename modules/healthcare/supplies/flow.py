@@ -151,7 +151,7 @@ async def _start_flow(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     logger.info(f"[supplies] flow started  user={update.effective_user.id}")
     session.step = STEP_PATIENT
     session.save(context.user_data)
-    await patient_selector.enter(update, context, return_to=_RKEY_PATIENT)
+    await patient_selector.enter(update, context, return_to=_RKEY_PATIENT, include_pharmacy=True)
 
 
 async def _handle_date_today(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -161,7 +161,7 @@ async def _handle_date_today(update: Update, context: ContextTypes.DEFAULT_TYPE)
     session.step = STEP_PATIENT
     session.save(context.user_data)
     logger.info(f"[supplies] date confirmed (today)  user={update.effective_user.id}")
-    await patient_selector.enter(update, context, return_to=_RKEY_PATIENT)
+    await patient_selector.enter(update, context, return_to=_RKEY_PATIENT, include_pharmacy=True)
 
 
 async def _handle_date_calendar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -217,7 +217,7 @@ async def _handle_cal_action(
         logger.info(
             f"[supplies] date picked: {y}-{m:02d}-{d:02d}  user={update.effective_user.id}"
         )
-        await patient_selector.enter(update, context, return_to=_RKEY_PATIENT)
+        await patient_selector.enter(update, context, return_to=_RKEY_PATIENT, include_pharmacy=True)
 
 
 # ── Result route handlers ─────────────────────────────────────────────────────
@@ -357,7 +357,7 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
         session.step = STEP_PATIENT
         session.save(context.user_data)
         logger.info(f"[supplies] date set manually: {dt.date()}  user={update.effective_user.id}")
-        await patient_selector.enter(update, context, return_to=_RKEY_PATIENT)
+        await patient_selector.enter(update, context, return_to=_RKEY_PATIENT, include_pharmacy=True)
         return
 
     elif session.step == STEP_DEPT_OTHER:

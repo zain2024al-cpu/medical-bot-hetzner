@@ -66,6 +66,13 @@ async def patient_inline_query_handler(update: Update, context: ContextTypes.DEF
                         Patient.full_name != ""
                     ).order_by(Patient.full_name).limit(50).all()
 
+                # ✅ تقارير المترجمين تعرض مرضى general فقط — مرضى
+                # "pharmacy_only" مخصصون لزرّي صرف الأدوية/المستلزمات حصراً.
+                patients = [
+                    p for p in patients
+                    if (p.patient_type or "general") != "pharmacy_only"
+                ]
+
                 logger.info(f"✅ تم العثور على {len(patients)} مريض في قاعدة البيانات")
 
                 for patient in patients:
@@ -236,11 +243,17 @@ async def show_patient_list(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 
         with SessionLocal() as s:
             # ✅ جلب جميع المرضى من قاعدة البيانات مباشرة (أحدث البيانات)
+            # مع استبعاد مرضى "pharmacy_only" — تقارير المترجمين تعرض
+            # مرضى general فقط.
             all_patients = s.query(Patient).filter(
                 Patient.full_name.isnot(None),
                 Patient.full_name != ""
             ).order_by(Patient.full_name).all()
-            patient_names = [p.full_name.strip() for p in all_patients if p.full_name and p.full_name.strip()]
+            patient_names = [
+                p.full_name.strip() for p in all_patients
+                if p.full_name and p.full_name.strip()
+                and (p.patient_type or "general") != "pharmacy_only"
+            ]
             logger.info(f"✅ تم تحميل {len(patient_names)} اسم من قاعدة البيانات مباشرة في show_patient_list")
         
         # التحقق من وجود أسماء
