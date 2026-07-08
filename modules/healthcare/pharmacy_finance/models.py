@@ -21,11 +21,23 @@ class SourceRecordInfo:
     has_financial:    bool
 
 
-def list_pharmacy_source_records(page: int = 0, page_size: int = 10) -> tuple[list[SourceRecordInfo], int]:
+def list_pharmacy_source_records(
+    page: int = 0,
+    page_size: int = 10,
+    *,
+    requester_id: "int | None" = None,
+    is_admin: bool = False,
+) -> tuple[list[SourceRecordInfo], int]:
     """
     يعيد قائمة مُرقَّمة صفحات من MedicationRecord + SuppliesRecord حيث
     dispense_source == 'الصيدلية' فقط، مرتبة الأحدث أولاً، مع علامة
     has_financial (استعلام دفعة واحدة، ليس N+1).
+
+    ✅ عزل التقارير حسب المستخدم:
+      - الأدمن (is_admin=True): يرى كل الحالات.
+      - المستخدم العادي: يرى فقط الحالات التي (أ) لم تُسجَّل لها بيانات
+        مالية بعد (متاحة للإنشاء)، أو (ب) بياناتها المالية أنشأها هو نفسه
+        (created_by == requester_id). لا يرى أي حالة موّلها مستخدم آخر.
     """
     import json
     from db.session import get_db
@@ -59,20 +71,34 @@ def list_pharmacy_source_records(page: int = 0, page_size: int = 10) -> tuple[li
                 item_count=r.item_count or 0, created_at=r.created_at, has_financial=False,
             ))
 
-        # علامة has_financial بدفعة واحدة (بدون N+1)
+        # علامة has_financial + مالك السجل (created_by) بدفعة واحدة (بدون N+1)
+        owner_by_key: "dict[tuple[str, int], int | None]" = {}
         if combined:
             financial_keys = {(row.source_type, row.source_record_id) for row in combined}
             existing = (
-                db.query(PharmacyFinancialRecord.source_type, PharmacyFinancialRecord.source_record_id)
+                db.query(
+                    PharmacyFinancialRecord.source_type,
+                    PharmacyFinancialRecord.source_record_id,
+                    PharmacyFinancialRecord.created_by,
+                )
                 .filter(
                     PharmacyFinancialRecord.source_type.in_({k[0] for k in financial_keys}),
                     PharmacyFinancialRecord.source_record_id.in_({k[1] for k in financial_keys}),
                 )
                 .all()
             )
-            existing_set = set(existing)
+            for stype, sid, cby in existing:
+                owner_by_key[(stype, sid)] = cby
             for row in combined:
-                row.has_financial = (row.source_type, row.source_record_id) in existing_set
+                row.has_financial = (row.source_type, row.source_record_id) in owner_by_key
+
+        # ✅ فلترة الملكية للمستخدم العادي (الأدمن يرى الكل)
+        if not is_admin:
+            combined = [
+                row for row in combined
+                if not row.has_financial
+                or owner_by_key.get((row.source_type, row.source_record_id)) == requester_id
+            ]
 
         combined.sort(key=lambda r: r.created_at or datetime.min, reverse=True)
 
@@ -122,6 +148,7 @@ def get_financial_record(source_type: str, source_record_id: int) -> dict | None
             "discount_percent": r.discount_percent or 0.0,
             "discount_amount": r.discount_amount or 0.0,
             "net_amount": r.net_amount or 0.0,
+            "created_by": r.created_by,  # لفحص الملكية عند الاختيار
         }
 
 

@@ -63,7 +63,14 @@ async def start_pharmacy_finance(update: Update, context: ContextTypes.DEFAULT_T
 async def _show_list(update: Update, context: ContextTypes.DEFAULT_TYPE, page: int) -> None:
     from modules.healthcare.pharmacy_finance.models import list_pharmacy_source_records
 
-    rows, total = list_pharmacy_source_records(page=page, page_size=_PAGE_SIZE)
+    user = update.effective_user
+    requester_id = user.id if user else None
+    admin = bool(user and is_admin(user.id))
+    # ✅ المستخدم العادي يرى فقط حالاته (وغير المموّلة)؛ الأدمن يرى الكل.
+    rows, total = list_pharmacy_source_records(
+        page=page, page_size=_PAGE_SIZE,
+        requester_id=requester_id, is_admin=admin,
+    )
     total_pages = max(1, (total + _PAGE_SIZE - 1) // _PAGE_SIZE)
     text, kb = build_list_prompt(rows, page, total_pages, total)
     await _edit_or_reply(update, text, kb)
@@ -80,6 +87,17 @@ async def _handle_pick(update: Update, context: ContextTypes.DEFAULT_TYPE, sourc
         return
 
     existing = get_financial_record(source_type, source_record_id)
+
+    # ✅ حارس ملكية دفاعي: يمنع مستخدماً عادياً من فتح/تعديل بيانات مالية
+    # أنشأها مستخدم آخر (حتى لو وصل عبر callback قديم/مباشر لا يمر بالقائمة
+    # المفلترة). الأدمن معفى — يراجع الكل.
+    user = update.effective_user
+    if existing and not (user and is_admin(user.id)):
+        owner = existing.get("created_by")
+        if owner is not None and user and owner != user.id:
+            await _edit_or_reply(update, *build_error("هذا التقرير المالي يخص مستخدماً آخر."))
+            return
+
     session = PharmacyFinanceSession.create(
         context.user_data, source_type=source_type, source_record_id=source_record_id,
         patient_name=source.patient_name, item_count=source.item_count,
