@@ -1,19 +1,32 @@
 # ================================================
 # bot/handlers/shared/medical_files_access.py
-# 📂 زر "فتح التقارير الطبية" — إرسال الملفات في نفس المحادثة لكل من يضغط الزر
+# 📂 زر "فتح التقارير الطبية" — إرسال الملفات خاصةً لمن ضغط الزر فقط
 # ================================================
 #
-# ✅ التصميم: الملفات تُرسَل دائماً في نفس المحادثة التي ضُغط فيها الزر
-# (وليس خاصةً)، بحيث يعمل الزر بنفس الطريقة تماماً للأدمن ولأي مستخدم
-# آخر — بلا اعتماد على ما إذا كان الشخص قد بدأ محادثة خاصة مع البوت من
-# قبل أم لا (قيد منصة تيليجرام لا يمكن تجاوزه لولا هذا التصميم).
+# ✅ التصميم: الملفات تُرسَل دائماً إلى محادثة المستخدم الخاصة مع البوت
+# (عبر query.from_user.id — هوية الضاغط تحديداً، وليس query.message.chat.id
+# الذي كان يشير لمحادثة المجموعة نفسها حيث ضُغط الزر). لا تُرسَل أي رسالة
+# جديدة إلى المجموعة إطلاقاً تحت أي ظرف — لا الملفات، ولا رسائل الخطأ/
+# التنبيه، فكل هذه تُعرَض للضاغط فقط عبر Alert (query.answer(show_alert=True))
+# أو تُرسَل لمحادثته الخاصة.
+#
+# ✅ حالة "لم يبدأ المستخدم محادثة خاصة مع البوت": تيليجرام يرفع
+# telegram.error.Forbidden عند محاولة مراسلة مستخدم لم يضغط Start في الخاص
+# (أو حظر البوت). نلتقط هذا تحديداً ونعرض تنبيهاً واضحاً للضاغط بدل فشل صامت
+# أو تسريب أي شيء للمجموعة.
 
 import logging
 
 from telegram import Update
+from telegram.error import Forbidden
 from telegram.ext import ContextTypes
 
 logger = logging.getLogger(__name__)
+
+_START_BOT_ALERT = (
+    "⚠️ يرجى فتح البوت والضغط على Start مرة واحدة "
+    "حتى أتمكن من إرسال الملفات إليك."
+)
 
 
 async def _send_one_medical_file(bot, chat_id, file_type, file_id):
@@ -30,10 +43,10 @@ async def _send_one_medical_file(bot, chat_id, file_type, file_id):
 
 
 async def handle_medical_files_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """عند الضغط على '📂 فتح التقارير الطبية' في بطاقة الحالة —
-    يرسل كل الملفات الطبية المرتبطة بهذا التقرير في نفس المحادثة التي
-    ضُغط فيها الزر (لكل المستخدمين بلا استثناء)، باستخدام الـfile_id
-    المحفوظ مسبقاً (بدون بحث في مجموعة الملفات)."""
+    """عند الضغط على '📂 فتح التقارير الطبية' في بطاقة الحالة (سواء كانت
+    البطاقة في مجموعة أو في الخاص) — يرسل كل الملفات الطبية المرتبطة بهذا
+    التقرير إلى محادثة الضاغط الخاصة مع البوت تحديداً، باستخدام الـfile_id
+    المحفوظ مسبقاً. لا تظهر أي رسالة جديدة في المجموعة أياً كانت النتيجة."""
     query = update.callback_query
     if not query or not query.data:
         return
@@ -56,35 +69,42 @@ async def handle_medical_files_callback(update: Update, context: ContextTypes.DE
             await query.answer("لا توجد ملفات طبية مرفقة بهذه الحالة.", show_alert=True)
             return
 
-        # ✅ نُقر مرة واحدة فقط هنا (answerCallbackQuery لا يمكن استخدامه
-        # أكثر من مرة فعلياً لنفس الضغطة) — أي رسائل لاحقة تُرسَل كرسائل
-        # عادية عبر send_message وليس عبر query.answer() مرة ثانية.
-        await query.answer()
+        # ✅ هوية الضاغط تحديداً — مصدر الحقيقة الوحيد لوجهة الإرسال، بصرف
+        # النظر تماماً عن نوع المحادثة التي ضُغط فيها الزر (مجموعة أو خاص).
+        presser_id = query.from_user.id
 
-        target_chat_id = query.message.chat.id if query.message else query.from_user.id
-
+        # ⚠️ لا نستدعي query.answer() الآن — Telegram لا يعتد فعلياً إلا
+        # بأول استدعاء لكل ضغطة، فننتظر معرفة النتيجة النهائية (نجاح/حظر/
+        # فشل) لنُبلغ الضاغط بها في استدعاء واحد فقط في نهاية المعالجة.
         sent_count = 0
+        blocked = False
         for f in files:  # بترتيب الرفع الأصلي — for عادي وليس gather
             ftype = f.get("file_type")
             fid = f.get("file_id")
             if not fid:
                 continue
             try:
-                await _send_one_medical_file(context.bot, target_chat_id, ftype, fid)
+                await _send_one_medical_file(context.bot, presser_id, ftype, fid)
                 sent_count += 1
+            except Forbidden:
+                # المستخدم لم يبدأ محادثة خاصة مع البوت (أو حظره) — هذا
+                # ينطبق على كامل المحادثة، فلا فائدة من محاولة بقية الملفات.
+                blocked = True
+                break
             except Exception as send_err:
                 logger.warning(
                     f"⚠️ medical_files_access: فشل إرسال ملف (report_id={report_id}, type={ftype}): {send_err}"
                 )
 
+        if blocked:
+            await query.answer(_START_BOT_ALERT, show_alert=True)
+            return
+
         if sent_count == 0:
-            try:
-                await context.bot.send_message(
-                    chat_id=target_chat_id,
-                    text="⚠️ تعذّر إرسال الملفات حالياً. حاول لاحقاً.",
-                )
-            except Exception:
-                pass
+            await query.answer("⚠️ تعذّر إرسال الملفات حالياً. حاول لاحقاً.", show_alert=True)
+            return
+
+        await query.answer(f"✅ تم إرسال {sent_count} ملف إلى محادثتك الخاصة.")
 
     except Exception as e:
         logger.exception(f"❌ خطأ في handle_medical_files_callback: {e}")
