@@ -354,22 +354,33 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
                     _draw_card("إجمالي أيام الفترة", str(period_days), color=colors.HexColor("#26A69A")),
                     _draw_card("إجمالي أيام العمل", str(item["work_days"]), color=colors.HexColor("#7E57C2")),
                 ],
-                # الصف الرابع: تقارير طبية نعم / لا
+                # الصف الرابع: لم تجهز بعد / تم رفعها
                 [
                     _draw_card(
-                        "تقارير طبية: لا",
-                        str(item.get("paper_no", 0)),
-                        color=colors.HexColor("#EF9A9A"),
-                        value_color=colors.HexColor("#B71C1C"),
-                        label_color=colors.HexColor("#B71C1C"),
+                        "🟡 لم تجهز بعد",
+                        str(item.get("paper_pending", 0)),
+                        color=colors.HexColor("#FFE0B2"),
+                        value_color=colors.HexColor("#E65100"),
+                        label_color=colors.HexColor("#E65100"),
                     ),
                     _draw_card(
-                        "تقارير طبية: نعم",
+                        "✅ تم رفعها",
                         str(item.get("paper_yes", 0)),
                         color=colors.HexColor("#A5D6A7"),
                         value_color=colors.HexColor("#1B5E20"),
                         label_color=colors.HexColor("#1B5E20"),
                     ),
+                ],
+                # الصف الخامس: لا يوجد تقرير (البطاقة الثانية فارغة بلا إطار)
+                [
+                    _draw_card(
+                        "❌ لا يوجد تقرير",
+                        str(item.get("paper_no", 0)),
+                        color=colors.HexColor("#EF9A9A"),
+                        value_color=colors.HexColor("#B71C1C"),
+                        label_color=colors.HexColor("#B71C1C"),
+                    ),
+                    Drawing(250, 84),  # خانة فارغة (لا إطار) لموازنة الشبكة ثنائية الأعمدة
                 ],
             ],
             colWidths=[260, 260],
@@ -564,9 +575,10 @@ def _generate_html_fallback(results, period_label, year, month, start_date_str, 
         before_8pm = item.get("before_8pm_reports", max(item["total_reports"] - item["late_reports"], 0))
         paper_yes_i = item.get("paper_yes", 0)
         paper_no_i = item.get("paper_no", 0)
+        paper_pending_i = item.get("paper_pending", 0)
         rank_prefix = "" if target_name else f"{_medal(i)} "
         translator_pages += f'''<div style="page-break-before:always;font-size:15px;"><h2 style="font-size:22px;">{rank_prefix}{item["translator_name"]}</h2>
-        <p style="font-size:16px;">إجمالي التقارير: <b>{item["total_reports"]}</b> | قبل 8 مساءً: <b>{before_8pm}</b> | بعد 8 مساءً: <b>{item["late_reports"]}</b> | أيام العمل: <b>{item["work_days"]}</b> | تقارير طبية نعم: <b>{paper_yes_i}</b> | تقارير طبية لا: <b>{paper_no_i}</b></p>
+        <p style="font-size:16px;">إجمالي التقارير: <b>{item["total_reports"]}</b> | قبل 8 مساءً: <b>{before_8pm}</b> | بعد 8 مساءً: <b>{item["late_reports"]}</b> | أيام العمل: <b>{item["work_days"]}</b> | ✅ تم رفعها: <b>{paper_yes_i}</b> | 🟡 لم تجهز بعد: <b>{paper_pending_i}</b> | ❌ لا يوجد تقرير: <b>{paper_no_i}</b></p>
         <table border="1" cellpadding="5" style="font-size:14px;border-collapse:collapse;"><tr style="background:#1a237e;color:#fff;font-size:15px;"><th style="padding:8px 12px;">نوع الإجراء</th><th style="padding:8px 12px;">العدد</th></tr>{actions_rows}</table></div>'''
 
     header_title = "تقرير تقييم مترجم فردي" if target_name else "تقرير تقييم المترجمين"
@@ -618,7 +630,7 @@ def _generate_excel(results, period_label, year, month, target_name: str | None 
         top=Side(style='thin', color='CCCCCC'),
         bottom=Side(style='thin', color='CCCCCC'),
     )
-    ws.merge_cells('A1:H1')
+    ws.merge_cells('A1:I1')
     main_title = (
         f"تقرير تقييم مترجم فردي - {target_name} - {period_label}"
         if target_name else f"تقرير تقييم أداء المترجمين - {period_label}"
@@ -627,12 +639,12 @@ def _generate_excel(results, period_label, year, month, target_name: str | None 
     ws['A1'].font = title_font
     ws['A1'].alignment = center_align
 
-    ws.merge_cells('A2:H2')
+    ws.merge_cells('A2:I2')
     ws['A2'] = f"تاريخ الإصدار: {datetime.now().strftime('%Y-%m-%d %H:%M')}"
     ws['A2'].font = Font(name='Arial', size=10, color='777777')
     ws['A2'].alignment = center_align
 
-    headers = ['الترتيب', 'المترجم', 'إجمالي التقارير', 'قبل 8 مساءً', 'بعد 8 مساءً', 'أيام العمل', 'تقارير طبية: نعم', 'تقارير طبية: لا']
+    headers = ['الترتيب', 'المترجم', 'إجمالي التقارير', 'قبل 8 مساءً', 'بعد 8 مساءً', 'أيام العمل', '✅ تم رفعها', '🟡 لم تجهز بعد', '❌ لا يوجد تقرير']
 
     row = 4
     for col, header in enumerate(headers, 1):
@@ -658,6 +670,7 @@ def _generate_excel(results, period_label, year, month, target_name: str | None 
             item['late_reports'],
             item['work_days'],
             item.get('paper_yes', 0),
+            item.get('paper_pending', 0),
             item.get('paper_no', 0),
         ]
 
@@ -667,7 +680,7 @@ def _generate_excel(results, period_label, year, month, target_name: str | None 
             cell.alignment = center_align if col != 2 else right_align
             cell.border = thin_border
 
-    col_widths = [8, 28, 15, 14, 14, 12, 18, 18]
+    col_widths = [8, 28, 15, 14, 14, 12, 16, 16, 16]
     for i, w in enumerate(col_widths, 1):
         ws.column_dimensions[get_column_letter(i)].width = w
 
@@ -797,8 +810,9 @@ def _eval_intro_text() -> str:
         "├ 🌇 قبل 8 مساءً\n"
         "├ 🌙 بعد 8 مساءً\n"
         "├ 📅 عدد أيام العمل\n"
-        "├ 📎 تقارير طبية: نعم\n"
-        "├ 📎 تقارير طبية: لا\n"
+        "├ ✅ تقارير تم رفعها\n"
+        "├ 🟡 تقارير لم تجهز بعد\n"
+        "├ ❌ حالات لا يوجد لها تقرير\n"
         "└ 📋 تفصيل حسب نوع الإجراء\n\n"
         "اختر نوع التقييم:"
     )

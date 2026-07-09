@@ -218,7 +218,11 @@ class Report(Base):
     # ✅ حقل رقم الغرفة والطابق
     room_number = Column(String(255), nullable=True)
 
-    # ✅ حقول التقرير الطبي الورقي (1=نعم, 0=لا, None=لم يُسأل)
+    # ✅ حقول التقرير الطبي الورقي — ثلاث حالات:
+    #   1 = يوجد تقرير طبي (مرفوع)
+    #   2 = لم يجهز بعد (Pending — يظهر في التقارير المعلقة حتى يُرفع)
+    #   0 = لا يوجد تقرير (مع سبب في no_paper_report_reason)
+    #   None = لم يُسأل (مسارات مستثناة من البوابة / تقارير قديمة)
     has_paper_report = Column(Integer, nullable=True)
     no_paper_report_reason = Column(Text, nullable=True)
 

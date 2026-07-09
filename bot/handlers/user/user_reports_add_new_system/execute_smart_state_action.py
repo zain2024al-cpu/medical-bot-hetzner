@@ -235,25 +235,17 @@ async def execute_smart_state_action(target_step, flow_type, update, context):
 
             _pending_flow = _rt.get("_pending_translator_flow", flow_type)
             if flow_type == "operation":
-                gate_text = "📎 **هل يوجد تقرير طبي او صور للعملية؟**\n\nاختر (نعم) إذا يوجد تقرير أو صور، أو (لا) إذا لا يوجد."
+                gate_text = "📎 **هل يوجد تقرير طبي او صور للعملية؟**\n\n• ✅ يوجد تقرير طبي\n• 🟡 لم يجهز بعد\n• ❌ لا يوجد تقرير"
             elif flow_type in ("rehab_physical", "rehab_device", "device"):
-                gate_text = "📎 **هل يوجد صور او فيدوهات للتمارين؟**\n\nاختر (نعم) إذا يوجد صور أو فيديوهات، أو (لا) إذا لا يوجد."
+                gate_text = "📎 **هل يوجد صور او فيدوهات للتمارين؟**\n\n• ✅ يوجد تقرير طبي\n• 🟡 لم يجهز بعد\n• ❌ لا يوجد تقرير"
             else:
-                gate_text = "📎 **هل يوجد تقرير طبي؟**\n\nاختر (نعم) إذا يوجد تقرير طبي، أو (لا) إذا لا يوجد."
+                gate_text = "📎 **هل يوجد تقرير طبي؟**\n\n• ✅ يوجد تقرير طبي\n• 🟡 لم يجهز بعد\n• ❌ لا يوجد تقرير"
 
-            first_row = [
-                InlineKeyboardButton("✅ نعم", callback_data="medrep:yes"),
-                InlineKeyboardButton("❌ لا", callback_data="medrep:no"),
-            ]
-            if flow_type == "radiology":
-                first_row.append(InlineKeyboardButton("⏭️ تخطي", callback_data="medrep:skip"))
-
+            # ✅ بوابة موحّدة بثلاث حالات (مصدر واحد مشترَك، بلا زر "تخطي")
+            from .flows.shared import build_medical_report_gate_keyboard
             await update.callback_query.edit_message_text(
                 gate_text,
-                reply_markup=InlineKeyboardMarkup([
-                    first_row,
-                    [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back")],
-                ]),
+                reply_markup=build_medical_report_gate_keyboard(),
                 parse_mode="Markdown",
             )
             context.user_data["_conversation_state"] = "MEDICAL_REPORT_ASK"
@@ -610,21 +602,13 @@ async def execute_smart_state_action(target_step, flow_type, update, context):
             return target_step
 
         elif target_step == "MEDICAL_REPORT_ASK":
-            flow_type_for_gate = context.user_data.get("report_tmp", {}).get("_pending_translator_flow", flow_type)
-            first_row = [
-                InlineKeyboardButton("✅ نعم", callback_data="medrep:yes"),
-                InlineKeyboardButton("❌ لا", callback_data="medrep:no"),
-            ]
-            if flow_type_for_gate == "radiology":
-                first_row.append(InlineKeyboardButton("⏭️ تخطي", callback_data="medrep:skip"))
+            # ✅ بوابة موحّدة بثلاث حالات (مصدر واحد مشترَك، بلا زر "تخطي")
+            from .flows.shared import build_medical_report_gate_keyboard
             context.user_data["_conversation_state"] = "MEDICAL_REPORT_ASK"
             await update.callback_query.edit_message_text(
                 "📎 **هل يوجد تقرير طبي؟**\n\n"
-                "اختر (نعم) إذا يوجد تقرير طبي، أو (لا) إذا لا يوجد.",
-                reply_markup=InlineKeyboardMarkup([
-                    first_row,
-                    [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back")],
-                ]),
+                "• ✅ يوجد تقرير طبي\n• 🟡 لم يجهز بعد\n• ❌ لا يوجد تقرير",
+                reply_markup=build_medical_report_gate_keyboard(),
                 parse_mode="Markdown",
             )
             return "MEDICAL_REPORT_ASK"

@@ -330,24 +330,18 @@ async def handle_smart_back_navigation(update: Update, context: ContextTypes.DEF
             report_tmp.pop("_medical_report_step_done", None)
             report_tmp.pop("_medical_attachments", None)
             report_tmp.pop("no_report_reason", None)
+            report_tmp.pop("_medical_report_pending", None)
             report_tmp.pop("_pending_translator_flow", None)
             report_tmp["_pending_translator_flow"] = flow_type
-            first_row = [
-                InlineKeyboardButton("✅ نعم", callback_data="medrep:yes"),
-                InlineKeyboardButton("❌ لا", callback_data="medrep:no"),
-            ]
-            if flow_type == "radiology":
-                first_row.append(InlineKeyboardButton("⏭️ تخطي", callback_data="medrep:skip"))
-            gate_keyboard = InlineKeyboardMarkup([
-                first_row,
-                [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back")],
-            ])
+            # ✅ بوابة موحّدة بثلاث حالات (مصدر واحد مشترَك، بلا زر "تخطي")
+            from .flows.shared import build_medical_report_gate_keyboard
+            gate_keyboard = build_medical_report_gate_keyboard()
             if flow_type == "operation":
-                gate_text = "📎 **هل يوجد تقرير طبي او صور للعملية؟**\n\nاختر (نعم) إذا يوجد تقرير أو صور، أو (لا) إذا لا يوجد."
+                gate_text = "📎 **هل يوجد تقرير طبي او صور للعملية؟**\n\n• ✅ يوجد تقرير طبي\n• 🟡 لم يجهز بعد\n• ❌ لا يوجد تقرير"
             elif flow_type in ("rehab_physical", "rehab_device", "device"):
-                gate_text = "📎 **هل يوجد صور او فيدوهات للتمارين؟**\n\nاختر (نعم) إذا يوجد صور أو فيديوهات، أو (لا) إذا لا يوجد."
+                gate_text = "📎 **هل يوجد صور او فيدوهات للتمارين؟**\n\n• ✅ يوجد تقرير طبي\n• 🟡 لم يجهز بعد\n• ❌ لا يوجد تقرير"
             else:
-                gate_text = "📎 **هل يوجد تقرير طبي؟**\n\nاختر (نعم) إذا يوجد تقرير طبي، أو (لا) إذا لا يوجد."
+                gate_text = "📎 **هل يوجد تقرير طبي؟**\n\n• ✅ يوجد تقرير طبي\n• 🟡 لم يجهز بعد\n• ❌ لا يوجد تقرير"
             try:
                 await query.edit_message_text(gate_text, reply_markup=gate_keyboard, parse_mode="Markdown")
             except Exception:

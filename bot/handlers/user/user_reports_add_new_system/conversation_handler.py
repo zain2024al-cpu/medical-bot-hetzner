@@ -645,7 +645,7 @@ def register(app):
             NEW_CONSULT_CONFIRM:    _confirm_state_handlers(sh, route_sel, route_inp),
             # ── MEDICAL REPORT GATE (string-keyed, shared across all flows) ───
             "MEDICAL_REPORT_ASK": [
-                CallbackQueryHandler(handle_medical_report_choice,          pattern="^medrep:(yes|no|skip)$"),
+                CallbackQueryHandler(handle_medical_report_choice,          pattern="^medrep:(yes|no|pending)$"),
                 CallbackQueryHandler(handle_cancel_navigation,              pattern="^nav:cancel$"),
                 CallbackQueryHandler(sh['handle_smart_back_navigation'],    pattern="^nav:back$"),
             ],
@@ -1024,7 +1024,7 @@ def register(app):
             CallbackQueryHandler(handle_hospital_selection,                   pattern="^select_hospital:"),
             CallbackQueryHandler(handle_cancel_navigation,                    pattern="^nav:cancel$"),
             # medrep gate: handle regardless of current state to prevent unhandled-callback fallthrough
-            CallbackQueryHandler(handle_medical_report_choice,                pattern="^medrep:(yes|no|skip)$"),
+            CallbackQueryHandler(handle_medical_report_choice,                pattern="^medrep:(yes|no|pending)$"),
             CommandHandler("cancel", handle_cancel_navigation),
             CommandHandler("start", sh['handle_restart_from_start']),
             MessageHandler(filters.Regex(r"^/start$"),                        sh['handle_restart_from_start']),

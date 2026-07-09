@@ -500,6 +500,23 @@ def _is_medical_report_step_enabled(context) -> bool:
     return True
 
 
+def build_medical_report_gate_keyboard() -> InlineKeyboardMarkup:
+    """بوابة التقرير الطبي الموحّدة بثلاث حالات — مصدر واحد تستورده كل
+    مواضع عرض البوابة (shared / navigation_helpers / execute_smart_state_action)
+    لتفادي تباعد النسخ. لا تعتمد على flow_type إطلاقاً (بوابة موحّدة لكل
+    المسارات، تحل محل زر "تخطي" القديم):
+      medrep:yes     → ✅ يوجد تقرير طبي (رفع الملفات)
+      medrep:pending → 🟡 لم يجهز بعد (يُحفظ Pending ويظهر في المعلقة)
+      medrep:no      → ❌ لا يوجد تقرير (مربع سبب، حالة منتهية)
+    """
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ يوجد تقرير طبي", callback_data="medrep:yes")],
+        [InlineKeyboardButton("🟡 لم يجهز بعد",   callback_data="medrep:pending")],
+        [InlineKeyboardButton("❌ لا يوجد تقرير", callback_data="medrep:no")],
+        [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back")],
+    ])
+
+
 async def show_translator_selection(message, context, flow_type):
     """
     عرض قائمة المترجمين للاختيار (من ملف translator_names.txt)
@@ -521,46 +538,28 @@ async def show_translator_selection(message, context, flow_type):
             and (not report_tmp.get("_medical_report_step_done"))
         ):
             report_tmp["_pending_translator_flow"] = flow_type
-            first_row = [
-                InlineKeyboardButton("✅ نعم", callback_data="medrep:yes"),
-                InlineKeyboardButton("❌ لا", callback_data="medrep:no"),
-            ]
-            # ✅ إضافة زر "تخطي" للمسارات التي لا تحتاج تقرير فوري
-            # radiology: قد لا تكون النتائج جاهزة
-            # followup/inpatient_followup: المريض مرقد ولا يمكن عمل تقرير الآن
-            if flow_type in ("radiology", "followup", "inpatient_followup", "periodic_followup"):
-                first_row.append(InlineKeyboardButton("⏭️ تخطي", callback_data="medrep:skip"))
-
-            keyboard = InlineKeyboardMarkup(
-                [
-                    first_row,
-                    [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back")],
-                ]
-            )
+            # ✅ بوابة موحّدة بثلاث حالات لكل المسارات (بلا زر "تخطي")
+            keyboard = build_medical_report_gate_keyboard()
             if flow_type == "operation":
                 gate_text = (
                     "📎 **هل يوجد تقرير طبي او صور للعملية؟**\n\n"
-                    "اختر (نعم) إذا يوجد تقرير أو صور، أو (لا) إذا لا يوجد، أو (تخطي) إذا كنت ستحضره لاحقاً."
-                )
-            elif flow_type in ("followup", "inpatient_followup"):
-                gate_text = (
-                    "📎 **هل يوجد تقرير طبي؟**\n\n"
-                    "اختر (نعم) إذا يوجد تقرير، أو (لا) إذا لا يوجد، أو (تخطي) لأن المريض مرقد."
-                )
-            elif flow_type == "periodic_followup":
-                gate_text = (
-                    "📎 **هل يوجد تقرير طبي؟**\n\n"
-                    "اختر (نعم) إذا يوجد تقرير، أو (لا) إذا لا يوجد، أو (تخطي) للمتابعة بدون تقرير."
+                    "• ✅ يوجد تقرير طبي — لرفع التقرير أو الصور الآن\n"
+                    "• 🟡 لم يجهز بعد — ستحضره لاحقاً (يظهر في المعلقة)\n"
+                    "• ❌ لا يوجد تقرير — مع كتابة السبب"
                 )
             elif flow_type in ("rehab_physical", "rehab_device", "device"):
                 gate_text = (
                     "📎 **هل يوجد صور او فيدوهات للتمارين؟**\n\n"
-                    "اختر (نعم) إذا يوجد صور أو فيديوهات، أو (لا) إذا لا يوجد."
+                    "• ✅ يوجد تقرير طبي — لرفع الصور أو الفيديوهات الآن\n"
+                    "• 🟡 لم يجهز بعد — ستحضرها لاحقاً (تظهر في المعلقة)\n"
+                    "• ❌ لا يوجد تقرير — مع كتابة السبب"
                 )
             else:
                 gate_text = (
                     "📎 **هل يوجد تقرير طبي؟**\n\n"
-                    "اختر (نعم) إذا يوجد تقرير طبي، أو (لا) إذا لا يوجد."
+                    "• ✅ يوجد تقرير طبي — لرفع التقرير الآن\n"
+                    "• 🟡 لم يجهز بعد — سيُحضَر لاحقاً (يظهر في المعلقة)\n"
+                    "• ❌ لا يوجد تقرير — مع كتابة السبب"
                 )
             await message.reply_text(
                 gate_text,
@@ -617,9 +616,10 @@ async def show_translator_selection(message, context, flow_type):
 
 async def handle_medical_report_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    معالجة بوابة 'هل يوجد تقرير طبي؟'
-    - yes/skip: انتقال مباشر لاختيار المترجم
-    - no: طلب كتابة سبب عدم وجود التقرير
+    معالجة بوابة 'هل يوجد تقرير طبي؟' — ثلاث حالات:
+    - yes:     فتح شاشة رفع الملفات الطبية.
+    - pending: حفظ الحالة كـ"لم يجهز بعد" (Pending) والانتقال مباشرة للمترجم.
+    - no:      طلب كتابة سبب عدم وجود التقرير (حالة منتهية، لا تظهر في المعلقة).
     """
     query = update.callback_query
     await query.answer()
@@ -628,42 +628,41 @@ async def handle_medical_report_choice(update: Update, context: ContextTypes.DEF
     flow_type = report_tmp.get("_pending_translator_flow", "new_consult")
     context.user_data.pop("_skip_medical_gate_once", None)
 
-    choice = query.data.split(":")[1]  # yes / no / skip
+    choice = query.data.split(":")[1]  # yes / pending / no
 
     if choice == "no":
-        # طلب سبب عدم وجود التقرير الطبي
+        # طلب سبب عدم وجود التقرير الطبي — حالة منتهية لا تُتتبَّع كمعلقة
+        report_tmp.pop("_medical_report_pending", None)
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back")],
         ])
         await query.edit_message_text(
             "📝 **سبب عدم وجود التقرير الطبي**\n\n"
-            "أدخل سبب عدم وجود التقرير الطبي:",
+            "أدخل سبب عدم وجود التقرير الطبي\n"
+            "(مثال: المريض مرقد، متابعة دورية، مراجعة فقط، علاج طبيعي، لم يصدر تقرير):",
             reply_markup=keyboard,
             parse_mode="Markdown",
         )
         context.user_data["_conversation_state"] = "MEDICAL_REPORT_NO_REASON"
         return "MEDICAL_REPORT_NO_REASON"
 
-    # skip → انتقال مباشر للمترجم بدون رفع ملفات
-    if choice == "skip":
+    # pending → "🟡 لم يجهز بعد": يُحفظ كتقرير معلق ويظهر في قائمة المعلقة
+    # حتى يُرفع لاحقاً عبر زر المرفقات الطبية (فيتحول تلقائياً إلى "يوجد").
+    if choice == "pending":
+        report_tmp["_medical_report_pending"] = True
         report_tmp["_medical_report_step_done"] = True
-        # ✅ يجب تسجيل سبب واضح هنا وإلا فلن يُنشأ سجل "تقرير معلق" عند
-        # الحفظ (الشرط في مكان الحفظ يتطلب no_report_reason غير فارغ) —
-        # وهذا بالضبط ما يجعل زر "تخطي" (المريض مرقد وغيرها) يظهر لاحقاً
-        # في تقرير التقارير المعلقة الساعة 9 مساءً.
-        _skip_reasons = {
-            "radiology": "تم التخطي - نتائج الأشعة غير جاهزة بعد",
-            "followup": "تم التخطي - المريض مرقد",
-            "inpatient_followup": "تم التخطي - المريض مرقد",
-            "periodic_followup": "تم التخطي - متابعة دورية بدون تقرير",
-        }
-        report_tmp["no_report_reason"] = _skip_reasons.get(flow_type, "تم التخطي - سيتم إحضار التقرير لاحقاً")
-        context.user_data.pop("_skip_medical_gate_once", None)
-        await query.edit_message_text("✅ تم.")
+        report_tmp.pop("_medical_attachments", None)
+        report_tmp.pop("no_report_reason", None)
+        await query.edit_message_text(
+            "🟡 **تم الحفظ — التقرير لم يجهز بعد**\n\n"
+            "ستظهر هذه الحالة في قائمة التقارير الطبية المعلقة حتى ترفع "
+            "التقرير لاحقاً من زر المرفقات الطبية."
+        )
         await show_translator_selection(query.message, context, flow_type)
         return get_translator_state(flow_type)
 
     # yes → فتح شاشة رفع الملفات الطبية
+    report_tmp.pop("_medical_report_pending", None)
     report_tmp["_medical_attachments"] = []
     report_tmp["_medical_report_step_done"] = False
 
@@ -2182,13 +2181,21 @@ async def save_report_to_database(query, context, flow_type):
             radiation_therapy_final_notes=(data.get("radiation_therapy_final_notes", "") or None) if flow_type == "radiation_therapy" else None,
             radiation_therapy_completed=(data.get("radiation_therapy_completed", False)) if flow_type == "radiation_therapy" else False,
 
-            # ✅ حقول التقرير الطبي الورقي
+            # ✅ حقول التقرير الطبي الورقي — ثلاث حالات:
+            #   1 = يوجد تقرير (مرفوع)، 2 = لم يجهز بعد (Pending)، 0 = لا يوجد (+سبب)
+            #   None = لم يُسأل (المسارات المستثناة من البوابة فقط)
             has_paper_report=(
-                1 if data.get("_medical_attachments") else 0
+                1 if data.get("_medical_attachments") else
+                2 if data.get("_medical_report_pending") else
+                0
             ) if data.get("_medical_report_step_done") is not None else None,
             no_paper_report_reason=(
                 data.get("no_report_reason") or None
-            ) if data.get("_medical_report_step_done") is not None and not data.get("_medical_attachments") else None,
+            ) if (
+                data.get("_medical_report_step_done") is not None
+                and not data.get("_medical_attachments")
+                and not data.get("_medical_report_pending")
+            ) else None,
         )
 
         # ✅ تحقق قبل الحفظ: translator_id يجب أن يكون موجوداً
@@ -2211,9 +2218,10 @@ async def save_report_to_database(query, context, flow_type):
             f"action={final_medical_action}"
         )
 
-        # ✅ حفظ التقرير المعلق إذا كان لا يوجد تقرير طبي
-        no_report_reason = data.get("no_report_reason")
-        if no_report_reason and data.get("_medical_report_step_done"):
+        # ✅ حفظ التقرير المعلق فقط لحالة "🟡 لم يجهز بعد" — هذه وحدها التي
+        # تظهر في قائمة التقارير المعلقة. حالة "❌ لا يوجد تقرير" (بسبب) حالة
+        # منتهية ولا تُنشئ سجلاً معلقاً إطلاقاً.
+        if data.get("_medical_report_pending") and data.get("_medical_report_step_done"):
             try:
                 from services.pending_reports_service import add_pending_report
                 add_pending_report(
@@ -2227,9 +2235,9 @@ async def save_report_to_database(query, context, flow_type):
                     department=dept_name_for_display or dept_name or "غير محدد",
                     translator_id=actual_translator_id,
                     translator_name=actual_translator_name,
-                    no_report_reason=no_report_reason
+                    no_report_reason="🟡 لم يجهز بعد",
                 )
-                logger.info(f"✅ Pending report created for report_id={report_id}, patient={patient_name}")
+                logger.info(f"✅ Pending report created (not-ready-yet) for report_id={report_id}, patient={patient_name}")
             except Exception as e:
                 logger.error(f"⚠️ Failed to create pending report: {e}", exc_info=True)
 
@@ -2309,6 +2317,9 @@ async def save_report_to_database(query, context, flow_type):
                 'medical_attachments': data.get("_medical_attachments", []),
                 'no_report_reason': data.get("no_report_reason", ""),
                 '_medical_report_step_done': data.get("_medical_report_step_done"),
+                # ✅ علامة الحالة "🟡 لم يجهز بعد" — تُستخدم في بناء سطر حالة
+                # التقرير الطبي داخل بطاقة المجموعة (_build_medical_report_status).
+                '_medical_report_pending': data.get("_medical_report_pending"),
             }
             
             # ✅ إضافة التشخيص لجميع المسارات التي تحتاجه

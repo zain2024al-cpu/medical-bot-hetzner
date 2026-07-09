@@ -693,13 +693,15 @@ def _build_medical_report_status(data: dict) -> list:
 
     lines = [""]
     if attachments:
-        lines.append(f"📎 تقرير طبي: ✅ نعم — تم الإرسال ({len(attachments)} {'ملف' if len(attachments) == 1 else 'ملفات'})")
+        lines.append(f"📎 تقرير طبي: ✅ يوجد تقرير طبي — تم الإرسال ({len(attachments)} {'ملف' if len(attachments) == 1 else 'ملفات'})")
+    elif data.get('has_paper_report') == 2 or data.get('_medical_report_pending'):
+        lines.append("📎 تقرير طبي: 🟡 لم يجهز بعد")
     elif no_reason and no_reason not in ('لا يوجد', 'None', ''):
-        lines.append(f"📎 تقرير طبي: ❌ لا — {no_reason}")
+        lines.append(f"📎 تقرير طبي: ❌ لا يوجد تقرير — {no_reason}")
     elif data.get('has_paper_report') == 1:
-        lines.append("📎 تقرير طبي: ✅ نعم")
+        lines.append("📎 تقرير طبي: ✅ يوجد تقرير طبي")
     elif data.get('has_paper_report') == 0 and not no_reason:
-        lines.append("📎 تقرير طبي: ❌ لا")
+        lines.append("📎 تقرير طبي: ❌ لا يوجد تقرير")
     elif data.get('_medical_report_step_done') is not None:
         lines.append("📎 تقرير طبي: ⏭️ لم يُحدد")
     # إذا لم يمر بالبوابة أصلاً (تقرير معدَّل/قديم) لا نضيف شيئاً

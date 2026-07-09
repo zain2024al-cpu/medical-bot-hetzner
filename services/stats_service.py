@@ -195,7 +195,8 @@ def _run_translator_query(session, start_date_str: str, end_date_str: str):
                     THEN 1 ELSE 0 END
                 ) as late_reports,
                 SUM(CASE WHEN r.has_paper_report = 1 THEN 1 ELSE 0 END) as paper_yes,
-                SUM(CASE WHEN r.has_paper_report = 0 THEN 1 ELSE 0 END) as paper_no
+                SUM(CASE WHEN r.has_paper_report = 0 THEN 1 ELSE 0 END) as paper_no,
+                SUM(CASE WHEN r.has_paper_report = 2 THEN 1 ELSE 0 END) as paper_pending
             FROM reports r
             LEFT JOIN translators td ON r.translator_id = td.translator_id
             WHERE (
@@ -213,7 +214,7 @@ def _run_translator_query(session, start_date_str: str, end_date_str: str):
         # ═══ LOG: عدد المترجمين والتقارير ═══
         logger.info(f"📊 stats_service: range=[{start_date_str} → {end_date_str}], translators={len(rows)}")
         for row in rows:
-            logger.info(f"   ├ tid={row[0]}, name={row[1]}, reports={row[2]}, days={row[3]}, late={row[4]}, paper_yes={row[5]}, paper_no={row[6]}")
+            logger.info(f"   ├ tid={row[0]}, name={row[1]}, reports={row[2]}, days={row[3]}, late={row[4]}, paper_yes={row[5]}, paper_no={row[6]}, paper_pending={row[7]}")
 
         # ═══ شرط التاريخ الموحّد (يلتقط التقارير القديمة المحفوظة بـ UTC أيضاً) ═══
         _DATE_FILTER = """(
@@ -283,6 +284,7 @@ def _run_translator_query(session, start_date_str: str, end_date_str: str):
             late = row[4] or 0
             paper_yes = int(row[5] or 0)
             paper_no = int(row[6] or 0)
+            paper_pending = int(row[7] or 0)
             work_days = attendance_days
 
             # بناء action_breakdown مع ضمان وجود كل الأنواع الـ 13
@@ -307,6 +309,7 @@ def _run_translator_query(session, start_date_str: str, end_date_str: str):
                 "late_reports": late,
                 "paper_yes": paper_yes,
                 "paper_no": paper_no,
+                "paper_pending": paper_pending,
                 "action_breakdown": action_breakdown,
                 "start_date": start_date_str,
                 "end_date": end_date_str,
@@ -409,6 +412,7 @@ def _run_translator_query_resilient(start_date_str: str, end_date_str: str):
                 "late_reports": 0,
                 "paper_yes": 0,
                 "paper_no": 0,
+                "paper_pending": 0,
                 "action_breakdown": {a: 0 for a in ALL_ACTION_TYPES},
             }
 
@@ -424,6 +428,8 @@ def _run_translator_query_resilient(start_date_str: str, end_date_str: str):
             item["paper_yes"] += 1
         elif has_paper_report == 0:
             item["paper_no"] += 1
+        elif has_paper_report == 2:
+            item["paper_pending"] += 1
 
         action_name = normalize_action_name(medical_action) or "أخرى"
         item["action_breakdown"][action_name] = item["action_breakdown"].get(action_name, 0) + 1
@@ -445,6 +451,7 @@ def _run_translator_query_resilient(start_date_str: str, end_date_str: str):
             "late_reports": item["late_reports"],
             "paper_yes": item["paper_yes"],
             "paper_no": item["paper_no"],
+            "paper_pending": item["paper_pending"],
             "action_breakdown": item["action_breakdown"],
             "start_date": start_date_str,
             "end_date": end_date_str,
