@@ -11,6 +11,7 @@ from config.settings import ADMIN_IDS
 from datetime import datetime
 import logging
 import os
+from bot.handlers.admin.decorators import require_admin
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +77,7 @@ async def start_admin_management(update: Update, context: ContextTypes.DEFAULT_T
     
     return AA_START
 
+@require_admin
 async def handle_admin_actions(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة أزرار إدارة الأدمنين"""
     query = update.callback_query
@@ -181,6 +183,7 @@ async def handle_admin_actions(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         return AA_CONFIRM_REMOVE
 
+@require_admin
 async def handle_add_admin_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة إدخال معرف الأدمن الجديد"""
     user_id_str = update.message.text.strip()
@@ -241,6 +244,7 @@ async def handle_add_admin_input(update: Update, context: ContextTypes.DEFAULT_T
     )
     return AA_START
 
+@require_admin
 async def handle_confirm_remove_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """تأكيد حذف الأدمن"""
     query = update.callback_query

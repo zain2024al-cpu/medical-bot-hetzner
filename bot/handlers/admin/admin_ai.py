@@ -3,6 +3,7 @@ from telegram.ext import CommandHandler, MessageHandler, filters, ContextTypes, 
 from services.ai_engine import analyze_reports
 from db.models import Report, Patient, Hospital  # ✅ إزالة Case واستبدال بـ Report
 from bot.shared_utils import summarize_text
+from bot.handlers.admin.decorators import require_admin
 
 # ==========================================
 # 📊 تحليل التقارير الطبية عبر الذكاء الاصطناعي
@@ -10,11 +11,13 @@ from bot.shared_utils import summarize_text
 
 ASK_QUERY = range(1)
 
+@require_admin
 async def start_ai_analysis(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🤖 أرسل النص أو التقرير الطبي الذي تريد تحليله:")
     return ASK_QUERY
 
 
+@require_admin
 async def process_ai_analysis(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_input = update.message.text
 
@@ -30,6 +33,7 @@ async def process_ai_analysis(update: Update, context: ContextTypes.DEFAULT_TYPE
     return ConversationHandler.END
 
 
+@require_admin
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🚫 تم إلغاء التحليل.")
     return ConversationHandler.END

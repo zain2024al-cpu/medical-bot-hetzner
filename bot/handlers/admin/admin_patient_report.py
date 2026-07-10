@@ -33,6 +33,7 @@ from telegram.ext import (
 )
 
 from bot.shared_auth import is_admin
+from bot.handlers.admin.decorators import require_admin
 
 logger = logging.getLogger(__name__)
 
@@ -131,6 +132,7 @@ async def start_patient_report(
 
 # ── State PR_SEARCH — user typed a name ──────────────────────────────────────
 
+@require_admin
 async def handle_patient_search(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
@@ -182,6 +184,7 @@ async def handle_patient_search(
 
 # ── State PR_PICK — user tapped a patient button ──────────────────────────────
 
+@require_admin
 async def handle_patient_picked(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
@@ -226,6 +229,7 @@ async def handle_patient_picked(
 
 # ── State PR_DEPTS — user chose departments ───────────────────────────────────
 
+@require_admin
 async def handle_depts_picked(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
@@ -274,6 +278,7 @@ async def handle_depts_picked(
 
 # ── State PR_ACTIONS — user chose procedure types ──────────────────────────────
 
+@require_admin
 async def handle_actions_picked(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
@@ -325,6 +330,7 @@ async def handle_actions_picked(
 
 # ── State PR_PERIOD — user chose a time range ─────────────────────────────────
 
+@require_admin
 async def handle_period_picked(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
@@ -438,6 +444,7 @@ async def handle_period_picked(
 
 # ── Cancel handler ─────────────────────────────────────────────────────────────
 
+@require_admin
 async def cancel_patient_report(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:

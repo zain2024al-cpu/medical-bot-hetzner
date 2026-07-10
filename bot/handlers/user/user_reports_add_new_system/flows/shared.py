@@ -1606,7 +1606,7 @@ async def handle_final_confirm(update: Update, context: ContextTypes.DEFAULT_TYP
         except Exception as e:
             logger.error(f"❌ Error in save_report_to_database: {e}", exc_info=True)
             context.user_data.pop("_publishing", None)
-            await query.answer(f"خطأ في النشر: {str(e)[:50]}", show_alert=True)
+            await query.answer("حدث خطأ غير متوقع، يرجى المحاولة لاحقاً.", show_alert=True)
             return get_confirm_state(flow_type)
         finally:
             context.user_data.pop("_publishing", None)
@@ -2709,8 +2709,8 @@ async def save_report_to_database(query, context, flow_type):
                         parse_mode="Markdown"
                     )
                 else:
-                    # ✅ Fallback: استخدام answer
-                    await query.answer(f"❌ خطأ: {str(e)[:100]}", show_alert=True)
+                    # ✅ Fallback: رسالة عامة بلا تفاصيل تقنية
+                    await query.answer("حدث خطأ غير متوقع، يرجى المحاولة لاحقاً.", show_alert=True)
             except Exception as fallback_err:
                 logger.error(f"❌ Error in fallback error message: {fallback_err}")
                 await query.answer("❌ حدث خطأ أثناء الحفظ", show_alert=True)

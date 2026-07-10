@@ -25,6 +25,7 @@ from telegram.ext import (
 )
 
 from bot.shared_auth import is_admin
+from bot.handlers.admin.decorators import require_admin
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +67,7 @@ async def start_reports_menu(
 
 # ── Callback handler ──────────────────────────────────────────────────────────
 
+@require_admin
 async def handle_type_selection(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
@@ -110,6 +112,7 @@ async def handle_type_selection(
 
 # ── Cancel ────────────────────────────────────────────────────────────────────
 
+@require_admin
 async def cancel_reports_menu(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:

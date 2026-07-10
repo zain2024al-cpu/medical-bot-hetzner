@@ -18,6 +18,7 @@ from datetime import datetime
 from db.session import SessionLocal
 from db.models import ScheduleImage, DailySchedule, Translator
 from bot.shared_auth import is_admin
+from bot.handlers.admin.decorators import require_admin
 
 UPLOAD_IMAGE, CONFIRM_SAVE = range(2)
 
@@ -37,6 +38,7 @@ async def start_upload_schedule(update: Update, context: ContextTypes.DEFAULT_TY
     await update.message.reply_text("📤 أرسل صورة *جدول اليوم* الآن (كصورة أو كملف صورة).", parse_mode="HTML")
     return UPLOAD_IMAGE
 
+@require_admin
 async def receive_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
     # الصورة قد تكون photo (list) أو document
@@ -59,6 +61,7 @@ async def receive_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("✅ تم استلام الصورة. هل تريد حفظها كـ 'جدول اليوم'؟", reply_markup=_confirm_kb())
     return CONFIRM_SAVE
 
+@require_admin
 async def handle_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
@@ -116,6 +119,7 @@ async def handle_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await q.edit_message_text("✅ تم حفظ جدول اليوم وإتاحته للمستخدمين.")
     return ConversationHandler.END
 
+@require_admin
 async def cancel_flow(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # إلغاء عبر رسالة نصية (بديل)
     context.user_data.clear()

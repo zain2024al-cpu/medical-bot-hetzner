@@ -28,6 +28,7 @@ from telegram.constants import ParseMode
 from telegram.ext import ContextTypes, CallbackQueryHandler, MessageHandler, filters
 
 from bot.shared_auth import is_admin
+from bot.handlers.admin.decorators import require_admin
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +67,7 @@ async def start_evaluation_menu(
         logger.error(f"[eval_menu] Failed to show menu: {exc}")
 
 
+@require_admin
 async def handle_menu_cancel(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:

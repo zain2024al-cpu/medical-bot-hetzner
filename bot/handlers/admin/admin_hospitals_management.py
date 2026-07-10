@@ -16,6 +16,7 @@ from services.hospitals_service import (
     update_hospital as service_update_hospital,
 )
 from services.doctors_smart_search import reload_doctors as _reload_doctors_cache
+from bot.handlers.admin.decorators import require_admin
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +59,7 @@ async def handle_manage_hospitals(update: Update, context: ContextTypes.DEFAULT_
         parse_mode=ParseMode.MARKDOWN
     )
 
+@require_admin
 async def handle_view_hospitals(update: Update, context: ContextTypes.DEFAULT_TYPE, page=0):
     """عرض جميع المستشفيات مع صفحات"""
     query = update.callback_query
@@ -136,6 +138,7 @@ async def handle_view_hospitals(update: Update, context: ContextTypes.DEFAULT_TY
                 parse_mode=ParseMode.MARKDOWN
             )
 
+@require_admin
 async def handle_add_hospital(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """بدء إضافة مستشفى جديد"""
     query = update.callback_query
@@ -154,6 +157,7 @@ async def handle_add_hospital(update: Update, context: ContextTypes.DEFAULT_TYPE
     )
     return "ADD_HOSPITAL_NAME"
 
+@require_admin
 async def handle_hospital_name_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة إدخال اسم المستشفى الجديد"""
     name = update.message.text.strip()
@@ -192,6 +196,7 @@ async def handle_hospital_name_input(update: Update, context: ContextTypes.DEFAU
     )
     return ConversationHandler.END
 
+@require_admin
 async def handle_delete_hospital(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """واجهة حذف مستشفى"""
     query = update.callback_query
@@ -262,6 +267,7 @@ async def handle_delete_hospital(update: Update, context: ContextTypes.DEFAULT_T
         parse_mode=ParseMode.MARKDOWN
     )
 
+@require_admin
 async def handle_confirm_delete_hospital(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """تأكيد حذف مستشفى"""
     query = update.callback_query
@@ -321,6 +327,7 @@ async def handle_confirm_delete_hospital(update: Update, context: ContextTypes.D
             parse_mode=ParseMode.MARKDOWN
         )
 
+@require_admin
 async def handle_edit_hospital(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """واجهة تعديل مستشفى"""
     query = update.callback_query
@@ -391,6 +398,7 @@ async def handle_edit_hospital(update: Update, context: ContextTypes.DEFAULT_TYP
         parse_mode=ParseMode.MARKDOWN
     )
 
+@require_admin
 async def handle_select_edit_hospital(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة اختيار مستشفى للتعديل"""
     query = update.callback_query
@@ -440,6 +448,7 @@ async def handle_select_edit_hospital(update: Update, context: ContextTypes.DEFA
 
     return "EDIT_HOSPITAL_INPUT"
 
+@require_admin
 async def handle_edit_hospital_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة إدخال الاسم الجديد للمستشفى"""
     new_name = update.message.text.strip()
@@ -490,6 +499,7 @@ async def handle_edit_hospital_input(update: Update, context: ContextTypes.DEFAU
 
 
 
+@require_admin
 async def handle_cancel_hospital_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """إلغاء عملية إضافة/تعديل مستشفى"""
     query = update.callback_query

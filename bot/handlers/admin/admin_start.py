@@ -10,6 +10,7 @@ from bot.keyboards import admin_main_kb, admin_main_inline_kb, reports_group_man
 from db.session import SessionLocal
 from db.models import Translator
 from datetime import datetime
+from bot.handlers.admin.decorators import require_admin
 
 
 # 🟣 أمر /admin لفتح لوحة تحكم الأدمن
@@ -60,6 +61,7 @@ async def cancel_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ✅ دالة لمعالجة زر القبول / الرفض للمستخدمين الجدد
+@require_admin
 async def handle_user_approval(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -343,6 +345,7 @@ async def handle_group_management(update, context):
         )
 
 
+@require_admin
 async def handle_group_settings(update, context):
     """معالجة إعدادات المجموعة"""
     import logging

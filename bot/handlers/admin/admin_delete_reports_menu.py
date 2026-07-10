@@ -18,6 +18,7 @@ from telegram.ext import (
 )
 
 from bot.shared_auth import is_admin
+from bot.handlers.admin.decorators import require_admin
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +67,7 @@ async def start_delete_reports_menu(
     return SHOW_MENU
 
 
+@require_admin
 async def handle_menu_choice(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
@@ -253,6 +255,7 @@ async def _delete_services_reports(
             pass
 
 
+@require_admin
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Cancel handler."""
     query = update.callback_query
@@ -423,6 +426,7 @@ async def _show_hc_list(query, year: int, month: int, page: int = 0) -> None:
         logger.error(f"[del_menu] Failed to render healthcare list: {exc}")
 
 
+@require_admin
 async def handle_healthcare_callback(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
@@ -629,6 +633,7 @@ async def handle_healthcare_callback(
                 pass
 
 
+@require_admin
 async def handle_services_callback(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:

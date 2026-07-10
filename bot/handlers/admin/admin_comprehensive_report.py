@@ -39,6 +39,8 @@ from telegram.ext import (
     CallbackQueryHandler,
 )
 
+from bot.handlers.admin.decorators import require_admin
+
 logger = logging.getLogger(__name__)
 
 # ── States ────────────────────────────────────────────────────────────────────
@@ -426,6 +428,7 @@ async def _generate_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 # ── Main callback dispatcher ────────────────────────────────────────────────────
 
+@require_admin
 async def handle_period(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:

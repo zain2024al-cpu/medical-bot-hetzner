@@ -11,6 +11,7 @@ import os
 from db.session import SessionLocal
 from db.models import User, TranslatorDirectory
 from bot.shared_auth import is_admin
+from bot.handlers.admin.decorators import require_admin
 
 logger = logging.getLogger(__name__)
 
@@ -172,6 +173,7 @@ async def handle_manage_translators(update: Update, context: ContextTypes.DEFAUL
     )
 
 
+@require_admin
 async def handle_view_translators(update: Update, context: ContextTypes.DEFAULT_TYPE, page=0):
     """عرض جميع المترجمين مع صفحات"""
     query = update.callback_query
@@ -232,6 +234,7 @@ async def handle_view_translators(update: Update, context: ContextTypes.DEFAULT_
         )
 
 
+@require_admin
 async def handle_add_translator(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """بدء إضافة مترجم جديد"""
     query = update.callback_query
@@ -251,6 +254,7 @@ async def handle_add_translator(update: Update, context: ContextTypes.DEFAULT_TY
     return "ADD_TRANSLATOR_NAME"
 
 
+@require_admin
 async def handle_translator_name_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة إدخال اسم المترجم الجديد"""
     name = update.message.text.strip()
@@ -310,6 +314,7 @@ async def handle_translator_name_input(update: Update, context: ContextTypes.DEF
     return ConversationHandler.END
 
 
+@require_admin
 async def handle_delete_translator(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """واجهة حذف مترجم"""
     query = update.callback_query
@@ -376,6 +381,7 @@ async def handle_delete_translator(update: Update, context: ContextTypes.DEFAULT
     )
 
 
+@require_admin
 async def handle_confirm_delete_translator(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """تأكيد حذف مترجم"""
     query = update.callback_query
@@ -438,6 +444,7 @@ async def handle_confirm_delete_translator(update: Update, context: ContextTypes
         )
 
 
+@require_admin
 async def handle_edit_translator(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """واجهة تعديل مترجم"""
     query = update.callback_query
@@ -504,6 +511,7 @@ async def handle_edit_translator(update: Update, context: ContextTypes.DEFAULT_T
     )
 
 
+@require_admin
 async def handle_select_edit_translator(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة اختيار مترجم للتعديل"""
     query = update.callback_query
@@ -548,6 +556,7 @@ async def handle_select_edit_translator(update: Update, context: ContextTypes.DE
     return "EDIT_TRANSLATOR_INPUT"
 
 
+@require_admin
 async def handle_edit_translator_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة إدخال الاسم الجديد للمترجم"""
     new_name = update.message.text.strip()
@@ -619,6 +628,7 @@ async def handle_edit_translator_input(update: Update, context: ContextTypes.DEF
     return ConversationHandler.END
 
 
+@require_admin
 async def handle_sync_translators(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """مزامنة المترجمين من قاعدة البيانات (المستخدمين المعتمدين)"""
     query = update.callback_query
@@ -680,6 +690,7 @@ async def handle_sync_translators(update: Update, context: ContextTypes.DEFAULT_
         )
 
 
+@require_admin
 async def handle_cancel_translator_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """إلغاء عملية إضافة/تعديل مترجم"""
     query = update.callback_query

@@ -8,6 +8,7 @@ from telegram.ext import (
 )
 from db.session import SessionLocal
 from db.models import AdminNote
+from bot.handlers.admin.decorators import require_admin
 
 ASK_NOTE = 800
 
@@ -16,10 +17,12 @@ def _cancel_inline():
         [[InlineKeyboardButton("❌ إلغاء المحادثة", callback_data="admin_cancel")]]
     )
 
+@require_admin
 async def start_notes(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("✍️ أرسل الملاحظة الإدارية:", reply_markup=_cancel_inline())
     return ASK_NOTE
 
+@require_admin
 async def receive_note(update: Update, context: ContextTypes.DEFAULT_TYPE):
     txt = update.message.text.strip()
     if not txt:
@@ -33,6 +36,7 @@ async def receive_note(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("✅ تمت إضافة الملاحظة.")
     return ConversationHandler.END
 
+@require_admin
 async def admin_cancel_inline(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()

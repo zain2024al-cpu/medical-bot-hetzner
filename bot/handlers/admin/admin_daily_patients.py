@@ -13,6 +13,7 @@ from datetime import datetime, date
 from db.session import SessionLocal
 from db.models import DailyPatient, Translator, DailySchedule
 from bot.shared_auth import is_admin
+from bot.handlers.admin.decorators import require_admin
 
 # حالات المحادثة
 SELECT_ACTION, ADD_PATIENTS, CONFIRM_ADD, VIEW_PATIENTS = range(4)
@@ -47,6 +48,7 @@ async def start_daily_patients_management(update: Update, context: ContextTypes.
     
     return SELECT_ACTION
 
+@require_admin
 async def handle_action_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة اختيار العملية"""
     query = update.callback_query
@@ -101,6 +103,7 @@ async def handle_action_selection(update: Update, context: ContextTypes.DEFAULT_
         
         return SELECT_ACTION
 
+@require_admin
 async def handle_patients_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة إدخال أسماء المرضى"""
     text = update.message.text.strip()
@@ -184,6 +187,7 @@ async def handle_patients_input(update: Update, context: ContextTypes.DEFAULT_TY
     
     return CONFIRM_ADD
 
+@require_admin
 async def handle_confirm_add(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """تأكيد حفظ الأسماء"""
     query = update.callback_query
@@ -278,6 +282,7 @@ async def handle_confirm_add(update: Update, context: ContextTypes.DEFAULT_TYPE)
         
         return ConversationHandler.END
 
+@require_admin
 async def back_to_schedule_from_patients(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """العودة لقائمة إدارة الجدول من أسماء المرضى"""
     query = update.callback_query
@@ -359,6 +364,7 @@ async def view_daily_patients(query, context):
         
         return ConversationHandler.END
 
+@require_admin
 async def cancel_management(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """إلغاء العملية"""
     context.user_data.clear()
@@ -369,6 +375,7 @@ async def cancel_management(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # معالجات للوصول من إدارة الجدول
 # ============================================
 
+@require_admin
 async def handle_dp_add_from_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة إضافة أسماء من إدارة الجدول"""
     query = update.callback_query
@@ -398,6 +405,7 @@ async def handle_dp_add_from_schedule(update: Update, context: ContextTypes.DEFA
     context.user_data['waiting_for_patients'] = True
     context.user_data['from_schedule'] = True
 
+@require_admin
 async def handle_dp_view_from_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة عرض أسماء من إدارة الجدول"""
     query = update.callback_query
@@ -465,6 +473,7 @@ async def handle_dp_view_from_schedule(update: Update, context: ContextTypes.DEF
         else:
             await query.edit_message_text(text, reply_markup=keyboard, parse_mode=ParseMode.MARKDOWN)
 
+@require_admin
 async def handle_dp_delete_from_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة حذف أسماء من إدارة الجدول"""
     query = update.callback_query
@@ -484,6 +493,7 @@ async def handle_dp_delete_from_schedule(update: Update, context: ContextTypes.D
         parse_mode=ParseMode.MARKDOWN
     )
 
+@require_admin
 async def handle_dp_confirm_delete_from_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """تأكيد حذف أسماء من إدارة الجدول"""
     query = update.callback_query
@@ -605,6 +615,7 @@ async def handle_text_input_for_patients(update: Update, context: ContextTypes.D
     context.user_data['patients_data'] = patients_data
     context.user_data['waiting_for_patients'] = False
 
+@require_admin
 async def handle_dp_save_from_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """حفظ الأسماء المدخلة"""
     query = update.callback_query

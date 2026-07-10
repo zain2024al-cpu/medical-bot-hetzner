@@ -35,6 +35,7 @@ from telegram.ext import (
 from bot.shared_auth import is_admin
 from shared.selectors.patient_selector import selector as patient_selector
 from shared.selectors import result_router
+from bot.handlers.admin.decorators import require_admin
 
 logger = logging.getLogger(__name__)
 
@@ -367,6 +368,7 @@ async def _show_calendar(
 
 # ── Callback handlers ─────────────────────────────────────────────────────────
 
+@require_admin
 async def handle_departments(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
@@ -445,6 +447,7 @@ async def handle_departments(
     return PR_DEPTS
 
 
+@require_admin
 async def handle_actions(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
@@ -622,6 +625,7 @@ async def _finalize_and_generate(
     return ConversationHandler.END
 
 
+@require_admin
 async def handle_period(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:

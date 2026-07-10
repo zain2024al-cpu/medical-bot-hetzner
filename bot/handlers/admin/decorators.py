@@ -11,6 +11,53 @@ from services.error_monitoring import error_monitor
 logger = logging.getLogger(__name__)
 
 
+def require_admin(func: Callable) -> Callable:
+    """🛡️ حماية موحّدة: يمنع أي مستخدم غير أدمن من الوصول للمعالج مهما كانت
+    وسيلة الوصول (زر ظاهر، أمر مكتوب، أو callback_data مُرسَل يدوياً/مُعاد).
+
+    - يُستخرَج المستخدم من كائن Update داخل الوسائط (لا يعتمد على ترتيب ثابت).
+    - غير الأدمن يُرفَض برسالة عامة مهذّبة (بلا أي بيانات) ويُعاد
+      ConversationHandler.END لتحرير أي محادثة قد تكون بدأت — آمن حتى لو لم
+      يكن المعالج ضمن ConversationHandler (القيمة المُعادة تُتجاهَل حينها).
+    - الأدمن يمر دون أي تغيير في السلوك (تمرير كامل للوسائط، ولا نستدعي
+      query.answer() هنا حتى لا نتعارض مع رد المعالج الأصلي).
+
+    يُطبَّق على نقاط دخول الأدمن (dispatcher الـcallbacks المستقلة، أوامر
+    الأدمن، أزرار القوائم، ونقاط دخول ConversationHandler). لا يحتاج تطبيقه
+    على معالجات الحالات الداخلية للمحادثة لأنها غير قابلة للوصول إلا بعد
+    اجتياز نقطة دخول محمية — لكن تطبيقه عليها أيضاً غير ضار (حماية زائدة)."""
+    @functools.wraps(func)
+    async def wrapper(*args, **kwargs):
+        from telegram.ext import ConversationHandler
+        from bot.shared_auth import is_admin
+
+        update = None
+        for a in args:
+            if hasattr(a, "effective_user"):
+                update = a
+                break
+
+        user = getattr(update, "effective_user", None) if update is not None else None
+        if user is None or not is_admin(user.id):
+            uid = getattr(user, "id", "unknown")
+            fname = getattr(func, "__name__", "?")
+            logger.warning(f"🚫 require_admin blocked non-admin user={uid} from {fname}")
+            try:
+                if update is not None and getattr(update, "callback_query", None):
+                    await update.callback_query.answer(
+                        "🚫 هذه الميزة مخصصة للإدارة فقط.", show_alert=True
+                    )
+                elif update is not None and getattr(update, "message", None):
+                    await update.message.reply_text("🚫 هذه الميزة مخصصة للإدارة فقط.")
+            except Exception:
+                pass
+            return ConversationHandler.END
+
+        return await func(*args, **kwargs)
+
+    return wrapper
+
+
 def error_handler_decorator(func: Callable) -> Callable:
     """Decorator لمعالجة الأخطاء في الدوال"""
     @functools.wraps(func)
@@ -92,6 +139,8 @@ def admin_handler(func: Callable) -> Callable:
             # محاولة إرسال رسالة للمستخدم
             try:
                 if update:
+                    # ✅ رسالة عامة فقط — لا تُكشف أي تفاصيل تقنية (نص الاستثناء)
+                    # للمستخدم. التفاصيل الكاملة مُسجَّلة في الـlog أعلاه فقط.
                     if hasattr(update, 'callback_query') and update.callback_query:
                         try:
                             await update.callback_query.answer(
@@ -102,20 +151,18 @@ def admin_handler(func: Callable) -> Callable:
                             pass
                         try:
                             await update.callback_query.edit_message_text(
-                                f"❌ **حدث خطأ**\n\n"
-                                f"الخطأ: `{str(e)[:100]}`\n\n"
-                                f"✅ تم إعادة تعيين الحالة\n"
-                                f"اضغط الزر مرة أخرى أو /start للبدء من جديد",
+                                "❌ **حدث خطأ غير متوقع**\n\n"
+                                "يرجى المحاولة لاحقاً.\n"
+                                "✅ تم إعادة تعيين الحالة — اضغط الزر مرة أخرى أو /start للبدء من جديد",
                                 parse_mode="Markdown"
                             )
                         except:
                             pass
                     elif hasattr(update, 'message') and update.message:
                         await update.message.reply_text(
-                            f"❌ **حدث خطأ**\n\n"
-                            f"الخطأ: `{str(e)[:100]}`\n\n"
-                            f"✅ تم إعادة تعيين الحالة\n"
-                            f"اضغط الزر مرة أخرى أو /start للبدء من جديد",
+                            "❌ **حدث خطأ غير متوقع**\n\n"
+                            "يرجى المحاولة لاحقاً.\n"
+                            "✅ تم إعادة تعيين الحالة — اضغط الزر مرة أخرى أو /start للبدء من جديد",
                             parse_mode="Markdown"
                         )
             except Exception as send_error:

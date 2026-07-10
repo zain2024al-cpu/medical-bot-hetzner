@@ -12,6 +12,7 @@ from services.translator_reminders import get_translator_status
 from db.session import SessionLocal
 from db.models import Translator
 from datetime import datetime
+from bot.handlers.admin.decorators import require_admin
 
 async def show_translators_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """عرض حالة جميع المترجمين"""
@@ -76,6 +77,7 @@ async def show_translators_status(update: Update, context: ContextTypes.DEFAULT_
             await update.message.reply_text(error_msg)
 
 
+@require_admin
 async def send_reminder_to_late_translators(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """إرسال تنبيه للمترجمين المتأخرين"""
     query = update.callback_query
@@ -96,6 +98,7 @@ async def send_reminder_to_late_translators(update: Update, context: ContextType
         await query.answer(f"❌ خطأ: {e}", show_alert=True)
 
 
+@require_admin
 async def show_translator_details(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """عرض تفاصيل كل مترجم"""
     query = update.callback_query

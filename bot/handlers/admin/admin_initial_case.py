@@ -10,6 +10,7 @@ from telegram.ext import (
 from db.models import Report, Patient, InitialCase
 from bot.shared_utils import format_datetime, parse_date
 from datetime import datetime
+from bot.handlers.admin.decorators import require_admin
 
 # Lazy import to handle missing weasyprint
 try:
@@ -70,6 +71,7 @@ async def start_add_case(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(first_question, reply_markup=keyboard)
     return ASK_PATIENT_NAME
 
+@require_admin
 async def ask_age(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     if text.lower() in ['إلغاء', 'الغاء', 'cancel']:
@@ -98,6 +100,7 @@ async def ask_age(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(age_text, reply_markup=keyboard)
     return ASK_AGE
 
+@require_admin
 async def ask_main_complaint(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     if text.lower() in ['إلغاء', 'الغاء', 'cancel']:
@@ -126,6 +129,7 @@ async def ask_main_complaint(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await update.message.reply_text(complaint_text, reply_markup=keyboard)
     return ASK_MAIN_COMPLAINT
 
+@require_admin
 async def ask_current_history(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     if text.lower() in ['إلغاء', 'الغاء', 'cancel']:
@@ -154,6 +158,7 @@ async def ask_current_history(update: Update, context: ContextTypes.DEFAULT_TYPE
     await update.message.reply_text(history_text, reply_markup=keyboard)
     return ASK_CURRENT_HISTORY
 
+@require_admin
 async def ask_notes(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     if text.lower() in ['إلغاء', 'الغاء', 'cancel']:
@@ -182,6 +187,7 @@ async def ask_notes(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(notes_text, reply_markup=keyboard)
     return ASK_NOTES
 
+@require_admin
 async def handle_skip_notes(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة تخطي الملاحظات"""
     query = update.callback_query
@@ -210,6 +216,7 @@ async def handle_skip_notes(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.edit_message_text(procedures_text, reply_markup=keyboard)
     return ASK_PREVIOUS_PROCEDURES
 
+@require_admin
 async def ask_previous_procedures(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """طلب الإجراءات السابقة بعد حفظ الملاحظات"""
     text = update.message.text.strip()
@@ -241,6 +248,7 @@ async def ask_previous_procedures(update: Update, context: ContextTypes.DEFAULT_
     await update.message.reply_text(procedures_text, reply_markup=keyboard)
     return ASK_PREVIOUS_PROCEDURES
 
+@require_admin
 async def handle_skip_procedures(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة تخطي الإجراءات السابقة"""
     query = update.callback_query
@@ -268,6 +276,7 @@ async def handle_skip_procedures(update: Update, context: ContextTypes.DEFAULT_T
     await query.edit_message_text(tests_text, reply_markup=keyboard)
     return ASK_HAS_TESTS
 
+@require_admin
 async def show_procedure_suggestions(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """عرض اقتراحات العمليات والإجراءات"""
     query = update.callback_query
@@ -308,6 +317,7 @@ async def show_procedure_suggestions(update: Update, context: ContextTypes.DEFAU
     )
     return ASK_PREVIOUS_PROCEDURES
 
+@require_admin
 async def handle_procedure_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة اختيار إجراء من الاقتراحات"""
     query = update.callback_query
@@ -352,6 +362,7 @@ async def handle_procedure_selection(update: Update, context: ContextTypes.DEFAU
     await query.edit_message_text(confirmation_text, reply_markup=keyboard)
     return ASK_HAS_TESTS
 
+@require_admin
 async def handle_procedure_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """طلب البحث في الإجراءات"""
     query = update.callback_query
@@ -430,6 +441,7 @@ async def handle_procedure_search_query(update: Update, context: ContextTypes.DE
     )
     return ASK_PREVIOUS_PROCEDURES
 
+@require_admin
 async def handle_procedure_manual(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """إدخال يدوي للإجراء"""
     query = update.callback_query
@@ -451,6 +463,7 @@ async def handle_procedure_manual(update: Update, context: ContextTypes.DEFAULT_
     await query.edit_message_text(manual_text, reply_markup=keyboard, parse_mode="Markdown")
     return ASK_PREVIOUS_PROCEDURES
 
+@require_admin
 async def handle_procedure_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """الرجوع من الاقتراحات"""
     query = update.callback_query
@@ -503,6 +516,7 @@ async def ask_has_tests(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(tests_text, reply_markup=keyboard)
     return ASK_HAS_TESTS
 
+@require_admin
 async def handle_tests_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -536,6 +550,7 @@ async def handle_tests_choice(update: Update, context: ContextTypes.DEFAULT_TYPE
         await query.edit_message_text("⏳ **جاري إعداد الملخص...**")
         return await show_summary(update, context)
 
+@require_admin
 async def ask_test_details(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     if text.lower() in ['إلغاء', 'الغاء', 'cancel']:
@@ -636,6 +651,7 @@ async def show_summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.callback_query.message.reply_text(summary, reply_markup=keyboard, parse_mode="Markdown")
     return CONFIRM_SAVE
 
+@require_admin
 async def handle_confirm_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -652,6 +668,7 @@ async def handle_confirm_action(update: Update, context: ContextTypes.DEFAULT_TY
         )
         return ConversationHandler.END
     
+@require_admin
 async def handle_nav_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة زر الإلغاء من الأزرار Inline"""
     query = update.callback_query
@@ -664,6 +681,7 @@ async def handle_nav_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return ConversationHandler.END
 
+@require_admin
 async def handle_back_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة زر الرجوع"""
     query = update.callback_query
@@ -880,6 +898,7 @@ async def save_case(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 
+@require_admin
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     await update.message.reply_text("🚫 تم إلغاء العملية.")

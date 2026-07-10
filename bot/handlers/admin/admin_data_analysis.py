@@ -17,6 +17,7 @@ from datetime import datetime, timedelta
 from db.session import SessionLocal
 from db.models import Report, Patient, Hospital, Department, Doctor, Translator
 from bot.shared_auth import is_admin
+from bot.handlers.admin.decorators import require_admin
 from collections import Counter, defaultdict
 import re
 from statistics import mean, median
@@ -1099,6 +1100,7 @@ async def _export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
 # ── Main callback dispatcher ────────────────────────────────────────────────────
 
+@require_admin
 async def handle_data_analysis_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     try:
