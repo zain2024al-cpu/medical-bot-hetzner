@@ -51,8 +51,10 @@ def _urgency_emoji(days_waiting: int) -> str:
 
 def _render_item_text(p: dict) -> str:
     reason = (p.get("no_report_reason") or "—").strip()
+    action = (p.get("medical_action") or "—").strip()
     return (
         f"{_urgency_emoji(p['days_waiting'])} {p['patient_name']}\n"
+        f"   🩺 نوع الفحص: {action}\n"
         f"   🏢 القسم: {p['department']}\n"
         f"   👤 المترجم: {p['translator_name']}\n"
         f"   📝 السبب: {reason}\n"

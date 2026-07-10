@@ -163,16 +163,11 @@ class DatabaseMaintenance:
 def run_scheduled_maintenance(context=None):
     """
     Function to be called by the job queue.
+    النسخ الاحتياطي اليومي/الساعي يتم محلياً عبر services/render_backup.py
+    (وسكريبتات cron المستقلة على السيرفر) — لا يوجد استخدام لـGoogle Cloud
+    Storage في هذا النشر، فلا داعي لمحاولة نسخة سحابية هنا.
     """
     try:
         DatabaseMaintenance.run_maintenance()
-        # Also trigger backup if available
-        try:
-            from services.sqlite_backup import SQLiteBackupService
-            backup_service = SQLiteBackupService()
-            backup_service.backup_database(backup_type="daily_maintenance")
-        except Exception as backup_error:
-            logger.error(f"❌ Backup during maintenance failed: {backup_error}")
-            
     except Exception as e:
         logger.error(f"❌ Scheduled maintenance failed: {e}")

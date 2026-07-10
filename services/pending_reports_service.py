@@ -127,6 +127,19 @@ def get_pending_reports() -> list:
                 PendingReport.status == "pending"
             ).order_by(PendingReport.created_at.desc()).all()
 
+            # ✅ نوع الفحص/الإجراء المعلَّق — يُقرأ من جدول reports (لا يُخزَّن
+            # في pending_reports نفسه) عبر استعلام دفعة واحدة بدل استعلام
+            # منفصل لكل صف (N+1)، فلا تأثير على أداء الشاشة.
+            report_ids = [p.report_id for p in pending_list if p.report_id]
+            action_by_report_id: dict[int, str] = {}
+            if report_ids:
+                rows = (
+                    session.query(Report.id, Report.medical_action)
+                    .filter(Report.id.in_(report_ids))
+                    .all()
+                )
+                action_by_report_id = {rid: (action or "—") for rid, action in rows}
+
             # حساب عدد أيام الانتظار لكل تقرير
             result = []
             for p in pending_list:
@@ -138,6 +151,7 @@ def get_pending_reports() -> list:
                     'department': p.department,
                     'translator_name': p.translator_name,
                     'no_report_reason': p.no_report_reason,
+                    'medical_action': action_by_report_id.get(p.report_id, "—"),
                     'days_waiting': days_waiting,
                     'created_at': p.created_at
                 })

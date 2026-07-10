@@ -129,29 +129,20 @@ async def _pending_reports_daily_job(app):
         print(f"Error in pending reports daily job: {e}")
 
 async def _sqlite_quick_backup_job():
-    """مهمة النسخ الاحتياطي السريع كل 10 دقائق"""
+    """مهمة النسخ الاحتياطي السريع كل 10 دقائق (نسخة محلية فقط — لا يوجد استخدام لـGCS في هذا النشر)"""
     try:
-        # النسخة المحلية الآمنة أولاً (SQLite backup API + integrity_check)
+        # النسخة المحلية الآمنة (SQLite backup API + integrity_check)
         from services.render_backup import create_local_backup
         backup_path = await asyncio.to_thread(create_local_backup, "quick")
         if backup_path:
             print(f"Local quick backup completed: {backup_path}")
         else:
             print("Local quick backup failed")
-
-        # محاولة رفع نسخة إلى GCS (اختياري)
-        try:
-            from services.sqlite_backup import get_backup_service
-            backup_service = get_backup_service()
-            await asyncio.to_thread(backup_service.quick_backup)
-            print("SQLite quick backup to GCS completed.")
-        except Exception as gcs_error:
-            print(f"GCS quick backup skipped: {gcs_error}")
     except Exception as e:
         print(f"Error in quick backup: {e}")
 
 async def _sqlite_daily_backup_job():
-    """مهمة النسخ الاحتياطي اليومي"""
+    """مهمة النسخ الاحتياطي اليومي (نسخة محلية فقط — لا يوجد استخدام لـGCS في هذا النشر)"""
     try:
         from datetime import datetime
         from services.render_backup import create_local_backup, create_monthly_archive
@@ -171,15 +162,6 @@ async def _sqlite_daily_backup_job():
                 print(f"Monthly archive completed: {archive_path}")
             else:
                 print("Monthly archive failed")
-
-        # محاولة رفع النسخة إلى GCS (اختياري)
-        try:
-            from services.sqlite_backup import get_backup_service
-            backup_service = get_backup_service()
-            await asyncio.to_thread(lambda: backup_service.backup_database(backup_type="daily"))
-            print("SQLite daily backup to GCS completed.")
-        except Exception as gcs_error:
-            print(f"GCS daily backup skipped: {gcs_error}")
     except Exception as e:
         print(f"Error in daily backup: {e}")
 
