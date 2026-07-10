@@ -438,8 +438,10 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
         ch.data = [vals]
         ch.strokeColor = GRID
         ch.valueAxis.valueMin = 0
-        ch.valueAxis.valueMax = max(vals) + 1
-        ch.valueAxis.valueStep = max(1, int((max(vals) + 1) / 4))
+        # ✅ مساحة إضافية في نهاية المحور حتى لا تُقتطع أرقام نهايات الأعمدة
+        _vmax = max(vals)
+        ch.valueAxis.valueMax = _vmax + max(1, int(_vmax * 0.18))
+        ch.valueAxis.valueStep = max(1, int((_vmax + 1) / 4))
         ch.valueAxis.labels.fontName = font_name
         ch.valueAxis.labels.fontSize = 7.5
         ch.categoryAxis.categoryNames = [r(x) for x in labels]
@@ -449,6 +451,12 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
         ch.bars[0].fillColor = color
         ch.bars[0].strokeColor = color
         ch.barWidth = 9
+        # ✅ إظهار القيمة على كل عمود (ReportLab لا يرسمها تلقائياً)
+        ch.barLabelFormat = "%d"
+        ch.barLabels.nudge = 9
+        ch.barLabels.fontName = font_name
+        ch.barLabels.fontSize = 7.5
+        ch.barLabels.fillColor = INK
         d.add(ch)
         return d
 
@@ -960,8 +968,9 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
             chart.data = [values]
             chart.strokeColor = GRID
             chart.valueAxis.valueMin = 0
-            chart.valueAxis.valueMax = max(values) + 1
-            chart.valueAxis.valueStep = max(1, int((max(values) + 1) / 5))
+            _dmax = max(values)
+            chart.valueAxis.valueMax = _dmax + max(1, int(_dmax * 0.18))
+            chart.valueAxis.valueStep = max(1, int((_dmax + 1) / 5))
             chart.categoryAxis.categoryNames = labels
             chart.categoryAxis.labels.angle = 35
             chart.categoryAxis.labels.dy = -12
@@ -971,6 +980,12 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
             chart.valueAxis.labels.fontSize = 8
             chart.bars[0].fillColor = MAIN
             chart.bars[0].strokeColor = MAIN
+            # ✅ إظهار القيمة فوق كل عمود (بدون تغيير أي شيء آخر في الرسم)
+            chart.barLabelFormat = "%d"
+            chart.barLabels.nudge = 7
+            chart.barLabels.fontName = font_name
+            chart.barLabels.fontSize = 6.5
+            chart.barLabels.fillColor = INK
             drawing.add(Rect(0, 0, 520, 250, fillColor=colors.HexColor("#FFFFFF"), strokeColor=GRID, strokeWidth=0.7))
             drawing.add(chart)
             story.append(drawing)
@@ -1054,8 +1069,9 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
                 wch.data = [_wk]
                 wch.strokeColor = GRID
                 wch.valueAxis.valueMin = 0
-                wch.valueAxis.valueMax = max(_wk) + 1
-                wch.valueAxis.valueStep = max(1, int((max(_wk) + 1) / 4))
+                _wmax = max(_wk)
+                wch.valueAxis.valueMax = _wmax + max(1, int(_wmax * 0.18))
+                wch.valueAxis.valueStep = max(1, int((_wmax + 1) / 4))
                 wch.valueAxis.labels.fontName = font_name
                 wch.valueAxis.labels.fontSize = 8
                 wch.categoryAxis.categoryNames = [r(x) for x in _wd_names]
@@ -1063,6 +1079,12 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
                 wch.categoryAxis.labels.fontSize = 8
                 wch.bars[0].fillColor = PURPLE
                 wch.bars[0].strokeColor = PURPLE
+                # ✅ إظهار القيمة فوق كل عمود
+                wch.barLabelFormat = "%d"
+                wch.barLabels.nudge = 8
+                wch.barLabels.fontName = font_name
+                wch.barLabels.fontSize = 7.5
+                wch.barLabels.fillColor = INK
                 wdraw.add(Rect(0, 0, 536, 190, fillColor=colors.white, strokeColor=GRID, strokeWidth=0.7))
                 wdraw.add(wch)
                 story.append(wdraw)
