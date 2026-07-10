@@ -130,20 +130,27 @@ def get_pending_reports() -> list:
             # ✅ نوع الفحص/الإجراء المعلَّق — يُقرأ من جدول reports (لا يُخزَّن
             # في pending_reports نفسه) عبر استعلام دفعة واحدة بدل استعلام
             # منفصل لكل صف (N+1)، فلا تأثير على أداء الشاشة.
+            # radiology_type هو النص الحر الذي يكتبه المترجم فعلياً عند اختيار
+            # "أشعة وفحوصات" (مثال: "فحص دم شامل"، "أشعة سينية للصدر") — أدق
+            # من medical_action العام، فيُفضَّل عليه عند توفره.
             report_ids = [p.report_id for p in pending_list if p.report_id]
-            action_by_report_id: dict[int, str] = {}
+            info_by_report_id: dict[int, tuple[str, str]] = {}
             if report_ids:
                 rows = (
-                    session.query(Report.id, Report.medical_action)
+                    session.query(Report.id, Report.medical_action, Report.radiology_type)
                     .filter(Report.id.in_(report_ids))
                     .all()
                 )
-                action_by_report_id = {rid: (action or "—") for rid, action in rows}
+                info_by_report_id = {
+                    rid: (action or "—", radiology_type or "")
+                    for rid, action, radiology_type in rows
+                }
 
             # حساب عدد أيام الانتظار لكل تقرير
             result = []
             for p in pending_list:
                 days_waiting = (datetime.utcnow() - p.created_at).days
+                action, radiology_type = info_by_report_id.get(p.report_id, ("—", ""))
                 result.append({
                     'id': p.id,
                     'report_id': p.report_id,
@@ -151,7 +158,8 @@ def get_pending_reports() -> list:
                     'department': p.department,
                     'translator_name': p.translator_name,
                     'no_report_reason': p.no_report_reason,
-                    'medical_action': action_by_report_id.get(p.report_id, "—"),
+                    'medical_action': action,
+                    'exam_detail': radiology_type.strip() if radiology_type else "",
                     'days_waiting': days_waiting,
                     'created_at': p.created_at
                 })
