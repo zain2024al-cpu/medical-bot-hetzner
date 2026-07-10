@@ -237,8 +237,9 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
 
     # تصميم احترافي متعدد الصفحات
     from reportlab.platypus import Flowable
-    from reportlab.graphics.shapes import Drawing, Rect, String
-    from reportlab.graphics.charts.barcharts import VerticalBarChart
+    from reportlab.graphics.shapes import Drawing, Rect, String, Line
+    from reportlab.graphics.charts.barcharts import VerticalBarChart, HorizontalBarChart
+    from reportlab.graphics.charts.piecharts import Pie
     from reportlab.lib.units import mm
     from services.stats_service import normalize_action_name as _norm_action
 
@@ -247,6 +248,13 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
     ACCENT = colors.HexColor("#26A69A")
     CARD_BG = colors.HexColor("#F8FAFC")
     GRID = colors.HexColor("#DDE3EA")
+    # ── ألوان إضافية للعرض الإداري (لا تغيّر أي لون قائم) ──
+    GREEN = colors.HexColor("#2E7D32")
+    RED = colors.HexColor("#D32F2F")
+    AMBER = colors.HexColor("#E65100")
+    PURPLE = colors.HexColor("#7E57C2")
+    MUTED = colors.HexColor("#607D8B")
+    INK = colors.HexColor("#263238")
 
     class HeaderBand(Flowable):
         def __init__(self, title_text: str, subtitle_text: str):
@@ -298,6 +306,175 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
         ))
         return d
 
+    # ══════════════════════════════════════════════════════════════════════
+    # أدوات عرض فقط (Presentation-only) — لا تُغيّر أي معادلة أو استعلام.
+    # كل ما تفعله: قراءة الحقول الموجودة أصلاً في results وتجميعها للعرض.
+    # ══════════════════════════════════════════════════════════════════════
+
+    def _pct(part, whole) -> float:
+        try:
+            return (float(part) / float(whole) * 100.0) if float(whole) else 0.0
+        except Exception:
+            return 0.0
+
+    def _i(it, key) -> int:
+        try:
+            return int(it.get(key) or 0)
+        except Exception:
+            return 0
+
+    def _before8(it) -> int:
+        """نفس التعبير المستخدم أصلاً في صفحة المترجم (بلا تغيير)."""
+        return int(it.get("before_8pm_reports", max(_i(it, "total_reports") - _i(it, "late_reports"), 0)))
+
+    def _late_pct(it) -> float:
+        return _pct(_i(it, "late_reports"), _i(it, "total_reports"))
+
+    def _norm_breakdown(it) -> dict:
+        bd: dict[str, int] = {}
+        for k, v in (it.get("action_breakdown") or {}).items():
+            nk = _norm_action(k)
+            if not nk:
+                continue
+            bd[nk] = bd.get(nk, 0) + int(v or 0)
+        return {k: v for k, v in bd.items() if v > 0}
+
+    def _top_action(it):
+        bd = _norm_breakdown(it)
+        if not bd:
+            return "—", 0
+        name, cnt = max(bd.items(), key=lambda x: x[1])
+        return name, cnt
+
+    def _avg_daily(it) -> float:
+        wd = _i(it, "work_days")
+        return (_i(it, "total_reports") / wd) if wd > 0 else 0.0
+
+    def _kpi(label, value, color=MAIN, width=170, height=62, value_color=None):
+        """بطاقة KPI مدمجة للصفحات الإدارية."""
+        d = Drawing(width, height)
+        d.add(Rect(0, 0, width, height, rx=6, ry=6, fillColor=CARD_BG, strokeColor=GRID, strokeWidth=0.7))
+        d.add(Rect(0, height - 5, width, 5, fillColor=color, strokeColor=color, strokeWidth=0))
+        d.add(String(width - 9, height - 23, r(label), fontName=font_name, fontSize=9.5,
+                     fillColor=MUTED, textAnchor="end"))
+        d.add(String(width - 9, 13, str(value), fontName=font_name, fontSize=19,
+                     fillColor=(value_color or color), textAnchor="end"))
+        return d
+
+    def _kpi_grid(cells, per_row=3, cw=176):
+        """شبكة KPI مرتبة RTL: أول عنصر يظهر أقصى اليمين."""
+        rows = []
+        for s in range(0, len(cells), per_row):
+            chunk = cells[s:s + per_row]
+            while len(chunk) < per_row:
+                chunk.append(Drawing(170, 62))
+            rows.append(list(reversed(chunk)))  # عكس ليقرأ من اليمين
+        t = Table(rows, colWidths=[cw] * per_row)
+        t.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 2),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 2),
+            ("TOPPADDING", (0, 0), (-1, -1), 2),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        return t
+
+    def _pie(data, labels, palette, width=262, height=172, title=None):
+        """رسم دائري آمن — يُعيد None إذا كانت كل القيم صفراً.
+        الدائرة يساراً ووسيلة الإيضاح يميناً (قراءة عربية) بلا تداخل."""
+        vals = [max(0, int(v or 0)) for v in data]
+        if sum(vals) <= 0:
+            return None
+        d = Drawing(width, height)
+        if title:
+            d.add(String(width - 8, height - 13, r(title), fontName=font_name,
+                         fontSize=10, fillColor=INK, textAnchor="end"))
+        pie = Pie()
+        pie.x = 8
+        pie.y = 16
+        pie.width = 96
+        pie.height = 96
+        pie.data = vals
+        total_v = sum(vals)
+        pie.labels = [f"{_pct(v, total_v):.0f}%" if v else "" for v in vals]
+        pie.slices.strokeWidth = 0.6
+        pie.slices.strokeColor = colors.white
+        pie.slices.fontName = font_name
+        pie.slices.fontSize = 8
+        pie.sideLabels = False
+        for idx, col in enumerate(palette[:len(vals)]):
+            pie.slices[idx].fillColor = col
+        d.add(pie)
+        # وسيلة إيضاح على أقصى اليمين — بعيدة تماماً عن الدائرة
+        ly = height - 38
+        for idx, lab in enumerate(labels[:len(vals)]):
+            d.add(Rect(width - 16, ly - 2, 9, 9, fillColor=palette[idx], strokeColor=palette[idx]))
+            d.add(String(width - 21, ly, r(f"{lab} ({vals[idx]})"), fontName=font_name,
+                         fontSize=8.5, fillColor=INK, textAnchor="end"))
+            ly -= 16
+        return d
+
+    def _hbar(labels, values, color=MAIN, width=540, height=None, title=None):
+        """رسم أعمدة أفقية — مناسب للأسماء العربية الطويلة.
+        ✅ HorizontalBarChart يرسم أول عنصر في الأسفل، لذا نعكس القوائم حتى
+        يظهر الأعلى قيمةً في الأعلى (ترتيب منطقي للقراءة الإدارية)."""
+        vals = [max(0, int(v or 0)) for v in values]
+        if not vals or sum(vals) <= 0:
+            return None
+        labels = list(labels)[::-1]
+        vals = vals[::-1]
+        n = len(vals)
+        height = height or (28 + n * 19)
+        d = Drawing(width, height)
+        if title:
+            d.add(String(width - 6, height - 13, r(title), fontName=font_name,
+                         fontSize=10.5, fillColor=INK, textAnchor="end"))
+        ch = HorizontalBarChart()
+        ch.x = 34
+        ch.y = 12
+        ch.width = width - 150
+        ch.height = height - 32
+        ch.data = [vals]
+        ch.strokeColor = GRID
+        ch.valueAxis.valueMin = 0
+        ch.valueAxis.valueMax = max(vals) + 1
+        ch.valueAxis.valueStep = max(1, int((max(vals) + 1) / 4))
+        ch.valueAxis.labels.fontName = font_name
+        ch.valueAxis.labels.fontSize = 7.5
+        ch.categoryAxis.categoryNames = [r(x) for x in labels]
+        ch.categoryAxis.labels.fontName = font_name
+        ch.categoryAxis.labels.fontSize = 8
+        ch.categoryAxis.labels.dx = -4
+        ch.bars[0].fillColor = color
+        ch.bars[0].strokeColor = color
+        ch.barWidth = 9
+        d.add(ch)
+        return d
+
+    def _bullets(title, items, color, width=268):
+        """صندوق نقاط (قوة / تحتاج تحسين) — نص مشتق من البيانات فقط."""
+        items = items or ["—"]
+        rows = [[Paragraph(r(title), ParagraphStyle(
+            "bt", parent=styles["Normal"], fontName=font_name, fontSize=11,
+            leading=15, alignment=TA_RIGHT, textColor=colors.white))]]
+        for it_txt in items:
+            rows.append([Paragraph(r(f"• {it_txt}"), ParagraphStyle(
+                "bi", parent=styles["Normal"], fontName=font_name, fontSize=9.5,
+                leading=14, alignment=TA_RIGHT, textColor=INK))])
+        t = Table(rows, colWidths=[width])
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (0, 0), color),
+            ("BACKGROUND", (0, 1), (0, -1), CARD_BG),
+            ("GRID", (0, 0), (-1, -1), 0.4, GRID),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("LEFTPADDING", (0, 0), (-1, -1), 7),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+        ]))
+        return t
+
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=18, leftMargin=18, topMargin=14, bottomMargin=14)
     styles = getSampleStyleSheet()
@@ -308,6 +485,206 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
 
     story = []
     total_before = total_reports - total_late
+
+    # ══════════════════════════════════════════════════════════════════════
+    # تجميعات للعرض فقط (مشتقة من نفس الحقول الموجودة في results)
+    # ══════════════════════════════════════════════════════════════════════
+    try:
+        _sd_g = datetime.strptime(start_date_str, "%d/%m/%Y").date()
+        _ed_g = datetime.strptime(end_date_str, "%d/%m/%Y").date()
+        period_days_g = max(int((_ed_g - _sd_g).days) + 1, 1)
+    except Exception:
+        period_days_g = "-"
+
+    n_tr = len(results)
+    tot_before8 = sum(_before8(it) for it in results)
+    tot_work_days = sum(_i(it, "work_days") for it in results)
+    tot_yes = sum(_i(it, "paper_yes") for it in results)
+    tot_no = sum(_i(it, "paper_no") for it in results)
+    tot_pending = sum(_i(it, "paper_pending") for it in results)
+    gate_total = tot_yes + tot_no + tot_pending
+    late_pct_g = _pct(total_late, total_reports)
+    upload_pct_g = _pct(tot_yes, gate_total)
+    team_avg_daily = (total_reports / tot_work_days) if tot_work_days else 0.0
+
+    # ترتيب العرض: كما يصل من stats_service (الأعلى تقارير أولاً)
+    ranked = list(results)
+    with_reports = [it for it in ranked if _i(it, "total_reports") > 0]
+
+    def _best(key_fn, pool=None, reverse=True):
+        pool = pool if pool is not None else with_reports
+        if not pool:
+            return None
+        return sorted(pool, key=key_fn, reverse=reverse)[0]
+
+    best_volume   = _best(lambda it: _i(it, "total_reports"))
+    best_ontime   = _best(lambda it: (-_late_pct(it), _i(it, "total_reports")))
+    best_upload   = _best(lambda it: _i(it, "paper_yes"))
+    worst_late    = _best(lambda it: (_late_pct(it), _i(it, "total_reports")))
+    worst_no      = _best(lambda it: _i(it, "paper_no"), pool=ranked)
+    worst_pending = _best(lambda it: _i(it, "paper_pending"), pool=ranked)
+
+    avg_no = (tot_no / n_tr) if n_tr else 0.0
+    avg_pending = (tot_pending / n_tr) if n_tr else 0.0
+    LATE_THRESHOLD = 30.0
+
+    def _needs_followup(it):
+        reasons = []
+        if _i(it, "total_reports") > 0 and _late_pct(it) >= LATE_THRESHOLD:
+            reasons.append(f"نسبة تأخير {_late_pct(it):.0f}%")
+        if _i(it, "paper_no") > avg_no and _i(it, "paper_no") > 0:
+            reasons.append(f"لا يوجد تقرير: {_i(it, 'paper_no')}")
+        if _i(it, "paper_pending") > avg_pending and _i(it, "paper_pending") > 0:
+            reasons.append(f"لم تجهز بعد: {_i(it, 'paper_pending')}")
+        return reasons
+
+    is_multi = n_tr > 1
+
+    # ══════════════════════════════════════════════════════════════════════
+    # صفحة 1 — الملخص التنفيذي (Executive Summary)
+    # ══════════════════════════════════════════════════════════════════════
+    if is_multi:
+        story.append(HeaderBand(r("الملخص التنفيذي — تقييم أداء المترجمين"),
+                                r(f"من {start_date_str} إلى {end_date_str}")))
+        story.append(Spacer(1, 8))
+
+        kpis = [
+            _kpi("عدد المترجمين", str(n_tr), color=MAIN),
+            _kpi("إجمالي التقارير", str(total_reports), color=MAIN),
+            _kpi("إجمالي أيام الفترة", str(period_days_g), color=ACCENT),
+            _kpi("إجمالي أيام العمل", str(tot_work_days), color=PURPLE),
+            _kpi("قبل 8 مساء", str(tot_before8), color=ACCENT, value_color=GREEN),
+            _kpi("بعد 8 مساء", str(total_late), color=RED, value_color=RED),
+            _kpi("نسبة التقارير بعد 8", f"{late_pct_g:.0f}%", color=RED, value_color=RED),
+            _kpi("تقارير تم رفعها", str(tot_yes), color=GREEN, value_color=GREEN),
+            _kpi("نسبة رفع التقارير", f"{upload_pct_g:.0f}%", color=GREEN, value_color=GREEN),
+            _kpi("تقارير لم تجهز بعد", str(tot_pending), color=AMBER, value_color=AMBER),
+            _kpi("حالات لا يوجد تقرير", str(tot_no), color=RED, value_color=RED),
+            _kpi("متوسط تقارير/مترجم", f"{(total_reports / n_tr):.1f}" if n_tr else "0", color=MAIN),
+        ]
+        story.append(_kpi_grid(kpis, per_row=3, cw=178))
+        story.append(Spacer(1, 9))
+
+        # رسمان دائريان جنباً إلى جنب
+        pie_time = _pie([tot_before8, total_late], ["قبل 8 مساء", "بعد 8 مساء"],
+                        [GREEN, RED], title="توزيع التقارير حسب التوقيت")
+        pie_docs = _pie([tot_yes, tot_pending, tot_no],
+                        ["تم رفعها", "لم تجهز بعد", "لا يوجد تقرير"],
+                        [GREEN, AMBER, RED], title="حالة التقارير الطبية")
+        if pie_time or pie_docs:
+            row = [pie_docs or Drawing(262, 172), pie_time or Drawing(262, 172)]
+            pt = Table([row], colWidths=[268, 268])
+            pt.setStyle(TableStyle([
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("BOX", (0, 0), (0, 0), 0.5, GRID),
+                ("BOX", (1, 0), (1, 0), 0.5, GRID),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                ("TOPPADDING", (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ]))
+            story.append(pt)
+
+        # ✅ رسم توزيع التقارير بين المترجمين هنا لملء الصفحة الأولى (بدل فراغ غير مبرر)
+        top_n = ranked[:10]
+        bar_tr = _hbar([str(it.get("translator_name", "—")) for it in top_n],
+                       [_i(it, "total_reports") for it in top_n],
+                       color=MAIN, width=536,
+                       title="توزيع التقارير بين المترجمين (أعلى 10)")
+        if bar_tr:
+            story.append(Spacer(1, 9))
+            story.append(bar_tr)
+        story.append(PageBreak())
+
+        # ══════════════════════════════════════════════════════════════════
+        # صفحة 2 — جدول ترتيب المترجمين (نظرة إدارية شاملة)
+        # ══════════════════════════════════════════════════════════════════
+        story.append(HeaderBand(r("جدول ترتيب المترجمين"), r(f"إجمالي {n_tr} مترجم — {period_label}")))
+        story.append(Spacer(1, 8))
+
+        # RTL: أول عنصر منطقي يجب أن يكون آخر عمود (يظهر يميناً)
+        rank_rows = [[r("لم تجهز"), r("لا يوجد"), r("مرفوعة"), r("نسبة التأخير"),
+                      r("بعد 8"), r("قبل 8"), r("الإجمالي"), r("المترجم"), r("#")]]
+        for idx, it in enumerate(ranked, 1):
+            rank_rows.append([
+                str(_i(it, "paper_pending")),
+                str(_i(it, "paper_no")),
+                str(_i(it, "paper_yes")),
+                f"{_late_pct(it):.0f}%",
+                str(_i(it, "late_reports")),
+                str(_before8(it)),
+                str(_i(it, "total_reports")),
+                r(str(it.get("translator_name", "—"))),
+                str(idx),
+            ])
+        rank_tbl = Table(rank_rows, colWidths=[54, 54, 54, 62, 48, 48, 54, 145, 40], repeatRows=1)
+        rank_style = [
+            ("BACKGROUND", (0, 0), (-1, 0), MAIN),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, -1), font_name),
+            ("FONTSIZE", (0, 0), (-1, 0), 9.5),
+            ("FONTSIZE", (0, 1), (-1, -1), 9),
+            ("GRID", (0, 0), (-1, -1), 0.4, GRID),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ]
+        # ✅ العمود رقم 3 هو «نسبة التأخير» في ترتيب الأعمدة أعلاه (وليس 5)
+        _COL_LATE_PCT = 3
+        _COL_RANK = 8
+        for rr in range(1, len(rank_rows)):
+            if rr % 2 == 0:
+                rank_style.append(("BACKGROUND", (0, rr), (-1, rr), colors.HexColor("#FAFBFD")))
+            it = ranked[rr - 1]
+            if _i(it, "total_reports") > 0 and _late_pct(it) >= LATE_THRESHOLD:
+                rank_style.append(("TEXTCOLOR", (_COL_LATE_PCT, rr), (_COL_LATE_PCT, rr), RED))
+            if rr <= 3:
+                rank_style.append(("TEXTCOLOR", (_COL_RANK, rr), (_COL_RANK, rr), MAIN))
+        rank_tbl.setStyle(TableStyle(rank_style))
+        story.append(rank_tbl)
+        story.append(Spacer(1, 7))
+        story.append(Paragraph(
+            r(f"معيار «يحتاج متابعة»: نسبة تأخير ≥ {LATE_THRESHOLD:.0f}% أو «لا يوجد تقرير» / «لم تجهز بعد» أعلى من المتوسط."),
+            ParagraphStyle("note", parent=styles["Normal"], fontName=font_name, fontSize=8.5,
+                           leading=12, alignment=TA_CENTER, textColor=MUTED)))
+
+        # ══════════════════════════════════════════════════════════════════
+        # أبرز المؤشرات — تتدفق طبيعياً بعد الجدول (بلا فراغات غير مبررة)
+        # ══════════════════════════════════════════════════════════════════
+        story.append(Spacer(1, 13))
+        story.append(Paragraph(r("أبرز المؤشرات"), section_style))
+        story.append(Spacer(1, 6))
+
+        def _hl(icon_label, it, value_text, color):
+            name = str(it.get("translator_name", "—")) if it else "—"
+            return _kpi(f"{icon_label} — {name}", value_text, color=color, value_color=color)
+
+        # ملاحظة: قيمة البطاقة تُرسم بلا إعادة تشكيل عربي (كما في _draw_card الأصلية)،
+        # لذا نُبقيها أرقاماً/نِسَباً فقط ونضع أي نص عربي في التسمية.
+        hl_cells = [
+            _hl("الأعلى عدد تقارير", best_volume, str(_i(best_volume, "total_reports")) if best_volume else "—", GREEN),
+            _hl("الأكثر التزاماً (نسبة تأخير)", best_ontime, f"{_late_pct(best_ontime):.0f}%" if best_ontime else "—", GREEN),
+            _hl("الأكثر رفعاً للتقارير", best_upload, str(_i(best_upload, "paper_yes")) if best_upload else "—", GREEN),
+            _hl("أعلى نسبة تأخير", worst_late, f"{_late_pct(worst_late):.0f}%" if worst_late else "—", RED),
+            _hl("أعلى «لا يوجد تقرير»", worst_no, str(_i(worst_no, "paper_no")) if worst_no else "—", RED),
+            _hl("أعلى «لم تجهز بعد»", worst_pending, str(_i(worst_pending, "paper_pending")) if worst_pending else "—", AMBER),
+        ]
+        story.append(_kpi_grid(hl_cells, per_row=2, cw=266))
+        story.append(Spacer(1, 12))
+
+        agg_actions: dict[str, int] = {}
+        for it in results:
+            for k, v in _norm_breakdown(it).items():
+                agg_actions[k] = agg_actions.get(k, 0) + v
+        top_actions = sorted(agg_actions.items(), key=lambda x: x[1], reverse=True)[:8]
+        if top_actions:
+            bar_ac = _hbar([k for k, _ in top_actions], [v for _, v in top_actions],
+                           color=ACCENT, width=534, title="توزيع أنواع الإجراءات (الأعلى)")
+            if bar_ac:
+                story.append(bar_ac)
+        story.append(PageBreak())
 
     for i, item in enumerate(results, 1):
         before_8pm = item.get("before_8pm_reports", max(item["total_reports"] - item["late_reports"], 0))
@@ -326,6 +703,39 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
         story.append(HeaderBand(r(f"تقرير تقييم المترجم: {item['translator_name']}"), ""))
         story.append(Spacer(1, 4))
         story.append(Paragraph(r(f"من {start_date_str} إلى {end_date_str}"), date_style))
+        story.append(Spacer(1, 6))
+
+        # ✅ بطاقة أداء مختصرة قبل الكروت الحالية (الكروت الحالية تبقى كما هي تماماً)
+        _ta_name, _ta_cnt = _top_action(item)
+        _commit_pct = _pct(before_8pm, total_reports_i)
+        _perf_rows = [[
+            r("أكثر إجراء"), r("أيام العمل"), r("متوسط يومي"),
+            r("نسبة التأخير"), r("نسبة الالتزام"), r("إجمالي التقارير"),
+        ], [
+            r(f"{_ta_name}" + (f" ({_ta_cnt})" if _ta_cnt else "")),
+            str(item.get("work_days", 0)),
+            f"{_avg_daily(item):.1f}",
+            f"{late_pct:.0f}%",
+            f"{_commit_pct:.0f}%",
+            str(total_reports_i),
+        ]]
+        _perf = Table(_perf_rows, colWidths=[124, 74, 74, 84, 88, 86])
+        _perf.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), MAIN_LIGHT),
+            ("TEXTCOLOR", (0, 0), (-1, 0), MAIN),
+            ("FONTNAME", (0, 0), (-1, -1), font_name),
+            ("FONTSIZE", (0, 0), (-1, 0), 9),
+            ("FONTSIZE", (0, 1), (-1, 1), 12),
+            ("TEXTCOLOR", (3, 1), (3, 1), RED if late_pct >= LATE_THRESHOLD else INK),
+            ("TEXTCOLOR", (4, 1), (4, 1), GREEN),
+            ("TEXTCOLOR", (5, 1), (5, 1), MAIN),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("GRID", (0, 0), (-1, -1), 0.4, GRID),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ]))
+        story.append(_perf)
         story.append(Spacer(1, 6))
 
         cards = Table(
@@ -355,16 +765,19 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
                     _draw_card("إجمالي أيام العمل", str(item["work_days"]), color=colors.HexColor("#7E57C2")),
                 ],
                 # الصف الرابع: لم تجهز بعد / تم رفعها
+                # ملاحظة: أُزيلت رموز الإيموجي من التسميات فقط — الخط العربي
+                # المستخدم في الـPDF لا يملك محارف إيموجي فكانت تُطبع مربعات
+                # فارغة (□). التصميم والألوان والقيم كما هي بلا أي تغيير.
                 [
                     _draw_card(
-                        "🟡 لم تجهز بعد",
+                        "لم تجهز بعد",
                         str(item.get("paper_pending", 0)),
                         color=colors.HexColor("#FFE0B2"),
                         value_color=colors.HexColor("#E65100"),
                         label_color=colors.HexColor("#E65100"),
                     ),
                     _draw_card(
-                        "✅ تم رفعها",
+                        "تم رفعها",
                         str(item.get("paper_yes", 0)),
                         color=colors.HexColor("#A5D6A7"),
                         value_color=colors.HexColor("#1B5E20"),
@@ -374,7 +787,7 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
                 # الصف الخامس: لا يوجد تقرير (البطاقة الثانية فارغة بلا إطار)
                 [
                     _draw_card(
-                        "❌ لا يوجد تقرير",
+                        "لا يوجد تقرير",
                         str(item.get("paper_no", 0)),
                         color=colors.HexColor("#EF9A9A"),
                         value_color=colors.HexColor("#B71C1C"),
@@ -556,8 +969,193 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
         else:
             story.append(Paragraph(r("لا توجد بيانات نشاط يومي متاحة لهذه الفترة."), base_style))
 
+        # ══════════════════════════════════════════════════════════════════
+        # صفحة إضافية لكل مترجم: رسوم تحليلية + ملخص نقاط القوة/التحسين
+        # (إضافة فقط — لا تحذف أو تغيّر أي رسم أو جدول قائم)
+        # ══════════════════════════════════════════════════════════════════
+        story.append(PageBreak())
+        story.append(Paragraph(r(f"{item['translator_name']} — تحليل الأداء"), section_style))
+        story.append(Spacer(1, 6))
+
+        # النشاط الأسبوعي (مشتق من نفس بيانات daily المجلوبة أصلاً)
+        if daily:
+            _wd_names = ["الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت", "الأحد"]
+            _wk = [0] * 7
+            for _d, _c in daily:
+                try:
+                    _wk[datetime.strptime(_d, "%Y-%m-%d").weekday()] += int(_c)
+                except Exception:
+                    pass
+            if sum(_wk) > 0:
+                wdraw = Drawing(536, 190)
+                wdraw.add(String(530, 176, r("النشاط الأسبوعي (مجموع التقارير لكل يوم)"),
+                                 fontName=font_name, fontSize=10.5, fillColor=INK, textAnchor="end"))
+                wch = VerticalBarChart()
+                wch.x = 36
+                wch.y = 34
+                wch.width = 470
+                wch.height = 126
+                wch.data = [_wk]
+                wch.strokeColor = GRID
+                wch.valueAxis.valueMin = 0
+                wch.valueAxis.valueMax = max(_wk) + 1
+                wch.valueAxis.valueStep = max(1, int((max(_wk) + 1) / 4))
+                wch.valueAxis.labels.fontName = font_name
+                wch.valueAxis.labels.fontSize = 8
+                wch.categoryAxis.categoryNames = [r(x) for x in _wd_names]
+                wch.categoryAxis.labels.fontName = font_name
+                wch.categoryAxis.labels.fontSize = 8
+                wch.bars[0].fillColor = PURPLE
+                wch.bars[0].strokeColor = PURPLE
+                wdraw.add(Rect(0, 0, 536, 190, fillColor=colors.white, strokeColor=GRID, strokeWidth=0.7))
+                wdraw.add(wch)
+                story.append(wdraw)
+                story.append(Spacer(1, 8))
+
+        # توزيع التوقيت (دائري) + توزيع الإجراءات (أعمدة أفقية) جنباً إلى جنب
+        _pie_i = _pie([before_8pm, late_reports_i], ["قبل 8 مساء", "بعد 8 مساء"],
+                      [GREEN, RED], width=250, height=164, title="توزيع التوقيت")
+        _bd_i = _norm_breakdown(item)
+        _top_i = sorted(_bd_i.items(), key=lambda x: x[1], reverse=True)[:6]
+        _bar_i = _hbar([k for k, _ in _top_i], [v for _, v in _top_i],
+                       color=ACCENT, width=274, height=164, title="أنواع الإجراءات") if _top_i else None
+        if _pie_i or _bar_i:
+            _row = [_bar_i or Drawing(274, 164), _pie_i or Drawing(250, 164)]
+            _t = Table([_row], colWidths=[276, 258])
+            _t.setStyle(TableStyle([
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("BOX", (0, 0), (0, 0), 0.5, GRID),
+                ("BOX", (1, 0), (1, 0), 0.5, GRID),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                ("TOPPADDING", (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ]))
+            story.append(_t)
+            story.append(Spacer(1, 9))
+
+        # ── ملخص الأداء: نقاط القوة / نقاط تحتاج تحسين (من البيانات فقط) ──
+        _pyes, _pno, _ppend = _i(item, "paper_yes"), _i(item, "paper_no"), _i(item, "paper_pending")
+        _wd = _i(item, "work_days")
+        _adaily = _avg_daily(item)
+        _pd = period_days_g if isinstance(period_days_g, int) else 0
+
+        strengths = []
+        if total_reports_i > 0 and late_pct <= 20:
+            strengths.append(f"التزام ممتاز بالوقت (نسبة تأخير {late_pct:.0f}%)")
+        if total_reports_i > 0 and _commit_pct >= 80:
+            strengths.append(f"معظم التقارير قبل 8 مساء ({_commit_pct:.0f}%)")
+        if _pyes > 0:
+            strengths.append(f"رفع {_pyes} تقرير طبي")
+        if team_avg_daily > 0 and _adaily >= team_avg_daily:
+            strengths.append(f"معدل يومي ({_adaily:.1f}) أعلى من متوسط الفريق ({team_avg_daily:.1f})")
+        if _pd and _wd >= 0.7 * _pd:
+            strengths.append(f"انتظام حضور مرتفع ({_wd} من {_pd} يوم)")
+        if _ta_cnt:
+            strengths.append(f"أكثر إجراء: {_ta_name} ({_ta_cnt})")
+
+        needs = []
+        if total_reports_i > 0 and late_pct >= LATE_THRESHOLD:
+            needs.append(f"نسبة تأخير مرتفعة ({late_pct:.0f}%)")
+        if _pno > 0:
+            needs.append(f"{_pno} حالة بلا تقرير طبي")
+        if _ppend > 0:
+            needs.append(f"{_ppend} تقرير لم يجهز بعد")
+        if team_avg_daily > 0 and _adaily < team_avg_daily:
+            needs.append(f"معدل يومي ({_adaily:.1f}) أقل من متوسط الفريق ({team_avg_daily:.1f})")
+        if _pd and _wd < 0.4 * _pd:
+            needs.append(f"أيام عمل منخفضة ({_wd} من {_pd} يوم)")
+        if not needs:
+            needs.append("لا توجد ملاحظات — الأداء ضمن المعدلات")
+
+        _sw = Table([[_bullets("نقاط تحتاج تحسين", needs[:5], RED),
+                      _bullets("نقاط القوة", strengths[:5], GREEN)]],
+                    colWidths=[268, 268])
+        _sw.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ]))
+        story.append(_sw)
+
         if i < len(results):
             story.append(PageBreak())
+
+    # ══════════════════════════════════════════════════════════════════════
+    # الصفحة الختامية — الخلاصة العامة + يحتاج متابعة
+    # ══════════════════════════════════════════════════════════════════════
+    if is_multi:
+        story.append(PageBreak())
+        story.append(HeaderBand(r("الخلاصة العامة"), r(f"{period_label} — {n_tr} مترجم — {total_reports} تقرير")))
+        story.append(Spacer(1, 10))
+
+        def _nm(it):
+            return str(it.get("translator_name", "—")) if it else "—"
+
+        # القيم أرقام/نِسَب فقط (بلا نص عربي) — أي وصف عربي يوضَع في عمود «المؤشر»
+        summary_rows = [[r("القيمة"), r("المترجم"), r("المؤشر")]]
+        summary_rows += [
+            [str(_i(best_volume, "total_reports")) if best_volume else "—", r(_nm(best_volume)), r("أفضل مترجم (الأعلى عدد تقارير)")],
+            [f"{_late_pct(best_ontime):.0f}%" if best_ontime else "—", r(_nm(best_ontime)), r("الأكثر التزاماً بالوقت (نسبة تأخير)")],
+            [f"{_avg_daily(best_volume):.1f}" if best_volume else "—", r(_nm(best_volume)), r("الأعلى نشاطاً (متوسط تقارير/يوم)")],
+            [str(_i(best_upload, "paper_yes")) if best_upload else "—", r(_nm(best_upload)), r("الأكثر رفعاً للتقارير الطبية")],
+            [f"{_late_pct(best_ontime):.0f}%" if best_ontime else "—", r(_nm(best_ontime)), r("الأقل تأخيراً (نسبة تأخير)")],
+        ]
+        s_tbl = Table(summary_rows, colWidths=[150, 176, 210], repeatRows=1)
+        s_tbl.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), MAIN),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, -1), font_name),
+            ("FONTSIZE", (0, 0), (-1, 0), 10),
+            ("FONTSIZE", (0, 1), (-1, -1), 10.5),
+            ("TEXTCOLOR", (0, 1), (0, -1), GREEN),
+            ("GRID", (0, 0), (-1, -1), 0.4, GRID),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+        ]))
+        for _rr in range(1, len(summary_rows)):
+            if _rr % 2 == 0:
+                s_tbl.setStyle(TableStyle([("BACKGROUND", (0, _rr), (-1, _rr), colors.HexColor("#FAFBFD"))]))
+        story.append(s_tbl)
+        story.append(Spacer(1, 16))
+
+        story.append(Paragraph(r("يحتاج متابعة"), section_style))
+        story.append(Spacer(1, 5))
+        follow = [(it, _needs_followup(it)) for it in ranked]
+        follow = [(it, rs) for it, rs in follow if rs]
+        if not follow:
+            story.append(Paragraph(r("لا يوجد مترجمون يحتاجون متابعة وفق المعايير المحددة. ✔"), base_style))
+        else:
+            f_rows = [[r("سبب المتابعة"), r("المترجم")]]
+            for it, rs in follow:
+                f_rows.append([r("، ".join(rs)), r(_nm(it))])
+            f_tbl = Table(f_rows, colWidths=[360, 176], repeatRows=1)
+            f_style = [
+                ("BACKGROUND", (0, 0), (-1, 0), RED),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("FONTNAME", (0, 0), (-1, -1), font_name),
+                ("FONTSIZE", (0, 0), (-1, 0), 10),
+                ("FONTSIZE", (0, 1), (-1, -1), 9.5),
+                ("GRID", (0, 0), (-1, -1), 0.4, GRID),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("TOPPADDING", (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ]
+            for _rr in range(1, len(f_rows)):
+                if _rr % 2 == 0:
+                    f_style.append(("BACKGROUND", (0, _rr), (-1, _rr), colors.HexColor("#FFF5F5")))
+            f_tbl.setStyle(TableStyle(f_style))
+            story.append(f_tbl)
+
+        story.append(Spacer(1, 14))
+        story.append(Paragraph(
+            r(f"معايير المتابعة: نسبة تأخير ≥ {LATE_THRESHOLD:.0f}% • «لا يوجد تقرير» أعلى من المتوسط ({avg_no:.1f}) • «لم تجهز بعد» أعلى من المتوسط ({avg_pending:.1f})"),
+            ParagraphStyle("crit", parent=styles["Normal"], fontName=font_name, fontSize=8.5,
+                           leading=12, alignment=TA_CENTER, textColor=MUTED)))
 
     doc.build(story)
     return buffer.getvalue(), "pdf"
