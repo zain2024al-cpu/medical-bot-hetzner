@@ -60,10 +60,20 @@ def _render_item_text(p: dict) -> str:
     )
 
 
+_NOT_READY_REASON = "🟡 لم يجهز بعد"
+
+
 async def _render_list(query, page: int) -> None:
     from services.pending_reports_service import get_pending_reports
 
-    items = get_pending_reports()
+    # ✅ هذه الشاشة مخصَّصة حصراً لحالة "🟡 لم يجهز بعد" — العلامة الثابتة
+    # التي يضعها flows/shared.py عند هذا الاختيار فقط (انظر add_pending_report
+    # call site). أي سجل آخر (بيانات قديمة سابقة لهذا التصميم، أو أي مسار
+    # مستقبلي) لا يجب أن يظهر هنا حتى لو دخل جدول pending_reports بطريقة ما.
+    items = [
+        p for p in get_pending_reports()
+        if (p.get("no_report_reason") or "").strip() == _NOT_READY_REASON
+    ]
     items.sort(key=lambda x: x["days_waiting"], reverse=True)
     total = len(items)
 

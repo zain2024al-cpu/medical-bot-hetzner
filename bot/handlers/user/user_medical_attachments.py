@@ -212,7 +212,7 @@ async def _show_today_reports(update: Update, context: ContextTypes.DEFAULT_TYPE
         for r in page_reports:
             keyboard.append([
                 InlineKeyboardButton(
-                    f"👤 {r['patient_name']}",
+                    f"👤 {r['patient_name']} — {r['medical_action']}",
                     callback_data=f"ma:select:{r['id']}"
                 )
             ])
@@ -327,10 +327,12 @@ async def _show_upload_prompt(query, context, report: dict):
     hospital = report["hospital_name"]
     dept = report["department_name"]
     translator = report["translator_name"]
+    action = report.get("medical_action", "—")
 
     text = (
         f"📎 **إضافة مرفقات طبية**\n\n"
         f"👤 **المريض:** {name}\n"
+        f"📋 **نوع الإجراء:** {action}\n"
         f"🏥 **المستشفى:** {hospital}\n"
         f"🏢 **القسم:** {dept}\n"
         f"👨‍💼 **المترجم:** {translator}\n\n"

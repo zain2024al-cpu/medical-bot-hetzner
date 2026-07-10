@@ -1338,7 +1338,7 @@ def test_medication_session_lifecycle():
     assert s.step == STEP_DATE          # date-first: first step is date selection
     assert s.medical_department_ids    == []
     assert s.medical_department_labels == []
-    assert s.item_count == 0
+    assert s.item_count == ""          # عدد الأصناف أصبح نصاً حراً؛ الافتراضي فارغ
     MedicationSession.clear(ud)
     assert MedicationSession.load(ud) is None
     print("medication session lifecycle OK")
@@ -1985,7 +1985,7 @@ def test_supplies_session_lifecycle():
     s = SuppliesSession.create(ud)
     assert s.step         == STEP_DATE
     assert s.patient_name == ""
-    assert s.item_count   == 0
+    assert s.item_count   == ""        # عدد المستلزمات أصبح نصاً حراً؛ الافتراضي فارغ
     assert "_hcsup_add"   in ud
 
     s.patient_name = "ابراهيم سعيد"
@@ -2061,7 +2061,7 @@ def test_supplies_count_prompt_view():
     text, kb = build_count_prompt(s)
     assert "محمد حسين" in text
     assert "العظام"    in text
-    assert "عدد الأصناف" in text
+    assert "عدد المستلزمات" in text   # كانت "عدد الأصناف" (خطأ سابق: نص المترجمات وليس المستلزمات)
     kb_str = str(kb)
     assert "back"   in kb_str
     assert "cancel" in kb_str
@@ -2159,7 +2159,9 @@ def test_supplies_db_save_persisted():
         rec = db.query(SuppliesRecord).filter(SuppliesRecord.id == saved.record_id).first()
         assert rec is not None, "record not found in DB"
         assert rec.patient_name    == "تحقق من الحفظ"
-        assert rec.item_count      == 2
+        # عدد الأصناف عمود نصي الآن (TEXT affinity) — قيمة رقمية مُدخَلة كـ int
+        # تُخزَّن وتُقرأ كنص، وهذا هو السلوك الصحيح الجديد المتوافق مع الإدخال الحر.
+        assert str(rec.item_count) == "2"
         assert rec.dispense_source == "المخزن"
     print(f"supplies DB persistence OK  id={saved.record_id}")
 

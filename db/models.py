@@ -373,7 +373,10 @@ class MedicationRecord(Base):
     patient_id               = Column(Integer, nullable=True, index=True)
     patient_name             = Column(String(255), nullable=True, index=True)
     medical_departments_json = Column(Text, nullable=True)     # JSON list of medical specialty labels
-    item_count               = Column(Integer, default=0, nullable=True)  # عدد الأصناف
+    # عدد الأصناف — نص حر (رقم و/أو حروف) يسمح بتوضيح كل صنف، مثل: "بنادول 5، شاش 3".
+    # SQLite لا يفرض نوعاً صارماً على الأعمدة (type affinity)، فالقيم النصية القديمة
+    # والجديدة تُخزَّن وتُقرأ بأمان دون أي ترحيل (migration) للبيانات الحالية.
+    item_count               = Column(String(255), default=None, nullable=True)
     dispense_source          = Column(String(50), nullable=True)           # الصيدلية / المخزن
     image_file_ids           = Column(Text, nullable=True)
     image_count              = Column(Integer, default=0, nullable=True)
@@ -396,7 +399,8 @@ class SuppliesRecord(Base):
     patient_id               = Column(Integer, nullable=True, index=True)
     patient_name             = Column(String(255), nullable=True, index=True)
     medical_departments_json = Column(Text, nullable=True)     # JSON list of medical specialty labels
-    item_count               = Column(Integer, default=0, nullable=True)  # عدد الأصناف
+    # عدد الأصناف — نص حر (انظر التعليق في MedicationRecord أعلاه لنفس السبب).
+    item_count               = Column(String(255), default=None, nullable=True)
     dispense_source          = Column(String(50), nullable=True)           # الصيدلية / المخزن
     image_file_ids           = Column(Text, nullable=True)
     image_count              = Column(Integer, default=0, nullable=True)

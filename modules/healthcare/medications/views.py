@@ -106,7 +106,7 @@ def build_dept_other_prompt(session: MedicationSession) -> tuple[str, InlineKeyb
 def build_count_prompt(
     session: MedicationSession, *, error: bool = False
 ) -> tuple[str, InlineKeyboardMarkup]:
-    """Numeric input for عدد الأصناف. Set error=True to show validation message."""
+    """Free-text input for عدد الأصناف (رقم أو وصف). Set error=True to show validation message."""
     depts = "، ".join(session.medical_department_labels) if session.medical_department_labels else "—"
     lines = [
         _DIVIDER,
@@ -118,8 +118,11 @@ def build_count_prompt(
         "",
     ]
     if error:
-        lines += ["⚠️ *الرجاء إدخال رقم صحيح وموجب.*  (مثال: 3)", ""]
-    lines += ["أرسل عدد أصناف الأدوية المصروفة (رقم موجب، مثال: 3)."]
+        lines += ["⚠️ *الرجاء إرسال نص غير فارغ.*", ""]
+    lines += [
+        "أرسل عدد أصناف الأدوية المصروفة، أو وضّح كل صنف كما تريد.",
+        "_(مثال: 3  —  أو: بنادول 5، شاش 3، محلول ملحي 2)_",
+    ]
     kb = InlineKeyboardMarkup([[
         InlineKeyboardButton("🔙 رجوع", callback_data=f"{HCMED}:back"),
         InlineKeyboardButton("❌ إلغاء", callback_data=f"{HCMED}:cancel"),
@@ -236,7 +239,7 @@ def build_review(session: MedicationSession) -> tuple[str, InlineKeyboardMarkup]
         "",
         f"📅 {date_str}",
         f"👤 {session.patient_name}  •  🏥 {dept_text}",
-        f"🔢 {session.item_count or '—'} أصناف  •  🏪 {session.dispense_source or '—'}",
+        f"🔢 الأصناف: {session.item_count or '—'}  •  🏪 {session.dispense_source or '—'}",
         f"📎 {imgs}",
         f"📝 {notes}",
         f"👨‍⚕️ {session.specialist_name or '—'}",

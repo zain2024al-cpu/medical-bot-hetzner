@@ -11,7 +11,7 @@ STEP_DATE_CUSTOM      = "date_custom"      # 1b. free-text date entry
 STEP_PATIENT          = "patient"          # 2.  اسم المريض
 STEP_DEPARTMENT       = "department"       # 3.  القسم (medical specialty multiselect)
 STEP_DEPT_OTHER       = "dept_other"       # 3b. free-text when "أخرى" selected
-STEP_COUNT            = "count"            # 4.  عدد الأصناف (numeric input)
+STEP_COUNT            = "count"            # 4.  عدد الأصناف (نص حر: رقم أو وصف)
 STEP_IMAGES           = "images"           # 5.  رفع صورة الوصفة
 STEP_DISPENSE_SOURCE  = "dispense_source"  # 6.  جهة الصرف (الصيدلية / المخزن)
 STEP_NOTES            = "notes"            # 7.  ملاحظات
@@ -26,7 +26,7 @@ class MedicationSession:
     patient_name:             str
     medical_department_ids:   list[str]   # multiselect IDs from DEPARTMENT step
     medical_department_labels: list[str]  # display labels (may include free-text replacement)
-    item_count:               int         # عدد الأصناف — numeric input from COUNT step
+    item_count:               str         # عدد الأصناف — نص حر (رقم و/أو وصف) من خطوة COUNT
     dispense_source:          str         # الصيدلية / المخزن — from DISPENSE_SOURCE step
     images:                   list[dict]
     notes:                    str
@@ -62,7 +62,7 @@ class MedicationSession:
             patient_name=             "",
             medical_department_ids=   [],
             medical_department_labels=[],
-            item_count=               0,
+            item_count=               "",
             dispense_source=          "",
             images=                   [],
             notes=                    "",
@@ -84,7 +84,7 @@ class MedicationSession:
             patient_name=             raw.get("patient_name",             ""),
             medical_department_ids=   raw.get("medical_department_ids",   []),
             medical_department_labels=raw.get("medical_department_labels",[]),
-            item_count=               raw.get("item_count",               0),
+            item_count=               raw.get("item_count",               ""),
             dispense_source=          raw.get("dispense_source",          ""),
             images=                   raw.get("images",                   []),
             notes=                    raw.get("notes",                    ""),

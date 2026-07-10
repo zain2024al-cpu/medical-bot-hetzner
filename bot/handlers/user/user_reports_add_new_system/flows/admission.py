@@ -6,15 +6,16 @@ Admission Flow Handlers
 يحتوي على:
 - start_admission_flow: بدء مسار ترقيد
 - handle_admission_reason: معالجة سبب الرقود
-- handle_admission_room: معالجة رقم الغرفة
-- handle_admission_notes: معالجة الملاحظات
+- handle_admission_room: معالجة رقم الغرفة والطابق
+- handle_admission_notes: معالجة الملاحظات (نص حر)
+- handle_admission_notes_skip: زر "لا توجد ملاحظات" (بديل الكتابة الحرة)
 - handle_admission_followup_date_text: معالجة تاريخ العودة
 - handle_admission_followup_reason: معالجة سبب العودة
 """
 
 import logging
 from datetime import datetime
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
 # Import states
@@ -87,9 +88,25 @@ async def handle_admission_reason(update: Update, context: ContextTypes.DEFAULT_
     return ADMISSION_ROOM
 
 
+def _admission_notes_keyboard() -> InlineKeyboardMarkup:
+    """لوحة مفاتيح خطوة الملاحظات: زر ⏭️ لا توجد ملاحظات + أزرار التنقل المعتادة."""
+    nav = _nav_buttons(show_back=True)
+    rows = [[InlineKeyboardButton("⏭️ لا توجد ملاحظات", callback_data="admission_notes_skip")]]
+    rows.extend(nav.inline_keyboard)
+    return InlineKeyboardMarkup(rows)
+
+
 async def handle_admission_room(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """الحقل 2: رقم الغرفة"""
+    """الحقل 2: رقم الغرفة والطابق"""
     text = update.message.text.strip()
+    if not text or len(text) > 50:
+        await update.message.reply_text(
+            "⚠️ **خطأ في الإدخال**\n\n"
+            "يرجى إدخال رقم الغرفة والطابق (مثال: غرفة 205 - الطابق الثاني):",
+            reply_markup=_nav_buttons(show_back=True),
+            parse_mode="Markdown"
+        )
+        return ADMISSION_ROOM
 
     if text.lower() in ['لم يتم التحديد', 'لا يوجد', 'لا', 'no']:
         text = "لم يتم التحديد"
@@ -99,9 +116,8 @@ async def handle_admission_room(update: Update, context: ContextTypes.DEFAULT_TY
     await update.message.reply_text(
         "✅ تم الحفظ\n\n"
         "📝 **ملاحظات**\n\n"
-        "يرجى إدخال أي ملاحظات إضافية:\n"
-        "(أو اكتب 'لا يوجد')",
-        reply_markup=_nav_buttons(show_back=True),
+        "يرجى إدخال أي ملاحظات إضافية، أو اضغط الزر أدناه إذا لا توجد ملاحظات:",
+        reply_markup=_admission_notes_keyboard(),
         parse_mode="Markdown"
     )
 
@@ -109,7 +125,7 @@ async def handle_admission_room(update: Update, context: ContextTypes.DEFAULT_TY
 
 
 async def handle_admission_notes(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """الحقل 3: ملاحظات"""
+    """الحقل 3: ملاحظات (نص حر)"""
     text = update.message.text.strip()
 
     if text.lower() in ['لا يوجد', 'لا', 'no', 'none']:
@@ -117,35 +133,21 @@ async def handle_admission_notes(update: Update, context: ContextTypes.DEFAULT_T
 
     context.user_data["report_tmp"]["notes"] = text
 
-    # بعد الملاحظات: طلب رقم الغرفة والطابق
-    await update.message.reply_text(
-        "🚪 **رقم الغرفة والطابق**\n\n"
-        "يرجى إدخال رقم الغرفة والطابق (مثال: غرفة 205 - الطابق الثاني):",
-        reply_markup=_nav_buttons(show_back=True),
-        parse_mode="Markdown"
-    )
-    return ADMISSION_ROOM
-
-
-# إعادة handler رقم الغرفة والطابق لمسار الترقيد بعد الملاحظات
-async def handle_admission_room(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """الحقل: رقم الغرفة والطابق (بعد الملاحظات)"""
-    text = update.message.text.strip()
-    if not text or len(text) < 1 or len(text) > 50:
-        await update.message.reply_text(
-            "⚠️ **خطأ في الإدخال**\n\n"
-            "يرجى إدخال رقم الغرفة والطابق (مثال: غرفة 205 - الطابق الثاني):",
-            reply_markup=_nav_buttons(show_back=True),
-            parse_mode="Markdown"
-        )
-        return ADMISSION_ROOM
-    context.user_data["report_tmp"]["room_number"] = text
     await update.message.reply_text("✅ تم الحفظ")
-    # بعد رقم الغرفة: عرض تقويم تاريخ العودة
+    # بعد الملاحظات: عرض تقويم تاريخ العودة
     await _render_followup_calendar(update.message, context)
     return ADMISSION_FOLLOWUP_DATE
-    await _render_followup_calendar(update.message, context)
 
+
+async def handle_admission_notes_skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """زر ⏭️ لا توجد ملاحظات — يسجّل 'لا يوجد' مباشرة بدل الكتابة الحرة."""
+    query = update.callback_query
+    await query.answer()
+
+    context.user_data.setdefault("report_tmp", {})["notes"] = "لا يوجد"
+
+    # بعد الملاحظات: عرض تقويم تاريخ العودة
+    await _render_followup_calendar(query, context)
     return ADMISSION_FOLLOWUP_DATE
 
 

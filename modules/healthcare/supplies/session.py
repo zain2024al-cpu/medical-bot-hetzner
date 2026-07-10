@@ -11,7 +11,7 @@ STEP_DATE_CUSTOM      = "date_custom"
 STEP_PATIENT          = "patient"
 STEP_DEPARTMENT       = "department"
 STEP_DEPT_OTHER       = "dept_other"
-STEP_COUNT            = "count"
+STEP_COUNT            = "count"            # عدد المستلزمات (نص حر: رقم أو وصف)
 STEP_IMAGES           = "images"
 STEP_DISPENSE_SOURCE  = "dispense_source"
 STEP_NOTES            = "notes"
@@ -26,7 +26,7 @@ class SuppliesSession:
     patient_name:              str
     medical_department_ids:    list[str]
     medical_department_labels: list[str]
-    item_count:                int
+    item_count:                str         # عدد المستلزمات — نص حر (رقم و/أو وصف)
     dispense_source:           str
     images:                    list[dict]
     notes:                     str
@@ -62,7 +62,7 @@ class SuppliesSession:
             patient_name=             "",
             medical_department_ids=   [],
             medical_department_labels=[],
-            item_count=               0,
+            item_count=               "",
             dispense_source=          "",
             images=                   [],
             notes=                    "",
@@ -84,7 +84,7 @@ class SuppliesSession:
             patient_name=             raw.get("patient_name",             ""),
             medical_department_ids=   raw.get("medical_department_ids",   []),
             medical_department_labels=raw.get("medical_department_labels",[]),
-            item_count=               raw.get("item_count",               0),
+            item_count=               raw.get("item_count",               ""),
             dispense_source=          raw.get("dispense_source",          ""),
             images=                   raw.get("images",                   []),
             notes=                    raw.get("notes",                    ""),

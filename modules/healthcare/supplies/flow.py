@@ -4,7 +4,7 @@
 #   1.  التاريخ          — auto (session.create)
 #   2.  اسم المريض       — patient_selector
 #   3.  القسم            — DEPARTMENT_OPTIONS multiselect (+ DEPT_OTHER branch)
-#   4.  عدد المستلزمات    — numeric text input (STEP_COUNT)
+#   4.  عدد المستلزمات    — free text input, رقم أو وصف (STEP_COUNT)
 #   5.  صورة المستلزمات  — uploads (optional, 0-10)
 #   6.  جهة الصرف        — 2-button callback: الصيدلية / المخزن (REQUIRED)
 #   7.  ملاحظات          — text input (optional)
@@ -377,17 +377,14 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
         text, kb = build_count_prompt(session)
         await update.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
+    # ── عدد المستلزمات — نص حر (رقم أو وصف المستلزمات)؛ يُرفَض الفارغ فقط ──
     elif session.step == STEP_COUNT:
         raw = (update.message.text or "").strip()
-        try:
-            count = int(raw)
-            if count <= 0:
-                raise ValueError("non-positive")
-        except ValueError:
+        if not raw:
             text, kb = build_count_prompt(session, error=True)
             await update.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
             return
-        session.item_count = count
+        session.item_count = raw
         if session.edit_from_review:
             session.save(context.user_data)
             await _go_to_review(update, context)

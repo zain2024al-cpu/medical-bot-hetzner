@@ -237,7 +237,7 @@ def get_evaluation_data(
                 service_label="مستلزمات",
                 patient_name= r.patient_name or "—",
                 departments=  _parse_json_list(r.medical_departments_json),
-                detail=       f"{r.item_count or 0} صنف",
+                detail=       _item_count_detail(r.item_count),
                 image_count=  r.image_count or 0,
                 created_at=   r.created_at,
                 specialist_name= r.specialist_name or "—",
@@ -294,6 +294,17 @@ def _parse_json_list(raw: str | None, limit: int = 0) -> list[str] | str:
         return lst
     except Exception:
         return [] if limit != 1 else raw
+
+
+def _item_count_detail(item_count) -> str:
+    """
+    عرض "عدد الأصناف" في جدول تفاصيل الحالات. الحقل أصبح نصاً حراً (رقم أو وصف)،
+    فقيمة رقمية بحتة تُعرض بنفس الصياغة القديمة، والنص الحر يُعرض كما هو.
+    """
+    val = str(item_count if item_count is not None else "").strip()
+    if val.isdigit():
+        return f"{val} صنف"
+    return val or "—"
 
 
 def _aggregate(data: EvaluationData, rows: list[CaseRow]) -> None:

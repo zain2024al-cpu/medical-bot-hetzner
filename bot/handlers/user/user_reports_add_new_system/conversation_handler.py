@@ -458,6 +458,7 @@ def register(app):
         handle_admission_reason             as ad_reason,
         handle_admission_room               as ad_room,
         handle_admission_notes              as ad_notes,
+        handle_admission_notes_skip         as ad_notes_skip,
         handle_admission_followup_reason    as ad_followup_reason,
     )
     from .flows.discharge import (
@@ -918,6 +919,7 @@ def register(app):
             ],
             ADMISSION_NOTES: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, _tracked(ad_notes, ADMISSION_NOTES)),
+                CallbackQueryHandler(_tracked(ad_notes_skip, ADMISSION_NOTES),            pattern="^admission_notes_skip$"),
                 CallbackQueryHandler(sh['handle_smart_back_navigation'], pattern="^nav:back$"),
             ],
             ADMISSION_FOLLOWUP_DATE: _followup_date_state_handlers(sh, ADMISSION_FOLLOWUP_DATE),

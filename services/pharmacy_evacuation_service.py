@@ -20,6 +20,24 @@ logger = logging.getLogger(__name__)
 _PHARMACY_SOURCE = "الصيدلية"
 
 
+def _format_dispense_statement(item_count, kind: str) -> str:
+    """
+    "عدد الأصناف" أصبح نصاً حراً (رقم أو وصف كل صنف)، وليس رقماً فقط.
+    - قيمة رقمية بحتة (بيانات قديمة أو إدخال رقم بسيط) → نفس الصياغة السابقة تماماً.
+    - نص حر (وصف الأصناف) → يُعرَض كما هو في البيان مباشرة.
+    """
+    val = str(item_count if item_count is not None else "").strip()
+    if val.isdigit():
+        return (
+            f"تم صرف {val} أصناف."
+            if kind == "medication"
+            else f"تم صرف {val} مستلزمات طبية."
+        )
+    if val:
+        return f"الأصناف المصروفة: {val}."
+    return "تم صرف 0 أصناف." if kind == "medication" else "تم صرف 0 مستلزمات طبية."
+
+
 async def get_evacuation_ledger_rows(start_date: date, end_date: date) -> list[dict]:
     return await asyncio.to_thread(_get_evacuation_ledger_rows_sync, start_date, end_date)
 
@@ -73,11 +91,7 @@ def _get_evacuation_ledger_rows_sync(start_date: date, end_date: date) -> list[d
                 if fin is None:
                     # لا بيانات مالية مكتملة -> استبعاد تام من المسير
                     continue
-                statement = (
-                    f"تم صرف {r.item_count or 0} أصناف."
-                    if source_type == "medication"
-                    else f"تم صرف {r.item_count or 0} مستلزمات طبية."
-                )
+                statement = _format_dispense_statement(r.item_count, source_type)
                 rows.append({
                     "amount": fin.net_amount or 0.0,
                     "name": r.patient_name or "—",

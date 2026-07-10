@@ -12,7 +12,7 @@ class SavedSuppliesRecord:
     record_id:         int
     patient_name:      str
     department_labels: list[str]
-    item_count:        int
+    item_count:        str         # عدد المستلزمات — نص حر (رقم و/أو وصف)
     dispense_source:   str
     image_count:       int
     specialist_name:   str
@@ -24,7 +24,7 @@ def save_supplies_record(
     patient_name:              str,
     medical_department_ids:    list[str],
     medical_department_labels: list[str],
-    item_count:                int,
+    item_count:                str,
     dispense_source:           str = "",
     images:                    list[dict],
     notes:                     str,

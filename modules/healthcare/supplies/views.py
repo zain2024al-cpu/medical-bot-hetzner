@@ -103,6 +103,7 @@ def build_dept_other_prompt(session: SuppliesSession) -> tuple[str, InlineKeyboa
 def build_count_prompt(
     session: SuppliesSession, *, error: bool = False
 ) -> tuple[str, InlineKeyboardMarkup]:
+    """Free-text input for عدد المستلزمات (رقم أو وصف). Set error=True to show validation message."""
     depts = "، ".join(session.medical_department_labels) if session.medical_department_labels else "—"
     lines = [
         _DIVIDER,
@@ -114,8 +115,11 @@ def build_count_prompt(
         "",
     ]
     if error:
-        lines += ["⚠️ *الرجاء إدخال رقم صحيح وموجب.*  (مثال: 3)", ""]
-    lines += ["أرسل عدد المستلزمات الطبية المصروفة (رقم موجب، مثال: 3)."]
+        lines += ["⚠️ *الرجاء إرسال نص غير فارغ.*", ""]
+    lines += [
+        "أرسل عدد المستلزمات الطبية المصروفة، أو وضّح كل صنف كما تريد.",
+        "_(مثال: 3  —  أو: شاش 5، قفازات 3، محلول معقم 2)_",
+    ]
     kb = InlineKeyboardMarkup([[
         InlineKeyboardButton("🔙 رجوع", callback_data=f"{HCSUP}:back"),
         InlineKeyboardButton("❌ إلغاء", callback_data=f"{HCSUP}:cancel"),
@@ -223,7 +227,7 @@ def build_review(session: SuppliesSession) -> tuple[str, InlineKeyboardMarkup]:
         "",
         f"📅 {date_str}",
         f"👤 {session.patient_name}  •  🏥 {dept_text}",
-        f"🔢 {session.item_count or '—'} مستلزمات  •  🏪 {session.dispense_source or '—'}",
+        f"🔢 المستلزمات: {session.item_count or '—'}  •  🏪 {session.dispense_source or '—'}",
         f"📎 {imgs}",
         f"📝 {notes}",
         f"👨‍⚕️ {session.specialist_name or '—'}",
