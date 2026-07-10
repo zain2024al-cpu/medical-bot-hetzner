@@ -681,8 +681,7 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
                 agg_actions[k] = agg_actions.get(k, 0) + v
                 agg_actors[k] = agg_actors.get(k, 0) + 1
         # ══════════════════════════════════════════════════════════════════
-        # صفحة مستقلة: توزيع أنواع الإجراءات — رسم بياني + جدول إحصائيات
-        # (الرسم وحده لا يعطي أرقاماً، فأُضيف الجدول بجانبه في نفس الصفحة)
+        # صفحة مستقلة: توزيع أنواع الإجراءات — جدول الإحصائيات أولاً ثم الرسم
         # ══════════════════════════════════════════════════════════════════
         all_actions = sorted(agg_actions.items(), key=lambda x: x[1], reverse=True)
         if all_actions:
@@ -691,13 +690,6 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
             story.append(HeaderBand(r("توزيع أنواع الإجراءات"),
                                     r(f"{period_label} — {_sum_actions} إجراء")))
             story.append(Spacer(1, 10))
-
-            top_actions = all_actions[:8]
-            bar_ac = _hbar([k for k, _ in top_actions], [v for _, v in top_actions],
-                           color=ACCENT, width=534, title="الأعلى تكراراً")
-            if bar_ac:
-                story.append(bar_ac)
-                story.append(Spacer(1, 10))
 
             # ✅ النسبة هنا = حصة الإجراء من إجمالي الإجراءات (تجمع دائماً 100%)
             # وهو المعنى الصحيح لجدول «توزيع». لم يُمَس اصطلاح جدول الإجراءات
@@ -734,11 +726,19 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
                     act_style.append(("TEXTCOLOR", (0, _rr), (-1, _rr), RED))
             act_tbl.setStyle(TableStyle(act_style))
             story.append(act_tbl)
-            story.append(Spacer(1, 7))
+            story.append(Spacer(1, 6))
             story.append(Paragraph(
                 r("النسبة = حصة الإجراء من إجمالي الإجراءات المنفَّذة خلال الفترة."),
                 ParagraphStyle("actnote", parent=styles["Normal"], fontName=font_name,
                                fontSize=8.5, leading=12, alignment=TA_CENTER, textColor=MUTED)))
+
+            # ── الرسم البياني بعد الجدول ──
+            top_actions = all_actions[:8]
+            bar_ac = _hbar([k for k, _ in top_actions], [v for _, v in top_actions],
+                           color=ACCENT, width=534, title="الأعلى تكراراً")
+            if bar_ac:
+                story.append(Spacer(1, 12))
+                story.append(bar_ac)
 
         story.append(PageBreak())
 
