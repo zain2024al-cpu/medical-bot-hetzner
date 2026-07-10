@@ -10,6 +10,9 @@ import logging
 from telegram import Update
 from telegram.ext import ContextTypes, CallbackQueryHandler, MessageHandler, filters
 
+from bot.shared_auth import is_admin
+from core.access.access_service import user_has_module
+
 from shared.calendar_picker import build_calendar
 from shared.multiselect import engine as multiselect
 from shared.multiselect import Option
@@ -38,6 +41,13 @@ logger = logging.getLogger(__name__)
 
 _RKEY_ARRIVALS = "gs.departures.arrivals"
 _RKEY_IMAGES   = "gs.departures.images"
+
+_MODULE_KEY = "general_services"
+
+
+def _is_authorized(user_id: int) -> bool:
+    return is_admin(user_id) or user_has_module(user_id, _MODULE_KEY)
+
 
 # ── Review edit routes ────────────────────────────────────────────────────────
 
@@ -172,6 +182,11 @@ async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not data.startswith(prefix):
         return
     action = data[len(prefix):]
+
+    # ✅ الحماية داخل المعالِج نفسه — مستقلة تماماً عن ظهور الزر في القائمة.
+    if not query.from_user or not _is_authorized(query.from_user.id):
+        logger.warning(f"[departures] 🚫 blocked unauthorized user={getattr(query.from_user, 'id', '?')}  action={action!r}")
+        return
 
     # ── GS navigation ─────────────────────────────────────────────────────────
     if action == "departures":
@@ -475,6 +490,9 @@ async def _on_images(result, update: Update, context: ContextTypes.DEFAULT_TYPE)
 # ── Text handler (group 12) ───────────────────────────────────────────────────
 
 async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # ✅ الحماية داخل المعالِج نفسه — معالِج نصوص عام (يطابق أي رسالة نصية).
+    if not update.effective_user or not _is_authorized(update.effective_user.id):
+        return
     session = DepartureSession.load(context.user_data)
     if session is None or session.step not in _TEXT_STEPS:
         return

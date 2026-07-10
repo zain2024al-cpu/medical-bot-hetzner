@@ -10,6 +10,9 @@ import logging
 from telegram import Update
 from telegram.ext import ContextTypes, CallbackQueryHandler
 
+from bot.shared_auth import is_admin
+from core.access.access_service import user_has_module
+
 from shared.calendar_picker import build_calendar
 from shared.uploads import collector as uploads
 from shared.result_router import register as _register_route
@@ -35,6 +38,12 @@ logger = logging.getLogger(__name__)
 
 _RKEY_RENEWAL_DOC = "res.renewal.doc"
 _RKEY_C_DOC       = "res.renewal.c_doc"
+
+_MODULE_KEY = "residency"
+
+
+def _is_authorized(user_id: int) -> bool:
+    return is_admin(user_id) or user_has_module(user_id, _MODULE_KEY)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -186,6 +195,11 @@ async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
     action = data[len(prefix):]
     uid    = query.from_user.id if query.from_user else "?"
+
+    # ✅ الحماية داخل المعالِج نفسه — مستقلة تماماً عن ظهور الزر في القائمة.
+    if not query.from_user or not _is_authorized(query.from_user.id):
+        logger.warning(f"[residency.renewal.cb] 🚫 blocked unauthorized user={uid}  action={action!r}")
+        return
 
     logger.info(f"[residency.renewal.cb] action={action!r}  user={uid}")
 

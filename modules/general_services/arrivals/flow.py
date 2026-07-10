@@ -11,6 +11,9 @@ import logging
 from telegram import Update
 from telegram.ext import ContextTypes, CallbackQueryHandler, MessageHandler, filters
 
+from bot.shared_auth import is_admin
+from core.access.access_service import user_has_module
+
 from shared.calendar_picker import build_calendar
 from modules.general_services.views import parse_date_input, build_gs_menu
 from modules.general_services.constants import HOSPITAL_MAP, STAFF_MAP
@@ -40,6 +43,12 @@ from modules.general_services.arrivals.views import (
 )
 
 logger = logging.getLogger(__name__)
+
+_MODULE_KEY = "general_services"
+
+
+def _is_authorized(user_id: int) -> bool:
+    return is_admin(user_id) or user_has_module(user_id, _MODULE_KEY)
 
 
 def _session_debug_str(session: ArrivalSession) -> str:
@@ -281,6 +290,12 @@ async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     # ── Central entry log — visible for EVERY callback that reaches this handler
     uid  = query.from_user.id   if query.from_user  else "?"
     chat = query.message.chat_id if query.message   else "?"
+
+    # ✅ الحماية داخل المعالِج نفسه — مستقلة تماماً عن ظهور الزر في القائمة.
+    if not query.from_user or not _is_authorized(query.from_user.id):
+        logger.warning(f"[arrivals.cb] 🚫 blocked unauthorized user={uid}  action={action!r}")
+        return
+
     logger.info(
         f"[arrivals.cb] FIRED  action={action!r}"
         f"  user={uid}  chat={chat}"
@@ -910,6 +925,10 @@ async def _dispatch_callback_inner(
 # ── Text handler (group 10) ───────────────────────────────────────────────────
 
 async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # ✅ الحماية داخل المعالِج نفسه — معالِج نصوص عام (يطابق أي رسالة نصية).
+    if not update.effective_user or not _is_authorized(update.effective_user.id):
+        return
+
     # ── Diagnostic: confirm handler is being invoked at all ──────────────────
     uid  = update.effective_user.id if update.effective_user else "unknown"
     chat = update.effective_chat.id  if update.effective_chat  else "unknown"
@@ -1047,6 +1066,9 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def _handle_photo_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     uid = update.effective_user.id if update.effective_user else "?"
+    # ✅ الحماية داخل المعالِج نفسه — معالِج صور عام (يطابق أي صورة/مستند صورة).
+    if not update.effective_user or not _is_authorized(update.effective_user.id):
+        return
     session = ArrivalSession.load(context.user_data)
     if session is None or session.step not in _PHOTO_STEPS:
         return

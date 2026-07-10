@@ -10,6 +10,9 @@ import logging
 from telegram import Update
 from telegram.ext import ContextTypes, CallbackQueryHandler, MessageHandler, filters
 
+from bot.shared_auth import is_admin
+from core.access.access_service import user_has_module
+
 from shared.result_router import register as _register_route
 from shared.calendar_picker import build_calendar
 from shared.selectors.patient_selector import selector as patient_selector
@@ -54,6 +57,12 @@ _RKEY_PROC_TYPE   = "hc.followup.proc_type"
 _RKEY_COMPLAINT   = "hc.followup.complaint"
 _RKEY_MEDS_SUPPLY = "hc.followup.meds_supply"
 _RKEY_IMAGES      = "hc.followup.images"
+
+_MODULE_KEY = "healthcare"
+
+
+def _is_authorized(user_id: int) -> bool:
+    return is_admin(user_id) or user_has_module(user_id, _MODULE_KEY)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -482,6 +491,9 @@ async def _on_images(result, update: Update, context: ContextTypes.DEFAULT_TYPE)
 # ── Text input handler ────────────────────────────────────────────────────────
 
 async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # ✅ الحماية داخل المعالِج نفسه — معالِج نصوص عام (يطابق أي رسالة نصية).
+    if not update.effective_user or not _is_authorized(update.effective_user.id):
+        return
     session = MedicalFollowupSession.load(context.user_data)
     if session is None:
         return
@@ -861,6 +873,10 @@ async def _handle_hc_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         await query.answer()
     except Exception:
         pass
+    # ✅ الحماية داخل المعالِج نفسه — مستقلة تماماً عن ظهور الزر في القائمة.
+    if not query.from_user or not _is_authorized(query.from_user.id):
+        logger.warning(f"[followup.hc] 🚫 blocked unauthorized user={getattr(query.from_user, 'id', '?')}")
+        return
 
     action = data[len(HC) + 1:]   # strip "hc:"
 
@@ -892,6 +908,10 @@ async def _handle_hcfu_callback(update: Update, context: ContextTypes.DEFAULT_TY
         await query.answer()
     except Exception:
         pass
+    # ✅ الحماية داخل المعالِج نفسه — مستقلة تماماً عن ظهور الزر في القائمة.
+    if not query.from_user or not _is_authorized(query.from_user.id):
+        logger.warning(f"[followup] 🚫 blocked unauthorized user={getattr(query.from_user, 'id', '?')}")
+        return
 
     action = data[len(HCFU) + 1:]   # strip "hcfu:"
 

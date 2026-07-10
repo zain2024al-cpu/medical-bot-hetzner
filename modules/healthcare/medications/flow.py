@@ -1,7 +1,7 @@
 # modules/healthcare/medications/flow.py
 # Medication dispensing — official 10-step operational workflow.
 #
-#   1.  التاريخ          — auto (session.create)
+#   1.  التاريخ          — اليوم أو من التقويم (كبقية وحدات الرعاية الصحية)
 #   2.  اسم المريض       — patient_selector
 #   3.  القسم            — DEPARTMENT_OPTIONS multiselect (+ DEPT_OTHER branch for أخرى)
 #   4.  عدد الأصناف      — free text input, رقم أو وصف (STEP_COUNT)
@@ -16,6 +16,9 @@ import logging
 
 from telegram import Update
 from telegram.ext import ContextTypes, CallbackQueryHandler, MessageHandler, filters
+
+from bot.shared_auth import is_admin
+from core.access.access_service import user_has_module
 
 from shared.result_router import register as _register_route
 from shared.calendar_picker import build_calendar
@@ -50,6 +53,13 @@ logger = logging.getLogger(__name__)
 _RKEY_PATIENT     = "hc.medications.patient"
 _RKEY_DEPARTMENTS = "hc.medications.departments"
 _RKEY_IMAGES      = "hc.medications.images"
+
+_MODULE_KEY = "healthcare"
+
+
+def _is_authorized(user_id: int) -> bool:
+    return is_admin(user_id) or user_has_module(user_id, _MODULE_KEY)
+
 
 # ── Review edit routes ────────────────────────────────────────────────────────
 
@@ -144,14 +154,20 @@ async def _open_edit_step(
     await _route_to_edit_step(session, step, update, context)
 
 
-# ── Step 1: start — date is auto-stamped (today), no manual selection ───────
+# ── Step 1: start — show date confirmation screen ────────────────────────────
 
 async def _start_flow(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    session = MedicationSession.create(context.user_data)
+    MedicationSession.create(context.user_data)
     logger.info(f"[medications] flow started  user={update.effective_user.id}")
-    session.step = STEP_PATIENT
-    session.save(context.user_data)
-    await patient_selector.enter(update, context, return_to=_RKEY_PATIENT, include_pharmacy=True)
+    text, kb = build_date_prompt()
+    query = update.callback_query
+    try:
+        if query:
+            await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
+            return
+    except Exception:
+        pass
+    await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
 
 # ── Step 1 → 2: date confirmed — open patient selector ───────────────────────
@@ -356,6 +372,9 @@ async def _open_images_upload(update: Update, context: ContextTypes.DEFAULT_TYPE
 # ── Text input handler (steps: DEPT_OTHER, COUNT, NOTES) ─────────────────────
 
 async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # ✅ الحماية داخل المعالِج نفسه — معالِج نصوص عام (يطابق أي رسالة نصية).
+    if not update.effective_user or not _is_authorized(update.effective_user.id):
+        return
     session = MedicationSession.load(context.user_data)
     if session is None:
         return
@@ -653,6 +672,10 @@ async def _handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await query.answer()
     except Exception:
         pass
+    # ✅ الحماية داخل المعالِج نفسه — مستقلة تماماً عن ظهور الزر في القائمة.
+    if not query.from_user or not _is_authorized(query.from_user.id):
+        logger.warning(f"[medications] 🚫 blocked unauthorized user={getattr(query.from_user, 'id', '?')}")
+        return
     action = data[len(HCMED) + 1:]
 
     # Dispense source selection (disp_pharmacy / disp_warehouse)

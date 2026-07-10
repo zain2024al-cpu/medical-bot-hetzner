@@ -11,6 +11,9 @@ import logging
 from telegram import Update
 from telegram.ext import ContextTypes, CallbackQueryHandler, MessageHandler, filters
 
+from bot.shared_auth import is_admin
+from core.access.access_service import user_has_module
+
 from shared.calendar_picker import build_calendar
 
 from modules.residency.profiles.session import (
@@ -43,6 +46,13 @@ from modules.residency.profiles.repository import (
 )
 
 logger = logging.getLogger(__name__)
+
+_MODULE_KEY = "residency"
+
+
+def _is_authorized(user_id: int) -> bool:
+    return is_admin(user_id) or user_has_module(user_id, _MODULE_KEY)
+
 
 # ── Step sets ─────────────────────────────────────────────────────────────────
 
@@ -215,6 +225,11 @@ async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
     action = data[len(prefix):]
     uid    = query.from_user.id if query.from_user else "?"
+
+    # ✅ الحماية داخل المعالِج نفسه — مستقلة تماماً عن ظهور الزر في القائمة.
+    if not query.from_user or not _is_authorized(query.from_user.id):
+        logger.warning(f"[res.profiles.cb] 🚫 blocked unauthorized user={uid}  action={action!r}")
+        return
 
     logger.info(f"[res.profiles.cb] FIRED  action={action!r}  user={uid}")
 
@@ -625,6 +640,11 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     uid = update.effective_user.id if update.effective_user else "?"
 
+    # ✅ الحماية داخل المعالِج نفسه — هذا معالِج نصوص عام (يطابق أي رسالة
+    # نصية)، فيجب ألا يتقدّم بأي منطق داخلي قبل التحقق من الصلاحية.
+    if not update.effective_user or not _is_authorized(update.effective_user.id):
+        return
+
     # ── Search mode ───────────────────────────────────────────────────────────
     if context.user_data.get("_res_search_active"):
         query_text = (update.message.text or "").strip()
@@ -755,6 +775,9 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def _handle_photo_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     uid     = update.effective_user.id if update.effective_user else "?"
+    # ✅ الحماية داخل المعالِج نفسه — معالِج صور عام (يطابق أي صورة/مستند صورة).
+    if not update.effective_user or not _is_authorized(update.effective_user.id):
+        return
     session = AddProfileSession.load(context.user_data)
     if session is None or session.step not in _PHOTO_STEPS:
         return

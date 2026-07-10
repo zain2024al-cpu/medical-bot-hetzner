@@ -6,6 +6,9 @@ import logging
 from telegram import Update
 from telegram.ext import ContextTypes, CallbackQueryHandler, MessageHandler, filters
 
+from bot.shared_auth import is_admin
+from core.access.access_service import user_has_module
+
 from shared.result_router import register as _register_route
 from shared.calendar_picker import build_calendar
 from shared.selectors.patient_selector import selector as patient_selector
@@ -31,6 +34,13 @@ logger = logging.getLogger(__name__)
 _RKEY_PATIENT    = "hc.other.patient"
 _RKEY_OPERATIONS = "hc.other.actions"
 _RKEY_IMAGES     = "hc.other.images"
+
+_MODULE_KEY = "healthcare"
+
+
+def _is_authorized(user_id: int) -> bool:
+    return is_admin(user_id) or user_has_module(user_id, _MODULE_KEY)
+
 
 # ── Review edit routes ────────────────────────────────────────────────────────
 
@@ -287,6 +297,9 @@ async def _on_images(result, update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # ✅ الحماية داخل المعالِج نفسه — معالِج نصوص عام (يطابق أي رسالة نصية).
+    if not update.effective_user or not _is_authorized(update.effective_user.id):
+        return
     session = OtherHealthcareSession.load(context.user_data)
     if session is None:
         return
@@ -490,6 +503,10 @@ async def _handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await query.answer()
     except Exception:
         pass
+    # ✅ الحماية داخل المعالِج نفسه — مستقلة تماماً عن ظهور الزر في القائمة.
+    if not query.from_user or not _is_authorized(query.from_user.id):
+        logger.warning(f"[other_hc] 🚫 blocked unauthorized user={getattr(query.from_user, 'id', '?')}")
+        return
     action = data[len(HCOTH) + 1:]
 
     # Calendar widget (cal_pick / cal_prev / cal_next / cal_noop)

@@ -15,6 +15,8 @@ from datetime import date, timedelta, datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler, CommandHandler, MessageHandler, filters
 
+from bot.shared_auth import is_admin
+
 logger = logging.getLogger(__name__)
 
 _PREFIX = "hceval"
@@ -38,7 +40,10 @@ _KEY_DATE_END    = "_hceval_end"       # "YYYY-MM-DD"
 async def handle_evaluation_command(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
-    """Entry point — show specialist selection."""
+    """Entry point — show specialist selection. Admin-only."""
+    user = update.effective_user
+    if not user or not is_admin(user.id):
+        return
     await _show_specialist_list(update, context)
 
 
@@ -312,6 +317,10 @@ async def _handle_callback(
         await query.answer()
     except Exception:
         pass
+    # ✅ الحماية داخل المعالِج نفسه — أدمن فقط، مستقلة عن ظهور الزر.
+    if not query.from_user or not is_admin(query.from_user.id):
+        logger.warning(f"[evaluation] 🚫 blocked non-admin user={getattr(query.from_user, 'id', '?')}")
+        return
 
     data   = query.data or ""
     action = data[len(_PREFIX) + 1:]   # strip "hceval:"

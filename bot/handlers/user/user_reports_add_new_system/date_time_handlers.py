@@ -96,7 +96,19 @@ async def render_date_selection(message, context, query=None):
         [InlineKeyboardButton("📅 إدخال من التقويم", callback_data="date:calendar")],
         [InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")]
     ])
-    text = "📅 **إضافة تقرير جديد** (الخطوة 1 من 5)\n\nاختر طريقة إدخال التاريخ:"
+
+    # ✅ مصطلح طبي اليوم — نفس الميزة ونفس الدوران اليومي المستخدَم في قائمة
+    # الرعاية الصحية الرئيسية (modules/healthcare/views.py)، بلا أي تكرار للقائمة.
+    from modules.healthcare.daily_term import get_daily_term
+    ar_term, en_term, ar_def = get_daily_term()
+    text = (
+        "📅 **إضافة تقرير جديد** (الخطوة 1 من 5)\n\n"
+        "اختر طريقة إدخال التاريخ:\n\n"
+        "─────────────────────\n"
+        "📚 *مصطلح طبي اليوم*\n"
+        f"*{ar_term}*  ·  _{en_term}_\n"
+        f"{ar_def}"
+    )
 
     if query:
         try:
