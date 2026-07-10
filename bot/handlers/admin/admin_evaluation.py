@@ -675,15 +675,71 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
         story.append(Spacer(1, 12))
 
         agg_actions: dict[str, int] = {}
+        agg_actors: dict[str, int] = {}   # عدد المترجمين الذين نفّذوا كل إجراء
         for it in results:
             for k, v in _norm_breakdown(it).items():
                 agg_actions[k] = agg_actions.get(k, 0) + v
-        top_actions = sorted(agg_actions.items(), key=lambda x: x[1], reverse=True)[:8]
-        if top_actions:
+                agg_actors[k] = agg_actors.get(k, 0) + 1
+        # ══════════════════════════════════════════════════════════════════
+        # صفحة مستقلة: توزيع أنواع الإجراءات — رسم بياني + جدول إحصائيات
+        # (الرسم وحده لا يعطي أرقاماً، فأُضيف الجدول بجانبه في نفس الصفحة)
+        # ══════════════════════════════════════════════════════════════════
+        all_actions = sorted(agg_actions.items(), key=lambda x: x[1], reverse=True)
+        if all_actions:
+            _sum_actions = sum(v for _, v in all_actions)
+            story.append(PageBreak())
+            story.append(HeaderBand(r("توزيع أنواع الإجراءات"),
+                                    r(f"{period_label} — {_sum_actions} إجراء")))
+            story.append(Spacer(1, 10))
+
+            top_actions = all_actions[:8]
             bar_ac = _hbar([k for k, _ in top_actions], [v for _, v in top_actions],
-                           color=ACCENT, width=534, title="توزيع أنواع الإجراءات (الأعلى)")
+                           color=ACCENT, width=534, title="الأعلى تكراراً")
             if bar_ac:
                 story.append(bar_ac)
+                story.append(Spacer(1, 10))
+
+            # ✅ النسبة هنا = حصة الإجراء من إجمالي الإجراءات (تجمع دائماً 100%)
+            # وهو المعنى الصحيح لجدول «توزيع». لم يُمَس اصطلاح جدول الإجراءات
+            # الخاص بكل مترجم (الذي يقسم على إجمالي تقارير المترجم).
+            act_rows = [[r("النسبة"), r("عدد المترجمين"), r("العدد"), r("نوع الإجراء")]]
+            for _an, _ac in all_actions:
+                act_rows.append([
+                    f"{_pct(_ac, _sum_actions):.1f}%",
+                    str(agg_actors.get(_an, 0)),
+                    str(_ac),
+                    r(_an),
+                ])
+            act_rows.append(["100%", "—", str(_sum_actions), r("الإجمالي")])
+
+            act_tbl = Table(act_rows, colWidths=[84, 104, 74, 272], repeatRows=1)
+            act_style = [
+                ("BACKGROUND", (0, 0), (-1, 0), MAIN),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("FONTNAME", (0, 0), (-1, -1), font_name),
+                ("FONTSIZE", (0, 0), (-1, 0), 9.5),
+                ("FONTSIZE", (0, 1), (-1, -1), 9.5),
+                ("GRID", (0, 0), (-1, -1), 0.4, GRID),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                ("BACKGROUND", (0, -1), (-1, -1), MAIN_LIGHT),
+                ("TEXTCOLOR", (0, -1), (-1, -1), MAIN),
+            ]
+            for _rr in range(1, len(act_rows) - 1):
+                if _rr % 2 == 0:
+                    act_style.append(("BACKGROUND", (0, _rr), (-1, _rr), colors.HexColor("#FAFBFD")))
+                if all_actions[_rr - 1][0] == "تأجيل موعد":
+                    act_style.append(("TEXTCOLOR", (0, _rr), (-1, _rr), RED))
+            act_tbl.setStyle(TableStyle(act_style))
+            story.append(act_tbl)
+            story.append(Spacer(1, 7))
+            story.append(Paragraph(
+                r("النسبة = حصة الإجراء من إجمالي الإجراءات المنفَّذة خلال الفترة."),
+                ParagraphStyle("actnote", parent=styles["Normal"], fontName=font_name,
+                               fontSize=8.5, leading=12, alignment=TA_CENTER, textColor=MUTED)))
+
         story.append(PageBreak())
 
     for i, item in enumerate(results, 1):
