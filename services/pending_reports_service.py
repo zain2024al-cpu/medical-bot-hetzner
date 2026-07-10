@@ -164,7 +164,11 @@ def get_pending_reports() -> list:
                     'created_at': p.created_at
                 })
 
-            logger.info(f"✅ Fetched {len(result)} pending reports")
+            # ملاحظة: هذا العدد خام (كل صف بحالة status='pending')، وقد يشمل
+            # سجلات قديمة سابقة لنظام الحالات الثلاث بأسباب غير "🟡 لم يجهز
+            # بعد". شاشة الأدمن تُصفّي على هذا السبب تحديداً قبل العرض، فالعدد
+            # الظاهر هناك قد يكون أقل من هذا الرقم — وهذا هو السلوك الصحيح.
+            logger.info(f"✅ Fetched {len(result)} pending reports (raw, status=pending)")
             return result
 
     except Exception as e:
