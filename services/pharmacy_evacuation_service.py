@@ -38,11 +38,17 @@ def _format_dispense_statement(item_count, kind: str) -> str:
     return "تم صرف 0 أصناف." if kind == "medication" else "تم صرف 0 مستلزمات طبية."
 
 
-async def get_evacuation_ledger_rows(start_date: date, end_date: date) -> list[dict]:
-    return await asyncio.to_thread(_get_evacuation_ledger_rows_sync, start_date, end_date)
+async def get_evacuation_ledger_rows(
+    start_date: date, end_date: date, manifest_type: str | None = None,
+) -> list[dict]:
+    """manifest_type: "A" | "B" | "C" لتقييد المسير على تصنيف واحد فقط،
+    أو None لعدم الفلترة (كل التصنيفات معاً — السلوك القديم بلا تغيير)."""
+    return await asyncio.to_thread(_get_evacuation_ledger_rows_sync, start_date, end_date, manifest_type)
 
 
-def _get_evacuation_ledger_rows_sync(start_date: date, end_date: date) -> list[dict]:
+def _get_evacuation_ledger_rows_sync(
+    start_date: date, end_date: date, manifest_type: str | None = None,
+) -> list[dict]:
     from db.session import SessionLocal
     from db.models import MedicationRecord, SuppliesRecord, PharmacyFinancialRecord
 
@@ -76,20 +82,28 @@ def _get_evacuation_ledger_rows_sync(start_date: date, end_date: date) -> list[d
                 return []
 
             keys = {(stype, r.id) for stype, r in source_records}
-            financial_rows = (
-                s.query(PharmacyFinancialRecord)
-                .filter(
-                    PharmacyFinancialRecord.source_type.in_({k[0] for k in keys}),
-                    PharmacyFinancialRecord.source_record_id.in_({k[1] for k in keys}),
-                )
-                .all()
+            financial_query = s.query(PharmacyFinancialRecord).filter(
+                PharmacyFinancialRecord.source_type.in_({k[0] for k in keys}),
+                PharmacyFinancialRecord.source_record_id.in_({k[1] for k in keys}),
             )
+            if manifest_type:
+                # ✅ السجلات القديمة (قبل إضافة هذا التصنيف) لها manifest_type
+                # فارغ في القاعدة — تُعامَل كـ"A" في كل مكان آخر بالكود، لذا
+                # فلترة A تشمل أيضاً NULL حتى تبقى ظاهرة في المسير كسابقاً.
+                if manifest_type == "A":
+                    financial_query = financial_query.filter(
+                        (PharmacyFinancialRecord.manifest_type == "A")
+                        | (PharmacyFinancialRecord.manifest_type.is_(None))
+                    )
+                else:
+                    financial_query = financial_query.filter(PharmacyFinancialRecord.manifest_type == manifest_type)
+            financial_rows = financial_query.all()
             financial_by_key = {(f.source_type, f.source_record_id): f for f in financial_rows}
 
             for source_type, r in source_records:
                 fin = financial_by_key.get((source_type, r.id))
                 if fin is None:
-                    # لا بيانات مالية مكتملة -> استبعاد تام من المسير
+                    # لا بيانات مالية مكتملة (أو لا تطابق فلتر نوع المسير) -> استبعاد تام من المسير
                     continue
                 statement = _format_dispense_statement(r.item_count, source_type)
                 rows.append({
@@ -99,6 +113,7 @@ def _get_evacuation_ledger_rows_sync(start_date: date, end_date: date) -> list[d
                     "expense_item": fin.expense_item or "—",
                     "statement": statement,
                     "date": r.created_at.date() if r.created_at else start_date,
+                    "manifest_type": fin.manifest_type or "A",
                     "_sort_dt": r.created_at or start_dt,
                 })
 

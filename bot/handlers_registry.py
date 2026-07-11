@@ -56,6 +56,10 @@ def register_all_handlers(app):
     from bot.handlers.admin.admin_pending_reports import register as register_pending_reports
     register_pending_reports(app)
 
+    # ✅ شاشة التقارير الناقصة المرفقات (زر "📎 تقارير ناقصة المرفقات" داخل إدارة النظام)
+    from bot.handlers.admin.admin_missing_attachments import register as register_missing_attachments
+    register_missing_attachments(app)
+
     # ✅ نظام التقارير الجديد — 2 أنواع احترافية: شامل + مريض واحد (مع patient_selector)
     from bot.handlers.admin.admin_reports_menu import register as register_reports_menu
     from bot.handlers.admin.admin_comprehensive_report import register as register_comprehensive_report

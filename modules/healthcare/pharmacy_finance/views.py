@@ -13,6 +13,13 @@ _THIN    = "─────────────────────"
 
 _SOURCE_LABEL = {"medication": "💊 صرف أدوية", "supplies": "🏥 مستلزمات طبية"}
 
+# ✅ تصنيف المسير عند الطباعة — لا علاقة له بحساب المبلغ (انظر flow.py).
+_MANIFEST_TYPE_LABELS = {
+    "A": "🅰️ نسبة ثابتة (22%)",
+    "B": "🅱️ نسبة مختلفة",
+    "C": "↪️ إخلاء لجهة أخرى",
+}
+
 
 def _row_label(r) -> str:
     """تسمية زر صف واحد في أي قائمة حالات — تُظهر رقم الفاتورة إن وُجد
@@ -131,7 +138,7 @@ def build_expense_item_prompt(session: PharmacyFinanceSession) -> tuple[str, Inl
 
 def build_invoice_total_prompt(session: PharmacyFinanceSession, *, error: bool = False) -> tuple[str, InlineKeyboardMarkup]:
     lines = [
-        _DIVIDER, "💰  **إجمالي الفاتورة**", "",
+        _DIVIDER, "💵  **المبلغ النهائي**", "",
         *_source_header(session),
         f"🧾 رقم الفاتورة: {session.invoice_number}",
         f"📋 بند الصرف: {session.expense_item}",
@@ -139,7 +146,7 @@ def build_invoice_total_prompt(session: PharmacyFinanceSession, *, error: bool =
     ]
     if error:
         lines += ["⚠️ *الرجاء إدخال رقم صحيح وموجب.* (مثال: 1500 أو 1500.50)", ""]
-    lines.append("أرسل إجمالي مبلغ الفاتورة:")
+    lines.append("أرسل المبلغ النهائي مباشرة:")
     kb = InlineKeyboardMarkup([[
         InlineKeyboardButton("🔙 رجوع", callback_data=f"{HCPHFIN}:back"),
         InlineKeyboardButton("❌ إلغاء", callback_data=f"{HCPHFIN}:cancel"),
@@ -147,35 +154,35 @@ def build_invoice_total_prompt(session: PharmacyFinanceSession, *, error: bool =
     return "\n".join(lines), kb
 
 
-def build_discount_percent_prompt(session: PharmacyFinanceSession, *, error: bool = False) -> tuple[str, InlineKeyboardMarkup]:
+def build_manifest_type_prompt(session: PharmacyFinanceSession) -> tuple[str, InlineKeyboardMarkup]:
     lines = [
-        _DIVIDER, "🏷️  **نسبة التخفيض %**", "",
+        _DIVIDER, "🔖  **نوع المسير**", "",
         *_source_header(session),
-        f"💰 إجمالي الفاتورة: {session.invoice_total:.2f}",
+        f"💵 المبلغ النهائي: {session.net_amount:.2f}",
         _THIN, "",
+        "اختر تصنيف هذا السجل (يُستخدَم كفلتر عند طباعة المسير لاحقاً):",
     ]
-    if error:
-        lines += ["⚠️ *الرجاء إدخال نسبة بين 0 و100.* (مثال: 10 أو 0 إن لا يوجد تخفيض)", ""]
-    lines.append("أرسل نسبة التخفيض % (أرسل 0 إن لم يوجد تخفيض):")
-    kb = InlineKeyboardMarkup([[
-        InlineKeyboardButton("🔙 رجوع", callback_data=f"{HCPHFIN}:back"),
-        InlineKeyboardButton("❌ إلغاء", callback_data=f"{HCPHFIN}:cancel"),
-    ]])
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton(_MANIFEST_TYPE_LABELS["A"], callback_data=f"{HCPHFIN}:mtype:A")],
+        [InlineKeyboardButton(_MANIFEST_TYPE_LABELS["B"], callback_data=f"{HCPHFIN}:mtype:B")],
+        [InlineKeyboardButton(_MANIFEST_TYPE_LABELS["C"], callback_data=f"{HCPHFIN}:mtype:C")],
+        [InlineKeyboardButton("🔙 رجوع", callback_data=f"{HCPHFIN}:back"),
+         InlineKeyboardButton("❌ إلغاء", callback_data=f"{HCPHFIN}:cancel")],
+    ])
     return "\n".join(lines), kb
 
 
 def build_review(session: PharmacyFinanceSession) -> tuple[str, InlineKeyboardMarkup]:
     title = "✏️ تعديل بيانات مالية" if session.is_edit else "💰 مراجعة البيانات المالية"
+    manifest_label = _MANIFEST_TYPE_LABELS.get(session.manifest_type, session.manifest_type)
     lines = [
         title, "",
         *_source_header(session),
         "─────────────────────",
         f"🧾 رقم الفاتورة: {session.invoice_number}",
         f"📋 بند الصرف: {session.expense_item}",
-        f"💰 إجمالي الفاتورة: {session.invoice_total:.2f}",
-        f"🏷️ نسبة التخفيض: {session.discount_percent:.1f}%",
-        f"💵 مبلغ الخصم: {session.discount_amount:.2f}",
-        f"💳 صافي المبلغ: {session.net_amount:.2f}",
+        f"💵 المبلغ النهائي: {session.net_amount:.2f}",
+        f"🔖 نوع المسير: {manifest_label}",
         "",
         "هل تريد الحفظ؟",
     ]
@@ -185,8 +192,8 @@ def build_review(session: PharmacyFinanceSession) -> tuple[str, InlineKeyboardMa
         [InlineKeyboardButton("✏️ عدد الأصناف", callback_data=f"{HCPHFIN}:edit_item_count"),
          InlineKeyboardButton("✏️ رقم الفاتورة", callback_data=f"{HCPHFIN}:edit_invoice_number")],
         [InlineKeyboardButton("✏️ بند الصرف", callback_data=f"{HCPHFIN}:edit_expense_item"),
-         InlineKeyboardButton("✏️ إجمالي الفاتورة", callback_data=f"{HCPHFIN}:edit_invoice_total")],
-        [InlineKeyboardButton("✏️ نسبة التخفيض", callback_data=f"{HCPHFIN}:edit_discount_percent")],
+         InlineKeyboardButton("✏️ المبلغ النهائي", callback_data=f"{HCPHFIN}:edit_invoice_total")],
+        [InlineKeyboardButton("✏️ نوع المسير", callback_data=f"{HCPHFIN}:edit_manifest_type")],
     ])
     return "\n".join(lines), kb
 

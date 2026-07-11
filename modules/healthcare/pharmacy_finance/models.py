@@ -164,6 +164,7 @@ def get_financial_record(source_type: str, source_record_id: int) -> dict | None
             "discount_percent": r.discount_percent or 0.0,
             "discount_amount": r.discount_amount or 0.0,
             "net_amount": r.net_amount or 0.0,
+            "manifest_type": r.manifest_type or "A",
             "created_by": r.created_by,  # لفحص الملكية عند الاختيار
         }
 
@@ -176,12 +177,18 @@ def save_financial_record(
     expense_item: str,
     invoice_total: float,
     discount_percent: float,
+    manifest_type: str = "A",
     created_by: int | None,
     existing_financial_id: int | None = None,
 ) -> dict:
     """
     ينشئ سجلاً جديداً أو يُحدِّث سجلاً موجوداً (existing_financial_id).
     يُعيد حساب discount_amount/net_amount من الصفر دائماً عند الحفظ.
+
+    ✅ discount_percent يبقى موجوداً في التوقيع/القاعدة للتوافق فقط — واجهة
+    الإدخال الحالية لا تعرض خطوة نسبة تخفيض إطلاقاً، وتُمرِّر 0.0 دائماً
+    (المترجم يكتب المبلغ النهائي مباشرة في invoice_total، فيكون net_amount
+    مساوياً له تلقائياً). manifest_type تصنيف طباعة منفصل تماماً (A/B/C).
     """
     from db.session import get_db
     from db.models import PharmacyFinancialRecord
@@ -208,12 +215,13 @@ def save_financial_record(
         record.discount_percent = discount_percent
         record.discount_amount = discount_amount
         record.net_amount = net_amount
+        record.manifest_type = manifest_type
         db.flush()
         record_id = record.id
 
     logger.info(
         f"[pharmacy_finance] saved financial record id={record_id} "
-        f"source={source_type}#{source_record_id} net={net_amount}"
+        f"source={source_type}#{source_record_id} net={net_amount} manifest_type={manifest_type}"
     )
     return {
         "id": record_id,
@@ -223,6 +231,7 @@ def save_financial_record(
         "discount_percent": discount_percent,
         "discount_amount": discount_amount,
         "net_amount": net_amount,
+        "manifest_type": manifest_type,
     }
 
 

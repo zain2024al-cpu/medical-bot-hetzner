@@ -18,6 +18,8 @@
 #     بدون المرور بشاشة قبول/رفض/تجميد الخاصة بـ"إدارة المستخدمين" العادية)
 #   - "pndrep:page:0"     → admin_pending_reports.py (شاشة متابعة يدوية
 #     للتقارير الطبية المعلقة — بديل/مكمّل لتنبيه الساعة 9 مساءً التلقائي)
+#   - "msngatt:page:0"    → admin_missing_attachments.py (تقارير عليها
+#     "يوجد تقرير طبي" لكن بلا أي مرفق فعلي مسجَّل — فشل صامت سابق في البث)
 #
 # استُخدمت بادئة "sys_menu:" و"goto:" (وليس "admin:") لتفادي تصادم مع
 # المعالج العام في admin_start.py (`^admin:(?!evaluation$|manage_admins$)`)
@@ -50,6 +52,7 @@ def _menu_kb() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("👥 إدارة الحسابات", callback_data=f"{_PFX}:accounts")],
         [InlineKeyboardButton("📆 المواعيد القادمة", callback_data="goto:appointments")],
         [InlineKeyboardButton("📋 التقارير المعلقة", callback_data="pndrep:page:0")],
+        [InlineKeyboardButton("📎 تقارير ناقصة المرفقات", callback_data="msngatt:page:0")],
         [InlineKeyboardButton("❌ إغلاق", callback_data=f"{_PFX}:close")],
     ])
 

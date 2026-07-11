@@ -2691,16 +2691,30 @@ async def save_report_to_database(query, context, flow_type):
                 logger.info(f"🔬 save_report_to_database: radiology_delivery_date في broadcast_data = {repr(broadcast_data.get('radiology_delivery_date'))}")
             
             broadcast_success = False
+            attachments_send_failed = False
             try:
-                await broadcast_new_report(context.bot, broadcast_data)
+                _broadcast_result = await broadcast_new_report(context.bot, broadcast_data)
                 logger.info(f"✅ save_report_to_database: تم بث التقرير #{report_id} لجميع المستخدمين")
                 broadcast_success = True
+                # ✅ اكتشاف فشل صامت لإرسال المرفقات: بطاقة التقرير نجحت لكن
+                # المرفق (PDF الصور/الملف) فشل داخلياً — كان هذا يمر بلا أي
+                # أثر (لا استثناء يصل هنا) فيبقى has_paper_report=1 محفوظاً
+                # بلا أي سجل مرفق فعلي في medical_attachment_files.
+                if isinstance(_broadcast_result, dict):
+                    _att_result = _broadcast_result.get("attachments_result")
+                    if _att_result and _att_result.get("sent", 0) < _att_result.get("attempted", 0):
+                        attachments_send_failed = True
+                        logger.warning(
+                            f"⚠️ save_report_to_database: فشل إرسال بعض/كل المرفقات الطبية "
+                            f"للتقرير #{report_id} (sent={_att_result.get('sent')}/{_att_result.get('attempted')})"
+                        )
             except Exception as broadcast_error:
                 logger.error(f"❌ save_report_to_database: خطأ في بث التقرير #{report_id}: {broadcast_error}", exc_info=True)
                 # ✅ لا نوقف العملية - نكمل حتى لو فشل البث
         except Exception as e:
             logger.error(f"❌ save_report_to_database: خطأ عام في حفظ التقرير: {e}", exc_info=True)
             broadcast_success = False
+            attachments_send_failed = False
 
         # الرد للمستخدم
         success_message = (
@@ -2717,6 +2731,14 @@ async def save_report_to_database(query, context, flow_type):
         # ✅ إظهار رسالة مختلفة حسب نجاح البث
         if broadcast_success:
             success_message += f"\n✅ تم إرسال التقرير للمجموعة."
+            # ✅ بطاقة التقرير نجحت لكن المرفق الطبي فشل إرساله — كان هذا
+            # يمر بصمت سابقاً بلا أي تنبيه، فيظل التقرير عليه "يوجد تقرير
+            # طبي" بلا أي ملف فعلي يمكن الرجوع إليه لاحقاً.
+            if attachments_send_failed:
+                success_message += (
+                    f"\n⚠️ لكن فشل إرسال المرفق الطبي (الصور/الملف) للمجموعة. "
+                    f"يرجى رفعه يدوياً عبر زر \"📎 المرفقات الطبية\"."
+                )
         else:
             success_message += f"\n⚠️ تم حفظ التقرير لكن فشل إرساله للمجموعة. يرجى التواصل مع الأدمن."
         

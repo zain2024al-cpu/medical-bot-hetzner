@@ -432,6 +432,9 @@ class PharmacyFinancialRecord(Base):
     discount_percent  = Column(Float, nullable=True)                     # نسبة التخفيض %
     discount_amount   = Column(Float, nullable=True)                     # مبلغ الخصم (محسوب في بايثون)
     net_amount        = Column(Float, nullable=True)                     # صافي المبلغ (محسوب في بايثون)
+    # ✅ تصنيف المسير عند الطباعة — لا علاقة له بحساب المبلغ:
+    #   "A" = نسبة ثابتة (22%) | "B" = نسبة مختلفة | "C" = إخلاء لجهة أخرى
+    manifest_type     = Column(String(5), nullable=True)
     created_by        = Column(Integer, nullable=True, index=True)
     created_at        = Column(DateTime, default=datetime.utcnow, index=True, nullable=True)
     updated_at        = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)

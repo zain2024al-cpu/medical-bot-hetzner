@@ -152,6 +152,9 @@ class DatabaseMaintenance:
                 # واحد متوقَّع" في كود القراءة، فلا يتغيّر سلوكها.
                 _migrate_column(conn, "pending_reports", "expected_count", "INTEGER")
                 _migrate_column(conn, "pending_reports", "uploaded_count", "INTEGER")
+                # ✅ تصنيف مسير الصيدلية عند الطباعة (A/B/C) — الصفوف القديمة
+                # تحصل على NULL، تُعامَل كـ"A" افتراضياً في كود القراءة.
+                _migrate_column(conn, "pharmacy_financial_records", "manifest_type", "VARCHAR(5)")
                 logger.info("🔎 Migration check finished.")
 
                 if check == "ok":

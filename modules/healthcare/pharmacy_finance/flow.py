@@ -15,13 +15,13 @@ from shared.calendar_picker import build_calendar
 from modules.healthcare.pharmacy_finance.session import (
     PharmacyFinanceSession,
     STEP_LIST, STEP_ITEM_COUNT, STEP_INVOICE_NUMBER, STEP_EXPENSE_ITEM,
-    STEP_INVOICE_TOTAL, STEP_DISCOUNT_PERCENT, STEP_REVIEW,
+    STEP_INVOICE_TOTAL, STEP_MANIFEST_TYPE, STEP_REVIEW,
 )
 from modules.healthcare.pharmacy_finance.views import (
     HCPHFIN,
     build_list_prompt, build_date_list_prompt, build_item_count_prompt,
     build_invoice_number_prompt, build_expense_item_prompt,
-    build_invoice_total_prompt, build_discount_percent_prompt,
+    build_invoice_total_prompt, build_manifest_type_prompt,
     build_review, build_success, build_cancelled, build_error,
 )
 
@@ -29,13 +29,14 @@ logger = logging.getLogger(__name__)
 
 _MODULE_KEY = "pharmacy_finance"
 _PAGE_SIZE = 10
+_VALID_MANIFEST_TYPES = ("A", "B", "C")
 
 _REVIEW_EDIT_ROUTES = {
-    "edit_item_count":       STEP_ITEM_COUNT,
-    "edit_invoice_number":   STEP_INVOICE_NUMBER,
-    "edit_expense_item":     STEP_EXPENSE_ITEM,
-    "edit_invoice_total":    STEP_INVOICE_TOTAL,
-    "edit_discount_percent": STEP_DISCOUNT_PERCENT,
+    "edit_item_count":     STEP_ITEM_COUNT,
+    "edit_invoice_number": STEP_INVOICE_NUMBER,
+    "edit_expense_item":   STEP_EXPENSE_ITEM,
+    "edit_invoice_total":  STEP_INVOICE_TOTAL,
+    "edit_manifest_type":  STEP_MANIFEST_TYPE,
 }
 
 
@@ -158,6 +159,7 @@ async def _handle_pick(update: Update, context: ContextTypes.DEFAULT_TYPE, sourc
         session.discount_percent = existing["discount_percent"]
         session.discount_amount = existing["discount_amount"]
         session.net_amount = existing["net_amount"]
+        session.manifest_type = existing.get("manifest_type") or "A"
         session.step = STEP_REVIEW
         session.save(context.user_data)
         await _edit_or_reply(update, *build_review(session))
@@ -229,35 +231,43 @@ async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         except ValueError:
             await _reply(update, build_invoice_total_prompt(session, error=True))
             return
+        # ✅ لا خطوة نسبة تخفيض إطلاقاً — المبلغ المُدخَل هو المبلغ النهائي
+        # مباشرة (discount_percent يبقى 0 دائماً، فـ_recompute() تجعل
+        # net_amount == invoice_total تلقائياً بنفس المعادلة القديمة بلا حاجة لتعديلها).
         session.invoice_total = total
+        session.discount_percent = 0.0
+        _recompute(session)
         if session.edit_from_review:
-            _recompute(session)
             session.save(context.user_data)
             await _go_to_review(update, context)
             return
-        session.step = STEP_DISCOUNT_PERCENT
+        session.step = STEP_MANIFEST_TYPE
         session.save(context.user_data)
-        await _reply(update, build_discount_percent_prompt(session))
-
-    elif session.step == STEP_DISCOUNT_PERCENT:
-        try:
-            percent = float(text.replace("%", ""))
-            if percent < 0 or percent > 100:
-                raise ValueError("out of range")
-        except ValueError:
-            await _reply(update, build_discount_percent_prompt(session, error=True))
-            return
-        session.discount_percent = percent
-        _recompute(session)
-        session.edit_from_review = False
-        session.step = STEP_REVIEW
-        session.save(context.user_data)
-        await _reply(update, build_review(session))
+        await _reply(update, build_manifest_type_prompt(session))
 
 
 def _recompute(session: PharmacyFinanceSession) -> None:
     session.discount_amount = round(session.invoice_total * session.discount_percent / 100, 2)
     session.net_amount = round(session.invoice_total - session.discount_amount, 2)
+
+
+async def _handle_manifest_type_pick(update: Update, context: ContextTypes.DEFAULT_TYPE, code: str) -> None:
+    """اختيار نوع المسير (A/B/C) — زر وليس نص، لذا يُعالَج من handle_callback
+    مباشرة (وليس handle_text_input)."""
+    session = PharmacyFinanceSession.load(context.user_data)
+    if session is None:
+        return
+    if code not in _VALID_MANIFEST_TYPES:
+        return
+    session.manifest_type = code
+    if session.edit_from_review:
+        session.save(context.user_data)
+        await _go_to_review(update, context)
+        return
+    session.edit_from_review = False
+    session.step = STEP_REVIEW
+    session.save(context.user_data)
+    await _edit_or_reply(update, *build_review(session))
 
 
 async def _go_to_review(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -291,8 +301,8 @@ async def _open_edit_step(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
         await _edit_or_reply(update, *build_expense_item_prompt(session))
     elif step == STEP_INVOICE_TOTAL:
         await _edit_or_reply(update, *build_invoice_total_prompt(session))
-    elif step == STEP_DISCOUNT_PERCENT:
-        await _edit_or_reply(update, *build_discount_percent_prompt(session))
+    elif step == STEP_MANIFEST_TYPE:
+        await _edit_or_reply(update, *build_manifest_type_prompt(session))
 
 
 # ── Back navigation ──────────────────────────────────────────────────────────
@@ -318,7 +328,7 @@ async def _handle_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         session.step = STEP_EXPENSE_ITEM
         session.save(context.user_data)
         await _edit_or_reply(update, *build_expense_item_prompt(session))
-    elif session.step == STEP_DISCOUNT_PERCENT:
+    elif session.step == STEP_MANIFEST_TYPE:
         session.step = STEP_INVOICE_TOTAL
         session.save(context.user_data)
         await _edit_or_reply(update, *build_invoice_total_prompt(session))
@@ -345,6 +355,7 @@ async def _handle_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             expense_item=session.expense_item,
             invoice_total=session.invoice_total,
             discount_percent=session.discount_percent,
+            manifest_type=session.manifest_type,
             created_by=user.id if user else None,
             existing_financial_id=session.existing_financial_id,
         )
@@ -410,6 +421,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     if action == "pick":
         source_type, source_record_id = parts[2], int(parts[3])
         await _handle_pick(update, context, source_type, source_record_id)
+        return
+    if action == "mtype":
+        code = parts[2] if len(parts) > 2 else ""
+        await _handle_manifest_type_pick(update, context, code)
         return
     if action in _REVIEW_EDIT_ROUTES:
         await _open_edit_step(update, context, action)

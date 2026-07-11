@@ -123,6 +123,42 @@ def get_medical_attachment_files_for_patient(patient_id: int) -> list[dict]:
         return []
 
 
+def get_reports_missing_attachments(limit: int = 200) -> list[dict]:
+    """يجلب التقارير التي عليها has_paper_report=1 (المترجم أكّد وجود تقرير
+    طبي مرفوع وقت الإنشاء) لكن لا يوجد لها أي سجل فعلي في
+    medical_attachment_files — يكشف فشلاً صامتاً في إرسال المرفق وقت البث
+    (بطاقة التقرير تنجح، لكن PDF الصور/الملف يفشل داخلياً بلا أي أثر ظاهر
+    للمترجم — انظر broadcast_service._send_medical_attachments)."""
+    try:
+        from sqlalchemy import func
+
+        with SessionLocal() as session:
+            rows = (
+                session.query(Report)
+                .outerjoin(MedicalAttachmentFile, MedicalAttachmentFile.report_id == Report.id)
+                .filter(Report.has_paper_report == 1)
+                .group_by(Report.id)
+                .having(func.count(MedicalAttachmentFile.id) == 0)
+                .order_by(Report.report_date.desc())
+                .limit(limit)
+                .all()
+            )
+            return [
+                {
+                    "report_id": r.id,
+                    "patient_name": r.patient_name,
+                    "department": r.department,
+                    "translator_name": r.translator_name,
+                    "medical_action": r.medical_action,
+                    "report_date": r.report_date,
+                }
+                for r in rows
+            ]
+    except Exception as e:
+        logger.error(f"❌ medical_attachment_files: فشل جلب التقارير الناقصة المرفقات: {e}", exc_info=True)
+        return []
+
+
 def count_medical_attachment_files(report_id: int) -> int:
     """عدد الملفات الطبية المرتبطة بتقرير — يُستخدم لتحديد ظهور الزر عند إعادة النشر."""
     if not report_id:

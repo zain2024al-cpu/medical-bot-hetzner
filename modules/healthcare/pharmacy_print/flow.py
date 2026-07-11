@@ -26,6 +26,15 @@ _MONTH_AR = {
     7: "يوليو", 8: "أغسطس", 9: "سبتمبر", 10: "أكتوبر", 11: "نوفمبر", 12: "ديسمبر",
 }
 
+# ✅ نفس تصنيف "نوع المسير" المُدخَل عند التقرير المالي (pharmacy_finance) —
+# يُستخدَم هنا كفلتر عند الطباعة فقط. code=None يعني "الكل" (بلا فلترة).
+_MANIFEST_TYPE_LABELS = {
+    "A": "🅰️ نسبة ثابتة (22%)",
+    "B": "🅱️ نسبة مختلفة",
+    "C": "↪️ إخلاء لجهة أخرى",
+    None: "📋 الكل",
+}
+
 
 def _is_authorized(user_id: int) -> bool:
     return is_admin(user_id) or user_has_module(user_id, _MODULE_KEY)
@@ -126,7 +135,7 @@ async def _handle_cal_select(update: Update, context: ContextTypes.DEFAULT_TYPE,
     if step == "day":
         state["start_date"] = selected
         state["end_date"] = selected
-        await _generate_and_show_export_choice(update, context)
+        await _show_manifest_type_menu(update, context)
         return
 
     if step == "start":
@@ -141,8 +150,29 @@ async def _handle_cal_select(update: Update, context: ContextTypes.DEFAULT_TYPE,
             start, end = end, start
         state["start_date"] = start
         state["end_date"] = end
-        await _generate_and_show_export_choice(update, context)
+        await _show_manifest_type_menu(update, context)
         return
+
+
+# ── اختيار نوع المسير (فلتر A/B/C/الكل) ──────────────────────────────────────
+
+async def _show_manifest_type_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    text = "🖨️ *طباعة مسير الإخلاء*\n\nاختر نوع المسير المطلوب طباعته:"
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton(_MANIFEST_TYPE_LABELS["A"], callback_data=f"{_PFX}:mtype:A")],
+        [InlineKeyboardButton(_MANIFEST_TYPE_LABELS["B"], callback_data=f"{_PFX}:mtype:B")],
+        [InlineKeyboardButton(_MANIFEST_TYPE_LABELS["C"], callback_data=f"{_PFX}:mtype:C")],
+        [InlineKeyboardButton(_MANIFEST_TYPE_LABELS[None], callback_data=f"{_PFX}:mtype:ALL")],
+        [InlineKeyboardButton("🔙 رجوع", callback_data=f"{_PFX}:back_to_period")],
+        [InlineKeyboardButton("❌ إلغاء", callback_data=f"{_PFX}:cancel")],
+    ])
+    await _edit_or_reply(update, text, kb)
+
+
+async def _handle_manifest_type_select(update: Update, context: ContextTypes.DEFAULT_TYPE, code: str) -> None:
+    state = context.user_data.setdefault(_KEY, {})
+    state["manifest_type"] = None if code == "ALL" else code
+    await _generate_and_show_export_choice(update, context)
 
 
 async def _handle_cal_nav(update: Update, context: ContextTypes.DEFAULT_TYPE, step: str, year: int, month: int) -> None:
@@ -161,14 +191,18 @@ async def _generate_and_show_export_choice(update: Update, context: ContextTypes
         await _show_period_menu(update)
         return
 
-    rows = await get_evacuation_ledger_rows(start, end)
+    manifest_type = state.get("manifest_type")  # None = الكل، بلا فلترة
+    rows = await get_evacuation_ledger_rows(start, end, manifest_type=manifest_type)
     state["rows"] = rows
     context.user_data[_KEY] = state
+
+    manifest_label = _MANIFEST_TYPE_LABELS.get(manifest_type, "📋 الكل")
 
     if not rows:
         text = (
             f"⚠️ لا توجد بيانات مطابقة لمعايير البحث المحددة.\n\n"
-            f"الفترة: من {start.strftime('%Y-%m-%d')} إلى {end.strftime('%Y-%m-%d')}"
+            f"الفترة: من {start.strftime('%Y-%m-%d')} إلى {end.strftime('%Y-%m-%d')}\n"
+            f"نوع المسير: {manifest_label}"
         )
         kb = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data=f"{_PFX}:back_to_period")]])
         await _edit_or_reply(update, text, kb)
@@ -178,6 +212,7 @@ async def _generate_and_show_export_choice(update: Update, context: ContextTypes
     text = (
         f"✅ *تم إعداد المسير*\n\n"
         f"الفترة: من {start.strftime('%Y-%m-%d')} إلى {end.strftime('%Y-%m-%d')}\n"
+        f"نوع المسير: {manifest_label}\n"
         f"عدد السجلات: {len(rows)}\n"
         f"إجمالي المبلغ: {total:,.2f}\n\n"
         f"اختر صيغة التصدير:"
@@ -275,6 +310,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             await _handle_cal_nav(update, context, step, int(y_str), int(m_str))
         elif sub == "select":
             await _handle_cal_select(update, context, step, parts[4])
+        return
+    if action == "mtype":
+        code = parts[2] if len(parts) > 2 else "ALL"
+        await _handle_manifest_type_select(update, context, code)
         return
     if action == "export":
         choice = parts[2] if len(parts) > 2 else "pdf"

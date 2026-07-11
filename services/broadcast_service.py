@@ -235,21 +235,32 @@ async def _send_medical_attachments(
     إرسال الملفات الطبية:
     - الصور → تُحوَّل لـ PDF واحد وتُرسل لـ MEDICAL_REPORTS_GROUP_ID
     - الفيديوهات والمستندات → تُرسل لـ MEDICAL_REPORTS_GROUP_ID مباشرة
+
+    يعيد (attempted, sent) — عدد "وحدات الإرسال" المحاولة والناجحة فعلياً
+    (الصور تُحتسَب كوحدة واحدة إن نجح تحويلها لـPDF، أو كعدد الصور نفسها إن
+    فشل التحويل واضطُررنا لإرسالها فرادى). ✅ يسمح للمستدعي (broadcast_new_report)
+    باكتشاف فشل إرسال المرفقات بصمت — كل خطوة هنا كانت تُبتلَع داخلياً بلا أي
+    أثر يصل للمترجم، وهذا بالضبط ما سبّب فجوة تتبّع حقيقية (تقارير عليها
+    has_paper_report=1 بلا أي سجل مرفق فعلي، لأن بطاقة التقرير نجحت والمرفق
+    فشل بصمت في نفس البث).
     """
     if not attachments:
-        return
+        return 0, 0
 
     target_group = MEDICAL_REPORTS_GROUP_ID or REPORTS_GROUP_ID
     if not target_group:
         logger.warning("⚠️ لا يوجد معرف مجموعة للمرفقات الطبية")
-        return
+        return len(attachments), 0
 
     photo_ids = [a["file_id"] for a in attachments if a.get("type") == "photo"]
     other_atts = [a for a in attachments if a.get("type") != "photo"]
     _persist_order = 0
+    attempted = 0
+    sent_count = 0
 
     # ── الصور → PDF ────────────────────────────────────────
     if photo_ids:
+        attempted += 1  # وحدة واحدة: "دفعة الصور" (PDF واحد أو صور فرادى كـfallback)
         pdf_buf = await _photos_to_pdf(bot, photo_ids, caption)
         if pdf_buf:
             pdf_buf.name = build_medical_pdf_filename(
@@ -261,21 +272,27 @@ async def _send_medical_attachments(
                 logger.info(f"✅ أُرسل PDF ({len(photo_ids)} صورة) للمجموعة {target_group}")
                 _persist_sent_medical_file(sent_msg, report_id, uploaded_by, uploaded_by_tg_id, _persist_order)
                 _persist_order += 1
+                sent_count += 1
             except Exception as e:
                 logger.warning(f"⚠️ فشل إرسال PDF: {e}")
         else:
             # fallback: أرسل الصور كما هي
             logger.warning("⚠️ فشل تحويل الصور لـ PDF، يُرسل كصور")
+            any_photo_sent = False
             for fid in photo_ids:
                 try:
                     sent_msg = await bot.send_photo(chat_id=target_group, photo=fid, caption=caption)
                     _persist_sent_medical_file(sent_msg, report_id, uploaded_by, uploaded_by_tg_id, _persist_order)
                     _persist_order += 1
+                    any_photo_sent = True
                 except Exception as e:
                     logger.warning(f"⚠️ فشل إرسال صورة: {e}")
+            if any_photo_sent:
+                sent_count += 1
 
     # ── فيديوهات ومستندات ───────────────────────────────────
     for att in other_atts:
+        attempted += 1
         try:
             ftype = att.get("type")
             fid = att.get("file_id")
@@ -295,8 +312,11 @@ async def _send_medical_attachments(
             if sent_msg is not None:
                 _persist_sent_medical_file(sent_msg, report_id, uploaded_by, uploaded_by_tg_id, _persist_order)
                 _persist_order += 1
+                sent_count += 1
         except Exception as e:
             logger.warning(f"⚠️ فشل إرسال مرفق ({att.get('type')}): {e}")
+
+    return attempted, sent_count
 
 
 async def _send_message_in_chunks(bot: Bot, chat_id, text: str, parse_mode=None, reply_markup=None):
@@ -361,7 +381,11 @@ async def broadcast_new_report(bot: Bot, report_data: dict):
         report_data: بيانات التقرير كـ dictionary
     """
     logger.info(f"📤 broadcast_new_report: بدء البث - report_id={report_data.get('report_id')}, medical_action={report_data.get('medical_action')}")
-    
+
+    # ✅ نتيجة إرسال المرفقات الطبية (None إن لم توجد مرفقات أصلاً أو لم يُصَل
+    # لخطوة البث) — يسمح للمستدعي باكتشاف فشل إرسال المرفقات بصمت.
+    attachments_result = None
+
     # تنسيق الرسالة
     try:
         message = format_report_message(report_data)
@@ -537,7 +561,7 @@ async def broadcast_new_report(bot: Bot, report_data: dict):
             medical_attachments = report_data.get('medical_attachments', [])
             if medical_attachments:
                 attach_caption = _build_attachment_caption(report_data)
-                await _send_medical_attachments(
+                attempted, sent_count = await _send_medical_attachments(
                     bot,
                     medical_attachments,
                     attach_caption,
@@ -547,7 +571,14 @@ async def broadcast_new_report(bot: Bot, report_data: dict):
                     uploaded_by=report_data.get("translator_name"),
                     uploaded_by_tg_id=report_data.get("user_id") or report_data.get("translator_id"),
                 )
-                logger.info(f"✅ تم إرسال {len(medical_attachments)} مرفق طبي لمجموعة المرفقات")
+                attachments_result = {"attempted": attempted, "sent": sent_count}
+                if sent_count < attempted:
+                    logger.warning(
+                        f"⚠️ broadcast_new_report: فشل إرسال بعض/كل المرفقات الطبية "
+                        f"(report_id={report_id}, sent={sent_count}/{attempted})"
+                    )
+                else:
+                    logger.info(f"✅ تم إرسال {len(medical_attachments)} مرفق طبي لمجموعة المرفقات")
 
             # ✅ إرسال نسخة التقرير للمستخدم في الخلفية (لا يعطّل event loop)
             user_id = report_data.get('user_id') or report_data.get('translator_id')
@@ -595,7 +626,7 @@ async def broadcast_new_report(bot: Bot, report_data: dict):
                         logger.error(f"❌ فشل إرسال التقرير للأدمن {admin_id}: {e}")
 
             logger.info(f"✅ broadcast_new_report: اكتمل البث للمجموعة بنجاح")
-            return  # ✅ إنهاء الدالة بعد الإرسال الناجح للمجموعة
+            return {"attachments_result": attachments_result}  # ✅ إنهاء الدالة بعد الإرسال الناجح للمجموعة
             
         except Exception as e:
             logger.error(f"❌ broadcast_new_report: فشل إرسال التقرير للمجموعة: {e}", exc_info=True)
