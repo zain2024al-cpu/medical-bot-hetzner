@@ -20,6 +20,7 @@ class SourceRecordInfo:
     created_at:       "datetime | None"
     has_financial:    bool
     invoice_number:   str    # رقم الفاتورة إن وُجدت بيانات مالية بالفعل، وإلا ""
+    created_by:       "int | None" = None  # من أدخل سجل الصرف الأصلي (medication/supplies) — لعزل الرؤية بين المترجمين
 
 
 def list_pharmacy_source_records(
@@ -70,7 +71,7 @@ def list_pharmacy_source_records(
                 source_type="medication", source_record_id=r.id,
                 patient_name=r.patient_name or "—", department_labels=depts,
                 item_count=r.item_count or 0, created_at=r.created_at, has_financial=False,
-                invoice_number="",
+                invoice_number="", created_by=r.created_by,
             ))
         for r in sup_rows:
             depts = json.loads(r.medical_departments_json) if r.medical_departments_json else []
@@ -78,7 +79,7 @@ def list_pharmacy_source_records(
                 source_type="supplies", source_record_id=r.id,
                 patient_name=r.patient_name or "—", department_labels=depts,
                 item_count=r.item_count or 0, created_at=r.created_at, has_financial=False,
-                invoice_number="",
+                invoice_number="", created_by=r.created_by,
             ))
 
         # علامة has_financial + مالك السجل + رقم الفاتورة بدفعة واحدة (بدون N+1)
@@ -107,13 +108,14 @@ def list_pharmacy_source_records(
                 row.has_financial = key in owner_by_key
                 row.invoice_number = invoice_by_key.get(key, "")
 
-        # ✅ فلترة الملكية للمستخدم العادي (الأدمن يرى الكل)
+        # ✅ عزل كامل لكل مستخدم عادي — يرى فقط حالات الصرف التي أدخلها هو
+        # نفسه (سجل medication/supplies الأصلي)، بغض النظر عن وجود بيانات
+        # مالية أو لا. الأدمن يبقى يرى الكل (للمراجعة والطباعة المجمَّعة).
+        # ✅ تغيير مقصود: سابقاً كانت أي حالة بلا بيانات مالية بعد (🆕) تظهر
+        # لكل المستخدمين ("متاحة للإنشاء") — بناءً على طلب صريح، أصبح كل
+        # مستخدم يرى حالاته فقط حتى في هذه الحالة.
         if not is_admin:
-            combined = [
-                row for row in combined
-                if not row.has_financial
-                or owner_by_key.get((row.source_type, row.source_record_id)) == requester_id
-            ]
+            combined = [row for row in combined if row.created_by == requester_id]
 
         combined.sort(key=lambda r: r.created_at or datetime.min, reverse=True)
 
