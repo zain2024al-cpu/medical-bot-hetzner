@@ -517,6 +517,21 @@ def build_medical_report_gate_keyboard() -> InlineKeyboardMarkup:
     ])
 
 
+def build_pending_count_keyboard() -> InlineKeyboardMarkup:
+    """اختيار سريع لعدد الفحوصات/التقارير المنتظرة بعد '🟡 لم يجهز بعد' —
+    يحدِّد لاحقاً متى يُعتبر التقرير مكتملاً فعلياً في المرفقات الطبية
+    (بدل اعتبار أول رفعة = اكتمال كامل بلا تمييز)."""
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("1", callback_data="medrep_count:1"),
+         InlineKeyboardButton("2", callback_data="medrep_count:2"),
+         InlineKeyboardButton("3", callback_data="medrep_count:3")],
+        [InlineKeyboardButton("4", callback_data="medrep_count:4"),
+         InlineKeyboardButton("5", callback_data="medrep_count:5"),
+         InlineKeyboardButton("أكثر", callback_data="medrep_count:more")],
+        [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back")],
+    ])
+
+
 async def show_translator_selection(message, context, flow_type):
     """
     عرض قائمة المترجمين للاختيار (من ملف translator_names.txt)
@@ -647,7 +662,10 @@ async def handle_medical_report_choice(update: Update, context: ContextTypes.DEF
         return "MEDICAL_REPORT_NO_REASON"
 
     # pending → "🟡 لم يجهز بعد": يُحفظ كتقرير معلق ويظهر في قائمة المعلقة
-    # حتى يُرفع لاحقاً عبر زر المرفقات الطبية (فيتحول تلقائياً إلى "يوجد").
+    # حتى تُرفع كل الفحوصات المنتظرة لاحقاً عبر زر المرفقات الطبية.
+    # ✅ نسأل أولاً عن عدد الفحوصات/التقارير المنتظرة (قد تكون حالة واحدة
+    # تمثّل عدة فحوصات، مثال: فحص دم + أشعة صدر = 2) — حتى لا يُعتبر
+    # التقرير مكتملاً بمجرد رفع أول مرفق واحد فقط.
     if choice == "pending":
         report_tmp["_medical_report_pending"] = True
         report_tmp["_medical_report_step_done"] = True
@@ -655,11 +673,13 @@ async def handle_medical_report_choice(update: Update, context: ContextTypes.DEF
         report_tmp.pop("no_report_reason", None)
         await query.edit_message_text(
             "🟡 **تم الحفظ — التقرير لم يجهز بعد**\n\n"
-            "ستظهر هذه الحالة في قائمة التقارير الطبية المعلقة حتى ترفع "
-            "التقرير لاحقاً من زر المرفقات الطبية."
+            "🔢 **كم عدد الفحوصات/التقارير المنتظرة لهذه الحالة؟**\n"
+            "_(مثال: فحص دم + أشعة صدر = 2)_",
+            reply_markup=build_pending_count_keyboard(),
+            parse_mode="Markdown",
         )
-        await show_translator_selection(query.message, context, flow_type)
-        return get_translator_state(flow_type)
+        context.user_data["_conversation_state"] = "MEDICAL_REPORT_PENDING_COUNT"
+        return "MEDICAL_REPORT_PENDING_COUNT"
 
     # yes → فتح شاشة رفع الملفات الطبية
     report_tmp.pop("_medical_report_pending", None)
@@ -682,6 +702,53 @@ async def handle_medical_report_choice(update: Update, context: ContextTypes.DEF
     )
     context.user_data["_conversation_state"] = "MEDICAL_REPORT_IMAGE"
     return "MEDICAL_REPORT_IMAGE"
+
+
+async def handle_medical_report_pending_count(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    معالجة اختيار عدد الفحوصات/التقارير المنتظرة بعد '🟡 لم يجهز بعد' —
+    عبر زر سريع (1-5) أو رقم مكتوب (بعد الضغط على 'أكثر' أو مباشرة).
+    """
+    report_tmp = context.user_data.setdefault("report_tmp", {})
+    flow_type = report_tmp.get("_pending_translator_flow", "new_consult")
+
+    query = update.callback_query
+    if query:
+        await query.answer()
+        raw = query.data.split(":")[1]  # "1".."5" أو "more"
+        if raw == "more":
+            await query.edit_message_text(
+                "🔢 **كم عدد الفحوصات المنتظرة؟**\n\nأرسل الرقم:",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="nav:back")]]),
+                parse_mode="Markdown",
+            )
+            context.user_data["_conversation_state"] = "MEDICAL_REPORT_PENDING_COUNT"
+            return "MEDICAL_REPORT_PENDING_COUNT"
+        count = int(raw)
+    else:
+        text = (update.message.text or "").strip()
+        try:
+            count = int(text)
+            if count <= 0:
+                raise ValueError("non-positive")
+        except ValueError:
+            await update.message.reply_text(
+                "⚠️ *الرجاء إرسال رقم صحيح موجب.* (مثال: 3)",
+                parse_mode="Markdown",
+            )
+            return "MEDICAL_REPORT_PENDING_COUNT"
+
+    report_tmp["_pending_exam_count"] = count
+    label = f"{count} فحص/فحوصات منتظرة."
+    if query:
+        await query.edit_message_text(f"✅ تم — {label}")
+        message_target = query.message
+    else:
+        await update.message.reply_text(f"✅ تم — {label}")
+        message_target = update.message
+
+    await show_translator_selection(message_target, context, flow_type)
+    return get_translator_state(flow_type)
 
 
 async def handle_medical_report_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2236,6 +2303,7 @@ async def save_report_to_database(query, context, flow_type):
                     translator_id=actual_translator_id,
                     translator_name=actual_translator_name,
                     no_report_reason="🟡 لم يجهز بعد",
+                    expected_count=data.get("_pending_exam_count") or 1,
                 )
                 logger.info(f"✅ Pending report created (not-ready-yet) for report_id={report_id}, patient={patient_name}")
             except Exception as e:

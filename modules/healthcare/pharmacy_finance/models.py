@@ -19,6 +19,7 @@ class SourceRecordInfo:
     item_count:       int
     created_at:       "datetime | None"
     has_financial:    bool
+    invoice_number:   str    # رقم الفاتورة إن وُجدت بيانات مالية بالفعل، وإلا ""
 
 
 def list_pharmacy_source_records(
@@ -27,33 +28,40 @@ def list_pharmacy_source_records(
     *,
     requester_id: "int | None" = None,
     is_admin: bool = False,
+    target_date: "object | None" = None,   # datetime.date — فلترة يوم واحد (تعديل تقرير بتاريخ)
 ) -> tuple[list[SourceRecordInfo], int]:
     """
     يعيد قائمة مُرقَّمة صفحات من MedicationRecord + SuppliesRecord حيث
     dispense_source == 'الصيدلية' فقط، مرتبة الأحدث أولاً، مع علامة
-    has_financial (استعلام دفعة واحدة، ليس N+1).
+    has_financial ورقم الفاتورة إن وُجد (استعلام دفعة واحدة، ليس N+1).
 
     ✅ عزل التقارير حسب المستخدم:
       - الأدمن (is_admin=True): يرى كل الحالات.
       - المستخدم العادي: يرى فقط الحالات التي (أ) لم تُسجَّل لها بيانات
         مالية بعد (متاحة للإنشاء)، أو (ب) بياناتها المالية أنشأها هو نفسه
         (created_by == requester_id). لا يرى أي حالة موّلها مستخدم آخر.
+
+    target_date: إن مُرِّر، تُفلتَر النتائج على يوم إنشاء سجل الصرف الأصلي
+    فقط (نفس معيار التاريخ المستخدَم في مسير الإخلاء) — لشاشة "تعديل تقرير
+    بتاريخ".
     """
     import json
+    from datetime import datetime as _dt, time as _time
     from db.session import get_db
     from db.models import MedicationRecord, SuppliesRecord, PharmacyFinancialRecord
 
     with get_db() as db:
-        med_rows = (
-            db.query(MedicationRecord)
-            .filter(MedicationRecord.dispense_source == _PHARMACY_SOURCE)
-            .all()
-        )
-        sup_rows = (
-            db.query(SuppliesRecord)
-            .filter(SuppliesRecord.dispense_source == _PHARMACY_SOURCE)
-            .all()
-        )
+        med_q = db.query(MedicationRecord).filter(MedicationRecord.dispense_source == _PHARMACY_SOURCE)
+        sup_q = db.query(SuppliesRecord).filter(SuppliesRecord.dispense_source == _PHARMACY_SOURCE)
+
+        if target_date is not None:
+            start_dt = _dt.combine(target_date, _time.min)
+            end_dt = _dt.combine(target_date, _time.max)
+            med_q = med_q.filter(MedicationRecord.created_at >= start_dt, MedicationRecord.created_at <= end_dt)
+            sup_q = sup_q.filter(SuppliesRecord.created_at >= start_dt, SuppliesRecord.created_at <= end_dt)
+
+        med_rows = med_q.all()
+        sup_rows = sup_q.all()
 
         combined: list[SourceRecordInfo] = []
         for r in med_rows:
@@ -62,6 +70,7 @@ def list_pharmacy_source_records(
                 source_type="medication", source_record_id=r.id,
                 patient_name=r.patient_name or "—", department_labels=depts,
                 item_count=r.item_count or 0, created_at=r.created_at, has_financial=False,
+                invoice_number="",
             ))
         for r in sup_rows:
             depts = json.loads(r.medical_departments_json) if r.medical_departments_json else []
@@ -69,10 +78,12 @@ def list_pharmacy_source_records(
                 source_type="supplies", source_record_id=r.id,
                 patient_name=r.patient_name or "—", department_labels=depts,
                 item_count=r.item_count or 0, created_at=r.created_at, has_financial=False,
+                invoice_number="",
             ))
 
-        # علامة has_financial + مالك السجل (created_by) بدفعة واحدة (بدون N+1)
+        # علامة has_financial + مالك السجل + رقم الفاتورة بدفعة واحدة (بدون N+1)
         owner_by_key: "dict[tuple[str, int], int | None]" = {}
+        invoice_by_key: "dict[tuple[str, int], str]" = {}
         if combined:
             financial_keys = {(row.source_type, row.source_record_id) for row in combined}
             existing = (
@@ -80,6 +91,7 @@ def list_pharmacy_source_records(
                     PharmacyFinancialRecord.source_type,
                     PharmacyFinancialRecord.source_record_id,
                     PharmacyFinancialRecord.created_by,
+                    PharmacyFinancialRecord.invoice_number,
                 )
                 .filter(
                     PharmacyFinancialRecord.source_type.in_({k[0] for k in financial_keys}),
@@ -87,10 +99,13 @@ def list_pharmacy_source_records(
                 )
                 .all()
             )
-            for stype, sid, cby in existing:
+            for stype, sid, cby, inv in existing:
                 owner_by_key[(stype, sid)] = cby
+                invoice_by_key[(stype, sid)] = inv or ""
             for row in combined:
-                row.has_financial = (row.source_type, row.source_record_id) in owner_by_key
+                key = (row.source_type, row.source_record_id)
+                row.has_financial = key in owner_by_key
+                row.invoice_number = invoice_by_key.get(key, "")
 
         # ✅ فلترة الملكية للمستخدم العادي (الأدمن يرى الكل)
         if not is_admin:
@@ -124,6 +139,7 @@ def get_source_record(source_type: str, source_record_id: int) -> "SourceRecordI
             source_type=source_type, source_record_id=r.id,
             patient_name=r.patient_name or "—", department_labels=depts,
             item_count=r.item_count or 0, created_at=r.created_at, has_financial=False,
+            invoice_number="",
         )
 
 
@@ -208,3 +224,36 @@ def save_financial_record(
         "discount_amount": discount_amount,
         "net_amount": net_amount,
     }
+
+
+def update_source_item_count(source_type: str, source_record_id: int, new_item_count: str) -> bool:
+    """
+    يحدّث عدد/تفاصيل الأصناف على سجل الصرف الأصلي (MedicationRecord أو
+    SuppliesRecord) القائم فعلاً — وليس على البيانات المالية.
+
+    الاستخدام: عند تعديل تقرير مالي سابق (مثال: استرجاع أدوية يُنقص العدد)،
+    حتى تعكس مسير الإخلاء القيمة الصحيحة الحالية عند إعادة الطباعة —
+    الطباعة تقرأ item_count من نفس هذا السجل مباشرة في كل مرة.
+
+    يعيد True إن وُجد السجل وحُدِّث، وFalse إن لم يوجد (مثلاً id قديم/خاطئ).
+    """
+    from db.session import get_db
+    from db.models import MedicationRecord, SuppliesRecord
+
+    model = MedicationRecord if source_type == "medication" else SuppliesRecord
+    with get_db() as db:
+        r = db.query(model).filter_by(id=source_record_id).first()
+        if not r:
+            logger.warning(
+                f"[pharmacy_finance] update_source_item_count: "
+                f"source not found {source_type}#{source_record_id}"
+            )
+            return False
+        r.item_count = new_item_count
+        db.flush()
+
+    logger.info(
+        f"[pharmacy_finance] updated item_count "
+        f"source={source_type}#{source_record_id} -> {new_item_count!r}"
+    )
+    return True

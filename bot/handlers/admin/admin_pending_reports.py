@@ -56,9 +56,15 @@ def _render_item_text(p: dict) -> str:
     # (مثال: "ترقيد"، "استشارة جديدة") لبقية أنواع الإجراءات غير الأشعة.
     exam_detail = (p.get("exam_detail") or "").strip()
     detail = exam_detail or action
+
+    expected = int(p.get("expected_count") or 1)
+    uploaded = int(p.get("uploaded_count") or 0)
+    progress_line = f"   📊 التقدّم: {uploaded}/{expected} فحص\n" if expected > 1 else ""
+
     return (
         f"{_urgency_emoji(p['days_waiting'])} {p['patient_name']}\n"
         f"   🩺 نوع الفحص: {detail}\n"
+        f"{progress_line}"
         f"   🏢 القسم: {p['department']}\n"
         f"   👤 المترجم: {p['translator_name']}\n"
         f"   📝 السبب: {reason}\n"

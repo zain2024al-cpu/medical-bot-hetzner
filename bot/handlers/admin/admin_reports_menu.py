@@ -41,6 +41,7 @@ def _type_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("📊 تقرير شامل", callback_data=f"{_PFX}:comp")],
         [InlineKeyboardButton("👤 تقرير مريض", callback_data=f"{_PFX}:patient")],
+        [InlineKeyboardButton("📎 كل مرفقات مريض", callback_data=f"{_PFX}:attachments")],
         [InlineKeyboardButton("❌ إلغاء", callback_data=f"{_PFX}:cancel")],
     ])
 
@@ -106,6 +107,14 @@ async def handle_type_selection(
         # Return the state from patient_report_v2, don't end here
         # (This allows the ConversationHandler there to manage the flow)
         return result
+
+    if data == f"{_PFX}:attachments":
+        # Delegate to attachments-bundle handler — no further states needed,
+        # it does everything (patient pick → merge → send) via result_router.
+        context.user_data["_report_type"] = "attachments"
+        from . import admin_patient_attachments_bundle
+        await admin_patient_attachments_bundle.show_patient_selector(update, context)
+        return ConversationHandler.END
 
     return MENU_CHOOSE_TYPE
 

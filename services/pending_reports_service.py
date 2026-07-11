@@ -45,16 +45,26 @@ def add_pending_report(
     department: str,
     translator_id: int,
     translator_name: str,
-    no_report_reason: str
+    no_report_reason: str,
+    expected_count: int = 1,
 ) -> bool:
     """إضافة تقرير معلق جديد — تُستبعَد الحالات التي يدل سببها على أن لا
-    تقرير قادم أصلاً (انظر _reason_indicates_no_report_needed)."""
+    تقرير قادم أصلاً (انظر _reason_indicates_no_report_needed).
+
+    expected_count: عدد الفحوصات/التقارير المنتظرة لهذه الحالة (قد يمثّل
+    تقرير واحد عدة فحوصات، مثال: فحص دم + أشعة صدر = 2). التقرير لا
+    يُعتبر مكتملاً في المرفقات الطبية إلا عند وصول عدد جلسات الرفع لهذا
+    الرقم بالضبط — انظر increment_pending_upload()."""
     if _reason_indicates_no_report_needed(no_report_reason):
         logger.info(
             f"⏭️ Pending report skipped (reason indicates no report needed): "
             f"patient={patient_name}, reason={no_report_reason!r}"
         )
         return False
+    try:
+        expected_count = max(1, int(expected_count or 1))
+    except (TypeError, ValueError):
+        expected_count = 1
     try:
         with SessionLocal() as session:
             # تحقق من عدم وجود سجل معلق نشط لنفس التقرير
@@ -77,17 +87,112 @@ def add_pending_report(
                 translator_name=translator_name,
                 no_report_reason=no_report_reason,
                 status="pending",
-                created_at=datetime.utcnow()
+                created_at=datetime.utcnow(),
+                expected_count=expected_count,
+                uploaded_count=0,
             )
             session.add(pending)
             session.commit()
 
-            logger.info(f"✅ Pending report added: patient={patient_name}, dept={department}")
+            logger.info(
+                f"✅ Pending report added: patient={patient_name}, dept={department}, "
+                f"expected_count={expected_count}"
+            )
             return True
 
     except Exception as e:
         logger.error(f"❌ Error adding pending report: {e}", exc_info=True)
         return False
+
+
+def increment_pending_upload(report_id: int) -> tuple[bool, int, int]:
+    """
+    يُستدعى عند كل جلسة رفع ناجحة في "المرفقات الطبية" لتقرير كان معلَّقاً.
+
+    يزيد uploaded_count بمقدار 1، ولا يُقفَل السجل (status='completed')
+    إلا عند وصول uploaded_count لعدد expected_count بالضبط — بدل اعتبار
+    أول رفعة اكتمالاً كاملاً بلا تمييز (كان هذا يُخفي حالات معلقة فعلياً
+    عن قائمة المتابعة بمجرد رفع فحص واحد من عدة فحوصات منتظرة).
+
+    يعيد (is_complete, uploaded_count, expected_count):
+      - إن لم يوجد سجل معلق نشط لهذا التقرير أصلاً (مثال: المسار العادي
+        "✅ يوجد تقرير طبي" الذي لم يمرّ بحالة "لم يجهز بعد" قط) يعيد
+        (True, 1, 1) — الاستدعاء القديم غير المشروط لا يتأثر.
+    """
+    try:
+        with SessionLocal() as session:
+            pending = session.query(PendingReport).filter(
+                PendingReport.report_id == report_id,
+                PendingReport.status == "pending"
+            ).first()
+
+            if not pending:
+                # لا يوجد سجل معلق نشط — إما لم يُمرّ بحالة "لم يجهز بعد" قط،
+                # أو أُغلق سابقاً. السلوك المتوقَّع لمثل هذه الحالة هو نفس
+                # السلوك القديم: اكتمال فوري (لا شيء لتتبّعه جزئياً).
+                return True, 1, 1
+
+            expected = max(1, int(pending.expected_count or 1))
+            uploaded = int(pending.uploaded_count or 0) + 1
+            pending.uploaded_count = uploaded
+
+            is_complete = uploaded >= expected
+            if is_complete:
+                pending.status = "completed"
+                pending.completed_at = datetime.utcnow()
+
+            session.commit()
+
+            logger.info(
+                f"📤 Pending upload progress: report_id={report_id} "
+                f"patient={pending.patient_name} {uploaded}/{expected} "
+                f"{'(COMPLETED)' if is_complete else '(still pending)'}"
+            )
+            return is_complete, uploaded, expected
+
+    except Exception as e:
+        logger.error(f"❌ Error incrementing pending upload for report_id={report_id}: {e}", exc_info=True)
+        # فشل التتبّع لا يجب أن يمنع نشر المرفقات فعلياً — نُعامله كاكتمال
+        # آمن (نفس السلوك القديم) بدل حجب النشر أو ترك حالة غامضة.
+        return True, 1, 1
+
+
+def complete_pending_upload(report_id: int) -> tuple[bool, int, int]:
+    """
+    يُستدعى عند اختيار "📦 رفع الكل دفعة واحدة" — يعني أن كل الفحوصات
+    المنتظرة أصبحت جاهزة بنفس الجلسة/الملف، فيُغلق السجل المعلَّق فوراً
+    (uploaded_count = expected_count) بدل زيادته بمقدار 1 فقط كما تفعل
+    increment_pending_upload().
+
+    يعيد نفس الشكل (is_complete, uploaded_count, expected_count) —
+    is_complete دائماً True هنا. إن لم يوجد سجل معلق نشط لهذا التقرير
+    أصلاً يعيد (True, 1, 1) لنفس سبب increment_pending_upload().
+    """
+    try:
+        with SessionLocal() as session:
+            pending = session.query(PendingReport).filter(
+                PendingReport.report_id == report_id,
+                PendingReport.status == "pending"
+            ).first()
+
+            if not pending:
+                return True, 1, 1
+
+            expected = max(1, int(pending.expected_count or 1))
+            pending.uploaded_count = expected
+            pending.status = "completed"
+            pending.completed_at = datetime.utcnow()
+            session.commit()
+
+            logger.info(
+                f"📤 Pending upload — رفع الكل دفعة واحدة: report_id={report_id} "
+                f"patient={pending.patient_name} {expected}/{expected} (COMPLETED)"
+            )
+            return True, expected, expected
+
+    except Exception as e:
+        logger.error(f"❌ Error completing pending upload (رفع الكل) for report_id={report_id}: {e}", exc_info=True)
+        return True, 1, 1
 
 
 def mark_report_completed(report_id: int) -> bool:
@@ -160,6 +265,8 @@ def get_pending_reports() -> list:
                     'no_report_reason': p.no_report_reason,
                     'medical_action': action,
                     'exam_detail': radiology_type.strip() if radiology_type else "",
+                    'expected_count': max(1, int(p.expected_count or 1)),
+                    'uploaded_count': int(p.uploaded_count or 0),
                     'days_waiting': days_waiting,
                     'created_at': p.created_at
                 })

@@ -145,15 +145,14 @@ def _build_main_calendar_markup(year: int, month: int):
                 date_str = f"{year}-{month:02d}-{day:02d}"
                 try:
                     date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
-                    # عدم عرض التواريخ القديمة - فقط من اليوم فصاعداً
-                    if date_obj < today:
-                        row.append(InlineKeyboardButton(" ", callback_data="noop"))
+                    # ✅ تاريخ التقرير يوثّق زيارة/فحصاً حصل فعلياً (وقد يُدخَل
+                    # متأخراً) — لا يجب حجب الأيام السابقة هنا، بخلاف تقاويم
+                    # "تاريخ العودة/الموعد القادم" في مسارات أخرى (new_consult،
+                    # radiology، radiation_therapy) التي تبقى محصورة بالمستقبل عمداً.
+                    if date_obj == today:
+                        row.append(InlineKeyboardButton(f"📍{day:02d}", callback_data=f"main_cal_day:{date_str}"))
                     else:
-                        # تمييز اليوم بعلامة خاصة
-                        if date_obj == today:
-                            row.append(InlineKeyboardButton(f"📍{day:02d}", callback_data=f"main_cal_day:{date_str}"))
-                        else:
-                            row.append(InlineKeyboardButton(f"{day:02d}", callback_data=f"main_cal_day:{date_str}"))
+                        row.append(InlineKeyboardButton(f"{day:02d}", callback_data=f"main_cal_day:{date_str}"))
                 except Exception:
                     row.append(InlineKeyboardButton(" ", callback_data="noop"))
         keyboard.append(row)

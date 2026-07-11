@@ -14,6 +14,16 @@ _THIN    = "─────────────────────"
 _SOURCE_LABEL = {"medication": "💊 صرف أدوية", "supplies": "🏥 مستلزمات طبية"}
 
 
+def _row_label(r) -> str:
+    """تسمية زر صف واحد في أي قائمة حالات — تُظهر رقم الفاتورة إن وُجد
+    حتى يُميَّز السجل المطلوب تعديله بسرعة."""
+    mark = "✅" if r.has_financial else "🆕"
+    label = f"{mark} {_SOURCE_LABEL.get(r.source_type, '')} — {r.patient_name}"
+    if getattr(r, "invoice_number", ""):
+        label += f" (🧾{r.invoice_number})"
+    return label[:64]
+
+
 def build_list_prompt(rows, page: int, total_pages: int, total: int) -> tuple[str, InlineKeyboardMarkup]:
     lines = [
         _DIVIDER,
@@ -25,12 +35,10 @@ def build_list_prompt(rows, page: int, total_pages: int, total: int) -> tuple[st
     if not rows:
         lines.append("لا توجد حالات صرف من الصيدلية بعد.")
 
-    kb_rows = []
+    kb_rows = [[InlineKeyboardButton("📅 تعديل تقرير بتاريخ", callback_data=f"{HCPHFIN}:datesearch")]]
     for r in rows:
-        mark = "✅" if r.has_financial else "🆕"
-        label = f"{mark} {_SOURCE_LABEL.get(r.source_type, '')} — {r.patient_name}"
         kb_rows.append([InlineKeyboardButton(
-            label[:64], callback_data=f"{HCPHFIN}:pick:{r.source_type}:{r.source_record_id}"
+            _row_label(r), callback_data=f"{HCPHFIN}:pick:{r.source_type}:{r.source_record_id}"
         )])
 
     nav = []
@@ -47,12 +55,55 @@ def build_list_prompt(rows, page: int, total_pages: int, total: int) -> tuple[st
     return "\n".join(lines), InlineKeyboardMarkup(kb_rows)
 
 
+def build_date_list_prompt(rows, target_date) -> tuple[str, InlineKeyboardMarkup]:
+    """قائمة الحالات ليوم واحد محدَّد — شاشة 'تعديل تقرير بتاريخ'."""
+    from datetime import datetime as _dt
+    date_label = format_arabic_date(_dt.combine(target_date, _dt.min.time()))
+    lines = [
+        _DIVIDER,
+        "📅  **تعديل تقرير — حسب التاريخ**",
+        "",
+        f"التاريخ: {date_label}",
+        f"عدد الحالات: {len(rows)}",
+        _THIN,
+    ]
+    if not rows:
+        lines.append("لا توجد حالات صرف من الصيدلية في هذا التاريخ.")
+
+    kb_rows = []
+    for r in rows:
+        kb_rows.append([InlineKeyboardButton(
+            _row_label(r), callback_data=f"{HCPHFIN}:pick:{r.source_type}:{r.source_record_id}"
+        )])
+    kb_rows.append([InlineKeyboardButton("📆 تاريخ آخر", callback_data=f"{HCPHFIN}:datesearch")])
+    kb_rows.append([InlineKeyboardButton("🔙 رجوع للقائمة الكاملة", callback_data=f"{HCPHFIN}:page:0")])
+    return "\n".join(lines), InlineKeyboardMarkup(kb_rows)
+
+
 def _source_header(session: PharmacyFinanceSession) -> list[str]:
     return [
         f"👤 المريض: {session.patient_name}",
         f"📦 العدد: {session.item_count}",
         f"🏪 جهة الصرف: الصيدلية",
     ]
+
+
+def build_item_count_prompt(session: PharmacyFinanceSession, *, error: bool = False) -> tuple[str, InlineKeyboardMarkup]:
+    lines = [
+        _DIVIDER, "📦  **عدد الأصناف**", "",
+        f"👤 المريض: {session.patient_name}",
+        _THIN, "",
+    ]
+    if error:
+        lines += ["⚠️ *الرجاء إرسال نص غير فارغ.*", ""]
+    lines.append(f"العدد/التفاصيل الحالية: {session.item_count}")
+    lines.append("")
+    lines.append("أرسل العدد أو التفاصيل الجديدة (مثال: بنادول 3، شاش 2):")
+    kb = InlineKeyboardMarkup([[
+        InlineKeyboardButton("🔙 رجوع", callback_data=f"{HCPHFIN}:back"),
+        InlineKeyboardButton("❌ إلغاء", callback_data=f"{HCPHFIN}:cancel"),
+    ]])
+    return "\n".join(lines), kb
 
 
 def build_invoice_number_prompt(session: PharmacyFinanceSession) -> tuple[str, InlineKeyboardMarkup]:
@@ -131,10 +182,11 @@ def build_review(session: PharmacyFinanceSession) -> tuple[str, InlineKeyboardMa
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("💾 حفظ", callback_data=f"{HCPHFIN}:confirm"),
          InlineKeyboardButton("❌ إلغاء", callback_data=f"{HCPHFIN}:cancel")],
-        [InlineKeyboardButton("✏️ رقم الفاتورة", callback_data=f"{HCPHFIN}:edit_invoice_number"),
-         InlineKeyboardButton("✏️ بند الصرف", callback_data=f"{HCPHFIN}:edit_expense_item")],
-        [InlineKeyboardButton("✏️ إجمالي الفاتورة", callback_data=f"{HCPHFIN}:edit_invoice_total"),
-         InlineKeyboardButton("✏️ نسبة التخفيض", callback_data=f"{HCPHFIN}:edit_discount_percent")],
+        [InlineKeyboardButton("✏️ عدد الأصناف", callback_data=f"{HCPHFIN}:edit_item_count"),
+         InlineKeyboardButton("✏️ رقم الفاتورة", callback_data=f"{HCPHFIN}:edit_invoice_number")],
+        [InlineKeyboardButton("✏️ بند الصرف", callback_data=f"{HCPHFIN}:edit_expense_item"),
+         InlineKeyboardButton("✏️ إجمالي الفاتورة", callback_data=f"{HCPHFIN}:edit_invoice_total")],
+        [InlineKeyboardButton("✏️ نسبة التخفيض", callback_data=f"{HCPHFIN}:edit_discount_percent")],
     ])
     return "\n".join(lines), kb
 

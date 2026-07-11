@@ -30,6 +30,24 @@ logger = logging.getLogger(__name__)
 _PFX = "del_menu"
 
 
+# ✅ زر "🗑️ حذف التقارير" مستخدَم بنفس النص بالضبط في قائمتي الأدمن والمستخدم
+# العادي (bot/keyboards.py: admin_main_kb() و user_main_kb()) — وكلاهما
+# ConversationHandler مسجَّل بدون group صريح (أي المجموعة 0 الافتراضية).
+# بدون هذا الفلتر، كان هذا الـConversationHandler (المسجَّل أولاً في
+# handlers_registry.py) يعترض الضغطة لأي مستخدم (حتى غير الأدمن)، وينهي
+# المحادثة فوراً بلا أي رسالة — فلا تصل الضغطة إطلاقاً لمعالج المترجمين
+# الحقيقي في user_reports_delete.py المسجَّل بعده بنفس المجموعة. بإضافة
+# هذا الفلتر، فحص المطابقة (check_update) يعيد False لغير الأدمن، فينتقل
+# PTB تلقائياً للمعالج التالي في نفس المجموعة (معالج المترجمين).
+class _IsAdminFilter(filters.MessageFilter):
+    def filter(self, message):
+        user = message.from_user
+        return bool(user and is_admin(user.id))
+
+
+_is_admin_filter = _IsAdminFilter()
+
+
 # ── Keyboards ──────────────────────────────────────────────────────────────────
 
 def _menu_kb() -> InlineKeyboardMarkup:
@@ -779,7 +797,7 @@ def register(app) -> None:
     conv = ConversationHandler(
         entry_points=[
             MessageHandler(
-                filters.Regex(r"^🗑️ حذف التقارير$"),
+                filters.Regex(r"^🗑️ حذف التقارير$") & _is_admin_filter,
                 start_delete_reports_menu,
             ),
         ],

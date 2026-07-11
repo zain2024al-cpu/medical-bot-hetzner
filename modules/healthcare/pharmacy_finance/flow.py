@@ -10,14 +10,17 @@ from telegram.ext import ContextTypes, CallbackQueryHandler, MessageHandler, fil
 from bot.shared_auth import is_admin
 from core.access.access_service import user_has_module
 
+from shared.calendar_picker import build_calendar
+
 from modules.healthcare.pharmacy_finance.session import (
     PharmacyFinanceSession,
-    STEP_LIST, STEP_INVOICE_NUMBER, STEP_EXPENSE_ITEM,
+    STEP_LIST, STEP_ITEM_COUNT, STEP_INVOICE_NUMBER, STEP_EXPENSE_ITEM,
     STEP_INVOICE_TOTAL, STEP_DISCOUNT_PERCENT, STEP_REVIEW,
 )
 from modules.healthcare.pharmacy_finance.views import (
     HCPHFIN,
-    build_list_prompt, build_invoice_number_prompt, build_expense_item_prompt,
+    build_list_prompt, build_date_list_prompt, build_item_count_prompt,
+    build_invoice_number_prompt, build_expense_item_prompt,
     build_invoice_total_prompt, build_discount_percent_prompt,
     build_review, build_success, build_cancelled, build_error,
 )
@@ -28,6 +31,7 @@ _MODULE_KEY = "pharmacy_finance"
 _PAGE_SIZE = 10
 
 _REVIEW_EDIT_ROUTES = {
+    "edit_item_count":       STEP_ITEM_COUNT,
     "edit_invoice_number":   STEP_INVOICE_NUMBER,
     "edit_expense_item":     STEP_EXPENSE_ITEM,
     "edit_invoice_total":    STEP_INVOICE_TOTAL,
@@ -74,6 +78,48 @@ async def _show_list(update: Update, context: ContextTypes.DEFAULT_TYPE, page: i
     total_pages = max(1, (total + _PAGE_SIZE - 1) // _PAGE_SIZE)
     text, kb = build_list_prompt(rows, page, total_pages, total)
     await _edit_or_reply(update, text, kb)
+
+
+# ── تعديل تقرير بتاريخ ────────────────────────────────────────────────────────
+
+async def _show_date_calendar(update: Update, context: ContextTypes.DEFAULT_TYPE, year: int = None, month: int = None) -> None:
+    from datetime import datetime
+    now = datetime.utcnow()
+    year = year or now.year
+    month = month or now.month
+    text, kb = build_calendar(year, month, HCPHFIN, back_callback=f"{HCPHFIN}:page:0")
+    await _edit_or_reply(update, text, kb)
+
+
+async def _show_date_list(update: Update, context: ContextTypes.DEFAULT_TYPE, target_date) -> None:
+    from modules.healthcare.pharmacy_finance.models import list_pharmacy_source_records
+
+    user = update.effective_user
+    requester_id = user.id if user else None
+    admin = bool(user and is_admin(user.id))
+    # يوم واحد فقط — عدد الحالات المتوقَّع صغير، فلا حاجة لترقيم صفحات.
+    rows, _total = list_pharmacy_source_records(
+        page=0, page_size=1000,
+        requester_id=requester_id, is_admin=admin, target_date=target_date,
+    )
+    await _edit_or_reply(update, *build_date_list_prompt(rows, target_date))
+
+
+async def _handle_cal_action(update: Update, context: ContextTypes.DEFAULT_TYPE, action: str) -> None:
+    from datetime import date as _date
+    parts = action.split(":")
+    kind = parts[0]
+
+    if kind == "cal_noop":
+        return
+    if kind in ("cal_prev", "cal_next"):
+        y, m = int(parts[1]), int(parts[2])
+        await _show_date_calendar(update, context, year=y, month=m)
+        return
+    if kind == "cal_pick":
+        y, m, d = int(parts[1]), int(parts[2]), int(parts[3])
+        await _show_date_list(update, context, _date(y, m, d))
+        return
 
 
 # ── Pick a source record ────────────────────────────────────────────────────────
@@ -142,6 +188,18 @@ async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         return
 
     text = (update.message.text or "").strip()
+
+    if session.step == STEP_ITEM_COUNT:
+        # ✅ نص حر (رقم أو وصف) — بنفس منطق حقل عدد الأصناف الأصلي في
+        # مسار الصرف؛ يُرفَض الفارغ فقط. لا مسار خطي يصل هنا عادة (هذه
+        # الخطوة تُفتَح فقط من زر التعديل في شاشة المراجعة).
+        if not text:
+            await _reply(update, build_item_count_prompt(session, error=True))
+            return
+        session.item_count = text
+        session.save(context.user_data)
+        await _go_to_review(update, context)
+        return
 
     if session.step == STEP_INVOICE_NUMBER:
         session.invoice_number = text
@@ -225,7 +283,9 @@ async def _open_edit_step(update: Update, context: ContextTypes.DEFAULT_TYPE, ac
     session.step = step
     session.save(context.user_data)
 
-    if step == STEP_INVOICE_NUMBER:
+    if step == STEP_ITEM_COUNT:
+        await _edit_or_reply(update, *build_item_count_prompt(session))
+    elif step == STEP_INVOICE_NUMBER:
         await _edit_or_reply(update, *build_invoice_number_prompt(session))
     elif step == STEP_EXPENSE_ITEM:
         await _edit_or_reply(update, *build_expense_item_prompt(session))
@@ -269,7 +329,7 @@ async def _handle_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 # ── Confirm / cancel ─────────────────────────────────────────────────────────
 
 async def _handle_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    from modules.healthcare.pharmacy_finance.models import save_financial_record
+    from modules.healthcare.pharmacy_finance.models import save_financial_record, update_source_item_count
 
     session = PharmacyFinanceSession.load(context.user_data)
     if session is None:
@@ -288,6 +348,10 @@ async def _handle_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             created_by=user.id if user else None,
             existing_financial_id=session.existing_financial_id,
         )
+        # ✅ عدد/تفاصيل الأصناف يُحدَّث على سجل الصرف الأصلي (وليس على
+        # البيانات المالية) — حتى تعكس مسير الإخلاء القيمة الصحيحة الحالية
+        # عند إعادة الطباعة (مثال: استرجاع أدوية يُنقص العدد).
+        update_source_item_count(session.source_type, session.source_record_id, session.item_count)
     except Exception as exc:
         logger.error(f"[pharmacy_finance] save failed: {exc}", exc_info=True)
         await _edit_or_reply(update, *build_error("فشل حفظ البيانات المالية."))
@@ -335,6 +399,13 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     if action == "page":
         page = int(parts[2]) if len(parts) > 2 else 0
         await _show_list(update, context, page=page)
+        return
+    if action == "datesearch":
+        await _show_date_calendar(update, context)
+        return
+    if action.startswith("cal_"):
+        # إعادة تجميع بقية الأجزاء (السنة/الشهر/اليوم) بعد بادئة الوحدة.
+        await _handle_cal_action(update, context, ":".join(parts[1:]))
         return
     if action == "pick":
         source_type, source_record_id = parts[2], int(parts[3])

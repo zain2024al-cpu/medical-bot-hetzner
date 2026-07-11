@@ -147,6 +147,11 @@ class DatabaseMaintenance:
                 # الحالية تحصل على NULL تلقائياً (= general = يظهر للجميع)،
                 # فلا يختفي أي مريض ولا يتغيّر أي سلوك قائم.
                 _migrate_column(conn, "patients", "patient_type", "VARCHAR(30)")
+                # ✅ تتبع الإكمال الجزئي للتقارير المعلقة (عدة فحوصات لكل
+                # تقرير). الصفوف القديمة تحصل على NULL — تُعامَل كـ"فحص
+                # واحد متوقَّع" في كود القراءة، فلا يتغيّر سلوكها.
+                _migrate_column(conn, "pending_reports", "expected_count", "INTEGER")
+                _migrate_column(conn, "pending_reports", "uploaded_count", "INTEGER")
                 logger.info("🔎 Migration check finished.")
 
                 if check == "ok":

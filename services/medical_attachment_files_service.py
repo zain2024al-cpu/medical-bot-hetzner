@@ -11,7 +11,7 @@
 import logging
 from datetime import datetime
 from db.session import SessionLocal
-from db.models import MedicalAttachmentFile
+from db.models import MedicalAttachmentFile, Report
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +76,50 @@ def get_medical_attachment_files(report_id: int) -> list[dict]:
             ]
     except Exception as e:
         logger.error(f"❌ medical_attachment_files: فشل جلب ملفات التقرير #{report_id}: {e}", exc_info=True)
+        return []
+
+
+def get_medical_attachment_files_for_patient(patient_id: int) -> list[dict]:
+    """جلب كل الملفات الطبية المرفقة بكل تقارير/زيارات مريض معيّن مجمَّعة معاً،
+    مرتبة حسب تاريخ التقرير ثم ترتيب الرفع داخل كل تقرير — تُستخدم لتجميع
+    كل مرفقات المريض عبر تاريخه الطبي بالكامل في ملف واحد."""
+    if not patient_id:
+        return []
+    try:
+        with SessionLocal() as session:
+            rows = (
+                session.query(
+                    MedicalAttachmentFile,
+                    Report.report_date,
+                    Report.department,
+                    Report.medical_action,
+                )
+                .join(Report, Report.id == MedicalAttachmentFile.report_id)
+                .filter(Report.patient_id == patient_id)
+                .order_by(
+                    Report.report_date.asc(),
+                    MedicalAttachmentFile.upload_order.asc(),
+                    MedicalAttachmentFile.id.asc(),
+                )
+                .all()
+            )
+            return [
+                {
+                    "id": r.id,
+                    "report_id": r.report_id,
+                    "file_id": r.file_id,
+                    "file_type": r.file_type,
+                    "file_name": r.file_name,
+                    "uploaded_by": r.uploaded_by,
+                    "created_at": r.created_at,
+                    "report_date": report_date,
+                    "department": department,
+                    "medical_action": medical_action,
+                }
+                for r, report_date, department, medical_action in rows
+            ]
+    except Exception as e:
+        logger.error(f"❌ medical_attachment_files: فشل جلب مرفقات المريض #{patient_id}: {e}", exc_info=True)
         return []
 
 

@@ -16,6 +16,7 @@ redis>=4.0.0
 # PDF & Image Processing
 reportlab>=4.0.0
 Pillow>=9.0.0
+pypdf>=4.0.0
 matplotlib>=3.5.0
 arabic-reshaper>=3.0.0
 python-bidi>=0.6.0

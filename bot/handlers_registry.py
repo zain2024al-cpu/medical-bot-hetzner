@@ -60,9 +60,11 @@ def register_all_handlers(app):
     from bot.handlers.admin.admin_reports_menu import register as register_reports_menu
     from bot.handlers.admin.admin_comprehensive_report import register as register_comprehensive_report
     from bot.handlers.admin.admin_patient_report_v2 import register as register_patient_report_v2
+    from bot.handlers.admin.admin_patient_attachments_bundle import register as register_patient_attachments_bundle
     register_reports_menu(app)              # Entry point: "🖨️ طباعة التقارير" button
     register_comprehensive_report(app)      # Comprehensive report callbacks (cr:*)
     register_patient_report_v2(app)         # Patient report v2 with patient_selector (pr2:*)
+    register_patient_attachments_bundle(app)  # ✅ "📎 كل مرفقات مريض" — دمج كل مرفقات مريض في ملف واحد
     from bot.handlers.user.user_paste_full_report import register as register_paste_full_report
     register_paste_full_report(app)  # ✅ لصق تقرير جاهز (أدمن فقط) قبل admin_start
 

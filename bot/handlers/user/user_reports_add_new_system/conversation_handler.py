@@ -124,6 +124,7 @@ from .flows.shared import (
     save_report_to_database,
     handle_edit_before_save,
     handle_medical_report_choice,
+    handle_medical_report_pending_count,
     handle_medical_report_image,
     handle_medical_report_image_done,
     handle_medical_report_no_reason,
@@ -649,6 +650,12 @@ def register(app):
                 CallbackQueryHandler(handle_medical_report_choice,          pattern="^medrep:(yes|no|pending)$"),
                 CallbackQueryHandler(handle_cancel_navigation,              pattern="^nav:cancel$"),
                 CallbackQueryHandler(sh['handle_smart_back_navigation'],    pattern="^nav:back$"),
+            ],
+            "MEDICAL_REPORT_PENDING_COUNT": [
+                CallbackQueryHandler(handle_medical_report_pending_count,   pattern="^medrep_count:"),
+                CallbackQueryHandler(handle_cancel_navigation,              pattern="^nav:cancel$"),
+                CallbackQueryHandler(sh['handle_smart_back_navigation'],    pattern="^nav:back$"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND,            handle_medical_report_pending_count),
             ],
             "MEDICAL_REPORT_IMAGE": [
                 CallbackQueryHandler(handle_medical_report_image_done,      pattern="^medrep_done:yes$"),

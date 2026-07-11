@@ -907,6 +907,13 @@ class PendingReport(Base):
     completed_at = Column(DateTime, nullable=True)  # متى تم إكمال المرافقات
     days_waiting = Column(Integer, default=0, nullable=True)  # عدد الأيام في الانتظار
 
+    # ✅ تتبع الإكمال الجزئي — تقرير واحد قد يمثّل عدة فحوصات (مثال: فحص
+    # دم + أشعة صدر) تصل نتائجها منفصلة عبر عدة جلسات رفع في "المرفقات
+    # الطبية". لا يُعتبر التقرير مكتملاً (ولا يُخرَج من قائمة المعلقة) إلا
+    # عند uploaded_count >= expected_count بالضبط.
+    expected_count = Column(Integer, default=1, nullable=True)   # عدد الفحوصات المنتظرة (يحدده المترجم)
+    uploaded_count = Column(Integer, default=0, nullable=True)   # عدد جلسات الرفع المكتملة حتى الآن
+
     def __repr__(self):
         return f"<PendingReport(id={self.id}, patient={self.patient_name}, dept={self.department}, status={self.status})>"
 

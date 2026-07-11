@@ -13,7 +13,7 @@ from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes, ConversationHandler, CallbackQueryHandler, MessageHandler, filters
 
 from db.session import SessionLocal
-from db.models import Report
+from db.models import Report, PendingReport
 from config.settings import REPORTS_GROUP_ID, MEDICAL_REPORTS_GROUP_ID
 from shared.files.filename_builder import build_medical_pdf_filename, build_medical_attachment_filename
 
@@ -305,9 +305,14 @@ async def handle_ma_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await _show_upload_prompt(query, context, report)
         return
 
-    # ─── الانتهاء من الرفع ───
+    # ─── الانتهاء من الرفع (فحص واحد فقط من عدة فحوصات منتظرة) ───
     if parts[1] == "done":
         await _publish_attachments(query, context)
+        return
+
+    # ─── رفع الكل دفعة واحدة (كل الفحوصات المنتظرة جاهزة بنفس الملف/الجلسة) ───
+    if parts[1] == "done_all":
+        await _publish_attachments(query, context, complete_all=True)
         return
 
     # ─── إلغاء الرفع ───
@@ -322,6 +327,29 @@ async def handle_ma_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
 
+def _get_pending_progress(report_id: int) -> dict | None:
+    """يجلب تقدُّم الرفع لتقرير كان معلَّقاً (expected_count/uploaded_count)
+    — للعرض فقط، best-effort (لا يُوقِف الشاشة عند أي خطأ)."""
+    if not report_id:
+        return None
+    try:
+        with SessionLocal() as s:
+            p = (
+                s.query(PendingReport)
+                .filter_by(report_id=report_id, status="pending")
+                .first()
+            )
+            if not p:
+                return None
+            return {
+                "expected_count": max(1, int(p.expected_count or 1)),
+                "uploaded_count": int(p.uploaded_count or 0),
+            }
+    except Exception as exc:
+        logger.warning(f"⚠️ MA: تعذّر جلب تقدّم الرفع للتقرير #{report_id}: {exc}")
+        return None
+
+
 async def _show_upload_prompt(query, context, report: dict):
     name = report["patient_name"]
     hospital = report["hospital_name"]
@@ -329,20 +357,35 @@ async def _show_upload_prompt(query, context, report: dict):
     translator = report["translator_name"]
     action = report.get("medical_action", "—")
 
+    progress_line = ""
+    progress = _get_pending_progress(report.get("id"))
+    show_done_all = bool(progress and progress["expected_count"] > 1)
+    if progress and progress["expected_count"] > 1:
+        done = progress["uploaded_count"]
+        total = progress["expected_count"]
+        remaining = max(0, total - done)
+        progress_line = f"📊 **تقدّم الفحوصات:** تم رفع {done} من {total} — متبقي {remaining}\n"
+
     text = (
         f"📎 **إضافة مرفقات طبية**\n\n"
         f"👤 **المريض:** {name}\n"
         f"📋 **نوع الإجراء:** {action}\n"
+        f"{progress_line}"
         f"🏥 **المستشفى:** {hospital}\n"
         f"🏢 **القسم:** {dept}\n"
         f"👨‍💼 **المترجم:** {translator}\n\n"
-        f"أرسل الصور أو الملفات أو الفيديوهات الآن.\n"
-        f"عند الانتهاء اضغط **✅ تم الانتهاء**."
+        f"أرسل الصور أو الملفات أو الفيديوهات الآن"
+        + (" **(إذا جهّزت هذا الفحص فقط اضغط \"تم رفع هذا الفحص\"، وإذا كانت كل الفحوصات المنتظرة جاهزة الآن بنفس الملفات اضغط \"رفع الكل دفعة واحدة\")**" if show_done_all else "")
+        + ".\n"
+        f"عند الانتهاء اضغط الزر المناسب."
     )
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("✅ تم الانتهاء", callback_data="ma:done")],
-        [InlineKeyboardButton("🔙 رجوع للقائمة", callback_data="ma:back_list")],
-    ])
+    keyboard_rows = [[InlineKeyboardButton(
+        "✅ تم رفع هذا الفحص" if show_done_all else "✅ تم الانتهاء", callback_data="ma:done",
+    )]]
+    if show_done_all:
+        keyboard_rows.append([InlineKeyboardButton("📦 رفع الكل دفعة واحدة", callback_data="ma:done_all")])
+    keyboard_rows.append([InlineKeyboardButton("🔙 رجوع للقائمة", callback_data="ma:back_list")])
+    keyboard = InlineKeyboardMarkup(keyboard_rows)
     try:
         await query.edit_message_text(text, reply_markup=keyboard, parse_mode="Markdown")
     except Exception:
@@ -423,12 +466,18 @@ async def handle_ma_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
     attachments.append({"file_id": file_id, "type": file_type, "file_name": original_name})
     count = len(attachments)
 
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton(f"✅ تم الانتهاء ({count} مرفق)", callback_data="ma:done")],
-        [InlineKeyboardButton("🔙 رجوع للقائمة", callback_data="ma:back_list")],
-    ])
+    progress = _get_pending_progress(ma.get("report_id"))
+    show_done_all = bool(progress and progress["expected_count"] > 1)
+    keyboard_rows = [[InlineKeyboardButton(
+        f"✅ تم رفع هذا الفحص ({count} مرفق)" if show_done_all else f"✅ تم الانتهاء ({count} مرفق)",
+        callback_data="ma:done",
+    )]]
+    if show_done_all:
+        keyboard_rows.append([InlineKeyboardButton("📦 رفع الكل دفعة واحدة", callback_data="ma:done_all")])
+    keyboard_rows.append([InlineKeyboardButton("🔙 رجوع للقائمة", callback_data="ma:back_list")])
+    keyboard = InlineKeyboardMarkup(keyboard_rows)
     await msg.reply_text(
-        f"✅ تم استلام المرفق ({count} حتى الآن). أرسل المزيد أو اضغط **تم الانتهاء**.",
+        f"✅ تم استلام المرفق ({count} حتى الآن). أرسل المزيد أو اضغط الزر المناسب.",
         reply_markup=keyboard,
         parse_mode="Markdown"
     )
@@ -474,8 +523,9 @@ def _persist_ma_sent_files(sent, report_id, uploaded_by, uploaded_by_tg_id, orde
     return saved
 
 
-async def _publish_attachments(query, context):
+async def _publish_attachments(query, context, complete_all: bool = False):
     ma = context.user_data.get("ma_state", {})
+    ma["complete_all"] = complete_all  # يُستخدم لو فشل النشر وأعاد المستخدم المحاولة
     attachments = ma.get("attachments", [])
     report      = ma.get("report_info", {})
 
@@ -659,28 +709,37 @@ async def _publish_attachments(query, context):
 
         logger.info(f"✅ MA: نُشرت {len(attachments)} مرفقات للتقرير {report.get('id')} في المجموعة {group_id}")
 
-        # تحديث has_paper_report = 1 حتى تُحتسب ضمن "تقارير طبية: نعم" في التقييم
+        # ✅ تتبّع الإكمال الجزئي: هذه الجلسة تُحتسَب كفحص واحد مكتمل. تقرير
+        # كان معلَّقاً بعدة فحوصات منتظرة لا يُعتبر "جاهزاً" (has_paper_report=1)
+        # ولا يُغلَق في قائمة المعلقة إلا عند اكتمال كل الفحوصات المنتظرة —
+        # increment_pending_upload تتولّى هذا القرار (وتُعيد اكتمالاً فورياً
+        # للمسار العادي الذي لم يمرّ بحالة "لم يجهز بعد" أصلاً).
         report_id = report.get("id")
         report_medical_action = report.get("medical_action")
+        upload_progress = None
         if report_id:
             try:
-                with SessionLocal() as s:
-                    r = s.query(Report).filter_by(id=report_id).first()
-                    if r:
-                        r.has_paper_report = 1
-                        report_medical_action = r.medical_action
-                        s.commit()
-                        logger.info(f"✅ MA: تم تحديث has_paper_report=1 للتقرير #{report_id}")
-            except Exception as db_err:
-                logger.warning(f"⚠️ MA: فشل تحديث has_paper_report للتقرير #{report_id}: {db_err}")
-
-            # ✅ إغلاق سجل "تقرير معلق" إن وُجد لهذه الحالة — حتى لا يبقى
-            # يظهر في تقرير التقارير المعلقة الساعة 9 مساءً بعد إحضار الملف فعلياً
-            try:
-                from services.pending_reports_service import mark_report_completed
-                mark_report_completed(report_id)
+                from services.pending_reports_service import increment_pending_upload, complete_pending_upload
+                if complete_all:
+                    is_complete, uploaded_n, expected_n = complete_pending_upload(report_id)
+                else:
+                    is_complete, uploaded_n, expected_n = increment_pending_upload(report_id)
+                upload_progress = (is_complete, uploaded_n, expected_n)
             except Exception as pr_err:
-                logger.warning(f"⚠️ MA: فشل إغلاق سجل التقرير المعلق للتقرير #{report_id}: {pr_err}")
+                logger.warning(f"⚠️ MA: فشل تتبّع تقدّم الرفع للتقرير #{report_id}: {pr_err}")
+                is_complete = True  # فشل التتبّع لا يجب أن يحجب اكتمال التقرير فعلياً
+
+            if is_complete:
+                try:
+                    with SessionLocal() as s:
+                        r = s.query(Report).filter_by(id=report_id).first()
+                        if r:
+                            r.has_paper_report = 1
+                            report_medical_action = r.medical_action
+                            s.commit()
+                            logger.info(f"✅ MA: تم تحديث has_paper_report=1 للتقرير #{report_id}")
+                except Exception as db_err:
+                    logger.warning(f"⚠️ MA: فشل تحديث has_paper_report للتقرير #{report_id}: {db_err}")
 
         # ✅ محاولة تحديث زر بطاقة الحالة الأصلية لإظهار "📂 فتح التقارير الطبية"
         # (best-effort — الرسالة قد تكون قديمة/محذوفة/بلا صلاحية تعديل، هذا غير حرج)
@@ -711,18 +770,28 @@ async def _publish_attachments(query, context):
         # تنظيف الجلسة
         context.user_data.pop("ma_state", None)
 
-        await query.edit_message_text(
-            f"✅ **تم النشر بنجاح**\n\n"
-            f"تم إرسال {len(attachments)} مرفق(ات) للمجموعة.",
-            parse_mode="Markdown"
-        )
+        success_text = f"✅ **تم النشر بنجاح**\n\nتم إرسال {len(attachments)} مرفق(ات) للمجموعة."
+        if upload_progress is not None:
+            is_complete, uploaded_n, expected_n = upload_progress
+            if expected_n > 1:
+                if is_complete:
+                    success_text += f"\n\n🎉 اكتملت كل الفحوصات المنتظرة ({expected_n}/{expected_n})."
+                else:
+                    remaining_n = expected_n - uploaded_n
+                    success_text += (
+                        f"\n\n📊 تقدّم الفحوصات: {uploaded_n} من {expected_n} — متبقي {remaining_n}.\n"
+                        f"ستبقى هذه الحالة في التقارير المعلقة حتى رفع بقية الفحوصات."
+                    )
+
+        await query.edit_message_text(success_text, parse_mode="Markdown")
 
     except Exception as e:
         logger.error(f"❌ MA: فشل النشر: {e}", exc_info=True)
+        retry_cb = "ma:done_all" if ma.get("complete_all") else "ma:done"
         await query.edit_message_text(
             f"❌ فشل النشر: {e}\n\nيرجى المحاولة مرة أخرى.",
             reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("🔄 إعادة المحاولة", callback_data="ma:done"),
+                InlineKeyboardButton("🔄 إعادة المحاولة", callback_data=retry_cb),
                 InlineKeyboardButton("❌ إلغاء", callback_data="ma:cancel"),
             ]])
         )

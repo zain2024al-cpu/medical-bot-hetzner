@@ -6,6 +6,7 @@ _KEY = "_hcphfin_add"
 
 # ── Step identifiers ───────────────────────────────────────────────────────────
 STEP_LIST              = "list"               # قائمة الحالات (صيدلية فقط)
+STEP_ITEM_COUNT        = "item_count_edit"     # تعديل عدد/تفاصيل الأصناف (من شاشة المراجعة فقط)
 STEP_INVOICE_NUMBER    = "invoice_number"      # رقم الفاتورة
 STEP_EXPENSE_ITEM      = "expense_item"        # بند الصرف
 STEP_INVOICE_TOTAL     = "invoice_total"       # إجمالي الفاتورة
