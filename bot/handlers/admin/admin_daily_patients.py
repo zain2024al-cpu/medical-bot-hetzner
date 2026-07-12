@@ -523,22 +523,33 @@ async def handle_text_input_for_patients(update: Update, context: ContextTypes.D
     """معالجة إدخال نصي لأسماء المرضى (خارج ConversationHandler)"""
     import logging as _logging
     _log = _logging.getLogger(__name__)
+
+    # ✅ المسجَّل بـfilters.TEXT فقط — يمرّر update.effective_message للفحص
+    # (message أو edited_message)، فيمكن أن يُطابَق تعديل رسالة سابقة أيضاً
+    # حيث update.message تكون None بينما update.edited_message تحمل النص.
+    # الكود القديم كان يستخدم update.message مباشرة فيتعطّل بـ
+    # AttributeError عند أي رسالة معدَّلة — استخدام effective_message هنا
+    # يطابق نفس المصدر الذي اعتمده الفلتر لقبول التحديث أصلاً.
+    msg = update.effective_message
+    if msg is None:
+        return
+
     uid = update.effective_user.id if update.effective_user else "?"
     waiting = context.user_data.get('waiting_for_patients')
     _log.info(
         f"[daily_patients.text] FIRED  user={uid}"
         f"  waiting_for_patients={waiting!r}"
-        f"  text={((update.message.text or '')[:30])!r}"
+        f"  text={((msg.text or '')[:30])!r}"
     )
     if not waiting:
         _log.debug(f"[daily_patients.text] SKIP — waiting_for_patients not set  user={uid}")
         return
-    
-    text = update.message.text.strip()
-    
+
+    text = msg.text.strip()
+
     if text.lower() == "إلغاء":
         context.user_data.clear()
-        await update.message.reply_text("❌ تم إلغاء العملية")
+        await msg.reply_text("❌ تم إلغاء العملية")
         return
     
     # معالجة النص
@@ -579,7 +590,7 @@ async def handle_text_input_for_patients(update: Update, context: ContextTypes.D
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("❌ إلغاء", callback_data="back_to_schedule")]
         ])
-        await update.message.reply_text(
+        await msg.reply_text(
             "⚠️ لم يتم العثور على أسماء صحيحة.\n\n"
             "حاول مرة أخرى:",
             reply_markup=keyboard
@@ -605,12 +616,12 @@ async def handle_text_input_for_patients(update: Update, context: ContextTypes.D
         [InlineKeyboardButton("🔙 العودة لإدارة الجدول", callback_data="back_to_schedule")]
     ])
     
-    await update.message.reply_text(
+    await msg.reply_text(
         summary_text,
         reply_markup=keyboard,
         parse_mode=ParseMode.MARKDOWN
     )
-    
+
     # حفظ البيانات
     context.user_data['patients_data'] = patients_data
     context.user_data['waiting_for_patients'] = False
