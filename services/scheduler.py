@@ -151,6 +151,13 @@ async def _sqlite_daily_backup_job():
         backup_path = await asyncio.to_thread(create_local_backup, "daily")
         if backup_path:
             print(f"Local daily backup completed: {backup_path}")
+            # ✅ طبقة حماية إضافية: نسخة خارج السيرفر عبر البريد — best-effort
+            # بالكامل، لا تؤثر على نجاح مهمة النسخ المحلي حتى لو فشلت.
+            try:
+                from services.backup_email import send_backup_via_email
+                await asyncio.to_thread(send_backup_via_email, backup_path)
+            except Exception as email_err:
+                print(f"Error sending backup email: {email_err}")
         else:
             print("Local daily backup failed")
 
