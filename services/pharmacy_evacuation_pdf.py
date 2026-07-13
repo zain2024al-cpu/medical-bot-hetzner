@@ -35,21 +35,26 @@ _ARABIC_RE = re.compile(
     "[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿]"
 )
 
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_EVAL_FONTS_DIR = os.path.normpath(os.path.join(_HERE, "..", "assets", "fonts"))
+
 _FONT_CANDIDATES = [
-    ("C:\\Windows\\Fonts\\arial.ttf",    "Arial"),   # ✅ نفس خط ملف Excel المرجعي بالضبط
+    ("C:\\Windows\\Fonts\\arial.ttf",    "Arial"),   # ✅ نفس خط ملف Excel المرجعي بالضبط (على ويندوز فقط)
     ("C:\\Windows\\Fonts\\tahoma.ttf",   "Tahoma"),
-    ("/usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf", "NotoAr"),
+    # ✅ خط عربي مضمَّن مع المشروع — يعمل فعلياً على السيرفر (Linux)، بعكس
+    # مسار Noto السابق الذي لم يكن مثبَّتاً أصلاً فتسقط الخطوط لـ Helvetica
+    # (بلا أي دعم للعربية) فتظهر كل النصوص كمربعات.
+    (os.path.join(_EVAL_FONTS_DIR, "Arabic-Regular.ttf"), "EvacArFont"),
 ]
 _FONT_BOLD_CANDIDATES = [
     ("C:\\Windows\\Fonts\\arialbd.ttf",  "ArialBd"),
     ("C:\\Windows\\Fonts\\tahomabd.ttf", "TahomaBd"),
+    (os.path.join(_EVAL_FONTS_DIR, "Arabic-Bold.ttf"), "EvacArFontBd"),
 ]
 
 # ✅ عمود "التاريخ" حصراً يستخدم نفس الخط المُثبَت نجاحه في تقرير تقييم
 # المترجمين (modules/healthcare/evaluation/pdf_builder.py) — خط عربي مخصّص
 # مضمَّن، وليس خط النظام Arial/Tahoma المستخدَم لبقية أعمدة هذا الجدول.
-_HERE = os.path.dirname(os.path.abspath(__file__))
-_EVAL_FONTS_DIR = os.path.normpath(os.path.join(_HERE, "..", "assets", "fonts"))
 _DATE_FONT_CANDIDATES = [
     (os.path.join(_EVAL_FONTS_DIR, "Arabic-Regular.ttf"), "EvacDateFont"),
     ("C:\\Windows\\Fonts\\arial.ttf", "Arial"),
@@ -129,6 +134,7 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
     from reportlab.lib.enums import TA_RIGHT, TA_CENTER
     from reportlab.platypus import (
         SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Flowable,
+        KeepTogether,
     )
 
     C = _colors()
@@ -333,7 +339,11 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
             ("TOPPADDING", (0, 0), (-1, -1), 5), ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
             ("RIGHTPADDING", (0, 0), (-1, -1), 5), ("LEFTPADDING", (0, 0), (-1, -1), 5),
         ]))
-        story.append(t)
+        # ✅ KeepTogether يمنع reportlab من تقسيم صفوف الجدول تلقائياً منتصف
+        # الصفحة عندما يتجاوز ارتفاعها المساحة المتبقية (يحدث عند وجود خلية
+        # بنص ملتفّ لعدة أسطر) — بدلاً من ذلك يُنقَل الجدول كاملاً لصفحة
+        # جديدة، فيبقى ترقيم "١٥ صفاً لكل صفحة" منظّماً كما هو مصمَّم.
+        story.append(KeepTogether(t))
         if chunk_idx < len(chunks) - 1:
             story.append(PageBreak())
 
