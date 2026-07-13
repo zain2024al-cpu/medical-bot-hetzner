@@ -246,13 +246,13 @@ async def _handle_export(update: Update, context: ContextTypes.DEFAULT_TYPE, cho
             pdf_buf = build_evacuation_pdf(rows, start, end)
             await context.bot.send_document(
                 chat_id=chat_id, document=pdf_buf,
-                filename=f"مسير_اخلاء_{start.strftime('%Y%m%d')}_{end.strftime('%Y%m%d')}.pdf",
+                filename=f"مسير_اخلاء_{start.strftime('%Y-%m-%d')}_الى_{end.strftime('%Y-%m-%d')}.pdf",
             )
         if choice in ("excel", "both"):
             xlsx_buf = build_evacuation_excel(rows, start, end)
             await context.bot.send_document(
                 chat_id=chat_id, document=xlsx_buf,
-                filename=f"مسير_اخلاء_{start.strftime('%Y%m%d')}_{end.strftime('%Y%m%d')}.xlsx",
+                filename=f"مسير_اخلاء_{start.strftime('%Y-%m-%d')}_الى_{end.strftime('%Y-%m-%d')}.xlsx",
             )
     except Exception as exc:
         logger.error(f"[pharmacy_print] export failed: {exc}", exc_info=True)

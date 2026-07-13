@@ -288,18 +288,13 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
     )
     story = []
 
-    story.append(EvacuationHeaderBand())
-    story.append(Spacer(1, 0.6 * cm))
-
     if not rows:
+        story.append(EvacuationHeaderBand())
+        story.append(Spacer(1, 0.6 * cm))
         story.append(P("لا توجد بيانات مطابقة لمعايير البحث المحددة.", "body"))
         doc.build(story, onFirstPage=_on_page, onLaterPages=_on_page)
         buf.seek(0)
         return buf
-
-    # ترقيم "م" مسبقاً على كامل البيانات — يبقى متصلاً عبر كل الصفحات
-    for i, r in enumerate(rows, start=1):
-        r["_row_number"] = i
 
     # ✅ الأعمدة مُعرَّفة هنا بترتيب معكوس (التاريخ أولاً ... م أخيراً) حتى
     # يظهر "م" في أقصى يمين الصفحة كما يُقرأ طبيعياً بالعربية — العمود
@@ -311,10 +306,18 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
     col_widths = [content_width * _COL_PERCENTAGES[lbl] for lbl in REVERSED_LABELS]
     AMOUNT_COL_IDX = REVERSED_LABELS.index("المبلغ")
 
+    # ✅ كل مجموعة من 15 صفاً = "مسير" مستقل ومغلق تماماً: رأس خاص به،
+    # جدول خاص به، إجمالي خاص به، وتذييل توقيعات خاص به — وليس مستنداً
+    # واحداً يمتد عبر عدة صفحات بإجمالي واحد في النهاية. الترقيم "م" يبدأ
+    # من 1 في كل مسير جديد (وليس مستمراً عبر كل المسيرات) لأن كل مسير
+    # وثيقة رسمية مستقلة بذاتها.
     chunks = [rows[i:i + _ROWS_PER_PAGE] for i in range(0, len(rows), _ROWS_PER_PAGE)]
     for chunk_idx, chunk in enumerate(chunks):
+        story.append(EvacuationHeaderBand())
+        story.append(Spacer(1, 0.6 * cm))
+
         table_data = [HEADER_ROW]
-        for r in chunk:
+        for row_num, r in enumerate(chunk, start=1):
             # ✅ نفس تنسيق strftime ("%Y-%m-%d") ونفس نمط الخط المستخدَمين في
             # عمود التاريخ بتقرير تقييم المترجمين (modules/healthcare/
             # evaluation/pdf_builder.py) تحديداً — بقية الأعمدة لم تتغيّر.
@@ -326,8 +329,13 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
                 P(r["invoice_number"], "td_c"),
                 P(r["name"], "td_c"),
                 P(f'{r["amount"]:.2f}', "td_c"),
-                P(str(r["_row_number"]), "td_c"),
+                P(str(row_num), "td_c"),
             ])
+        # ✅ تعبئة الأسطر المتبقية فارغة حتى يظهر كل مسير بـ15 سطراً دائماً
+        # (شكل نموذج ورقي ثابت)، حتى لو كان عدد الصفوف الفعلية أقل — رقم
+        # "م" يستمر بالعدّ على الأسطر الفارغة أيضاً، وبقية الأعمدة فارغة.
+        for blank_row_num in range(len(chunk) + 1, _ROWS_PER_PAGE + 1):
+            table_data.append(["", "", "", "", "", "", P(str(blank_row_num), "td_c")])
         t = Table(table_data, colWidths=col_widths, hAlign="CENTER", repeatRows=1)
         t.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), C["primary"]),
@@ -339,56 +347,54 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
             ("TOPPADDING", (0, 0), (-1, -1), 5), ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
             ("RIGHTPADDING", (0, 0), (-1, -1), 5), ("LEFTPADDING", (0, 0), (-1, -1), 5),
         ]))
+
+        # ── إجمالي المبلغ الخاص بهذا المسير فقط ─────────────────────────────
+        chunk_total = sum(r["amount"] for r in chunk)
+        total_row = [""] * len(col_widths)
+        total_row[0] = P("إجمالي المبلغ", "total_lbl")
+        total_row[AMOUNT_COL_IDX] = P(f'{chunk_total:,.2f}', "total_val")
+        total_table = Table([total_row], colWidths=col_widths, hAlign="CENTER")
+        total_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), C["primary"]),
+            ("SPAN", (0, 0), (AMOUNT_COL_IDX - 1, 0)),
+            ("ALIGN", (0, 0), (0, 0), "CENTER"),
+            ("ALIGN", (AMOUNT_COL_IDX, 0), (AMOUNT_COL_IDX, 0), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING", (0, 0), (-1, -1), 9), ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 5), ("LEFTPADDING", (0, 0), (-1, -1), 5),
+        ]))
+
+        # ── تذييل توقيعات هذا المسير ─────────────────────────────────────────
+        # ✅ الترتيب معكوس هنا صراحة (نفس سبب عكس أعمدة الجدول أعلاه): يُرسَم
+        # من اليسار لليمين بترتيب القائمة، فـ"مستلم العهدة" آخر القائمة كي
+        # يظهر في أقصى يمين الصفحة كأول عنصر يُقرأ.
+        # ✅ خط توقيع حقيقي (LINEBELOW) بدل شرطات نصّية "----": ReportLab يرسم
+        # هذا الخط عبر canvas.line داخلياً، وهو كائن رسومي مستقل تماماً عن
+        # النص — يظهر دائماً بمحاذاة نظيفة وثابتة بصرف النظر عن الخط المُستخدَم،
+        # بعكس شرطات "-" النصّية التي قد لا تتناسق مع نص عربي مُعاد تشكيله.
+        footer_labels = ["مسؤول العمليات", "المسؤول المالي", "المراجعة", "مستلم العهدة"]
+        footer_table = Table(
+            [[P(lbl, "footer") for lbl in footer_labels], ["", "", "", ""]],
+            colWidths=[content_width / 4] * 4, hAlign="CENTER", rowHeights=[0.8 * cm, 1.2 * cm],
+        )
+        footer_table.setStyle(TableStyle([
+            ("LINEBELOW", (0, 1), (-1, 1), 1.0, C["text_dark"]),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]))
+
         # ✅ KeepTogether يمنع reportlab من تقسيم صفوف الجدول تلقائياً منتصف
         # الصفحة عندما يتجاوز ارتفاعها المساحة المتبقية (يحدث عند وجود خلية
         # بنص ملتفّ لعدة أسطر) — بدلاً من ذلك يُنقَل الجدول كاملاً لصفحة
-        # جديدة، فيبقى ترقيم "١٥ صفاً لكل صفحة" منظّماً كما هو مصمَّم.
+        # جديدة، فيبقى كل مسير (حتى 15 صفاً) وحدة واحدة متماسكة لا تتجزأ.
         story.append(KeepTogether(t))
+        story.append(Spacer(1, 0.35 * cm))
+        story.append(total_table)
+        story.append(Spacer(1, 1.3 * cm))
+        story.append(footer_table)
+
         if chunk_idx < len(chunks) - 1:
             story.append(PageBreak())
-
-    # ── إجمالي المبلغ — القيمة تحت عمود "المبلغ" فقط، بنفس عرض الجدول كاملاً،
-    # وبنفس أسلوب صف الإجمالي في Excel (خانة القيمة + تسمية ممتدة) ──────────
-    total_amount = sum(r["amount"] for r in rows)
-    story.append(Spacer(1, 0.35 * cm))
-    total_row = [""] * len(col_widths)
-    total_row[0] = P("إجمالي المبلغ", "total_lbl")
-    total_row[AMOUNT_COL_IDX] = P(f'{total_amount:,.2f}', "total_val")
-    total_table = Table([total_row], colWidths=col_widths, hAlign="CENTER")
-    total_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), C["primary"]),
-        ("SPAN", (0, 0), (AMOUNT_COL_IDX - 1, 0)),
-        ("ALIGN", (0, 0), (0, 0), "CENTER"),
-        ("ALIGN", (AMOUNT_COL_IDX, 0), (AMOUNT_COL_IDX, 0), "CENTER"),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("TOPPADDING", (0, 0), (-1, -1), 9), ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 5), ("LEFTPADDING", (0, 0), (-1, -1), 5),
-    ]))
-    story.append(total_table)
-
-    # ── صف تذييل التوقيعات (مرة واحدة، آخر الوثيقة، فارغ دائماً) ──────────────
-    # ✅ الترتيب معكوس هنا صراحة (نفس سبب عكس أعمدة الجدول أعلاه): يُرسَم
-    # من اليسار لليمين بترتيب القائمة، فـ"مستلم العهدة" آخر القائمة كي
-    # يظهر في أقصى يمين الصفحة كأول عنصر يُقرأ.
-    # ✅ خط توقيع حقيقي (LINEBELOW) بدل شرطات نصّية "----": ReportLab يرسم
-    # هذا الخط عبر canvas.line داخلياً، وهو كائن رسومي مستقل تماماً عن
-    # النص — يظهر دائماً بمحاذاة نظيفة وثابتة بصرف النظر عن الخط المُستخدَم،
-    # بعكس شرطات "-" النصّية التي قد لا تتناسق مع نص عربي مُعاد تشكيله.
-    story.append(Spacer(1, 1.3 * cm))
-    footer_labels = ["مسؤول العمليات", "المسؤول المالي", "المراجعة", "مستلم العهدة"]
-    footer_table = Table(
-        [[P(lbl, "footer") for lbl in footer_labels], ["", "", "", ""]],
-        colWidths=[content_width / 4] * 4, hAlign="CENTER", rowHeights=[0.8 * cm, 1.2 * cm],
-    )
-    footer_table.setStyle(TableStyle([
-        ("LINEBELOW", (0, 1), (-1, 1), 1.0, C["text_dark"]),
-        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-        ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-    ]))
-    story.append(footer_table)
-
-    for r in rows:
-        r.pop("_row_number", None)
 
     doc.build(story, onFirstPage=_on_page, onLaterPages=_on_page)
     buf.seek(0)
