@@ -55,7 +55,7 @@ def _build_radiology_calendar_markup(year: int, month: int):
         InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
     ])
 
-    text = f"📅 **اختيار تاريخ تسليم النتائج**\n\n{MONTH_NAMES_AR.get(month, str(month))} {year}\n\nاختر التاريخ من التقويم:"
+    text = f"📅 **تاريخ العودة**\n\n{MONTH_NAMES_AR.get(month, str(month))} {year}\n\nاختر التاريخ من التقويم:"
     return text, InlineKeyboardMarkup(keyboard)
 
 

@@ -59,6 +59,16 @@ from .states import (
     RADIATION_THERAPY_TYPE, RADIATION_THERAPY_SESSION_NUMBER, RADIATION_THERAPY_REMAINING,
     RADIATION_THERAPY_NOTES, RADIATION_THERAPY_RETURN_DATE, RADIATION_THERAPY_RETURN_REASON,
     RADIATION_THERAPY_TRANSLATOR, RADIATION_THERAPY_CONFIRM,
+    RADIATION_THERAPY_EDIT_REASON,
+    ENDOSCOPY_COMPLAINT, ENDOSCOPY_TYPE, ENDOSCOPY_RESULT,
+    ENDOSCOPY_PROCEDURES, ENDOSCOPY_PROCEDURES_OTHER, ENDOSCOPY_NOTES,
+    ENDOSCOPY_FOLLOWUP_DATE, ENDOSCOPY_FOLLOWUP_REASON,
+    ENDOSCOPY_TRANSLATOR, ENDOSCOPY_CONFIRM,
+    TREATMENT_PLAN_SETUP, TREATMENT_PLAN_EDIT_VALUE, TREATMENT_PLAN_EDIT_REASON,
+    TREATMENT_PLAN_DISPLAY, TREATMENT_NOTES, TREATMENT_FOLLOWUP_DATE,
+    TREATMENT_FOLLOWUP_REASON, TREATMENT_TRANSLATOR, TREATMENT_CONFIRM,
+    CHEMO_MODE_CHOICE, CHEMO_CYCLES_TOTAL, CHEMO_CYCLES_UNIFORM_CHOICE,
+    CHEMO_CYCLES_UNIFORM_COUNT, CHEMO_CYCLES_CUSTOM_ENTRY,
 )
 
 # =============================
@@ -101,7 +111,7 @@ from .doctor_handlers import (
 # --- Action Type (modular) ---
 from .action_type_handlers import (
     show_action_type_menu, handle_action_type_choice, handle_action_page,
-    handle_noop, handle_stale_callback,
+    handle_noop, handle_stale_callback, handle_action_category,
 )
 
 # --- Navigation (modular) ---
@@ -304,7 +314,10 @@ def _radiation_handlers():
         from bot.handlers.user.user_reports_add_new_system.flows.radiation_therapy import (
             handle_radiation_therapy_type,
             handle_radiation_therapy_session_number,
+            handle_radiation_plan_choice,
             handle_radiation_therapy_remaining,
+            handle_radiation_edit_reason,
+            handle_radiation_edit_reason_skip,
             handle_radiation_therapy_notes,
             handle_radiation_therapy_return_date,
             handle_radiation_therapy_return_reason,
@@ -313,7 +326,10 @@ def _radiation_handlers():
         return {
             'type':            handle_radiation_therapy_type,
             'session_number':  handle_radiation_therapy_session_number,
+            'plan_choice':     handle_radiation_plan_choice,
             'remaining':       handle_radiation_therapy_remaining,
+            'edit_reason':     handle_radiation_edit_reason,
+            'edit_reason_skip': handle_radiation_edit_reason_skip,
             'notes':           handle_radiation_therapy_notes,
             'return_date':     handle_radiation_therapy_return_date,
             'return_reason':   handle_radiation_therapy_return_reason,
@@ -321,6 +337,37 @@ def _radiation_handlers():
         }
     except ImportError as e:
         logger.error(f"❌ Cannot import radiation_therapy handlers: {e}")
+        return {}
+
+
+def _treatment_handlers():
+    """Import and return treatment_sessions flow handlers by name."""
+    try:
+        from bot.handlers.user.user_reports_add_new_system.flows.treatment_sessions import (
+            handle_chemo_mode_choice, handle_chemo_cycles_total, handle_chemo_cycles_uniform_choice,
+            handle_chemo_cycles_uniform_count, handle_chemo_cycles_custom_entry,
+            handle_treatment_plan_setup, handle_treatment_plan_display_choice,
+            handle_treatment_plan_edit_value, handle_treatment_plan_edit_reason,
+            handle_treatment_plan_edit_reason_skip,
+            handle_treatment_notes, handle_treatment_notes_skip, handle_treatment_followup_reason,
+        )
+        return {
+            'chemo_mode_choice':        handle_chemo_mode_choice,
+            'chemo_cycles_total':       handle_chemo_cycles_total,
+            'chemo_cycles_uniform_choice': handle_chemo_cycles_uniform_choice,
+            'chemo_cycles_uniform_count':  handle_chemo_cycles_uniform_count,
+            'chemo_cycles_custom_entry':   handle_chemo_cycles_custom_entry,
+            'plan_setup':               handle_treatment_plan_setup,
+            'plan_display_choice':      handle_treatment_plan_display_choice,
+            'plan_edit_value':          handle_treatment_plan_edit_value,
+            'plan_edit_reason':         handle_treatment_plan_edit_reason,
+            'plan_edit_reason_skip':    handle_treatment_plan_edit_reason_skip,
+            'notes':                    handle_treatment_notes,
+            'notes_skip':                handle_treatment_notes_skip,
+            'followup_reason':          handle_treatment_followup_reason,
+        }
+    except ImportError as e:
+        logger.error(f"❌ Cannot import treatment_sessions handlers: {e}")
         return {}
 
 
@@ -393,6 +440,9 @@ def register(app):
 
     # --- Radiation therapy handlers ---
     rad = _radiation_handlers()
+
+    # --- Treatment sessions handlers (chemo/targeted/immuno/dialysis) ---
+    tp = _treatment_handlers()
 
     # --- Flow handlers — direct imports from package (no monolith dependency) ---
     from .flows.new_consult import (
@@ -468,6 +518,17 @@ def register(app):
         handle_discharge_operation_details  as di_operation_details,
         handle_discharge_operation_name_en  as di_operation_name_en,
         handle_discharge_followup_reason    as di_followup_reason,
+    )
+    from .flows.endoscopy import (
+        handle_endoscopy_complaint          as en_complaint,
+        handle_endoscopy_type               as en_type,
+        handle_endoscopy_result             as en_result,
+        handle_endoscopy_procedure_toggle   as en_proc_toggle,
+        handle_endoscopy_procedures_done    as en_proc_done,
+        handle_endoscopy_procedures_other   as en_proc_other,
+        handle_endoscopy_notes              as en_notes,
+        handle_endoscopy_notes_skip         as en_notes_skip,
+        handle_endoscopy_followup_reason    as en_followup_reason,
     )
 
     # Validate that no critical flow handler is None
@@ -605,6 +666,7 @@ def register(app):
             R_ACTION_TYPE: [
                 CallbackQueryHandler(sh['handle_calendar_cancel'],                              pattern="^nav:cancel$"),
                 CallbackQueryHandler(_tracked(handle_action_type_choice, R_ACTION_TYPE),        pattern="^action_idx:"),
+                CallbackQueryHandler(_tracked(handle_action_category, R_ACTION_TYPE),           pattern="^action_cat:"),
                 CallbackQueryHandler(handle_noop,                                               pattern="^noop$"),
                 CallbackQueryHandler(_tracked(handle_go_to_state, R_ACTION_TYPE),              pattern="^go_to_search_doctor_screen$"),
                 CallbackQueryHandler(sh['handle_smart_back_navigation'],                        pattern="^nav:back$"),
@@ -988,12 +1050,19 @@ def register(app):
             RADIATION_THERAPY_SESSION_NUMBER: [
                 CallbackQueryHandler(sh['handle_smart_back_navigation'],                                               pattern="^nav:back$"),
                 CallbackQueryHandler(sh['handle_smart_cancel_navigation'],                                             pattern="^nav:cancel$"),
+                CallbackQueryHandler(_tracked(rad.get('plan_choice'), RADIATION_THERAPY_SESSION_NUMBER),               pattern="^rad_plan:"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, _tracked(rad.get('session_number'), RADIATION_THERAPY_SESSION_NUMBER)),
             ],
             RADIATION_THERAPY_REMAINING: [
                 CallbackQueryHandler(sh['handle_smart_back_navigation'],                                           pattern="^nav:back$"),
                 CallbackQueryHandler(sh['handle_smart_cancel_navigation'],                                         pattern="^nav:cancel$"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, _tracked(rad.get('remaining'), RADIATION_THERAPY_REMAINING)),
+            ],
+            RADIATION_THERAPY_EDIT_REASON: [
+                CallbackQueryHandler(sh['handle_smart_back_navigation'],                                           pattern="^nav:back$"),
+                CallbackQueryHandler(sh['handle_smart_cancel_navigation'],                                         pattern="^nav:cancel$"),
+                CallbackQueryHandler(_tracked(rad.get('edit_reason_skip'), RADIATION_THERAPY_EDIT_REASON),         pattern="^rad_edit_reason_skip$"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, _tracked(rad.get('edit_reason'), RADIATION_THERAPY_EDIT_REASON)),
             ],
             RADIATION_THERAPY_NOTES: [
                 CallbackQueryHandler(sh['handle_smart_back_navigation'],                                       pattern="^nav:back$"),
@@ -1021,6 +1090,105 @@ def register(app):
                 CallbackQueryHandler(handle_noop,                                                                          pattern="^noop$"),
             ],
             RADIATION_THERAPY_CONFIRM: _confirm_state_handlers(sh, route_sel, route_inp),
+            # ── ENDOSCOPY (المناظير) ──────────────────────────────────────────
+            ENDOSCOPY_COMPLAINT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, _tracked(en_complaint, ENDOSCOPY_COMPLAINT)),
+                CallbackQueryHandler(sh['handle_smart_back_navigation'],   pattern="^nav:back$"),
+                CallbackQueryHandler(sh['handle_smart_cancel_navigation'], pattern="^nav:cancel$"),
+            ],
+            ENDOSCOPY_TYPE: [
+                CallbackQueryHandler(_tracked(en_type, ENDOSCOPY_TYPE),     pattern="^endo_type:"),
+                CallbackQueryHandler(sh['handle_smart_back_navigation'],    pattern="^nav:back$"),
+                CallbackQueryHandler(sh['handle_smart_cancel_navigation'],  pattern="^nav:cancel$"),
+            ],
+            ENDOSCOPY_RESULT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, _tracked(en_result, ENDOSCOPY_RESULT)),
+                CallbackQueryHandler(sh['handle_smart_back_navigation'],    pattern="^nav:back$"),
+                CallbackQueryHandler(sh['handle_smart_cancel_navigation'],  pattern="^nav:cancel$"),
+            ],
+            ENDOSCOPY_PROCEDURES: [
+                CallbackQueryHandler(_tracked(en_proc_toggle, ENDOSCOPY_PROCEDURES),  pattern="^endo_proc:"),
+                CallbackQueryHandler(_tracked(en_proc_done, ENDOSCOPY_PROCEDURES),    pattern="^endo_proc_done$"),
+                CallbackQueryHandler(sh['handle_smart_back_navigation'],    pattern="^nav:back$"),
+                CallbackQueryHandler(sh['handle_smart_cancel_navigation'],  pattern="^nav:cancel$"),
+                CallbackQueryHandler(handle_noop,                           pattern="^noop$"),
+            ],
+            ENDOSCOPY_PROCEDURES_OTHER: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, _tracked(en_proc_other, ENDOSCOPY_PROCEDURES_OTHER)),
+                CallbackQueryHandler(sh['handle_smart_back_navigation'],    pattern="^nav:back$"),
+                CallbackQueryHandler(sh['handle_smart_cancel_navigation'],  pattern="^nav:cancel$"),
+            ],
+            ENDOSCOPY_NOTES: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, _tracked(en_notes, ENDOSCOPY_NOTES)),
+                CallbackQueryHandler(_tracked(en_notes_skip, ENDOSCOPY_NOTES), pattern="^endoscopy_notes_skip$"),
+                CallbackQueryHandler(sh['handle_smart_back_navigation'],    pattern="^nav:back$"),
+                CallbackQueryHandler(sh['handle_smart_cancel_navigation'],  pattern="^nav:cancel$"),
+            ],
+            ENDOSCOPY_FOLLOWUP_DATE: _followup_date_state_handlers(sh, ENDOSCOPY_FOLLOWUP_DATE),
+            ENDOSCOPY_FOLLOWUP_REASON: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, _tracked(en_followup_reason, ENDOSCOPY_FOLLOWUP_REASON)),
+                CallbackQueryHandler(sh['handle_smart_back_navigation'],    pattern="^nav:back$"),
+                CallbackQueryHandler(sh['handle_smart_cancel_navigation'],  pattern="^nav:cancel$"),
+            ],
+            ENDOSCOPY_TRANSLATOR: _translator_state_handlers(sh, ENDOSCOPY_TRANSLATOR),
+            ENDOSCOPY_CONFIRM: _confirm_state_handlers(sh, route_sel, route_inp),
+            # ── جلسات العلاج (كيماوي/موجّه/مناعي/غسيل كلى) ─────────────────────
+            CHEMO_MODE_CHOICE: [
+                CallbackQueryHandler(_tracked(tp.get('chemo_mode_choice'), CHEMO_MODE_CHOICE), pattern="^chemo_mode:"),
+                CallbackQueryHandler(sh['handle_smart_back_navigation'],   pattern="^nav:back$"),
+                CallbackQueryHandler(sh['handle_smart_cancel_navigation'], pattern="^nav:cancel$"),
+            ],
+            CHEMO_CYCLES_TOTAL: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, _tracked(tp.get('chemo_cycles_total'), CHEMO_CYCLES_TOTAL)),
+                CallbackQueryHandler(sh['handle_smart_back_navigation'],   pattern="^nav:back$"),
+                CallbackQueryHandler(sh['handle_smart_cancel_navigation'], pattern="^nav:cancel$"),
+            ],
+            CHEMO_CYCLES_UNIFORM_CHOICE: [
+                CallbackQueryHandler(_tracked(tp.get('chemo_cycles_uniform_choice'), CHEMO_CYCLES_UNIFORM_CHOICE), pattern="^chemo_uniform:"),
+                CallbackQueryHandler(sh['handle_smart_back_navigation'],   pattern="^nav:back$"),
+                CallbackQueryHandler(sh['handle_smart_cancel_navigation'], pattern="^nav:cancel$"),
+            ],
+            CHEMO_CYCLES_UNIFORM_COUNT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, _tracked(tp.get('chemo_cycles_uniform_count'), CHEMO_CYCLES_UNIFORM_COUNT)),
+                CallbackQueryHandler(sh['handle_smart_back_navigation'],   pattern="^nav:back$"),
+                CallbackQueryHandler(sh['handle_smart_cancel_navigation'], pattern="^nav:cancel$"),
+            ],
+            CHEMO_CYCLES_CUSTOM_ENTRY: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, _tracked(tp.get('chemo_cycles_custom_entry'), CHEMO_CYCLES_CUSTOM_ENTRY)),
+                CallbackQueryHandler(sh['handle_smart_back_navigation'],   pattern="^nav:back$"),
+                CallbackQueryHandler(sh['handle_smart_cancel_navigation'], pattern="^nav:cancel$"),
+            ],
+            TREATMENT_PLAN_SETUP: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, _tracked(tp.get('plan_setup'), TREATMENT_PLAN_SETUP)),
+                CallbackQueryHandler(sh['handle_smart_back_navigation'],   pattern="^nav:back$"),
+                CallbackQueryHandler(sh['handle_smart_cancel_navigation'], pattern="^nav:cancel$"),
+            ],
+            TREATMENT_PLAN_DISPLAY: [
+                CallbackQueryHandler(_tracked(tp.get('plan_display_choice'), TREATMENT_PLAN_DISPLAY), pattern="^tp_display:"),
+            ],
+            TREATMENT_PLAN_EDIT_VALUE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, _tracked(tp.get('plan_edit_value'), TREATMENT_PLAN_EDIT_VALUE)),
+                CallbackQueryHandler(sh['handle_smart_back_navigation'],   pattern="^nav:back$"),
+                CallbackQueryHandler(sh['handle_smart_cancel_navigation'], pattern="^nav:cancel$"),
+            ],
+            TREATMENT_PLAN_EDIT_REASON: [
+                CallbackQueryHandler(_tracked(tp.get('plan_edit_reason_skip'), TREATMENT_PLAN_EDIT_REASON), pattern="^tp_edit_reason_skip$"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, _tracked(tp.get('plan_edit_reason'), TREATMENT_PLAN_EDIT_REASON)),
+            ],
+            TREATMENT_NOTES: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, _tracked(tp.get('notes'), TREATMENT_NOTES)),
+                CallbackQueryHandler(_tracked(tp.get('notes_skip'), TREATMENT_NOTES), pattern="^treatment_notes_skip$"),
+                CallbackQueryHandler(sh['handle_smart_back_navigation'],   pattern="^nav:back$"),
+                CallbackQueryHandler(sh['handle_smart_cancel_navigation'], pattern="^nav:cancel$"),
+            ],
+            TREATMENT_FOLLOWUP_DATE: _followup_date_state_handlers(sh, TREATMENT_FOLLOWUP_DATE),
+            TREATMENT_FOLLOWUP_REASON: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, _tracked(tp.get('followup_reason'), TREATMENT_FOLLOWUP_REASON)),
+                CallbackQueryHandler(sh['handle_smart_back_navigation'],   pattern="^nav:back$"),
+                CallbackQueryHandler(sh['handle_smart_cancel_navigation'], pattern="^nav:cancel$"),
+            ],
+            TREATMENT_TRANSLATOR: _translator_state_handlers(sh, TREATMENT_TRANSLATOR),
+            TREATMENT_CONFIRM: _confirm_state_handlers(sh, route_sel, route_inp),
             # ── EDIT_FIELD (generic) ───────────────────────────────────────────
             "EDIT_FIELD": [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, sh['handle_edit_field_input']),

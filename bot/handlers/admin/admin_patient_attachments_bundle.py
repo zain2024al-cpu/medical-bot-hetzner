@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import io
 import logging
 
@@ -63,16 +64,50 @@ def _label_for(att: dict) -> str:
     return f"{date_str} — {dept}"
 
 
-async def _build_combined_pdf(bot, attachments: list[dict]) -> tuple[io.BytesIO | None, int, list[dict]]:
-    """يحمّل كل مرفق ويحاول دمجه ضمن ملف PDF واحد (صور كصفحات + صفحات أي
-    مستند PDF مدمجة بترتيبها). يعيد (الملف الناتج أو None عند عدم وجود أي
-    صفحة قابلة للدمج، عدد الصفحات، والمرفقات التي تعذّر دمجها لتُرسَل لاحقاً
-    كل واحد منها على حِدة)."""
+def _merge_downloaded_pages(items: list[tuple[dict, bytes, bool]]) -> tuple[io.BytesIO | None, int, list[dict]]:
+    """الجزء الحسابي الثقيل فقط (تحويل صور→PDF ودمج الصفحات) — دالة متزامنة
+    عادية تُشغَّل داخل asyncio.to_thread حتى لا تُجمِّد حلقة أحداث البوت
+    الوحيدة (وبالتالي كل المستخدمين الآخرين) طوال مدة معالجة كل الصفحات."""
     from PIL import Image
     from pypdf import PdfReader, PdfWriter
 
     writer = PdfWriter()
     page_count = 0
+    failed: list[dict] = []
+
+    for att, raw, is_image in items:
+        try:
+            if is_image:
+                img = Image.open(io.BytesIO(raw)).convert("RGB")
+                page_buf = io.BytesIO()
+                img.save(page_buf, format="PDF", resolution=150.0)
+                page_buf.seek(0)
+                reader = PdfReader(page_buf)
+            else:
+                reader = PdfReader(io.BytesIO(raw))
+
+            for page in reader.pages:
+                writer.add_page(page)
+            page_count += len(reader.pages)
+        except Exception:
+            logger.exception(f"[patient_attachments_bundle] فشل دمج مرفق id={att.get('id')}")
+            failed.append(att)
+
+    if page_count == 0:
+        return None, 0, failed
+
+    out = io.BytesIO()
+    writer.write(out)
+    out.seek(0)
+    return out, page_count, failed
+
+
+async def _build_combined_pdf(bot, attachments: list[dict]) -> tuple[io.BytesIO | None, int, list[dict]]:
+    """يحمّل كل مرفق (I/O شبكي — يبقى async) ثم يدمجها ضمن ملف PDF واحد
+    (صور كصفحات + صفحات أي مستند PDF مدمجة بترتيبها) عبر خيط منفصل. يعيد
+    (الملف الناتج أو None عند عدم وجود أي صفحة قابلة للدمج، عدد الصفحات،
+    والمرفقات التي تعذّر تحميلها/دمجها لتُرسَل لاحقاً كل واحد منها على حِدة)."""
+    downloaded: list[tuple[dict, bytes, bool]] = []
     leftovers: list[dict] = []
 
     for att in attachments:
@@ -90,35 +125,14 @@ async def _build_combined_pdf(bot, attachments: list[dict]) -> tuple[io.BytesIO 
         try:
             tg_file = await bot.get_file(att["file_id"])
             raw = bytes(await tg_file.download_as_bytearray())
+            downloaded.append((att, raw, is_image))
         except Exception:
             logger.exception(f"[patient_attachments_bundle] فشل تحميل مرفق id={att.get('id')}")
             leftovers.append(att)
-            continue
 
-        try:
-            if is_image:
-                img = Image.open(io.BytesIO(raw)).convert("RGB")
-                page_buf = io.BytesIO()
-                img.save(page_buf, format="PDF", resolution=150.0)
-                page_buf.seek(0)
-                reader = PdfReader(page_buf)
-            else:
-                reader = PdfReader(io.BytesIO(raw))
-
-            for page in reader.pages:
-                writer.add_page(page)
-            page_count += len(reader.pages)
-        except Exception:
-            logger.exception(f"[patient_attachments_bundle] فشل دمج مرفق id={att.get('id')}")
-            leftovers.append(att)
-
-    if page_count == 0:
-        return None, 0, leftovers
-
-    out = io.BytesIO()
-    writer.write(out)
-    out.seek(0)
-    return out, page_count, leftovers
+    pdf_buf, page_count, merge_failed = await asyncio.to_thread(_merge_downloaded_pages, downloaded)
+    leftovers.extend(merge_failed)
+    return pdf_buf, page_count, leftovers
 
 
 async def _send_leftover(bot, chat_id: int, att: dict) -> None:
@@ -158,7 +172,7 @@ async def _on_patient_selected(result, update: Update, context: ContextTypes.DEF
     try:
         from services.medical_attachment_files_service import get_medical_attachment_files_for_patient
 
-        attachments = get_medical_attachment_files_for_patient(patient_id)
+        attachments = await asyncio.to_thread(get_medical_attachment_files_for_patient, patient_id)
 
         if not attachments:
             try:

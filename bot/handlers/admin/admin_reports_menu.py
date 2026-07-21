@@ -89,31 +89,58 @@ async def handle_type_selection(
         context.user_data.clear()
         return ConversationHandler.END
 
+    # ✅ كل تفويض هنا محاط بـ try/except صراحة: بدونها، أي استثناء غير متوقع
+    # في المسار المُفوَّض (تعليق شبكة، خطأ قاعدة بيانات، إلخ) كان سيتسرّب
+    # قبل الوصول لـ return ConversationHandler.END — فيبقى هذا الـ
+    # ConversationHandler عالقاً في حالة MENU_CHOOSE_TYPE لهذا المستخدم إلى
+    # الأبد (allow_reentry=False يمنع إعادة تشغيله بالضغط على الزر مجدداً،
+    # وزر "🖨️ طباعة التقارير" غير مسجَّل في قائمة أزرار المقاطعة group -2
+    # التي تصفّر المحادثات العالقة). أي خطأ الآن يُبلَّغ للمستخدم بدل أن
+    # يُعطِّل الزر بصمت حتى إعادة تشغيل البوت.
     if data == f"{_PFX}:comp":
-        # Delegate to comprehensive report handler
         context.user_data["_report_type"] = "comprehensive"
-        from . import admin_comprehensive_report
-        # Show period menu - this handler will take over from here
-        await admin_comprehensive_report.show_period_menu(update, context)
-        # End this conversation, comprehensive_report handler takes over
+        try:
+            from . import admin_comprehensive_report
+            # Show period menu - this handler will take over from here
+            await admin_comprehensive_report.show_period_menu(update, context)
+        except Exception:
+            logger.exception("[reports_menu] فشل عرض قائمة التقرير الشامل")
+            try:
+                await query.edit_message_text("❌ حدث خطأ. حاول الضغط على '🖨️ طباعة التقارير' مرة أخرى.")
+            except Exception:
+                pass
         return ConversationHandler.END
 
     if data == f"{_PFX}:patient":
-        # Delegate to patient report handler (v2 with patient_selector)
         context.user_data["_report_type"] = "patient"
-        from . import admin_patient_report_v2
-        # Show patient selector and let patient_report_v2 handler take over
-        result = await admin_patient_report_v2.show_patient_selector(update, context)
-        # Return the state from patient_report_v2, don't end here
-        # (This allows the ConversationHandler there to manage the flow)
-        return result
+        try:
+            from . import admin_patient_report_v2
+            # Show patient selector and let patient_report_v2 handler take over
+            result = await admin_patient_report_v2.show_patient_selector(update, context)
+            # Return the state from patient_report_v2, don't end here
+            # (This allows the ConversationHandler there to manage the flow)
+            return result
+        except Exception:
+            logger.exception("[reports_menu] فشل عرض منتقي المريض (تقرير مريض)")
+            try:
+                await query.edit_message_text("❌ حدث خطأ. حاول الضغط على '🖨️ طباعة التقارير' مرة أخرى.")
+            except Exception:
+                pass
+            return ConversationHandler.END
 
     if data == f"{_PFX}:attachments":
         # Delegate to attachments-bundle handler — no further states needed,
         # it does everything (patient pick → merge → send) via result_router.
         context.user_data["_report_type"] = "attachments"
-        from . import admin_patient_attachments_bundle
-        await admin_patient_attachments_bundle.show_patient_selector(update, context)
+        try:
+            from . import admin_patient_attachments_bundle
+            await admin_patient_attachments_bundle.show_patient_selector(update, context)
+        except Exception:
+            logger.exception("[reports_menu] فشل عرض منتقي المريض (كل المرفقات)")
+            try:
+                await query.edit_message_text("❌ حدث خطأ. حاول الضغط على '🖨️ طباعة التقارير' مرة أخرى.")
+            except Exception:
+                pass
         return ConversationHandler.END
 
     return MENU_CHOOSE_TYPE

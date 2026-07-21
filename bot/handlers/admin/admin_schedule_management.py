@@ -548,7 +548,11 @@ async def handle_manage_patients(update: Update, context: ContextTypes.DEFAULT_T
     """إدارة أسماء المرضى من قاعدة البيانات الموحدة"""
     query = update.callback_query
     await query.answer()
-    
+
+    # ✅ هذه الشاشة تُستخدم كـfallback عام لزر "🔙 رجوع" — قد تُستدعى منتصف
+    # تدفق إضافة مريض/مرافقين، فنمسح أي حالة معلّقة حتى لا تتسرب لمحاولة لاحقة.
+    _clear_patient_companion_state(context)
+
     # استخدام الخدمة الموحدة
     try:
         from services.patients_service import get_patients_count
@@ -559,6 +563,10 @@ async def handle_manage_patients(update: Update, context: ContextTypes.DEFAULT_T
     
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("➕ إضافة اسم جديد", callback_data="add_patient_name")],
+        # ✅ زر منفصل تماماً عن "➕ إضافة اسم جديد" — مخصص للمرضى الجدد
+        # المرتبطين بمرافقين (الخدمات العامة/الإقامة). اسم المريض هنا يظهر
+        # في كل الشاشات كالمعتاد؛ المرافقون فقط مخفيون إلا في تلك الوحدتين.
+        [InlineKeyboardButton("🤝 مريض جديد مع مرافقين", callback_data="add_patient_with_companions")],
         [InlineKeyboardButton("📋 عرض جميع الأسماء", callback_data="view_patient_names")],
         [InlineKeyboardButton("✏️ تعديل اسم", callback_data="edit_patient_name")],
         [InlineKeyboardButton("🗑️ حذف اسم", callback_data="delete_patient_name")],
@@ -680,11 +688,19 @@ async def handle_patient_type_choice(update: Update, context: ContextTypes.DEFAU
     )
     return "ADD_PATIENT_NAME"
 
+def _clear_patient_companion_state(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """يمسح كل مفاتيح إضافة المريض/المرافقين — يمنع تسرّب حالة قديمة لمحاولة لاحقة."""
+    for key in ('new_patient_type', 'new_patient_id', 'new_patient_name',
+                'new_patient_type_label', 'companion_count', 'companion_index',
+                'companion_names'):
+        context.user_data.pop(key, None)
+
+
 async def handle_cancel_patient_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     if query:
         await query.answer()
-    context.user_data.pop('new_patient_type', None)
+    _clear_patient_companion_state(context)
     await handle_manage_patients(update, context)
     return ConversationHandler.END
 
@@ -752,6 +768,203 @@ async def handle_patient_name_input(update: Update, context: ContextTypes.DEFAUL
             parse_mode=ParseMode.MARKDOWN
         )
         return ConversationHandler.END
+
+
+async def handle_start_patient_with_companions(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """بدء تدفق منفصل تماماً: مريض جديد مرتبط بمرافقين (خدمات عامة/إقامة).
+
+    ✅ منفصل عمداً عن "➕ إضافة اسم جديد" (بقرار المستخدم) — لا شاشة اختيار
+    نوع هنا: المريض دائماً "عام" (يظهر في كل الشاشات)، والمرافقون وحدهم
+    يُسجَّلون بنوع "companion" (مخفي إلا في 🔧 الخدمات العامة و🪪 الإقامة).
+    """
+    query = update.callback_query
+    await query.answer()
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")],
+        [InlineKeyboardButton("❌ إلغاء", callback_data="cancel_patient_input")]
+    ])
+
+    await query.edit_message_text(
+        "🤝 **إضافة مريض جديد مع مرافقين**\n\n"
+        "🌍 اسم المريض سيظهر في جميع الشاشات كالمعتاد.\n"
+        "👥 أسماء المرافقين ستظهر فقط داخل 🔧 الخدمات العامة و🪪 الإقامة.\n\n"
+        "📝 اكتب اسم المريض:",
+        reply_markup=keyboard,
+        parse_mode=ParseMode.MARKDOWN
+    )
+    return "PWC_PATIENT_NAME"
+
+
+async def handle_pwc_patient_name_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة اسم المريض في تدفق 'مريض جديد مع مرافقين' — النوع دائماً عام"""
+    name = update.message.text.strip()
+
+    if not name or len(name) < 2:
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")],
+            [InlineKeyboardButton("❌ إلغاء", callback_data="cancel_patient_input")]
+        ])
+        await update.message.reply_text(
+            "⚠️ **خطأ:** الاسم قصير جداً\n\nيرجى إدخال اسم صحيح:",
+            reply_markup=keyboard,
+            parse_mode=ParseMode.MARKDOWN
+        )
+        return "PWC_PATIENT_NAME"
+
+    try:
+        from services.patients_service import add_patient, get_patient_by_name
+
+        existing = get_patient_by_name(name)
+        if existing:
+            keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")]])
+            await update.message.reply_text(
+                f"⚠️ **الاسم موجود مسبقاً:** {name}",
+                reply_markup=keyboard,
+                parse_mode=ParseMode.MARKDOWN
+            )
+            return ConversationHandler.END
+
+        patient_id = add_patient(name, patient_type=None)  # عام دائماً — يظهر في كل الشاشات
+
+        if not patient_id:
+            await update.message.reply_text("❌ **خطأ في الإضافة**", parse_mode=ParseMode.MARKDOWN)
+            return ConversationHandler.END
+
+        context.user_data['new_patient_id'] = patient_id
+        context.user_data['new_patient_name'] = name
+        context.user_data['new_patient_type_label'] = "🌍 جميع المستخدمين"
+
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("✅ نعم", callback_data="pcomp:yes")],
+            [InlineKeyboardButton("❌ لا", callback_data="pcomp:no")],
+        ])
+        await update.message.reply_text(
+            f"✅ **تم إضافة المريض:** {name}\n\n"
+            f"👥 هل يوجد مرافق (مرافقون) لهذا المريض؟",
+            reply_markup=keyboard,
+            parse_mode=ParseMode.MARKDOWN
+        )
+        return "ADD_PATIENT_COMPANION_ASK"
+    except Exception as e:
+        logger.error(f"Error adding patient with companions: {e}")
+        await update.message.reply_text(
+            f"❌ **خطأ في الحفظ:** {str(e)}",
+            parse_mode=ParseMode.MARKDOWN
+        )
+        return ConversationHandler.END
+
+
+async def handle_companion_ask_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة الإجابة على سؤال 'هل يوجد مرافق؟'"""
+    query = update.callback_query
+    await query.answer()
+
+    choice = (query.data or "").split(":", 1)[-1]
+    patient_name = context.user_data.get('new_patient_name', '')
+
+    if choice == "no":
+        context.user_data.pop('new_patient_id', None)
+        context.user_data.pop('new_patient_name', None)
+        context.user_data.pop('new_patient_type_label', None)
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")]])
+        await query.edit_message_text(
+            f"✅ **تم إضافة الاسم:** {patient_name}\n\n"
+            f"📝 يمكنك إضافة المزيد أو الرجوع للقائمة",
+            reply_markup=keyboard,
+            parse_mode=ParseMode.MARKDOWN
+        )
+        return ConversationHandler.END
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("❌ إلغاء", callback_data="cancel_patient_input")]
+    ])
+    await query.edit_message_text(
+        f"👥 **إضافة مرافقين لـ:** {patient_name}\n\n"
+        f"🔢 كم عدد المرافقين؟ (اكتب رقماً)",
+        reply_markup=keyboard,
+        parse_mode=ParseMode.MARKDOWN
+    )
+    return "ADD_PATIENT_COMPANION_COUNT"
+
+
+async def handle_companion_count_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة إدخال عدد المرافقين"""
+    text = update.message.text.strip()
+
+    if not text.isdigit() or not (1 <= int(text) <= 20):
+        await update.message.reply_text(
+            "⚠️ **خطأ:** يرجى إدخال رقم صحيح بين 1 و20.",
+            parse_mode=ParseMode.MARKDOWN
+        )
+        return "ADD_PATIENT_COMPANION_COUNT"
+
+    count = int(text)
+    context.user_data['companion_count'] = count
+    context.user_data['companion_index'] = 1
+    context.user_data['companion_names'] = []
+
+    await update.message.reply_text(
+        f"📝 اكتب اسم المرافق رقم 1 من {count}:",
+        parse_mode=ParseMode.MARKDOWN
+    )
+    return "ADD_PATIENT_COMPANION_NAME"
+
+
+async def handle_companion_name_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة إدخال اسم مرافق واحد ثم الانتقال للتالي أو الإنهاء"""
+    name = update.message.text.strip()
+
+    if not name or len(name) < 2:
+        await update.message.reply_text(
+            "⚠️ **خطأ:** الاسم قصير جداً\n\nيرجى إدخال اسم صحيح:",
+            parse_mode=ParseMode.MARKDOWN
+        )
+        return "ADD_PATIENT_COMPANION_NAME"
+
+    try:
+        from services.patients_service import add_patient
+        # ✅ أسماء المرافقين لا تُفحص للتكرار عمداً — قد يتكرر نفس الاسم
+        # لمرافقين مختلفين لمرضى مختلفين، وهذا مقبول (راجع الخطة المعتمدة).
+        add_patient(name, patient_type="companion")
+    except Exception as e:
+        logger.error(f"Error adding companion: {e}")
+        await update.message.reply_text(
+            f"❌ **خطأ في الحفظ:** {str(e)}",
+            parse_mode=ParseMode.MARKDOWN
+        )
+        return "ADD_PATIENT_COMPANION_NAME"
+
+    context.user_data.setdefault('companion_names', []).append(name)
+    index = context.user_data.get('companion_index', 1)
+    count = context.user_data.get('companion_count', 0)
+
+    if index < count:
+        context.user_data['companion_index'] = index + 1
+        await update.message.reply_text(
+            f"📝 اكتب اسم المرافق رقم {index + 1} من {count}:",
+            parse_mode=ParseMode.MARKDOWN
+        )
+        return "ADD_PATIENT_COMPANION_NAME"
+
+    # ✅ اكتملت كل أسماء المرافقين — رسالة نجاح واحدة مجمَّعة
+    patient_name = context.user_data.get('new_patient_name', '')
+    companion_names = context.user_data.get('companion_names', [])
+    summary = "\n".join(f"👤 {n}" for n in companion_names)
+
+    for key in ('new_patient_id', 'new_patient_name', 'new_patient_type_label',
+                'companion_count', 'companion_index', 'companion_names'):
+        context.user_data.pop(key, None)
+
+    keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")]])
+    await update.message.reply_text(
+        f"✅ **تم إضافة المريض والمرافقين بنجاح**\n\n"
+        f"🧍 **المريض:** {patient_name}\n"
+        f"👥 **المرافقون ({len(companion_names)}):**\n{summary}",
+        reply_markup=keyboard,
+        parse_mode=ParseMode.MARKDOWN
+    )
+    return ConversationHandler.END
 
 async def handle_delete_patient_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """واجهة حذف اسم مريض مع التصفح بالصفحات"""
@@ -1490,7 +1703,9 @@ def register(app):
     patient_names_conv = ConversationHandler(
         entry_points=[
             CallbackQueryHandler(handle_select_edit, pattern="^edit_patient:\\d+$"),
-            CallbackQueryHandler(start_add_patient_name, pattern="^add_patient_name$")
+            CallbackQueryHandler(start_add_patient_name, pattern="^add_patient_name$"),
+            # ✅ نقطة دخول منفصلة تماماً: مريض جديد مع مرافقين (خدمات عامة/إقامة)
+            CallbackQueryHandler(handle_start_patient_with_companions, pattern="^add_patient_with_companions$"),
         ],
         states={
             "EDIT_NAME_INPUT": [
@@ -1505,6 +1720,22 @@ def register(app):
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_patient_name_input),
                 # 🔙 رجوع من شاشة إدخال الاسم → العودة لشاشة اختيار النوع
                 CallbackQueryHandler(start_add_patient_name, pattern="^add_patient_name$")
+            ],
+            # ✅ اسم المريض في تدفق "مريض جديد مع مرافقين" المنفصل — لا نوع يُختار (عام دائماً)
+            "PWC_PATIENT_NAME": [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_pwc_patient_name_input),
+                CallbackQueryHandler(handle_start_patient_with_companions, pattern="^add_patient_with_companions$")
+            ],
+            # ✅ حالات سؤال المرافقين — مشتركة بين تدفق "➕ إضافة اسم جديد" (لم يعد
+            # يستخدمها) وتدفق "🤝 مريض جديد مع مرافقين" الجديد (المستخدم الفعلي الآن)
+            "ADD_PATIENT_COMPANION_ASK": [
+                CallbackQueryHandler(handle_companion_ask_choice, pattern="^pcomp:(yes|no)$")
+            ],
+            "ADD_PATIENT_COMPANION_COUNT": [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_companion_count_input)
+            ],
+            "ADD_PATIENT_COMPANION_NAME": [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_companion_name_input)
             ]
         },
         fallbacks=[

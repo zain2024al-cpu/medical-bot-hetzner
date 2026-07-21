@@ -28,6 +28,7 @@
 #
 from __future__ import annotations
 
+import asyncio
 import logging
 from calendar import monthrange
 from datetime import datetime, timedelta, date
@@ -385,7 +386,11 @@ async def _generate_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             )
             return
 
-        stats = compute_stats(reports)
+        # ✅ compute_stats/build_comprehensive_pdf عمل CPU ثقيل متزامن (matplotlib +
+        # reportlab لبناء رسوم بيانية وجداول). استدعاؤه مباشرة داخل هذا الـ async
+        # handler يُجمِّد حلقة الأحداث الوحيدة للبوت بالكامل — أي كل المستخدمين —
+        # طوال مدة البناء. asyncio.to_thread ينقله لخيط منفصل فلا يعلّق البوت.
+        stats = await asyncio.to_thread(compute_stats, reports)
         filters_summary = {
             "hospitals": [] if filt["hospitals_all"] else filt["hospitals"],
             "departments": [] if filt["departments_all"] else filt["departments"],
@@ -393,7 +398,9 @@ async def _generate_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             "actions": [] if filt["actions_all"] else filt["actions"],
             "generated_at": datetime.now(),
         }
-        pdf_buf = build_comprehensive_pdf(reports, stats, filt["period_label"], filters_summary=filters_summary)
+        pdf_buf = await asyncio.to_thread(
+            build_comprehensive_pdf, reports, stats, filt["period_label"], filters_summary=filters_summary
+        )
 
         filename = f"Comprehensive_{filt['start']}_{filt['end']}.pdf"
         caption = (

@@ -89,8 +89,15 @@ async def handle_user_approval(update: Update, context: ContextTypes.DEFAULT_TYP
                 from datetime import datetime
                 import hashlib
                 
-                # الحصول على رسالة ترحيبية
-                now = datetime.now()
+                # الحصول على رسالة ترحيبية — ✅ بتوقيت الهند (Asia/Kolkata) وليس
+                # توقيت السيرفر (أوروبا، متأخر ~3.5 ساعة) — نفس منطق get_arabic_date
+                # في user_start.py.
+                try:
+                    import pytz
+                    from config.settings import TIMEZONE
+                    now = datetime.now(pytz.timezone(TIMEZONE))
+                except Exception:
+                    now = datetime.now()
                 days_ar = ["الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت", "الأحد"]
                 months_ar = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
                             "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"]

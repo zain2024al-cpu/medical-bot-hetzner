@@ -22,6 +22,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from calendar import monthrange
 from datetime import date, timedelta
@@ -546,6 +547,7 @@ async def _finalize_and_generate(
 
     try:
         from services.reports_repository import get_reports
+        from services.healthcare_records_repository import get_healthcare_records_for_patient
         from services.patient_report_pdf import build_patient_pdf
 
         depts = context.user_data.get("_pr_depts")
@@ -559,11 +561,19 @@ async def _finalize_and_generate(
             actions=actions,
         )
 
+        # ✅ سجلات وحدة الرعاية الصحية (منفصلة تماماً عن تقارير المترجم) —
+        # نفس فترة التقرير المختارة أعلاه، تُضاف كقسم إضافي في نفس ملف الـ PDF.
+        healthcare_records = await get_healthcare_records_for_patient(
+            patient_id=patient_id, start=period_start, end=period_end,
+        )
+
         patient_name = context.user_data.get("_patient_name", "")
 
-        if not reports:
+        # ✅ لا نتوقف إلا إذا كان كلا المصدرين فارغين — مريض قد لا يملك أي
+        # تقرير مترجم لكن له سجلات رعاية صحية (أو العكس)، وكلاهما يستحق تقريراً.
+        if not reports and not healthcare_records:
             await query.edit_message_text(
-                f"⚠️ لا توجد تقارير للمريض *{patient_name}* في هذه الفترة/المعايير.",
+                f"⚠️ لا توجد تقارير أو سجلات رعاية صحية للمريض *{patient_name}* في هذه الفترة/المعايير.",
                 parse_mode=ParseMode.MARKDOWN,
             )
             return PR_PERIOD
@@ -581,7 +591,12 @@ async def _finalize_and_generate(
                 "disease": getattr(patient_obj, "disease", "") if patient_obj else "",
             }
 
-        pdf_buf = build_patient_pdf(patient_data, reports, depts, period_label)
+        # ✅ بناء PDF عمل CPU متزامن (matplotlib + reportlab) — ينقل لخيط منفصل
+        # حتى لا يُجمِّد حلقة أحداث البوت الوحيدة لكل المستخدمين أثناء البناء.
+        pdf_buf = await asyncio.to_thread(
+            build_patient_pdf, patient_data, reports, depts, period_label,
+            healthcare_records=healthcare_records,
+        )
 
         filename = f"Patient_{patient_id}_{period_start}_{period_end}.pdf"
         caption = (
@@ -590,6 +605,8 @@ async def _finalize_and_generate(
             f"📅 {period_label}\n"
             f"📋 {len(reports)} تقرير"
         )
+        if healthcare_records:
+            caption += f"\n🏥 {len(healthcare_records)} سجل رعاية صحية"
 
         try:
             await query.delete_message()

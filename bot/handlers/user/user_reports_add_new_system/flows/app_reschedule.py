@@ -5,13 +5,13 @@
 
 import logging
 import calendar
-from datetime import datetime
+from datetime import datetime, date
 from zoneinfo import ZoneInfo
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 
 from ..states import APP_RESCHEDULE_REASON, APP_RESCHEDULE_RETURN_DATE, APP_RESCHEDULE_RETURN_REASON, APP_RESCHEDULE_TRANSLATOR
-from ..utils import _nav_buttons, MONTH_NAMES_AR
+from ..utils import _nav_buttons, MONTH_NAMES_AR, WEEKDAYS_AR
 from ...user_reports_add_helpers import validate_text_input
 from .shared import show_translator_selection
 
@@ -65,43 +65,55 @@ async def handle_app_reschedule_reason(update: Update, context: ContextTypes.DEF
 
 
 async def _show_reschedule_calendar(message, context, year=None, month=None):
-    """عرض تقويم لاختيار تاريخ العودة"""
-    today = datetime.now(ZoneInfo(TIMEZONE))
-    year = year or today.year
-    month = month or today.month
+    """عرض تقويم لاختيار تاريخ العودة — ✅ شكل موحَّد تماماً مع بقية شاشات
+    "تاريخ العودة" في كل المسارات (نفس رأس الشهر بالأسهم، نفس مسمّيات أيام
+    الأسبوع، علامة 📍 لليوم، أرقام بصفر، إخفاء الأيام الماضية). مُعرّفات
+    الاستدعاء (reschedule_cal_day / reschedule_cal_nav) لم تتغيّر إطلاقاً."""
+    now = datetime.now(ZoneInfo(TIMEZONE))
+    today = now.date()
+    year = year or now.year
+    month = month or now.month
 
-    cal = calendar.Calendar(firstweekday=6)
-    weeks = cal.monthdatescalendar(year, month)
+    cal = calendar.Calendar(firstweekday=calendar.SATURDAY)
+    weeks = cal.monthdayscalendar(year, month)
+
+    prev_month = month - 1 if month > 1 else 12
+    prev_year = year if month > 1 else year - 1
+    next_month = month + 1 if month < 12 else 1
+    next_year = year if month < 12 else year + 1
 
     keyboard = []
-    keyboard.append([InlineKeyboardButton(f"📅 {MONTH_NAMES_AR.get(month, month)} {year}", callback_data="noop")])
-    keyboard.append([InlineKeyboardButton(d, callback_data="noop") for d in ["س", "أ", "ث", "ر", "خ", "ج", "س"]])
+    keyboard.append([
+        InlineKeyboardButton("⬅️", callback_data=f"reschedule_cal_nav:prev:{prev_year}:{prev_month}"),
+        InlineKeyboardButton(f"{MONTH_NAMES_AR.get(month, month)} {year}", callback_data="noop"),
+        InlineKeyboardButton("➡️", callback_data=f"reschedule_cal_nav:next:{next_year}:{next_month}"),
+    ])
+    keyboard.append([InlineKeyboardButton(d, callback_data="noop") for d in WEEKDAYS_AR])
 
     for week in weeks:
         row = []
         for day in week:
-            if day.month == month and day >= today.date():
-                row.append(InlineKeyboardButton(
-                    str(day.day),
-                    callback_data=f"reschedule_cal_day:{day.strftime('%Y-%m-%d')}"
-                ))
-            else:
+            if day == 0:
                 row.append(InlineKeyboardButton(" ", callback_data="noop"))
+            else:
+                current_date = date(year, month, day)
+                date_str = f"{year}-{month:02d}-{day:02d}"
+                if current_date < today:
+                    row.append(InlineKeyboardButton(" ", callback_data="noop"))
+                elif current_date == today:
+                    row.append(InlineKeyboardButton(f"📍{day:02d}", callback_data=f"reschedule_cal_day:{date_str}"))
+                else:
+                    row.append(InlineKeyboardButton(f"{day:02d}", callback_data=f"reschedule_cal_day:{date_str}"))
         keyboard.append(row)
 
-    nav_row = []
-    if month > today.month or year > today.year:
-        prev_month = month - 1 if month > 1 else 12
-        prev_year = year if month > 1 else year - 1
-        nav_row.append(InlineKeyboardButton("⬅️ السابق", callback_data=f"reschedule_cal_nav:prev:{prev_year}:{prev_month}"))
-    nav_row.append(InlineKeyboardButton("➡️ التالي", callback_data=f"reschedule_cal_nav:next:{year}:{month + 1 if month < 12 else 1}"))
-    keyboard.append(nav_row)
+    keyboard.append([
+        InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
+        InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel"),
+    ])
 
-    keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="nav:back")])
-    keyboard.append([InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")])
-
+    text = f"📅 **تاريخ العودة**\n\n{MONTH_NAMES_AR.get(month, str(month))} {year}\n\nاختر التاريخ من التقويم:"
     await message.reply_text(
-        "📅 **اختر تاريخ العودة الجديد:**",
+        text,
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="Markdown"
     )
