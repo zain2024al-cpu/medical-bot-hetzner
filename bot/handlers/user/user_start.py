@@ -62,8 +62,18 @@ def get_daily_quote():
 
 def get_arabic_date():
     """تنسيق التاريخ والوقت بالعربي"""
-    now = datetime.now()
-    
+    # ✅ توقيت الهند (Asia/Kolkata) وليس توقيت السيرفر: السيرفر يعمل على
+    # توقيت أوروبا (CEST) المتأخر ~3.5 ساعة عن الهند، فكان datetime.now()
+    # المجرَّد يُظهر وقتاً خاطئاً في رسالة الترحيب. نستخدم نفس المنطقة الزمنية
+    # المعتمَدة بالمشروع (config.settings.TIMEZONE) عبر pytz كما في
+    # services/notification_service.py.
+    try:
+        import pytz
+        from config.settings import TIMEZONE
+        now = datetime.now(pytz.timezone(TIMEZONE))
+    except Exception:
+        now = datetime.now()
+
     # أيام الأسبوع بالعربي
     days_ar = ["الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت", "الأحد"]
     day_name = days_ar[now.weekday()]

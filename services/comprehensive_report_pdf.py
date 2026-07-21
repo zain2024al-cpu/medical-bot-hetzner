@@ -53,6 +53,36 @@ def _ar(text: str) -> str:
         return str(text or "")
 
 
+def _ar_wrap(text, font_name: str, font_size: float, max_width_pts: float) -> str:
+    """يلفّ النص يدوياً كلمة-كلمة ضمن العرض المتاح، ثم يُطبِّق reshape+bidi على
+    كل سطر منجَز على حدة — يمنع تكسّر نص مختلط عربي/إنجليزي طويل (مثل اسم
+    عملية بالإنجليزي داخل قرار الطبيب) عند لف Paragraph التلقائي لسلسلة
+    أُعيد ترتيبها بصرياً بالفعل (نفس الإصلاح في services/patient_report_pdf.py
+    وservices/pharmacy_evacuation_pdf.py)."""
+    from reportlab.pdfbase.pdfmetrics import stringWidth
+
+    s = str(text or "").strip()
+    if not s:
+        return ""
+
+    words = s.split()
+    lines: list[str] = []
+    current: list[str] = []
+    for word in words:
+        candidate = current + [word]
+        shaped_candidate = _ar(" ".join(candidate))
+        w = stringWidth(shaped_candidate, font_name, font_size)
+        if w <= max_width_pts or not current:
+            current = candidate
+        else:
+            lines.append(" ".join(current))
+            current = [word]
+    if current:
+        lines.append(" ".join(current))
+
+    return "<br/>".join(_ar(line) for line in lines)
+
+
 def _colors():
     from reportlab.lib import colors
     return {
@@ -212,6 +242,14 @@ def build_comprehensive_pdf(
     def P(txt, style_key) -> Paragraph:
         return Paragraph(_ar(txt), ST[style_key])
 
+    def P_wrap(txt, style_key, max_width_pts) -> Paragraph:
+        """مثل P، لكن يلفّ يدوياً قبل reshape/bidi — للخلايا المعرَّضة لنص
+        طويل مختلط عربي/إنجليزي (تفاصيل الحالة، اسم العملية بالإنجليزي)."""
+        style = ST[style_key]
+        usable_width = max(max_width_pts - 8, 20)
+        wrapped = _ar_wrap(txt, style.fontName, style.fontSize, usable_width)
+        return Paragraph(wrapped, style)
+
     # ── Header/footer on each page ────────────────────────────────────────────
     def _on_page(canvas, doc):
         canvas.saveState()
@@ -290,12 +328,14 @@ def build_comprehensive_pdf(
         story.append(Spacer(1, 0.4 * cm))
 
     # ── Summary stats ─────────────────────────────────────────────────────────
+    # ✅ معكوسة عمداً: آخر عنصر بالقائمة = الأقصى يميناً — "إجمالي الحالات"
+    # يظهر أولاً (أقصى اليمين) كأهم رقم تنفيذي (نفس مبدأ services/patient_report_pdf.py).
     stat_rows = [[
-        [P("إجمالي الحالات",      "stat_label"), P(str(stats["total"]),               "stat_value")],
-        [P("المرضى",              "stat_label"), P(str(stats["unique_patients"]),     "stat_value")],
-        [P("المستشفيات",          "stat_label"), P(str(stats["unique_hospitals"]),   "stat_value")],
-        [P("الأقسام",              "stat_label"), P(str(stats["unique_depts"]),       "stat_value")],
         [P("الإجراءات",            "stat_label"), P(str(stats["unique_actions"]),     "stat_value")],
+        [P("الأقسام",              "stat_label"), P(str(stats["unique_depts"]),       "stat_value")],
+        [P("المستشفيات",          "stat_label"), P(str(stats["unique_hospitals"]),   "stat_value")],
+        [P("المرضى",              "stat_label"), P(str(stats["unique_patients"]),     "stat_value")],
+        [P("إجمالي الحالات",      "stat_label"), P(str(stats["total"]),               "stat_value")],
     ]]
     flat_stat = []
     for cell_pair in stat_rows[0]:
@@ -323,17 +363,17 @@ def build_comprehensive_pdf(
     action_counts = aggregate_by_action(reports)
     date_counts = aggregate_by_date(reports)
 
-    # Hospitals table
+    # Hospitals table — ✅ معكوسة: "المستشفى" يظهر أقصى اليمين
     story.append(P("المستشفيات", "section"))
-    hosp_rows = [[P("المستشفى", "th"), P("عدد الحالات", "th")]]
+    hosp_rows = [[P("عدد الحالات", "th"), P("المستشفى", "th")]]
     for h, cnt in hosp_counts.items():
-        hosp_rows.append([P(h, "td_r"), P(str(cnt), "td_c")])
-    ht = Table(hosp_rows, colWidths=[13 * cm, 3 * cm], hAlign="RIGHT")
+        hosp_rows.append([P(str(cnt), "td_c"), P(h, "td_r")])
+    ht = Table(hosp_rows, colWidths=[3 * cm, 13 * cm], hAlign="RIGHT")
     ht.setStyle(TableStyle([
         ("BACKGROUND",     (0, 0), (-1, 0),  C["primary"]),
         ("ROWBACKGROUNDS", (0, 1), (-1, -1), [C["white"], C["light_bg"]]),
         ("GRID",           (0, 0), (-1, -1), 0.4, C["grid"]),
-        ("ALIGN",          (1, 0), (1, -1), "CENTER"),
+        ("ALIGN",          (0, 0), (0, -1), "CENTER"),
         ("TOPPADDING",     (0, 0), (-1, -1), 5),
         ("BOTTOMPADDING",  (0, 0), (-1, -1), 5),
         ("RIGHTPADDING",   (0, 0), (-1, -1), 6),
@@ -341,17 +381,17 @@ def build_comprehensive_pdf(
     story.append(ht)
     story.append(Spacer(1, 0.3 * cm))
 
-    # Departments table
+    # Departments table — ✅ معكوسة: "القسم" يظهر أقصى اليمين
     story.append(P("الأقسام", "section"))
-    dept_rows = [[P("القسم", "th"), P("عدد الحالات", "th")]]
+    dept_rows = [[P("عدد الحالات", "th"), P("القسم", "th")]]
     for d, cnt in list(dept_counts.items())[:15]:
-        dept_rows.append([P(d, "td_r"), P(str(cnt), "td_c")])
-    dt = Table(dept_rows, colWidths=[13 * cm, 3 * cm], hAlign="RIGHT")
+        dept_rows.append([P(str(cnt), "td_c"), P(d, "td_r")])
+    dt = Table(dept_rows, colWidths=[3 * cm, 13 * cm], hAlign="RIGHT")
     dt.setStyle(TableStyle([
         ("BACKGROUND",     (0, 0), (-1, 0),  C["primary"]),
         ("ROWBACKGROUNDS", (0, 1), (-1, -1), [C["white"], C["light_bg"]]),
         ("GRID",           (0, 0), (-1, -1), 0.4, C["grid"]),
-        ("ALIGN",          (1, 0), (1, -1), "CENTER"),
+        ("ALIGN",          (0, 0), (0, -1), "CENTER"),
         ("TOPPADDING",     (0, 0), (-1, -1), 5),
         ("BOTTOMPADDING",  (0, 0), (-1, -1), 5),
         ("RIGHTPADDING",   (0, 0), (-1, -1), 6),
@@ -359,14 +399,14 @@ def build_comprehensive_pdf(
     story.append(dt)
     story.append(Spacer(1, 0.3 * cm))
 
-    # Actions table
+    # Actions table — ✅ معكوسة: "نوع الإجراء" يظهر أقصى اليمين
     story.append(P("الإجراءات", "section"))
-    act_rows = [[P("نوع الإجراء", "th"), P("عدد الحالات", "th"), P("النسبة", "th")]]
+    act_rows = [[P("النسبة", "th"), P("عدد الحالات", "th"), P("نوع الإجراء", "th")]]
     total = stats["total"] or 1
     for a, cnt in list(action_counts.items())[:15]:
         pct = f"{cnt / total * 100:.1f}%"
-        act_rows.append([P(a, "td_r"), P(str(cnt), "td_c"), P(pct, "td_c")])
-    at = Table(act_rows, colWidths=[10 * cm, 3 * cm, 3 * cm], hAlign="RIGHT")
+        act_rows.append([P(pct, "td_c"), P(str(cnt), "td_c"), P(a, "td_r")])
+    at = Table(act_rows, colWidths=[3 * cm, 3 * cm, 10 * cm], hAlign="RIGHT")
     at.setStyle(TableStyle([
         ("BACKGROUND",     (0, 0), (-1, 0),  C["primary"]),
         ("ROWBACKGROUNDS", (0, 1), (-1, -1), [C["white"], C["light_bg"]]),
@@ -403,53 +443,102 @@ def build_comprehensive_pdf(
             story.append(img)
 
     # ── Case-by-case detail table ─────────────────────────────────────────────
+    # ✅ لا يُعرض هنا كل حالة على حدة — الجداول/الرسوم أعلاه (المستشفيات/
+    # الأقسام/الإجراءات مع النسب + الرسوم البيانية) تكفي كملخص إحصائي لكل
+    # الحالات الروتينية. يبقى الكشف الكامل فقط لأهم نوعين إكلينيكياً: "عملية"
+    # (مع اسمها بالإنجليزي) و"استشارة أخيرة" — أحداث نادرة الحدوث ومهمة تستحق
+    # التفصيل الكامل، بعكس المتابعات الروتينية المتكررة.
     def _trunc(text: str, n: int) -> str:
         text = (text or "").strip()
         return text if len(text) <= n else text[: n - 1].rstrip() + "…"
 
-    if reports:
-        story.append(PageBreak())
-        story.append(P("تفاصيل الحالات", "section"))
+    def _extract_op_name_en(doctor_decision: str) -> str:
+        dd = doctor_decision or ""
+        if "اسم العملية بالإنجليزي:" not in dd:
+            return ""
+        try:
+            rest = dd.split("اسم العملية بالإنجليزي:", 1)[1]
+            for sep in ("\n\n", "ملاحظات:", "الفحوصات"):
+                if sep in rest:
+                    rest = rest.split(sep, 1)[0]
+            return rest.strip()
+        except Exception:
+            return ""
 
-        detail_rows = [[
-            P("التاريخ",     "th"), P("المريض",   "th"), P("المستشفى", "th"),
-            P("القسم",       "th"), P("الطبيب",   "th"), P("الإجراء",  "th"),
-            P("تفاصيل الحالة", "th"), P("ملاحظات", "th"),
-        ]]
-        for r in reports:
-            detail_rows.append([
-                P(_fmt_date(r.get("report_date")),           "td_c"),
-                P(_trunc(r.get("patient_name", ""), 20),      "td_r"),
-                P(_trunc(r.get("hospital_name", ""), 20),     "td_r"),
-                P(_trunc(r.get("department", ""), 18),        "td_r"),
-                P(_trunc(r.get("doctor_name", ""), 16),       "td_r"),
-                P(_trunc(r.get("medical_action", ""), 16),    "td_r"),
-                P(_trunc(r.get("doctor_decision", ""), 40),   "td_r"),
-                P(_trunc(r.get("notes", ""), 30),             "td_r"),
-            ])
+    _FULL_DETAIL_ACTIONS = {"عملية", "استشارة أخيرة"}
+    detail_reports = [r for r in reports if (r.get("medical_action") or "").strip() in _FULL_DETAIL_ACTIONS]
 
-        detail_table = Table(
-            detail_rows,
-            colWidths=[1.8*cm, 2.6*cm, 2.6*cm, 2.2*cm, 2.2*cm, 2.2*cm, 3.6*cm, 2.6*cm],
-            hAlign="CENTER",
-            repeatRows=1,
-        )
-        detail_table.setStyle(TableStyle([
-            ("BACKGROUND",     (0, 0), (-1, 0),  C["primary"]),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [C["white"], C["light_bg"]]),
-            ("GRID",           (0, 0), (-1, -1), 0.4, C["grid"]),
-            ("VALIGN",         (0, 0), (-1, -1), "MIDDLE"),
-            ("TOPPADDING",     (0, 0), (-1, -1), 4),
-            ("BOTTOMPADDING",  (0, 0), (-1, -1), 4),
-            ("RIGHTPADDING",   (0, 0), (-1, -1), 4),
-            ("LEFTPADDING",    (0, 0), (-1, -1), 4),
-        ]))
-        story.append(detail_table)
+    story.append(PageBreak())
+    story.append(P("تفاصيل الحالات — العمليات والاستشارات الأخيرة", "section"))
+
+    if detail_reports:
+        for action in sorted(_FULL_DETAIL_ACTIONS):
+            action_reps = [r for r in detail_reports if (r.get("medical_action") or "").strip() == action]
+            if not action_reps:
+                continue
+            is_operation = action == "عملية"
+
+            story.append(Spacer(1, 0.3 * cm))
+            story.append(P(f"● {action}  ({len(action_reps)} حالة)", "section"))
+
+            header_row = [
+                P("التاريخ",  "th"), P("المريض",   "th"), P("المستشفى", "th"),
+                P("القسم",    "th"), P("الطبيب",   "th"),
+            ]
+            if is_operation:
+                header_row.append(P("اسم العملية بالإنجليزي", "th"))
+            header_row.append(P("تفاصيل الحالة", "th"))
+            detail_rows = [header_row]
+
+            # ✅ عرض الأعمدة قبل بناء الصفوف — P_wrap يحتاجه لتحديد نقاط اللف
+            # الصحيحة (نفس سبب استخدامه: نص مختلط عربي/إنجليزي طويل يُفسِد
+            # لفّه التلقائي إن مرّ عبر reshape+bidi قبل اللف اليدوي).
+            # ⚠️ المجموع يجب ألا يتجاوز عرض المحتوى المتاح (17.4سم مع هوامش
+            # 1.8سم) — عمود "اسم العملية بالإنجليزي" الإضافي كان يدفع
+            # المجموع لأكثر من ذلك فيفيض الجدول خارج هامش الصفحة.
+            if is_operation:
+                col_widths = [1.8*cm, 2.4*cm, 2.4*cm, 2*cm, 2*cm, 2.2*cm, 4.5*cm]
+            else:
+                col_widths = [1.8*cm, 2.4*cm, 2.4*cm, 2*cm, 2*cm, 6.7*cm]
+            opname_w, decision_w = (col_widths[5] if is_operation else None), col_widths[-1]
+
+            for r in sorted(action_reps, key=lambda x: x.get("report_date") or date.min):
+                row = [
+                    P(_fmt_date(r.get("report_date")),           "td_c"),
+                    P(_trunc(r.get("patient_name", ""), 20),      "td_r"),
+                    P(_trunc(r.get("hospital_name", ""), 20),     "td_r"),
+                    P(_trunc(r.get("department", ""), 18),        "td_r"),
+                    P(_trunc(r.get("doctor_name", ""), 16),       "td_r"),
+                ]
+                if is_operation:
+                    row.append(P_wrap(_extract_op_name_en(r.get("doctor_decision")) or "—", "td_r", opname_w))
+                row.append(P_wrap(r.get("doctor_decision") or "", "td_r", decision_w))
+                detail_rows.append(row)
+
+            # ✅ عكس كل الأعمدة دفعة واحدة — "التاريخ" ينتهي أقصى اليمين
+            # (نفس مبدأ العكس المطبَّق على كل جداول هذا الملف).
+            detail_rows = [list(reversed(row)) for row in detail_rows]
+            col_widths = list(reversed(col_widths))
+
+            detail_table = Table(
+                detail_rows,
+                colWidths=col_widths,
+                hAlign="CENTER",
+                repeatRows=1,
+            )
+            detail_table.setStyle(TableStyle([
+                ("BACKGROUND",     (0, 0), (-1, 0),  C["primary"]),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [C["white"], C["light_bg"]]),
+                ("GRID",           (0, 0), (-1, -1), 0.4, C["grid"]),
+                ("VALIGN",         (0, 0), (-1, -1), "MIDDLE"),
+                ("TOPPADDING",     (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING",  (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING",   (0, 0), (-1, -1), 4),
+                ("LEFTPADDING",    (0, 0), (-1, -1), 4),
+            ]))
+            story.append(detail_table)
     else:
-        # ✅ لا يُنشئ تقريراً فارغاً — رسالة واضحة بدل جدول فارغ
-        story.append(PageBreak())
-        story.append(P("تفاصيل الحالات", "section"))
-        story.append(P("لا توجد حالات مطابقة لمعايير البحث المحددة.", "body"))
+        story.append(P("لا توجد عمليات أو استشارات أخيرة ضمن هذه الفترة/المعايير.", "body"))
 
     # ── Build PDF ─────────────────────────────────────────────────────────────
     doc.build(story, onFirstPage=_on_page, onLaterPages=_on_page)

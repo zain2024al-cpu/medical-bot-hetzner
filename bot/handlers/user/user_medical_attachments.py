@@ -162,6 +162,10 @@ def _get_reports_for_date(tg_id: int, target_date: date):
                 Report.submitted_by_user_id == tg_id,
                 Report.created_at >= start,
                 Report.created_at < end,
+                # ✅ فقط التقارير "لم يجهز بعد" (has_paper_report=2) — تُستبعَد
+                # التقارير المكتملة (=1) وتلك التي لا يوجد لها تقرير طبي أصلاً
+                # (=0) لأن القائمة كانت تتراكم بأسماء منتهية وتُربك المترجم.
+                Report.has_paper_report == 2,
             )
             .order_by(Report.created_at.desc())
             .all()

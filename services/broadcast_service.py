@@ -733,9 +733,10 @@ def _build_medical_report_status(data: dict) -> list:
         lines.append("📎 تقرير طبي: ✅ يوجد تقرير طبي")
     elif data.get('has_paper_report') == 0 and not no_reason:
         lines.append("📎 تقرير طبي: ❌ لا يوجد تقرير")
-    elif data.get('_medical_report_step_done') is not None:
-        lines.append("📎 تقرير طبي: ⏭️ لم يُحدد")
-    # إذا لم يمر بالبوابة أصلاً (تقرير معدَّل/قديم) لا نضيف شيئاً
+    # ✅ حالة "⏭️ لم يُحدد" أُزيلت: كانت مخلَّفات زر "تخطي" القديم الذي لم يعد
+    # موجوداً في البوابة (البوابة الآن ثلاث حالات واضحة فقط: يوجد/لم يجهز/لا يوجد).
+    # التقارير القديمة التي مرّت بـ"تخطي" لم تعد تعرض سطراً مضلِّلاً — تُعامَل
+    # كالتقارير التي لم تمر بالبوابة أصلاً (لا يُضاف أي سطر).
     return lines
 
 
@@ -824,6 +825,16 @@ def format_report_message(data: dict) -> str:
 
     elif medical_action == 'جلسة إشعاعي':
         lines.extend(_build_radiation_therapy_fields(data))
+        lines.append("")
+        lines.append("━━━━━━━━━━━━━━━━━━━━")
+        lines.append("")
+        lines.extend(_build_medical_report_status(data))
+        if data.get('translator_name'):
+            lines.append(f"👨‍⚕️ المترجم: {data['translator_name']}")
+        return "\n".join(lines)
+
+    elif medical_action in ('العلاج الكيماوي', 'العلاج الموجه', 'العلاج المناعي', 'جلسات غسيل الكلى'):
+        lines.extend(_build_treatment_session_fields(data))
         lines.append("")
         lines.append("━━━━━━━━━━━━━━━━━━━━")
         lines.append("")
@@ -1226,6 +1237,25 @@ def _build_radiation_therapy_fields(data: dict) -> list:
     return lines
 
 
+def _build_treatment_session_fields(data: dict) -> list:
+    """بناء حقول جلسات العلاج (كيماوي/موجه/مناعي/غسيل الكلى)"""
+    lines = []
+
+    summary = data.get('treatment_plan_summary', '')
+    if summary and str(summary).strip():
+        lines.append(str(summary).strip())
+        lines.append("")
+
+    notes = data.get('notes', '')
+    if notes and str(notes).strip() and str(notes) != 'لا يوجد':
+        lines.append(f"📝 **ملاحظات:** {escape_markdown(str(notes).strip())}")
+        lines.append("")
+
+    lines.extend(_build_followup_fields(data))
+
+    return lines
+
+
 def _build_general_fields(data: dict) -> list:
     """بناء الحقول العامة (new_consult, followup, emergency, etc.)"""
     lines = []
@@ -1252,6 +1282,39 @@ def _build_general_fields(data: dict) -> list:
             else:
                 lines.append(f"💬 **شكوى المريض:**")
             lines.append(escape_markdown(str(data['complaint_text'])))
+            lines.append("")
+
+    # ✅ حقول المناظير — تظهر فقط لمسار "المناظير" بعد الشكوى مباشرة
+    if medical_action == 'المناظير':
+        endo_type = data.get('endoscopy_type')
+        if endo_type and str(endo_type).strip():
+            lines.append(f"🔬 **نوع المنظار:** {escape_markdown(str(endo_type).strip())}")
+            lines.append("")
+        endo_result = data.get('endoscopy_result')
+        if endo_result and str(endo_result).strip():
+            lines.append("📋 **نتيجة المنظار / خطة الطبيب:**")
+            lines.append(escape_markdown(str(endo_result).strip()))
+            lines.append("")
+        # الإجراءات التي تمت — تُخزَّن JSON {"list":[...], "other": "..."}
+        endo_procs = data.get('endoscopy_procedures')
+        if endo_procs:
+            proc_list, proc_other = [], None
+            try:
+                import json as _json
+                parsed = _json.loads(endo_procs) if isinstance(endo_procs, str) else endo_procs
+                if isinstance(parsed, dict):
+                    proc_list = parsed.get('list') or []
+                    proc_other = parsed.get('other')
+            except Exception:
+                proc_list = []
+            lines.append("🔧 **الإجراءات التي تمت أثناء المنظار:**")
+            if not proc_list and not proc_other:
+                lines.append("منظار تشخيصي — لم يُجرَ أي إجراء")
+            else:
+                for p in proc_list:
+                    lines.append(f"• {escape_markdown(str(p))}")
+                if proc_other:
+                    lines.append(f"• أخرى: {escape_markdown(str(proc_other))}")
             lines.append("")
 
     # ✅ التشخيص - حقل منفصل تماماً (لا يظهر في المسارات المحددة)
@@ -1301,7 +1364,12 @@ def _build_general_fields(data: dict) -> list:
             lines.append("")
 
     # ✅ حالة الحالة (إذا كانت موجودة)
-    if data.get('case_status') and str(data.get('case_status')) != 'لا يوجد':
+    # ⚠️ يُستثنى "طوارئ" هنا لأن له بطاقته الخاصة الأكثر تفصيلاً أدناه
+    # ("🏥 وضع الحالة" + ملاحظات الرقود/نوع الترقيد أو تفاصيل العملية) —
+    # بدون هذا الاستثناء يظهر السطر مكرَّراً بعد أي إعادة نشر (حيث
+    # doctor_decision يُفرَّغ عمداً في handle_republish فلا يعود يحمي منه
+    # شرط "case_status ليس جزءاً من doctor_decision" أدناه).
+    if medical_action != 'طوارئ' and data.get('case_status') and str(data.get('case_status')) != 'لا يوجد':
         case_status_text = str(data['case_status'])
         # التحقق من أن case_status ليس جزءاً من doctor_decision
         doctor_decision = data.get('doctor_decision', '')

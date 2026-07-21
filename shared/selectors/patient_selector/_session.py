@@ -23,17 +23,21 @@ class PatientSelectorState:
     # إضافةً لمرضى general. يُحفظ في الجلسة حتى تحترمه إعادة الجلب عند فقدان
     # الـsnapshot وبحث inline النشط.
     include_pharmacy: bool = False
+    # ✅ True فقط للخدمات العامة/الإقامة — يُظهر مرضى "companion" إضافةً لمرضى
+    # general. نفس سبب الحفظ في الجلسة مثل include_pharmacy تماماً.
+    include_companions: bool = False
     # names-only snapshot for idx resolution (avoids re-querying on every tap)
     snapshot: list[str] = field(default_factory=list)
 
 
 def save(user_data: dict, state: PatientSelectorState) -> None:
     user_data[_KEY] = {
-        "return_to":        state.return_to,
-        "page":             state.page,
-        "search_query":     state.search_query,
-        "include_pharmacy": state.include_pharmacy,
-        "snapshot":         state.snapshot,
+        "return_to":          state.return_to,
+        "page":               state.page,
+        "search_query":       state.search_query,
+        "include_pharmacy":   state.include_pharmacy,
+        "include_companions": state.include_companions,
+        "snapshot":           state.snapshot,
     }
 
 
@@ -46,6 +50,7 @@ def load(user_data: dict) -> PatientSelectorState | None:
         page=raw.get("page", 0),
         search_query=raw.get("search_query", ""),
         include_pharmacy=raw.get("include_pharmacy", False),
+        include_companions=raw.get("include_companions", False),
         snapshot=raw.get("snapshot", []),
     )
 

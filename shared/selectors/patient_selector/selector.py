@@ -69,6 +69,7 @@ async def enter(
     search_query: str = "",
     page: int = 0,
     include_pharmacy: bool = False,
+    include_companions: bool = False,
 ) -> None:
     """
     Open the patient selector.
@@ -79,12 +80,14 @@ async def enter(
     include_pharmacy — True فقط لزرّي صرف الأدوية/المستلزمات الطبية:
                        يشمل مرضى "pharmacy_only" إضافةً لمرضى general.
                        الافتراضي False = مرضى general فقط (كل الشاشات الأخرى).
+    include_companions — True فقط للخدمات العامة/الإقامة: يشمل مرضى
+                       "companion" إضافةً لمرضى general. الافتراضي False.
 
     Fetches patient list from DB, saves session state, and renders the
     list screen.  All further interaction is handled by handle_callback().
     """
     records = await asyncio.get_event_loop().run_in_executor(
-        None, lambda: fetch_all(include_pharmacy=include_pharmacy)
+        None, lambda: fetch_all(include_pharmacy=include_pharmacy, include_companions=include_companions)
     )
     names = [r.name for r in records]
 
@@ -93,6 +96,7 @@ async def enter(
         page=page,
         search_query=search_query,
         include_pharmacy=include_pharmacy,
+        include_companions=include_companions,
         snapshot=names,
     )
     _save(context.user_data, state)
@@ -302,17 +306,19 @@ async def _handle_selection(
         logger.warning(
             "[patient_selector] snapshot empty at idx-consume time — re-fetching list"
         )
-        # ✅ إعادة الجلب تحترم include_pharmacy الأصلي من الجلسة — حتى لا
-        # يتسرب مريض pharmacy_only لشاشة غير مخوَّلة (أو يختفي من مخوَّلة)
-        # أثناء إعادة البناء بعد فقدان الـsnapshot.
+        # ✅ إعادة الجلب تحترم include_pharmacy/include_companions الأصليين من
+        # الجلسة — حتى لا يتسرب مريض pharmacy_only/companion لشاشة غير
+        # مخوَّلة (أو يختفي من مخوَّلة) أثناء إعادة البناء بعد فقدان الـsnapshot.
         _inc = state.include_pharmacy
+        _inc_comp = state.include_companions
         records = await asyncio.get_event_loop().run_in_executor(
-            None, lambda: fetch_all(include_pharmacy=_inc)
+            None, lambda: fetch_all(include_pharmacy=_inc, include_companions=_inc_comp)
         )
         state = PatientSelectorState(
             return_to=state.return_to,   # preserved from existing session
             page=0,
             include_pharmacy=_inc,
+            include_companions=_inc_comp,
             snapshot=[r.name for r in records],
         )
         _save(context.user_data, state)

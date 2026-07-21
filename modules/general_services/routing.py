@@ -30,8 +30,12 @@ def register_all(app) -> None:
     register_nav_handler(app)
 
     # ── Arrivals (🛬) ──────────────────────────────────────────────────────────
-    from modules.general_services.arrivals.flow import register_handlers as reg_arrivals
+    from modules.general_services.arrivals.flow import (
+        register_handlers as reg_arrivals,
+        register_result_routes as reg_arrivals_routes,
+    )
     reg_arrivals(app)
+    reg_arrivals_routes()
 
     # ── Departures (🛫) ────────────────────────────────────────────────────────
     from modules.general_services.departures.flow import (

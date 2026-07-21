@@ -12,22 +12,38 @@ _SESSION_KEY = "_gsarr_add"
 # ── Steps ─────────────────────────────────────────────────────────────────────
 STEP_DATE               = "date"
 STEP_DATE_CUSTOM        = "date_custom"
-STEP_HOSPITAL           = "hospital"
 STEP_SPECIALIST         = "specialist"
 STEP_PATIENT_COUNT      = "patient_count"
 STEP_P_NAME             = "p_name"
+# ✅ حقول فردية جديدة (جولة توسيع تدفق الواصلين — اختيار إلزامي من السجل)
+STEP_P_ARRIVAL_DATE     = "p_arrival_date"
+STEP_P_PASSPORT_EXPIRY  = "p_passport_expiry"
 STEP_P_VISA_EXPIRY      = "p_visa_expiry"
 STEP_P_HAS_COMPANION    = "p_has_companion"
 STEP_P_PASSPORT         = "p_passport"
 STEP_P_VISA             = "p_visa"
+STEP_P_ENTRY_STAMP      = "p_entry_stamp"
+STEP_P_TICKETS          = "p_tickets"
 STEP_P_RESIDENCE        = "p_residence"
 STEP_P_RESIDENCE_EXPIRY = "p_residence_expiry"
+STEP_P_INDIV_NOTES      = "p_indiv_notes"
+STEP_P_SERVICES         = "p_services"
+STEP_P_ESCORT_ENTITY    = "p_escort_entity"
+STEP_P_RESIDENCE_ADDRESS = "p_residence_address"
 STEP_P_NOTES            = "p_notes"          # kept for legacy session compat only
 STEP_BATCH_NOTES        = "batch_notes"
 STEP_C_NAME             = "c_name"
+STEP_C_ARRIVAL_DATE     = "c_arrival_date"
+STEP_C_PASSPORT_EXPIRY  = "c_passport_expiry"
 STEP_C_VISA_EXPIRY      = "c_visa_expiry"
 STEP_C_PASSPORT         = "c_passport"
 STEP_C_VISA             = "c_visa"
+STEP_C_ENTRY_STAMP      = "c_entry_stamp"
+STEP_C_TICKETS          = "c_tickets"
+STEP_C_INDIV_NOTES      = "c_indiv_notes"
+STEP_C_SERVICES         = "c_services"
+STEP_C_ESCORT_ENTITY    = "c_escort_entity"
+STEP_C_RESIDENCE_ADDRESS = "c_residence_address"
 STEP_C_RESIDENCE        = "c_residence"         # kept for legacy session compat only
 STEP_C_RESIDENCE_EXPIRY = "c_residence_expiry"  # kept for legacy session compat only
 STEP_REVIEW             = "review"
@@ -37,8 +53,6 @@ STEP_REVIEW             = "review"
 class ArrivalSession:
     step:               str
     created_at:         str          # ISO datetime
-    hospital_id:        str
-    hospital_label:     str
     specialist_id:      str
     specialist_label:   str
     patient_count:      int
@@ -54,8 +68,6 @@ class ArrivalSession:
         user_data[_SESSION_KEY] = {
             "step":               self.step,
             "created_at":         self.created_at,
-            "hospital_id":        self.hospital_id,
-            "hospital_label":     self.hospital_label,
             "specialist_id":      self.specialist_id,
             "specialist_label":   self.specialist_label,
             "patient_count":      self.patient_count,
@@ -86,8 +98,6 @@ class ArrivalSession:
         return cls(
             step=               raw.get("step",               STEP_DATE),
             created_at=         raw.get("created_at",         datetime.utcnow().isoformat()),
-            hospital_id=        raw.get("hospital_id",        ""),
-            hospital_label=     raw.get("hospital_label",     ""),
             specialist_id=      raw.get("specialist_id",      ""),
             specialist_label=   raw.get("specialist_label",   ""),
             patient_count=      raw.get("patient_count",      0),
@@ -103,8 +113,6 @@ class ArrivalSession:
         session = cls(
             step=               STEP_DATE,
             created_at=         datetime.utcnow().isoformat(),
-            hospital_id=        "",
-            hospital_label=     "",
             specialist_id=      "",
             specialist_label=   "",
             patient_count=      0,
@@ -125,14 +133,22 @@ class ArrivalSession:
 
     def init_current_patient(self) -> None:
         self.current_patient = {
-            "name":              "",
-            "visa_expiry":       "",
-            "has_companion":     False,
-            "passport_file_id":  "",
-            "visa_file_id":      "",
-            "residence_file_id": "",
-            "residence_expiry":  "",
-            "companions":        [],
+            "name":                "",
+            "arrival_date":        "",
+            "passport_expiry":     "",
+            "visa_expiry":         "",
+            "has_companion":       False,
+            "passport_file_id":    "",
+            "visa_file_id":        "",
+            "entry_stamp_file_id": "",
+            "tickets_file_id":     "",
+            "residence_file_id":   "",
+            "residence_expiry":    "",
+            "notes":               "",
+            "services_provided":   "",
+            "escort_entity":       "",
+            "residence_address":   "",
+            "companions":          [],
         }
         self.current_companion = {}
 

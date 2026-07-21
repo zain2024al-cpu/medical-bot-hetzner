@@ -109,13 +109,49 @@ def _ar(text) -> str:
         return s
 
 
+def _ar_wrap(text, font_name: str, font_size: float, max_width_pts: float) -> str:
+    """يلفّ النص يدوياً كلمة-كلمة ضمن العرض المتاح، ثم يُطبِّق reshape+bidi
+    على كل سطر مُنجَز على حدة (لا على النص الكامل قبل اللف).
+
+    ✅ سبب وجود هذه الدالة: لو مُرِّر نص عربي طويل عبر _ar() ثم دخل داخل
+    Paragraph من reportlab، فإن Paragraph يلفّه تلقائياً بعد إعادة الترتيب
+    البصري (bidi) — أي أنه يقطع سلسلة نصية أُعيد ترتيبها أصلاً لتُقرأ من
+    اليمين لليسار، فيقع القطع في نقطة خاطئة بصرياً، مما يُظهر النص وكأنه
+    "منعكس" أو "ناقص" (أعمدة الاسم/البيان تحديداً، لأنها الأطول محتوى).
+    الحل: اللف يتم هنا على النص الأصلي (بترتيب القراءة الطبيعي) *قبل* أي
+    reshape/bidi، ثم يُعاد تشكيل وترتيب كل سطر مكتمل بمفرده، فيبقى كل سطر
+    وحدة بصرية سليمة ومستقلة."""
+    from reportlab.pdfbase.pdfmetrics import stringWidth
+
+    s = str(text or "").strip()
+    if not s:
+        return ""
+
+    words = s.split()
+    lines: list[str] = []
+    current: list[str] = []
+    for word in words:
+        candidate = current + [word]
+        shaped_candidate = _ar(" ".join(candidate))
+        w = stringWidth(shaped_candidate, font_name, font_size)
+        if w <= max_width_pts or not current:
+            current = candidate
+        else:
+            lines.append(" ".join(current))
+            current = [word]
+    if current:
+        lines.append(" ".join(current))
+
+    return "<br/>".join(_ar(line) for line in lines)
+
+
 def _colors():
     from reportlab.lib import colors
     return {
-        "primary":   colors.HexColor("#1565C0"),
-        "light_bg":  colors.HexColor("#F0F4F8"),
+        "primary":   colors.HexColor("#424242"),  # ✅ رمادي غامق بدل الأزرق (رأس الجدول/العنوان/شريط الإجمالي)
+        "light_bg":  colors.HexColor("#F0F0F0"),
         "grid":      colors.HexColor("#CCCCCC"),  # ✅ نفس لون حدود الجدول في Excel المرجعي
-        "text_dark": colors.HexColor("#1A237E"),
+        "text_dark": colors.HexColor("#212121"),  # ✅ رمادي شبه أسود بدل الأزرق الغامق (نص الجدول)
         "text_gray": colors.HexColor("#777777"),  # ✅ نفس لون سطر "الفترة" في Excel المرجعي
         "white":     colors.white,
         "frame":     colors.HexColor("#333333"),  # إطار الصفحة — رمادي غامق جداً وهادئ
@@ -152,18 +188,30 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
 
     ST = {
         "body":   S("bd",  fontSize=11, leading=15, alignment=TA_CENTER, textColor=C["text_dark"]),
-        "th":     S("th",  fontSize=9,  leading=12, alignment=TA_CENTER, textColor=C["white"], fontName=FNB),
+        # ✅ صف الرأس بيج فاتح (light_bg) بنص داكن — بدل الخلفية الداكنة/النص الأبيض.
+        "th":     S("th",  fontSize=9,  leading=12, alignment=TA_CENTER, textColor=C["text_dark"], fontName=FNB),
         "td_c":   S("tdc", fontSize=8,  leading=11, alignment=TA_CENTER, textColor=C["text_dark"]),
         # ✅ نفس نمط "td_c" تماماً، فقط بخط عمود التاريخ المطابق لتقرير
         # تقييم المترجمين (FN_DATE بدل FN) — بقية الأعمدة لم تتغيّر إطلاقاً.
         "td_date": S("tdd", fontSize=8, leading=11, alignment=TA_CENTER, textColor=C["text_dark"], fontName=FN_DATE),
-        "total_lbl": S("totl", fontSize=11, leading=14, alignment=TA_CENTER, textColor=C["white"], fontName=FNB),
-        "total_val": S("totv", fontSize=11, leading=14, alignment=TA_CENTER, textColor=C["white"], fontName=FNB),
+        # ✅ صف الإجمالي بيج فاتح (light_bg) بنص داكن — بدل الخلفية الداكنة/النص الأبيض.
+        "total_lbl": S("totl", fontSize=11, leading=14, alignment=TA_CENTER, textColor=C["text_dark"], fontName=FNB),
+        "total_val": S("totv", fontSize=11, leading=14, alignment=TA_CENTER, textColor=C["text_dark"], fontName=FNB),
         "footer": S("ft",  fontSize=9,  leading=12, alignment=TA_CENTER, textColor=C["text_dark"], fontName=FNB),
     }
 
     def P(txt, style_key) -> Paragraph:
         return Paragraph(_ar(txt), ST[style_key])
+
+    def P_wrap(txt, style_key, max_width_pts) -> Paragraph:
+        """مثل P تماماً، لكن يستخدم _ar_wrap للأعمدة المعرَّضة لنص طويل
+        (الاسم/البيان) لمنع تكسّر النص عند التفاف Paragraph التلقائي."""
+        style = ST[style_key]
+        # ✅ خصم الحشوة الأفقية للخلية (RIGHTPADDING+LEFTPADDING = 5+5) حتى
+        # يُقاس العرض المتاح للنص فعلياً، لا عرض العمود كاملاً.
+        usable_width = max(max_width_pts - 10, 20)
+        wrapped = _ar_wrap(txt, style.fontName, style.fontSize, usable_width)
+        return Paragraph(wrapped, style)
 
     # ── شريط الرأس (مرة واحدة أول الوثيقة) ────────────────────────────────────
     class EvacuationHeaderBand(Flowable):
@@ -305,12 +353,18 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
     HEADER_ROW = [P(lbl, "th") for lbl in REVERSED_LABELS]
     col_widths = [content_width * _COL_PERCENTAGES[lbl] for lbl in REVERSED_LABELS]
     AMOUNT_COL_IDX = REVERSED_LABELS.index("المبلغ")
+    # ✅ عرضا عمودي "الاسم" و"البيان" تحديداً — أطول الأعمدة محتوى وأكثرها
+    # عرضة للف التلقائي، لذا يُمرَّران لـ P_wrap لضمان لف يدوي سليم.
+    NAME_COL_W = col_widths[REVERSED_LABELS.index("الاسم")]
+    STATEMENT_COL_W = col_widths[REVERSED_LABELS.index("البيان")]
 
-    # ✅ كل مجموعة من 15 صفاً = "مسير" مستقل ومغلق تماماً: رأس خاص به،
-    # جدول خاص به، إجمالي خاص به، وتذييل توقيعات خاص به — وليس مستنداً
-    # واحداً يمتد عبر عدة صفحات بإجمالي واحد في النهاية. الترقيم "م" يبدأ
-    # من 1 في كل مسير جديد (وليس مستمراً عبر كل المسيرات) لأن كل مسير
-    # وثيقة رسمية مستقلة بذاتها.
+    # ✅ كل مجموعة من 15 صفاً = "مسير" مستقل: رأس خاص به، جدول خاص به،
+    # وتذييل توقيعات خاص به. الترقيم "م" يبدأ من 1 في كل مسير جديد (وليس
+    # مستمراً عبر كل المسيرات) لأن كل مسير وثيقة رسمية مستقلة بذاتها.
+    # ✅ الإجمالي (المبلغ) استثناء متعمَّد: يظهر مرة واحدة فقط، في آخر صفحة
+    # من الفترة المطبوعة بأكملها — وليس إجمالياً جزئياً مكرَّراً في كل صفحة
+    # (بقرار المستخدم صراحةً؛ سابقاً كان كل مسير/صفحة يعرض إجمالي صفوفه فقط).
+    grand_total = sum(r["amount"] for r in rows)
     chunks = [rows[i:i + _ROWS_PER_PAGE] for i in range(0, len(rows), _ROWS_PER_PAGE)]
     for chunk_idx, chunk in enumerate(chunks):
         story.append(EvacuationHeaderBand())
@@ -324,10 +378,10 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
             date_str = r["date"].strftime("%Y-%m-%d") if isinstance(r["date"], date) else str(r["date"])
             table_data.append([
                 P(date_str, "td_date"),
-                P(r["statement"], "td_c"),
+                P_wrap(r["statement"], "td_c", STATEMENT_COL_W),
                 P(r["expense_item"], "td_c"),
                 P(r["invoice_number"], "td_c"),
-                P(r["name"], "td_c"),
+                P_wrap(r["name"], "td_c", NAME_COL_W),
                 P(f'{r["amount"]:.2f}', "td_c"),
                 P(str(row_num), "td_c"),
             ])
@@ -338,7 +392,8 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
             table_data.append(["", "", "", "", "", "", P(str(blank_row_num), "td_c")])
         t = Table(table_data, colWidths=col_widths, hAlign="CENTER", repeatRows=1)
         t.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), C["primary"]),
+            # ✅ صف الرأس بيج فاتح بدل الرمادي الداكن (نفس شريط سند الصرف).
+            ("BACKGROUND", (0, 0), (-1, 0), C["light_bg"]),
             # ✅ بلا تظليل متبادل بين الصفوف — نفس مظهر Excel المرجعي (صفوف بيضاء
             # صرفة مفصولة بخطوط شبكة رفيعة فقط، بدون تلوين متبادل).
             ("BACKGROUND", (0, 1), (-1, -1), C["white"]),
@@ -348,21 +403,24 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
             ("RIGHTPADDING", (0, 0), (-1, -1), 5), ("LEFTPADDING", (0, 0), (-1, -1), 5),
         ]))
 
-        # ── إجمالي المبلغ الخاص بهذا المسير فقط ─────────────────────────────
-        chunk_total = sum(r["amount"] for r in chunk)
-        total_row = [""] * len(col_widths)
-        total_row[0] = P("إجمالي المبلغ", "total_lbl")
-        total_row[AMOUNT_COL_IDX] = P(f'{chunk_total:,.2f}', "total_val")
-        total_table = Table([total_row], colWidths=col_widths, hAlign="CENTER")
-        total_table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, -1), C["primary"]),
-            ("SPAN", (0, 0), (AMOUNT_COL_IDX - 1, 0)),
-            ("ALIGN", (0, 0), (0, 0), "CENTER"),
-            ("ALIGN", (AMOUNT_COL_IDX, 0), (AMOUNT_COL_IDX, 0), "CENTER"),
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("TOPPADDING", (0, 0), (-1, -1), 9), ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 5), ("LEFTPADDING", (0, 0), (-1, -1), 5),
-        ]))
+        # ── إجمالي المبلغ — يظهر فقط في آخر صفحة من كامل الفترة المطبوعة ─────
+        is_last_chunk = chunk_idx == len(chunks) - 1
+        total_table = None
+        if is_last_chunk:
+            total_row = [""] * len(col_widths)
+            total_row[0] = P("إجمالي المبلغ", "total_lbl")
+            total_row[AMOUNT_COL_IDX] = P(f'{grand_total:,.2f}', "total_val")
+            total_table = Table([total_row], colWidths=col_widths, hAlign="CENTER")
+            total_table.setStyle(TableStyle([
+                # ✅ صف الإجمالي بيج فاتح بدل الرمادي الداكن (نفس شريط سند الصرف).
+                ("BACKGROUND", (0, 0), (-1, -1), C["light_bg"]),
+                ("SPAN", (0, 0), (AMOUNT_COL_IDX - 1, 0)),
+                ("ALIGN", (0, 0), (0, 0), "CENTER"),
+                ("ALIGN", (AMOUNT_COL_IDX, 0), (AMOUNT_COL_IDX, 0), "CENTER"),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("TOPPADDING", (0, 0), (-1, -1), 9), ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 5), ("LEFTPADDING", (0, 0), (-1, -1), 5),
+            ]))
 
         # ── تذييل توقيعات هذا المسير ─────────────────────────────────────────
         # ✅ الترتيب معكوس هنا صراحة (نفس سبب عكس أعمدة الجدول أعلاه): يُرسَم
@@ -388,8 +446,9 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
         # بنص ملتفّ لعدة أسطر) — بدلاً من ذلك يُنقَل الجدول كاملاً لصفحة
         # جديدة، فيبقى كل مسير (حتى 15 صفاً) وحدة واحدة متماسكة لا تتجزأ.
         story.append(KeepTogether(t))
-        story.append(Spacer(1, 0.35 * cm))
-        story.append(total_table)
+        if total_table is not None:
+            story.append(Spacer(1, 0.35 * cm))
+            story.append(total_table)
         story.append(Spacer(1, 1.3 * cm))
         story.append(footer_table)
 

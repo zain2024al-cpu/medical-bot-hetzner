@@ -22,7 +22,11 @@ try:
     from .radiology import start_radiology_flow
     from .app_reschedule import start_appointment_reschedule_flow as start_reschedule_flow
     from .radiation_therapy import start_radiation_therapy_flow
-    
+    from .endoscopy import start_endoscopy_flow
+    from .treatment_sessions import (
+        start_chemo_flow, start_targeted_flow, start_immuno_flow, start_dialysis_flow,
+    )
+
     logger.debug("✅ Successfully imported all flow functions from flows/ modules")
     logger.debug(f"✅ start_radiation_therapy_flow imported: {start_radiation_therapy_flow}")
 except ImportError as e:
@@ -47,7 +51,8 @@ except ImportError as e:
         start_emergency_flow = start_admission_flow = start_operation_flow = \
         start_surgery_consult_flow = start_final_consult_flow = start_discharge_flow = \
         start_rehab_flow = start_radiology_flow = start_reschedule_flow = \
-        start_radiation_therapy_flow = stub_flow
+        start_radiation_therapy_flow = start_endoscopy_flow = \
+        start_chemo_flow = start_targeted_flow = start_immuno_flow = start_dialysis_flow = stub_flow
 
 __all__ = [
     'start_new_consultation_flow',
@@ -63,4 +68,9 @@ __all__ = [
     'start_radiology_flow',
     'start_reschedule_flow',
     'start_radiation_therapy_flow',
+    'start_endoscopy_flow',
+    'start_chemo_flow',
+    'start_targeted_flow',
+    'start_immuno_flow',
+    'start_dialysis_flow',
 ]

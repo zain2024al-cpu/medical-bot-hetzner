@@ -113,3 +113,44 @@ R_ACTION_TYPE = STATE_SELECT_ACTION_TYPE
     RADIATION_THERAPY_TRANSLATOR,     # اسم المترجم
     RADIATION_THERAPY_CONFIRM          # تأكيد
 ) = range(93, 101)
+
+# مسار 13: المناظير (101-110)
+(
+    ENDOSCOPY_COMPLAINT,          # شكوى المريض
+    ENDOSCOPY_TYPE,               # نوع المنظار (Colonoscopy / Upper GI / Both)
+    ENDOSCOPY_RESULT,             # نتيجة المنظار / خطة الطبيب
+    ENDOSCOPY_PROCEDURES,         # الإجراءات التي تمت (اختيار متعدد)
+    ENDOSCOPY_PROCEDURES_OTHER,   # نص "أخرى" عند اختيارها
+    ENDOSCOPY_NOTES,              # الملاحظات
+    ENDOSCOPY_FOLLOWUP_DATE,      # تاريخ العودة (+ الوقت داخل نفس الحالة)
+    ENDOSCOPY_FOLLOWUP_REASON,    # سبب العودة
+    ENDOSCOPY_TRANSLATOR,         # اسم المترجم
+    ENDOSCOPY_CONFIRM             # تأكيد
+) = range(101, 111)
+
+# مسار 14: جلسات العلاج (Treatment Plans) — نظام عام يخدم العلاج الكيماوي
+# والموجه والمناعي وغسيل الكلى (والعلاج الإشعاعي يستمر يستخدم حالاته
+# الخاصة RADIATION_THERAPY_* أعلاه، فقط منطق الجلسات الداخلي تغيّر).
+# (111-124)
+(
+    TREATMENT_PLAN_SETUP,          # أول مرة: "كم عدد الجلسات الكلي؟" (نمط sessions فقط)
+    TREATMENT_PLAN_EDIT_VALUE,     # تعديل: عدد جلسات جديد (نمط sessions)
+    TREATMENT_PLAN_EDIT_REASON,    # سبب التعديل (اختياري، لأي نمط)
+    TREATMENT_PLAN_DISPLAY,        # عرض التقدّم + أزرار متابعة/تعديل
+    TREATMENT_NOTES,               # الملاحظات
+    TREATMENT_FOLLOWUP_DATE,       # تاريخ العودة
+    TREATMENT_FOLLOWUP_REASON,     # سبب العودة
+    TREATMENT_TRANSLATOR,          # اسم المترجم
+    TREATMENT_CONFIRM,             # تأكيد
+    # ── خاص بالعلاج الكيماوي (اختيار جلسات/دورات) ──
+    CHEMO_MODE_CHOICE,             # حسب الجلسات / حسب الدورات
+    CHEMO_CYCLES_TOTAL,            # كم عدد الدورات؟
+    CHEMO_CYCLES_UNIFORM_CHOICE,   # هل كل الدورات بنفس عدد الجلسات؟
+    CHEMO_CYCLES_UNIFORM_COUNT,    # كم جلسة في كل دورة؟
+    CHEMO_CYCLES_CUSTOM_ENTRY,     # إدخال عدد الجلسات لكل دورة على حدة (تسلسلي)
+) = range(111, 125)
+
+# حالة إضافية واحدة: سبب تعديل خطة العلاج الإشعاعي (اختياري) — العلاج
+# الإشعاعي يستخدم TreatmentPlan أيضاً الآن، لكن يُبقي أعمدة Report القديمة
+# (radiation_therapy_session_number/remaining) لعدم كسر بطاقة تقريره.
+(RADIATION_THERAPY_EDIT_REASON,) = range(125, 126)

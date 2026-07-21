@@ -155,6 +155,18 @@ class DatabaseMaintenance:
                 # ✅ تصنيف مسير الصيدلية عند الطباعة (A/B/C) — الصفوف القديمة
                 # تحصل على NULL، تُعامَل كـ"A" افتراضياً في كود القراءة.
                 _migrate_column(conn, "pharmacy_financial_records", "manifest_type", "VARCHAR(5)")
+                # ✅ حقول وحدة المناظير — أعمدة جديدة في reports. الصفوف
+                # الحالية تحصل على NULL تلقائياً (لا تخص مسار المناظير)، فلا
+                # يتغيّر أي تقرير قائم ولا أي مسار آخر.
+                _migrate_column(conn, "reports", "endoscopy_type", "VARCHAR(100)")
+                _migrate_column(conn, "reports", "endoscopy_result", "TEXT")
+                _migrate_column(conn, "reports", "endoscopy_procedures", "TEXT")
+                # ✅ لقطة خطة العلاج (جلسات كيماوي/موجه/مناعي/غسيل كلى) — انظر
+                # التعليق على العمود في db/models.py. جداول TreatmentPlan/
+                # TreatmentPlanChangeLog نفسها جداول جديدة بالكامل فتُنشَأ
+                # تلقائياً عبر Base.metadata.create_all عند بدء التشغيل، بلا
+                # حاجة لأي migration صريح هنا.
+                _migrate_column(conn, "reports", "treatment_plan_summary", "TEXT")
                 logger.info("🔎 Migration check finished.")
 
                 if check == "ok":

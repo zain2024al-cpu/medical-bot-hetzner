@@ -39,7 +39,7 @@ def build_date_prompt() -> tuple[str, InlineKeyboardMarkup]:
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("✅ اختيار تاريخ اليوم", callback_data=f"{WCA}:date_today")],
         [InlineKeyboardButton("📆 اختيار من التقويم",  callback_data=f"{WCA}:date_calendar")],
-        [InlineKeyboardButton("⬅️ رجوع",               callback_data=f"{HC}:woundcare")],
+        [InlineKeyboardButton("⬅️ رجوع",               callback_data=f"{HC}:main")],
     ])
     return "\n".join(lines), kb
 
@@ -60,7 +60,7 @@ def build_date_calendar_prompt(*, error: bool = False) -> tuple[str, InlineKeybo
     ]
     kb = InlineKeyboardMarkup([[
         InlineKeyboardButton("⬅️ رجوع", callback_data=f"{WCA}:start"),
-        InlineKeyboardButton("❌ إلغاء", callback_data=f"{HC}:woundcare"),
+        InlineKeyboardButton("❌ إلغاء", callback_data=f"{HC}:main"),
     ]])
     return "\n".join(lines), kb
 

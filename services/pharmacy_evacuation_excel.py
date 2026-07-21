@@ -53,16 +53,19 @@ def build_evacuation_excel(rows: list[dict], start_date: date, end_date: date) -
     ws.title = "مسير الإخلاء"
     ws.sheet_view.rightToLeft = True
 
-    header_font = Font(name="Arial", bold=True, color="FFFFFF", size=11)
-    header_fill = PatternFill(start_color="1565C0", end_color="1565C0", fill_type="solid")
-    bismillah_font = Font(name="Arial", bold=True, size=22, color="1A237E")
-    title_font = Font(name="Arial", bold=True, size=20, color="1565C0")
-    band_font = Font(name="Arial", bold=True, size=11, color="1A237E")
-    band_fill = PatternFill(start_color="F0F4F8", end_color="F0F4F8", fill_type="solid")
+    # ✅ مخطَّط رمادي/بيج مطابق لنسخة PDF (كان هذا الملف أزرق بالكامل ولم
+    # يُحدَّث في تعديل "أزرق → رمادي" السابق). صف الرأس وصف الإجمالي بيج فاتح
+    # (F0F0F0 = نفس شريط سند الصرف) بنص داكن؛ العناوين/التذييل رمادي داكن (424242).
+    header_font = Font(name="Arial", bold=True, color="212121", size=11)
+    header_fill = PatternFill(start_color="F0F0F0", end_color="F0F0F0", fill_type="solid")
+    bismillah_font = Font(name="Arial", bold=True, size=22, color="424242")
+    title_font = Font(name="Arial", bold=True, size=20, color="424242")
+    band_font = Font(name="Arial", bold=True, size=11, color="424242")
+    band_fill = PatternFill(start_color="F0F0F0", end_color="F0F0F0", fill_type="solid")
     normal_font = Font(name="Arial", size=10)
-    total_font = Font(name="Arial", bold=True, size=11, color="FFFFFF")
-    total_fill = PatternFill(start_color="1565C0", end_color="1565C0", fill_type="solid")
-    footer_font = Font(name="Arial", bold=True, size=10, color="1A237E")
+    total_font = Font(name="Arial", bold=True, size=11, color="212121")
+    total_fill = PatternFill(start_color="F0F0F0", end_color="F0F0F0", fill_type="solid")
+    footer_font = Font(name="Arial", bold=True, size=10, color="424242")
     center_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
     band_border = Border(
         left=Side(style="thin", color="B0BEC5"), right=Side(style="thin", color="B0BEC5"),

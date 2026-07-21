@@ -11,8 +11,20 @@ from datetime import datetime, date
 
 from ...user_reports_add_helpers import validate_text_input
 from ..utils import _nav_buttons, _chunked
+from services.treatment_plan_service import get_active_plan, create_plan, advance_plan, edit_plan
 
 logger = logging.getLogger(__name__)
+
+RADIATION_TREATMENT_KEY = "radiation"
+
+
+def _actor(update: Update):
+    """معرّف واسم المستخدم الحالي (لتسجيله كمنشئ/معدِّل الخطة)."""
+    u = update.effective_user
+    if not u:
+        return None, None
+    return u.id, (u.full_name or u.username or str(u.id))
+
 
 # استيراد الـ states من states.py مباشرة
 try:
@@ -25,6 +37,7 @@ try:
         RADIATION_THERAPY_RETURN_REASON,
         RADIATION_THERAPY_TRANSLATOR,
         RADIATION_THERAPY_CONFIRM,
+        RADIATION_THERAPY_EDIT_REASON,
     )
 except ImportError:
     # Fallback: إذا فشل الاستيراد، نستخدم قيم افتراضية
@@ -37,6 +50,7 @@ except ImportError:
     RADIATION_THERAPY_RETURN_REASON = 98
     RADIATION_THERAPY_TRANSLATOR = 99
     RADIATION_THERAPY_CONFIRM = 100
+    RADIATION_THERAPY_EDIT_REASON = 125
 
 MONTH_NAMES_AR = {
     1: "يناير", 2: "فبراير", 3: "مارس", 4: "أبريل",
@@ -62,17 +76,18 @@ def _build_radiation_calendar_markup(year: int, month: int):
 
     keyboard = []
 
-    # تقويم الشهر مع أزرار التنقل
+    # تقويم الشهر مع أزرار التنقل — ✅ شكل موحَّد مع بقية شاشات "تاريخ العودة"
     keyboard.append([
         InlineKeyboardButton("⬅️", callback_data=f"rad_cal_prev:{year}-{month:02d}"),
-        InlineKeyboardButton(f"📅 {MONTH_NAMES_AR[month]} {year}", callback_data="noop"),
+        InlineKeyboardButton(f"{MONTH_NAMES_AR.get(month, month)} {year}", callback_data="noop"),
         InlineKeyboardButton("➡️", callback_data=f"rad_cal_next:{year}-{month:02d}"),
     ])
 
     # أيام الأسبوع
     keyboard.append([InlineKeyboardButton(d, callback_data="noop") for d in WEEKDAYS_AR])
 
-    # أيام الشهر
+    # أيام الشهر — ✅ نفس تنسيق بقية المسارات: اليوم بعلامة 📍، الأرقام بصفر،
+    # الأيام الماضية مخفية (زر فارغ) بدل عرضها معطَّلة.
     for week in weeks:
         row = []
         for day in week:
@@ -81,14 +96,11 @@ def _build_radiation_calendar_markup(year: int, month: int):
             else:
                 current_date = date(year, month, day)
                 if current_date < today:
-                    # أيام ماضية - غير قابلة للاختيار
-                    row.append(InlineKeyboardButton(f"·{day}·", callback_data="noop"))
+                    row.append(InlineKeyboardButton(" ", callback_data="noop"))
                 elif current_date == today:
-                    # اليوم الحالي
-                    row.append(InlineKeyboardButton(f"[{day}]", callback_data=f"rad_cal_day:{year}-{month:02d}-{day:02d}"))
+                    row.append(InlineKeyboardButton(f"📍{day:02d}", callback_data=f"rad_cal_day:{year}-{month:02d}-{day:02d}"))
                 else:
-                    # أيام مستقبلية
-                    row.append(InlineKeyboardButton(str(day), callback_data=f"rad_cal_day:{year}-{month:02d}-{day:02d}"))
+                    row.append(InlineKeyboardButton(f"{day:02d}", callback_data=f"rad_cal_day:{year}-{month:02d}-{day:02d}"))
         keyboard.append(row)
 
     # أزرار التنقل
@@ -97,10 +109,7 @@ def _build_radiation_calendar_markup(year: int, month: int):
         InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
     ])
 
-    text = (
-        f"📅 **تاريخ الجلسة القادمة**\n\n"
-        f"اختر تاريخ الجلسة القادمة من التقويم:"
-    )
+    text = f"📅 **تاريخ العودة**\n\n{MONTH_NAMES_AR.get(month, str(month))} {year}\n\nاختر التاريخ من التقويم:"
 
     return text, InlineKeyboardMarkup(keyboard)
 
@@ -224,7 +233,7 @@ async def start_radiation_therapy_flow(message, context):
 # =============================
 
 async def handle_radiation_therapy_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """الحقل 1: نوع الإشعاعي"""
+    """الحقل 1: نوع الإشعاعي — بعده: خطة العلاج (تلقائية عبر TreatmentPlan)."""
     text = update.message.text.strip()
     valid, msg = validate_text_input(text, min_length=2)
 
@@ -237,94 +246,148 @@ async def handle_radiation_therapy_type(update: Update, context: ContextTypes.DE
         )
         return RADIATION_THERAPY_TYPE
 
-    context.user_data.setdefault("report_tmp", {})["radiation_therapy_type"] = text
-    context.user_data["report_tmp"]["current_flow"] = "radiation_therapy"
-    context.user_data["report_tmp"]["medical_action"] = "جلسة إشعاعي"
-    context.user_data['_conversation_state'] = RADIATION_THERAPY_SESSION_NUMBER
+    data = context.user_data.setdefault("report_tmp", {})
+    data["radiation_therapy_type"] = text
+    data["current_flow"] = "radiation_therapy"
+    data["medical_action"] = "جلسة إشعاعي"
+
+    patient_id = data.get("patient_id")
+    plan = get_active_plan(patient_id, RADIATION_TREATMENT_KEY) if patient_id else None
+    if plan:
+        advanced = advance_plan(plan["id"])
+        return await _show_radiation_plan(update.message, context, advanced)
 
     await update.message.reply_text(
         "✅ تم الحفظ\n\n"
-        "🔢 **رقم الجلسة**\n\n"
-        "يرجى إدخال رقم الجلسة الحالية:\n"
-        "(مثال: 5 من 30)",
+        "📊 **كم عدد الجلسات الكلي؟**\n\n"
+        "أدخل رقماً (مثال: 30):",
         reply_markup=_nav_buttons(show_back=True),
         parse_mode="Markdown"
     )
-
+    context.user_data['_conversation_state'] = RADIATION_THERAPY_SESSION_NUMBER
     return RADIATION_THERAPY_SESSION_NUMBER
 
 
 async def handle_radiation_therapy_session_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """الحقل 2: رقم الجلسة"""
+    """أول مرة فقط: استقبال العدد الكلي للجلسات وإنشاء الخطة."""
     text = update.message.text.strip()
-    valid, msg = validate_text_input(text, min_length=1)
-
-    if not valid:
+    if not text.isdigit() or int(text) <= 0:
         await update.message.reply_text(
-            f"⚠️ **خطأ: {msg}**\n\n"
-            f"يرجى إدخال رقم الجلسة:",
+            "⚠️ يرجى إدخال رقم صحيح أكبر من صفر (عدد الجلسات الكلي):",
             reply_markup=_nav_buttons(show_back=True),
             parse_mode="Markdown"
         )
         return RADIATION_THERAPY_SESSION_NUMBER
 
-    session_number = text
-    context.user_data.setdefault("report_tmp", {})["radiation_therapy_session_number"] = session_number
-    context.user_data['_conversation_state'] = RADIATION_THERAPY_REMAINING
-
-    await update.message.reply_text(
-        "✅ تم الحفظ\n\n"
-        "📊 **الجلسات المتبقية**\n\n"
-        "يرجى إدخال عدد الجلسات المتبقية:\n"
-        "(مثال: 25)",
-        reply_markup=_nav_buttons(show_back=True),
-        parse_mode="Markdown"
+    data = context.user_data.setdefault("report_tmp", {})
+    actor_id, actor_name = _actor(update)
+    plan = create_plan(
+        patient_id=data.get("patient_id"), treatment_key=RADIATION_TREATMENT_KEY, mode="sessions",
+        total_sessions=int(text), created_by=actor_id, created_by_name=actor_name,
     )
+    await update.message.reply_text("✅ تم الحفظ")
+    return await _show_radiation_plan(update.message, context, plan)
 
-    return RADIATION_THERAPY_REMAINING
+
+async def _show_radiation_plan(message, context, plan: dict):
+    """يعرض تقدُّم الخطة، ويملأ نفس أعمدة Report القديمة تلقائياً
+    (radiation_therapy_session_number/remaining) — بطاقة التقرير الحالية
+    تبقى تعمل بلا أي تعديل عليها."""
+    data = context.user_data.setdefault("report_tmp", {})
+    data["_tp_plan_id"] = plan.get("id")
+    total = plan.get("total_sessions") or 0
+    current = plan.get("current_session") or 0
+    remaining = max(0, total - current)
+
+    data["radiation_therapy_session_number"] = str(current)
+    data["radiation_therapy_remaining"] = str(remaining)
+    data["radiation_therapy_completed"] = (remaining <= 0)
+
+    text = f"📋 **الخطة العلاجية:** {total} جلسة\n📍 **الجلسة الحالية:** {current} من {total}"
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ متابعة", callback_data="rad_plan:continue"),
+         InlineKeyboardButton("✏️ تعديل الخطة", callback_data="rad_plan:edit")],
+    ])
+    await message.reply_text(text, reply_markup=keyboard, parse_mode="Markdown")
+    context.user_data['_conversation_state'] = RADIATION_THERAPY_SESSION_NUMBER
+    return RADIATION_THERAPY_SESSION_NUMBER
 
 
-async def handle_radiation_therapy_remaining(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """الحقل 3: الجلسات المتبقية - ثم عرض التقويم"""
-    text = update.message.text.strip()
-    valid, msg = validate_text_input(text, min_length=1)
+async def handle_radiation_plan_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """زرّا [متابعة]/[تعديل الخطة] المعروضان بعد _show_radiation_plan."""
+    query = update.callback_query
+    await query.answer()
+    choice = query.data.split(":", 1)[1]
+    data = context.user_data.setdefault("report_tmp", {})
 
-    if not valid:
-        await update.message.reply_text(
-            f"⚠️ **خطأ: {msg}**\n\n"
-            f"يرجى إدخال عدد الجلسات المتبقية:",
-            reply_markup=_nav_buttons(show_back=True),
-            parse_mode="Markdown"
+    if choice == "edit":
+        data["_tp_editing_plan_id"] = data.get("_tp_plan_id")
+        await query.edit_message_text(
+            "✏️ **تعديل الخطة**\n\n📊 **العدد الكلي الجديد للجلسات؟**",
+            parse_mode="Markdown",
         )
+        context.user_data['_conversation_state'] = RADIATION_THERAPY_REMAINING
         return RADIATION_THERAPY_REMAINING
 
-    remaining_sessions = text
-    context.user_data.setdefault("report_tmp", {})["radiation_therapy_remaining"] = remaining_sessions
-
-    # التحقق من اكتمال الجلسات
-    try:
-        remaining = int(remaining_sessions)
-        if remaining == 0:
-            context.user_data["report_tmp"]["radiation_therapy_completed"] = True
-        else:
-            context.user_data["report_tmp"]["radiation_therapy_completed"] = False
-    except ValueError:
-        context.user_data["report_tmp"]["radiation_therapy_completed"] = False
-
-    context.user_data['_conversation_state'] = RADIATION_THERAPY_NOTES
-
-    # الانتقال لحقل الملاحظات / التوصيات
-    await update.message.reply_text(
-        "✅ تم الحفظ\n\n"
+    await query.edit_message_reply_markup(reply_markup=None)
+    await query.message.reply_text(
         "📝 **ملاحظات أو توصيات**\n\n"
         "يرجى إدخال أي ملاحظات أو توصيات خاصة بالجلسة:\n"
         "(اختياري - أرسل 'تخطي' للمتابعة)",
         reply_markup=_nav_buttons(show_back=True),
         parse_mode="Markdown"
     )
-
+    context.user_data['_conversation_state'] = RADIATION_THERAPY_NOTES
     return RADIATION_THERAPY_NOTES
 
+
+async def handle_radiation_therapy_remaining(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """أُعيد استخدامها الآن لتعديل الخطة: يستقبل العدد الكلي الجديد."""
+    text = update.message.text.strip()
+    if not text.isdigit() or int(text) <= 0:
+        await update.message.reply_text(
+            "⚠️ يرجى إدخال رقم صحيح أكبر من صفر:",
+            reply_markup=_nav_buttons(show_back=True),
+            parse_mode="Markdown"
+        )
+        return RADIATION_THERAPY_REMAINING
+
+    data = context.user_data.setdefault("report_tmp", {})
+    data["_tp_pending_total"] = int(text)
+
+    await update.message.reply_text(
+        "✅ تم الحفظ\n\n"
+        "✍️ **سبب التعديل** (اختياري)\n\n"
+        "اكتب السبب، أو اضغط الزر أدناه للتخطي:",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("⏭️ بدون سبب", callback_data="rad_edit_reason_skip")],
+        ]),
+        parse_mode="Markdown",
+    )
+    context.user_data['_conversation_state'] = RADIATION_THERAPY_EDIT_REASON
+    return RADIATION_THERAPY_EDIT_REASON
+
+
+async def _apply_radiation_edit(update_or_query, context, reason):
+    data = context.user_data.setdefault("report_tmp", {})
+    plan_id = data.pop("_tp_editing_plan_id", None)
+    total = data.pop("_tp_pending_total", None)
+    actor_id, actor_name = _actor(update_or_query)
+    return edit_plan(plan_id, {"total_sessions": total},
+                      changed_by=actor_id, changed_by_name=actor_name, reason=reason)
+
+
+async def handle_radiation_edit_reason(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    reason = update.message.text.strip()
+    plan = await _apply_radiation_edit(update, context, reason)
+    return await _show_radiation_plan(update.message, context, plan)
+
+
+async def handle_radiation_edit_reason_skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    plan = await _apply_radiation_edit(update, context, None)
+    return await _show_radiation_plan(query.message, context, plan)
 
 
 async def handle_radiation_therapy_notes(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -537,7 +600,10 @@ __all__ = [
     'start_radiation_therapy_flow',
     'handle_radiation_therapy_type',
     'handle_radiation_therapy_session_number',
+    'handle_radiation_plan_choice',
     'handle_radiation_therapy_remaining',
+    'handle_radiation_edit_reason',
+    'handle_radiation_edit_reason_skip',
     'handle_radiation_therapy_notes',
     'handle_radiation_therapy_return_date',
     'handle_radiation_therapy_return_reason',

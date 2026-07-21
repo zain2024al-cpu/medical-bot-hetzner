@@ -187,6 +187,14 @@ def _ensure_schema_compatibility(target_engine=None) -> None:
                 _add_column_if_missing(conn, "gs_arrival_patients", ap_cols, "departure_record_id", "INTEGER")
                 _add_column_if_missing(conn, "gs_arrival_patients", ap_cols, "residence_expiry",    "VARCHAR(50)")
                 _add_column_if_missing(conn, "gs_arrival_patients", ap_cols, "residence_file_id",   "VARCHAR(255)")
+                # ✅ حقول فردية إضافية — جولة توسيع تدفق الواصلين (اختيار إلزامي من السجل)
+                _add_column_if_missing(conn, "gs_arrival_patients", ap_cols, "arrival_date",        "VARCHAR(50)")
+                _add_column_if_missing(conn, "gs_arrival_patients", ap_cols, "passport_expiry",     "VARCHAR(50)")
+                _add_column_if_missing(conn, "gs_arrival_patients", ap_cols, "entry_stamp_file_id", "VARCHAR(255)")
+                _add_column_if_missing(conn, "gs_arrival_patients", ap_cols, "tickets_file_id",     "VARCHAR(255)")
+                _add_column_if_missing(conn, "gs_arrival_patients", ap_cols, "services_provided",   "TEXT")
+                _add_column_if_missing(conn, "gs_arrival_patients", ap_cols, "escort_entity",       "VARCHAR(255)")
+                _add_column_if_missing(conn, "gs_arrival_patients", ap_cols, "residence_address",   "TEXT")
 
             if _table_exists(conn, "gs_departure_records"):
                 dr_cols = _table_columns(conn, "gs_departure_records")
@@ -196,6 +204,15 @@ def _ensure_schema_compatibility(target_engine=None) -> None:
                 ac_cols = _table_columns(conn, "gs_arrival_companions")
                 _add_column_if_missing(conn, "gs_arrival_companions", ac_cols, "residence_expiry",  "VARCHAR(50)")
                 _add_column_if_missing(conn, "gs_arrival_companions", ac_cols, "residence_file_id", "VARCHAR(255)")
+                # ✅ نفس الحقول الإضافية للمريض — المرافق يمر بنفس القائمة الكاملة
+                _add_column_if_missing(conn, "gs_arrival_companions", ac_cols, "arrival_date",        "VARCHAR(50)")
+                _add_column_if_missing(conn, "gs_arrival_companions", ac_cols, "passport_expiry",     "VARCHAR(50)")
+                _add_column_if_missing(conn, "gs_arrival_companions", ac_cols, "entry_stamp_file_id", "VARCHAR(255)")
+                _add_column_if_missing(conn, "gs_arrival_companions", ac_cols, "tickets_file_id",     "VARCHAR(255)")
+                _add_column_if_missing(conn, "gs_arrival_companions", ac_cols, "notes",               "TEXT")
+                _add_column_if_missing(conn, "gs_arrival_companions", ac_cols, "services_provided",   "TEXT")
+                _add_column_if_missing(conn, "gs_arrival_companions", ac_cols, "escort_entity",       "VARCHAR(255)")
+                _add_column_if_missing(conn, "gs_arrival_companions", ac_cols, "residence_address",   "TEXT")
 
             # ── Phase 2: translator link (optional) ───────────────────────────
             # This block is entirely optional — it only runs when the legacy

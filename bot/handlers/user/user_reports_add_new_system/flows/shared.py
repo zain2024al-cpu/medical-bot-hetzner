@@ -23,6 +23,8 @@ from ..states import (
     FINAL_CONSULT_CONFIRM, DISCHARGE_CONFIRM, PHYSICAL_THERAPY_CONFIRM,
     DEVICE_CONFIRM, RADIOLOGY_CONFIRM, APP_RESCHEDULE_CONFIRM,
     RADIATION_THERAPY_CONFIRM,
+    ENDOSCOPY_TRANSLATOR, ENDOSCOPY_CONFIRM,
+    TREATMENT_TRANSLATOR, TREATMENT_CONFIRM,
     R_ACTION_TYPE
 )
 from ..utils import _nav_buttons, format_time_12h_str
@@ -460,7 +462,12 @@ def get_translator_state(flow_type):
         "rehab_device": DEVICE_TRANSLATOR,
         "device": DEVICE_TRANSLATOR,  # ✅ إضافة للتوافق
         "radiology": RADIOLOGY_TRANSLATOR,
-        "radiation_therapy": RADIATION_THERAPY_TRANSLATOR
+        "radiation_therapy": RADIATION_THERAPY_TRANSLATOR,
+        "endoscopy": ENDOSCOPY_TRANSLATOR,
+        "treatment_chemo": TREATMENT_TRANSLATOR,
+        "treatment_targeted": TREATMENT_TRANSLATOR,
+        "treatment_immuno": TREATMENT_TRANSLATOR,
+        "treatment_dialysis": TREATMENT_TRANSLATOR,
     }
     return states.get(flow_type, NEW_CONSULT_TRANSLATOR)
 
@@ -483,7 +490,12 @@ def get_confirm_state(flow_type):
         "rehab_device": DEVICE_CONFIRM,
         "device": DEVICE_CONFIRM,
         "radiology": RADIOLOGY_CONFIRM,
-        "radiation_therapy": RADIATION_THERAPY_CONFIRM
+        "radiation_therapy": RADIATION_THERAPY_CONFIRM,
+        "endoscopy": ENDOSCOPY_CONFIRM,
+        "treatment_chemo": TREATMENT_CONFIRM,
+        "treatment_targeted": TREATMENT_CONFIRM,
+        "treatment_immuno": TREATMENT_CONFIRM,
+        "treatment_dialysis": TREATMENT_CONFIRM,
     }
     return states.get(flow_type, NEW_CONSULT_CONFIRM)
 
@@ -2046,6 +2058,24 @@ async def save_report_to_database(query, context, flow_type):
             elif flow_type == "emergency":
                 status = data.get("status", "")
                 decision_text += f"\n\nوضع الحالة: {status}"
+                # ✅ ملاحظات الرقود/نوع الترقيد/تفاصيل العملية لا أعمدة مخصصة
+                # لها في Report — كانت تُرسَل إلى broadcast_data عند النشر
+                # الأول فقط دون أي حفظ فعلي، فتختفي تماماً من البطاقة عند أي
+                # إعادة نشر لاحقة بعد تعديل (حتى لو كان التعديل في حقل آخر
+                # لا علاقة له). نُضيفها هنا داخل doctor_decision (نفس نمط
+                # "عملية"/"خروج من المستشفى" أعلاه) لتبقى محفوظة ومُستخرَجة
+                # لاحقاً في handle_republish.
+                if "ترقيد" in str(status):
+                    admission_notes = data.get("admission_notes", "")
+                    if admission_notes and str(admission_notes).strip():
+                        decision_text += f"\n\nملاحظات الرقود: {admission_notes}"
+                    admission_type = data.get("admission_type", "")
+                    if admission_type and str(admission_type).strip():
+                        decision_text += f"\n\nنوع الترقيد: {admission_type}"
+                elif "عملية" in str(status):
+                    op_details = data.get("operation_details", "")
+                    if op_details and str(op_details).strip():
+                        decision_text += f"\n\nتفاصيل العملية: {op_details}"
 
         # تحويل datetime/string إلى naive datetime (SQLite لا يقبل tzinfo أو نصوص)
         def to_naive_datetime(dt):
@@ -2237,7 +2267,17 @@ async def save_report_to_database(query, context, flow_type):
             # ✅ حقول الأشعة
             radiology_type=data.get("radiology_type", "") or None,
             radiology_delivery_date=to_naive_datetime(data.get("radiology_delivery_date")) if data.get("radiology_delivery_date") else None,
-            
+
+            # ✅ حقول المناظير — تُحفظ بلا شرط flow_type (هذه المفاتيح لا يضبطها
+            # أي مسار آخر، فتكون None لبقية المسارات تلقائياً).
+            endoscopy_type=data.get("endoscopy_type", "") or None,
+            endoscopy_result=data.get("endoscopy_result", "") or None,
+            endoscopy_procedures=data.get("endoscopy_procedures", "") or None,
+
+            # ✅ لقطة خطة العلاج (كيماوي/موجّه/مناعي/غسيل كلى) — بلا شرط
+            # flow_type لنفس السبب أعلاه (مفتاح خاص بهذه المسارات فقط).
+            treatment_plan_summary=data.get("treatment_plan_summary", "") or None,
+
             # ✅ حقول العلاج الإشعاعي (فقط إذا كان المسار هو radiation_therapy)
             radiation_therapy_type=(data.get("radiation_therapy_type", "") or None) if flow_type == "radiation_therapy" else None,
             radiation_therapy_session_number=(data.get("radiation_therapy_session_number", "") or None) if flow_type == "radiation_therapy" else None,

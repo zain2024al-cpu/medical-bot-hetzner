@@ -1060,44 +1060,29 @@ async def _handle_hc_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         except Exception:
             await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
+    # ✅ تسهيل الشاشة: كانت هذه الأفرع تعرض "شاشة تأكيد" وسيطة (زر واحد
+    # "➕ تسجيل جديد" + رجوع) بين القائمة الرئيسية وشاشة التاريخ — ضغطة
+    # إضافية بلا أي خيار حقيقي. الآن تنتقل مباشرة لشاشة التاريخ (نفس ما
+    # كان يحدث فقط بعد الضغط على "➕ تسجيل جديد" سابقاً). القائمة القديمة
+    # (build_*_menu) تبقى معرَّفة في الملفات لكنها لم تعد تُستدعى من هنا.
     elif action == "woundcare":
-        text, kb = build_woundcare_menu()
-        try:
-            await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
-        except Exception:
-            await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+        await _start_add_flow(update, context)
 
     elif action == "followup":
-        from modules.healthcare.medical_followup.views import build_followup_menu
-        text, kb = build_followup_menu()
-        try:
-            await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
-        except Exception:
-            await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+        from modules.healthcare.medical_followup.flow import _start_flow as _start_followup_flow
+        await _start_followup_flow(update, context)
 
     elif action == "medications":
-        from modules.healthcare.medications.views import build_medications_menu
-        text, kb = build_medications_menu()
-        try:
-            await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
-        except Exception:
-            await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+        from modules.healthcare.medications.flow import _start_flow as _start_medications_flow
+        await _start_medications_flow(update, context)
 
     elif action == "supplies":
-        from modules.healthcare.supplies.views import build_supplies_menu
-        text, kb = build_supplies_menu()
-        try:
-            await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
-        except Exception:
-            await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+        from modules.healthcare.supplies.flow import _start_flow as _start_supplies_flow
+        await _start_supplies_flow(update, context)
 
     elif action == "other":
-        from modules.healthcare.other.views import build_other_menu
-        text, kb = build_other_menu()
-        try:
-            await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
-        except Exception:
-            await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+        from modules.healthcare.other.flow import _start_flow as _start_other_flow
+        await _start_other_flow(update, context)
 
     else:
         logger.warning(f"[woundcare/hc] unknown hc action: {action!r}")

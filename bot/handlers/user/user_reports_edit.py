@@ -102,7 +102,12 @@ def test_editable_fields_mapping():
         ('خروج من المستشفى', 6),  # 6 حقول
         ('تأجيل موعد', 4),  # 4 حقول
         ('أشعة وفحوصات', 3),  # 3 حقول
-        ('جلسة إشعاعي', 6),  # 6 حقول
+        ('جلسة إشعاعي', 6),  # 6 حقول (type, recommendations, followup_date, followup_reason, no_paper_report_reason, translator)
+        ('العلاج الكيماوي', 5),  # 5 حقول (notes, followup_date, followup_reason, no_paper_report_reason, translator)
+        ('العلاج الموجه', 5),  # 5 حقول
+        ('العلاج المناعي', 5),  # 5 حقول
+        ('جلسات غسيل الكلى', 5),  # 5 حقول
+        ('المناظير', 7),  # 7 حقول (complaint, endoscopy_type, endoscopy_result, followup_date, followup_reason, no_paper_report_reason, translator)
         ('نوع غير معروف', 4),  # 4 حقول افتراضية
     ]
 
@@ -397,11 +402,36 @@ def get_editable_fields_by_action_type(medical_action):
         ]
 
     elif action_clean == 'جلسة إشعاعي':
+        # ⚠️ رقم الجلسة والجلسات المتبقية لم يعودا قابلين للتعديل هنا:
+        # أصبحا يُحسَبان تلقائياً من TreatmentPlan (services/treatment_plan_service.py)
+        # وتعديلهما مباشرة على التقرير سيفصلهما عن الخطة الفعلية (بلا سجل تغييرات)
+        # ويجعل التقرير التالي للمريض نفسه يتابع من الرقم القديم غير المعدَّل.
+        # التعديل الصحيح لرقم الجلسة يتم عبر "✏️ تعديل الخطة" أثناء إنشاء تقرير جديد.
         return [
             ('radiation_therapy_type', '☢️ نوع الإشعاعي'),
-            ('radiation_therapy_session_number', '🔢 رقم الجلسة'),
-            ('radiation_therapy_remaining', '📊 الجلسات المتبقية'),
             ('radiation_therapy_recommendations', '📝 ملاحظات / توصيات'),
+            ('followup_date', '📅 موعد العودة'),
+            ('followup_reason', '✍️ سبب العودة'),
+            ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
+            ('translator_name', '👤 المترجم'),
+        ]
+
+    elif action_clean in ('العلاج الكيماوي', 'العلاج الموجه', 'العلاج المناعي', 'جلسات غسيل الكلى'):
+        # ⚠️ ملخص الخطة العلاجية (عدد الجلسات/الدورات) غير قابل للتعديل هنا لنفس
+        # السبب أعلاه — التعديل الصحيح يتم عبر "✏️ تعديل الخطة" أثناء إنشاء تقرير جديد
+        return [
+            ('notes', '📝 ملاحظات'),
+            ('followup_date', '📅 موعد العودة'),
+            ('followup_reason', '✍️ سبب العودة'),
+            ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
+            ('translator_name', '👤 المترجم'),
+        ]
+
+    elif action_clean == 'المناظير':
+        return [
+            ('complaint_text', '💬 شكوى المريض'),
+            ('endoscopy_type', '🔬 نوع المنظار'),
+            ('endoscopy_result', '📋 نتيجة المنظار / خطة الطبيب'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
             ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
@@ -815,6 +845,9 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
                 'radiation_therapy_final_notes': getattr(report, 'radiation_therapy_final_notes', None) or "",
                 'radiation_therapy_completed': getattr(report, 'radiation_therapy_completed', False) or False,
                 'no_paper_report_reason': getattr(report, 'no_paper_report_reason', None) or "لا يوجد",
+                # ✅ حقول المناظير
+                'endoscopy_type': getattr(report, 'endoscopy_type', None) or "لا يوجد",
+                'endoscopy_result': getattr(report, 'endoscopy_result', None) or "لا يوجد",
             }
             
             # تحويل موعد العودة إلى صيغة 12 ساعة للعرض
@@ -1014,6 +1047,8 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
             admission_summary = ''
             success_rate = ''
             benefit_rate = ''
+            emergency_admission_notes = ''
+            emergency_admission_type = ''
             extracted_notes = report.notes or ''
 
             doctor_decision_text = report.doctor_decision or ''
@@ -1115,6 +1150,26 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except Exception as e:
                     logger.warning(f"⚠️ فشل استخراج حقول استشارة مع قرار عملية (republish): {e}")
 
+            # ✅ استخراج حقول الطوارئ الإضافية (ملاحظات الرقود/نوع الترقيد/
+            # تفاصيل العملية) — محفوظة داخل doctor_decision منذ الإنشاء
+            # (انظر flows/shared.py) لأنه لا أعمدة مخصصة لها في Report.
+            elif report.medical_action == 'طوارئ':
+                if 'ملاحظات الرقود:' in doctor_decision_text:
+                    try:
+                        rest = doctor_decision_text.split('ملاحظات الرقود:', 1)[1]
+                        if 'نوع الترقيد:' in rest:
+                            emergency_admission_notes = rest.split('نوع الترقيد:')[0].strip()
+                            emergency_admission_type = rest.split('نوع الترقيد:', 1)[1].strip()
+                        else:
+                            emergency_admission_notes = rest.strip()
+                    except Exception as e:
+                        logger.warning(f"⚠️ فشل استخراج ملاحظات الرقود (republish): {e}")
+                if 'تفاصيل العملية:' in doctor_decision_text:
+                    try:
+                        operation_details = doctor_decision_text.split('تفاصيل العملية:', 1)[1].strip()
+                    except Exception as e:
+                        logger.warning(f"⚠️ فشل استخراج تفاصيل عملية الطوارئ (republish): {e}")
+
             # ✅ المسارات التي تحفظ البيانات مباشرة في الحقول (لا تحتاج استخراج)
             # - استشارة جديدة (new_consult): complaint_text, diagnosis, decision
             # - متابعة (followup): complaint_text, diagnosis, decision
@@ -1157,6 +1212,9 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 'notes': report.notes or '',
                 'medications': report.medications or '',
                 'case_status': report.case_status or '',
+                # ✅ حقول الطوارئ الإضافية (ترقيد/عملية) — مستخرجة أعلاه من doctor_decision
+                'admission_notes': emergency_admission_notes,
+                'admission_type': emergency_admission_type,
                 # ✅ موعد العودة
                 'followup_date': followup_display if followup_display and followup_display != 'لا يوجد' else '',
                 'followup_time': report.followup_time or '',
@@ -1352,6 +1410,7 @@ async def handle_field_selection(update: Update, context: ContextTypes.DEFAULT_T
             logger.info(f"✅ تم عرض حقل التعديل: {field_name} (تاريخ) - التقويم الكامل")
             return EDIT_DATE_CALENDAR
         else:
+            context.user_data['edit_field_display'] = field_display
             text = f"✏️ **تعديل: {field_display}**\n\n"
             text += f"**القيمة الحالية:**\n```\n{current_value}\n```\n\n"
             text += f"📝 **أرسل القيمة الجديدة لـ ({field_display}):**"
@@ -1776,6 +1835,39 @@ async def confirm_date_edit(message_or_query, context, selected_date, selected_t
     
     return CONFIRM_EDIT
 
+
+async def confirm_text_edit(message, context, new_value: str):
+    """عرض معاينة القيمة الجديدة لحقل نصي قبل حفظها فعلياً — يمنع حفظ
+    نص خاطئ (مثل نسخ/لصق نص شاشة أخرى بالخطأ) دون أن يراه المترجم أولاً."""
+    field_name = context.user_data.get('edit_field', '')
+    field_display = context.user_data.get('edit_field_display', field_name)
+    old_value = context.user_data['current_report_data'].get(field_name, "لا يوجد")
+
+    old_display = str(old_value) if old_value and old_value != "None" else "لا يوجد"
+
+    old_display_safe = escape_markdown(old_display)
+    new_display_safe = escape_markdown(new_value)
+
+    text = "📝 **تأكيد التعديل**\n\n"
+    text += f"**الحقل:** {field_display}\n\n"
+    text += f"**القيمة القديمة:**\n```\n{old_display_safe}\n```\n\n"
+    text += f"**القيمة الجديدة:**\n```\n{new_display_safe}\n```\n\n"
+    text += "⚠️ راجع القيمة الجديدة جيداً قبل الحفظ — هل تريد الحفظ؟"
+
+    keyboard = [
+        [InlineKeyboardButton("✅ تأكيد الحفظ", callback_data="edit_confirm_save_text")],
+        [InlineKeyboardButton("🔙 رجوع", callback_data="edit_back_to_fields")],
+        [InlineKeyboardButton("❌ إلغاء", callback_data="edit_cancel")]
+    ]
+
+    await message.reply_text(
+        text,
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode=ParseMode.MARKDOWN
+    )
+    return CONFIRM_EDIT
+
+
 async def handle_new_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة القيمة الجديدة"""
     new_value = update.message.text.strip()
@@ -1837,16 +1929,9 @@ async def handle_new_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return EDIT_VALUE
     
-    # حفظ القيمة في DB ثم العودة لقائمة الحقول — المستخدم ينشر بنفسه
+    # ✅ عرض معاينة القيمة الجديدة قبل الحفظ — المستخدم يؤكد صراحة قبل أي كتابة فعلية
     context.user_data['new_value'] = new_value
-    await save_edit_to_database(None, context)
-    # محاكاة query من message لعرض قائمة الحقول
-    class _FakeQuery:
-        def __init__(self, msg): self.message = msg; self.data = ""
-        async def answer(self): pass
-        async def edit_message_text(self, *a, **kw): await self.message.reply_text(*a, **kw)
-    fake_q = _FakeQuery(update.message)
-    return await show_field_selection(fake_q, context)
+    return await confirm_text_edit(update.message, context, new_value)
 
 async def save_edit_to_database(query, context):
     """حفظ التعديل في قاعدة البيانات (دالة مساعدة)"""
@@ -2020,7 +2105,9 @@ async def save_edit_to_database(query, context):
             logger.info(f"✅ تم تحديث doctor_decision لاستشارة مع قرار عملية: {field_name} = {new_value[:50]}...")
 
         # ✅ معالجة حقول العلاج الإشعاعي
-        elif field_name in ['radiation_therapy_type', 'radiation_therapy_session_number', 'radiation_therapy_remaining', 'radiation_therapy_recommendations']:
+        # ⚠️ رقم الجلسة/الجلسات المتبقية لم يعودا مُعدَّلين هنا — يُحسبان من TreatmentPlan
+        # (services/treatment_plan_service.py)، تعديلهما هنا كان سيفصلهما عن الخطة الفعلية
+        elif field_name in ['radiation_therapy_type', 'radiation_therapy_recommendations']:
             setattr(report, field_name, new_value)
             if field_name == 'radiation_therapy_recommendations':
                 # حفظ في حقل notes أيضاً
@@ -2029,10 +2116,10 @@ async def save_edit_to_database(query, context):
             current_data = context.user_data.get('current_report_data', {})
             current_data[field_name] = new_value
             context.user_data['current_report_data'] = current_data
-            
+
             rad_type = current_data.get('radiation_therapy_type', '') or getattr(report, 'radiation_therapy_type', '') or ''
-            session_num = current_data.get('radiation_therapy_session_number', '') or getattr(report, 'radiation_therapy_session_number', '') or ''
-            remaining = current_data.get('radiation_therapy_remaining', '') or getattr(report, 'radiation_therapy_remaining', '') or ''
+            session_num = getattr(report, 'radiation_therapy_session_number', '') or ''
+            remaining = getattr(report, 'radiation_therapy_remaining', '') or ''
             
             new_decision = f"نوع الإشعاعي: {rad_type}\n\n"
             new_decision += f"رقم الجلسة: {session_num}\n\n"
@@ -2082,7 +2169,13 @@ async def handle_confirm_edit(update: Update, context: ContextTypes.DEFAULT_TYPE
         await save_edit_to_database(query, context)
         # ثم ننشر التقرير
         return await handle_republish(update, context)
-    
+
+    # ✅ تأكيد حفظ حقل نصي بعد المعاينة — يحفظ فقط ويعود لقائمة الحقول
+    # (بلا نشر تلقائي، حتى يمكن تعديل عدة حقول ثم النشر مرة واحدة لاحقاً)
+    if query.data == "edit_confirm_save_text":
+        await save_edit_to_database(query, context)
+        return await show_field_selection(query, context)
+
     return CONFIRM_EDIT
 
 async def show_field_selection(query, context):
@@ -2148,6 +2241,9 @@ async def show_field_selection(query, context):
             'radiation_therapy_recommendations': getattr(report, 'radiation_therapy_recommendations', None) or getattr(report, 'notes', None) or "",
             'radiation_therapy_return_reason': getattr(report, 'radiation_therapy_return_reason', None) or "لا يوجد",
             'no_paper_report_reason': getattr(report, 'no_paper_report_reason', None) or "لا يوجد",
+            # ✅ حقول المناظير
+            'endoscopy_type': getattr(report, 'endoscopy_type', None) or "لا يوجد",
+            'endoscopy_result': getattr(report, 'endoscopy_result', None) or "لا يوجد",
         })
         
         # ✅ استخراج قرار الطبيب الحقيقي من الحقل المركب (مثل "التشخيص: ...\n\nقرار الطبيب: ...")

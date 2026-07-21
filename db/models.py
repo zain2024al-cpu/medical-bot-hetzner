@@ -226,6 +226,27 @@ class Report(Base):
     has_paper_report = Column(Integer, nullable=True)
     no_paper_report_reason = Column(Text, nullable=True)
 
+    # ✅ حقول وحدة المناظير (endoscopy) — خاصة بمسار "🔬 المناظير":
+    #   endoscopy_type       = نوع المنظار (Colonoscopy / Upper GI Endoscopy /
+    #                          Endoscopy & Colonoscopy)
+    #   endoscopy_result     = نتيجة المنظار / خطة الطبيب (نص حر)
+    #   endoscopy_procedures = الإجراءات التي تمت أثناء المنظار — تُخزَّن كـ JSON
+    #                          (قائمة الرموز المختارة + نص "أخرى" إن وُجد)، أو
+    #                          "منظار تشخيصي — بلا إجراء" عند عدم اختيار أي إجراء.
+    # كلها nullable — لا تؤثر على أي مسار أو تقرير قائم.
+    endoscopy_type = Column(String(100), nullable=True)
+    endoscopy_result = Column(Text, nullable=True)
+    endoscopy_procedures = Column(Text, nullable=True)
+
+    # ✅ لقطة ثابتة (immutable snapshot) من حالة "خطة العلاج" وقت نشر هذا
+    # التقرير تحديداً — تُستخدَم لعرض تقدُّم الجلسات/الدورات (العلاج
+    # الكيماوي/الموجه/المناعي/غسيل الكلى). التعديل اللاحق على الخطة النشطة
+    # (TreatmentPlan) لا يغيّر هذه اللقطة، فيبقى كل تقرير قديم يعرض الرقم
+    # الصحيح تاريخياً. العلاج الإشعاعي استثناء: يُعاد استخدام أعمدته
+    # القديمة (radiation_therapy_session_number/remaining) بدل هذا الحقل،
+    # فتبقى بطاقة تقريره كما هي دون أي تعديل.
+    treatment_plan_summary = Column(Text, nullable=True)
+
 
 # ================================================
 # Schedule Model
@@ -500,6 +521,14 @@ class ArrivalPatient(Base):
     arrival_status      = Column(String(20), default="active", nullable=True)
     departure_record_id = Column(Integer, nullable=True)
     created_at          = Column(DateTime, default=datetime.utcnow, nullable=True)
+    # ✅ حقول فردية إضافية (جولة توسيع تدفق الواصلين — اختيار إلزامي من السجل)
+    arrival_date        = Column(String(50),  nullable=True)
+    passport_expiry     = Column(String(50),  nullable=True)
+    entry_stamp_file_id = Column(String(255), nullable=True)
+    tickets_file_id     = Column(String(255), nullable=True)
+    services_provided   = Column(Text, nullable=True)
+    escort_entity       = Column(String(255), nullable=True)
+    residence_address   = Column(Text, nullable=True)
 
 
 class ArrivalCompanion(Base):
@@ -514,6 +543,15 @@ class ArrivalCompanion(Base):
     residence_file_id   = Column(String(255), nullable=True)
     residence_expiry    = Column(String(50),  nullable=True)
     created_at          = Column(DateTime, default=datetime.utcnow, nullable=True)
+    # ✅ نفس الحقول الإضافية للمريض — المرافق يمر بنفس القائمة الكاملة
+    arrival_date        = Column(String(50),  nullable=True)
+    passport_expiry     = Column(String(50),  nullable=True)
+    entry_stamp_file_id = Column(String(255), nullable=True)
+    tickets_file_id     = Column(String(255), nullable=True)
+    notes               = Column(Text, nullable=True)
+    services_provided   = Column(Text, nullable=True)
+    escort_entity       = Column(String(255), nullable=True)
+    residence_address   = Column(Text, nullable=True)
 
 
 # ================================================
@@ -946,6 +984,62 @@ class MedicalAttachmentFile(Base):
         return f"<MedicalAttachmentFile(id={self.id}, report_id={self.report_id}, type={self.file_type})>"
 
 
+# ================================================
+# Treatment Plans — نظام عام لتتبّع خطط الجلسات/الدورات العلاجية
+# (العلاج الكيماوي، الموجه، المناعي، غسيل الكلى، وأي برنامج مستقبلي)
+# ================================================
+
+class TreatmentPlan(Base):
+    """خطة علاجية نشطة لمريض ضمن نوع علاج معيّن (treatment_key).
+
+    مصمَّم ليكون عاماً بالكامل: إضافة نوع علاج جديد مستقبلاً (مثل العلاج
+    البيولوجي) لا يحتاج أي عمود أو جدول جديد — فقط قيمة treatment_key
+    جديدة + شاشة اختيار في الكود. mode يحدّد أي الحقول تُستخدَم:
+      - "sessions":        total_sessions / current_session فقط.
+      - "cycles_uniform":  total_cycles / current_cycle / sessions_per_cycle
+                           (نفس عدد الجلسات في كل الدورات) + current_session
+                           (الجلسة الحالية ضمن الدورة الحالية).
+      - "cycles_custom":   total_cycles / current_cycle / custom_cycle_sessions
+                           (JSON: قائمة عدد الجلسات لكل دورة على حدة) + current_session.
+    """
+    __tablename__ = "treatment_plans"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    patient_id = Column(Integer, nullable=False, index=True)
+    treatment_key = Column(String(50), nullable=False, index=True)  # radiation|chemo|targeted|immuno|dialysis|...
+    mode = Column(String(20), nullable=False)  # sessions|cycles_uniform|cycles_custom
+
+    total_sessions = Column(Integer, nullable=True)
+    current_session = Column(Integer, nullable=True)
+
+    total_cycles = Column(Integer, nullable=True)
+    current_cycle = Column(Integer, nullable=True)
+    sessions_per_cycle = Column(Integer, nullable=True)
+    custom_cycle_sessions = Column(Text, nullable=True)  # JSON list, e.g. "[1,2,3,4,5,6]"
+
+    status = Column(String(20), default="active", nullable=True)  # active|completed
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
+    created_by = Column(Integer, nullable=True)
+    created_by_name = Column(String(255), nullable=True)
+
+
+class TreatmentPlanChangeLog(Base):
+    """سجل تدقيق كامل لكل تعديل على خطة علاجية — الخطة السابقة، الجديدة،
+    وقت التعديل، من قام به، والسبب (اختياري). سطر واحد لكل عملية تعديل،
+    ولا يُحذف أو يُعدَّل أبداً بعد إنشائه (append-only audit trail)."""
+    __tablename__ = "treatment_plan_change_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    plan_id = Column(Integer, nullable=False, index=True)
+    previous_snapshot = Column(Text, nullable=True)  # JSON لكامل حالة الخطة قبل التعديل
+    new_snapshot = Column(Text, nullable=True)        # JSON لكامل حالة الخطة بعد التعديل
+    changed_at = Column(DateTime, default=datetime.utcnow, nullable=True)
+    changed_by = Column(Integer, nullable=True)
+    changed_by_name = Column(String(255), nullable=True)
+    reason = Column(Text, nullable=True)
+
+
 # Helper function for backward compatibility
 def desc(field):
     """SQLAlchemy desc() compatibility"""
@@ -994,5 +1088,7 @@ __all__ = [
     'ArrivalCompanion',
     'DepartureRecord',
     'PublicServiceRecord',
+    'TreatmentPlan',
+    'TreatmentPlanChangeLog',
     'desc'
 ]

@@ -103,7 +103,7 @@ async def _open_patient_selector(update, context):
         await _cancel(update, context); return
     session.step = STEP_PATIENT
     session.save(context.user_data)
-    await patient_selector.enter(update, context, return_to=_RKEY_PATIENT)
+    await patient_selector.enter(update, context, return_to=_RKEY_PATIENT, include_companions=True)
 
 
 async def _show_service_type_prompt(update, context):

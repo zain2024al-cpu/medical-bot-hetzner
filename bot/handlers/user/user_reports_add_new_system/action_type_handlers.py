@@ -31,6 +31,11 @@ def _get_action_routing():
             start_radiology_flow,
             start_reschedule_flow,
             start_radiation_therapy_flow,
+            start_endoscopy_flow,
+            start_chemo_flow,
+            start_targeted_flow,
+            start_immuno_flow,
+            start_dialysis_flow,
         )
         logger.debug(f"✅ start_radiation_therapy_flow imported successfully: {start_radiation_therapy_flow}")
     except ImportError as e:
@@ -43,7 +48,8 @@ def _get_action_routing():
         NEW_CONSULT_COMPLAINT, FOLLOWUP_COMPLAINT, EMERGENCY_COMPLAINT,
         ADMISSION_REASON, OPERATION_DETAILS_AR, SURGERY_CONSULT_DIAGNOSIS,
         FINAL_CONSULT_DIAGNOSIS, DISCHARGE_TYPE, REHAB_TYPE, RADIOLOGY_TYPE,
-        APP_RESCHEDULE_REASON, RADIATION_THERAPY_TYPE
+        APP_RESCHEDULE_REASON, RADIATION_THERAPY_TYPE, ENDOSCOPY_COMPLAINT,
+        CHEMO_MODE_CHOICE, TREATMENT_PLAN_SETUP,
     )
     
     routing_dict = {
@@ -112,39 +118,108 @@ def _get_action_routing():
             "flow": start_radiation_therapy_flow,
             "pre_process": None
         },
+        "المناظير": {
+            "state": ENDOSCOPY_COMPLAINT,
+            "flow": start_endoscopy_flow,
+            "pre_process": None
+        },
+        "العلاج الكيماوي": {
+            "state": CHEMO_MODE_CHOICE,
+            "flow": start_chemo_flow,
+            "pre_process": None
+        },
+        "العلاج الموجه": {
+            "state": TREATMENT_PLAN_SETUP,
+            "flow": start_targeted_flow,
+            "pre_process": None
+        },
+        "العلاج المناعي": {
+            "state": TREATMENT_PLAN_SETUP,
+            "flow": start_immuno_flow,
+            "pre_process": None
+        },
+        "جلسات غسيل الكلى": {
+            "state": TREATMENT_PLAN_SETUP,
+            "flow": start_dialysis_flow,
+            "pre_process": None
+        },
     }
-    
+
     return routing_dict
 
 
-def _build_action_type_keyboard(page=0):
-    """بناء لوحة مفاتيح أنواع الإجراءات - مرتّبة حسب الاستخدام، زرّان بكل صف"""
-    ORDERED_ACTIONS = [
-        ("استشارة جديدة",           "🩺"),
-        ("مراجعة / عودة دورية",      "🔄"),
-        ("متابعة في الرقود",         "🛏️"),
-        ("استشارة مع قرار عملية",    "🔬"),
-        ("عملية",                    "🔪"),
-        ("استشارة أخيرة",            "✅"),
-        ("ترقيد",                    "🏥"),
-        ("خروج من المستشفى",         "🚪"),
-        ("طوارئ",                    "🚨"),
-        ("علاج طبيعي وإعادة تأهيل", "🏃"),
-        ("أشعة وفحوصات",            "📷"),
-        ("جلسة إشعاعي",             "☢️"),
-        ("تأجيل موعد",              "📅"),
-    ]
+# ✅ تصنيف أزرار نوع الإجراء في قوائم فرعية (تنظيم بصري بحت — لا يغيّر أي
+# منطق أو توجيه أو نموذج أو تقرير: كل زر فرعي يحتفظ بنفس callback_data
+# =action_idx:{idx} السابق تماماً، فيُعالَج بنفس handle_action_type_choice).
+# كل تصنيف: (مفتاح, عنوان, [(اسم الإجراء الفعلي, أيقونة العرض, تسمية العرض)]).
+ACTION_CATEGORIES = [
+    ("consult", "🩺 الاستشارات", [
+        ("استشارة جديدة",         "🆕", "استشارة جديدة"),
+        ("مراجعة / عودة دورية",    "🔄", "عودة دورية"),
+        ("استشارة أخيرة",         "✅", "استشارة أخيرة"),
+        ("استشارة مع قرار عملية",  "📄", "استشارة مع قرار عملية"),
+    ]),
+    ("admission", "🏥 التنويم والعمليات", [
+        ("ترقيد",                "🛏️", "ترقيد"),
+        ("عملية",                "🔪", "عملية"),
+        ("متابعة في الرقود",      "🏥", "متابعة في الرقود"),
+        ("خروج من المستشفى",      "✅", "خروج من المستشفى"),
+    ]),
+]
 
+# ✅ "💉 جلسات العلاج" — تصنيف مُتشعِّب على مستويين: يفتح على قسمين
+# (🎗️ جلسات الأورام تتوسّع لأربعة أنواع، 🩸 جلسات غسيل الكلى يبدأ مباشرة
+# بلا قائمة فرعية إضافية لأنه نوع وحيد). نفس مبدأ action_idx القديم تماماً
+# لكل الأزرار الفعلية — تنظيم بصري فقط.
+TREATMENT_SESSIONS_KEY = "treatment"
+TREATMENT_SESSIONS_LABEL = "💉 جلسات العلاج"
+ONCOLOGY_KEY = "oncology"
+ONCOLOGY_LABEL = "🎗️ جلسات الأورام"
+ONCOLOGY_SUBS = [
+    ("جلسة إشعاعي",       "☢️", "العلاج الإشعاعي"),
+    ("العلاج الكيماوي",    "💉", "العلاج الكيماوي"),
+    ("العلاج الموجه",      "🎯", "العلاج الموجه"),
+    ("العلاج المناعي",     "🧬", "العلاج المناعي"),
+]
+DIALYSIS_LEAF = ("جلسات غسيل الكلى", "🩸", "جلسات غسيل الكلى")
+
+# الأزرار التي تبقى مباشرة في القائمة الرئيسية (غير مصنّفة ضمن قائمة فرعية)
+_TOP_LEVEL_ACTIONS = [
+    ("طوارئ",                    "🚨"),
+    ("علاج طبيعي وإعادة تأهيل",   "🏃"),
+    ("أشعة وفحوصات",             "📷"),
+    ("المناظير",                 "🔬"),
+    ("تأجيل موعد",               "📅"),
+]
+
+
+def _build_action_type_keyboard(page=0):
+    """القائمة الرئيسية لنوع الإجراء: أزرار التصنيفات + الأزرار غير المصنّفة."""
     idx_map = {name: i for i, name in enumerate(PREDEFINED_ACTIONS)}
 
     keyboard = []
+
+    # صف/صفوف أزرار التصنيفات (توسيع لقائمة فرعية عند الضغط)
     row = []
-    for action_name, icon in ORDERED_ACTIONS:
+    for cat_key, cat_label, _subs in ACTION_CATEGORIES:
+        row.append(InlineKeyboardButton(cat_label, callback_data=f"action_cat:{cat_key}"))
+        if len(row) == 2:
+            keyboard.append(row)
+            row = []
+    row.append(InlineKeyboardButton(TREATMENT_SESSIONS_LABEL, callback_data=f"action_cat:{TREATMENT_SESSIONS_KEY}"))
+    if len(row) == 2:
+        keyboard.append(row)
+        row = []
+    if row:
+        keyboard.append(row)
+
+    # الأزرار غير المصنّفة — نفس callback القديم تماماً
+    row = []
+    for action_name, icon in _TOP_LEVEL_ACTIONS:
         idx = idx_map.get(action_name)
         if idx is None:
             continue
-        btn = InlineKeyboardButton(f"{icon} {action_name}", callback_data=f"action_idx:{idx}")
-        row.append(btn)
+        row.append(InlineKeyboardButton(f"{icon} {action_name}", callback_data=f"action_idx:{idx}"))
         if len(row) == 2:
             keyboard.append(row)
             row = []
@@ -158,6 +233,90 @@ def _build_action_type_keyboard(page=0):
 
     text = "⚕️ **نوع الإجراء** (الخطوة 6 من 6)\n\nاختر نوع الإجراء:"
     return text, InlineKeyboardMarkup(keyboard), 1
+
+
+def _build_leaves_keyboard(subs, back_target: str):
+    """يبني لوحة أزرار قابلة لإعادة الاستخدام لأي قائمة إجراءات نهائية
+    (action_idx) — تُستخدَم لتصنيفات القائمة الرئيسية وللمستوى الفرعي
+    داخل "جلسات العلاج" على حدٍّ سواء."""
+    idx_map = {name: i for i, name in enumerate(PREDEFINED_ACTIONS)}
+    keyboard = []
+    row = []
+    for action_name, icon, display in subs:
+        idx = idx_map.get(action_name)
+        if idx is None:
+            continue
+        row.append(InlineKeyboardButton(f"{icon} {display}", callback_data=f"action_idx:{idx}"))
+        if len(row) == 2:
+            keyboard.append(row)
+            row = []
+    if row:
+        keyboard.append(row)
+    keyboard.append([
+        InlineKeyboardButton("🔙 رجوع للقائمة", callback_data=f"action_cat:{back_target}"),
+        InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
+    ])
+    return keyboard
+
+
+def _build_category_submenu(cat_key):
+    """القائمة الفرعية لتصنيف معيّن — أزرار الإجراءات بنفس callback القديم."""
+    cat = next((c for c in ACTION_CATEGORIES if c[0] == cat_key), None)
+    if not cat:
+        return _build_action_type_keyboard()
+    _key, cat_label, subs = cat
+    keyboard = _build_leaves_keyboard(subs, back_target="main")
+    text = f"⚕️ **{cat_label}**\n\nاختر نوع الإجراء:"
+    return text, InlineKeyboardMarkup(keyboard), 1
+
+
+def _build_treatment_sessions_menu():
+    """المستوى الأول داخل "💉 جلسات العلاج": 🎗️ جلسات الأورام (يتوسّع أكثر)
+    + 🩸 جلسات غسيل الكلى (زر مباشر بلا قائمة فرعية إضافية)."""
+    idx_map = {name: i for i, name in enumerate(PREDEFINED_ACTIONS)}
+    keyboard = [[InlineKeyboardButton(ONCOLOGY_LABEL, callback_data=f"action_cat:{ONCOLOGY_KEY}")]]
+
+    dialysis_name, dialysis_icon, dialysis_display = DIALYSIS_LEAF
+    idx = idx_map.get(dialysis_name)
+    if idx is not None:
+        keyboard.append([InlineKeyboardButton(f"{dialysis_icon} {dialysis_display}", callback_data=f"action_idx:{idx}")])
+
+    keyboard.append([
+        InlineKeyboardButton("🔙 رجوع للقائمة", callback_data="action_cat:main"),
+        InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
+    ])
+    text = f"⚕️ **{TREATMENT_SESSIONS_LABEL}**\n\nاختر القسم:"
+    return text, InlineKeyboardMarkup(keyboard), 1
+
+
+def _build_oncology_submenu():
+    """المستوى الثاني: أنواع علاج الأورام الأربعة."""
+    keyboard = _build_leaves_keyboard(ONCOLOGY_SUBS, back_target=TREATMENT_SESSIONS_KEY)
+    text = f"⚕️ **{ONCOLOGY_LABEL}**\n\nاختر نوع الإجراء:"
+    return text, InlineKeyboardMarkup(keyboard), 1
+
+
+async def handle_action_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """توسيع/طي تصنيفات نوع الإجراء — تنظيم بصري فقط (بلا أي تغيير في المنطق)."""
+    query = update.callback_query
+    if not query:
+        return R_ACTION_TYPE
+    await query.answer()
+    cat_key = query.data.split(":", 1)[1]
+    context.user_data['_conversation_state'] = R_ACTION_TYPE
+    if cat_key == "main":
+        text, keyboard, _ = _build_action_type_keyboard()
+    elif cat_key == TREATMENT_SESSIONS_KEY:
+        text, keyboard, _ = _build_treatment_sessions_menu()
+    elif cat_key == ONCOLOGY_KEY:
+        text, keyboard, _ = _build_oncology_submenu()
+    else:
+        text, keyboard, _ = _build_category_submenu(cat_key)
+    try:
+        await query.edit_message_text(text, reply_markup=keyboard, parse_mode="Markdown")
+    except Exception as e:
+        logger.error(f"HANDLE_ACTION_CATEGORY: error rendering '{cat_key}': {e}", exc_info=True)
+    return R_ACTION_TYPE
 
 
 async def show_action_type_menu(message, context, page=0, query=None):
@@ -336,6 +495,11 @@ async def handle_action_type_choice(update: Update, context: ContextTypes.DEFAUL
             "أشعة وفحوصات": "radiology",
             "تأجيل موعد": "appointment_reschedule",
             "جلسة إشعاعي": "radiation_therapy",
+            "المناظير": "endoscopy",
+            "العلاج الكيماوي": "treatment_chemo",
+            "العلاج الموجه": "treatment_targeted",
+            "العلاج المناعي": "treatment_immuno",
+            "جلسات غسيل الكلى": "treatment_dialysis",
         }
 
         flow_type = action_to_flow_type.get(action_name, "new_consult")
