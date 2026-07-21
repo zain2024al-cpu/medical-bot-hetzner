@@ -39,9 +39,12 @@ else:
     try:
         from weasyprint import HTML as _WP_HTML
         WEASYPRINT_AVAILABLE = True
-    except ImportError:
+    except Exception as e:
+        # ✅ Exception كاملة وليس ImportError فقط — نقص مكتبة نظام (libpango)
+        # يرمي OSError، وكان يتسرّب ويُسقط استيراد الوحدة.
         WEASYPRINT_AVAILABLE = False
-        logger.warning("[residency_pdf] WeasyPrint not available")
+        _WP_HTML = None
+        logger.warning(f"[residency_pdf] WeasyPrint not available ({type(e).__name__}: {e})")
 
 
 # ── Display helpers ────────────────────────────────────────────────────────────

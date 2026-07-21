@@ -20,12 +20,15 @@ if not IS_WINDOWS:
         from weasyprint import HTML, CSS
         from weasyprint.text.fonts import FontConfiguration
         font_config = FontConfiguration()
-    except ImportError:
-        # If weasyprint is not installed, disable it
+    except Exception as e:
+        # ✅ نلتقط Exception كاملةً (وليس ImportError فقط): عند نقص مكتبة نظام
+        # مثل libpango يرمي weasyprint OSError (من cffi.dlopen) — وليس
+        # ImportError — فكان يتسرّب ويُسقط تحميل كل الـhandlers المتقدمة
+        # للبوت لوضع "basic handlers only". الآن يتعطّل توليد PDF فقط بأمان.
         HTML = None
         CSS = None
         font_config = None
-        logger.warning("weasyprint not installed - PDF generation disabled")
+        logger.warning(f"weasyprint unavailable — PDF generation disabled ({type(e).__name__}: {e})")
 else:
     # على Windows: تعطيل WeasyPrint
     HTML = None
@@ -45,13 +48,20 @@ OUTPUT_DIR = str(BASE_DIR / "exports")
 # Create output directory if not exists
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# Font configuration (فقط على Linux)
-if not IS_WINDOWS and font_config is None:
-    from weasyprint.text.fonts import FontConfiguration
-    font_config = FontConfiguration()
+# Font configuration (فقط على Linux، وفقط إن حُمِّل weasyprint فعلاً).
+# ✅ الشرط HTML is not None ضروري: لو فشل تحميل weasyprint (نقص libpango →
+# OSError) يكون font_config/CSS = None، فبدونه كان هذا السطر يُعيد استيراد
+# weasyprint فيُعيد رمي OSError على مستوى الوحدة ويُسقط التحميل من جديد.
+if not IS_WINDOWS and HTML is not None and font_config is None:
+    try:
+        from weasyprint.text.fonts import FontConfiguration
+        font_config = FontConfiguration()
+    except Exception as e:
+        font_config = None
+        logger.warning(f"weasyprint FontConfiguration unavailable ({type(e).__name__}: {e})")
 
-# CSS للعربي والتنسيق (فقط على Linux)
-if not IS_WINDOWS:
+# CSS للعربي والتنسيق (فقط على Linux، وفقط إن حُمِّل weasyprint فعلاً)
+if not IS_WINDOWS and CSS is not None:
     DEFAULT_CSS = CSS(string='''
     @page {
         size: A4;
@@ -141,6 +151,14 @@ def generate_pdf_report(report_id: int, template_name: str = "report_template.ht
             logger.error(f"❌ فشل حفظ HTML: {e}")
             raise RuntimeError(f"❌ فشل حفظ HTML: {e}")
     
+    # ✅ حارس وقت التشغيل: لو لم يُحمَّل weasyprint (نقص مكتبة نظام مثل libpango)
+    # نفشل بوضوح هنا بدل الانهيار لاحقاً على HTML/CSS = None.
+    if HTML is None or DEFAULT_CSS is None:
+        raise RuntimeError(
+            "❌ توليد PDF غير متاح: weasyprint أو مكتبات النظام الخاصة به "
+            "(libpango وأخواتها) غير مثبّتة على الخادم."
+        )
+
     try:
         # Fetch report from database
         report = Report.get_by_id(report_id)

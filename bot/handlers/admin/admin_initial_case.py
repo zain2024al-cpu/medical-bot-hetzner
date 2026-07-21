@@ -12,10 +12,13 @@ from bot.shared_utils import format_datetime, parse_date
 from datetime import datetime
 from bot.handlers.admin.decorators import require_admin
 
-# Lazy import to handle missing weasyprint
+# Lazy import to handle missing weasyprint.
+# ✅ نلتقط Exception كاملةً وليس ImportError فقط: pdf_generator يستورد
+# weasyprint الذي قد يرمي OSError (نقص مكتبة نظام مثل libpango) وليس
+# ImportError — فكان يتسرّب ويُسقط register_all_handlers بالكامل.
 try:
     from services.pdf_generator import generate_pdf_report
-except ImportError:
+except Exception:
     generate_pdf_report = None
 
 

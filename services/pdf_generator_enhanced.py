@@ -25,9 +25,13 @@ else:
     try:
         from weasyprint import HTML, CSS
         WEASYPRINT_AVAILABLE = True
-    except ImportError:
+    except Exception as e:
+        # ✅ Exception كاملة وليس ImportError فقط — نقص مكتبة نظام (libpango)
+        # يرمي OSError، وكان يتسرّب ويُسقط استيراد الوحدة.
         WEASYPRINT_AVAILABLE = False
-        logger.warning("⚠️ WeasyPrint غير متوفر")
+        HTML = None
+        CSS = None
+        logger.warning(f"⚠️ WeasyPrint غير متوفر ({type(e).__name__}: {e})")
 
 # المسارات (مطلقة لضمان توفر القوالب داخل Docker)
 BASE_DIR = Path(__file__).resolve().parent.parent
