@@ -125,17 +125,21 @@ def _normalize_dept(dept: str) -> str:
 # ── Color palette ─────────────────────────────────────────────────────────────
 
 def _colors():
+    # ✅ لوحة رمادي غامق (Slate) بدل الأزرق السابق — اختيار المستخدم صراحة
+    # بديلاً عن الأزرق. مبنية على تدرّجات Material "Blue Grey" لضمان انسجام
+    # الألوان مع بعضها (نفس العائلة اللونية بدرجات متفاوتة) بدل اختيار لون
+    # واحد فقط وترك البقية بلا تناسق.
     from reportlab.lib import colors
     return {
-        "primary":    colors.HexColor("#1565C0"),
-        "accent":     colors.HexColor("#0288D1"),
+        "primary":    colors.HexColor("#37474F"),
+        "accent":     colors.HexColor("#607D8B"),
         "success":    colors.HexColor("#2E7D32"),
         "warning":    colors.HexColor("#F57F17"),
         "danger":     colors.HexColor("#C62828"),
-        "light_bg":   colors.HexColor("#F0F4F8"),
-        "card_bg":    colors.HexColor("#FAFCFF"),
-        "grid":       colors.HexColor("#D0D9E8"),
-        "text_dark":  colors.HexColor("#1A237E"),
+        "light_bg":   colors.HexColor("#ECEFF1"),
+        "card_bg":    colors.HexColor("#F7F9FA"),
+        "grid":       colors.HexColor("#CFD8DC"),
+        "text_dark":  colors.HexColor("#263238"),
         "text_gray":  colors.HexColor("#546E7A"),
         "white":      colors.white,
         "black":      colors.black,
