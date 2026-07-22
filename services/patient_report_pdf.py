@@ -690,7 +690,7 @@ def build_patient_pdf(
         ]
         story += section_block
 
-        col_widths = [2.5 * cm, 5.5 * cm, 4.5 * cm, 4.9 * cm]
+        col_widths = [0.9 * cm, 2.3 * cm, 5.2 * cm, 4.3 * cm, 4.7 * cm]
         col_widths_rev = list(reversed(col_widths))
         n_cols = len(col_widths)
 
@@ -701,9 +701,12 @@ def build_patient_pdf(
         # صفحتين — بناءً على طلب صريح ("لا تفصل الهيدر عن الجدول... يتشوه
         # الملف"). بلا أي تباعد بين جداول التقارير المتتالية فتبدو متّصلة
         # بصرياً كجدول واحد (طلب سابق: "اربطهم مع بعض بنفس الجدول").
-        for r in sorted_reps:
-            header_row = list(reversed([P("التاريخ", "th"), P("المستشفى", "th"), P("القسم", "th"), P("الطبيب", "th")]))
+        # ✅ عمود "م" (الترقيم) أقصى اليمين قبل التاريخ — طلب صريح ليظهر
+        # ترقيم التقارير بوضوح.
+        for idx, r in enumerate(sorted_reps, 1):
+            header_row = list(reversed([P("م", "th"), P("التاريخ", "th"), P("المستشفى", "th"), P("القسم", "th"), P("الطبيب", "th")]))
             data_row = list(reversed([
+                P(str(idx), "td_c"),
                 P(_fd(r.get("report_date")), "td_c"),
                 P(r.get("hospital_name") or "—", "td_r"),
                 P(_normalize_dept(r.get("department")) or "—", "td_r"),
