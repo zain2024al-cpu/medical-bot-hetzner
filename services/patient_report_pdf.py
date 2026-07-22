@@ -593,20 +593,24 @@ def build_patient_pdf(
         story.append(Spacer(1, 0.4 * cm))
         story.append(KeepTogether([P("إحصائيات حسب القسم ونوع الإجراء", "section"), dept_action_table]))
 
-    def _extract_op_name_en(doctor_decision: str) -> str:
-        """يستخرج اسم العملية بالإنجليزي من doctor_decision — لا عمود مخصَّص
-        له في Report (نفس نمط استخراجه في user_reports_edit.py عند التعديل)."""
-        dd = doctor_decision or ""
-        if "اسم العملية بالإنجليزي:" not in dd:
-            return ""
-        try:
-            rest = dd.split("اسم العملية بالإنجليزي:", 1)[1]
-            for sep in ("\n\n", "ملاحظات:", "الفحوصات"):
-                if sep in rest:
-                    rest = rest.split(sep, 1)[0]
-            return rest.strip()
-        except Exception:
-            return ""
+    def _parse_decision_sections(raw: str) -> list[tuple[str, str]]:
+        """يفكك doctor_decision (نص مركّب من عدة أقسام "تسمية: قيمة" مفصولة
+        بسطرين فارغين — انظر التركيب الفعلي في
+        bot/handlers/user/user_reports_add_new_system/flows/shared.py، مثال:
+        "التشخيص النهائي: ...\\n\\nقرار الطبيب: ...\\n\\nالتوصيات الطبية: ...")
+        إلى أقسام مفردة، بدل عرضه ككتلة واحدة تحت تسمية عامة "القرار الطبي".
+        ✅ يُستبعد قسم التشخيص/التشخيص النهائي كلياً بناءً على طلب صريح."""
+        sections: list[tuple[str, str]] = []
+        for chunk in (raw or "").split("\n\n"):
+            chunk = chunk.strip()
+            if not chunk or ":" not in chunk:
+                continue
+            label, _, value = chunk.partition(":")
+            label = label.strip()
+            if "تشخيص" in label:
+                continue
+            sections.append((label, value.strip()))
+        return sections
 
     # ── سجلات الرعاية الصحية — إحصائيات + رسم بياني فقط (بلا جدول تفصيلي) ─────
     if healthcare_records:
@@ -678,72 +682,61 @@ def build_patient_pdf(
             continue
         count = len(reps)
         sorted_reps = sorted(reps, key=lambda x: x.get("report_date") or date.min)
-        is_operation = action == "عملية"
 
         section_block = [
             Spacer(1, 0.4 * cm),
             P(f"● {action}  ({count} تقرير)", "section"),
             HRFlowable(width="100%", thickness=0.8, color=C["accent"], spaceAfter=4),
         ]
+        story += section_block
 
         col_widths = [2.5 * cm, 5.5 * cm, 4.5 * cm, 4.9 * cm]
         col_widths_rev = list(reversed(col_widths))
         n_cols = len(col_widths)
 
-        def _header_row():
-            # ✅ عناصر جديدة في كل استدعاء (لا نعيد استخدام نفس كائنات
-            # Paragraph عبر صفوف متعددة من نفس الجدول — قد يسبّب تضارباً في
-            # حالة التخطيط الداخلية لـ reportlab إذا شُوركت الفقرة نفسها بين
-            # خلايا مختلفة).
-            return list(reversed([P("التاريخ", "th"), P("المستشفى", "th"), P("القسم", "th"), P("الطبيب", "th")]))
-
-        # ✅ جدول واحد متصل للقسم كله (بدل جداول منفصلة لكل تقرير) بناءً على
-        # طلب صريح: "اربطهم مع بعض بنفس الجدول". رأس الجدول يتكرر قبل كل
-        # تقرير (وليس مرة واحدة فقط) — طلب صريح أيضاً. القرار الطبي/اسم
-        # العملية صفّ ممتد عبر كل الأعمدة (SPAN) داخل نفس الجدول.
-        all_rows: list = []
-        style_cmds = [
-            ("GRID",          (0, 0), (-1, -1), 0.3, C["grid"]),
-            ("ALIGN",         (0, 0), (-1, -1), "CENTER"),
-            ("VALIGN",        (0, 0), (-1, -1), "TOP"),
-            ("TOPPADDING",    (0, 0), (-1, -1), 4),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-            ("RIGHTPADDING",  (0, 0), (-1, -1), 5),
-            ("LEFTPADDING",   (0, 0), (-1, -1), 5),
-        ]
-
+        # ✅ لكل تقرير: جدول صغير خاص به (رأس + صف بيانات + صفوف ممتدة SPAN
+        # لكل قسم مفكَّك من doctor_decision — قرار الطبيب/اسم العملية/
+        # التوصيات... كل قسم بسطره الخاص، لا كتلة واحدة مدمجة). يُغلَّف
+        # الجدول بأكمله بـ KeepTogether حتى لا ينفصل رأسه عن بياناته على
+        # صفحتين — بناءً على طلب صريح ("لا تفصل الهيدر عن الجدول... يتشوه
+        # الملف"). بلا أي تباعد بين جداول التقارير المتتالية فتبدو متّصلة
+        # بصرياً كجدول واحد (طلب سابق: "اربطهم مع بعض بنفس الجدول").
         for r in sorted_reps:
-            header_i = len(all_rows)
-            all_rows.append(_header_row())
-            style_cmds.append(("BACKGROUND", (0, header_i), (-1, header_i), C["accent"]))
-
-            data_row = [
+            header_row = list(reversed([P("التاريخ", "th"), P("المستشفى", "th"), P("القسم", "th"), P("الطبيب", "th")]))
+            data_row = list(reversed([
                 P(_fd(r.get("report_date")), "td_c"),
                 P(r.get("hospital_name") or "—", "td_r"),
                 P(_normalize_dept(r.get("department")) or "—", "td_r"),
                 P(r.get("doctor_name") or "—", "td_r"),
+            ]))
+
+            rows = [header_row, data_row]
+            style_cmds = [
+                ("GRID",          (0, 0), (-1, -1), 0.3, C["grid"]),
+                ("ALIGN",         (0, 0), (-1, -1), "CENTER"),
+                ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+                ("TOPPADDING",    (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING",  (0, 0), (-1, -1), 5),
+                ("LEFTPADDING",   (0, 0), (-1, -1), 5),
+                ("BACKGROUND",    (0, 0), (-1, 0), C["accent"]),
             ]
-            all_rows.append(list(reversed(data_row)))
 
-            # ✅ القرار الطبي أولاً، ثم اسم العملية بعده إن وُجد — كل منهما
-            # صفّ ممتَد (SPAN) عبر كل الأعمدة داخل نفس الجدول.
-            decision_i = len(all_rows)
-            decision_cell = P_field("القرار الطبي", r.get("doctor_decision"), "td_r", content_width_pts)
-            all_rows.append([decision_cell] + [""] * (n_cols - 1))
-            style_cmds.append(("SPAN", (0, decision_i), (-1, decision_i)))
-            style_cmds.append(("ALIGN", (0, decision_i), (-1, decision_i), "RIGHT"))
+            # ✅ كل قسم من doctor_decision (قرار الطبيب، اسم العملية،
+            # التوصيات...) بسطره الممتد (SPAN) الخاص — لا داعي لقسم
+            # التشخيص/التشخيص النهائي (مُستبعَد داخل _parse_decision_sections).
+            sections = _parse_decision_sections(r.get("doctor_decision"))
+            if not sections:
+                sections = [("القرار الطبي", r.get("doctor_decision") or "—")]
+            for label, value in sections:
+                row_i = len(rows)
+                rows.append([P_field(label, value, "td_r", content_width_pts)] + [""] * (n_cols - 1))
+                style_cmds.append(("SPAN", (0, row_i), (-1, row_i)))
+                style_cmds.append(("ALIGN", (0, row_i), (-1, row_i), "RIGHT"))
 
-            if is_operation:
-                opname_i = len(all_rows)
-                opname_cell = P_field("اسم العملية", _extract_op_name_en(r.get("doctor_decision")), "td_r", content_width_pts)
-                all_rows.append([opname_cell] + [""] * (n_cols - 1))
-                style_cmds.append(("SPAN", (0, opname_i), (-1, opname_i)))
-                style_cmds.append(("ALIGN", (0, opname_i), (-1, opname_i), "RIGHT"))
-
-        detail_table = Table(all_rows, colWidths=col_widths_rev, hAlign="RIGHT")
-        detail_table.setStyle(TableStyle(style_cmds))
-
-        story += section_block + [detail_table]
+            report_table = Table(rows, colWidths=col_widths_rev, hAlign="RIGHT")
+            report_table.setStyle(TableStyle(style_cmds))
+            story.append(KeepTogether([report_table]))
 
     # ── Build ─────────────────────────────────────────────────────────────────
     doc.build(story, onFirstPage=_on_page, onLaterPages=_on_page)
