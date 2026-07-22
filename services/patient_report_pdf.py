@@ -347,9 +347,10 @@ def build_patient_pdf(
 
     # ── مربع الصورة الشخصية (فارغ — يُلصَق يدوياً) + الاسم والفترة فقط ─────────
     # ✅ بلا بيانات شخصية تفصيلية (رقم ملف/جنسية/حالة مرضية/هاتف) بناءً على
-    # طلب صريح — الاسم والفترة فقط، مع مربع فارغ 4×6 سم للصورة الشخصية.
+    # طلب صريح — الاسم والفترة فقط. مربع الصورة يظهر منفصلاً وحده (بلا جدول
+    # الاسم/الفترة بجانبه) وبحجم أصغر (كان 4×6 سم) بناءً على طلب لاحق.
     class PhotoBox(_F):
-        def __init__(self, w=4 * cm, h=6 * cm):
+        def __init__(self, w=2.6 * cm, h=3.4 * cm):
             super().__init__()
             self.width = w
             self.height = h
@@ -360,9 +361,9 @@ def build_patient_pdf(
             c.setLineWidth(1)
             c.rect(0, 0, self.width, self.height, fill=0, stroke=1)
             c.setFillColor(C["text_gray"])
-            c.setFont(FN, 8)
-            c.drawCentredString(self.width / 2, self.height / 2 + 4, _ar("الصورة"))
-            c.drawCentredString(self.width / 2, self.height / 2 - 8, _ar("الشخصية"))
+            c.setFont(FN, 6.5)
+            c.drawCentredString(self.width / 2, self.height / 2 + 3, _ar("الصورة"))
+            c.drawCentredString(self.width / 2, self.height / 2 - 6, _ar("الشخصية"))
 
     # ✅ عمود القيمة أولاً ثم التسمية — آخر عمود بالقائمة = الأقصى يميناً
     # (reportlab يرسم الأعمدة من اليسار لليمين بترتيب القائمة المُعطاة، فلا
@@ -373,7 +374,7 @@ def build_patient_pdf(
             [P(patient_name, "body"),  P("الاسم:",   "td_r")],
             [P(period_label, "body"), P("الفترة:", "td_r")],
         ],
-        colWidths=[9 * cm, 3 * cm], hAlign="RIGHT",
+        colWidths=[13 * cm, 3.5 * cm], hAlign="RIGHT",
     )
     name_period_table.setStyle(TableStyle([
         ("BACKGROUND",    (0, 0), (-1, -1), C["card_bg"]),
@@ -384,17 +385,13 @@ def build_patient_pdf(
         ("RIGHTPADDING",  (0, 0), (-1, -1), 8),
         ("LEFTPADDING",   (0, 0), (-1, -1), 8),
     ]))
+    story.append(name_period_table)
+    story.append(Spacer(1, 0.4 * cm))
 
-    # ✅ مربع الصورة أخيراً بالقائمة = الأقصى يميناً في الصف الخارجي
-    header_row_table = Table(
-        [[name_period_table, PhotoBox()]],
-        colWidths=[12 * cm, 4 * cm], hAlign="RIGHT",
-    )
-    header_row_table.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("ALIGN",  (1, 0), (1, 0), "CENTER"),
-    ]))
-    story.append(header_row_table)
+    # ✅ مربع الصورة منفصل تماماً في سطره الخاص (لا يشارك جدول الاسم/الفترة صفه)
+    photo_box = PhotoBox()
+    photo_box.hAlign = "RIGHT"
+    story.append(photo_box)
     story.append(Spacer(1, 0.5 * cm))
 
     # ── Summary stat cards ────────────────────────────────────────────────────
