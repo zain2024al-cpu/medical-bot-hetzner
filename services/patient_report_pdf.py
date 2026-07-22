@@ -290,6 +290,31 @@ def build_patient_pdf(
         action_counts[a] += 1
         action_reports[a].append(r)
 
+    # ✅ الأنواع الإكلينيكية المعتمدة لعرضها في: الملخص التنفيذي (عدد أنواع
+    # الإجراءات)، جدول "ملخص الإجراءات"، ورسم "توزيع الإجراءات" — بناءً على
+    # طلب صريح بتطبيق نفس القائمة على الثلاثة معاً للتناسق. بقية الأنواع
+    # (طوارئ/تأجيل موعد/ترقيد/خروج من المستشفى/أشعة وفحوصات/أجهزة تعويضية...)
+    # لا تظهر في أي منها. "جدول القسم×نوع الإجراء" وقسم "تفاصيل التقارير"
+    # لهما قوائمهما الخاصة (غير مُمَسوسة هنا) — لم يُطلَب تغييرهما.
+    # "الجلسات" ليست قيمة medical_action فعلية بل تسمية قائمة فرعية في واجهة
+    # الإدخال تتفرّع لخمسة أنواع فعلية مختلفة — كلها مُدرَجة هنا. "التمارين
+    # الطبيعية" تقابل القيمة الفعلية الوحيدة "علاج طبيعي".
+    _SUMMARY_ACTIONS = {
+        "استشارة جديدة",
+        "مراجعة / عودة دورية",
+        "استشارة أخيرة",
+        "استشارة مع قرار عملية",
+        "عملية",
+        "جلسة إشعاعي",
+        "العلاج الكيماوي",
+        "العلاج الموجه",
+        "العلاج المناعي",
+        "جلسات غسيل الكلى",
+        "المناظير",
+        "علاج طبيعي",
+    }
+    summary_action_counts = {a: c for a, c in action_counts.items() if a in _SUMMARY_ACTIONS}
+
     def _fd(d) -> str:
         if d is None: return "—"
         return d.strftime("%d/%m/%Y") if hasattr(d, "strftime") else str(d)
@@ -398,7 +423,7 @@ def build_patient_pdf(
     # (أقصى اليمين) كأهم رقم تنفيذي.
     stat_data = [[
         [P(str(len(depts_in)),   "stat_value"), P("الأقسام",            "stat_label")],
-        [P(str(len(action_counts)), "stat_value"), P("أنواع الإجراءات", "stat_label")],
+        [P(str(len(summary_action_counts)), "stat_value"), P("أنواع الإجراءات", "stat_label")],
         [P(str(len(hospitals)),  "stat_value"), P("المستشفيات",         "stat_label")],
         [P(str(total),           "stat_value"), P("إجمالي التقارير",   "stat_label")],
     ]]
@@ -422,32 +447,12 @@ def build_patient_pdf(
     # ✅ ترتيب صريح بناءً على طلب المستخدم: يبدأ الجدول ثم يليه الرسم البياني
     # (بدل الرسم البياني أولاً كما كان). معكوسة: "نوع الإجراء" يظهر أقصى اليمين.
     #
-    # ✅ جدول "ملخص الإجراءات" (فقط) مقصور بناءً على طلب صريح على الأنواع
-    # الإكلينيكية المهمة أدناه — بقية الأنواع (طوارئ/تأجيل موعد/ترقيد/خروج من
-    # المستشفى/أشعة وفحوصات/أجهزة تعويضية...) لا تظهر في هذا الجدول تحديداً.
-    # "الجلسات" ليست قيمة medical_action فعلية بل تسمية قائمة فرعية في واجهة
-    # الإدخال (bot/handlers/user/user_reports_add_new_system/action_type_handlers.py)
-    # تتفرّع لخمسة أنواع فعلية مختلفة — كلها مُدرَجة هنا لتغطية "الجلسات بشكل
-    # كامل" كما طلب المستخدم حرفياً. "التمارين الطبيعية" تقابل القيمة الفعلية
-    # الوحيدة "علاج طبيعي" (flows/rehab.py) — لا توجد قيمة منفصلة بهذا الاسم.
-    _SUMMARY_TABLE_ACTIONS = {
-        "استشارة جديدة",
-        "مراجعة / عودة دورية",
-        "استشارة أخيرة",
-        "استشارة مع قرار عملية",
-        "عملية",
-        "جلسة إشعاعي",
-        "العلاج الكيماوي",
-        "العلاج الموجه",
-        "العلاج المناعي",
-        "جلسات غسيل الكلى",
-        "المناظير",
-        "علاج طبيعي",
-    }
+    # ✅ جدول "ملخص الإجراءات" ورسم "توزيع الإجراءات" كلاهما مقصوران على
+    # summary_action_counts (الأنواع الإكلينيكية المعتمدة — انظر تعريف
+    # _SUMMARY_ACTIONS أعلاه) بناءً على طلب صريح بتطبيق نفس القائمة على
+    # الاثنين معاً للتناسق مع الملخص التنفيذي.
     act_rows = [[P("النسبة", "th"), P("عدد التقارير", "th"), P("نوع الإجراء", "th")]]
-    for action, cnt in sorted(action_counts.items(), key=lambda x: -x[1]):
-        if action not in _SUMMARY_TABLE_ACTIONS:
-            continue
+    for action, cnt in sorted(summary_action_counts.items(), key=lambda x: -x[1]):
         pct = f"{cnt / total * 100:.1f}%" if total else "—"
         act_rows.append([
             P(pct, "td_c"),
@@ -471,8 +476,8 @@ def build_patient_pdf(
         # والجدول بأكمله في الصفحة التالية، وهو خطأ فادح بحسب المستخدم صراحة.
         story.append(KeepTogether([P("جدول ملخص الإجراءات", "section"), act_table]))
 
-    if len(action_counts) > 1:
-        chart_items = sorted(action_counts.items(), key=lambda x: -x[1])
+    if len(summary_action_counts) > 1:
+        chart_items = sorted(summary_action_counts.items(), key=lambda x: -x[1])
         chart = _HBarChart(chart_items, width=content_width_pts)
         chart.hAlign = "RIGHT"
         # ✅ العنوان والرسم يبقيان معاً على نفس الصفحة (KeepTogether) —
