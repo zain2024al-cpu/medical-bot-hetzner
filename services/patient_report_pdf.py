@@ -22,13 +22,18 @@ logger = logging.getLogger(__name__)
 _FONT_CANDIDATES = [
     ("C:\\Windows\\Fonts\\tahoma.ttf",   "Tahoma"),
     ("C:\\Windows\\Fonts\\arial.ttf",    "Arial"),
-    ("/usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf", "NotoAr"),
-    ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "DejaVu"),
-    # Project-bundled font (assets/fonts/Arabic-Regular.ttf copied from Arial)
+    # ✅ الخط المرفَق مع المشروع مضمون الوجود على أي سيرفر (جزء من الـ repo)
+    # ومؤكَّد أنه يعرض العربي بشكل صحيح (اختُبر فعلياً مع matplotlib أيضاً) —
+    # يجب تجربته قبل خطوط النظام (NotoNaskh/DejaVu) التي قد تكون غير مثبَّتة
+    # على الخادم، أو مثبَّتة لكن بدعم عربي ضعيف (DejaVu Sans تحديداً لا يدعم
+    # أشكال العرض العربية Presentation Forms بشكل كامل، وهذا ما كان يسبب
+    # ظهور تسميات الرسم البياني مشوَّهة رغم إصلاح استخدام matplotlib للخط).
     (
         os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "assets", "fonts", "Arabic-Regular.ttf")),
         "ArabicReg",
     ),
+    ("/usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf", "NotoAr"),
+    ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "DejaVu"),
 ]
 
 _FONT_BOLD_CANDIDATES = [
@@ -182,6 +187,8 @@ def build_patient_pdf(
     dept_filter: list[str] | None,
     period_label: str,
     healthcare_records: list[dict] | None = None,
+    period_start: date | None = None,
+    period_end: date | None = None,
 ) -> io.BytesIO:
     """
     Build a professional Arabic PDF report for a single patient.
@@ -189,12 +196,15 @@ def build_patient_pdf(
     patient  — {name, file_number, nationality, disease, phone, ...}
     reports  — list of report dicts from DB
     dept_filter — None = all depts, list = specific depts selected
-    period_label — human-readable period string for the header
+    period_label — human-readable period string for the header (e.g. "آخر 3 أشهر")
     healthcare_records — سجلات وحدة الرعاية الصحية (اختياري)، من
         services/healthcare_records_repository.py:get_healthcare_records_for_patient —
         [{"type", "type_label", "date", "department", "description",
           "specialist_name", "notes"}, ...]. إذا كانت فارغة/None، لا يُضاف
         أي قسم إضافي (سلوك الدالة بلا تغيير عن السابق).
+    period_start / period_end — تواريخ الفترة الفعلية (اختياري) لعرضها بجانب
+        period_label في سطر الفترة أعلى التقرير (مثال: "آخر 3 أشهر — من
+        23/04/2026 إلى 22/07/2026"). إن لم تُمرَّر، يُعرض period_label وحده.
     """
     try:
         from reportlab.lib.pagesizes import A4
@@ -306,49 +316,20 @@ def build_patient_pdf(
         action_counts[a] += 1
         action_reports[a].append(r)
 
-    dates = [r.get("report_date") for r in reports if r.get("report_date")]
-    first_dt = min(dates) if dates else None
-    last_dt  = max(dates) if dates else None
-
     def _fd(d) -> str:
         if d is None: return "—"
         return d.strftime("%d/%m/%Y") if hasattr(d, "strftime") else str(d)
 
-    # ── COVER ─────────────────────────────────────────────────────────────────
+    # ── رأس التقرير: بلا صندوق أزرق كبير ──────────────────────────────────────
+    # ✅ إزالة الصندوق الأزرق الكبير (CoverBand) وجدول الاسم/الفترة المكرر
+    # بناءً على طلب صريح: "المربع الأزرق كبير جدا لا داعي له" + "الجدول الذي
+    # فيه الاسم والفترة مكرر مرة ثانية" (كان يكرر ما يعرضه الصندوق الأزرق).
+    # الشكل الجديد: سطر باسم المريض، سطر "التقرير الطبي الشامل" تحته، سطر
+    # الفترة تحته (تُدمَج فيه period_label الجاهزة مع تواريخ البداية/النهاية
+    # الفعلية إن تُوفِّرت)، والصورة الشخصية أعلى الصفحة على اليسار (بدل
+    # اليمين/تحت الجدول كما كانت) — كل ذلك بلا أي خلفية ملوّنة.
     from reportlab.platypus.flowables import Flowable as _F
-    from reportlab.lib.units import cm as _cm
 
-    class CoverBand(_F):
-        def __init__(self):
-            super().__init__()
-            self.width  = 540
-            self.height = 120
-
-        def draw(self):
-            c = self.canv
-            c.setFillColor(C["primary"])
-            c.roundRect(0, 0, self.width, self.height, 10, stroke=0, fill=1)
-            # Accent strip
-            c.setFillColor(C["accent"])
-            c.roundRect(0, 0, self.width, 8, 0, stroke=0, fill=1)
-            # Title
-            c.setFillColor(C["white"])
-            c.setFont(FNB, 20)
-            c.drawRightString(self.width - 15, self.height - 38, _ar("التقرير الطبي الشامل للمريض"))
-            # Subtitle
-            c.setFont(FN, 11)
-            c.setFillColor(C["light_bg"])
-            c.drawRightString(self.width - 15, self.height - 58, _ar(patient_name))
-            c.setFont(FN, 9)
-            c.drawRightString(self.width - 15, 18, _ar(f"الفترة: {period_label}"))
-
-    story.append(CoverBand())
-    story.append(Spacer(1, 0.4 * cm))
-
-    # ── مربع الصورة الشخصية (فارغ — يُلصَق يدوياً) + الاسم والفترة فقط ─────────
-    # ✅ بلا بيانات شخصية تفصيلية (رقم ملف/جنسية/حالة مرضية/هاتف) بناءً على
-    # طلب صريح — الاسم والفترة فقط. مربع الصورة يظهر منفصلاً وحده (بلا جدول
-    # الاسم/الفترة بجانبه) وبحجم أصغر (كان 4×6 سم) بناءً على طلب لاحق.
     class PhotoBox(_F):
         def __init__(self, w=2.6 * cm, h=3.4 * cm):
             super().__init__()
@@ -365,34 +346,37 @@ def build_patient_pdf(
             c.drawCentredString(self.width / 2, self.height / 2 + 3, _ar("الصورة"))
             c.drawCentredString(self.width / 2, self.height / 2 - 6, _ar("الشخصية"))
 
-    # ✅ عمود القيمة أولاً ثم التسمية — آخر عمود بالقائمة = الأقصى يميناً
-    # (reportlab يرسم الأعمدة من اليسار لليمين بترتيب القائمة المُعطاة، فلا
-    # بد من هذا الترتيب المعكوس صراحة ليُقرأ "الاسم:" ثم القيمة من اليمين
-    # لليسار كما يُقرأ العربي طبيعياً — نفس مبدأ services/pharmacy_evacuation_pdf.py).
-    name_period_table = Table(
-        [
-            [P(patient_name, "body"),  P("الاسم:",   "td_r")],
-            [P(period_label, "body"), P("الفترة:", "td_r")],
-        ],
-        colWidths=[13 * cm, 3.5 * cm], hAlign="RIGHT",
-    )
-    name_period_table.setStyle(TableStyle([
-        ("BACKGROUND",    (0, 0), (-1, -1), C["card_bg"]),
-        ("GRID",          (0, 0), (-1, -1), 0.4, C["grid"]),
-        ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
-        ("TOPPADDING",    (0, 0), (-1, -1), 6),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-        ("RIGHTPADDING",  (0, 0), (-1, -1), 8),
-        ("LEFTPADDING",   (0, 0), (-1, -1), 8),
-    ]))
-    story.append(name_period_table)
-    story.append(Spacer(1, 0.4 * cm))
+    if period_start and period_end:
+        period_line_text = f"الفترة: {period_label} — من {_fd(period_start)} إلى {_fd(period_end)}"
+    else:
+        period_line_text = f"الفترة: {period_label}"
 
-    # ✅ مربع الصورة منفصل تماماً في سطره الخاص (لا يشارك جدول الاسم/الفترة صفه)
-    photo_box = PhotoBox()
-    photo_box.hAlign = "RIGHT"
-    story.append(photo_box)
-    story.append(Spacer(1, 0.5 * cm))
+    name_style     = S("name_ttl", fontSize=17, leading=21, alignment=TA_RIGHT, textColor=C["text_dark"], fontName=FNB)
+    subtitle_style = S("subttl",   fontSize=12, leading=16, alignment=TA_RIGHT, textColor=C["primary"],   fontName=FNB)
+    period_style   = S("prdline",  fontSize=9.5, leading=13, alignment=TA_RIGHT, textColor=C["text_gray"])
+
+    text_stack = [
+        Paragraph(_ar(patient_name), name_style),
+        Paragraph(_ar("التقرير الطبي الشامل"), subtitle_style),
+        Paragraph(_ar(period_line_text), period_style),
+    ]
+
+    # ✅ الصورة أولاً بالقائمة = أقصى اليسار (بعكس بقية جداول هذا الملف التي
+    # تُعكَس عمداً لتصبح RTL — هنا نريد LEFT فعلاً، فلا نعكس الترتيب).
+    header_table = Table(
+        [[PhotoBox(), text_stack]],
+        colWidths=[3.4 * cm, content_width_pts - 3.4 * cm],
+    )
+    header_table.setStyle(TableStyle([
+        ("VALIGN",       (0, 0), (-1, -1), "TOP"),
+        ("ALIGN",        (0, 0), (0, 0),   "CENTER"),
+        ("ALIGN",        (1, 0), (1, 0),   "RIGHT"),
+        ("LEFTPADDING",  (0, 0), (0, 0),   0),
+        ("RIGHTPADDING", (1, 0), (1, 0),   0),
+        ("TOPPADDING",   (0, 0), (-1, -1), 0),
+    ]))
+    story.append(header_table)
+    story.append(Spacer(1, 0.4 * cm))
 
     # ── Summary stat cards ────────────────────────────────────────────────────
     story.append(HRFlowable(width="100%", thickness=1, color=C["grid"], spaceAfter=4))
@@ -421,38 +405,21 @@ def build_patient_pdf(
     ]))
     story.append(stat_table)
     story.append(Spacer(1, 0.3 * cm))
-
-    # Period — ✅ معكوس: "أول تقرير" يظهر أولاً (أقصى اليمين) ثم قيمته، تليها
-    # "آخر تقرير" ثم قيمتها يساراً — بترتيب قراءة عربي طبيعي من اليمين لليسار.
-    period_data = [
-        [P(_fd(last_dt), "body"), P("آخر تقرير:", "td_r"),
-         P(_fd(first_dt), "body"), P("أول تقرير:", "td_r")],
-    ]
-    pt = Table(period_data, colWidths=[5 * cm, 3 * cm, 5 * cm, 3 * cm], hAlign="RIGHT")
-    pt.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), C["light_bg"]),
-        ("GRID",       (0, 0), (-1, -1), 0.4, C["grid"]),
-        ("ALIGN",      (0, 0), (-1, -1), "RIGHT"),
-        ("TOPPADDING", (0, 0), (-1, -1), 5),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-    ]))
-    story.append(pt)
+    # ✅ حُذف سطر "أول تقرير/آخر تقرير" بناءً على طلب صريح — لا داعي له.
 
     # ── Action-type bar chart ─────────────────────────────────────────────────
     if len(action_counts) > 1:
-        story.append(Spacer(1, 0.5 * cm))
-        story.append(P("توزيع الإجراءات", "section"))
         chart_buf = _action_bar_chart(dict(action_counts), FN)
         if chart_buf:
             chart_h = min(10 * cm, max(3 * cm, len(action_counts) * 0.55 * cm))
             img = Image(chart_buf, width=15 * cm, height=chart_h)
             img.hAlign = "CENTER"
-            story.append(img)
+            # ✅ العنوان والرسم يبقيان معاً على نفس الصفحة (KeepTogether) —
+            # بدل احتمال أن يظهر العنوان في أسفل صفحة والرسم في التي تليها.
+            story.append(Spacer(1, 0.5 * cm))
+            story.append(KeepTogether([P("توزيع الإجراءات", "section"), img]))
 
     # ── Action summary table ──────────────────────────────────────────────────
-    story.append(Spacer(1, 0.4 * cm))
-    story.append(P("جدول ملخص الإجراءات", "section"))
     # ✅ معكوسة: "نوع الإجراء" (العمود الأساسي) يظهر أقصى اليمين
     act_rows = [[P("النسبة", "th"), P("عدد التقارير", "th"), P("نوع الإجراء", "th")]]
     for action, cnt in sorted(action_counts.items(), key=lambda x: -x[1]):
@@ -473,12 +440,14 @@ def build_patient_pdf(
         ("RIGHTPADDING",   (0, 0), (-1, -1), 6),
         ("LEFTPADDING",    (0, 0), (-1, -1), 6),
     ]))
-    story.append(act_table)
+    story.append(Spacer(1, 0.4 * cm))
+    # ✅ العنوان والجدول معاً (KeepTogether) — كان يظهر العنوان في أسفل صفحة
+    # والجدول بأكمله في الصفحة التالية، وهو خطأ فادح بحسب المستخدم صراحة.
+    story.append(KeepTogether([P("جدول ملخص الإجراءات", "section"), act_table]))
 
     # ── Hospitals list ────────────────────────────────────────────────────────
     if hospitals:
         story.append(Spacer(1, 0.4 * cm))
-        story.append(P("المستشفيات المزارة", "section"))
         # ✅ معكوسة: "المستشفى" يظهر أقصى اليمين
         hosp_rows = [[P("عدد الزيارات", "th"), P("المستشفى", "th")]]
         hosp_counts = defaultdict(int)
@@ -498,7 +467,7 @@ def build_patient_pdf(
             ("BOTTOMPADDING",  (0, 0), (-1, -1), 5),
             ("RIGHTPADDING",   (0, 0), (-1, -1), 6),
         ]))
-        story.append(ht)
+        story.append(KeepTogether([P("المستشفيات المزارة", "section"), ht]))
 
     # ── إحصائيات حسب القسم ونوع الإجراء معاً ─────────────────────────────────
     # ✅ جدول تقاطعي (Pivot): يجيب على "كم إجراء من كل نوع صدر عن كل قسم" —
@@ -513,9 +482,6 @@ def build_patient_pdf(
         dept_action_counts[dept][a] += 1
 
     if dept_action_counts:
-        story.append(Spacer(1, 0.4 * cm))
-        story.append(P("إحصائيات حسب القسم ونوع الإجراء", "section"))
-
         action_names = sorted(action_counts.keys())
         dept_col_w  = 3.2 * cm
         total_col_w = 1.6 * cm
@@ -554,7 +520,8 @@ def build_patient_pdf(
             ("RIGHTPADDING",   (0, 0), (-1, -1),  3),
             ("LEFTPADDING",    (0, 0), (-1, -1),  3),
         ]))
-        story.append(dept_action_table)
+        story.append(Spacer(1, 0.4 * cm))
+        story.append(KeepTogether([P("إحصائيات حسب القسم ونوع الإجراء", "section"), dept_action_table]))
 
     def _extract_op_name_en(doctor_decision: str) -> str:
         """يستخرج اسم العملية بالإنجليزي من doctor_decision — لا عمود مخصَّص
@@ -580,7 +547,6 @@ def build_patient_pdf(
 
         story.append(Spacer(1, 0.4 * cm))
         story.append(HRFlowable(width="100%", thickness=1, color=C["grid"], spaceAfter=4))
-        story.append(P("سجلات الرعاية الصحية", "section"))
 
         # ✅ معكوسة: "النوع" يظهر أقصى اليمين
         hc_rows = [[P("النسبة", "th"), P("العدد", "th"), P("النوع", "th")]]
@@ -598,23 +564,26 @@ def build_patient_pdf(
             ("RIGHTPADDING",   (0, 0), (-1, -1), 6),
             ("LEFTPADDING",    (0, 0), (-1, -1), 6),
         ]))
-        story.append(hc_table)
+        story.append(KeepTogether([P("سجلات الرعاية الصحية", "section"), hc_table]))
 
         if len(hc_counts) > 1:
             chart_buf = _action_bar_chart(dict(hc_counts), FN)
             if chart_buf:
-                story.append(Spacer(1, 0.3 * cm))
                 chart_h = min(8 * cm, max(3 * cm, len(hc_counts) * 0.6 * cm))
                 img = Image(chart_buf, width=15 * cm, height=chart_h)
                 img.hAlign = "CENTER"
+                story.append(Spacer(1, 0.3 * cm))
                 story.append(img)
 
     # ── تفاصيل التقارير — تُعرَض أخيراً في التقرير ─────────────────────────────
-    # ✅ الكشف الكامل بكل التقارير يبقى فقط لأهم نوعين إكلينيكياً (عمليات
-    # ونادرة الحدوث): "عملية" (مع اسمها بالإنجليزي) و"استشارة أخيرة". بقية
-    # الأنواع الروتينية تظهر ملخَّصة إحصائياً أعلاه فقط، مع عرض آخر تقرير
-    # لكل نوع هنا للسياق — بلا تكرار القائمة الكاملة.
-    _FULL_DETAIL_ACTIONS = {"عملية", "استشارة أخيرة"}
+    # ✅ الكشف الكامل بكل التقارير يبقى فقط لنوعين حصراً بناءً على طلب صريح:
+    # "استشارة مع قرار عملية" و"استشارة أخيرة". بقية الأنواع (بما فيها "عملية"
+    # كنوع منفصل) تظهر ملخَّصة إحصائياً أعلاه فقط، مع عرض آخر تقرير لكل نوع
+    # هنا للسياق — بلا تكرار القائمة الكاملة.
+    # ⚠️ الاسم الفعلي في قاعدة البيانات هو "استشارة مع قرار عملية" (بلا الـ
+    # "ال" التعريف) — وليس "عملية" وحدها، وهي نوع منفصل تماماً في البيانات
+    # الحقيقية (رصدنا كليهما ظاهرين كنوعين مستقلين في تقرير مريض فعلي).
+    _FULL_DETAIL_ACTIONS = {"استشارة مع قرار عملية", "استشارة أخيرة"}
 
     story.append(PageBreak())
     story.append(P("تفاصيل التقارير حسب نوع الإجراء", "section"))
@@ -633,7 +602,7 @@ def build_patient_pdf(
             HRFlowable(width="100%", thickness=0.8, color=C["accent"], spaceAfter=4),
         ]
 
-        is_operation = action == "عملية"
+        is_operation = action == "استشارة مع قرار عملية"
 
         # ✅ جدول موجز آمن (حقول قصيرة فقط: #/تاريخ/مستشفى/طبيب/متابعة) — بلا
         # أي نص حر طويل، فلا يمكن أن يفيض عن ارتفاع الصفحة إطلاقاً. النصوص

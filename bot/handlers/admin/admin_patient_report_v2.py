@@ -596,6 +596,7 @@ async def _finalize_and_generate(
         pdf_buf = await asyncio.to_thread(
             build_patient_pdf, patient_data, reports, depts, period_label,
             healthcare_records=healthcare_records,
+            period_start=period_start, period_end=period_end,
         )
 
         filename = f"Patient_{patient_id}_{period_start}_{period_end}.pdf"
