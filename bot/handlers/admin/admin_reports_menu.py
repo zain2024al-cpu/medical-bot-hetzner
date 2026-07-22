@@ -115,18 +115,24 @@ async def handle_type_selection(
         context.user_data["_report_type"] = "patient"
         try:
             from . import admin_patient_report_v2
-            # Show patient selector and let patient_report_v2 handler take over
-            result = await admin_patient_report_v2.show_patient_selector(update, context)
-            # Return the state from patient_report_v2, don't end here
-            # (This allows the ConversationHandler there to manage the flow)
-            return result
+            # ✅ admin_patient_report_v2 يدير حالته بنفسه عبر CallbackQueryHandler
+            # مستقلة (context.user_data)، وليس عبر ConversationHandler متداخل —
+            # نفس نمط فرعي "comp"/"attachments" أدناه بالضبط. إعادة قيمة الحالة
+            # الداخلية (PR_SHOW_SELECTOR=0) هنا كانت الخطأ: هذه القيمة غير
+            # مسجَّلة ضمن states الخاصة بـ reports_menu_conv، فيسجّلها PTB
+            # كحالة "عالقة" لهذا المستخدم (تحذير PTBUserWarning فقط، لا خطأ) —
+            # ونتيجة allow_reentry=False تُقفَل كل التفاعلات اللاحقة مع هذا الزر
+            # صامتة تماماً حتى إعادة تشغيل البوت (نفس عرَض "يعمل أول مرة ثم
+            # يتوقف" الذي أبلغ عنه المستخدم). يجب إنهاء المحادثة الخارجية دوماً
+            # بعد التفويض، تماماً كبقية الفروع.
+            await admin_patient_report_v2.show_patient_selector(update, context)
         except Exception:
             logger.exception("[reports_menu] فشل عرض منتقي المريض (تقرير مريض)")
             try:
                 await query.edit_message_text("❌ حدث خطأ. حاول الضغط على '🖨️ طباعة التقارير' مرة أخرى.")
             except Exception:
                 pass
-            return ConversationHandler.END
+        return ConversationHandler.END
 
     if data == f"{_PFX}:attachments":
         # Delegate to attachments-bundle handler — no further states needed,
