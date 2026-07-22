@@ -232,18 +232,24 @@ def build_patient_pdf(
         wrapped = _ar_wrap(txt, style.fontName, style.fontSize, usable_width)
         return Paragraph(wrapped, style)
 
-    def P_field(label, txt, style_key, max_width_pts) -> Paragraph:
-        """حقل نصي مستقل (تسمية: قيمة) خارج أي جدول — على عكس خلية جدول،
-        هذا الـ Paragraph قابل للانقسام تلقائياً بين صفحتين إن طال (Platypus
-        يدعم split() للفقرات)، فلا يمكن أن يسبّب LayoutError مهما طال النص
-        (وهو ما كان يحدث سابقاً عندما كان النص الطويل محشوراً داخل خلية جدول
-        واحدة غير قابلة للانقسام)."""
+    def P_cell_capped(txt, style_key, max_width_pts, max_lines=18) -> Paragraph:
+        """مثل P_wrap، لكن لخلايا جدول (لا فقرة مستقلة) — بحدّ أقصى لعدد
+        الأسطر الملفوفة (قص + "…" عند التجاوز). ✅ ضروري هنا تحديداً: خلية
+        جدول واحدة غير قابلة للانقسام بين صفحتين في reportlab (بعكس فقرة
+        مستقلة خارج الجدول)، فنص حر طويل جداً بلا حدّ فيها يسبب LayoutError
+        فعلياً (تعطّل شوهد سابقاً في سجلات الإنتاج). الحدّ هنا سخي (18 سطراً)
+        يحافظ على كل النصوص الواقعية تقريباً كاملة، ولا يُفعَّل التقصير إلا في
+        حالات نادرة جداً من نص طويل جداً بشكل غير معتاد."""
         style = ST[style_key]
         usable_width = max(max_width_pts - 8, 20)
-        value = str(txt or "").strip() or "—"
-        combined = f"{label}:  {value}"
-        wrapped = _ar_wrap(combined, style.fontName, style.fontSize, usable_width)
-        return Paragraph(wrapped, style)
+        wrapped = _ar_wrap(txt, style.fontName, style.fontSize, usable_width)
+        if not wrapped:
+            return Paragraph("—", style)
+        lines = wrapped.split("<br/>")
+        if len(lines) > max_lines:
+            lines = lines[:max_lines]
+            lines[-1] = lines[-1] + " …"
+        return Paragraph("<br/>".join(lines), style)
 
     # ── Canvas callbacks (header/footer on every page) ─────────────────────
     patient_name = patient.get("name", "—")
@@ -618,22 +624,39 @@ def build_patient_pdf(
 
     # ── تفاصيل التقارير — تُعرَض أخيراً في التقرير ─────────────────────────────
     # ✅ هذا القسم يقتصر حصراً على نوعين بناءً على طلب صريح: "استشارة مع قرار
-    # عملية" و"استشارة أخيرة" — بقية الأنواع لا تظهر هنا إطلاقاً (لا حتى
-    # بصيغة "آخر تقرير فقط")، فهي معروضة إحصائياً فقط في الجداول أعلاه.
-    # ⚠️ الاسم الفعلي في قاعدة البيانات هو "استشارة مع قرار عملية" (بلا الـ
-    # "ال" التعريف) — وليس "عملية" وحدها، وهي نوع منفصل تماماً في البيانات
-    # الحقيقية (رصدنا كليهما ظاهرين كنوعين مستقلين في تقرير مريض فعلي).
+    # عملية" و"استشارة أخيرة" — بقية الأنواع لا تظهر هنا إطلاقاً، فهي معروضة
+    # إحصائياً فقط في الجداول أعلاه. ⚠️ الاسم الفعلي في قاعدة البيانات هو
+    # "استشارة مع قرار عملية" (بلا الـ"ال" التعريف) — وليس "عملية" وحدها،
+    # وهي نوع منفصل تماماً في البيانات الحقيقية.
+    #
+    # ✅ جدول واحد فقط لكل نوع (بدل جدول حقول قصيرة + فقرات نصية منفصلة تحته)
+    # بناءً على طلب صريح: "لا داعي للنصوص والجداول مع بعض... بجدول واحد أسهل
+    # وأمرن". الأعمدة: التاريخ، المستشفى، القسم، القرار الطبي، واسم العملية
+    # (للنوع الجراحي فقط). الترتيب بين القسمين ثابت (عملية القرار أولاً ثم
+    # استشارة أخيرة) بناءً على طلب صريح، وليس بحسب عدد التقارير كما كان.
+    #
+    # ⚠️ ملاحظة فنية مهمة: دمج "القرار الطبي" (نص حر قد يطول جداً) داخل خلية
+    # جدول يُعيد فعلياً خطر التعطّل (LayoutError) الذي أُصلِح سابقاً بنقل هذا
+    # النص لفقرة مستقلة خارج الجدول — لأن خلية جدول واحدة غير قابلة للانقسام
+    # بين صفحتين في reportlab. بما أن جدول واحد أُريد صراحةً، استُخدم
+    # P_cell_capped بدل P_wrap: يلفّ النص بأمان لكن بحدّ أقصى 18 سطراً لكل
+    # خلية (يحافظ على كل نص واقعي تقريباً)، ويقصّه بـ"…" فقط في حالات نادرة
+    # جداً من نص أطول من ذلك بكثير — هذا يمنع التعطّل نهائياً مهما طال النص.
     _FULL_DETAIL_ACTIONS = {"استشارة مع قرار عملية", "استشارة أخيرة"}
+    _DETAIL_ORDER = ["استشارة مع قرار عملية", "استشارة أخيرة"]
 
     story.append(PageBreak())
     story.append(P("تفاصيل التقارير حسب نوع الإجراء", "section"))
     story.append(HRFlowable(width="100%", thickness=1.5, color=C["primary"], spaceAfter=6))
 
     detail_actions = {a: reps for a, reps in action_reports.items() if a in _FULL_DETAIL_ACTIONS}
-    for action, reps in sorted(detail_actions.items(), key=lambda x: -len(x[1])):
+    for action in _DETAIL_ORDER:
+        reps = detail_actions.get(action)
+        if not reps:
+            continue
         count = len(reps)
         sorted_reps = sorted(reps, key=lambda x: x.get("report_date") or date.min)
-        display_reps = sorted_reps
+        is_operation = action == "استشارة مع قرار عملية"
 
         section_block = [
             Spacer(1, 0.4 * cm),
@@ -641,79 +664,45 @@ def build_patient_pdf(
             HRFlowable(width="100%", thickness=0.8, color=C["accent"], spaceAfter=4),
         ]
 
-        is_operation = action == "استشارة مع قرار عملية"
-
-        # ✅ جدول موجز آمن (حقول قصيرة فقط: #/تاريخ/مستشفى/طبيب/متابعة) — بلا
-        # أي نص حر طويل، فلا يمكن أن يفيض عن ارتفاع الصفحة إطلاقاً. النصوص
-        # الحرة (الشكوى/القرار الطبي/اسم العملية) تُعرض تحته كفقرات مستقلة
-        # (انظر P_field) بدل حشرها في خلية جدول — لأن خلية جدول واحدة غير
-        # قابلة للانقسام بين صفحتين، فنص حر طويل جداً فيها كان يسبب
-        # LayoutError (تعطّل فعلي شوهد في سجلات الإنتاج: خلية بارتفاع 710
-        # نقطة لا تتسع في صفحة كاملة). الفقرة المستقلة قابلة للانقسام تلقائياً
-        # بين الصفحات مهما طال النص، فتُلغي هذا الخطر نهائياً.
-        header_row = [
-            P("#",       "th"),
-            P("التاريخ", "th"),
-            P("المستشفى / القسم", "th"),
-            P("الطبيب",  "th"),
-            P("المتابعة", "th"),
-        ]
-        col_widths = [0.8*cm, 2.4*cm, 5*cm, 3.5*cm, 2.5*cm]
+        header_row = [P("التاريخ", "th"), P("المستشفى", "th"), P("القسم", "th"), P("القرار الطبي", "th")]
+        col_widths = [2.3 * cm, 3.8 * cm, 3.3 * cm]
+        if is_operation:
+            header_row.append(P("اسم العملية", "th"))
+            col_widths.append(2.6 * cm)
+        decision_w = content_width_pts - sum(col_widths)
+        col_widths.append(decision_w)  # عمود القرار الطبي (الأخير منطقياً = الأوسع)
 
         rows = [header_row]
-        for idx, r in enumerate(display_reps, 1):
-            hosp = r.get("hospital_name", "")
-            dept = _normalize_dept(r.get("department"))
-            location = hosp + ("\n" + dept if dept else "")
-            followup  = _fd(r.get("followup_date"))
-            rows.append([
-                P(str(idx),       "td_c"),
+        for r in sorted_reps:
+            row = [
                 P(_fd(r.get("report_date")), "td_c"),
-                P(location,       "td_r"),
-                P(r.get("doctor_name", "—"), "td_r"),
-                P(followup if followup != "—" else "—", "td_c"),
-            ])
+                P(r.get("hospital_name") or "—", "td_r"),
+                P(_normalize_dept(r.get("department")) or "—", "td_r"),
+            ]
+            if is_operation:
+                row.append(P_cell_capped(_extract_op_name_en(r.get("doctor_decision")) or "—", "td_r", 2.6 * cm))
+            row.append(P_cell_capped(r.get("doctor_decision"), "td_r", decision_w))
+            rows.append(row)
 
         # ✅ عكس كل الأعمدة (رأس + كل الصفوف + العرض) دفعة واحدة — يضمن ظهور
-        # "#" أقصى اليمين (نفس مبدأ "م" في services/pharmacy_evacuation_pdf.py)
-        # بدل بنائها معكوسة يدوياً عمود عمود (عرضة للخطأ).
+        # "التاريخ" أقصى اليمين، نفس مبدأ بقية جداول هذا الملف.
         rows = [list(reversed(row)) for row in rows]
         col_widths = list(reversed(col_widths))
 
-        info_table = Table(
-            rows,
-            colWidths=col_widths,
-            hAlign="RIGHT",
-            repeatRows=1,
-        )
-        info_table.setStyle(TableStyle([
+        detail_table = Table(rows, colWidths=col_widths, hAlign="RIGHT", repeatRows=1)
+        detail_table.setStyle(TableStyle([
             ("BACKGROUND",     (0, 0), (-1, 0),  C["accent"]),
             ("ROWBACKGROUNDS", (0, 1), (-1, -1), [C["white"], C["light_bg"]]),
             ("GRID",           (0, 0), (-1, -1), 0.3, C["grid"]),
             ("ALIGN",          (0, 0), (-1, -1), "CENTER"),
             ("VALIGN",         (0, 0), (-1, -1), "TOP"),
-            ("TOPPADDING",     (0, 0), (-1, -1), 3),
-            ("BOTTOMPADDING",  (0, 0), (-1, -1), 3),
-            ("RIGHTPADDING",   (0, 0), (-1, -1), 4),
-            ("LEFTPADDING",    (0, 0), (-1, -1), 4),
+            ("TOPPADDING",     (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING",  (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING",   (0, 0), (-1, -1), 5),
+            ("LEFTPADDING",    (0, 0), (-1, -1), 5),
         ]))
 
-        story += section_block + [info_table]
-
-        # ── تفاصيل نصية حرة لكل تقرير — فقرات مستقلة قابلة للانقسام بين
-        # الصفحات (بلا حد أقصى آمن لطول النص، بعكس خلية الجدول أعلاه) ────────
-        for idx, r in enumerate(display_reps, 1):
-            detail_block = [
-                Spacer(1, 0.25 * cm),
-                P(f"● تقرير رقم {idx} — {_fd(r.get('report_date'))}", "small"),
-                P_field("الشكوى", r.get("complaint_text"), "td_r", content_width_pts),
-            ]
-            if is_operation:
-                detail_block.append(
-                    P_field("اسم العملية بالإنجليزي", _extract_op_name_en(r.get("doctor_decision")), "td_r", content_width_pts)
-                )
-            detail_block.append(P_field("القرار الطبي", r.get("doctor_decision"), "td_r", content_width_pts))
-            story += detail_block
+        story += section_block + [detail_table]
 
     # ── Build ─────────────────────────────────────────────────────────────────
     doc.build(story, onFirstPage=_on_page, onLaterPages=_on_page)
