@@ -421,29 +421,55 @@ def build_patient_pdf(
     # ── توزيع الإجراءات: الجدول أولاً ثم الرسم البياني ────────────────────────
     # ✅ ترتيب صريح بناءً على طلب المستخدم: يبدأ الجدول ثم يليه الرسم البياني
     # (بدل الرسم البياني أولاً كما كان). معكوسة: "نوع الإجراء" يظهر أقصى اليمين.
+    #
+    # ✅ جدول "ملخص الإجراءات" (فقط) مقصور بناءً على طلب صريح على الأنواع
+    # الإكلينيكية المهمة أدناه — بقية الأنواع (طوارئ/تأجيل موعد/ترقيد/خروج من
+    # المستشفى/أشعة وفحوصات/أجهزة تعويضية...) لا تظهر في هذا الجدول تحديداً.
+    # "الجلسات" ليست قيمة medical_action فعلية بل تسمية قائمة فرعية في واجهة
+    # الإدخال (bot/handlers/user/user_reports_add_new_system/action_type_handlers.py)
+    # تتفرّع لخمسة أنواع فعلية مختلفة — كلها مُدرَجة هنا لتغطية "الجلسات بشكل
+    # كامل" كما طلب المستخدم حرفياً. "التمارين الطبيعية" تقابل القيمة الفعلية
+    # الوحيدة "علاج طبيعي" (flows/rehab.py) — لا توجد قيمة منفصلة بهذا الاسم.
+    _SUMMARY_TABLE_ACTIONS = {
+        "استشارة جديدة",
+        "مراجعة / عودة دورية",
+        "استشارة أخيرة",
+        "استشارة مع قرار عملية",
+        "عملية",
+        "جلسة إشعاعي",
+        "العلاج الكيماوي",
+        "العلاج الموجه",
+        "العلاج المناعي",
+        "جلسات غسيل الكلى",
+        "المناظير",
+        "علاج طبيعي",
+    }
     act_rows = [[P("النسبة", "th"), P("عدد التقارير", "th"), P("نوع الإجراء", "th")]]
     for action, cnt in sorted(action_counts.items(), key=lambda x: -x[1]):
+        if action not in _SUMMARY_TABLE_ACTIONS:
+            continue
         pct = f"{cnt / total * 100:.1f}%" if total else "—"
         act_rows.append([
             P(pct, "td_c"),
             P(str(cnt), "td_c"),
             P(action, "td_r"),
         ])
-    act_table = Table(act_rows, colWidths=[3 * cm, 3 * cm, 10 * cm], hAlign="RIGHT")
-    act_table.setStyle(TableStyle([
-        ("BACKGROUND",     (0, 0), (-1, 0),  C["primary"]),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [C["white"], C["light_bg"]]),
-        ("GRID",           (0, 0), (-1, -1), 0.4, C["grid"]),
-        ("ALIGN",          (0, 0), (-1, -1), "CENTER"),
-        ("TOPPADDING",     (0, 0), (-1, -1), 5),
-        ("BOTTOMPADDING",  (0, 0), (-1, -1), 5),
-        ("RIGHTPADDING",   (0, 0), (-1, -1), 6),
-        ("LEFTPADDING",    (0, 0), (-1, -1), 6),
-    ]))
-    story.append(Spacer(1, 0.4 * cm))
-    # ✅ العنوان والجدول معاً (KeepTogether) — كان يظهر العنوان في أسفل صفحة
-    # والجدول بأكمله في الصفحة التالية، وهو خطأ فادح بحسب المستخدم صراحة.
-    story.append(KeepTogether([P("جدول ملخص الإجراءات", "section"), act_table]))
+    if len(act_rows) > 1:
+        act_table = Table(act_rows, colWidths=[3 * cm, 3 * cm, 10 * cm], hAlign="RIGHT")
+        act_table.setStyle(TableStyle([
+            ("BACKGROUND",     (0, 0), (-1, 0),  C["primary"]),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [C["white"], C["light_bg"]]),
+            ("GRID",           (0, 0), (-1, -1), 0.4, C["grid"]),
+            ("ALIGN",          (0, 0), (-1, -1), "CENTER"),
+            ("TOPPADDING",     (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING",  (0, 0), (-1, -1), 5),
+            ("RIGHTPADDING",   (0, 0), (-1, -1), 6),
+            ("LEFTPADDING",    (0, 0), (-1, -1), 6),
+        ]))
+        story.append(Spacer(1, 0.4 * cm))
+        # ✅ العنوان والجدول معاً (KeepTogether) — كان يظهر العنوان في أسفل صفحة
+        # والجدول بأكمله في الصفحة التالية، وهو خطأ فادح بحسب المستخدم صراحة.
+        story.append(KeepTogether([P("جدول ملخص الإجراءات", "section"), act_table]))
 
     if len(action_counts) > 1:
         chart_items = sorted(action_counts.items(), key=lambda x: -x[1])
