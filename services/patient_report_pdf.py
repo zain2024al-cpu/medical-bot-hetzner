@@ -576,10 +576,9 @@ def build_patient_pdf(
                 story.append(img)
 
     # ── تفاصيل التقارير — تُعرَض أخيراً في التقرير ─────────────────────────────
-    # ✅ الكشف الكامل بكل التقارير يبقى فقط لنوعين حصراً بناءً على طلب صريح:
-    # "استشارة مع قرار عملية" و"استشارة أخيرة". بقية الأنواع (بما فيها "عملية"
-    # كنوع منفصل) تظهر ملخَّصة إحصائياً أعلاه فقط، مع عرض آخر تقرير لكل نوع
-    # هنا للسياق — بلا تكرار القائمة الكاملة.
+    # ✅ هذا القسم يقتصر حصراً على نوعين بناءً على طلب صريح: "استشارة مع قرار
+    # عملية" و"استشارة أخيرة" — بقية الأنواع لا تظهر هنا إطلاقاً (لا حتى
+    # بصيغة "آخر تقرير فقط")، فهي معروضة إحصائياً فقط في الجداول أعلاه.
     # ⚠️ الاسم الفعلي في قاعدة البيانات هو "استشارة مع قرار عملية" (بلا الـ
     # "ال" التعريف) — وليس "عملية" وحدها، وهي نوع منفصل تماماً في البيانات
     # الحقيقية (رصدنا كليهما ظاهرين كنوعين مستقلين في تقرير مريض فعلي).
@@ -589,16 +588,15 @@ def build_patient_pdf(
     story.append(P("تفاصيل التقارير حسب نوع الإجراء", "section"))
     story.append(HRFlowable(width="100%", thickness=1.5, color=C["primary"], spaceAfter=6))
 
-    for action, reps in sorted(action_reports.items(), key=lambda x: -len(x[1])):
+    detail_actions = {a: reps for a, reps in action_reports.items() if a in _FULL_DETAIL_ACTIONS}
+    for action, reps in sorted(detail_actions.items(), key=lambda x: -len(x[1])):
         count = len(reps)
         sorted_reps = sorted(reps, key=lambda x: x.get("report_date") or date.min)
-        show_full = action in _FULL_DETAIL_ACTIONS
-        display_reps = sorted_reps if show_full else [sorted_reps[-1]]
-        note_suffix = "" if show_full else "  — آخر تقرير فقط"
+        display_reps = sorted_reps
 
         section_block = [
             Spacer(1, 0.4 * cm),
-            P(f"● {action}  ({count} تقرير{note_suffix})", "section"),
+            P(f"● {action}  ({count} تقرير)", "section"),
             HRFlowable(width="100%", thickness=0.8, color=C["accent"], spaceAfter=4),
         ]
 
