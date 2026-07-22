@@ -222,9 +222,10 @@ async def handle_manage_translators(update: Update, context: ContextTypes.DEFAUL
         [InlineKeyboardButton("✏️ تعديل مترجم", callback_data="edit_translator")],
         [InlineKeyboardButton("🗑️ حذف مترجم", callback_data="delete_translator")],
         [InlineKeyboardButton("🔄 مزامنة من المستخدمين", callback_data="sync_translators")],
+        [InlineKeyboardButton("🔍 كشف أسماء مكررة محتملة", callback_data="detect_dup_translators")],
         [InlineKeyboardButton("🔙 رجوع", callback_data="back_to_schedule")]
     ])
-    
+
     await query.edit_message_text(
         f"👥 **إدارة المترجمين**\n\n"
         f"📊 **عدد المترجمين:** {len(names)}\n\n"
@@ -854,6 +855,120 @@ async def handle_sync_translators(update: Update, context: ContextTypes.DEFAULT_
         )
 
 
+def _find_prefix_duplicate_candidates() -> list[tuple[str, str]]:
+    """
+    يكتشف أزواج أسماء مشتبه بتكرارها في TranslatorDirectory — حيث كل كلمات
+    اسم أقصر تطابق تماماً بداية كلمات اسم آخر أطول (مثال: "نجم" و"نجم الدين").
+    هذا النمط ناتج غالباً عن مزامنة قديمة أخذت الاسم الأول فقط من بروفايل
+    تيليجرام لشخص اسمه الكامل مركَّب. لا يحذف شيئاً — للمراجعة اليدوية فقط.
+
+    Returns: قائمة (الاسم الأقصر المحتمل الخطأ، الاسم الأطول الأرجح صحة)
+    """
+    try:
+        with SessionLocal() as s:
+            rows = s.query(TranslatorDirectory).all()
+    except Exception as e:
+        logger.error("TD: failed to fetch translators for duplicate detection: %s", e)
+        return []
+
+    names = sorted({(r.name or "").strip() for r in rows if (r.name or "").strip()})
+    candidates: list[tuple[str, str]] = []
+    for a in names:
+        a_words = a.split()
+        for b in names:
+            if a == b:
+                continue
+            b_words = b.split()
+            if len(b_words) > len(a_words) and b_words[:len(a_words)] == a_words:
+                candidates.append((a, b))
+    return candidates
+
+
+@require_admin
+async def handle_detect_duplicate_translators(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """كشف أسماء مشتبه بتكرارها (اسم أقصر هو بداية اسم أطول) — للمراجعة اليدوية"""
+    query = update.callback_query
+    await query.answer()
+
+    candidates = _find_prefix_duplicate_candidates()
+
+    if not candidates:
+        await query.edit_message_text(
+            "✅ **لا توجد أسماء مشتبه بتكرارها حالياً**",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_translators")]]),
+            parse_mode=ParseMode.MARKDOWN
+        )
+        return
+
+    context.user_data['dup_candidates_list'] = candidates
+
+    text = (
+        "🔍 **أسماء مشتبه بتكرارها**\n\n"
+        "الاسم الأقصر غالباً ناتج عن مزامنة قديمة أخذت الاسم الأول فقط — "
+        "راجع كل زوج واحذف الاسم الخاطئ إن كان كذلك:\n\n"
+    )
+    keyboard = []
+    for i, (short, long_) in enumerate(candidates):
+        text += f"• {short}  ⟵  {long_}\n"
+        keyboard.append([InlineKeyboardButton(f"🗑️ حذف \"{short}\"", callback_data=f"dup_del_trans:{i}")])
+    keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="manage_translators")])
+
+    await query.edit_message_text(
+        text,
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode=ParseMode.MARKDOWN
+    )
+
+
+@require_admin
+async def handle_confirm_delete_duplicate(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """حذف الاسم الأقصر المكرَّر بعد مراجعة الأدمن له"""
+    query = update.callback_query
+    await query.answer()
+
+    parts = query.data.split(':')
+    if len(parts) < 2 or not parts[1].isdigit():
+        await query.edit_message_text("❌ خطأ: طلب غير صالح.")
+        return
+
+    idx = int(parts[1])
+    candidates = context.user_data.get('dup_candidates_list', [])
+    if idx >= len(candidates):
+        await query.edit_message_text(
+            "❌ **خطأ:** انتهت صلاحية هذه القائمة — افتح كشف التكرار من جديد.",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_translators")]]),
+            parse_mode=ParseMode.MARKDOWN
+        )
+        return
+
+    short_name, long_name = candidates[idx]
+
+    names = get_translator_names_from_file()
+    if short_name in names:
+        names.remove(short_name)
+
+    db_ok = _db_delete_translator(short_name)
+    if not db_ok:
+        await query.edit_message_text(
+            "❌ **خطأ في الحذف من قاعدة البيانات**\n\nلم يتم الحذف.",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_translators")]]),
+            parse_mode=ParseMode.MARKDOWN
+        )
+        return
+
+    file_ok = save_translator_names_to_file(names)
+    if not file_ok:
+        logger.warning("TD: file write failed after deleting duplicate [%s] — DB is authoritative", short_name)
+
+    logger.info("TD duplicate cleanup: deleted [%s] (kept [%s])", short_name, long_name)
+
+    await query.edit_message_text(
+        f"✅ **تم حذف** \"{short_name}\" **(المكرر الخاطئ لـ** \"{long_name}\"**)**",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_translators")]]),
+        parse_mode=ParseMode.MARKDOWN
+    )
+
+
 @require_admin
 async def handle_cancel_translator_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """إلغاء عملية إضافة/تعديل مترجم"""
@@ -873,6 +988,7 @@ async def handle_cancel_translator_input(update: Update, context: ContextTypes.D
         [InlineKeyboardButton("✏️ تعديل مترجم", callback_data="edit_translator")],
         [InlineKeyboardButton("🗑️ حذف مترجم", callback_data="delete_translator")],
         [InlineKeyboardButton("🔄 مزامنة من القائمة الثابتة", callback_data="sync_translators")],
+        [InlineKeyboardButton("🔍 كشف أسماء مكررة محتملة", callback_data="detect_dup_translators")],
         [InlineKeyboardButton("🔙 رجوع", callback_data="back_to_schedule")]
     ])
 
@@ -933,4 +1049,6 @@ def register(app):
     app.add_handler(CallbackQueryHandler(handle_edit_translator, pattern="^edit_translator$"))
     app.add_handler(CallbackQueryHandler(handle_edit_translator, pattern="^edit_trans_page:"))  # صفحات التعديل
     app.add_handler(CallbackQueryHandler(handle_sync_translators, pattern="^sync_translators$"))
+    app.add_handler(CallbackQueryHandler(handle_detect_duplicate_translators, pattern="^detect_dup_translators$"))
+    app.add_handler(CallbackQueryHandler(handle_confirm_delete_duplicate, pattern=r"^dup_del_trans:\d+$"))
 

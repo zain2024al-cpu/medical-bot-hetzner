@@ -132,6 +132,8 @@ KNOWN_CALLBACKS = [
     r"^view_translators_page:",
     r"^cancel_translator_input$",
     r"^cancel_hospital_input$",
+    r"^detect_dup_translators$",
+    r"^dup_del_trans:\d+$",
 
     # ===========================
     # نظام تعديل وحذف التقارير للمستخدمين
