@@ -42,7 +42,13 @@ async def get_evacuation_ledger_rows(
     start_date: date, end_date: date, manifest_type: str | None = None,
 ) -> list[dict]:
     """manifest_type: "A" | "B" | "C" لتقييد المسير على تصنيف واحد فقط،
-    أو None لعدم الفلترة (كل التصنيفات معاً — السلوك القديم بلا تغيير)."""
+    أو None لعدم الفلترة (كل التصنيفات معاً — السلوك القديم بلا تغيير).
+
+    ⚠️ start_date/end_date يُطبَّقان دائماً على تاريخ سجل الصرف الأصلي
+    (MedicationRecord/SuppliesRecord.created_at) — وليس على تاريخ إدخال
+    البيانات المالية (PharmacyFinancialRecord). حالة صُرِفت يوم 10 وأُدخلت
+    بياناتها المالية يوم 15 تظهر دائماً في مسير يوم 10، وتبقى غائبة تماماً
+    عن أي مسير يُطبَع لنطاق يوم 15 فقط."""
     return await asyncio.to_thread(_get_evacuation_ledger_rows_sync, start_date, end_date, manifest_type)
 
 
@@ -112,6 +118,13 @@ def _get_evacuation_ledger_rows_sync(
                     "invoice_number": fin.invoice_number or "—",
                     "expense_item": fin.expense_item or "—",
                     "statement": statement,
+                    # ⚠️ مصدر الحقيقة الوحيد للتاريخ هو سجل الصرف الأصلي (r =
+                    # MedicationRecord/SuppliesRecord.created_at) — أبداً
+                    # fin.created_at/fin.updated_at (التقرير المالي) ولا
+                    # datetime.now()/utcnow(). التقرير المالي يُثري سجل الصرف
+                    # ببيانات مالية فقط (فاتورة/مبلغ) ولا يُنشئ حدثاً طبياً
+                    # جديداً ولا يُغيّر تاريخه أبداً، حتى لو أُدخل أو عُدِّل
+                    # بعد يوم الصرف الفعلي بأيام. لا تُغيّر هذا السطر لاستخدام fin.*.
                     "date": r.created_at.date() if r.created_at else start_date,
                     "manifest_type": fin.manifest_type or "A",
                     "_sort_dt": r.created_at or start_dt,
