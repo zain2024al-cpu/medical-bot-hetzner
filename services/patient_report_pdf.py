@@ -121,62 +121,15 @@ def _colors():
     }
 
 
-# ── Matplotlib chart ──────────────────────────────────────────────────────────
-
-def _action_bar_chart(action_counts: dict[str, int], font_name: str) -> io.BytesIO | None:
-    try:
-        import matplotlib
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
-        from matplotlib import font_manager
-        import arabic_reshaper
-        from bidi.algorithm import get_display
-
-        if not action_counts:
-            return None
-
-        # ✅ matplotlib يتجاهل الخط المسجَّل في reportlab (font_name هنا اسم
-        # مستعار (alias) خاص بـ reportlab فقط، لا معنى له عند matplotlib).
-        # بدون تحميل ملف خط عربي فعلي عبر FontProperties، يستخدم matplotlib
-        # خطه الافتراضي (DejaVu Sans عادة) الذي لا يدعم أشكال العرض العربية
-        # (Presentation Forms) الناتجة عن arabic_reshaper بشكل صحيح — فتظهر
-        # الحروف مشوَّهة/غير متصلة (هذا بالضبط ما اشتكى منه المستخدم:
-        # "الخط العربي مقطوع"). نُعيد استخدام نفس قائمة الخطوط المستخدمة في
-        # reportlab (_FONT_CANDIDATES) لإيجاد ملف خط فعلي على القرص.
-        _font_path = next((p for p, _ in _FONT_CANDIDATES if os.path.isfile(p)), None)
-        ar_font = font_manager.FontProperties(fname=_font_path) if _font_path else None
-
-        items = sorted(action_counts.items(), key=lambda x: -x[1])[:12]
-        labels = [get_display(arabic_reshaper.reshape(k)) for k, _ in items]
-        values = [v for _, v in items]
-
-        fig, ax = plt.subplots(figsize=(8, max(3, len(items) * 0.5)))
-        bars = ax.barh(range(len(labels)), values, color="#1565C0", edgecolor="white", height=0.65)
-        for bar, v in zip(bars, values):
-            ax.text(bar.get_width() + 0.1, bar.get_y() + bar.get_height() / 2,
-                    str(v), va="center", fontsize=9, color="#333")
-        ax.set_yticks(range(len(labels)))
-        ax.set_yticklabels(labels, fontproperties=ar_font, fontsize=9)
-        ax.set_xlim(0, max(values) * 1.2 if values else 1)
-        ax.invert_yaxis()
-        # ✅ اتجاه RTL: القيم تبدأ من أقصى اليمين وتمتد يساراً، وتسميات الأنواع
-        # تظهر على يمين الرسم (بدل الافتراضي اليساري في matplotlib).
-        ax.invert_xaxis()
-        ax.yaxis.tick_right()
-        ax.set_xlabel("")
-        ax.spines["top"].set_visible(False)
-        ax.spines["left"].set_visible(False)
-        ax.tick_params(axis="y", labelsize=9)
-        plt.tight_layout()
-
-        buf = io.BytesIO()
-        fig.savefig(buf, format="png", dpi=120, bbox_inches="tight")
-        plt.close(fig)
-        buf.seek(0)
-        return buf
-    except Exception as exc:
-        logger.warning(f"[patient_pdf] chart generation failed: {exc}")
-        return None
+# ✅ الرسوم البيانية تُرسَم مباشرة عبر reportlab (Flowable مخصَّصة، انظر
+# _HBarChart داخل build_patient_pdf) بدل matplotlib. matplotlib+freetype على
+# السيرفر الفعلي يطبِّق تشكيلاً/ترتيباً تلقائياً إضافياً للنص العربي (عبر
+# raqm/HarfBuzz إن كان مفعَّلاً في بنية matplotlib المثبَّتة) فوق التشكيل
+# اليدوي الذي نطبِّقه (arabic_reshaper + get_display) — هذه المعالجة
+# المزدوجة تنتج نصاً مشوَّهاً، وهي بيئة-محدَّدة (ظهرت على السيرفر الفعلي رغم
+# نجاح نفس الكود محلياً على Windows). بما أن reportlab يُستخدم بالفعل بنجاح
+# مثبَّت عبر كل هذا الملف لعرض العربي بشكل صحيح ومتّسق، رسم الأشرطة والنصوص
+# به مباشرة يُلغي هذا الخلل نهائياً بدل ملاحقة إعدادات matplotlib بيئة بيئة.
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
@@ -213,7 +166,7 @@ def build_patient_pdf(
         from reportlab.lib.enums import TA_RIGHT, TA_CENTER, TA_LEFT
         from reportlab.platypus import (
             SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
-            PageBreak, Image, HRFlowable, KeepTogether,
+            PageBreak, HRFlowable, KeepTogether,
         )
         from reportlab.platypus.flowables import Flowable
     except ImportError as e:
@@ -346,6 +299,43 @@ def build_patient_pdf(
             c.drawCentredString(self.width / 2, self.height / 2 + 3, _ar("الصورة"))
             c.drawCentredString(self.width / 2, self.height / 2 - 6, _ar("الشخصية"))
 
+    class _HBarChart(_F):
+        """رسم بياني بالأشرطة الأفقية يُرسَم مباشرة عبر reportlab (بلا
+        matplotlib) — يضمن نفس عرض العربي الصحيح والمتّسق المستخدَم في بقية
+        هذا المستند، ويتجنّب خلل التشكيل المزدوج المحتمل مع matplotlib على
+        بعض بيئات الخادم (انظر التعليق أعلى تعريف build_patient_pdf)."""
+        def __init__(self, items, width, row_h=0.6 * cm, label_w=5.2 * cm):
+            super().__init__()
+            self.items = items[:12]
+            self.width = width
+            self.row_h = row_h
+            self.label_w = label_w
+            self.height = max(len(self.items), 1) * row_h
+
+        def draw(self):
+            c = self.canv
+            if not self.items:
+                return
+            max_v = max(v for _, v in self.items) or 1
+            bar_area_w = self.width - self.label_w - 0.3 * cm
+            for i, (label, value) in enumerate(self.items):
+                row_top = self.height - i * self.row_h
+                bar_h = self.row_h * 0.6
+                y = row_top - self.row_h + (self.row_h - bar_h) / 2
+                bar_len = (value / max_v) * bar_area_w
+                bar_x_left = bar_area_w - bar_len
+                c.setFillColor(C["primary"])
+                c.rect(bar_x_left, y, bar_len, bar_h, fill=1, stroke=0)
+                c.setFillColor(C["text_gray"])
+                c.setFont(FN, 8)
+                c.drawRightString(bar_x_left - 4, y + bar_h / 2 - 3, str(value))
+                c.setFillColor(C["black"])
+                c.setFont(FN, 8)
+                c.drawString(bar_area_w + 6, y + bar_h / 2 - 3, _ar(label))
+            c.setStrokeColor(C["grid"])
+            c.setLineWidth(0.6)
+            c.line(bar_area_w, 0, bar_area_w, self.height)
+
     if period_start and period_end:
         period_line_text = f"الفترة: {period_label} — من {_fd(period_start)} إلى {_fd(period_end)}"
     else:
@@ -435,15 +425,13 @@ def build_patient_pdf(
     story.append(KeepTogether([P("جدول ملخص الإجراءات", "section"), act_table]))
 
     if len(action_counts) > 1:
-        chart_buf = _action_bar_chart(dict(action_counts), FN)
-        if chart_buf:
-            chart_h = min(10 * cm, max(3 * cm, len(action_counts) * 0.55 * cm))
-            img = Image(chart_buf, width=15 * cm, height=chart_h)
-            img.hAlign = "CENTER"
-            # ✅ العنوان والرسم يبقيان معاً على نفس الصفحة (KeepTogether) —
-            # بدل احتمال أن يظهر العنوان في أسفل صفحة والرسم في التي تليها.
-            story.append(Spacer(1, 0.5 * cm))
-            story.append(KeepTogether([P("توزيع الإجراءات", "section"), img]))
+        chart_items = sorted(action_counts.items(), key=lambda x: -x[1])
+        chart = _HBarChart(chart_items, width=content_width_pts)
+        chart.hAlign = "RIGHT"
+        # ✅ العنوان والرسم يبقيان معاً على نفس الصفحة (KeepTogether) —
+        # بدل احتمال أن يظهر العنوان في أسفل صفحة والرسم في التي تليها.
+        story.append(Spacer(1, 0.5 * cm))
+        story.append(KeepTogether([P("توزيع الإجراءات", "section"), chart]))
 
     # ── Hospitals list ────────────────────────────────────────────────────────
     if hospitals:
@@ -567,13 +555,11 @@ def build_patient_pdf(
         story.append(KeepTogether([P("سجلات الرعاية الصحية", "section"), hc_table]))
 
         if len(hc_counts) > 1:
-            chart_buf = _action_bar_chart(dict(hc_counts), FN)
-            if chart_buf:
-                chart_h = min(8 * cm, max(3 * cm, len(hc_counts) * 0.6 * cm))
-                img = Image(chart_buf, width=15 * cm, height=chart_h)
-                img.hAlign = "CENTER"
-                story.append(Spacer(1, 0.3 * cm))
-                story.append(img)
+            hc_chart_items = sorted(hc_counts.items(), key=lambda x: -x[1])
+            hc_chart = _HBarChart(hc_chart_items, width=content_width_pts)
+            hc_chart.hAlign = "RIGHT"
+            story.append(Spacer(1, 0.3 * cm))
+            story.append(hc_chart)
 
     # ── تفاصيل التقارير — تُعرَض أخيراً في التقرير ─────────────────────────────
     # ✅ هذا القسم يقتصر حصراً على نوعين بناءً على طلب صريح: "استشارة مع قرار
