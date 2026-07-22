@@ -11,6 +11,7 @@ from __future__ import annotations
 import io
 import logging
 import os
+import re
 from collections import defaultdict
 from datetime import date, datetime
 from typing import Optional
@@ -99,6 +100,26 @@ def _ar_wrap(text, font_name: str, font_size: float, max_width_pts: float) -> st
         lines.append(" ".join(current))
 
     return "<br/>".join(_ar(line) for line in lines)
+
+
+def _normalize_dept(dept: str) -> str:
+    """يوحّد اسم القسم قبل استخدامه كمفتاح تجميع/عرض.
+
+    بعض سجلات التقارير (الأقدم) تخزّن اسم القسم بالعربي فقط (مثال:
+    "الجراحة العامة")، بينما قوائم اختيار الأقسام الحالية (مثال:
+    bot/handlers/user/departments_surgery.py) تنتج قيمة ثنائية اللغة
+    "عربي | English" (مثال: "الجراحة العامة | General Surgery") لنفس
+    القسم فعلياً. بدون توحيد، يُعامَل هذان كقسمين منفصلين في التقرير
+    (تكرار ظاهري رصده المستخدم في جدول "إحصائيات حسب القسم ونوع الإجراء").
+    نأخذ الجزء العربي فقط كمفتاح موحَّد — وهذا يُلغي أيضاً مشكلة عرض
+    ثانوية: تمرير السلسلة الكاملة المختلطة عربي/إنجليزي لـ _ar() يُعيد
+    ترتيبها بصرياً (bidi) فيظهر الجزء الإنجليزي أولاً بشكل مربك.
+    """
+    d = (dept or "").strip()
+    if "|" not in d:
+        return d
+    parts = [p.strip() for p in d.split("|") if p.strip()]
+    return next((p for p in parts if re.search(r"[؀-ۿ]", p)), parts[0] if parts else d)
 
 
 # ── Color palette ─────────────────────────────────────────────────────────────
@@ -260,7 +281,7 @@ def build_patient_pdf(
     # ── Aggregate data ────────────────────────────────────────────────────────
     total = len(reports)
     hospitals = sorted({r.get("hospital_name", "") for r in reports if r.get("hospital_name")})
-    depts_in  = sorted({r.get("department", "") for r in reports if r.get("department")})
+    depts_in  = sorted({_normalize_dept(r.get("department", "")) for r in reports if r.get("department")})
 
     action_counts: dict[str, int] = defaultdict(int)
     action_reports: dict[str, list[dict]] = defaultdict(list)
@@ -463,7 +484,7 @@ def build_patient_pdf(
     # بالقسم. يُبنى فقط إن وُجد قسم واحد على الأقل ضمن التقارير.
     dept_action_counts: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     for r in reports:
-        dept = (r.get("department") or "").strip()
+        dept = _normalize_dept(r.get("department"))
         if not dept:
             continue
         a = (r.get("medical_action") or "غير محدد").strip()
@@ -608,7 +629,7 @@ def build_patient_pdf(
         rows = [header_row]
         for idx, r in enumerate(display_reps, 1):
             hosp = r.get("hospital_name", "")
-            dept = r.get("department", "")
+            dept = _normalize_dept(r.get("department"))
             location = hosp + ("\n" + dept if dept else "")
             followup  = _fd(r.get("followup_date"))
             rows.append([
