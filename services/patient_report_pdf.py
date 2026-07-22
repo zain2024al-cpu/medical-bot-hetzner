@@ -318,6 +318,7 @@ def build_patient_pdf(
         "جلسات غسيل الكلى",
         "المناظير",
         "علاج طبيعي",
+        "أشعة وفحوصات",
     }
     summary_action_counts = {a: c for a, c in action_counts.items() if a in _SUMMARY_ACTIONS}
 
