@@ -220,8 +220,13 @@ def get_translators_from_file() -> List[str]:
     for path in possible_paths:
         if os.path.exists(path):
             try:
-                with open(path, 'r', encoding='utf-8') as f:
-                    names = [line.strip() for line in f if line.strip() and not line.startswith('#')]
+                with open(path, 'rb') as f:
+                    raw = f.read()
+                if raw.startswith(b'\xff\xfe') or raw.startswith(b'\xfe\xff'):
+                    text = raw.decode('utf-16')
+                else:
+                    text = raw.decode('utf-8-sig')
+                names = [line.strip() for line in text.splitlines() if line.strip() and not line.startswith('#')]
                 logger.info(f"Loaded {len(names)} translators from file")
                 return names
             except Exception as e:

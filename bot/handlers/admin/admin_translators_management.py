@@ -119,13 +119,17 @@ def _db_add_translator_if_absent(name: str) -> bool:
 
 
 def get_translator_names_from_file():
-    """قراءة أسماء المترجمين من الملف"""
+    """قراءة أسماء المترجمين من الملف (يدعم UTF-16 مع BOM أو UTF-8)"""
     try:
         if os.path.exists(TRANSLATOR_NAMES_FILE):
-            with open(TRANSLATOR_NAMES_FILE, 'r', encoding='utf-8') as f:
-                lines = f.readlines()
+            with open(TRANSLATOR_NAMES_FILE, 'rb') as f:
+                raw = f.read()
+            if raw.startswith(b'\xff\xfe') or raw.startswith(b'\xfe\xff'):
+                text = raw.decode('utf-16')
+            else:
+                text = raw.decode('utf-8-sig')
             names = []
-            for line in lines:
+            for line in text.splitlines():
                 line = line.strip()
                 if line and not line.startswith('#'):
                     names.append(line)
