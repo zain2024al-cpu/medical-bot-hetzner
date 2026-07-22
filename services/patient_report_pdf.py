@@ -683,47 +683,47 @@ def build_patient_pdf(
 
         header_row = [P("التاريخ", "th"), P("المستشفى", "th"), P("القسم", "th"), P("الطبيب", "th")]
         col_widths = [2.5 * cm, 5.5 * cm, 4.5 * cm, 4.9 * cm]
+        col_widths_rev = list(reversed(col_widths))
 
-        rows = [header_row]
-        for r in sorted_reps:
-            rows.append([
+        story += section_block
+
+        # ✅ كل استشارة/تقرير يظهر كوحدة واحدة متتالية: صف بياناته القصيرة
+        # (مباشرة بعد رأس الجدول لأول تقرير فقط) ثم القرار الطبي (واسم
+        # العملية بعده إن وُجد) مباشرة تحته — قبل الانتقال لصف التقرير
+        # التالي. بناءً على طلب صريح: كان عرض كل الصفوف مجتمعة ثم كل قرارات
+        # الأطباء مجتمعة بعدها منفصلة "بشكل سيء" يصعب معه ربط كل قرار بصفّه.
+        for i, r in enumerate(sorted_reps):
+            data_row = [
                 P(_fd(r.get("report_date")), "td_c"),
                 P(r.get("hospital_name") or "—", "td_r"),
                 P(_normalize_dept(r.get("department")) or "—", "td_r"),
                 P(r.get("doctor_name") or "—", "td_r"),
-            ])
-
-        # ✅ عكس كل الأعمدة (رأس + كل الصفوف + العرض) دفعة واحدة — يضمن ظهور
-        # "التاريخ" أقصى اليمين، نفس مبدأ بقية جداول هذا الملف.
-        rows = [list(reversed(row)) for row in rows]
-        col_widths = list(reversed(col_widths))
-
-        detail_table = Table(rows, colWidths=col_widths, hAlign="RIGHT", repeatRows=1)
-        detail_table.setStyle(TableStyle([
-            ("BACKGROUND",     (0, 0), (-1, 0),  C["accent"]),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [C["white"], C["light_bg"]]),
-            ("GRID",           (0, 0), (-1, -1), 0.3, C["grid"]),
-            ("ALIGN",          (0, 0), (-1, -1), "CENTER"),
-            ("VALIGN",         (0, 0), (-1, -1), "TOP"),
-            ("TOPPADDING",     (0, 0), (-1, -1), 4),
-            ("BOTTOMPADDING",  (0, 0), (-1, -1), 4),
-            ("RIGHTPADDING",   (0, 0), (-1, -1), 5),
-            ("LEFTPADDING",    (0, 0), (-1, -1), 5),
-        ]))
-
-        story += section_block + [detail_table]
-
-        # ── القرار الطبي / اسم العملية — سطر مستقل تحت الجدول لكل تقرير ─────
-        for idx, r in enumerate(sorted_reps, 1):
-            field_block = [
-                Spacer(1, 0.25 * cm),
-                P(f"● تقرير رقم {idx} — {_fd(r.get('report_date'))}", "small"),
             ]
+            # ✅ عكس الأعمدة (والرأس عند الحاجة) ليظهر "التاريخ" أقصى اليمين.
+            row_table_rows = [list(reversed(header_row)), list(reversed(data_row))] if i == 0 else [list(reversed(data_row))]
+            row_table = Table(row_table_rows, colWidths=col_widths_rev, hAlign="RIGHT")
+            style_cmds = [
+                ("GRID",          (0, 0), (-1, -1), 0.3, C["grid"]),
+                ("ALIGN",         (0, 0), (-1, -1), "CENTER"),
+                ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+                ("TOPPADDING",    (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING",  (0, 0), (-1, -1), 5),
+                ("LEFTPADDING",   (0, 0), (-1, -1), 5),
+            ]
+            if i == 0:
+                style_cmds.append(("BACKGROUND", (0, 0), (-1, 0), C["accent"]))
+            row_table.setStyle(TableStyle(style_cmds))
+            story.append(row_table)
+
+            # ✅ القرار الطبي أولاً، ثم اسم العملية بعده إن وُجد — ترتيب صريح
+            # مطلوب (بدل اسم العملية قبل القرار الطبي كما كان).
+            field_block = [P_field("القرار الطبي", r.get("doctor_decision"), "td_r", content_width_pts)]
             if is_operation:
                 field_block.append(
                     P_field("اسم العملية", _extract_op_name_en(r.get("doctor_decision")), "td_r", content_width_pts)
                 )
-            field_block.append(P_field("القرار الطبي", r.get("doctor_decision"), "td_r", content_width_pts))
+            field_block.append(Spacer(1, 0.25 * cm))
             story += field_block
 
     # ── Build ─────────────────────────────────────────────────────────────────
