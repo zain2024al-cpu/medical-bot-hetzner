@@ -1991,6 +1991,12 @@ async def save_report_to_database(query, context, flow_type):
                 decision_text += f"\n\nتاريخ العودة الجديد: {date_str}"
             if app_reschedule_return_reason:
                 decision_text += f"\n\nسبب العودة: {app_reschedule_return_reason}"
+        elif flow_type in ("treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis"):
+            # ✅ شكوى المريض (حقل جديد أُضيف لمسار الجلسات) — تقدُّم الخطة
+            # نفسه يُعرض عبر treatment_plan_summary المخزَّن بشكل منفصل، فلا
+            # داعي لتكراره هنا في decision_text.
+            complaint_text = data.get("complaint", "")
+            decision_text = ""
         elif flow_type == "radiation_therapy":
             # الحصول على report_tmp مرة واحدة
             report_tmp = context.user_data.get("report_tmp", {})

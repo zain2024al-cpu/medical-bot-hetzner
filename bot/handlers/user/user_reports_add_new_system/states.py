@@ -154,3 +154,7 @@ R_ACTION_TYPE = STATE_SELECT_ACTION_TYPE
 # الإشعاعي يستخدم TreatmentPlan أيضاً الآن، لكن يُبقي أعمدة Report القديمة
 # (radiation_therapy_session_number/remaining) لعدم كسر بطاقة تقريره.
 (RADIATION_THERAPY_EDIT_REASON,) = range(125, 126)
+
+# حالة إضافية: شكوى المريض في مسار جلسات العلاج (chemo/targeted/immuno/
+# dialysis) — تُسأل بعد عرض تقدُّم الخطة وقبل ملاحظات الطبيب.
+(TREATMENT_COMPLAINT,) = range(126, 127)

@@ -25,7 +25,7 @@ from telegram.ext import ContextTypes
 
 from ..states import (
     TREATMENT_PLAN_SETUP, TREATMENT_PLAN_EDIT_VALUE, TREATMENT_PLAN_EDIT_REASON,
-    TREATMENT_PLAN_DISPLAY, TREATMENT_NOTES, TREATMENT_FOLLOWUP_DATE,
+    TREATMENT_PLAN_DISPLAY, TREATMENT_COMPLAINT, TREATMENT_NOTES, TREATMENT_FOLLOWUP_DATE,
     TREATMENT_FOLLOWUP_REASON, TREATMENT_TRANSLATOR,
     CHEMO_MODE_CHOICE, CHEMO_CYCLES_TOTAL, CHEMO_CYCLES_UNIFORM_CHOICE,
     CHEMO_CYCLES_UNIFORM_COUNT, CHEMO_CYCLES_CUSTOM_ENTRY,
@@ -346,9 +346,9 @@ async def handle_treatment_plan_display_choice(update: Update, context: ContextT
 
     if choice == "continue":
         await query.edit_message_text(f"{data.get('treatment_plan_summary', '')}", parse_mode="Markdown")
-        await _prompt_notes(query.message, context)
-        context.user_data['_conversation_state'] = TREATMENT_NOTES
-        return TREATMENT_NOTES
+        await _prompt_complaint(query.message, context)
+        context.user_data['_conversation_state'] = TREATMENT_COMPLAINT
+        return TREATMENT_COMPLAINT
 
     # edit
     plan_id = data.get("_tp_plan_id")
@@ -421,8 +421,38 @@ async def handle_treatment_plan_edit_reason_skip(update: Update, context: Contex
 
 
 # ═══════════════════════════════════════════════════════════════════
-# الملاحظات → التقويم المشترك → سبب العودة → المترجم
+# شكوى المريض → ملاحظات الطبيب → التقويم المشترك → سبب العودة → المترجم
 # ═══════════════════════════════════════════════════════════════════
+async def _prompt_complaint(message, context):
+    await message.reply_text(
+        "🗣️ **شكوى المريض**\n\n"
+        "يرجى إدخال شكوى المريض:",
+        reply_markup=_nav_buttons(show_back=True),
+        parse_mode="Markdown",
+    )
+
+
+async def handle_treatment_complaint(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data['_conversation_state'] = TREATMENT_COMPLAINT
+    text = update.message.text.strip()
+
+    valid, msg = validate_text_input(text, min_length=3)
+    if not valid:
+        await update.message.reply_text(
+            f"⚠️ **خطأ: {msg}**\n\nيرجى إدخال شكوى المريض:",
+            reply_markup=_nav_buttons(show_back=True),
+            parse_mode="Markdown",
+        )
+        return TREATMENT_COMPLAINT
+
+    context.user_data.setdefault("report_tmp", {})["complaint"] = text
+
+    await update.message.reply_text("✅ تم الحفظ")
+    await _prompt_notes(update.message, context)
+    context.user_data['_conversation_state'] = TREATMENT_NOTES
+    return TREATMENT_NOTES
+
+
 def _notes_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("⏭️ لا توجد ملاحظات", callback_data="treatment_notes_skip")],
@@ -433,7 +463,7 @@ def _notes_keyboard() -> InlineKeyboardMarkup:
 
 async def _prompt_notes(message, context):
     await message.reply_text(
-        "📝 **ملاحظات**\n\n"
+        "📝 **ملاحظات الطبيب**\n\n"
         "يرجى إدخال أي ملاحظات إضافية، أو اضغط الزر أدناه إذا لا توجد ملاحظات:",
         reply_markup=_notes_keyboard(),
         parse_mode="Markdown",
@@ -492,6 +522,7 @@ __all__ = [
     'handle_treatment_plan_setup', 'handle_treatment_plan_display_choice',
     'handle_treatment_plan_edit_value', 'handle_treatment_plan_edit_reason',
     'handle_treatment_plan_edit_reason_skip',
+    'handle_treatment_complaint',
     'handle_treatment_notes', 'handle_treatment_notes_skip', 'handle_treatment_followup_reason',
     'TREATMENT_MEDICAL_ACTION',
 ]

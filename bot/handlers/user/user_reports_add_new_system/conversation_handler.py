@@ -65,7 +65,7 @@ from .states import (
     ENDOSCOPY_FOLLOWUP_DATE, ENDOSCOPY_FOLLOWUP_REASON,
     ENDOSCOPY_TRANSLATOR, ENDOSCOPY_CONFIRM,
     TREATMENT_PLAN_SETUP, TREATMENT_PLAN_EDIT_VALUE, TREATMENT_PLAN_EDIT_REASON,
-    TREATMENT_PLAN_DISPLAY, TREATMENT_NOTES, TREATMENT_FOLLOWUP_DATE,
+    TREATMENT_PLAN_DISPLAY, TREATMENT_COMPLAINT, TREATMENT_NOTES, TREATMENT_FOLLOWUP_DATE,
     TREATMENT_FOLLOWUP_REASON, TREATMENT_TRANSLATOR, TREATMENT_CONFIRM,
     CHEMO_MODE_CHOICE, CHEMO_CYCLES_TOTAL, CHEMO_CYCLES_UNIFORM_CHOICE,
     CHEMO_CYCLES_UNIFORM_COUNT, CHEMO_CYCLES_CUSTOM_ENTRY,
@@ -349,6 +349,7 @@ def _treatment_handlers():
             handle_treatment_plan_setup, handle_treatment_plan_display_choice,
             handle_treatment_plan_edit_value, handle_treatment_plan_edit_reason,
             handle_treatment_plan_edit_reason_skip,
+            handle_treatment_complaint,
             handle_treatment_notes, handle_treatment_notes_skip, handle_treatment_followup_reason,
         )
         return {
@@ -362,6 +363,7 @@ def _treatment_handlers():
             'plan_edit_value':          handle_treatment_plan_edit_value,
             'plan_edit_reason':         handle_treatment_plan_edit_reason,
             'plan_edit_reason_skip':    handle_treatment_plan_edit_reason_skip,
+            'complaint':                handle_treatment_complaint,
             'notes':                    handle_treatment_notes,
             'notes_skip':                handle_treatment_notes_skip,
             'followup_reason':          handle_treatment_followup_reason,
@@ -1174,6 +1176,11 @@ def register(app):
             TREATMENT_PLAN_EDIT_REASON: [
                 CallbackQueryHandler(_tracked(tp.get('plan_edit_reason_skip'), TREATMENT_PLAN_EDIT_REASON), pattern="^tp_edit_reason_skip$"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, _tracked(tp.get('plan_edit_reason'), TREATMENT_PLAN_EDIT_REASON)),
+            ],
+            TREATMENT_COMPLAINT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, _tracked(tp.get('complaint'), TREATMENT_COMPLAINT)),
+                CallbackQueryHandler(sh['handle_smart_back_navigation'],   pattern="^nav:back$"),
+                CallbackQueryHandler(sh['handle_smart_cancel_navigation'], pattern="^nav:cancel$"),
             ],
             TREATMENT_NOTES: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, _tracked(tp.get('notes'), TREATMENT_NOTES)),
