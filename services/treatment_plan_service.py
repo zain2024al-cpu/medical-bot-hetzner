@@ -143,7 +143,12 @@ def edit_plan(
     """يعدّل خطة نشطة — يسجّل الحالة قبل وبعد في TreatmentPlanChangeLog
     أولاً، ثم يطبّق التعديل. changes: أي من حقول TreatmentPlan المسموح
     تعديلها (total_sessions/total_cycles/sessions_per_cycle/
-    custom_cycle_sessions)."""
+    custom_cycle_sessions/current_session/current_cycle).
+
+    ✅ current_session/current_cycle: تصحيح يدوي مباشر لرقم الجلسة/الدورة
+    الحالية (بخلاف advance_plan الذي يزيدها +1 تلقائياً فقط) — لمرضى بدأوا
+    الجلسات فعلياً قبل إنشاء الخطة في هذا النظام، فيحتاج المترجم مطابقة
+    العدّاد مع الرقم الحقيقي دفعة واحدة."""
     with SessionLocal() as s:
         plan = s.get(TreatmentPlan, plan_id)
         if not plan:
@@ -159,6 +164,10 @@ def edit_plan(
             plan.sessions_per_cycle = changes["sessions_per_cycle"]
         if "custom_cycle_sessions" in changes:
             plan.custom_cycle_sessions = json.dumps(changes["custom_cycle_sessions"], ensure_ascii=False)
+        if "current_session" in changes:
+            plan.current_session = changes["current_session"]
+        if "current_cycle" in changes:
+            plan.current_cycle = changes["current_cycle"]
 
         plan.updated_at = datetime.utcnow()
         new_snapshot = json.dumps(_plan_to_dict(plan), ensure_ascii=False)

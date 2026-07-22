@@ -25,7 +25,8 @@ from telegram.ext import ContextTypes
 
 from ..states import (
     TREATMENT_PLAN_SETUP, TREATMENT_PLAN_EDIT_VALUE, TREATMENT_PLAN_EDIT_REASON,
-    TREATMENT_PLAN_DISPLAY, TREATMENT_COMPLAINT, TREATMENT_NOTES, TREATMENT_FOLLOWUP_DATE,
+    TREATMENT_PLAN_DISPLAY, TREATMENT_PLAN_MANUAL_SESSION,
+    TREATMENT_COMPLAINT, TREATMENT_NOTES, TREATMENT_FOLLOWUP_DATE,
     TREATMENT_FOLLOWUP_REASON, TREATMENT_TRANSLATOR,
     CHEMO_MODE_CHOICE, CHEMO_CYCLES_TOTAL, CHEMO_CYCLES_UNIFORM_CHOICE,
     CHEMO_CYCLES_UNIFORM_COUNT, CHEMO_CYCLES_CUSTOM_ENTRY,
@@ -333,6 +334,7 @@ async def _show_plan_display(message, context, plan: dict):
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("✅ متابعة", callback_data="tp_display:continue"),
          InlineKeyboardButton("✏️ تعديل الخطة", callback_data="tp_display:edit")],
+        [InlineKeyboardButton("🔢 إدخال رقم الجلسة الحالية", callback_data="tp_display:manual")],
     ])
     await message.reply_text(f"{summary}", reply_markup=keyboard, parse_mode="Markdown")
     return TREATMENT_PLAN_DISPLAY
@@ -349,6 +351,17 @@ async def handle_treatment_plan_display_choice(update: Update, context: ContextT
         await _prompt_complaint(query.message, context)
         context.user_data['_conversation_state'] = TREATMENT_COMPLAINT
         return TREATMENT_COMPLAINT
+
+    if choice == "manual":
+        # ✅ إدخال يدوي لرقم الجلسة الحالية — لمرضى بدأوا الجلسات فعلياً قبل
+        # إنشاء الخطة في هذا النظام، فيحتاج المترجم مطابقة العدّاد مباشرة
+        # بدل الاعتماد فقط على "متابعة" (+1) أو "تعديل الخطة" (العدد الكلي).
+        await query.edit_message_text(
+            "🔢 **إدخال رقم الجلسة الحالية**\n\n"
+            "أدخل رقم الجلسة الحالية (مثال: 5):",
+            parse_mode="Markdown",
+        )
+        return TREATMENT_PLAN_MANUAL_SESSION
 
     # edit
     plan_id = data.get("_tp_plan_id")
@@ -371,6 +384,31 @@ async def handle_treatment_plan_display_choice(update: Update, context: ContextT
         parse_mode="Markdown",
     )
     return CHEMO_CYCLES_TOTAL
+
+
+async def handle_treatment_plan_manual_session(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """إدخال يدوي لرقم الجلسة الحالية — يعدّل current_session مباشرة (بلا
+    المرور بأسئلة العدد الكلي)، مع تسجيل التغيير في سجل تدقيق الخطة."""
+    text = update.message.text.strip()
+    if not text.isdigit() or int(text) <= 0:
+        await update.message.reply_text(
+            "⚠️ يرجى إدخال رقم صحيح أكبر من صفر (رقم الجلسة الحالية):",
+            reply_markup=_nav_buttons(show_back=True),
+        )
+        return TREATMENT_PLAN_MANUAL_SESSION
+
+    data = context.user_data.setdefault("report_tmp", {})
+    plan_id = data.get("_tp_plan_id")
+    actor_id, actor_name = _actor(update)
+
+    plan = edit_plan(
+        plan_id, {"current_session": int(text)},
+        changed_by=actor_id, changed_by_name=actor_name,
+        reason="تصحيح يدوي لرقم الجلسة الحالية",
+    )
+
+    await update.message.reply_text("✅ تم الحفظ")
+    return await _show_plan_display(update.message, context, plan)
 
 
 async def handle_treatment_plan_edit_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -521,7 +559,7 @@ __all__ = [
     'handle_chemo_cycles_uniform_count', 'handle_chemo_cycles_custom_entry',
     'handle_treatment_plan_setup', 'handle_treatment_plan_display_choice',
     'handle_treatment_plan_edit_value', 'handle_treatment_plan_edit_reason',
-    'handle_treatment_plan_edit_reason_skip',
+    'handle_treatment_plan_edit_reason_skip', 'handle_treatment_plan_manual_session',
     'handle_treatment_complaint',
     'handle_treatment_notes', 'handle_treatment_notes_skip', 'handle_treatment_followup_reason',
     'TREATMENT_MEDICAL_ACTION',

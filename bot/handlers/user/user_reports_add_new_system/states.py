@@ -158,3 +158,7 @@ R_ACTION_TYPE = STATE_SELECT_ACTION_TYPE
 # حالة إضافية: شكوى المريض في مسار جلسات العلاج (chemo/targeted/immuno/
 # dialysis) — تُسأل بعد عرض تقدُّم الخطة وقبل ملاحظات الطبيب.
 (TREATMENT_COMPLAINT,) = range(126, 127)
+
+# حالة إضافية: إدخال يدوي لرقم الجلسة الحالية في مسار جلسات العلاج — لتصحيح
+# العدّاد عند مرضى بدأوا الجلسات قبل إنشاء الخطة في هذا النظام.
+(TREATMENT_PLAN_MANUAL_SESSION,) = range(127, 128)
