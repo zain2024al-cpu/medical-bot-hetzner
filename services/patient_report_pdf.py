@@ -357,37 +357,56 @@ def build_patient_pdf(
         matplotlib) — يضمن نفس عرض العربي الصحيح والمتّسق المستخدَم في بقية
         هذا المستند، ويتجنّب خلل التشكيل المزدوج المحتمل مع matplotlib على
         بعض بيئات الخادم (انظر التعليق أعلى تعريف build_patient_pdf)."""
-        def __init__(self, items, width, row_h=0.6 * cm, label_w=5.2 * cm):
+        def __init__(self, items, width, row_h=0.65 * cm, label_w=5.2 * cm, pad=0.35 * cm):
             super().__init__()
             self.items = items[:12]
             self.width = width
             self.row_h = row_h
             self.label_w = label_w
-            self.height = max(len(self.items), 1) * row_h
+            self.pad = pad
+            self.height = max(len(self.items), 1) * row_h + 2 * pad
 
         def draw(self):
             c = self.canv
             if not self.items:
                 return
+            pad = self.pad
+            inner_w = self.width - 2 * pad
+            inner_h = self.height - 2 * pad
             max_v = max(v for _, v in self.items) or 1
-            bar_area_w = self.width - self.label_w - 0.3 * cm
+            bar_area_w = inner_w - self.label_w - 0.3 * cm
+
+            # ✅ إطار وخلفية حول الرسم كاملاً بناءً على طلب صريح ("افعل إطار
+            # حولها") — بدل رسم عائم بلا حدود كان يبدو "سيئ التنسيق".
+            c.setFillColor(C["card_bg"])
+            c.setStrokeColor(C["grid"])
+            c.setLineWidth(0.8)
+            c.roundRect(0, 0, self.width, self.height, 5, stroke=1, fill=1)
+
             for i, (label, value) in enumerate(self.items):
-                row_top = self.height - i * self.row_h
-                bar_h = self.row_h * 0.6
-                y = row_top - self.row_h + (self.row_h - bar_h) / 2
+                row_bottom = pad + inner_h - (i + 1) * self.row_h
+                # ✅ تخطيط صفوف متبادل (كما في كل جداول هذا التقرير) لتحسين
+                # القراءة بدل الخلفية البيضاء الموحَّدة.
+                if i % 2 == 1:
+                    c.setFillColor(C["light_bg"])
+                    c.rect(pad, row_bottom, inner_w, self.row_h, fill=1, stroke=0)
+                bar_h = self.row_h * 0.55
+                bar_y = row_bottom + (self.row_h - bar_h) / 2
                 bar_len = (value / max_v) * bar_area_w
-                bar_x_left = bar_area_w - bar_len
+                bar_x_right = pad + bar_area_w
+                bar_x_left = bar_x_right - bar_len
                 c.setFillColor(C["primary"])
-                c.rect(bar_x_left, y, bar_len, bar_h, fill=1, stroke=0)
+                c.rect(bar_x_left, bar_y, bar_len, bar_h, fill=1, stroke=0)
                 c.setFillColor(C["text_gray"])
                 c.setFont(FN, 8)
-                c.drawRightString(bar_x_left - 4, y + bar_h / 2 - 3, str(value))
+                c.drawRightString(bar_x_left - 4, bar_y + bar_h / 2 - 3, str(value))
                 c.setFillColor(C["black"])
                 c.setFont(FN, 8)
-                c.drawString(bar_area_w + 6, y + bar_h / 2 - 3, _ar(label))
+                c.drawString(bar_x_right + 6, bar_y + bar_h / 2 - 3, _ar(label))
+
             c.setStrokeColor(C["grid"])
             c.setLineWidth(0.6)
-            c.line(bar_area_w, 0, bar_area_w, self.height)
+            c.line(pad + bar_area_w, pad, pad + bar_area_w, pad + inner_h)
 
     if period_start and period_end:
         period_line_text = f"الفترة: {period_label} — من {_fd(period_start)} إلى {_fd(period_end)}"
@@ -671,8 +690,8 @@ def build_patient_pdf(
             HRFlowable(width="100%", thickness=0.8, color=C["accent"], spaceAfter=4),
         ]
 
-        header_row = [P("التاريخ", "th"), P("المستشفى", "th"), P("القسم", "th"), P("القرار الطبي", "th")]
-        col_widths = [2.3 * cm, 3.8 * cm, 3.3 * cm]
+        header_row = [P("التاريخ", "th"), P("المستشفى", "th"), P("القسم", "th"), P("الطبيب", "th"), P("القرار الطبي", "th")]
+        col_widths = [2.3 * cm, 3.8 * cm, 3.3 * cm, 2.8 * cm]
         if is_operation:
             header_row.append(P("اسم العملية", "th"))
             col_widths.append(2.6 * cm)
@@ -685,6 +704,7 @@ def build_patient_pdf(
                 P(_fd(r.get("report_date")), "td_c"),
                 P(r.get("hospital_name") or "—", "td_r"),
                 P(_normalize_dept(r.get("department")) or "—", "td_r"),
+                P(r.get("doctor_name") or "—", "td_r"),
             ]
             if is_operation:
                 row.append(P_cell_capped(_extract_op_name_en(r.get("doctor_decision")) or "—", "td_r", 2.6 * cm))
