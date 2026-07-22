@@ -599,7 +599,9 @@ def build_patient_pdf(
         bot/handlers/user/user_reports_add_new_system/flows/shared.py، مثال:
         "التشخيص النهائي: ...\\n\\nقرار الطبيب: ...\\n\\nالتوصيات الطبية: ...")
         إلى أقسام مفردة، بدل عرضه ككتلة واحدة تحت تسمية عامة "القرار الطبي".
-        ✅ يُستبعد قسم التشخيص/التشخيص النهائي كلياً بناءً على طلب صريح."""
+        ✅ يُستبعد قسم التشخيص/التشخيص النهائي والملاحظات كلياً بناءً على طلب
+        صريح (الملاحظات تحديداً غير مطلوبة من قسم العملية)."""
+        _EXCLUDED_LABELS = ("تشخيص", "ملاحظات")
         sections: list[tuple[str, str]] = []
         for chunk in (raw or "").split("\n\n"):
             chunk = chunk.strip()
@@ -607,7 +609,7 @@ def build_patient_pdf(
                 continue
             label, _, value = chunk.partition(":")
             label = label.strip()
-            if "تشخيص" in label:
+            if any(ex in label for ex in _EXCLUDED_LABELS):
                 continue
             sections.append((label, value.strip()))
         return sections
@@ -715,7 +717,8 @@ def build_patient_pdf(
 
             rows = [header_row, data_row]
             style_cmds = [
-                ("GRID",          (0, 0), (-1, -1), 0.3, C["grid"]),
+                # ✅ سُمك أكبر (كان 0.3 يبدو خفيفاً جداً) بناءً على طلب صريح.
+                ("GRID",          (0, 0), (-1, -1), 0.9, C["grid"]),
                 ("ALIGN",         (0, 0), (-1, -1), "CENTER"),
                 ("VALIGN",        (0, 0), (-1, -1), "TOP"),
                 ("TOPPADDING",    (0, 0), (-1, -1), 4),
