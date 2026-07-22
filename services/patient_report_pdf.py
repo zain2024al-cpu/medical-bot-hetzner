@@ -125,25 +125,22 @@ def _normalize_dept(dept: str) -> str:
 # ── Color palette ─────────────────────────────────────────────────────────────
 
 def _colors():
-    # ✅ لوحة Jasmine (ذهبي فاتح) بدل الرمادي الغامق — اختيار المستخدم صراحة.
-    # ⚠️ Jasmine لون فاتح جداً (#F8DE7E)، فالنص الأبيض على خلفية بهذا اللون
-    # (كما كان مطبَّقاً حين كان اللون الأساسي غامقاً) يصبح غير مقروء عملياً.
-    # لذلك أُضيف "header_text" (بنّي غامق) ليحل محل الأبيض في كل مكان يُكتَب
-    # فيه نص فوق خلفية primary/accent (عناوين الجداول، الشريط العلوي/السفلي)
-    # — يحافظ هذا على لون Jasmine المطلوب حرفياً كخلفية، مع إبقاء النص مقروءاً.
+    # ✅ رجوع صريح للأزرق الأصلي — المستخدم جرّب Slate ثم Jasmine ولم يعجباه،
+    # وطلب العودة للأزرق فقط. "header_text" = أبيض هنا (يعمل بشكل صحيح مع
+    # الأزرق الغامق، بعكس Jasmine الفاتح الذي احتاج نصاً غامقاً بدلاً منه).
     from reportlab.lib import colors
     return {
-        "primary":     colors.HexColor("#F8DE7E"),
-        "accent":      colors.HexColor("#D4AF37"),
+        "primary":     colors.HexColor("#1565C0"),
+        "accent":      colors.HexColor("#0288D1"),
         "success":     colors.HexColor("#2E7D32"),
         "warning":     colors.HexColor("#F57F17"),
         "danger":      colors.HexColor("#C62828"),
-        "light_bg":    colors.HexColor("#FFF8E1"),
-        "card_bg":     colors.HexColor("#FFFDF6"),
-        "grid":        colors.HexColor("#E6D9A8"),
-        "text_dark":   colors.HexColor("#3E2E00"),
-        "text_gray":   colors.HexColor("#7A6A4F"),
-        "header_text": colors.HexColor("#3E2E00"),
+        "light_bg":    colors.HexColor("#F0F4F8"),
+        "card_bg":     colors.HexColor("#FAFCFF"),
+        "grid":        colors.HexColor("#D0D9E8"),
+        "text_dark":   colors.HexColor("#1A237E"),
+        "text_gray":   colors.HexColor("#546E7A"),
+        "header_text": colors.white,
         "white":       colors.white,
         "black":       colors.black,
     }
