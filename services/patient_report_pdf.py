@@ -122,6 +122,22 @@ def _normalize_dept(dept: str) -> str:
     return next((p for p in parts if re.search(r"[؀-ۿ]", p)), parts[0] if parts else d)
 
 
+# ✅ تسمية عرض مختصرة لبعض أنواع الإجراءات — بناءً على طلب صريح: يُعرَض
+# "استشارة مع قرار عملية" في كل هذا التقرير باسم "عملية" فقط (أقصر وأوضح
+# للقارئ)، بينما تبقى المطابقة الفعلية مع البيانات (تجميع/تصفية/فرز) على
+# القيمة الحقيقية المخزَّنة في medical_action دون أي تغيير — لا علاقة لهذا
+# بمنطق التصفية، فقط بالنص المعروض. طُبِّق في كل مكان يُعرَض فيه اسم نوع
+# الإجراء كنص (الجدول، الرسم البياني، وعنوان قسم التفاصيل) لتفادي تناقض
+# ظاهري لو ظهر الاسم الكامل في مكان والمختصر في آخر لنفس النوع.
+_ACTION_DISPLAY_LABELS = {
+    "استشارة مع قرار عملية": "عملية",
+}
+
+
+def _display_action(action: str) -> str:
+    return _ACTION_DISPLAY_LABELS.get(action, action)
+
+
 # ── Color palette ─────────────────────────────────────────────────────────────
 
 def _colors():
@@ -463,7 +479,7 @@ def build_patient_pdf(
         act_rows.append([
             P(pct, "td_c"),
             P(str(cnt), "td_c"),
-            P(action, "td_r"),
+            P(_display_action(action), "td_r"),
         ])
     if len(act_rows) > 1:
         act_table = Table(act_rows, colWidths=[3 * cm, 3 * cm, 10 * cm], hAlign="RIGHT")
@@ -483,7 +499,7 @@ def build_patient_pdf(
         story.append(KeepTogether([P("جدول ملخص الإجراءات", "section"), act_table]))
 
     if len(summary_action_counts) > 1:
-        chart_items = sorted(summary_action_counts.items(), key=lambda x: -x[1])
+        chart_items = [(_display_action(a), c) for a, c in sorted(summary_action_counts.items(), key=lambda x: -x[1])]
         chart = _HBarChart(chart_items, width=content_width_pts)
         chart.hAlign = "RIGHT"
         # ✅ العنوان والرسم يبقيان معاً على نفس الصفحة (KeepTogether) —
@@ -535,7 +551,7 @@ def build_patient_pdf(
 
         # ✅ رأس مبني منطقياً (القسم أولاً) ثم يُعكَس دفعة واحدة أدناه —
         # نفس أسلوب جدول تفاصيل التقارير (info_table) لضمان "القسم" أقصى اليمين.
-        header_row = [P("القسم", "th")] + [P(a, "th") for a in action_names] + [P("الإجمالي", "th")]
+        header_row = [P("القسم", "th")] + [P(_display_action(a), "th") for a in action_names] + [P("الإجمالي", "th")]
         rows = [header_row]
         for dept in sorted(dept_action_counts.keys()):
             counts = dept_action_counts[dept]
@@ -660,7 +676,7 @@ def build_patient_pdf(
 
         section_block = [
             Spacer(1, 0.4 * cm),
-            P(f"● {action}  ({count} تقرير)", "section"),
+            P(f"● {_display_action(action)}  ({count} تقرير)", "section"),
             HRFlowable(width="100%", thickness=0.8, color=C["accent"], spaceAfter=4),
         ]
 
