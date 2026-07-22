@@ -125,24 +125,27 @@ def _normalize_dept(dept: str) -> str:
 # ── Color palette ─────────────────────────────────────────────────────────────
 
 def _colors():
-    # ✅ لوحة رمادي غامق (Slate) بدل الأزرق السابق — اختيار المستخدم صراحة
-    # بديلاً عن الأزرق. مبنية على تدرّجات Material "Blue Grey" لضمان انسجام
-    # الألوان مع بعضها (نفس العائلة اللونية بدرجات متفاوتة) بدل اختيار لون
-    # واحد فقط وترك البقية بلا تناسق.
+    # ✅ لوحة Jasmine (ذهبي فاتح) بدل الرمادي الغامق — اختيار المستخدم صراحة.
+    # ⚠️ Jasmine لون فاتح جداً (#F8DE7E)، فالنص الأبيض على خلفية بهذا اللون
+    # (كما كان مطبَّقاً حين كان اللون الأساسي غامقاً) يصبح غير مقروء عملياً.
+    # لذلك أُضيف "header_text" (بنّي غامق) ليحل محل الأبيض في كل مكان يُكتَب
+    # فيه نص فوق خلفية primary/accent (عناوين الجداول، الشريط العلوي/السفلي)
+    # — يحافظ هذا على لون Jasmine المطلوب حرفياً كخلفية، مع إبقاء النص مقروءاً.
     from reportlab.lib import colors
     return {
-        "primary":    colors.HexColor("#37474F"),
-        "accent":     colors.HexColor("#607D8B"),
-        "success":    colors.HexColor("#2E7D32"),
-        "warning":    colors.HexColor("#F57F17"),
-        "danger":     colors.HexColor("#C62828"),
-        "light_bg":   colors.HexColor("#ECEFF1"),
-        "card_bg":    colors.HexColor("#F7F9FA"),
-        "grid":       colors.HexColor("#CFD8DC"),
-        "text_dark":  colors.HexColor("#263238"),
-        "text_gray":  colors.HexColor("#546E7A"),
-        "white":      colors.white,
-        "black":      colors.black,
+        "primary":     colors.HexColor("#F8DE7E"),
+        "accent":      colors.HexColor("#D4AF37"),
+        "success":     colors.HexColor("#2E7D32"),
+        "warning":     colors.HexColor("#F57F17"),
+        "danger":      colors.HexColor("#C62828"),
+        "light_bg":    colors.HexColor("#FFF8E1"),
+        "card_bg":     colors.HexColor("#FFFDF6"),
+        "grid":        colors.HexColor("#E6D9A8"),
+        "text_dark":   colors.HexColor("#3E2E00"),
+        "text_gray":   colors.HexColor("#7A6A4F"),
+        "header_text": colors.HexColor("#3E2E00"),
+        "white":       colors.white,
+        "black":       colors.black,
     }
 
 
@@ -217,7 +220,7 @@ def build_patient_pdf(
         "section":      S("sec", fontSize=13, leading=18, alignment=TA_RIGHT,  textColor=C["primary"],  fontName=FNB, spaceBefore=10, spaceAfter=4),
         "body":         S("bd",  fontSize=10, leading=14, alignment=TA_RIGHT,  textColor=C["black"]),
         "small":        S("sm",  fontSize=8,  leading=11, alignment=TA_RIGHT,  textColor=C["text_gray"]),
-        "th":           S("th",  fontSize=9,  leading=12, alignment=TA_CENTER, textColor=C["white"],    fontName=FNB),
+        "th":           S("th",  fontSize=9,  leading=12, alignment=TA_CENTER, textColor=C["header_text"], fontName=FNB),
         "td_r":         S("tdr", fontSize=8,  leading=11, alignment=TA_RIGHT,  textColor=C["black"]),
         "td_c":         S("tdc", fontSize=8,  leading=11, alignment=TA_CENTER, textColor=C["black"]),
         "stat_label":   S("sl",  fontSize=9,  leading=12, alignment=TA_CENTER, textColor=C["text_gray"]),
@@ -259,13 +262,13 @@ def build_patient_pdf(
         # Top bar
         canvas.setFillColor(C["primary"])
         canvas.rect(0, h - 1.3 * cm, w, 1.3 * cm, fill=1, stroke=0)
-        canvas.setFillColor(C["white"])
+        canvas.setFillColor(C["header_text"])
         canvas.setFont(FNB, 9)
         canvas.drawCentredString(w / 2, h - 0.85 * cm, _ar(f"التقرير الطبي — {patient_name}"))
         # Footer
         canvas.setFillColor(C["primary"])
         canvas.rect(0, 0, w, 0.7 * cm, fill=1, stroke=0)
-        canvas.setFillColor(C["white"])
+        canvas.setFillColor(C["header_text"])
         canvas.setFont(FN, 7)
         canvas.drawString(1 * cm, 0.2 * cm, _ar(datetime.utcnow().strftime("%Y-%m-%d")))
         canvas.drawCentredString(w / 2, 0.2 * cm, _ar("سري — للاستخدام الطبي الداخلي"))
