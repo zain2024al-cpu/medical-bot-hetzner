@@ -122,22 +122,6 @@ def _normalize_dept(dept: str) -> str:
     return next((p for p in parts if re.search(r"[؀-ۿ]", p)), parts[0] if parts else d)
 
 
-# ✅ تسمية عرض مختصرة لبعض أنواع الإجراءات — بناءً على طلب صريح: يُعرَض
-# "استشارة مع قرار عملية" في كل هذا التقرير باسم "عملية" فقط (أقصر وأوضح
-# للقارئ)، بينما تبقى المطابقة الفعلية مع البيانات (تجميع/تصفية/فرز) على
-# القيمة الحقيقية المخزَّنة في medical_action دون أي تغيير — لا علاقة لهذا
-# بمنطق التصفية، فقط بالنص المعروض. طُبِّق في كل مكان يُعرَض فيه اسم نوع
-# الإجراء كنص (الجدول، الرسم البياني، وعنوان قسم التفاصيل) لتفادي تناقض
-# ظاهري لو ظهر الاسم الكامل في مكان والمختصر في آخر لنفس النوع.
-_ACTION_DISPLAY_LABELS = {
-    "استشارة مع قرار عملية": "عملية",
-}
-
-
-def _display_action(action: str) -> str:
-    return _ACTION_DISPLAY_LABELS.get(action, action)
-
-
 # ── Color palette ─────────────────────────────────────────────────────────────
 
 def _colors():
@@ -479,7 +463,7 @@ def build_patient_pdf(
         act_rows.append([
             P(pct, "td_c"),
             P(str(cnt), "td_c"),
-            P(_display_action(action), "td_r"),
+            P(action, "td_r"),
         ])
     if len(act_rows) > 1:
         act_table = Table(act_rows, colWidths=[3 * cm, 3 * cm, 10 * cm], hAlign="RIGHT")
@@ -499,7 +483,7 @@ def build_patient_pdf(
         story.append(KeepTogether([P("جدول ملخص الإجراءات", "section"), act_table]))
 
     if len(summary_action_counts) > 1:
-        chart_items = [(_display_action(a), c) for a, c in sorted(summary_action_counts.items(), key=lambda x: -x[1])]
+        chart_items = sorted(summary_action_counts.items(), key=lambda x: -x[1])
         chart = _HBarChart(chart_items, width=content_width_pts)
         chart.hAlign = "RIGHT"
         # ✅ العنوان والرسم يبقيان معاً على نفس الصفحة (KeepTogether) —
@@ -551,7 +535,7 @@ def build_patient_pdf(
 
         # ✅ رأس مبني منطقياً (القسم أولاً) ثم يُعكَس دفعة واحدة أدناه —
         # نفس أسلوب جدول تفاصيل التقارير (info_table) لضمان "القسم" أقصى اليمين.
-        header_row = [P("القسم", "th")] + [P(_display_action(a), "th") for a in action_names] + [P("الإجمالي", "th")]
+        header_row = [P("القسم", "th")] + [P(a, "th") for a in action_names] + [P("الإجمالي", "th")]
         rows = [header_row]
         for dept in sorted(dept_action_counts.keys()):
             counts = dept_action_counts[dept]
@@ -648,8 +632,14 @@ def build_patient_pdf(
     # ✅ جدول واحد فقط لكل نوع (بدل جدول حقول قصيرة + فقرات نصية منفصلة تحته)
     # بناءً على طلب صريح: "لا داعي للنصوص والجداول مع بعض... بجدول واحد أسهل
     # وأمرن". الأعمدة: التاريخ، المستشفى، القسم، القرار الطبي، واسم العملية
-    # (للنوع الجراحي فقط). الترتيب بين القسمين ثابت (عملية القرار أولاً ثم
-    # استشارة أخيرة) بناءً على طلب صريح، وليس بحسب عدد التقارير كما كان.
+    # (للنوع الجراحي فقط). الترتيب بين القسمين ثابت (عملية أولاً ثم استشارة
+    # أخيرة) بناءً على طلب صريح، وليس بحسب عدد التقارير كما كان.
+    #
+    # ⚠️ الاسم الفعلي المطلوب هنا هو "عملية" (وليس "استشارة مع قرار عملية")
+    # بناءً على طلب صريح لاحق — هما نوعان منفصلان تماماً في قاعدة البيانات،
+    # و"عملية" لا تزال ضمن _SUMMARY_ACTIONS أعلاه (تُعرَض إحصائياً هناك)، لكن
+    # قسم التفاصيل هذا تحديداً يعرض بياناتها الكاملة بدل "استشارة مع قرار
+    # عملية".
     #
     # ⚠️ ملاحظة فنية مهمة: دمج "القرار الطبي" (نص حر قد يطول جداً) داخل خلية
     # جدول يُعيد فعلياً خطر التعطّل (LayoutError) الذي أُصلِح سابقاً بنقل هذا
@@ -658,8 +648,8 @@ def build_patient_pdf(
     # P_cell_capped بدل P_wrap: يلفّ النص بأمان لكن بحدّ أقصى 18 سطراً لكل
     # خلية (يحافظ على كل نص واقعي تقريباً)، ويقصّه بـ"…" فقط في حالات نادرة
     # جداً من نص أطول من ذلك بكثير — هذا يمنع التعطّل نهائياً مهما طال النص.
-    _FULL_DETAIL_ACTIONS = {"استشارة مع قرار عملية", "استشارة أخيرة"}
-    _DETAIL_ORDER = ["استشارة مع قرار عملية", "استشارة أخيرة"]
+    _FULL_DETAIL_ACTIONS = {"عملية", "استشارة أخيرة"}
+    _DETAIL_ORDER = ["عملية", "استشارة أخيرة"]
 
     story.append(PageBreak())
     story.append(P("تفاصيل التقارير حسب نوع الإجراء", "section"))
@@ -672,11 +662,11 @@ def build_patient_pdf(
             continue
         count = len(reps)
         sorted_reps = sorted(reps, key=lambda x: x.get("report_date") or date.min)
-        is_operation = action == "استشارة مع قرار عملية"
+        is_operation = action == "عملية"
 
         section_block = [
             Spacer(1, 0.4 * cm),
-            P(f"● {_display_action(action)}  ({count} تقرير)", "section"),
+            P(f"● {action}  ({count} تقرير)", "section"),
             HRFlowable(width="100%", thickness=0.8, color=C["accent"], spaceAfter=4),
         ]
 
