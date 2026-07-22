@@ -3,6 +3,7 @@
 import json
 import logging
 from dataclasses import dataclass
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,7 @@ def save_supplies_record(
     notes:                     str,
     specialist_name:           str,
     created_by:                int | None,
+    created_at:                "datetime | None" = None,
 ) -> SavedSuppliesRecord:
     from db.session import get_db
     from db.models import SuppliesRecord
@@ -48,6 +50,11 @@ def save_supplies_record(
             notes=                    notes or "",
             specialist_name=          specialist_name or "",
             created_by=               created_by,
+            # ✅ تاريخ الصرف الفعلي الذي اختاره المستخدم في خطوة "📅 اختر
+            # التاريخ" — وليس وقت النشر الفعلي. نفس سبب التعديل في
+            # medications/models.py: بدونه يتجاهل العمود اختيار المستخدم
+            # ويظهر تاريخ خاطئ في مسير إخلاء الصيدلية.
+            created_at=               created_at or datetime.utcnow(),
         )
         db.add(record)
         db.flush()

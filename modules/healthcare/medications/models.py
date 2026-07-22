@@ -3,6 +3,7 @@
 import json
 import logging
 from dataclasses import dataclass
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,7 @@ def save_medication_record(
     notes:                    str,
     specialist_name:          str,
     created_by:               int | None,
+    created_at:               "datetime | None" = None,
 ) -> SavedMedicationRecord:
     from db.session import get_db
     from db.models import MedicationRecord
@@ -55,6 +57,12 @@ def save_medication_record(
             notes=                    notes or "",
             specialist_name=          specialist_name or "",
             created_by=               created_by,
+            # ✅ تاريخ الصرف الفعلي الذي اختاره المستخدم في خطوة "📅 اختر
+            # التاريخ" (اليوم أو من التقويم) — وليس وقت النشر الفعلي. بدون هذا
+            # كان العمود يأخذ القيمة الافتراضية (datetime.utcnow عند الحفظ)،
+            # فيتجاهل اختيار المستخدم تماماً ويظهر تاريخ خاطئ لاحقاً في مسير
+            # إخلاء الصيدلية (الذي يقرأ هذا العمود بالضبط).
+            created_at=               created_at or datetime.utcnow(),
         )
         db.add(record)
         db.flush()

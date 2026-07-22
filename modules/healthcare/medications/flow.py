@@ -505,6 +505,15 @@ async def _handle_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     dept_snap            = list(session.medical_department_labels)
     dispense_source_snap = session.dispense_source
 
+    # ✅ تاريخ الصرف الذي اختاره المستخدم فعلياً في خطوة "📅 اختر التاريخ"
+    # (اليوم أو من التقويم) — يُمرَّر صراحةً لعمود created_at بدل ترك القيمة
+    # الافتراضية (وقت الحفظ الفعلي)، حتى يعتمد عليه مسير إخلاء الصيدلية لاحقاً.
+    from datetime import datetime
+    try:
+        created_at_dt = datetime.fromisoformat(date_snap) if date_snap else None
+    except ValueError:
+        created_at_dt = None
+
     _created_by = update.effective_user.id if update.effective_user else None
     logger.info(
         "[healthcare.publish] model=MedicationRecord  payload:"
@@ -531,6 +540,7 @@ async def _handle_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             notes=                     session.notes,
             specialist_name=           session.specialist_name,
             created_by=                _created_by,
+            created_at=                created_at_dt,
         )
         logger.info(f"[healthcare.publish] save OK  model=MedicationRecord  id={saved.record_id}  patient={saved.patient_name!r}")
     except Exception:
