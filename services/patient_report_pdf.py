@@ -140,9 +140,13 @@ def _action_bar_chart(action_counts: dict[str, int], font_name: str) -> io.Bytes
                     str(v), va="center", fontsize=9, color="#333")
         ax.set_xlim(0, max(values) * 1.2 if values else 1)
         ax.invert_yaxis()
+        # ✅ اتجاه RTL: القيم تبدأ من أقصى اليمين وتمتد يساراً، وتسميات الأنواع
+        # تظهر على يمين الرسم (بدل الافتراضي اليساري في matplotlib).
+        ax.invert_xaxis()
+        ax.yaxis.tick_right()
         ax.set_xlabel("")
         ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)
+        ax.spines["left"].set_visible(False)
         ax.tick_params(axis="y", labelsize=8)
         plt.tight_layout()
 
@@ -228,6 +232,19 @@ def build_patient_pdf(
         style = ST[style_key]
         usable_width = max(max_width_pts - 8, 20)
         wrapped = _ar_wrap(txt, style.fontName, style.fontSize, usable_width)
+        return Paragraph(wrapped, style)
+
+    def P_field(label, txt, style_key, max_width_pts) -> Paragraph:
+        """حقل نصي مستقل (تسمية: قيمة) خارج أي جدول — على عكس خلية جدول،
+        هذا الـ Paragraph قابل للانقسام تلقائياً بين صفحتين إن طال (Platypus
+        يدعم split() للفقرات)، فلا يمكن أن يسبّب LayoutError مهما طال النص
+        (وهو ما كان يحدث سابقاً عندما كان النص الطويل محشوراً داخل خلية جدول
+        واحدة غير قابلة للانقسام)."""
+        style = ST[style_key]
+        usable_width = max(max_width_pts - 8, 20)
+        value = str(txt or "").strip() or "—"
+        combined = f"{label}:  {value}"
+        wrapped = _ar_wrap(combined, style.fontName, style.fontSize, usable_width)
         return Paragraph(wrapped, style)
 
     # ── Canvas callbacks (header/footer on every page) ─────────────────────
@@ -549,29 +566,23 @@ def build_patient_pdf(
         ]
 
         is_operation = action == "عملية"
-        header_row = [
-            P("#",             "th"),
-            P("التاريخ",       "th"),
-            P("المستشفى / القسم", "th"),
-            P("الطبيب",        "th"),
-            P("الشكوى",        "th"),
-        ]
-        if is_operation:
-            header_row.append(P("اسم العملية بالإنجليزي", "th"))
-        header_row += [P("القرار الطبي", "th"), P("المتابعة", "th")]
 
-        # ✅ عرض الأعمدة يُحسَب هنا (قبل بناء الصفوف) لأن P_wrap يحتاجه لتحديد
-        # نقاط اللف الصحيحة — نفس سبب استخدام P_wrap أصلاً: خلايا "الشكوى"/
-        # "القرار الطبي"/"اسم العملية بالإنجليزي" قد تحوي نصاً طويلاً مختلط
-        # عربي/إنجليزي يُفسِد التفافه التلقائي إن مرّ عبر reshape+bidi قبل اللف.
-        # ⚠️ مجموع الأعمدة يجب ألا يتجاوز عرض المحتوى المتاح (17.4سم مع هوامش
-        # 1.8سم يميناً ويساراً) — عمود "اسم العملية بالإنجليزي" الإضافي كان
-        # يدفع المجموع لأكثر من ذلك فيفيض الجدول خارج هامش الصفحة اليسار.
-        if is_operation:
-            col_widths = [0.6*cm, 2.2*cm, 2.6*cm, 2*cm, 2.4*cm, 2.2*cm, 2.6*cm, 1.6*cm]
-        else:
-            col_widths = [0.6*cm, 2.2*cm, 3.2*cm, 2.3*cm, 3*cm, 3*cm, 1.7*cm]
-        complaint_w, opname_w, decision_w = col_widths[4], (col_widths[5] if is_operation else None), col_widths[-2]
+        # ✅ جدول موجز آمن (حقول قصيرة فقط: #/تاريخ/مستشفى/طبيب/متابعة) — بلا
+        # أي نص حر طويل، فلا يمكن أن يفيض عن ارتفاع الصفحة إطلاقاً. النصوص
+        # الحرة (الشكوى/القرار الطبي/اسم العملية) تُعرض تحته كفقرات مستقلة
+        # (انظر P_field) بدل حشرها في خلية جدول — لأن خلية جدول واحدة غير
+        # قابلة للانقسام بين صفحتين، فنص حر طويل جداً فيها كان يسبب
+        # LayoutError (تعطّل فعلي شوهد في سجلات الإنتاج: خلية بارتفاع 710
+        # نقطة لا تتسع في صفحة كاملة). الفقرة المستقلة قابلة للانقسام تلقائياً
+        # بين الصفحات مهما طال النص، فتُلغي هذا الخطر نهائياً.
+        header_row = [
+            P("#",       "th"),
+            P("التاريخ", "th"),
+            P("المستشفى / القسم", "th"),
+            P("الطبيب",  "th"),
+            P("المتابعة", "th"),
+        ]
+        col_widths = [0.8*cm, 2.4*cm, 5*cm, 3.5*cm, 2.5*cm]
 
         rows = [header_row]
         for idx, r in enumerate(display_reps, 1):
@@ -579,21 +590,13 @@ def build_patient_pdf(
             dept = r.get("department", "")
             location = hosp + ("\n" + dept if dept else "")
             followup  = _fd(r.get("followup_date"))
-
-            row = [
+            rows.append([
                 P(str(idx),       "td_c"),
                 P(_fd(r.get("report_date")), "td_c"),
                 P(location,       "td_r"),
                 P(r.get("doctor_name", "—"), "td_r"),
-                P_wrap(r.get("complaint_text") or "", "td_r", complaint_w),
-            ]
-            if is_operation:
-                row.append(P_wrap(_extract_op_name_en(r.get("doctor_decision")) or "—", "td_r", opname_w))
-            row += [
-                P_wrap(r.get("doctor_decision") or "", "td_r", decision_w),
-                P(followup if followup != "—" else "", "td_c"),
-            ]
-            rows.append(row)
+                P(followup if followup != "—" else "—", "td_c"),
+            ])
 
         # ✅ عكس كل الأعمدة (رأس + كل الصفوف + العرض) دفعة واحدة — يضمن ظهور
         # "#" أقصى اليمين (نفس مبدأ "م" في services/pharmacy_evacuation_pdf.py)
@@ -601,13 +604,13 @@ def build_patient_pdf(
         rows = [list(reversed(row)) for row in rows]
         col_widths = list(reversed(col_widths))
 
-        detail_table = Table(
+        info_table = Table(
             rows,
             colWidths=col_widths,
             hAlign="RIGHT",
             repeatRows=1,
         )
-        detail_table.setStyle(TableStyle([
+        info_table.setStyle(TableStyle([
             ("BACKGROUND",     (0, 0), (-1, 0),  C["accent"]),
             ("ROWBACKGROUNDS", (0, 1), (-1, -1), [C["white"], C["light_bg"]]),
             ("GRID",           (0, 0), (-1, -1), 0.3, C["grid"]),
@@ -617,10 +620,25 @@ def build_patient_pdf(
             ("BOTTOMPADDING",  (0, 0), (-1, -1), 3),
             ("RIGHTPADDING",   (0, 0), (-1, -1), 4),
             ("LEFTPADDING",    (0, 0), (-1, -1), 4),
-            ("WORDWRAP",       (0, 0), (-1, -1), True),
         ]))
 
-        story += section_block + [detail_table]
+        story += section_block + [info_table]
+
+        # ── تفاصيل نصية حرة لكل تقرير — فقرات مستقلة قابلة للانقسام بين
+        # الصفحات (بلا حد أقصى آمن لطول النص، بعكس خلية الجدول أعلاه) ────────
+        content_width_pts = A4[0] - doc.leftMargin - doc.rightMargin
+        for idx, r in enumerate(display_reps, 1):
+            detail_block = [
+                Spacer(1, 0.25 * cm),
+                P(f"📋 تقرير رقم {idx} — {_fd(r.get('report_date'))}", "small"),
+                P_field("الشكوى", r.get("complaint_text"), "td_r", content_width_pts),
+            ]
+            if is_operation:
+                detail_block.append(
+                    P_field("اسم العملية بالإنجليزي", _extract_op_name_en(r.get("doctor_decision")), "td_r", content_width_pts)
+                )
+            detail_block.append(P_field("القرار الطبي", r.get("doctor_decision"), "td_r", content_width_pts))
+            story += detail_block
 
     # ── Build ─────────────────────────────────────────────────────────────────
     doc.build(story, onFirstPage=_on_page, onLaterPages=_on_page)
