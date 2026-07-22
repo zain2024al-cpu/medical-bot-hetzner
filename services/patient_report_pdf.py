@@ -236,19 +236,24 @@ def build_patient_pdf(
         wrapped = _ar_wrap(txt, style.fontName, style.fontSize, usable_width)
         return Paragraph(wrapped, style)
 
-    def P_field(label, txt, style_key, max_width_pts) -> Paragraph:
-        """حقل نصي مستقل (تسمية: قيمة) خارج أي جدول — على عكس خلية جدول،
-        هذا الـ Paragraph قابل للانقسام تلقائياً بين صفحتين إن طال (Platypus
-        يدعم split() للفقرات)، فلا يمكن أن يسبّب LayoutError مهما طال النص،
-        ولا يُكبِّر عرض/طول الجدول أعلاه — بناءً على طلب صريح بإخراج القرار
-        الطبي/اسم العملية من الجدول لسطر مستقل تحته (انظر رسم توضيحي أرفقه
-        المستخدم)."""
+    def P_field(label, txt, style_key, max_width_pts, max_lines=25) -> Paragraph:
+        """حقل (تسمية: قيمة) بصفّ ممتد (SPAN) داخل نفس جدول تفاصيل التقارير
+        — بناءً على طلب صريح بربط كل شيء بنفس الجدول. ⚠️ خلية جدول واحدة
+        (حتى الممتدة عبر الأعمدة بـ SPAN) غير قابلة للانقسام بين صفحتين في
+        reportlab، فنص حر طويل جداً بلا حدّ فيها قد يسبّب LayoutError فعلياً
+        (تعطّل شوهد سابقاً في سجلات الإنتاج). الحدّ هنا سخي (25 سطراً) يحافظ
+        على كل نص واقعي تقريباً كاملاً، ولا يُفعَّل القصّ (بـ"…") إلا في
+        حالات نادرة جداً من نص أطول من ذلك بكثير."""
         style = ST[style_key]
         usable_width = max(max_width_pts - 8, 20)
         value = str(txt or "").strip() or "—"
         combined = f"{label}:  {value}"
         wrapped = _ar_wrap(combined, style.fontName, style.fontSize, usable_width)
-        return Paragraph(wrapped, style)
+        lines = wrapped.split("<br/>") if wrapped else [""]
+        if len(lines) > max_lines:
+            lines = lines[:max_lines]
+            lines[-1] = lines[-1] + " …"
+        return Paragraph("<br/>".join(lines), style)
 
     # ── Canvas callbacks (header/footer on every page) ─────────────────────
     patient_name = patient.get("name", "—")
@@ -681,50 +686,64 @@ def build_patient_pdf(
             HRFlowable(width="100%", thickness=0.8, color=C["accent"], spaceAfter=4),
         ]
 
-        header_row = [P("التاريخ", "th"), P("المستشفى", "th"), P("القسم", "th"), P("الطبيب", "th")]
         col_widths = [2.5 * cm, 5.5 * cm, 4.5 * cm, 4.9 * cm]
         col_widths_rev = list(reversed(col_widths))
+        n_cols = len(col_widths)
 
-        story += section_block
+        def _header_row():
+            # ✅ عناصر جديدة في كل استدعاء (لا نعيد استخدام نفس كائنات
+            # Paragraph عبر صفوف متعددة من نفس الجدول — قد يسبّب تضارباً في
+            # حالة التخطيط الداخلية لـ reportlab إذا شُوركت الفقرة نفسها بين
+            # خلايا مختلفة).
+            return list(reversed([P("التاريخ", "th"), P("المستشفى", "th"), P("القسم", "th"), P("الطبيب", "th")]))
 
-        # ✅ كل استشارة/تقرير يظهر كوحدة واحدة متتالية: صف بياناته القصيرة
-        # (مباشرة بعد رأس الجدول لأول تقرير فقط) ثم القرار الطبي (واسم
-        # العملية بعده إن وُجد) مباشرة تحته — قبل الانتقال لصف التقرير
-        # التالي. بناءً على طلب صريح: كان عرض كل الصفوف مجتمعة ثم كل قرارات
-        # الأطباء مجتمعة بعدها منفصلة "بشكل سيء" يصعب معه ربط كل قرار بصفّه.
-        for i, r in enumerate(sorted_reps):
+        # ✅ جدول واحد متصل للقسم كله (بدل جداول منفصلة لكل تقرير) بناءً على
+        # طلب صريح: "اربطهم مع بعض بنفس الجدول". رأس الجدول يتكرر قبل كل
+        # تقرير (وليس مرة واحدة فقط) — طلب صريح أيضاً. القرار الطبي/اسم
+        # العملية صفّ ممتد عبر كل الأعمدة (SPAN) داخل نفس الجدول.
+        all_rows: list = []
+        style_cmds = [
+            ("GRID",          (0, 0), (-1, -1), 0.3, C["grid"]),
+            ("ALIGN",         (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+            ("TOPPADDING",    (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 5),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 5),
+        ]
+
+        for r in sorted_reps:
+            header_i = len(all_rows)
+            all_rows.append(_header_row())
+            style_cmds.append(("BACKGROUND", (0, header_i), (-1, header_i), C["accent"]))
+
             data_row = [
                 P(_fd(r.get("report_date")), "td_c"),
                 P(r.get("hospital_name") or "—", "td_r"),
                 P(_normalize_dept(r.get("department")) or "—", "td_r"),
                 P(r.get("doctor_name") or "—", "td_r"),
             ]
-            # ✅ عكس الأعمدة (والرأس عند الحاجة) ليظهر "التاريخ" أقصى اليمين.
-            row_table_rows = [list(reversed(header_row)), list(reversed(data_row))] if i == 0 else [list(reversed(data_row))]
-            row_table = Table(row_table_rows, colWidths=col_widths_rev, hAlign="RIGHT")
-            style_cmds = [
-                ("GRID",          (0, 0), (-1, -1), 0.3, C["grid"]),
-                ("ALIGN",         (0, 0), (-1, -1), "CENTER"),
-                ("VALIGN",        (0, 0), (-1, -1), "TOP"),
-                ("TOPPADDING",    (0, 0), (-1, -1), 4),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-                ("RIGHTPADDING",  (0, 0), (-1, -1), 5),
-                ("LEFTPADDING",   (0, 0), (-1, -1), 5),
-            ]
-            if i == 0:
-                style_cmds.append(("BACKGROUND", (0, 0), (-1, 0), C["accent"]))
-            row_table.setStyle(TableStyle(style_cmds))
-            story.append(row_table)
+            all_rows.append(list(reversed(data_row)))
 
-            # ✅ القرار الطبي أولاً، ثم اسم العملية بعده إن وُجد — ترتيب صريح
-            # مطلوب (بدل اسم العملية قبل القرار الطبي كما كان).
-            field_block = [P_field("القرار الطبي", r.get("doctor_decision"), "td_r", content_width_pts)]
+            # ✅ القرار الطبي أولاً، ثم اسم العملية بعده إن وُجد — كل منهما
+            # صفّ ممتَد (SPAN) عبر كل الأعمدة داخل نفس الجدول.
+            decision_i = len(all_rows)
+            decision_cell = P_field("القرار الطبي", r.get("doctor_decision"), "td_r", content_width_pts)
+            all_rows.append([decision_cell] + [""] * (n_cols - 1))
+            style_cmds.append(("SPAN", (0, decision_i), (-1, decision_i)))
+            style_cmds.append(("ALIGN", (0, decision_i), (-1, decision_i), "RIGHT"))
+
             if is_operation:
-                field_block.append(
-                    P_field("اسم العملية", _extract_op_name_en(r.get("doctor_decision")), "td_r", content_width_pts)
-                )
-            field_block.append(Spacer(1, 0.25 * cm))
-            story += field_block
+                opname_i = len(all_rows)
+                opname_cell = P_field("اسم العملية", _extract_op_name_en(r.get("doctor_decision")), "td_r", content_width_pts)
+                all_rows.append([opname_cell] + [""] * (n_cols - 1))
+                style_cmds.append(("SPAN", (0, opname_i), (-1, opname_i)))
+                style_cmds.append(("ALIGN", (0, opname_i), (-1, opname_i), "RIGHT"))
+
+        detail_table = Table(all_rows, colWidths=col_widths_rev, hAlign="RIGHT")
+        detail_table.setStyle(TableStyle(style_cmds))
+
+        story += section_block + [detail_table]
 
     # ── Build ─────────────────────────────────────────────────────────────────
     doc.build(story, onFirstPage=_on_page, onLaterPages=_on_page)
