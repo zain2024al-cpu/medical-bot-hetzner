@@ -18,7 +18,7 @@ from sqlalchemy import func
 
 from bot.shared_auth import is_admin
 from core.access.access_service import resolve_tg_user_id
-from db.models import Translator
+from db.models import Translator, TranslatorDirectory
 from db.session import SessionLocal
 
 logger = logging.getLogger(__name__)
@@ -42,11 +42,36 @@ def _home_kb() -> InlineKeyboardMarkup:
     )
 
 
+def _resolve_translator_directory_name(tg_user_id: int | None) -> str | None:
+    """
+    الاسم النظيف الموحَّد من TranslatorDirectory (مطابقة بآيدي تيليجرام) إن
+    وُجد — يُعرَض بدل الاسم الفوضوي المأخوذ من بروفايل تيليجرام (حرف واحد/
+    نقاط/اسم مستعار) الذي يظهر أحياناً في full_name عند التسجيل.
+    """
+    if not tg_user_id:
+        return None
+    try:
+        with SessionLocal() as s:
+            row = s.query(TranslatorDirectory).filter_by(translator_id=tg_user_id).first()
+            if row and (row.name or "").strip():
+                return row.name.strip()
+    except Exception as e:
+        logger.error("aum: failed to resolve translator directory name for tg_user_id=%s: %s", tg_user_id, e)
+    return None
+
+
+def _display_name(user: Translator) -> str:
+    """الاسم المعروض: النظيف من دليل المترجمين إن وُجد تطابق، وإلا الاسم الخام من تيليجرام."""
+    raw = (user.full_name or "").strip() or f"User {user.id}"
+    clean = _resolve_translator_directory_name(getattr(user, "tg_user_id", None))
+    return clean or raw
+
+
 def _list_kb(kind: str, page: int, total_pages: int, users: list[Translator]) -> InlineKeyboardMarkup:
     kb: list[list[InlineKeyboardButton]] = []
     for u in users:
         icon = "🔒" if getattr(u, "is_suspended", False) else ("✅" if getattr(u, "is_approved", False) else "⏳")
-        name = (u.full_name or f"User {u.id}").strip()
+        name = _display_name(u)
         kb.append([InlineKeyboardButton(f"{icon} {name}", callback_data=f"{CB}:user:{u.id}")])
 
     nav: list[InlineKeyboardButton] = []
@@ -73,7 +98,7 @@ def _perm_list_kb(page: int, total_pages: int, users: list[Translator]) -> Inlin
     """
     kb: list[list[InlineKeyboardButton]] = []
     for u in users:
-        name = (u.full_name or f"User {u.id}").strip()
+        name = _display_name(u)
         access_tg_user_id = _resolve_access_tg_user_id(u)
         if access_tg_user_id:
             kb.append([InlineKeyboardButton(f"🔐 {name}", callback_data=f"amod:list:{access_tg_user_id}")])
@@ -218,8 +243,9 @@ async def _render_user(query, user_id: int):
             await query.edit_message_text("❌ المستخدم غير موجود.", reply_markup=_home_kb())
             return
 
-        name = (u.full_name or "").strip() or f"User {u.id}"
+        raw_name = (u.full_name or "").strip() or f"User {u.id}"
         tg = u.tg_user_id
+        clean_name = _resolve_translator_directory_name(tg)
         access_tg_user_id = _resolve_access_tg_user_id(u)
         phone = (getattr(u, "phone_number", None) or "").strip() or "غير محدد"
         approved = bool(getattr(u, "is_approved", False))
@@ -231,9 +257,13 @@ async def _render_user(query, user_id: int):
             t = t.replace(ch, f"\\{ch}")
         return t
 
+    name_line = f"• *الاسم:* {_esc(clean_name or raw_name)}\n"
+    if clean_name and clean_name != raw_name:
+        name_line += f"• *الاسم المسجَّل في تيليجرام:* {_esc(raw_name)}\n"
+
     await query.edit_message_text(
         "👤 *تفاصيل المستخدم*\n\n"
-        f"• *الاسم:* {_esc(name)}\n"
+        f"{name_line}"
         f"• *Telegram ID:* `{tg}`\n"
         f"• *الهاتف:* {_esc(phone)}\n"
         f"• *موافقة:* {'✅' if approved else '⏳'}\n"
@@ -256,7 +286,7 @@ async def _apply_action(query, context: ContextTypes.DEFAULT_TYPE, action: str, 
             return
 
         tg = u.tg_user_id
-        name = (u.full_name or "").strip() or f"User {u.id}"
+        name = _display_name(u)
 
         if action == "approve":
             u.is_approved = True
