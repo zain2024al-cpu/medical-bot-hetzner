@@ -599,7 +599,11 @@ async def _finalize_and_generate(
             period_start=period_start, period_end=period_end,
         )
 
-        filename = f"Patient_{patient_id}_{period_start}_{period_end}.pdf"
+        # ✅ اسم الملف يعرض اسم المريض والفترة بدل "Patient_{id}_{تواريخ}"
+        # الإنجليزي — بناءً على طلب صريح، بنفس أداة تسمية الملفات المشتركة
+        # المستخدَمة في بقية تقارير PDF بهذا البوت.
+        from shared.files.filename_builder import build_medical_pdf_filename
+        filename = build_medical_pdf_filename(patient_name=patient_name, workflow_type=period_label)
         caption = (
             f"👤 *تقرير المريض*\n"
             f"📝 {patient_name}\n"
