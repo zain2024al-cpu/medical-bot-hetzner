@@ -278,6 +278,7 @@ def build_patient_pdf(
     )
 
     story = []
+    content_width_pts = A4[0] - doc.leftMargin - doc.rightMargin
 
     # ── Aggregate data ────────────────────────────────────────────────────────
     total = len(reports)
@@ -488,6 +489,62 @@ def build_patient_pdf(
         ]))
         story.append(ht)
 
+    # ── إحصائيات حسب القسم ونوع الإجراء معاً ─────────────────────────────────
+    # ✅ جدول تقاطعي (Pivot): يجيب على "كم إجراء من كل نوع صدر عن كل قسم" —
+    # بخلاف جدول "ملخص الإجراءات" أعلاه الذي يُظهر نوع الإجراء وحده بلا ربطه
+    # بالقسم. يُبنى فقط إن وُجد قسم واحد على الأقل ضمن التقارير.
+    dept_action_counts: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    for r in reports:
+        dept = (r.get("department") or "").strip()
+        if not dept:
+            continue
+        a = (r.get("medical_action") or "غير محدد").strip()
+        dept_action_counts[dept][a] += 1
+
+    if dept_action_counts:
+        story.append(Spacer(1, 0.4 * cm))
+        story.append(P("إحصائيات حسب القسم ونوع الإجراء", "section"))
+
+        action_names = sorted(action_counts.keys())
+        dept_col_w  = 3.2 * cm
+        total_col_w = 1.6 * cm
+        action_col_w = max((content_width_pts - dept_col_w - total_col_w) / len(action_names), 0.9 * cm)
+
+        # ✅ رأس مبني منطقياً (القسم أولاً) ثم يُعكَس دفعة واحدة أدناه —
+        # نفس أسلوب جدول تفاصيل التقارير (info_table) لضمان "القسم" أقصى اليمين.
+        header_row = [P("القسم", "th")] + [P(a, "th") for a in action_names] + [P("الإجمالي", "th")]
+        rows = [header_row]
+        for dept in sorted(dept_action_counts.keys()):
+            counts = dept_action_counts[dept]
+            dept_total = sum(counts.values())
+            row = [P(dept, "td_r")] + [P(str(counts.get(a, 0)), "td_c") for a in action_names] + [P(str(dept_total), "td_c")]
+            rows.append(row)
+
+        col_totals = [sum(dept_action_counts[d].get(a, 0) for d in dept_action_counts) for a in action_names]
+        grand_total = sum(col_totals)
+        rows.append(
+            [P("الإجمالي", "td_r")] + [P(str(c), "td_c") for c in col_totals] + [P(str(grand_total), "td_c")]
+        )
+
+        rows = [list(reversed(row)) for row in rows]
+        col_widths = list(reversed([dept_col_w] + [action_col_w] * len(action_names) + [total_col_w]))
+
+        dept_action_table = Table(rows, colWidths=col_widths, hAlign="RIGHT", repeatRows=1)
+        dept_action_table.setStyle(TableStyle([
+            ("BACKGROUND",     (0, 0), (-1, 0),   C["primary"]),
+            ("BACKGROUND",     (0, -1), (-1, -1), C["light_bg"]),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -2),  [C["white"], C["light_bg"]]),
+            ("GRID",           (0, 0), (-1, -1),  0.3, C["grid"]),
+            ("ALIGN",          (0, 0), (-1, -1),  "CENTER"),
+            ("VALIGN",         (0, 0), (-1, -1),  "MIDDLE"),
+            ("FONTNAME",       (0, -1), (-1, -1), FNB),
+            ("TOPPADDING",     (0, 0), (-1, -1),  4),
+            ("BOTTOMPADDING",  (0, 0), (-1, -1),  4),
+            ("RIGHTPADDING",   (0, 0), (-1, -1),  3),
+            ("LEFTPADDING",    (0, 0), (-1, -1),  3),
+        ]))
+        story.append(dept_action_table)
+
     def _extract_op_name_en(doctor_decision: str) -> str:
         """يستخرج اسم العملية بالإنجليزي من doctor_decision — لا عمود مخصَّص
         له في Report (نفس نمط استخراجه في user_reports_edit.py عند التعديل)."""
@@ -626,7 +683,6 @@ def build_patient_pdf(
 
         # ── تفاصيل نصية حرة لكل تقرير — فقرات مستقلة قابلة للانقسام بين
         # الصفحات (بلا حد أقصى آمن لطول النص، بعكس خلية الجدول أعلاه) ────────
-        content_width_pts = A4[0] - doc.leftMargin - doc.rightMargin
         for idx, r in enumerate(display_reps, 1):
             detail_block = [
                 Spacer(1, 0.25 * cm),
