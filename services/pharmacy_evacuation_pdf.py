@@ -217,7 +217,12 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
     class EvacuationHeaderBand(Flowable):
         def __init__(self):
             Flowable.__init__(self)
-            self.width, self.height = content_width, 5.8 * cm
+            # ✅ خُفِّض من 5.8cm — كان يترك ~1.5cm فراغاً فارغاً أسفل الشريط
+            # المظلَّل بلا داعٍ. هذا التخفيض جزء من مجموعة تعديلات لضمان بقاء
+            # كل "مسير" (جدول + إجمالي + تذييل توقيعات) على صفحة واحدة دائماً
+            # حتى عند التفاف خلايا "البيان"/"الاسم" لعدة أسطر — بدل أن يفيض
+            # تذييل التوقيعات وحده لصفحة جديدة شبه فارغة.
+            self.width, self.height = content_width, 4.6 * cm
 
         def draw(self):
             c = self.canv
@@ -338,7 +343,7 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
 
     if not rows:
         story.append(EvacuationHeaderBand())
-        story.append(Spacer(1, 0.6 * cm))
+        story.append(Spacer(1, 0.3 * cm))
         story.append(P("لا توجد بيانات مطابقة لمعايير البحث المحددة.", "body"))
         doc.build(story, onFirstPage=_on_page, onLaterPages=_on_page)
         buf.seek(0)
@@ -368,7 +373,7 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
     chunks = [rows[i:i + _ROWS_PER_PAGE] for i in range(0, len(rows), _ROWS_PER_PAGE)]
     for chunk_idx, chunk in enumerate(chunks):
         story.append(EvacuationHeaderBand())
-        story.append(Spacer(1, 0.6 * cm))
+        story.append(Spacer(1, 0.3 * cm))
 
         table_data = [HEADER_ROW]
         for row_num, r in enumerate(chunk, start=1):
@@ -399,7 +404,9 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
             ("BACKGROUND", (0, 1), (-1, -1), C["white"]),
             ("GRID", (0, 0), (-1, -1), 0.4, C["grid"]),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("TOPPADDING", (0, 0), (-1, -1), 5), ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            # ✅ خُفِّضت الحشوة الرأسية من 5 إلى 3 (جزء من تعديلات "صفحة واحدة
+            # لكل مسير" — توفّر ~2.3سم عبر 16 صفاً، بلا أثر يُذكر على القراءة).
+            ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
             ("RIGHTPADDING", (0, 0), (-1, -1), 5), ("LEFTPADDING", (0, 0), (-1, -1), 5),
         ]))
 
@@ -418,7 +425,7 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
                 ("ALIGN", (0, 0), (0, 0), "CENTER"),
                 ("ALIGN", (AMOUNT_COL_IDX, 0), (AMOUNT_COL_IDX, 0), "CENTER"),
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("TOPPADDING", (0, 0), (-1, -1), 9), ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
+                ("TOPPADDING", (0, 0), (-1, -1), 6), ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 5), ("LEFTPADDING", (0, 0), (-1, -1), 5),
             ]))
 
@@ -431,25 +438,29 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
         # النص — يظهر دائماً بمحاذاة نظيفة وثابتة بصرف النظر عن الخط المُستخدَم،
         # بعكس شرطات "-" النصّية التي قد لا تتناسق مع نص عربي مُعاد تشكيله.
         footer_labels = ["مسؤول العمليات", "المسؤول المالي", "المراجعة", "مستلم العهدة"]
+        # ✅ ارتفاعا الصفّين خُفِّضا قليلاً (0.8→0.65، 1.2→0.9) — جزء من تعديلات
+        # "صفحة واحدة لكل مسير"؛ يبقى سطر التوقيع اليدوي بمساحة كافية للكتابة.
         footer_table = Table(
             [[P(lbl, "footer") for lbl in footer_labels], ["", "", "", ""]],
-            colWidths=[content_width / 4] * 4, hAlign="CENTER", rowHeights=[0.8 * cm, 1.2 * cm],
+            colWidths=[content_width / 4] * 4, hAlign="CENTER", rowHeights=[0.65 * cm, 0.9 * cm],
         )
         footer_table.setStyle(TableStyle([
             ("LINEBELOW", (0, 1), (-1, 1), 1.0, C["text_dark"]),
             ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-            ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
         ]))
 
         # ✅ KeepTogether يمنع reportlab من تقسيم صفوف الجدول تلقائياً منتصف
         # الصفحة عندما يتجاوز ارتفاعها المساحة المتبقية (يحدث عند وجود خلية
         # بنص ملتفّ لعدة أسطر) — بدلاً من ذلك يُنقَل الجدول كاملاً لصفحة
         # جديدة، فيبقى كل مسير (حتى 15 صفاً) وحدة واحدة متماسكة لا تتجزأ.
+        # ✅ الفراغات بين الجدول/الإجمالي/التذييل خُفِّضت (جزء من تعديلات
+        # "صفحة واحدة لكل مسير" — راجع الملاحظة عند KeepTogether أعلاه).
         story.append(KeepTogether(t))
         if total_table is not None:
-            story.append(Spacer(1, 0.35 * cm))
+            story.append(Spacer(1, 0.2 * cm))
             story.append(total_table)
-        story.append(Spacer(1, 1.3 * cm))
+        story.append(Spacer(1, 0.6 * cm))
         story.append(footer_table)
 
         if chunk_idx < len(chunks) - 1:
