@@ -123,21 +123,35 @@ def _action_bar_chart(action_counts: dict[str, int], font_name: str) -> io.Bytes
         import matplotlib
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
+        from matplotlib import font_manager
         import arabic_reshaper
         from bidi.algorithm import get_display
 
         if not action_counts:
             return None
 
+        # ✅ matplotlib يتجاهل الخط المسجَّل في reportlab (font_name هنا اسم
+        # مستعار (alias) خاص بـ reportlab فقط، لا معنى له عند matplotlib).
+        # بدون تحميل ملف خط عربي فعلي عبر FontProperties، يستخدم matplotlib
+        # خطه الافتراضي (DejaVu Sans عادة) الذي لا يدعم أشكال العرض العربية
+        # (Presentation Forms) الناتجة عن arabic_reshaper بشكل صحيح — فتظهر
+        # الحروف مشوَّهة/غير متصلة (هذا بالضبط ما اشتكى منه المستخدم:
+        # "الخط العربي مقطوع"). نُعيد استخدام نفس قائمة الخطوط المستخدمة في
+        # reportlab (_FONT_CANDIDATES) لإيجاد ملف خط فعلي على القرص.
+        _font_path = next((p for p, _ in _FONT_CANDIDATES if os.path.isfile(p)), None)
+        ar_font = font_manager.FontProperties(fname=_font_path) if _font_path else None
+
         items = sorted(action_counts.items(), key=lambda x: -x[1])[:12]
         labels = [get_display(arabic_reshaper.reshape(k)) for k, _ in items]
         values = [v for _, v in items]
 
         fig, ax = plt.subplots(figsize=(8, max(3, len(items) * 0.5)))
-        bars = ax.barh(labels, values, color="#1565C0", edgecolor="white", height=0.65)
+        bars = ax.barh(range(len(labels)), values, color="#1565C0", edgecolor="white", height=0.65)
         for bar, v in zip(bars, values):
             ax.text(bar.get_width() + 0.1, bar.get_y() + bar.get_height() / 2,
                     str(v), va="center", fontsize=9, color="#333")
+        ax.set_yticks(range(len(labels)))
+        ax.set_yticklabels(labels, fontproperties=ar_font, fontsize=9)
         ax.set_xlim(0, max(values) * 1.2 if values else 1)
         ax.invert_yaxis()
         # ✅ اتجاه RTL: القيم تبدأ من أقصى اليمين وتمتد يساراً، وتسميات الأنواع
@@ -147,7 +161,7 @@ def _action_bar_chart(action_counts: dict[str, int], font_name: str) -> io.Bytes
         ax.set_xlabel("")
         ax.spines["top"].set_visible(False)
         ax.spines["left"].set_visible(False)
-        ax.tick_params(axis="y", labelsize=8)
+        ax.tick_params(axis="y", labelsize=9)
         plt.tight_layout()
 
         buf = io.BytesIO()
@@ -686,7 +700,7 @@ def build_patient_pdf(
         for idx, r in enumerate(display_reps, 1):
             detail_block = [
                 Spacer(1, 0.25 * cm),
-                P(f"📋 تقرير رقم {idx} — {_fd(r.get('report_date'))}", "small"),
+                P(f"● تقرير رقم {idx} — {_fd(r.get('report_date'))}", "small"),
                 P_field("الشكوى", r.get("complaint_text"), "td_r", content_width_pts),
             ]
             if is_operation:
