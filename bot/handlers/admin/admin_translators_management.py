@@ -18,16 +18,35 @@ logger = logging.getLogger(__name__)
 # مسار ملف المترجمين
 TRANSLATOR_NAMES_FILE = "data/translator_names.txt"
 
+# translator_id هو أيضاً المفتاح الأساسي (INTEGER PRIMARY KEY) لجدول
+# translators — فحين يُدرَج صف بـ translator_id=None، تُعيّن SQLite تلقائياً
+# rowid صغيراً بدل تركه NULL فعلياً (سلوك SQLite القياسي لهذا النوع من
+# الأعمدة). يعني أي صف قديم "بلا آيدي" يحمل فعلياً رقماً صغيراً (1، 2، ...)
+# وليس None — فلا يمكن الاعتماد على "IS NULL" لاكتشافه. آيديات تيليجرام
+# الحقيقية دائماً أكبر بكثير، فنستخدم هذا الحد كفاصل عملي.
+_MIN_REAL_TELEGRAM_ID = 100_000
+
+
+def _has_real_telegram_id(translator_id) -> bool:
+    return isinstance(translator_id, int) and translator_id >= _MIN_REAL_TELEGRAM_ID
+
 
 # ================================================
 # DB helpers — dual-write authority convergence
 # ================================================
 
-def _db_add_translator(name: str, telegram_id: int | None = None) -> bool:
+def _db_add_translator_ex(name: str, telegram_id: int | None = None) -> str | None:
     """
-    Add translator to TranslatorDirectory (DB authority).
-    translator_id is the given Telegram ID if provided, otherwise NULL.
-    Returns True on success or if already exists, False on error.
+    Add translator to TranslatorDirectory (DB authority), or backfill the
+    Telegram ID onto an existing name-matched row that doesn't have one yet
+    (e.g. one created earlier via "مزامنة" without an ID).
+
+    Returns one of:
+      "inserted"         — a new row was created
+      "backfilled"       — an existing row (no real id yet) got telegram_id set
+      "exists"           — existing row untouched (already fine / no id given)
+      "conflict_skipped" — telegram_id belongs to a different existing name; nothing done
+      None               — DB error
     """
     try:
         with SessionLocal() as s:
@@ -35,15 +54,41 @@ def _db_add_translator(name: str, telegram_id: int | None = None) -> bool:
                 TranslatorDirectory.name == name
             ).first()
             if existing:
+                if telegram_id is not None and not _has_real_telegram_id(existing.translator_id):
+                    conflict = s.query(TranslatorDirectory).filter(
+                        TranslatorDirectory.translator_id == telegram_id
+                    ).first()
+                    if not conflict:
+                        existing.translator_id = telegram_id
+                        s.commit()
+                        logger.info("TD: backfilled id for existing translator [%s] -> %s", name, telegram_id)
+                        return "backfilled"
                 logger.info("TD: translator already exists in DB: [%s]", name)
-                return True
+                return "exists"
+
+            if telegram_id is not None:
+                conflict = s.query(TranslatorDirectory).filter(
+                    TranslatorDirectory.translator_id == telegram_id
+                ).first()
+                if conflict:
+                    logger.info(
+                        "TD: translator_id %s already registered as [%s] — skipping add of [%s]",
+                        telegram_id, conflict.name, name
+                    )
+                    return "conflict_skipped"
+
             s.add(TranslatorDirectory(translator_id=telegram_id, name=name))
             s.commit()
             logger.info("TD: added translator to DB: [%s] id=%s", name, telegram_id)
-            return True
+            return "inserted"
     except Exception as e:
         logger.error("TD: failed to add translator [%s]: %s", name, e)
-        return False
+        return None
+
+
+def _db_add_translator(name: str, telegram_id: int | None = None) -> bool:
+    """Bool-friendly wrapper over _db_add_translator_ex for simple add flows."""
+    return _db_add_translator_ex(name, telegram_id=telegram_id) is not None
 
 
 def _find_translator_by_id(telegram_id: int):
@@ -110,12 +155,13 @@ def _db_rename_translator(old_name: str, new_name: str) -> bool:
         return False
 
 
-def _db_add_translator_if_absent(name: str) -> bool:
+def _db_add_translator_if_absent(name: str, telegram_id: int | None = None) -> str | None:
     """
-    Add translator to DB only if not already present (used by sync path).
-    Returns True on success or already-exists, False on error.
+    Add translator to DB, or backfill its Telegram ID if it already exists
+    without one (used by the sync path). See _db_add_translator_ex for the
+    meaning of the returned status string.
     """
-    return _db_add_translator(name)
+    return _db_add_translator_ex(name, telegram_id=telegram_id)
 
 
 def get_translator_names_from_file():
@@ -741,32 +787,42 @@ async def handle_sync_translators(update: Update, context: ContextTypes.DEFAULT_
     try:
         # قراءة الأسماء الحالية من الملف
         current_names = set(get_translator_names_from_file())
-        
+
         # جلب المستخدمين المعتمدين من قاعدة البيانات
         added_count = 0
+        reviewed_count = 0
         with SessionLocal() as s:
             users = s.query(User).filter(
                 User.is_approved == True,
                 User.full_name.isnot(None)
             ).all()
-            
+
             for user in users:
-                # استخراج الاسم الأول أو الاسم الكامل المختصر
-                full_name = user.full_name.strip()
-                if full_name and full_name not in current_names:
-                    # إضافة الاسم الأول فقط لتسهيل الاختيار
-                    first_name = full_name.split()[0] if full_name else None
-                    if first_name and first_name not in current_names:
-                        # DB write first (authority); file write follows after loop
-                        db_ok = _db_add_translator_if_absent(first_name)
-                        if not db_ok:
-                            logger.error(
-                                "TD: DB write failed during sync for [%s] — skipping this entry",
-                                first_name
-                            )
-                            continue
-                        current_names.add(first_name)
-                        added_count += 1
+                full_name = (user.full_name or "").strip()
+                if not full_name:
+                    continue
+                # الاسم الأول فقط لتسهيل الاختيار
+                first_name = full_name.split()[0]
+                if not first_name:
+                    continue
+
+                # DB write first (authority) — يضيف مترجم جديد بآيدي تيليجرام
+                # الحقيقي، أو يعبّئ الآيدي لمترجم موجود مسبقاً بلا آيدي (من
+                # مزامنة سابقة قبل هذا التعديل)
+                status = _db_add_translator_if_absent(first_name, telegram_id=user.tg_user_id)
+                if status is None:
+                    logger.error(
+                        "TD: DB write failed during sync for [%s] — skipping this entry",
+                        first_name
+                    )
+                    continue
+
+                if status == "inserted":
+                    current_names.add(first_name)
+                    added_count += 1
+                elif status == "backfilled":
+                    reviewed_count += 1
+                # "exists" و"conflict_skipped": لا تغيير على القائمة أو العدّادات
 
         # حفظ الأسماء — file write after all DB writes succeed
         names_list = sorted(list(current_names))
@@ -774,13 +830,17 @@ async def handle_sync_translators(update: Update, context: ContextTypes.DEFAULT_
         if not file_ok:
             logger.warning("TD: file write failed after sync DB writes — DB is authoritative, %d entries added", added_count)
 
-        logger.info("TD sync complete: added=%d  total=%d  file=%s", added_count, len(names_list), file_ok)
-        
+        logger.info(
+            "TD sync complete: added=%d  reviewed=%d  total=%d  file=%s",
+            added_count, reviewed_count, len(names_list), file_ok
+        )
+
         keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_translators")]])
-        
+
         await query.edit_message_text(
             f"✅ **تمت المزامنة بنجاح**\n\n"
             f"➕ **مترجمين جدد:** {added_count}\n"
+            f"🆔 **تمت مراجعة آيديهم من الموجودين مسبقاً:** {reviewed_count}\n"
             f"📊 **إجمالي المترجمين:** {len(names_list)}",
             reply_markup=keyboard,
             parse_mode=ParseMode.MARKDOWN
