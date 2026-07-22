@@ -579,8 +579,11 @@ def build_patient_pdf(
             hc_chart_items = sorted(hc_counts.items(), key=lambda x: -x[1])
             hc_chart = _HBarChart(hc_chart_items, width=content_width_pts)
             hc_chart.hAlign = "RIGHT"
-            story.append(Spacer(1, 0.3 * cm))
-            story.append(hc_chart)
+            # ✅ عنوان للرسم (كان يظهر مباشرة بعد الجدول بلا عنوان يفصلهما،
+            # فبدا مشوَّهاً) — نفس أسلوب عنوان "توزيع الإجراءات"، مع
+            # KeepTogether لضمان بقاء العنوان والرسم في نفس الصفحة.
+            story.append(Spacer(1, 0.4 * cm))
+            story.append(KeepTogether([P("توزيع سجلات الرعاية الصحية", "section"), hc_chart]))
 
     # ── تفاصيل التقارير — تُعرَض أخيراً في التقرير ─────────────────────────────
     # ✅ هذا القسم يقتصر حصراً على نوعين بناءً على طلب صريح: "استشارة مع قرار
