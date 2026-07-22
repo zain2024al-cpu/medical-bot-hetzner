@@ -407,20 +407,9 @@ def build_patient_pdf(
     story.append(Spacer(1, 0.3 * cm))
     # ✅ حُذف سطر "أول تقرير/آخر تقرير" بناءً على طلب صريح — لا داعي له.
 
-    # ── Action-type bar chart ─────────────────────────────────────────────────
-    if len(action_counts) > 1:
-        chart_buf = _action_bar_chart(dict(action_counts), FN)
-        if chart_buf:
-            chart_h = min(10 * cm, max(3 * cm, len(action_counts) * 0.55 * cm))
-            img = Image(chart_buf, width=15 * cm, height=chart_h)
-            img.hAlign = "CENTER"
-            # ✅ العنوان والرسم يبقيان معاً على نفس الصفحة (KeepTogether) —
-            # بدل احتمال أن يظهر العنوان في أسفل صفحة والرسم في التي تليها.
-            story.append(Spacer(1, 0.5 * cm))
-            story.append(KeepTogether([P("توزيع الإجراءات", "section"), img]))
-
-    # ── Action summary table ──────────────────────────────────────────────────
-    # ✅ معكوسة: "نوع الإجراء" (العمود الأساسي) يظهر أقصى اليمين
+    # ── توزيع الإجراءات: الجدول أولاً ثم الرسم البياني ────────────────────────
+    # ✅ ترتيب صريح بناءً على طلب المستخدم: يبدأ الجدول ثم يليه الرسم البياني
+    # (بدل الرسم البياني أولاً كما كان). معكوسة: "نوع الإجراء" يظهر أقصى اليمين.
     act_rows = [[P("النسبة", "th"), P("عدد التقارير", "th"), P("نوع الإجراء", "th")]]
     for action, cnt in sorted(action_counts.items(), key=lambda x: -x[1]):
         pct = f"{cnt / total * 100:.1f}%" if total else "—"
@@ -444,6 +433,17 @@ def build_patient_pdf(
     # ✅ العنوان والجدول معاً (KeepTogether) — كان يظهر العنوان في أسفل صفحة
     # والجدول بأكمله في الصفحة التالية، وهو خطأ فادح بحسب المستخدم صراحة.
     story.append(KeepTogether([P("جدول ملخص الإجراءات", "section"), act_table]))
+
+    if len(action_counts) > 1:
+        chart_buf = _action_bar_chart(dict(action_counts), FN)
+        if chart_buf:
+            chart_h = min(10 * cm, max(3 * cm, len(action_counts) * 0.55 * cm))
+            img = Image(chart_buf, width=15 * cm, height=chart_h)
+            img.hAlign = "CENTER"
+            # ✅ العنوان والرسم يبقيان معاً على نفس الصفحة (KeepTogether) —
+            # بدل احتمال أن يظهر العنوان في أسفل صفحة والرسم في التي تليها.
+            story.append(Spacer(1, 0.5 * cm))
+            story.append(KeepTogether([P("توزيع الإجراءات", "section"), img]))
 
     # ── Hospitals list ────────────────────────────────────────────────────────
     if hospitals:
