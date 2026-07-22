@@ -23,11 +23,10 @@ TRANSLATOR_NAMES_FILE = "data/translator_names.txt"
 # DB helpers — dual-write authority convergence
 # ================================================
 
-def _db_add_translator(name: str) -> bool:
+def _db_add_translator(name: str, telegram_id: int | None = None) -> bool:
     """
     Add translator to TranslatorDirectory (DB authority).
-    translator_id is NULL for admin-added translators with no known Telegram ID.
-    Duplicate detection uses LOWER(TRIM()) to prevent near-duplicates.
+    translator_id is the given Telegram ID if provided, otherwise NULL.
     Returns True on success or if already exists, False on error.
     """
     try:
@@ -38,13 +37,25 @@ def _db_add_translator(name: str) -> bool:
             if existing:
                 logger.info("TD: translator already exists in DB: [%s]", name)
                 return True
-            s.add(TranslatorDirectory(translator_id=None, name=name))
+            s.add(TranslatorDirectory(translator_id=telegram_id, name=name))
             s.commit()
-            logger.info("TD: added translator to DB: [%s]", name)
+            logger.info("TD: added translator to DB: [%s] id=%s", name, telegram_id)
             return True
     except Exception as e:
         logger.error("TD: failed to add translator [%s]: %s", name, e)
         return False
+
+
+def _find_translator_by_id(telegram_id: int):
+    """يبحث عن مترجم بآيدي تيليجرام معيّن، لمنع تعارض المفتاح الأساسي."""
+    try:
+        with SessionLocal() as s:
+            return s.query(TranslatorDirectory).filter(
+                TranslatorDirectory.translator_id == telegram_id
+            ).first()
+    except Exception as e:
+        logger.error("TD: failed to look up translator_id=%s: %s", telegram_id, e)
+        return None
 
 
 def _db_delete_translator(name: str) -> bool:
@@ -284,34 +295,123 @@ async def handle_translator_name_input(update: Update, context: ContextTypes.DEF
         )
         return ConversationHandler.END
     
-    # إضافة الاسم — DB first (authority), then file (backup)
+    # حفظ الاسم مؤقتاً، والانتقال لخطوة إدخال آيدي التيليجرام
+    context.user_data['add_translator_pending_name'] = name
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("⏭️ تخطي (بدون آيدي)", callback_data="add_translator_skip_id")],
+        [InlineKeyboardButton("❌ إلغاء", callback_data="cancel_translator_input")]
+    ])
+
+    await update.message.reply_text(
+        f"👤 **الاسم:** {name}\n\n"
+        "🔢 أدخل رقم آيدي التيليجرام الخاص بالمترجم:\n"
+        "(أو اضغط 'تخطي' لإضافته بدون آيدي الآن)",
+        reply_markup=keyboard,
+        parse_mode=ParseMode.MARKDOWN
+    )
+
+    return "ADD_TRANSLATOR_ID"
+
+
+async def _finalize_add_translator(reply_target, context, name: str, telegram_id: int | None, edit: bool):
+    """يكمل إضافة المترجم إلى القاعدة والملف، برد إما بـ edit_message_text أو reply_text."""
+    names = get_translator_names_from_file()
+
+    if name in names:
+        text = f"⚠️ **المترجم موجود مسبقاً:** {name}"
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_translators")]])
+        if edit:
+            await reply_target.edit_message_text(text, reply_markup=keyboard, parse_mode=ParseMode.MARKDOWN)
+        else:
+            await reply_target.reply_text(text, reply_markup=keyboard, parse_mode=ParseMode.MARKDOWN)
+        return ConversationHandler.END
+
     names.append(name)
 
-    db_ok = _db_add_translator(name)
+    db_ok = _db_add_translator(name, telegram_id=telegram_id)
     if not db_ok:
-        logger.error("TD: DB write failed for add [%s] — aborting file write", name)
-        await update.message.reply_text(
-            "❌ **خطأ في الحفظ في قاعدة البيانات**\n\nلم يتم الحفظ.",
-            parse_mode=ParseMode.MARKDOWN
-        )
+        logger.error("TD: DB write failed for add [%s] id=%s — aborting file write", name, telegram_id)
+        text = "❌ **خطأ في الحفظ في قاعدة البيانات**\n\nلم يتم الحفظ."
+        if edit:
+            await reply_target.edit_message_text(text, parse_mode=ParseMode.MARKDOWN)
+        else:
+            await reply_target.reply_text(text, parse_mode=ParseMode.MARKDOWN)
         return ConversationHandler.END
 
     file_ok = save_translator_names_to_file(names)
     if not file_ok:
         logger.warning("TD: file write failed after DB success for add [%s] — DB is authoritative", name)
 
-    logger.info("TD add complete: [%s]  db=%s  file=%s", name, db_ok, file_ok)
+    logger.info("TD add complete: [%s]  id=%s  db=%s  file=%s", name, telegram_id, db_ok, file_ok)
 
     keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_translators")]])
-
-    await update.message.reply_text(
-        f"✅ **تم إضافة المترجم بنجاح:** {name}\n\n"
-        f"👥 سيظهر المترجم عند إنشاء تقرير جديد",
-        reply_markup=keyboard,
-        parse_mode=ParseMode.MARKDOWN
+    id_line = f"\n🆔 **الآيدي:** {telegram_id}" if telegram_id else ""
+    text = (
+        f"✅ **تم إضافة المترجم بنجاح:** {name}{id_line}\n\n"
+        f"👥 سيظهر المترجم عند إنشاء تقرير جديد"
     )
 
+    if edit:
+        await reply_target.edit_message_text(text, reply_markup=keyboard, parse_mode=ParseMode.MARKDOWN)
+    else:
+        await reply_target.reply_text(text, reply_markup=keyboard, parse_mode=ParseMode.MARKDOWN)
+
     return ConversationHandler.END
+
+
+@require_admin
+async def handle_translator_id_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة إدخال آيدي التيليجرام للمترجم الجديد"""
+    text = update.message.text.strip()
+
+    name = context.user_data.get('add_translator_pending_name')
+    if not name:
+        await update.message.reply_text("❌ **خطأ:** لم يتم العثور على اسم المترجم.", parse_mode=ParseMode.MARKDOWN)
+        return ConversationHandler.END
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("⏭️ تخطي (بدون آيدي)", callback_data="add_translator_skip_id")],
+        [InlineKeyboardButton("❌ إلغاء", callback_data="cancel_translator_input")]
+    ])
+
+    if not text.isdigit():
+        await update.message.reply_text(
+            "⚠️ **خطأ:** الآيدي يجب أن يكون أرقاماً فقط\n\n"
+            "أدخل رقم آيدي التيليجرام، أو اضغط 'تخطي':",
+            reply_markup=keyboard,
+            parse_mode=ParseMode.MARKDOWN
+        )
+        return "ADD_TRANSLATOR_ID"
+
+    telegram_id = int(text)
+
+    conflict = _find_translator_by_id(telegram_id)
+    if conflict:
+        await update.message.reply_text(
+            f"⚠️ **هذا الآيدي مستخدَم بالفعل للمترجم:** {conflict.name}\n\n"
+            "أدخل آيدي آخر، أو اضغط 'تخطي' لإضافته بدون آيدي:",
+            reply_markup=keyboard,
+            parse_mode=ParseMode.MARKDOWN
+        )
+        return "ADD_TRANSLATOR_ID"
+
+    context.user_data.pop('add_translator_pending_name', None)
+    return await _finalize_add_translator(update.message, context, name, telegram_id, edit=False)
+
+
+@require_admin
+async def handle_add_translator_skip_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تخطي إدخال الآيدي — إضافة المترجم بدون آيدي تيليجرام"""
+    query = update.callback_query
+    await query.answer()
+
+    name = context.user_data.pop('add_translator_pending_name', None)
+    if not name:
+        await query.edit_message_text("❌ **خطأ:** لم يتم العثور على اسم المترجم.", parse_mode=ParseMode.MARKDOWN)
+        return ConversationHandler.END
+
+    return await _finalize_add_translator(query, context, name, None, edit=True)
 
 
 @require_admin
@@ -740,6 +840,11 @@ def register(app):
             "ADD_TRANSLATOR_NAME": [
                 CallbackQueryHandler(handle_cancel_translator_input, pattern="^cancel_translator_input$"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_translator_name_input)
+            ],
+            "ADD_TRANSLATOR_ID": [
+                CallbackQueryHandler(handle_add_translator_skip_id, pattern="^add_translator_skip_id$"),
+                CallbackQueryHandler(handle_cancel_translator_input, pattern="^cancel_translator_input$"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_translator_id_input)
             ]
         },
         fallbacks=[
