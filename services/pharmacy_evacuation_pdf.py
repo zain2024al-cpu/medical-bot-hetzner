@@ -387,7 +387,8 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
                 P(r["expense_item"], "td_c"),
                 P(r["invoice_number"], "td_c"),
                 P_wrap(r["name"], "td_c", NAME_COL_W),
-                P(f'{r["amount"]:.2f}', "td_c"),
+                # ✅ بلا كسور عشرية (لا داعي لـ".00" في نهاية المبلغ).
+                P(f'{r["amount"]:,.0f}', "td_c"),
                 P(str(row_num), "td_c"),
             ])
         # ✅ تعبئة الأسطر المتبقية فارغة حتى يظهر كل مسير بـ15 سطراً دائماً
@@ -416,7 +417,7 @@ def build_evacuation_pdf(rows: list[dict], start_date: date, end_date: date) -> 
         if is_last_chunk:
             total_row = [""] * len(col_widths)
             total_row[0] = P("إجمالي المبلغ", "total_lbl")
-            total_row[AMOUNT_COL_IDX] = P(f'{grand_total:,.2f}', "total_val")
+            total_row[AMOUNT_COL_IDX] = P(f'{grand_total:,.0f}', "total_val")  # ✅ بلا كسور عشرية
             total_table = Table([total_row], colWidths=col_widths, hAlign="CENTER")
             total_table.setStyle(TableStyle([
                 # ✅ صف الإجمالي بيج فاتح بدل الرمادي الداكن (نفس شريط سند الصرف).

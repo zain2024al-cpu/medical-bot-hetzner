@@ -152,7 +152,8 @@ def build_evacuation_excel(rows: list[dict], start_date: date, end_date: date) -
     for i, r in enumerate(rows, start=1):
         row_idx = header_row_idx + i
         date_str = _safe_date_text(r["date"])
-        values = [i, f'{r["amount"]:.2f}', r["name"], r["invoice_number"], r["expense_item"], r["statement"], date_str]
+        # ✅ بلا كسور عشرية (لا داعي لـ".00" في نهاية المبلغ).
+        values = [i, f'{r["amount"]:,.0f}', r["name"], r["invoice_number"], r["expense_item"], r["statement"], date_str]
         total_amount += r["amount"]
         for col, val in enumerate(values, 1):
             cell = ws.cell(row=row_idx, column=col, value=val)
@@ -161,8 +162,8 @@ def build_evacuation_excel(rows: list[dict], start_date: date, end_date: date) -
             cell.alignment = center_align  # ✅ كل الأعمدة موسَّطة لمظهر أفضل وأكثر اتساقاً
             if col == len(headers):  # عمود التاريخ — نصّ صرف دائماً، لا يُعاد تفسيره كرقم
                 cell.number_format = _TEXT_FORMAT
-            elif col == 2:  # عمود المبلغ — نفس تنسيق العملة من العينة المرجعية (بلا أثر مرئي لأن القيمة نص)
-                cell.number_format = "[$₹-439]#,##0.00"
+            elif col == 2:  # عمود المبلغ (بلا أثر مرئي لأن القيمة نص — القيمة الفعلية بلا كسور أصلاً)
+                cell.number_format = "[$₹-439]#,##0"
 
     # ✅ قيمة الإجمالي تظهر تحت عمود "المبلغ" (العمود 2) تحديداً فقط —
     # لا تمتد عبر الجدول كاملاً. عمود "م" (1) يُترك فارغاً بنفس التظليل،
@@ -172,7 +173,7 @@ def build_evacuation_excel(rows: list[dict], start_date: date, end_date: date) -
     empty_cell = ws.cell(row=total_row_idx, column=1, value="")
     empty_cell.fill = total_fill
 
-    amount_cell = ws.cell(row=total_row_idx, column=2, value=f"{total_amount:,.2f}")
+    amount_cell = ws.cell(row=total_row_idx, column=2, value=f"{total_amount:,.0f}")  # ✅ بلا كسور عشرية
     amount_cell.font = total_font
     amount_cell.fill = total_fill
     amount_cell.alignment = center_align
