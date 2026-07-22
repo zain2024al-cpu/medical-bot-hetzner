@@ -236,24 +236,19 @@ def build_patient_pdf(
         wrapped = _ar_wrap(txt, style.fontName, style.fontSize, usable_width)
         return Paragraph(wrapped, style)
 
-    def P_cell_capped(txt, style_key, max_width_pts, max_lines=18) -> Paragraph:
-        """مثل P_wrap، لكن لخلايا جدول (لا فقرة مستقلة) — بحدّ أقصى لعدد
-        الأسطر الملفوفة (قص + "…" عند التجاوز). ✅ ضروري هنا تحديداً: خلية
-        جدول واحدة غير قابلة للانقسام بين صفحتين في reportlab (بعكس فقرة
-        مستقلة خارج الجدول)، فنص حر طويل جداً بلا حدّ فيها يسبب LayoutError
-        فعلياً (تعطّل شوهد سابقاً في سجلات الإنتاج). الحدّ هنا سخي (18 سطراً)
-        يحافظ على كل النصوص الواقعية تقريباً كاملة، ولا يُفعَّل التقصير إلا في
-        حالات نادرة جداً من نص طويل جداً بشكل غير معتاد."""
+    def P_field(label, txt, style_key, max_width_pts) -> Paragraph:
+        """حقل نصي مستقل (تسمية: قيمة) خارج أي جدول — على عكس خلية جدول،
+        هذا الـ Paragraph قابل للانقسام تلقائياً بين صفحتين إن طال (Platypus
+        يدعم split() للفقرات)، فلا يمكن أن يسبّب LayoutError مهما طال النص،
+        ولا يُكبِّر عرض/طول الجدول أعلاه — بناءً على طلب صريح بإخراج القرار
+        الطبي/اسم العملية من الجدول لسطر مستقل تحته (انظر رسم توضيحي أرفقه
+        المستخدم)."""
         style = ST[style_key]
         usable_width = max(max_width_pts - 8, 20)
-        wrapped = _ar_wrap(txt, style.fontName, style.fontSize, usable_width)
-        if not wrapped:
-            return Paragraph("—", style)
-        lines = wrapped.split("<br/>")
-        if len(lines) > max_lines:
-            lines = lines[:max_lines]
-            lines[-1] = lines[-1] + " …"
-        return Paragraph("<br/>".join(lines), style)
+        value = str(txt or "").strip() or "—"
+        combined = f"{label}:  {value}"
+        wrapped = _ar_wrap(combined, style.fontName, style.fontSize, usable_width)
+        return Paragraph(wrapped, style)
 
     # ── Canvas callbacks (header/footer on every page) ─────────────────────
     patient_name = patient.get("name", "—")
@@ -653,25 +648,17 @@ def build_patient_pdf(
     # "استشارة مع قرار عملية" (بلا الـ"ال" التعريف) — وليس "عملية" وحدها،
     # وهي نوع منفصل تماماً في البيانات الحقيقية.
     #
-    # ✅ جدول واحد فقط لكل نوع (بدل جدول حقول قصيرة + فقرات نصية منفصلة تحته)
-    # بناءً على طلب صريح: "لا داعي للنصوص والجداول مع بعض... بجدول واحد أسهل
-    # وأمرن". الأعمدة: التاريخ، المستشفى، القسم، القرار الطبي، واسم العملية
-    # (للنوع الجراحي فقط). الترتيب بين القسمين ثابت (عملية أولاً ثم استشارة
-    # أخيرة) بناءً على طلب صريح، وليس بحسب عدد التقارير كما كان.
+    # ✅ جدول قصير آمن (التاريخ، المستشفى، القسم، الطبيب فقط — حقول قصيرة
+    # ثابتة الطول) + القرار الطبي/اسم العملية كسطر مستقل تحت الجدول لكل تقرير
+    # (بدل أن يكونا عمودين داخل الجدول) — بناءً على طلب صريح مع رسم توضيحي:
+    # "أريده يكون في سطر آخر لكي لا يكبر الصفحة". فقرة مستقلة خارج الجدول
+    # قابلة للانقسام تلقائياً بين الصفحات مهما طال نصها (بعكس خلية جدول واحدة
+    # غير قابلة للانقسام في reportlab) — فتُلغي أيضاً خطر تعطّل LayoutError
+    # الذي كان القرار الطبي كعمود جدول قد يسبّبه مع نص طويل جداً.
     #
-    # ⚠️ الاسم الفعلي المطلوب هنا هو "عملية" (وليس "استشارة مع قرار عملية")
-    # بناءً على طلب صريح لاحق — هما نوعان منفصلان تماماً في قاعدة البيانات،
-    # و"عملية" لا تزال ضمن _SUMMARY_ACTIONS أعلاه (تُعرَض إحصائياً هناك)، لكن
-    # قسم التفاصيل هذا تحديداً يعرض بياناتها الكاملة بدل "استشارة مع قرار
-    # عملية".
-    #
-    # ⚠️ ملاحظة فنية مهمة: دمج "القرار الطبي" (نص حر قد يطول جداً) داخل خلية
-    # جدول يُعيد فعلياً خطر التعطّل (LayoutError) الذي أُصلِح سابقاً بنقل هذا
-    # النص لفقرة مستقلة خارج الجدول — لأن خلية جدول واحدة غير قابلة للانقسام
-    # بين صفحتين في reportlab. بما أن جدول واحد أُريد صراحةً، استُخدم
-    # P_cell_capped بدل P_wrap: يلفّ النص بأمان لكن بحدّ أقصى 18 سطراً لكل
-    # خلية (يحافظ على كل نص واقعي تقريباً)، ويقصّه بـ"…" فقط في حالات نادرة
-    # جداً من نص أطول من ذلك بكثير — هذا يمنع التعطّل نهائياً مهما طال النص.
+    # الترتيب بين القسمين ثابت (عملية أولاً ثم استشارة أخيرة) بناءً على طلب
+    # صريح، وليس بحسب عدد التقارير. ⚠️ الاسم الفعلي المطلوب هنا هو "عملية"
+    # (وليس "استشارة مع قرار عملية") — هما نوعان منفصلان في قاعدة البيانات.
     _FULL_DETAIL_ACTIONS = {"عملية", "استشارة أخيرة"}
     _DETAIL_ORDER = ["عملية", "استشارة أخيرة"]
 
@@ -694,26 +681,17 @@ def build_patient_pdf(
             HRFlowable(width="100%", thickness=0.8, color=C["accent"], spaceAfter=4),
         ]
 
-        header_row = [P("التاريخ", "th"), P("المستشفى", "th"), P("القسم", "th"), P("الطبيب", "th"), P("القرار الطبي", "th")]
-        col_widths = [2.3 * cm, 3.8 * cm, 3.3 * cm, 2.8 * cm]
-        if is_operation:
-            header_row.append(P("اسم العملية", "th"))
-            col_widths.append(2.6 * cm)
-        decision_w = content_width_pts - sum(col_widths)
-        col_widths.append(decision_w)  # عمود القرار الطبي (الأخير منطقياً = الأوسع)
+        header_row = [P("التاريخ", "th"), P("المستشفى", "th"), P("القسم", "th"), P("الطبيب", "th")]
+        col_widths = [2.5 * cm, 5.5 * cm, 4.5 * cm, 4.9 * cm]
 
         rows = [header_row]
         for r in sorted_reps:
-            row = [
+            rows.append([
                 P(_fd(r.get("report_date")), "td_c"),
                 P(r.get("hospital_name") or "—", "td_r"),
                 P(_normalize_dept(r.get("department")) or "—", "td_r"),
                 P(r.get("doctor_name") or "—", "td_r"),
-            ]
-            if is_operation:
-                row.append(P_cell_capped(_extract_op_name_en(r.get("doctor_decision")) or "—", "td_r", 2.6 * cm))
-            row.append(P_cell_capped(r.get("doctor_decision"), "td_r", decision_w))
-            rows.append(row)
+            ])
 
         # ✅ عكس كل الأعمدة (رأس + كل الصفوف + العرض) دفعة واحدة — يضمن ظهور
         # "التاريخ" أقصى اليمين، نفس مبدأ بقية جداول هذا الملف.
@@ -734,6 +712,19 @@ def build_patient_pdf(
         ]))
 
         story += section_block + [detail_table]
+
+        # ── القرار الطبي / اسم العملية — سطر مستقل تحت الجدول لكل تقرير ─────
+        for idx, r in enumerate(sorted_reps, 1):
+            field_block = [
+                Spacer(1, 0.25 * cm),
+                P(f"● تقرير رقم {idx} — {_fd(r.get('report_date'))}", "small"),
+            ]
+            if is_operation:
+                field_block.append(
+                    P_field("اسم العملية", _extract_op_name_en(r.get("doctor_decision")), "td_r", content_width_pts)
+                )
+            field_block.append(P_field("القرار الطبي", r.get("doctor_decision"), "td_r", content_width_pts))
+            story += field_block
 
     # ── Build ─────────────────────────────────────────────────────────────────
     doc.build(story, onFirstPage=_on_page, onLaterPages=_on_page)
