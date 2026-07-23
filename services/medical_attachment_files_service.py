@@ -8,12 +8,18 @@
 3. عدّ الملفات المرتبطة بتقرير معين (لعرض/إخفاء الزر)
 """
 
+import re
 import logging
 from datetime import datetime
 from db.session import SessionLocal
-from db.models import MedicalAttachmentFile, Report
+from db.models import MedicalAttachmentFile, Report, Patient
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_patient_name(name: str | None) -> str:
+    """توحيد المسافات (بلا لمس الحروف) للمقارنة بين أسماء المرضى."""
+    return re.sub(r"\s+", " ", (name or "").strip())
 
 
 def add_medical_attachment_file(
@@ -82,11 +88,35 @@ def get_medical_attachment_files(report_id: int) -> list[dict]:
 def get_medical_attachment_files_for_patient(patient_id: int) -> list[dict]:
     """جلب كل الملفات الطبية المرفقة بكل تقارير/زيارات مريض معيّن مجمَّعة معاً،
     مرتبة حسب تاريخ التقرير ثم ترتيب الرفع داخل كل تقرير — تُستخدم لتجميع
-    كل مرفقات المريض عبر تاريخه الطبي بالكامل في ملف واحد."""
+    كل مرفقات المريض عبر تاريخه الطبي بالكامل في ملف واحد.
+
+    ✅ يجمع أيضاً تقارير أي صف مريض آخر يطابق نفس الاسم (بعد توحيد
+    المسافات فقط) — لأن اسماً واحداً قد يُدخَل أكثر من مرة عبر مسارات
+    مختلفة (مثل "الحالة الأولية" الذي يقبل كتابة الاسم يدوياً بلا مطابقة
+    مع مريض موجود مسبقاً)، فينشئ صف Patient جديداً كل مرة، فتُنسَب تقارير
+    نفس الشخص الحقيقي لعدة patient_id مختلفة — وبدون هذا التوسيع كانت
+    تختفي هذه التقارير من التجميع لأنها غير مرتبطة بالـpatient_id المختار
+    تحديداً من القائمة.
+    """
     if not patient_id:
         return []
     try:
         with SessionLocal() as session:
+            target = session.query(Patient).filter(Patient.id == patient_id).first()
+            if not target:
+                return []
+
+            target_norm = _normalize_patient_name(target.full_name)
+            matching_ids = [patient_id]
+            if target_norm:
+                all_patients = session.query(Patient.id, Patient.full_name).all()
+                matching_ids = [
+                    pid for pid, full_name in all_patients
+                    if _normalize_patient_name(full_name) == target_norm
+                ]
+                if patient_id not in matching_ids:
+                    matching_ids.append(patient_id)
+
             rows = (
                 session.query(
                     MedicalAttachmentFile,
@@ -95,7 +125,7 @@ def get_medical_attachment_files_for_patient(patient_id: int) -> list[dict]:
                     Report.medical_action,
                 )
                 .join(Report, Report.id == MedicalAttachmentFile.report_id)
-                .filter(Report.patient_id == patient_id)
+                .filter(Report.patient_id.in_(matching_ids))
                 .order_by(
                     Report.report_date.asc(),
                     MedicalAttachmentFile.upload_order.asc(),
