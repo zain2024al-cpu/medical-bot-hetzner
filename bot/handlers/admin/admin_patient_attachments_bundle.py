@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import io
 import logging
+from datetime import date, datetime
 
 from telegram import Update
 from telegram.constants import ParseMode
@@ -24,6 +25,27 @@ from shared.selectors import result_router
 from shared.files.filename_builder import build_medical_pdf_filename
 
 logger = logging.getLogger(__name__)
+
+# تاريخ إضافة نظام تتبع المرفقات الطبية (medical_attachment_files) — أي
+# تقرير أقدم من هذا التاريخ لا يمكن أن يكون له سجل مرفق حتى لو أُرسل فعلاً
+# للمجموعة وقتها، لأن جدول التتبع نفسه لم يكن موجوداً بعد.
+_ATTACHMENT_TRACKING_START = date(2026, 7, 4)
+
+
+def _as_date(value) -> date | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    if isinstance(value, str):
+        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
+            try:
+                return datetime.strptime(value, fmt).date()
+            except ValueError:
+                continue
+    return None
 
 _RKEY_PATIENT = "admin.patient_attachments.patient"
 
@@ -178,22 +200,36 @@ async def _on_patient_selected(result, update: Update, context: ContextTypes.DEF
         attachments = await asyncio.to_thread(get_medical_attachment_files_for_patient, patient_id)
         paper_reports = await asyncio.to_thread(get_reports_with_paper_report_for_patient, patient_id)
         reports_covered = {a["report_id"] for a in attachments}
-        missing_count = len([r for r in paper_reports if r["report_id"] not in reports_covered])
+        missing_reports = [r for r in paper_reports if r["report_id"] not in reports_covered]
+        missing_count = len(missing_reports)
 
         gap_note = ""
-        if missing_count:
-            gap_note = (
-                f"\n⚠️ {missing_count} تقرير مؤكَّد عليه \"يوجد تقرير طبي\" بلا أي مرفق فعلي مسجَّل "
-                f"(فشل صامت وقت النشر — راجع \"📋 تقارير ناقصة المرفقات\")."
-            )
+        if missing_reports:
+            missing_dates = [_as_date(r.get("report_date")) for r in missing_reports]
+            before_tracking = [d for d in missing_dates if d and d < _ATTACHMENT_TRACKING_START]
+            after_tracking = [d for d in missing_dates if d and d >= _ATTACHMENT_TRACKING_START]
+            undated = [d for d in missing_dates if d is None]
+
+            lines = [f"⚠️ {missing_count} تقرير مؤكَّد عليه \"يوجد تقرير طبي\" بلا أي مرفق فعلي مسجَّل:"]
+            if before_tracking:
+                lines.append(
+                    f"• {len(before_tracking)} منها أقدم من {_ATTACHMENT_TRACKING_START} "
+                    f"(تاريخ بدء تسجيل المرفقات) — طبيعي أن يكون بلا سجل، الملف أُرسل للمجموعة "
+                    f"وقتها لكن نظام التسجيل نفسه لم يكن موجوداً بعد."
+                )
+            if after_tracking:
+                lines.append(
+                    f"• ⚠️ {len(after_tracking)} منها بتاريخ {_ATTACHMENT_TRACKING_START} أو بعده — "
+                    f"هذا فشل فعلي وقت النشر، راجع \"📋 تقارير ناقصة المرفقات\" لمعرفة أيها بالضبط."
+                )
+            if undated:
+                lines.append(f"• {len(undated)} منها بلا تاريخ معروف.")
+            gap_note = "\n" + "\n".join(lines)
 
         if not attachments:
             text = f"⚠️ لا توجد مرفقات طبية مسجَّلة للمريض *{patient_name}*."
-            if paper_reports:
-                text += (
-                    f"\n\n📄 يوجد {len(paper_reports)} تقرير مؤكَّد عليه \"يوجد تقرير طبي\" "
-                    f"لكن بلا أي مرفق مسجَّل لأي منها — راجع \"📋 تقارير ناقصة المرفقات\"."
-                )
+            if gap_note:
+                text += f"\n\n{gap_note.strip()}"
             try:
                 await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN)
             except Exception:
