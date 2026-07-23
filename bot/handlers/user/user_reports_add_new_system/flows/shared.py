@@ -1461,6 +1461,11 @@ async def show_final_summary(message, context, flow_type):
                 "rehab_physical": "علاج طبيعي",
                 "rehab_device": "أجهزة تعويضية",
                 "radiation_therapy": "جلسة إشعاعي",
+                "endoscopy": "المناظير",
+                "treatment_chemo": "العلاج الكيماوي",
+                "treatment_targeted": "العلاج الموجه",
+                "treatment_immuno": "العلاج المناعي",
+                "treatment_dialysis": "جلسات غسيل الكلى",
             }
             if flow_type in flow_to_action:
                 data["medical_action"] = flow_to_action[flow_type]
@@ -1642,7 +1647,8 @@ async def handle_final_confirm(update: Update, context: ContextTypes.DEFAULT_TYP
     current_flow = data.get("current_flow", "")
     valid_flow_types = ["new_consult", "followup", "emergency", "admission", "surgery_consult",
                          "operation", "final_consult", "discharge", "rehab_physical", "rehab_device", "radiology", "appointment_reschedule",
-                         "radiation_therapy", "periodic_followup", "inpatient_followup", "device"]
+                         "radiation_therapy", "periodic_followup", "inpatient_followup", "device", "endoscopy",
+                         "treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis"]
 
     logger.info(f"🔍 [HANDLE_FINAL_CONFIRM] report_tmp current_flow: {current_flow}")
     logger.info(f"🔍 [HANDLE_FINAL_CONFIRM] report_tmp medical_action: {data.get('medical_action', '')}")
@@ -1748,7 +1754,8 @@ async def save_report_to_database(query, context, flow_type):
     current_flow = data.get("current_flow", "")
     valid_flow_types = ["new_consult", "followup", "emergency", "admission", "surgery_consult",
                          "operation", "final_consult", "discharge", "rehab_physical", "rehab_device", "radiology", "appointment_reschedule",
-                         "radiation_therapy", "periodic_followup", "inpatient_followup"]
+                         "radiation_therapy", "periodic_followup", "inpatient_followup", "device", "endoscopy",
+                         "treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis"]
 
     # ✅ إصلاح: إذا كان current_flow أكثر تحديداً (مثل periodic_followup بدلاً من followup)، استخدمه
     # المسارات الأكثر تحديداً لها الأولوية
@@ -1884,7 +1891,12 @@ async def save_report_to_database(query, context, flow_type):
             "device": "أجهزة تعويضية",  # ✅ إضافة "device" للتوافق مع get_confirm_state
             "radiology": "أشعة وفحوصات",
             "appointment_reschedule": "تأجيل موعد",
-            "radiation_therapy": "جلسة إشعاعي"
+            "radiation_therapy": "جلسة إشعاعي",
+            "endoscopy": "المناظير",
+            "treatment_chemo": "العلاج الكيماوي",
+            "treatment_targeted": "العلاج الموجه",
+            "treatment_immuno": "العلاج المناعي",
+            "treatment_dialysis": "جلسات غسيل الكلى",
         }
         
         # استخدام medical_action من data إذا كان موجوداً، وإلا استخدام flow_type
@@ -3051,7 +3063,8 @@ async def handle_translator_page_navigation(update: Update, context: ContextType
             "new_consult", "followup", "periodic_followup", "inpatient_followup",
             "emergency", "admission", "surgery_consult", "operation", "final_consult",
             "discharge", "rehab_physical", "rehab_device", "device",
-            "radiology", "appointment_reschedule", "radiation_therapy",
+            "radiology", "appointment_reschedule", "radiation_therapy", "endoscopy",
+            "treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis",
         ]
         current_flow = context.user_data.get("report_tmp", {}).get("current_flow", "")
         more_specific = {"followup": ["periodic_followup", "inpatient_followup"]}
