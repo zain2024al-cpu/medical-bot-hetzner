@@ -2662,6 +2662,41 @@ async def save_report_to_database(query, context, flow_type):
                 
                 logger.info(f"☢️ save_report_to_database: حقول العلاج الإشعاعي - type={radiation_type}, session={session_number}, remaining={remaining}, completed={completed}")
 
+            # ✅ إضافة حقول مسار جلسات العلاج (كيماوي/موجّه/مناعي/غسيل الكلى)
+            # كانت مفقودة تماماً من broadcast_data — البطاقة عند النشر الأول
+            # كانت تظهر فارغة (بلا خطة علاجية ولا ملاحظات) رغم حفظها بشكل
+            # صحيح في قاعدة البيانات، لأن هذا القاموس يُبنى يدوياً حقلاً حقلاً
+            # ولا يرث القيم تلقائياً من data.
+            if flow_type in ("treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis"):
+                plan_summary = data.get('treatment_plan_summary', '')
+                if not plan_summary:
+                    report_tmp = context.user_data.get("report_tmp", {})
+                    plan_summary = report_tmp.get('treatment_plan_summary', '')
+                if plan_summary:
+                    broadcast_data['treatment_plan_summary'] = plan_summary
+
+                if data.get('notes'):
+                    broadcast_data['notes'] = data.get('notes')
+
+                logger.info(
+                    f"💊 save_report_to_database: حقول جلسات العلاج - "
+                    f"plan_summary={plan_summary!r}, notes={data.get('notes')!r}"
+                )
+
+            # ✅ إضافة حقول مسار المناظير — نفس السبب أعلاه، كانت مفقودة من
+            # broadcast_data رغم حفظها في Report بلا شرط flow_type.
+            if flow_type == "endoscopy":
+                if data.get('endoscopy_type'):
+                    broadcast_data['endoscopy_type'] = data.get('endoscopy_type')
+                if data.get('endoscopy_result'):
+                    broadcast_data['endoscopy_result'] = data.get('endoscopy_result')
+                if data.get('endoscopy_procedures'):
+                    broadcast_data['endoscopy_procedures'] = data.get('endoscopy_procedures')
+                logger.info(
+                    f"🔬 save_report_to_database: حقول المناظير - "
+                    f"type={data.get('endoscopy_type')!r}, result={data.get('endoscopy_result')!r}"
+                )
+
             # إضافة الحقول الخاصة لمسار تأجيل موعد
             if flow_type == "appointment_reschedule":
                 logger.info(f"📅 save_report_to_database: معالجة مسار appointment_reschedule")

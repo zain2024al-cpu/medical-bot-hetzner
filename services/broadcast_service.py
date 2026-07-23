@@ -1246,9 +1246,15 @@ def _build_treatment_session_fields(data: dict) -> list:
         lines.append(str(summary).strip())
         lines.append("")
 
+    complaint = data.get('complaint_text', '')
+    if complaint and str(complaint).strip():
+        lines.append("💬 **شكوى المريض:**")
+        lines.append(escape_markdown(str(complaint).strip()))
+        lines.append("")
+
     notes = data.get('notes', '')
     if notes and str(notes).strip() and str(notes) != 'لا يوجد':
-        lines.append(f"📝 **ملاحظات:** {escape_markdown(str(notes).strip())}")
+        lines.append(f"📝 **ملاحظات الطبيب:** {escape_markdown(str(notes).strip())}")
         lines.append("")
 
     lines.extend(_build_followup_fields(data))
