@@ -13,7 +13,9 @@ import logging
 from datetime import datetime
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import CallbackQueryHandler, CommandHandler, ContextTypes, MessageHandler, filters
+from telegram.ext import (
+    CallbackQueryHandler, CommandHandler, ContextTypes, ConversationHandler, MessageHandler, filters,
+)
 from sqlalchemy import func
 
 from bot.shared_auth import is_admin
@@ -24,6 +26,8 @@ from db.session import SessionLocal
 logger = logging.getLogger(__name__)
 
 CB = "aum"  # admin users management callbacks
+
+AWAIT_TRANSLATOR_NAME = "AUM_AWAIT_TRANSLATOR_NAME"
 
 
 def _get_anchor(update: Update):
@@ -288,17 +292,9 @@ async def _apply_action(query, context: ContextTypes.DEFAULT_TYPE, action: str, 
         tg = u.tg_user_id
         name = _display_name(u)
 
-        if action == "approve":
-            u.is_approved = True
-            u.is_suspended = False
-            u.updated_at = datetime.utcnow()
-            s.commit()
-            try:
-                await context.bot.send_message(chat_id=tg, text="✅ تم تفعيل حسابك. اضغط /start للبدء.")
-            except Exception:
-                pass
-            await query.edit_message_text(f"✅ تم اعتماد المستخدم: {name}", reply_markup=_home_kb())
-            return
+        # ملاحظة: "approve" لا يُعالَج هنا — له مسار محادثة مستقل
+        # (handle_approve_entry) يوافق ثم يطلب اسم المترجم؛ مُسجَّل بنمط
+        # أضيق (aum:act:approve:\d+) قبل هذا الموزّع العام فيلتقطه أولاً.
 
         if action == "reject":
             s.delete(u)
@@ -335,6 +331,115 @@ async def _apply_action(query, context: ContextTypes.DEFAULT_TYPE, action: str, 
             return
 
     await query.answer("⚠️ إجراء غير معروف", show_alert=True)
+
+
+async def handle_approve_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    نقطة دخول '✅ موافقة': يعتمد المستخدم فوراً، ثم يطلب من الأدمن اسم هذا
+    الشخص ليُحفظ مباشرة في دليل المترجمين (TranslatorDirectory) بنفس آيدي
+    تيليجرام الحقيقي حقّه — فيظهر تلقائياً في زر المترجمين عند إنشاء تقرير،
+    ويتوحّد اسمه في هذه الشاشة والتقييم وإدارة الوصول، بلا أي خطوة يدوية
+    منفصلة لاحقاً.
+    """
+    query = update.callback_query
+    await query.answer()
+
+    user = update.effective_user
+    if not user or not is_admin(user.id):
+        return ConversationHandler.END
+
+    parts = (query.data or "").split(":")
+    if len(parts) < 4 or not parts[3].isdigit():
+        return ConversationHandler.END
+    user_id = int(parts[3])
+
+    with SessionLocal() as s:
+        u = s.query(Translator).filter(Translator.id == user_id).first()
+        if not u:
+            await query.edit_message_text("❌ المستخدم غير موجود.", reply_markup=_home_kb())
+            return ConversationHandler.END
+
+        tg = u.tg_user_id
+        name = _display_name(u)
+
+        u.is_approved = True
+        u.is_suspended = False
+        u.updated_at = datetime.utcnow()
+        s.commit()
+
+    try:
+        await context.bot.send_message(chat_id=tg, text="✅ تم تفعيل حسابك. اضغط /start للبدء.")
+    except Exception:
+        pass
+
+    if not tg:
+        # لا يوجد آيدي تيليجرام حقيقي — لا يمكن ربطه بدليل المترجمين
+        await query.edit_message_text(f"✅ تم اعتماد المستخدم: {name}", reply_markup=_home_kb())
+        return ConversationHandler.END
+
+    context.user_data['aum_pending_translator_tg_id'] = tg
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("⏭️ تخطي", callback_data="aum:skip_translator_link")],
+    ])
+    await query.edit_message_text(
+        f"✅ تم اعتماد المستخدم: {name}\n\n"
+        "🔤 أدخل الآن الاسم الذي سيظهر له في زر المترجمين عند إنشاء تقرير:\n"
+        "(أو اضغط 'تخطي' لو هذا المستخدم ليس مترجماً)",
+        reply_markup=keyboard,
+        parse_mode="Markdown",
+    )
+    return AWAIT_TRANSLATOR_NAME
+
+
+async def handle_translator_name_for_approved_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة إدخال اسم المترجم بعد الموافقة على مستخدم."""
+    text = (update.message.text or "").strip()
+
+    tg = context.user_data.get('aum_pending_translator_tg_id')
+    if not tg:
+        await update.message.reply_text("❌ خطأ: انتهت صلاحية هذا الطلب.")
+        return ConversationHandler.END
+
+    if not text or len(text) < 2:
+        await update.message.reply_text("⚠️ الاسم قصير جداً. أدخل اسماً صحيحاً، أو اضغط 'تخطي':")
+        return AWAIT_TRANSLATOR_NAME
+
+    from bot.handlers.admin.admin_translators_management import (
+        _db_add_translator_ex, get_translator_names_from_file, save_translator_names_to_file,
+    )
+
+    status = _db_add_translator_ex(text, telegram_id=tg)
+    if status is None:
+        await update.message.reply_text("❌ حدث خطأ في الحفظ في قاعدة البيانات. حاول مرة أخرى:")
+        return AWAIT_TRANSLATOR_NAME
+
+    if status in ("inserted", "backfilled"):
+        names = get_translator_names_from_file()
+        if text not in names:
+            names.append(text)
+            save_translator_names_to_file(names)
+
+    context.user_data.pop('aum_pending_translator_tg_id', None)
+
+    if status == "conflict_skipped":
+        await update.message.reply_text(
+            f"⚠️ هذا الآيدي مرتبط مسبقاً باسم آخر في دليل المترجمين — لم يُضَف \"{text}\" لتفادي التكرار.\n"
+            "يمكنك تعديل الاسم لاحقاً من دليل المترجمين إن احتجت."
+        )
+    else:
+        await update.message.reply_text(f"✅ تم حفظ الاسم: {text}\n👥 سيظهر عند إنشاء تقرير جديد.")
+
+    return ConversationHandler.END
+
+
+async def handle_skip_translator_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تخطي ربط المستخدم المعتمد بدليل المترجمين."""
+    query = update.callback_query
+    await query.answer()
+    context.user_data.pop('aum_pending_translator_tg_id', None)
+    await query.edit_message_text("✅ تم تخطي إضافة المترجم.", reply_markup=_home_kb())
+    return ConversationHandler.END
 
 
 async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -391,6 +496,31 @@ def register(app):
     )
     # فتح من أمر بديل
     app.add_handler(CommandHandler("users", start_user_management))
+
+    # ✅ مسار الموافقة → طلب اسم المترجم — يجب تسجيله قبل الموزّع العام
+    # (نمط أضيق aum:act:approve:\d+ يلتقط ضغطة "✅ موافقة" أولاً ضمن نفس
+    # المجموعة؛ أي aum: أخرى تمر للموزّع العام كالمعتاد).
+    approve_conv = ConversationHandler(
+        entry_points=[
+            CallbackQueryHandler(handle_approve_entry, pattern=r"^aum:act:approve:\d+$"),
+        ],
+        states={
+            AWAIT_TRANSLATOR_NAME: [
+                CallbackQueryHandler(handle_skip_translator_link, pattern="^aum:skip_translator_link$"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_translator_name_for_approved_user),
+            ],
+        },
+        fallbacks=[
+            CallbackQueryHandler(handle_skip_translator_link, pattern="^aum:skip_translator_link$"),
+        ],
+        per_chat=True,
+        per_user=True,
+        per_message=False,
+        allow_reentry=True,
+        name="aum_approve_conv",
+    )
+    app.add_handler(approve_conv, group=1)
+
     # callbacks الخاصة بالشاشة الجديدة فقط
     app.add_handler(CallbackQueryHandler(handle_callbacks, pattern=r"^aum:"), group=1)
 

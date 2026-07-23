@@ -12,8 +12,6 @@
 #   - "goto:schedule"     → admin_schedule_management.py (entry_point جديد أُضيف لهذا الغرض)
 #   - "goto:appointments" → admin_upcoming_appointments.py (entry_point جديد أُضيف لهذا الغرض)
 #   - "aum:home"          → admin_users_management.py (CallbackQueryHandler مستقل، group=1)
-#   - "manage_translators" → admin_translators_management.py (CallbackQueryHandler
-#     مستقل — كان مسجَّلاً بلا أي زر دخول فعلي في أي قائمة، فأُضيف هنا)
 #   - "admin:manage_admins" → admin_admins.py (CallbackQueryHandler مستقل ضمن ConversationHandler الخاص به)
 #   - "aum:permlist:0"    → admin_users_management.py (قائمة مستخدمين مخصَّصة
 #     لإدارة الصلاحيات مباشرة — اختيار اسم يفتح amod:list:<tg_id> مباشرة
@@ -63,7 +61,6 @@ def _accounts_kb() -> InlineKeyboardMarkup:
     """القائمة الفرعية لإدارة الحسابات (مستخدمين / أدمنين / صلاحيات)."""
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("👥 إدارة المستخدمين", callback_data="aum:home")],
-        [InlineKeyboardButton("👥 إدارة المترجمين", callback_data="manage_translators")],
         [InlineKeyboardButton("👑 إدارة الأدمنين", callback_data="admin:manage_admins")],
         [InlineKeyboardButton("🔐 إدارة الصلاحيات", callback_data="aum:permlist:0")],
         [InlineKeyboardButton("🔙 رجوع", callback_data=f"{_PFX}:back")],
