@@ -170,16 +170,32 @@ async def _on_patient_selected(result, update: Update, context: ContextTypes.DEF
         pass
 
     try:
-        from services.medical_attachment_files_service import get_medical_attachment_files_for_patient
+        from services.medical_attachment_files_service import (
+            get_medical_attachment_files_for_patient,
+            get_reports_with_paper_report_for_patient,
+        )
 
         attachments = await asyncio.to_thread(get_medical_attachment_files_for_patient, patient_id)
+        paper_reports = await asyncio.to_thread(get_reports_with_paper_report_for_patient, patient_id)
+        reports_covered = {a["report_id"] for a in attachments}
+        missing_count = len([r for r in paper_reports if r["report_id"] not in reports_covered])
+
+        gap_note = ""
+        if missing_count:
+            gap_note = (
+                f"\n⚠️ {missing_count} تقرير مؤكَّد عليه \"يوجد تقرير طبي\" بلا أي مرفق فعلي مسجَّل "
+                f"(فشل صامت وقت النشر — راجع \"📋 تقارير ناقصة المرفقات\")."
+            )
 
         if not attachments:
-            try:
-                await query.edit_message_text(
-                    f"⚠️ لا توجد مرفقات طبية مسجَّلة للمريض *{patient_name}*.",
-                    parse_mode=ParseMode.MARKDOWN,
+            text = f"⚠️ لا توجد مرفقات طبية مسجَّلة للمريض *{patient_name}*."
+            if paper_reports:
+                text += (
+                    f"\n\n📄 يوجد {len(paper_reports)} تقرير مؤكَّد عليه \"يوجد تقرير طبي\" "
+                    f"لكن بلا أي مرفق مسجَّل لأي منها — راجع \"📋 تقارير ناقصة المرفقات\"."
                 )
+            try:
+                await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN)
             except Exception:
                 pass
             return
@@ -192,7 +208,7 @@ async def _on_patient_selected(result, update: Update, context: ContextTypes.DEF
             caption = (
                 f"📎 *كل المرفقات الطبية*\n"
                 f"👤 {patient_name}\n"
-                f"📄 {page_count} صفحة — من {len(attachments)} مرفق"
+                f"📄 {page_count} صفحة — من {len(attachments)} مرفق ({len(reports_covered)} تقرير)"
             )
             await context.bot.send_document(
                 chat_id=chat_id, document=pdf_buf, filename=filename,
@@ -215,6 +231,13 @@ async def _on_patient_selected(result, update: Update, context: ContextTypes.DEF
                 parse_mode=ParseMode.MARKDOWN,
             )
 
+        if gap_note:
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=gap_note.strip(),
+                parse_mode=ParseMode.MARKDOWN,
+            )
+
         try:
             await query.delete_message()
         except Exception:
@@ -222,7 +245,8 @@ async def _on_patient_selected(result, update: Update, context: ContextTypes.DEF
 
         logger.info(
             f"[patient_attachments_bundle] patient_id={patient_id}  "
-            f"total={len(attachments)}  merged_pages={page_count}  leftovers={len(leftovers)}"
+            f"total={len(attachments)}  merged_pages={page_count}  leftovers={len(leftovers)}  "
+            f"paper_reports={len(paper_reports)}  reports_covered={len(reports_covered)}  missing={missing_count}"
         )
 
     except Exception:

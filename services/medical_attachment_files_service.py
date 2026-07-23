@@ -156,6 +156,47 @@ def get_medical_attachment_files_for_patient(patient_id: int) -> list[dict]:
         return []
 
 
+def get_reports_with_paper_report_for_patient(patient_id: int) -> list[dict]:
+    """
+    تقارير هذا المريض التي عليها has_paper_report=1 (المترجم أكّد وجود
+    تقرير طبي وقت الإنشاء) — بنفس منطق مطابقة patient_id/patient_name
+    المستخدَم في get_medical_attachment_files_for_patient، لمقارنة عدد
+    التقارير "المؤكَّد عليها تقرير طبي" مع عدد المرفقات الفعلي المجمَّع
+    فعلاً، وكشف أي تقرير فشل إرسال/تسجيل مرفقه بصمت وقت النشر.
+    """
+    if not patient_id:
+        return []
+    try:
+        with SessionLocal() as session:
+            target = session.query(Patient).filter(Patient.id == patient_id).first()
+            if not target:
+                return []
+
+            base = session.query(Report).filter(Report.has_paper_report == 1)
+            id_matched = base.filter(Report.patient_id == patient_id).all()
+
+            name_matched = []
+            if target.full_name and target.full_name.strip():
+                name_matched = base.filter(Report.patient_name == target.full_name).all()
+
+            seen_ids = set()
+            reports = []
+            for r in list(id_matched) + list(name_matched):
+                if r.id in seen_ids:
+                    continue
+                seen_ids.add(r.id)
+                reports.append({
+                    "report_id": r.id,
+                    "report_date": r.report_date,
+                    "department": r.department,
+                    "medical_action": r.medical_action,
+                })
+            return reports
+    except Exception as e:
+        logger.error(f"❌ medical_attachment_files: فشل جلب تقارير المريض #{patient_id} ذات التقرير الطبي: {e}", exc_info=True)
+        return []
+
+
 def get_reports_missing_attachments(limit: int = 200) -> list[dict]:
     """يجلب التقارير التي عليها has_paper_report=1 (المترجم أكّد وجود تقرير
     طبي مرفوع وقت الإنشاء) لكن لا يوجد لها أي سجل فعلي في
