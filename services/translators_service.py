@@ -5,6 +5,7 @@ Unified Translators Service - Single Source of Truth (Database)
 """
 
 import os
+import re
 import logging
 from typing import List, Dict, Optional, Tuple, TYPE_CHECKING
 
@@ -12,6 +13,8 @@ if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
+
+_ARABIC_RE = re.compile(r'[؀-ۿ]')
 
 # Cache
 _TRANSLATORS_CACHE = None
@@ -431,6 +434,47 @@ def load_translator_names() -> List[str]:
     return get_all_translator_names()
 
 
+def _get_report_counts_by_translator_name() -> Dict[str, int]:
+    """عدد التقارير المنشورة لكل مترجم (بالاسم كما يُحفَظ في Report.translator_name)."""
+    try:
+        from db.session import SessionLocal
+        from db.models import Report
+        from sqlalchemy import func
+
+        with SessionLocal() as s:
+            rows = (
+                s.query(Report.translator_name, func.count(Report.id))
+                .filter(Report.translator_name.isnot(None))
+                .group_by(Report.translator_name)
+                .all()
+            )
+            return {name: count for name, count in rows if name}
+    except Exception as e:
+        logger.error(f"Error counting reports by translator: {e}")
+        return {}
+
+
+def get_translator_names_for_picker() -> List[str]:
+    """
+    ترتيب أسماء المترجمين لشاشة الاختيار عند إنشاء تقرير:
+    الأسماء العربية أولاً (الأكثر نشراً للتقارير أولاً)، ثم الأسماء غير
+    العربية (الإنجليزية) في النهاية بنفس منطق الترتيب حسب النشاط.
+    """
+    names = get_all_translator_names()
+    if not names:
+        return names
+
+    counts = _get_report_counts_by_translator_name()
+
+    arabic_names = [n for n in names if _ARABIC_RE.search(n)]
+    other_names = [n for n in names if not _ARABIC_RE.search(n)]
+
+    arabic_names.sort(key=lambda n: (-counts.get(n, 0), n))
+    other_names.sort(key=lambda n: (-counts.get(n, 0), n))
+
+    return arabic_names + other_names
+
+
 __all__ = [
     'get_all_translator_names',
     'get_all_translators',
@@ -441,6 +485,7 @@ __all__ = [
     'sync_file_to_database',
     'get_translators_count',
     'load_translator_names',
+    'get_translator_names_for_picker',
 ]
 
 

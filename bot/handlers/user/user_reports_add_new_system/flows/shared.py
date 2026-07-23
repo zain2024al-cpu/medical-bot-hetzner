@@ -602,9 +602,9 @@ async def show_translator_selection(message, context, flow_type):
         # لا نمنع اختيار المترجم إذا حدث خطأ في البوابة
         pass
 
-    translator_names = load_translator_names()
+    text, keyboard = _build_translator_picker(flow_type, 0)
 
-    if not translator_names:
+    if not keyboard:
         await message.reply_text("❌ خطأ: لا توجد أسماء مترجمين متاحة")
         # المتابعة بدون مترجم
         await show_final_summary(message, context, flow_type)
@@ -612,33 +612,65 @@ async def show_translator_selection(message, context, flow_type):
         context.user_data['_conversation_state'] = confirm_state
         return confirm_state
 
-    # تقسيم الأسماء إلى صفوف (3 أسماء لكل صف)
+    await message.reply_text(text, reply_markup=keyboard, parse_mode="Markdown")
+    # mark that user is now on the translator list (distinct from MEDICAL_REPORT_ASK gate)
+    context.user_data["_conversation_state"] = "TRANSLATOR_SELECTING"
+
+
+_TRANSLATOR_PICKER_PAGE_SIZE = 18
+
+
+def _build_translator_picker(flow_type: str, page: int):
+    """
+    يبني نصّ ولوحة أزرار صفحة واحدة من شاشة اختيار المترجم.
+    الترتيب: الأسماء العربية أولاً (الأكثر نشراً للتقارير أولاً)، ثم
+    الأسماء غير العربية في آخر صفحة/صفحات. مقسّم على عدة شاشات بدل عرض
+    الكل دفعة واحدة.
+
+    Returns: (text, InlineKeyboardMarkup) أو (None, None) إن لم توجد أسماء.
+    """
+    from services.translators_service import get_translator_names_for_picker
+
+    names = get_translator_names_for_picker()
+    if not names:
+        return None, None
+
+    per_page = _TRANSLATOR_PICKER_PAGE_SIZE
+    total = len(names)
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    page = max(0, min(page, total_pages - 1))
+    start = page * per_page
+    end = min(start + per_page, total)
+    page_names = names[start:end]
+
     keyboard_buttons = []
     row = []
-
-    for i, name in enumerate(translator_names):
+    for i, name in enumerate(page_names):
         row.append(InlineKeyboardButton(name, callback_data=f"simple_translator:{flow_type}:{name}"))
-        if len(row) == 3 or i == len(translator_names) - 1:
+        if len(row) == 3 or i == len(page_names) - 1:
             keyboard_buttons.append(row)
             row = []
 
-    # إضافة أزرار التنقل
+    nav_row = []
+    if page > 0:
+        nav_row.append(InlineKeyboardButton("⬅️ السابق", callback_data=f"translator_page:{flow_type}:{page - 1}"))
+    if page < total_pages - 1:
+        nav_row.append(InlineKeyboardButton("التالي ➡️", callback_data=f"translator_page:{flow_type}:{page + 1}"))
+    if nav_row:
+        keyboard_buttons.append(nav_row)
+
     keyboard_buttons.append([
         InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
         InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")
     ])
 
-    keyboard = InlineKeyboardMarkup(keyboard_buttons)
-
-    await message.reply_text(
+    text = (
         f"👤 **اختر اسم المترجم**\n\n"
         f"المترجم مسؤول عن ترجمة التقرير إلى اللغة المطلوبة.\n"
-        f"اختر من القائمة أدناه:",
-        reply_markup=keyboard,
-        parse_mode="Markdown"
+        f"📄 الصفحة {page + 1} من {total_pages}\n\n"
+        f"اختر من القائمة أدناه:"
     )
-    # mark that user is now on the translator list (distinct from MEDICAL_REPORT_ASK gate)
-    context.user_data["_conversation_state"] = "TRANSLATOR_SELECTING"
+    return text, InlineKeyboardMarkup(keyboard_buttons)
 
 
 async def handle_medical_report_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -3073,38 +3105,13 @@ async def handle_translator_page_navigation(update: Update, context: ContextType
         elif flow_type not in valid_flow_types:
             flow_type = current_flow if current_flow in valid_flow_types else "new_consult"
 
-        translator_names = load_translator_names()
-        FIRST_PAGE_COUNT = 19
-        page_names = translator_names[:FIRST_PAGE_COUNT] if page == 1 else translator_names[FIRST_PAGE_COUNT:]
+        text, keyboard = _build_translator_picker(flow_type, page)
+        if not keyboard:
+            return
 
-        keyboard_buttons = []
-        row = []
-        for name in page_names:
-            row.append(InlineKeyboardButton(name, callback_data=f"simple_translator:{flow_type}:{name}"))
-            if len(row) == 3:
-                keyboard_buttons.append(row)
-                row = []
-        if row:
-            keyboard_buttons.append(row)
-
-        nav_buttons = []
-        if page == 1 and len(translator_names) > FIRST_PAGE_COUNT:
-            nav_buttons.append(InlineKeyboardButton("⬅️ الصفحة التالية", callback_data=f"translator_page:{flow_type}:2"))
-        elif page == 2:
-            nav_buttons.append(InlineKeyboardButton("➡️ الصفحة السابقة", callback_data=f"translator_page:{flow_type}:1"))
-        if nav_buttons:
-            keyboard_buttons.append(nav_buttons)
-        keyboard_buttons.append([
-            InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
-            InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel"),
-        ])
-
-        page_text = f"(الصفحة {page} من 2)" if len(translator_names) > FIRST_PAGE_COUNT else ""
         await query.edit_message_text(
-            f"👤 **اختر اسم المترجم** {page_text}\n\n"
-            f"المترجم مسؤول عن ترجمة التقرير إلى اللغة المطلوبة.\n"
-            f"اختر من القائمة أدناه:",
-            reply_markup=InlineKeyboardMarkup(keyboard_buttons),
+            text,
+            reply_markup=keyboard,
             parse_mode="Markdown"
         )
     except Exception as e:
