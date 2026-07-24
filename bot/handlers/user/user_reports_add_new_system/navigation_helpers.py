@@ -22,7 +22,7 @@ async def handle_cancel_navigation(update: Update, context: ContextTypes.DEFAULT
     # ✅ التحقق من last_valid_state - إذا كان التاريخ، عرض التقويم مباشرة
     last_valid_state = context.user_data.get('last_valid_state')
     logger.info(f"🔙 CANCEL: last_valid_state={last_valid_state}")
-    
+
     # إذا كان last_valid_state هو date_selection أو STATE_SELECT_DATE
     if last_valid_state in ['date_selection', STATE_SELECT_DATE]:
         try:
@@ -31,22 +31,17 @@ async def handle_cancel_navigation(update: Update, context: ContextTypes.DEFAULT
                     await query.message.delete()
                 except:
                     pass
-            
-            # تنظيف البيانات
-            report_tmp = context.user_data.get("report_tmp", {})
-            if report_tmp:
-                keys_to_remove = [
-                    "report_date", "patient_name", "patient_id", "hospital_name",
-                    "department_name", "doctor_name", "doctor_id", "action_type",
-                    "medical_action", "current_flow", "complaint", "diagnosis",
-                    "decision", "tests", "followup_date", "followup_time",
-                    "followup_reason", "translator_name", "translator_id",
-                    "patient_search_mode", "doctor_search_mode", "hospitals_search",
-                    "departments_search", "doctor_manual_mode", "step_history"
-                ]
-                for key in keys_to_remove:
-                    report_tmp.pop(key, None)
-            
+
+            # ✅ تصفير كامل لـ report_tmp بدل حذف قائمة مفاتيح يدوية — كانت
+            # هذه القائمة تُنسى تحديثها مع كل نوع إجراء جديد (لم تشمل قط
+            # endoscopy_type/result/procedures، notes، treatment_plan_summary،
+            # وغيرها)، فتبقى حقول نوع إجراء سابق مُلغى عالقة في report_tmp
+            # وتُحفَظ صامتة في التقرير التالي المختلف تماماً الذي يُنشأ في
+            # نفس الجلسة (غير ظاهرة في البطاقة لأن عرضها مشروط بـmedical_action،
+            # لكنها فعلياً في القاعدة). بما أن هذا المسار يعيد المستخدم لبداية
+            # اختيار التاريخ أصلاً، فلا داعي لإبقاء أي حقل من المحاولة الملغاة.
+            context.user_data["report_tmp"] = {}
+
             # تنظيف navigation stack
             nav_clear(context)
             context.user_data['_nav_stack'] = []
@@ -80,24 +75,8 @@ async def handle_cancel_navigation(update: Update, context: ContextTypes.DEFAULT
             logger.error(f"❌ خطأ في تحديث رسالة الإلغاء: {e}")
     
     try:
-        # تنظيف شامل لجميع البيانات
-        report_tmp = context.user_data.get("report_tmp", {})
-        if report_tmp:
-            # قائمة المفاتيح التي يجب حذفها
-            keys_to_remove = [
-                "report_date", "patient_name", "patient_id", "hospital_name",
-                "department_name", "doctor_name", "doctor_id", "action_type",
-                "medical_action", "current_flow", "complaint", "diagnosis",
-                "decision", "tests", "followup_date", "followup_time",
-                "followup_reason", "translator_name", "translator_id",
-                "patient_search_mode", "doctor_search_mode", "hospitals_search",
-                "departments_search", "doctor_manual_mode",
-                "step_history"
-            ]
-            for key in keys_to_remove:
-                context.user_data.pop(key, None)
-        
-        # حذف report_tmp نفسه
+        # حذف report_tmp نفسه (يشمل تلقائياً كل حقول أي نوع إجراء بلا حاجة
+        # لقائمة مفاتيح يدوية تُنسى تحديثها مع كل نوع إجراء جديد)
         context.user_data.pop("report_tmp", None)
         context.user_data.pop("_conversation_state", None)
         context.user_data.pop("_current_search_type", None)

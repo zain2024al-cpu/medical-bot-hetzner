@@ -478,10 +478,7 @@ async def handle_action_type_choice(update: Update, context: ContextTypes.DEFAUL
         action_name = PREDEFINED_ACTIONS[action_idx]
         logger.info(f"ACTION_TYPE_CHOICE: Selected action = '{action_name}' (index: {action_idx})")
 
-        # حفظ نوع الإجراء
-        context.user_data.setdefault("report_tmp", {})["medical_action"] = action_name
-        context.user_data["report_tmp"]["action_type"] = action_name
-        context.user_data["report_tmp"].setdefault("step_history", []).append(R_ACTION_TYPE)
+        report_tmp = context.user_data.setdefault("report_tmp", {})
 
         # حفظ flow_type
         action_to_flow_type = {
@@ -504,9 +501,48 @@ async def handle_action_type_choice(update: Update, context: ContextTypes.DEFAUL
             "العلاج المناعي": "treatment_immuno",
             "جلسات غسيل الكلى": "treatment_dialysis",
         }
-
         flow_type = action_to_flow_type.get(action_name, "new_consult")
-        context.user_data["report_tmp"]["current_flow"] = flow_type
+
+        # ✅ لو المستخدم رجع (🔙) لخطوة نوع الإجراء بعد ما بدأ فعلياً نوعاً
+        # مختلفاً (مثلاً بدأ "استشارة جديدة" ثم رجع واختار "المناظير")، نظّف
+        # كل حقول محتوى النوع السابق أولاً — وإلا تبقى عالقة في report_tmp
+        # (لا يمسحها أي مسار جديد لأنه يستخدم setdefault لا يعيد التصفير)
+        # وتُحفَظ صامتة مع التقرير الجديد رغم كونها من نوع إجراء مختلف تماماً.
+        previous_flow = report_tmp.get("current_flow")
+        if previous_flow and previous_flow != flow_type:
+            _STALE_CONTENT_KEYS = [
+                "complaint", "complaint_text", "diagnosis", "decision", "tests", "notes",
+                "operation_details", "operation_name_en", "success_rate", "benefit_rate",
+                "therapy_details", "device_details", "device_name",
+                "admission_reason", "admission_summary", "admission_notes", "admission_type",
+                "discharge_type", "room_number",
+                "radiology_type", "radiology_delivery_date",
+                "radiation_therapy_type", "radiation_therapy_session_number",
+                "radiation_therapy_remaining", "radiation_therapy_recommendations",
+                "radiation_therapy_return_date", "radiation_therapy_return_reason",
+                "radiation_therapy_final_notes", "radiation_therapy_completed",
+                "endoscopy_type", "endoscopy_result", "endoscopy_procedures", "_endoscopy_selected",
+                "treatment_plan_summary", "_tp_plan_id", "_treatment_key",
+                "app_reschedule_reason", "app_reschedule_return_date", "app_reschedule_return_reason",
+                "no_report_reason", "no_paper_report_reason", "case_status", "status",
+                "followup_date", "followup_time", "followup_reason",
+                "followup_calendar_year", "followup_calendar_month",
+                "translator_name", "translator_id",
+                "_medical_attachments", "_medical_report_step_done", "_medical_report_pending",
+                "_pending_translator_flow",
+            ]
+            for key in _STALE_CONTENT_KEYS:
+                report_tmp.pop(key, None)
+            logger.info(
+                f"ACTION_TYPE_CHOICE: Cleared stale content fields from previous flow "
+                f"'{previous_flow}' before starting '{action_name}'"
+            )
+
+        # حفظ نوع الإجراء
+        report_tmp["medical_action"] = action_name
+        report_tmp["action_type"] = action_name
+        report_tmp.setdefault("step_history", []).append(R_ACTION_TYPE)
+        report_tmp["current_flow"] = flow_type
         logger.info(f"ACTION_TYPE_CHOICE: Flow type = '{flow_type}' for action '{action_name}'")
 
         # Clear nav stack — fresh flow starts here
