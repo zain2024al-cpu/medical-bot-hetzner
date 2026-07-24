@@ -428,10 +428,13 @@ def get_editable_fields_by_action_type(medical_action):
         ]
 
     elif action_clean == 'المناظير':
+        # ⚠️ الإجراءات التي تمت أثناء المنظار (endoscopy_procedures) غير قابلة
+        # للتعديل هنا — قائمة اختيار مركّبة (JSON)، لا نص حر بسيط.
         return [
             ('complaint_text', '💬 شكوى المريض'),
             ('endoscopy_type', '🔬 نوع المنظار'),
             ('endoscopy_result', '📋 نتيجة المنظار / خطة الطبيب'),
+            ('notes', '📝 ملاحظات'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
             ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),

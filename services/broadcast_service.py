@@ -1323,6 +1323,11 @@ def _build_general_fields(data: dict) -> list:
                     lines.append(f"• أخرى: {escape_markdown(str(proc_other))}")
             lines.append("")
 
+        endo_notes = data.get('notes')
+        if endo_notes and str(endo_notes).strip() and str(endo_notes) != 'لا يوجد':
+            lines.append(f"📝 **ملاحظات:** {escape_markdown(str(endo_notes).strip())}")
+            lines.append("")
+
     # ✅ التشخيص - حقل منفصل تماماً (لا يظهر في المسارات المحددة)
     # ✅ "متابعة في الرقود" لا يحتوي على تشخيص
     if medical_action not in flows_without_diagnosis:

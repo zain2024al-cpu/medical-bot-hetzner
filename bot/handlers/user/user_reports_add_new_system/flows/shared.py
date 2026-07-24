@@ -1560,6 +1560,15 @@ async def show_final_summary(message, context, flow_type):
         if "_medical_attachments" in data and "medical_attachments" not in data:
             data["medical_attachments"] = data["_medical_attachments"]
 
+        # ✅ توحيد مفتاح الشكوى: عدة مسارات (استشارة جديدة/متابعة/طوارئ/
+        # جلسات العلاج) تخزّنها في report_tmp باسم "complaint"، بينما
+        # format_report_message تقرأ "complaint_text" — بدون هذا التوحيد
+        # تختفي شكوى المريض من شاشة "📋 ملخص التقرير" فقط (المراجعة قبل
+        # النشر)، رغم أنها تظهر صحيحة في البطاقة الفعلية عند النشر لأن
+        # save_report_to_database يبني complaint_text بشكل صحيح هناك.
+        if data.get("complaint") and not data.get("complaint_text"):
+            data["complaint_text"] = data["complaint"]
+
         # ✅ استخدام format_report_message لبناء الملخص (نفس منطق النشر)
         report_message = format_report_message(data)
         
@@ -2700,6 +2709,8 @@ async def save_report_to_database(query, context, flow_type):
                     broadcast_data['endoscopy_result'] = data.get('endoscopy_result')
                 if data.get('endoscopy_procedures'):
                     broadcast_data['endoscopy_procedures'] = data.get('endoscopy_procedures')
+                if data.get('notes'):
+                    broadcast_data['notes'] = data.get('notes')
                 logger.info(
                     f"🔬 save_report_to_database: حقول المناظير - "
                     f"type={data.get('endoscopy_type')!r}, result={data.get('endoscopy_result')!r}"
