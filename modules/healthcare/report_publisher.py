@@ -92,29 +92,49 @@ async def publish(bot, data: HealthcarePublishData) -> None:
                 f"[report_publisher] admin notify failed  admin={admin_id}: {exc}"
             )
 
+    # 1b. Send a copy of the published report back to the submitter (skip if
+    # they're already an admin — they'd otherwise get the exact same message twice).
+    if data.created_by_id and data.created_by_id not in ADMIN_IDS:
+        try:
+            await bot.send_message(
+                chat_id=data.created_by_id,
+                text=text,
+                parse_mode="Markdown",
+            )
+            logger.info(f"[report_publisher] submitter notified with report copy  user={data.created_by_id}")
+        except Exception as exc:
+            logger.warning(
+                f"[report_publisher] submitter notify failed  user={data.created_by_id}: {exc}"
+            )
+
     # 2. Publish to healthcare documentation group
     group_id = _resolve_group_id()
     logger.info(f"[report_publisher] group_id resolved → {group_id!r}")
-    if not group_id:
+    if group_id:
+        try:
+            await bot.send_message(
+                chat_id=group_id,
+                text=text,
+                parse_mode="Markdown",
+            )
+            logger.info(f"[report_publisher] text sent to group  group_id={group_id}")
+        except Exception as exc:
+            logger.warning(f"[report_publisher] group text send failed: {exc}")
+    else:
         logger.warning("[report_publisher] HEALTHCARE_GROUP_ID not configured — skipping group publish")
-        return
 
-    try:
-        await bot.send_message(
-            chat_id=group_id,
-            text=text,
-            parse_mode="Markdown",
-        )
-        logger.info(f"[report_publisher] text sent to group  group_id={group_id}")
-    except Exception as exc:
-        logger.warning(f"[report_publisher] group text send failed: {exc}")
-
-    # 3. Convert images to PDF and send to group
+    # 3. Convert images to PDF and send to the group and the submitter
     logger.info(
         f"[report_publisher] images check: {len(data.images)} image(s)"
     )
     if data.images:
-        await _send_pdf_to_group(bot, group_id, data)
+        pdf_targets: list = []
+        if group_id:
+            pdf_targets.append(group_id)
+        if data.created_by_id and data.created_by_id not in ADMIN_IDS and data.created_by_id != group_id:
+            pdf_targets.append(data.created_by_id)
+        if pdf_targets:
+            await _send_pdf_to_targets(bot, pdf_targets, data)
 
 
 # ── Per-workflow operations label ─────────────────────────────────────────────
@@ -187,22 +207,24 @@ _PDF_PREFIX: dict[str, str] = {
 }
 
 
-async def _send_pdf_to_group(
+async def _send_pdf_to_targets(
     bot,
-    group_id: int | str,
+    chat_ids: list,
     data: HealthcarePublishData,
 ) -> None:
     """
     Download all images attached to the record, merge them into a single PDF
-    (one image per page, no cover or extra formatting), and send the PDF to
-    the healthcare group.
+    (one image per page, no cover or extra formatting), and send that same
+    PDF to every chat id in chat_ids (e.g. the healthcare group and/or the
+    submitter) — built once, sent to each target independently so one
+    recipient's send failure never affects the others.
 
     Falls back silently — any failure is logged and swallowed.
     """
     from PIL import Image
 
     file_ids = [d.get("file_id", "") for d in data.images if d.get("file_id")]
-    logger.info(f"[report_publisher] _send_pdf_to_group  file_ids={len(file_ids)}  raw_images={len(data.images)}")
+    logger.info(f"[report_publisher] _send_pdf_to_targets  file_ids={len(file_ids)}  raw_images={len(data.images)}  targets={chat_ids}")
     if not file_ids:
         logger.warning("[report_publisher] no valid file_ids found in data.images — PDF skipped")
         return
@@ -226,6 +248,7 @@ async def _send_pdf_to_group(
         return
 
     # ── 2. Build PDF in memory ────────────────────────────────────────────────
+    pdf_bytes: bytes
     pdf_buffer = io.BytesIO()
     try:
         pil_images[0].save(
@@ -235,8 +258,8 @@ async def _send_pdf_to_group(
             append_images=pil_images[1:],
             resolution=150.0,
         )
-        pdf_buffer.seek(0)
-        logger.info(f"[report_publisher] PDF built  pages={len(pil_images)}  size={pdf_buffer.getbuffer().nbytes:,} bytes")
+        pdf_bytes = pdf_buffer.getvalue()
+        logger.info(f"[report_publisher] PDF built  pages={len(pil_images)}  size={len(pdf_bytes):,} bytes")
     except Exception:
         logger.exception("[report_publisher] PDF generation FAILED")
         return
@@ -254,21 +277,22 @@ async def _send_pdf_to_group(
         f"📅 {date_str}"
     )
 
-    # ── 4. Send PDF to group ──────────────────────────────────────────────────
-    logger.info(f"[report_publisher] sending PDF  file={filename}  chat={group_id}")
-    try:
-        await bot.send_document(
-            chat_id=group_id,
-            document=pdf_buffer,
-            filename=filename,
-            caption=caption,
-        )
-        logger.info(
-            f"[report_publisher] PDF sent OK  file={filename}"
-            f"  pages={len(pil_images)}  patient={data.patient_name!r}"
-        )
-    except Exception:
-        logger.exception(f"[report_publisher] PDF send FAILED  file={filename}")
+    # ── 4. Send the same PDF to each target ───────────────────────────────────
+    for chat_id in chat_ids:
+        logger.info(f"[report_publisher] sending PDF  file={filename}  chat={chat_id}")
+        try:
+            await bot.send_document(
+                chat_id=chat_id,
+                document=io.BytesIO(pdf_bytes),
+                filename=filename,
+                caption=caption,
+            )
+            logger.info(
+                f"[report_publisher] PDF sent OK  file={filename}"
+                f"  pages={len(pil_images)}  patient={data.patient_name!r}  chat={chat_id}"
+            )
+        except Exception:
+            logger.exception(f"[report_publisher] PDF send FAILED  file={filename}  chat={chat_id}")
 
 
 def _resolve_group_id() -> int | str | None:
