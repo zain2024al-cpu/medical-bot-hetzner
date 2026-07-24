@@ -770,12 +770,43 @@ async def handle_patient_name_input(update: Update, context: ContextTypes.DEFAUL
         return ConversationHandler.END
 
 
+def _create_residency_profile_for_companion_flow(
+    patient_name: str, companion_names: list, created_by: int | None,
+) -> None:
+    """
+    يولّد تلقائياً سجل إقامة (ResidencyProfile + ResidencyCompanion) لكل
+    مريض/مرافق يُضاف عبر زر "مريض جديد مع مرافقين" — بلا تواريخ انتهاء أو
+    مستندات (غير مُدخَلة في هذا التدفق أصلاً)، فيظهر جاهزاً في "🪪 الإقامة"
+    ليُكمَل لاحقاً. فشل هذه الخطوة لا يوقف تدفق إضافة المريض أبداً.
+    """
+    try:
+        from modules.residency.profiles.models import save_profile
+        save_profile(
+            name=patient_name,
+            expiry_date="",
+            residency_number="",
+            documents=[],
+            companions=[{"name": n, "expiry_date": ""} for n in companion_names],
+            notes="",
+            source="companion_flow",
+            created_by=created_by,
+        )
+        logger.info(
+            f"[admin_schedule] residency profile auto-created for companion-flow patient "
+            f"[{patient_name}] with {len(companion_names)} companion(s)"
+        )
+    except Exception as e:
+        logger.error(f"[admin_schedule] failed to auto-create residency profile for [{patient_name}]: {e}")
+
+
 async def handle_start_patient_with_companions(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """بدء تدفق منفصل تماماً: مريض جديد مرتبط بمرافقين (خدمات عامة/إقامة).
 
     ✅ منفصل عمداً عن "➕ إضافة اسم جديد" (بقرار المستخدم) — لا شاشة اختيار
-    نوع هنا: المريض دائماً "عام" (يظهر في كل الشاشات)، والمرافقون وحدهم
-    يُسجَّلون بنوع "companion" (مخفي إلا في 🔧 الخدمات العامة و🪪 الإقامة).
+    نوع هنا: المريض يبقى ظاهراً بشكل طبيعي كأي مريض "عام" في كل الشاشات
+    الأخرى (تقارير طبية...)، لكنه يُميَّز بنوع "companion_parent" ليظهر
+    أيضاً حصراً في 🔧 الخدمات العامة و🪪 الإقامة مع مرافقيه — والمرافقون
+    أنفسهم بنوع "companion" كالمعتاد (مخفيّون في كل مكان آخر).
     """
     query = update.callback_query
     await query.answer()
@@ -825,7 +856,10 @@ async def handle_pwc_patient_name_input(update: Update, context: ContextTypes.DE
             )
             return ConversationHandler.END
 
-        patient_id = add_patient(name, patient_type=None)  # عام دائماً — يظهر في كل الشاشات
+        # ✅ "companion_parent" يبقى ظاهراً كـ"general" في كل الشاشات الأخرى
+        # (نفس معاملة None سابقاً)، مع تمييزه إضافياً ليظهر حصراً أيضاً في
+        # 🔧 الخدمات العامة و🪪 الإقامة (انظر shared/selectors/patient_selector).
+        patient_id = add_patient(name, patient_type="companion_parent")
 
         if not patient_id:
             await update.message.reply_text("❌ **خطأ في الإضافة**", parse_mode=ParseMode.MARKDOWN)
@@ -867,6 +901,11 @@ async def handle_companion_ask_choice(update: Update, context: ContextTypes.DEFA
         context.user_data.pop('new_patient_id', None)
         context.user_data.pop('new_patient_name', None)
         context.user_data.pop('new_patient_type_label', None)
+
+        _create_residency_profile_for_companion_flow(
+            patient_name, [], created_by=update.effective_user.id if update.effective_user else None,
+        )
+
         keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")]])
         await query.edit_message_text(
             f"✅ **تم إضافة الاسم:** {patient_name}\n\n"
@@ -951,6 +990,10 @@ async def handle_companion_name_input(update: Update, context: ContextTypes.DEFA
     patient_name = context.user_data.get('new_patient_name', '')
     companion_names = context.user_data.get('companion_names', [])
     summary = "\n".join(f"👤 {n}" for n in companion_names)
+
+    _create_residency_profile_for_companion_flow(
+        patient_name, companion_names, created_by=update.effective_user.id if update.effective_user else None,
+    )
 
     for key in ('new_patient_id', 'new_patient_name', 'new_patient_type_label',
                 'companion_count', 'companion_index', 'companion_names'):

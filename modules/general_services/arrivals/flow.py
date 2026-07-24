@@ -179,7 +179,7 @@ async def _show_p_name(update, context, session):
         f"[arrivals] _show_p_name → opening patient_selector"
         f"  patient_index={session.patient_index}/{session.patient_count}  user={uid}"
     )
-    await patient_selector.enter(update, context, return_to=_RKEY_P_NAME, include_companions=True)
+    await patient_selector.enter(update, context, return_to=_RKEY_P_NAME, only_companion_flow=True)
 
 
 async def _show_p_arrival_date(update, context, session):
@@ -262,7 +262,7 @@ async def _show_batch_notes(update, context, session):
 async def _show_c_name(update, context, session):
     """✅ الاسم يُختار إلزامياً من patient_selector — لا شاشة كتابة حرة."""
     logger.info("[arrivals] _show_c_name → opening patient_selector")
-    await patient_selector.enter(update, context, return_to=_RKEY_C_NAME, include_companions=True)
+    await patient_selector.enter(update, context, return_to=_RKEY_C_NAME, only_companion_flow=True)
 
 
 async def _show_c_arrival_date(update, context, session):

@@ -26,18 +26,23 @@ class PatientSelectorState:
     # ✅ True فقط للخدمات العامة/الإقامة — يُظهر مرضى "companion" إضافةً لمرضى
     # general. نفس سبب الحفظ في الجلسة مثل include_pharmacy تماماً.
     include_companions: bool = False
+    # ✅ True يقيّد الظهور فقط لمن أُضيف عبر زر "مريض جديد مع مرافقين"
+    # (يتجاوز include_pharmacy/include_companions). نفس سبب الحفظ في
+    # الجلسة — تحترمه إعادة الجلب عند فقدان الـsnapshot.
+    only_companion_flow: bool = False
     # names-only snapshot for idx resolution (avoids re-querying on every tap)
     snapshot: list[str] = field(default_factory=list)
 
 
 def save(user_data: dict, state: PatientSelectorState) -> None:
     user_data[_KEY] = {
-        "return_to":          state.return_to,
-        "page":               state.page,
-        "search_query":       state.search_query,
-        "include_pharmacy":   state.include_pharmacy,
-        "include_companions": state.include_companions,
-        "snapshot":           state.snapshot,
+        "return_to":           state.return_to,
+        "page":                state.page,
+        "search_query":        state.search_query,
+        "include_pharmacy":    state.include_pharmacy,
+        "include_companions":  state.include_companions,
+        "only_companion_flow": state.only_companion_flow,
+        "snapshot":            state.snapshot,
     }
 
 
@@ -51,6 +56,7 @@ def load(user_data: dict) -> PatientSelectorState | None:
         search_query=raw.get("search_query", ""),
         include_pharmacy=raw.get("include_pharmacy", False),
         include_companions=raw.get("include_companions", False),
+        only_companion_flow=raw.get("only_companion_flow", False),
         snapshot=raw.get("snapshot", []),
     )
 

@@ -65,17 +65,22 @@ async def patient_search_inline_handler(update: Update, context: ContextTypes.DE
         
         results = []
 
-        # ✅ نوع ظهور المريض: مرضى "pharmacy_only" يظهرون في نتائج البحث
-        # inline فقط عندما تكون جلسة مُنتقي المرضى المشترك نشطة بوضع
-        # include_pharmacy=True (أي أن المستخدم داخل زرّي صرف الأدوية أو
-        # المستلزمات الطبية تحديداً). في كل الحالات الأخرى (بحث المترجمين
-        # أو أي جلسة مُنتقي أخرى) يُعرض مرضى general فقط.
+        # ✅ نوع ظهور المريض في نتائج البحث inline: يعتمد بالكامل على جلسة
+        # مُنتقي المرضى المشترك النشطة (نفس قاعدة _type_visible المستخدَمة
+        # في القائمة العادية) — حتى لا يختلف ما يظهر عبر "🔍 بحث" عمّا يظهر
+        # في القائمة المرقَّمة لنفس الشاشة (كانت include_companions/
+        # only_companion_flow مفقودتين هنا تماماً سابقاً، فيسرّب البحث
+        # مرضى "general" لشاشات مقيَّدة مثل الخدمات العامة).
         include_pharmacy = False
+        include_companions = False
+        only_companion_flow = False
         try:
             from shared.selectors.patient_selector._session import load as _sel_load
             _sel_state = _sel_load(context.user_data)
             if _sel_state is not None:
                 include_pharmacy = _sel_state.include_pharmacy
+                include_companions = _sel_state.include_companions
+                only_companion_flow = _sel_state.only_companion_flow
         except Exception:
             pass
 
@@ -100,11 +105,11 @@ async def patient_search_inline_handler(update: Update, context: ContextTypes.DE
 
                     logger.info(f"✅ عرض آخر {len(patients)} مريض (بدون بحث)")
 
-                if not include_pharmacy:
-                    patients = [
-                        p for p in patients
-                        if (p.patient_type or "general") != "pharmacy_only"
-                    ]
+                from shared.selectors.patient_selector._data import _type_visible
+                patients = [
+                    p for p in patients
+                    if _type_visible(p.patient_type, include_pharmacy, include_companions, only_companion_flow)
+                ]
 
                 # ✅ إنشاء النتائج
                 for idx, patient in enumerate(patients):
