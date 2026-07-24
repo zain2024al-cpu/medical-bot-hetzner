@@ -2041,6 +2041,14 @@ async def save_report_to_database(query, context, flow_type):
             # داعي لتكراره هنا في decision_text.
             complaint_text = data.get("complaint", "")
             decision_text = ""
+        elif flow_type == "endoscopy":
+            # ✅ شكوى المريض — أول حقل يجمعه مسار المناظير، ويُخزَّن باسم
+            # complaint_text مباشرة (بخلاف بقية المسارات التي تستخدم complaint).
+            # نتيجة/نوع/إجراءات المنظار نفسها تُعرض عبر حقولها المخصَّصة
+            # المنفصلة (endoscopy_type/result/procedures)، فلا داعي لتكرارها
+            # هنا في decision_text.
+            complaint_text = data.get("complaint_text", "")
+            decision_text = ""
         elif flow_type == "radiation_therapy":
             # الحصول على report_tmp مرة واحدة
             report_tmp = context.user_data.get("report_tmp", {})
