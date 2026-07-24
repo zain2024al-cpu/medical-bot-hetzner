@@ -1252,6 +1252,15 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 'radiation_therapy_return_reason': getattr(report, 'radiation_therapy_return_reason', '') or '',
                 'radiation_therapy_final_notes': getattr(report, 'radiation_therapy_final_notes', '') or '',
                 'radiation_therapy_completed': getattr(report, 'radiation_therapy_completed', False) or False,
+                # ✅ حقول جلسات العلاج (كيماوي/موجّه/مناعي/غسيل الكلى) — كانت
+                # مفقودة تماماً من إعادة النشر بعد التعديل، فتختفي خطة العلاج
+                # (عدد الجلسات/الجلسة الحالية) من البطاقة رغم بقائها محفوظة
+                # في قاعدة البيانات.
+                'treatment_plan_summary': getattr(report, 'treatment_plan_summary', '') or '',
+                # ✅ حقول المناظير — نفس السبب أعلاه.
+                'endoscopy_type': getattr(report, 'endoscopy_type', '') or '',
+                'endoscopy_result': getattr(report, 'endoscopy_result', '') or '',
+                'endoscopy_procedures': getattr(report, 'endoscopy_procedures', '') or '',
                 # ✅ المترجم - استخدام الاسم المحفوظ في التقرير
                 'translator_name': translator_name,
                 # ✅ حالة التقرير الطبي الورقي
