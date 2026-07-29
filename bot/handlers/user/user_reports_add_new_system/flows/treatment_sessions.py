@@ -14,9 +14,11 @@
 #                    + [✅ متابعة] [✏️ تعديل الخطة]
 #   ← ثم: الملاحظات → تاريخ العودة → سبب العودة → المترجم/البوابة/النشر
 #
-# العلاج الكيماوي إضافياً: يسأل أولاً (أول مرة فقط) "حسب الجلسات" أو
-# "حسب الدورات"، وفي حال الدورات: عدد الدورات، ثم هل نفسه لكل الدورات
-# (نعم → عدد موحّد) أو (لا → إدخال تسلسلي لكل دورة).
+# العلاج الكيماوي إضافياً: يُتابَع دائماً "حسب الدورات" (لا يوجد خيار
+# "حسب الجلسات" — أُزيل بناءً على طلب المستخدم): عدد الدورات، ثم هل نفسه
+# لكل الدورات (نعم → عدد موحّد) أو (لا → إدخال تسلسلي لكل دورة).
+# (خطط قديمة أُنشئت سابقاً بنمط mode="sessions" تبقى تعمل ويمكن تعديلها
+# بشكل طبيعي — فقط شاشة الاختيار عند إنشاء خطة جديدة أُزيلت.)
 
 import json
 import logging
@@ -28,7 +30,7 @@ from ..states import (
     TREATMENT_PLAN_DISPLAY, TREATMENT_PLAN_MANUAL_SESSION,
     TREATMENT_COMPLAINT, TREATMENT_NOTES, TREATMENT_FOLLOWUP_DATE,
     TREATMENT_FOLLOWUP_REASON, TREATMENT_TRANSLATOR,
-    CHEMO_MODE_CHOICE, CHEMO_CYCLES_TOTAL, CHEMO_CYCLES_UNIFORM_CHOICE,
+    CHEMO_CYCLES_TOTAL, CHEMO_CYCLES_UNIFORM_CHOICE,
     CHEMO_CYCLES_UNIFORM_COUNT, CHEMO_CYCLES_CUSTOM_ENTRY,
 )
 from ..utils import _nav_buttons
@@ -111,37 +113,11 @@ async def start_chemo_flow(message, context):
         advanced = advance_plan(plan["id"])
         return await _show_plan_display(message, context, advanced)
 
+    data["_chemo_mode"] = "cycles"
     await message.reply_text(
         "💉 **العلاج الكيماوي**\n\n"
-        "🔄 **كيف تريد متابعة الخطة العلاجية؟**",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("📝 حسب الجلسات", callback_data="chemo_mode:sessions")],
-            [InlineKeyboardButton("🔄 حسب الدورات العلاجية (Cycles)", callback_data="chemo_mode:cycles")],
-            [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
-             InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")],
-        ]),
-        parse_mode="Markdown",
-    )
-    return CHEMO_MODE_CHOICE
-
-
-async def handle_chemo_mode_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    mode = query.data.split(":", 1)[1]
-    data = context.user_data.setdefault("report_tmp", {})
-
-    if mode == "sessions":
-        data["_chemo_mode"] = "sessions"
-        await query.edit_message_text(
-            "📝 **حسب الجلسات**\n\n📊 **كم عدد الجلسات الكلي؟**\n\nأدخل رقماً (مثال: 12):",
-            parse_mode="Markdown",
-        )
-        return TREATMENT_PLAN_SETUP
-
-    data["_chemo_mode"] = "cycles"
-    await query.edit_message_text(
         "🔄 **حسب الدورات العلاجية**\n\n📊 **كم عدد الدورات العلاجية؟**\n\nمثال: 6",
+        reply_markup=_nav_buttons(show_back=True),
         parse_mode="Markdown",
     )
     return CHEMO_CYCLES_TOTAL
@@ -555,7 +531,7 @@ async def handle_treatment_followup_reason(update: Update, context: ContextTypes
 
 __all__ = [
     'start_targeted_flow', 'start_immuno_flow', 'start_dialysis_flow', 'start_chemo_flow',
-    'handle_chemo_mode_choice', 'handle_chemo_cycles_total', 'handle_chemo_cycles_uniform_choice',
+    'handle_chemo_cycles_total', 'handle_chemo_cycles_uniform_choice',
     'handle_chemo_cycles_uniform_count', 'handle_chemo_cycles_custom_entry',
     'handle_treatment_plan_setup', 'handle_treatment_plan_display_choice',
     'handle_treatment_plan_edit_value', 'handle_treatment_plan_edit_reason',

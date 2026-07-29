@@ -142,23 +142,22 @@ R_ACTION_TYPE = STATE_SELECT_ACTION_TYPE
     TREATMENT_FOLLOWUP_REASON,     # سبب العودة
     TREATMENT_TRANSLATOR,          # اسم المترجم
     TREATMENT_CONFIRM,             # تأكيد
-    # ── خاص بالعلاج الكيماوي (اختيار جلسات/دورات) ──
-    CHEMO_MODE_CHOICE,             # حسب الجلسات / حسب الدورات
+    # ── خاص بالعلاج الكيماوي (دورات علاجية — خيار "حسب الجلسات" أُزيل) ──
     CHEMO_CYCLES_TOTAL,            # كم عدد الدورات؟
     CHEMO_CYCLES_UNIFORM_CHOICE,   # هل كل الدورات بنفس عدد الجلسات؟
     CHEMO_CYCLES_UNIFORM_COUNT,    # كم جلسة في كل دورة؟
     CHEMO_CYCLES_CUSTOM_ENTRY,     # إدخال عدد الجلسات لكل دورة على حدة (تسلسلي)
-) = range(111, 125)
+) = range(111, 124)
 
 # حالة إضافية واحدة: سبب تعديل خطة العلاج الإشعاعي (اختياري) — العلاج
 # الإشعاعي يستخدم TreatmentPlan أيضاً الآن، لكن يُبقي أعمدة Report القديمة
 # (radiation_therapy_session_number/remaining) لعدم كسر بطاقة تقريره.
-(RADIATION_THERAPY_EDIT_REASON,) = range(125, 126)
+(RADIATION_THERAPY_EDIT_REASON,) = range(124, 125)
 
 # حالة إضافية: شكوى المريض في مسار جلسات العلاج (chemo/targeted/immuno/
 # dialysis) — تُسأل بعد عرض تقدُّم الخطة وقبل ملاحظات الطبيب.
-(TREATMENT_COMPLAINT,) = range(126, 127)
+(TREATMENT_COMPLAINT,) = range(125, 126)
 
 # حالة إضافية: إدخال يدوي لرقم الجلسة الحالية في مسار جلسات العلاج — لتصحيح
 # العدّاد عند مرضى بدأوا الجلسات قبل إنشاء الخطة في هذا النظام.
-(TREATMENT_PLAN_MANUAL_SESSION,) = range(127, 128)
+(TREATMENT_PLAN_MANUAL_SESSION,) = range(126, 127)

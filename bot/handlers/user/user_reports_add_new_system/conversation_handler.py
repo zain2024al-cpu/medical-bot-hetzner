@@ -68,7 +68,7 @@ from .states import (
     TREATMENT_PLAN_DISPLAY, TREATMENT_PLAN_MANUAL_SESSION,
     TREATMENT_COMPLAINT, TREATMENT_NOTES, TREATMENT_FOLLOWUP_DATE,
     TREATMENT_FOLLOWUP_REASON, TREATMENT_TRANSLATOR, TREATMENT_CONFIRM,
-    CHEMO_MODE_CHOICE, CHEMO_CYCLES_TOTAL, CHEMO_CYCLES_UNIFORM_CHOICE,
+    CHEMO_CYCLES_TOTAL, CHEMO_CYCLES_UNIFORM_CHOICE,
     CHEMO_CYCLES_UNIFORM_COUNT, CHEMO_CYCLES_CUSTOM_ENTRY,
 )
 
@@ -345,7 +345,7 @@ def _treatment_handlers():
     """Import and return treatment_sessions flow handlers by name."""
     try:
         from bot.handlers.user.user_reports_add_new_system.flows.treatment_sessions import (
-            handle_chemo_mode_choice, handle_chemo_cycles_total, handle_chemo_cycles_uniform_choice,
+            handle_chemo_cycles_total, handle_chemo_cycles_uniform_choice,
             handle_chemo_cycles_uniform_count, handle_chemo_cycles_custom_entry,
             handle_treatment_plan_setup, handle_treatment_plan_display_choice,
             handle_treatment_plan_edit_value, handle_treatment_plan_edit_reason,
@@ -354,7 +354,6 @@ def _treatment_handlers():
             handle_treatment_notes, handle_treatment_notes_skip, handle_treatment_followup_reason,
         )
         return {
-            'chemo_mode_choice':        handle_chemo_mode_choice,
             'chemo_cycles_total':       handle_chemo_cycles_total,
             'chemo_cycles_uniform_choice': handle_chemo_cycles_uniform_choice,
             'chemo_cycles_uniform_count':  handle_chemo_cycles_uniform_count,
@@ -1137,11 +1136,6 @@ def register(app):
             ENDOSCOPY_TRANSLATOR: _translator_state_handlers(sh, ENDOSCOPY_TRANSLATOR),
             ENDOSCOPY_CONFIRM: _confirm_state_handlers(sh, route_sel, route_inp),
             # ── جلسات العلاج (كيماوي/موجّه/مناعي/غسيل كلى) ─────────────────────
-            CHEMO_MODE_CHOICE: [
-                CallbackQueryHandler(_tracked(tp.get('chemo_mode_choice'), CHEMO_MODE_CHOICE), pattern="^chemo_mode:"),
-                CallbackQueryHandler(sh['handle_smart_back_navigation'],   pattern="^nav:back$"),
-                CallbackQueryHandler(sh['handle_smart_cancel_navigation'], pattern="^nav:cancel$"),
-            ],
             CHEMO_CYCLES_TOTAL: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, _tracked(tp.get('chemo_cycles_total'), CHEMO_CYCLES_TOTAL)),
                 CallbackQueryHandler(sh['handle_smart_back_navigation'],   pattern="^nav:back$"),

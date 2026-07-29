@@ -49,7 +49,7 @@ def _get_action_routing():
         ADMISSION_REASON, OPERATION_DETAILS_AR, SURGERY_CONSULT_DIAGNOSIS,
         FINAL_CONSULT_DIAGNOSIS, DISCHARGE_TYPE, REHAB_TYPE, RADIOLOGY_TYPE,
         APP_RESCHEDULE_REASON, RADIATION_THERAPY_TYPE, ENDOSCOPY_COMPLAINT,
-        CHEMO_MODE_CHOICE, TREATMENT_PLAN_SETUP,
+        CHEMO_CYCLES_TOTAL, TREATMENT_PLAN_SETUP,
     )
     
     routing_dict = {
@@ -124,7 +124,7 @@ def _get_action_routing():
             "pre_process": None
         },
         "العلاج الكيماوي": {
-            "state": CHEMO_MODE_CHOICE,
+            "state": CHEMO_CYCLES_TOTAL,
             "flow": start_chemo_flow,
             "pre_process": None
         },
