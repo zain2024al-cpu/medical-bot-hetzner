@@ -164,6 +164,18 @@ except ImportError as e:
     handle_radiation_therapy_edit_field_selection = None
     handle_radiation_therapy_edit_field_input = None
 
+try:
+    from .treatment_and_endoscopy_edit import (
+        handle_treatment_endoscopy_edit_field_selection,
+        handle_treatment_endoscopy_edit_field_input,
+        TREATMENT_AND_ENDOSCOPY_FLOWS,
+    )
+except ImportError as e:
+    logger.error(f"❌ Cannot import treatment_and_endoscopy_edit: {e}")
+    handle_treatment_endoscopy_edit_field_selection = None
+    handle_treatment_endoscopy_edit_field_input = None
+    TREATMENT_AND_ENDOSCOPY_FLOWS = set()
+
 
 # =============================
 # Field Selection Router
@@ -374,6 +386,14 @@ async def route_edit_field_selection(update: Update, context: ContextTypes.DEFAU
                 return await handle_radiation_therapy_edit_field_selection(update, context)
             else:
                 logger.error("❌ [ROUTER] handle_radiation_therapy_edit_field_selection غير متوفر")
+                await query.edit_message_text("❌ **خطأ**\n\nمعالج التعديل غير متوفر.")
+                return ConversationHandler.END
+        elif flow_type in TREATMENT_AND_ENDOSCOPY_FLOWS:
+            # ✅ جلسات العلاج/الأورام (كيماوي/موجّه/مناعي/غسيل الكلى/المدمج) والمناظير
+            if handle_treatment_endoscopy_edit_field_selection:
+                return await handle_treatment_endoscopy_edit_field_selection(update, context)
+            else:
+                logger.error("❌ [ROUTER] handle_treatment_endoscopy_edit_field_selection غير متوفر")
                 await query.edit_message_text("❌ **خطأ**\n\nمعالج التعديل غير متوفر.")
                 return ConversationHandler.END
         else:
@@ -621,6 +641,13 @@ async def route_edit_field_input(update: Update, context: ContextTypes.DEFAULT_T
                 return await handle_radiation_therapy_edit_field_input(update, context)
             else:
                 logger.error("❌ [ROUTER] handle_radiation_therapy_edit_field_input غير متوفر")
+                return ConversationHandler.END
+        elif flow_type in TREATMENT_AND_ENDOSCOPY_FLOWS:
+            # ✅ جلسات العلاج/الأورام (كيماوي/موجّه/مناعي/غسيل الكلى/المدمج) والمناظير
+            if handle_treatment_endoscopy_edit_field_input:
+                return await handle_treatment_endoscopy_edit_field_input(update, context)
+            else:
+                logger.error("❌ [ROUTER] handle_treatment_endoscopy_edit_field_input غير متوفر")
                 return ConversationHandler.END
         else:
             logger.warning(f"⚠️ [ROUTER] flow_type={flow_type} غير معروف - تجاهل")

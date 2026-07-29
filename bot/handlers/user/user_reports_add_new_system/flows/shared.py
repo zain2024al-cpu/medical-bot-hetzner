@@ -408,6 +408,17 @@ def get_editable_fields_by_flow_type(flow_type):
             ("no_report_reason", "📋 سبب عدم وجود تقرير طبي"),
             ("translator_name",  "👤 المترجم"),
         ],
+        "endoscopy": [
+            ("complaint_text",   "💬 شكوى المريض"),
+            ("endoscopy_type",   "🔬 نوع المنظار"),
+            ("endoscopy_result", "📋 نتيجة المنظار / خطة الطبيب"),
+            ("notes",            "📝 ملاحظات"),
+            ("followup_date",    "📅 موعد العودة"),
+            ("followup_time",    "⏰ وقت العودة"),
+            ("followup_reason",  "✍️ سبب العودة"),
+            ("no_report_reason", "📋 سبب عدم وجود تقرير طبي"),
+            ("translator_name",  "👤 المترجم"),
+        ],
         "radiation_therapy": [
             ("radiation_therapy_type",           "☢️ نوع الإشعاعي"),
             ("radiation_therapy_session_number", "🔢 رقم الجلسة"),
