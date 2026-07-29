@@ -193,6 +193,9 @@ async def handle_chemo_cycles_uniform_count(update: Update, context: ContextType
         update, context, mode="cycles_uniform",
         total_cycles=total_cycles, sessions_per_cycle=sessions_per_cycle,
     )
+    if data.get("_onc_queue") is not None:
+        from .oncology_multiselect import chemo_committed_in_queue
+        return await chemo_committed_in_queue(update.message, context, plan)
     return await _show_plan_display(update.message, context, plan)
 
 
@@ -225,6 +228,9 @@ async def handle_chemo_cycles_custom_entry(update: Update, context: ContextTypes
         update, context, mode="cycles_custom",
         total_cycles=total, custom_cycle_sessions=data["_chemo_custom_list"],
     )
+    if data.get("_onc_queue") is not None:
+        from .oncology_multiselect import chemo_committed_in_queue
+        return await chemo_committed_in_queue(update.message, context, plan)
     return await _show_plan_display(update.message, context, plan)
 
 

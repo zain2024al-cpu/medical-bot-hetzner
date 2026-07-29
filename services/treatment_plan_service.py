@@ -67,16 +67,18 @@ def create_plan(
     patient_id: int, treatment_key: str, mode: str,
     total_sessions=None, total_cycles=None, sessions_per_cycle=None,
     custom_cycle_sessions=None, created_by=None, created_by_name=None,
+    current_session=None,
 ) -> dict:
-    """ينشئ خطة جديدة، تبدأ مباشرة من الجلسة/الدورة رقم 1 (هذا التقرير
-    الحالي يمثّل أول جلسة في الخطة)."""
+    """ينشئ خطة جديدة. افتراضياً تبدأ من الجلسة رقم 1، لكن يمكن تمرير
+    current_session صراحةً لمرضى بدأوا الجلسات فعلياً قبل إنشاء الخطة في
+    هذا النظام (مثال: المريض بالفعل في جلسته الرابعة عند أول تسجيل)."""
     with SessionLocal() as s:
         plan = TreatmentPlan(
             patient_id=patient_id,
             treatment_key=treatment_key,
             mode=mode,
             total_sessions=total_sessions,
-            current_session=1,
+            current_session=(current_session if current_session is not None else 1),
             total_cycles=total_cycles,
             current_cycle=(1 if mode != "sessions" else None),
             sessions_per_cycle=sessions_per_cycle,

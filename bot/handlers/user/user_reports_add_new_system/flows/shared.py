@@ -468,6 +468,7 @@ def get_translator_state(flow_type):
         "treatment_targeted": TREATMENT_TRANSLATOR,
         "treatment_immuno": TREATMENT_TRANSLATOR,
         "treatment_dialysis": TREATMENT_TRANSLATOR,
+        "treatment_combined": TREATMENT_TRANSLATOR,
     }
     return states.get(flow_type, NEW_CONSULT_TRANSLATOR)
 
@@ -496,6 +497,7 @@ def get_confirm_state(flow_type):
         "treatment_targeted": TREATMENT_CONFIRM,
         "treatment_immuno": TREATMENT_CONFIRM,
         "treatment_dialysis": TREATMENT_CONFIRM,
+        "treatment_combined": TREATMENT_CONFIRM,
     }
     return states.get(flow_type, NEW_CONSULT_CONFIRM)
 
@@ -1689,7 +1691,7 @@ async def handle_final_confirm(update: Update, context: ContextTypes.DEFAULT_TYP
     valid_flow_types = ["new_consult", "followup", "emergency", "admission", "surgery_consult",
                          "operation", "final_consult", "discharge", "rehab_physical", "rehab_device", "radiology", "appointment_reschedule",
                          "radiation_therapy", "periodic_followup", "inpatient_followup", "device", "endoscopy",
-                         "treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis"]
+                         "treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis", "treatment_combined"]
 
     logger.info(f"🔍 [HANDLE_FINAL_CONFIRM] report_tmp current_flow: {current_flow}")
     logger.info(f"🔍 [HANDLE_FINAL_CONFIRM] report_tmp medical_action: {data.get('medical_action', '')}")
@@ -1796,7 +1798,7 @@ async def save_report_to_database(query, context, flow_type):
     valid_flow_types = ["new_consult", "followup", "emergency", "admission", "surgery_consult",
                          "operation", "final_consult", "discharge", "rehab_physical", "rehab_device", "radiology", "appointment_reschedule",
                          "radiation_therapy", "periodic_followup", "inpatient_followup", "device", "endoscopy",
-                         "treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis"]
+                         "treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis", "treatment_combined"]
 
     # ✅ إصلاح: إذا كان current_flow أكثر تحديداً (مثل periodic_followup بدلاً من followup)، استخدمه
     # المسارات الأكثر تحديداً لها الأولوية
@@ -2044,7 +2046,7 @@ async def save_report_to_database(query, context, flow_type):
                 decision_text += f"\n\nتاريخ العودة الجديد: {date_str}"
             if app_reschedule_return_reason:
                 decision_text += f"\n\nسبب العودة: {app_reschedule_return_reason}"
-        elif flow_type in ("treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis"):
+        elif flow_type in ("treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis", "treatment_combined"):
             # ✅ شكوى المريض (حقل جديد أُضيف لمسار الجلسات) — تقدُّم الخطة
             # نفسه يُعرض عبر treatment_plan_summary المخزَّن بشكل منفصل، فلا
             # داعي لتكراره هنا في decision_text.
@@ -2481,6 +2483,7 @@ async def save_report_to_database(query, context, flow_type):
                 'department_name': final_dept_name,
                 'doctor_name': doctor_name or 'لم يتم التحديد',
                 'medical_action': final_medical_action,
+                'current_flow': flow_type,
                 'complaint_text': complaint_text,
                 'doctor_decision': decision_text,
                 'followup_date': followup_display,
@@ -2684,7 +2687,7 @@ async def save_report_to_database(query, context, flow_type):
             # كانت تظهر فارغة (بلا خطة علاجية ولا ملاحظات) رغم حفظها بشكل
             # صحيح في قاعدة البيانات، لأن هذا القاموس يُبنى يدوياً حقلاً حقلاً
             # ولا يرث القيم تلقائياً من data.
-            if flow_type in ("treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis"):
+            if flow_type in ("treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis", "treatment_combined"):
                 plan_summary = data.get('treatment_plan_summary', '')
                 if not plan_summary:
                     report_tmp = context.user_data.get("report_tmp", {})
@@ -3150,7 +3153,7 @@ async def handle_translator_page_navigation(update: Update, context: ContextType
             "emergency", "admission", "surgery_consult", "operation", "final_consult",
             "discharge", "rehab_physical", "rehab_device", "device",
             "radiology", "appointment_reschedule", "radiation_therapy", "endoscopy",
-            "treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis",
+            "treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis", "treatment_combined",
         ]
         current_flow = context.user_data.get("report_tmp", {}).get("current_flow", "")
         more_specific = {"followup": ["periodic_followup", "inpatient_followup"]}

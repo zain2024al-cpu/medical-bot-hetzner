@@ -134,6 +134,9 @@ KNOWN_CALLBACKS = [
     r"^cancel_hospital_input$",
     r"^detect_dup_translators$",
     r"^dup_del_trans:\d+$",
+    r"^onc_toggle:",
+    r"^onc_next$",
+    r"^onc_delivery:",
 
     # ===========================
     # نظام تعديل وحذف التقارير للمستخدمين

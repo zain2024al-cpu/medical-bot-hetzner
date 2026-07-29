@@ -70,6 +70,8 @@ from .states import (
     TREATMENT_FOLLOWUP_REASON, TREATMENT_TRANSLATOR, TREATMENT_CONFIRM,
     CHEMO_CYCLES_TOTAL, CHEMO_CYCLES_UNIFORM_CHOICE,
     CHEMO_CYCLES_UNIFORM_COUNT, CHEMO_CYCLES_CUSTOM_ENTRY,
+    ONCOLOGY_QUEUE_TOTAL, ONCOLOGY_QUEUE_CURRENT,
+    ONCOLOGY_DELIVERY_MODE, ONCOLOGY_DELIVERY_DAYS,
 )
 
 # =============================
@@ -374,6 +376,27 @@ def _treatment_handlers():
         return {}
 
 
+def _oncology_handlers():
+    """Import and return oncology_multiselect flow handlers by name."""
+    try:
+        from bot.handlers.user.user_reports_add_new_system.flows.oncology_multiselect import (
+            handle_onc_toggle, handle_onc_next,
+            handle_oncology_queue_total, handle_oncology_queue_current,
+            handle_oncology_delivery_mode, handle_oncology_delivery_days,
+        )
+        return {
+            'onc_toggle':          handle_onc_toggle,
+            'onc_next':            handle_onc_next,
+            'queue_total':         handle_oncology_queue_total,
+            'queue_current':       handle_oncology_queue_current,
+            'delivery_mode':       handle_oncology_delivery_mode,
+            'delivery_days':       handle_oncology_delivery_days,
+        }
+    except ImportError as e:
+        logger.error(f"❌ Cannot import oncology_multiselect handlers: {e}")
+        return {}
+
+
 # =============================
 # Governed register()
 # =============================
@@ -446,6 +469,7 @@ def register(app):
 
     # --- Treatment sessions handlers (chemo/targeted/immuno/dialysis) ---
     tp = _treatment_handlers()
+    onc = _oncology_handlers()
 
     # --- Flow handlers — direct imports from package (no monolith dependency) ---
     from .flows.new_consult import (
@@ -670,6 +694,8 @@ def register(app):
                 CallbackQueryHandler(sh['handle_calendar_cancel'],                              pattern="^nav:cancel$"),
                 CallbackQueryHandler(_tracked(handle_action_type_choice, R_ACTION_TYPE),        pattern="^action_idx:"),
                 CallbackQueryHandler(_tracked(handle_action_category, R_ACTION_TYPE),           pattern="^action_cat:"),
+                CallbackQueryHandler(_tracked(onc.get('onc_toggle'), R_ACTION_TYPE),            pattern="^onc_toggle:"),
+                CallbackQueryHandler(_tracked(onc.get('onc_next'), R_ACTION_TYPE),              pattern="^onc_next$"),
                 CallbackQueryHandler(handle_noop,                                               pattern="^noop$"),
                 CallbackQueryHandler(_tracked(handle_go_to_state, R_ACTION_TYPE),              pattern="^go_to_search_doctor_screen$"),
                 CallbackQueryHandler(sh['handle_smart_back_navigation'],                        pattern="^nav:back$"),
@@ -1197,6 +1223,23 @@ def register(app):
             ],
             TREATMENT_TRANSLATOR: _translator_state_handlers(sh, TREATMENT_TRANSLATOR),
             TREATMENT_CONFIRM: _confirm_state_handlers(sh, route_sel, route_inp),
+            # ── جلسات الأورام: اختيار متعدد (طابور المعالجة لكل نوع) ────────────
+            ONCOLOGY_QUEUE_TOTAL: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, _tracked(onc.get('queue_total'), ONCOLOGY_QUEUE_TOTAL)),
+                CallbackQueryHandler(sh['handle_smart_back_navigation'],   pattern="^nav:back$"),
+                CallbackQueryHandler(sh['handle_smart_cancel_navigation'], pattern="^nav:cancel$"),
+            ],
+            ONCOLOGY_QUEUE_CURRENT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, _tracked(onc.get('queue_current'), ONCOLOGY_QUEUE_CURRENT)),
+                CallbackQueryHandler(sh['handle_smart_back_navigation'],   pattern="^nav:back$"),
+                CallbackQueryHandler(sh['handle_smart_cancel_navigation'], pattern="^nav:cancel$"),
+            ],
+            ONCOLOGY_DELIVERY_MODE: [
+                CallbackQueryHandler(_tracked(onc.get('delivery_mode'), ONCOLOGY_DELIVERY_MODE), pattern="^onc_delivery:"),
+            ],
+            ONCOLOGY_DELIVERY_DAYS: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, _tracked(onc.get('delivery_days'), ONCOLOGY_DELIVERY_DAYS)),
+            ],
             # ── EDIT_FIELD (generic) ───────────────────────────────────────────
             "EDIT_FIELD": [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, sh['handle_edit_field_input']),

@@ -833,7 +833,19 @@ def format_report_message(data: dict) -> str:
             lines.append(f"👨‍⚕️ المترجم: {data['translator_name']}")
         return "\n".join(lines)
 
-    elif medical_action in ('العلاج الكيماوي', 'العلاج الموجه', 'العلاج المناعي', 'جلسات غسيل الكلى'):
+    elif (
+        medical_action in ('العلاج الكيماوي', 'العلاج الموجه', 'العلاج المناعي', 'جلسات غسيل الكلى')
+        or data.get('current_flow') == 'treatment_combined'
+        # ✅ نوع إجراء مدمج (اختيار متعدد لجلسات الأورام) — نص مركّب مثل
+        # "العلاج الكيماوي + جلسة إشعاعي" لا يطابق أياً من القيم أعلاه
+        # تماماً، فنتحقق من احتوائه على أي من التسميات المعروفة كنص فرعي.
+        # هذا يغطي أيضاً مسار إعادة النشر بعد التعديل حيث current_flow
+        # غير محفوظ في قاعدة البيانات (medical_action وحده متاح هناك).
+        or (medical_action and ' + ' in medical_action and any(
+            lbl in medical_action for lbl in
+            ('العلاج الكيماوي', 'العلاج الموجه', 'العلاج المناعي', 'جلسات غسيل الكلى', 'جلسة إشعاعي')
+        ))
+    ):
         lines.extend(_build_treatment_session_fields(data))
         lines.append("")
         lines.append("━━━━━━━━━━━━━━━━━━━━")

@@ -175,12 +175,8 @@ TREATMENT_SESSIONS_KEY = "treatment"
 TREATMENT_SESSIONS_LABEL = "💉 الجلسات"
 ONCOLOGY_KEY = "oncology"
 ONCOLOGY_LABEL = "🎗️ جلسات الأورام"
-ONCOLOGY_SUBS = [
-    ("جلسة إشعاعي",       "☢️", "العلاج الإشعاعي"),
-    ("العلاج الكيماوي",    "💉", "العلاج الكيماوي"),
-    ("العلاج الموجه",      "🎯", "العلاج الموجه"),
-    ("العلاج المناعي",     "🧬", "العلاج المناعي"),
-]
+# ملاحظة: قائمة الأنواع الفعلية (كيماوي/مناعي/موجّه/إشعاعي) أصبحت اختيارية
+# متعددة (checkbox) — انظر flows/oncology_multiselect.py.
 DIALYSIS_LEAF = ("جلسات غسيل الكلى", "🩸", "جلسات غسيل الكلى")
 
 # الأزرار التي تبقى مباشرة في القائمة الرئيسية (غير مصنّفة ضمن قائمة فرعية).
@@ -292,13 +288,6 @@ def _build_treatment_sessions_menu():
     return text, InlineKeyboardMarkup(keyboard), 1
 
 
-def _build_oncology_submenu():
-    """المستوى الثاني: أنواع علاج الأورام الأربعة."""
-    keyboard = _build_leaves_keyboard(ONCOLOGY_SUBS, back_target=TREATMENT_SESSIONS_KEY)
-    text = f"⚕️ **{ONCOLOGY_LABEL}**\n\nاختر نوع الإجراء:"
-    return text, InlineKeyboardMarkup(keyboard), 1
-
-
 async def handle_action_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """توسيع/طي تصنيفات نوع الإجراء — تنظيم بصري فقط (بلا أي تغيير في المنطق)."""
     query = update.callback_query
@@ -312,7 +301,8 @@ async def handle_action_category(update: Update, context: ContextTypes.DEFAULT_T
     elif cat_key == TREATMENT_SESSIONS_KEY:
         text, keyboard, _ = _build_treatment_sessions_menu()
     elif cat_key == ONCOLOGY_KEY:
-        text, keyboard, _ = _build_oncology_submenu()
+        from .flows.oncology_multiselect import build_oncology_multiselect_screen
+        text, keyboard = build_oncology_multiselect_screen(context)
     else:
         text, keyboard, _ = _build_category_submenu(cat_key)
     try:
