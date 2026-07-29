@@ -159,6 +159,7 @@ async def handle_chemo_cycles_uniform_choice(update: Update, context: ContextTyp
         await query.edit_message_text(
             "✅ **نعم — نفس العدد لكل الدورات**\n\n"
             "📊 **كم عدد الجلسات في كل دورة؟**\n\nمثال: 3",
+            reply_markup=_nav_buttons(show_back=True),
             parse_mode="Markdown",
         )
         return CHEMO_CYCLES_UNIFORM_COUNT
@@ -170,6 +171,7 @@ async def handle_chemo_cycles_uniform_choice(update: Update, context: ContextTyp
     await query.edit_message_text(
         f"✏️ **إدخال مستقل لكل دورة**\n\n"
         f"📊 **كم عدد الجلسات في الدورة رقم 1 من {total}؟**",
+        reply_markup=_nav_buttons(show_back=True),
         parse_mode="Markdown",
     )
     return CHEMO_CYCLES_CUSTOM_ENTRY

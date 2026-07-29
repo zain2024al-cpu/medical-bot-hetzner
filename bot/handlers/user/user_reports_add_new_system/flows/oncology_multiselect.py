@@ -281,7 +281,10 @@ async def handle_oncology_delivery_mode(update: Update, context: ContextTypes.DE
         return await _advance_queue_after_delivery(query.message, context)
 
     try:
-        await query.edit_message_text("🛏️ رقود — كم عدد الأيام المتوقعة؟")
+        await query.edit_message_text(
+            "🛏️ رقود — كم عدد الأيام المتوقعة؟",
+            reply_markup=_nav_buttons(show_back=True),
+        )
     except Exception:
         pass
     return ONCOLOGY_DELIVERY_DAYS

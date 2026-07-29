@@ -1239,6 +1239,8 @@ def register(app):
             ],
             ONCOLOGY_DELIVERY_DAYS: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, _tracked(onc.get('delivery_days'), ONCOLOGY_DELIVERY_DAYS)),
+                CallbackQueryHandler(sh['handle_smart_back_navigation'],   pattern="^nav:back$"),
+                CallbackQueryHandler(sh['handle_smart_cancel_navigation'], pattern="^nav:cancel$"),
             ],
             # ── EDIT_FIELD (generic) ───────────────────────────────────────────
             "EDIT_FIELD": [

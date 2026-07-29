@@ -41,6 +41,12 @@ from .states import (
     RADIOLOGY_TYPE, RADIOLOGY_DELIVERY_DATE, RADIOLOGY_TRANSLATOR, RADIOLOGY_CONFIRM,
     APP_RESCHEDULE_REASON, APP_RESCHEDULE_RETURN_DATE, APP_RESCHEDULE_RETURN_REASON,
     APP_RESCHEDULE_TRANSLATOR, APP_RESCHEDULE_CONFIRM,
+    CHEMO_CYCLES_TOTAL, CHEMO_CYCLES_UNIFORM_CHOICE, CHEMO_CYCLES_UNIFORM_COUNT,
+    CHEMO_CYCLES_CUSTOM_ENTRY, TREATMENT_PLAN_SETUP, TREATMENT_PLAN_DISPLAY,
+    TREATMENT_PLAN_EDIT_VALUE, TREATMENT_PLAN_EDIT_REASON, TREATMENT_PLAN_MANUAL_SESSION,
+    TREATMENT_COMPLAINT, TREATMENT_NOTES, TREATMENT_FOLLOWUP_DATE,
+    TREATMENT_FOLLOWUP_REASON, TREATMENT_TRANSLATOR, TREATMENT_CONFIRM,
+    ONCOLOGY_QUEUE_TOTAL, ONCOLOGY_QUEUE_CURRENT, ONCOLOGY_DELIVERY_DAYS,
 )
 from .utils import _nav_buttons
 from .smart_state_renderer import SmartStateRenderer
@@ -160,6 +166,12 @@ async def execute_smart_state_action(target_step, flow_type, update, context):
         DISCHARGE_CONFIRM: 'CONFIRM',
         PHYSICAL_THERAPY_CONFIRM: 'CONFIRM',
         DEVICE_CONFIRM: 'CONFIRM',
+        TREATMENT_COMPLAINT: 'COMPLAINT',
+        TREATMENT_NOTES: 'NOTES',
+        TREATMENT_FOLLOWUP_DATE: 'FOLLOWUP_DATE_TIME',
+        TREATMENT_FOLLOWUP_REASON: 'FOLLOWUP_REASON',
+        TREATMENT_TRANSLATOR: 'TRANSLATOR',
+        TREATMENT_CONFIRM: 'CONFIRM',
     }
 
     if isinstance(target_step, int):
@@ -596,6 +608,125 @@ async def execute_smart_state_action(target_step, flow_type, update, context):
         elif 'DEVICE_DETAILS' in step_name:
             await update.callback_query.edit_message_text(
                 "🦾 **اسم الجهاز الذي تم توفيره مع التفاصيل**\n\nيرجى إدخال اسم الجهاز والتفاصيل:",
+                reply_markup=_nav_buttons(show_back=True),
+                parse_mode="Markdown"
+            )
+            return target_step
+
+        elif target_step == CHEMO_CYCLES_TOTAL:
+            await update.callback_query.edit_message_text(
+                "💉 **الكيماوي**\n\n🔄 **كم عدد الدورات العلاجية؟**\n\nمثال: 6",
+                reply_markup=_nav_buttons(show_back=True),
+                parse_mode="Markdown"
+            )
+            return target_step
+
+        elif target_step == CHEMO_CYCLES_UNIFORM_CHOICE:
+            await update.callback_query.edit_message_text(
+                "✅ تم الحفظ\n\n❓ **هل جميع الدورات تحتوي على نفس عدد الجلسات؟**",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("✅ نعم", callback_data="chemo_uniform:yes"),
+                     InlineKeyboardButton("✏️ لا", callback_data="chemo_uniform:no")],
+                    [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
+                     InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")],
+                ]),
+                parse_mode="Markdown"
+            )
+            return target_step
+
+        elif target_step == CHEMO_CYCLES_UNIFORM_COUNT:
+            await update.callback_query.edit_message_text(
+                "📊 **كم عدد الجلسات في كل دورة؟**\n\nمثال: 3",
+                reply_markup=_nav_buttons(show_back=True),
+                parse_mode="Markdown"
+            )
+            return target_step
+
+        elif target_step == CHEMO_CYCLES_CUSTOM_ENTRY:
+            rt = context.user_data.get("report_tmp", {})
+            idx = rt.get("_chemo_custom_index", 1)
+            total = rt.get("_chemo_total_cycles", 1)
+            await update.callback_query.edit_message_text(
+                f"✏️ **إدخال مستقل لكل دورة**\n\n📊 **كم عدد الجلسات في الدورة رقم {idx} من {total}؟**",
+                reply_markup=_nav_buttons(show_back=True),
+                parse_mode="Markdown"
+            )
+            return target_step
+
+        elif target_step == TREATMENT_PLAN_SETUP:
+            rt = context.user_data.get("report_tmp", {})
+            treatment_key = rt.get("_treatment_key", "")
+            label = {"targeted": "🎯 الموجّه", "immuno": "🧬 المناعي", "dialysis": "🩸 غسيل الكلى"}.get(treatment_key, "💉 الجلسات")
+            await update.callback_query.edit_message_text(
+                f"{label}\n\n📊 **كم عدد الجلسات الكلي؟**\n\nأدخل رقماً (مثال: 12):",
+                reply_markup=_nav_buttons(show_back=True),
+                parse_mode="Markdown"
+            )
+            return target_step
+
+        elif target_step == TREATMENT_PLAN_DISPLAY:
+            rt = context.user_data.get("report_tmp", {})
+            summary = rt.get("treatment_plan_summary", "")
+            await update.callback_query.edit_message_text(
+                summary or "📋 **الخطة العلاجية**",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("✅ متابعة", callback_data="tp_display:continue"),
+                     InlineKeyboardButton("✏️ تعديل الخطة", callback_data="tp_display:edit")],
+                    [InlineKeyboardButton("🔢 إدخال رقم الجلسة الحالية", callback_data="tp_display:manual")],
+                ]),
+                parse_mode="Markdown"
+            )
+            return target_step
+
+        elif target_step == TREATMENT_PLAN_EDIT_VALUE:
+            await update.callback_query.edit_message_text(
+                "✏️ **تعديل الخطة**\n\n📊 **العدد الكلي الجديد للجلسات؟**",
+                reply_markup=_nav_buttons(show_back=True),
+                parse_mode="Markdown"
+            )
+            return target_step
+
+        elif target_step == TREATMENT_PLAN_EDIT_REASON:
+            await update.callback_query.edit_message_text(
+                "✅ تم الحفظ\n\n✍️ **سبب التعديل** (اختياري)\n\nاكتب السبب، أو اضغط الزر أدناه للتخطي:",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("⏭️ بدون سبب", callback_data="tp_edit_reason_skip")],
+                ]),
+                parse_mode="Markdown"
+            )
+            return target_step
+
+        elif target_step == TREATMENT_PLAN_MANUAL_SESSION:
+            await update.callback_query.edit_message_text(
+                "🔢 **إدخال رقم الجلسة الحالية**\n\nأدخل رقم الجلسة الحالية (مثال: 5):",
+                reply_markup=_nav_buttons(show_back=True),
+                parse_mode="Markdown"
+            )
+            return target_step
+
+        elif target_step == ONCOLOGY_QUEUE_TOTAL:
+            from .flows.oncology_multiselect import _QUEUE_TOTAL_PROMPTS
+            rt = context.user_data.get("report_tmp", {})
+            key = rt.get("_onc_current_type", "immuno")
+            prompt = _QUEUE_TOTAL_PROMPTS.get(key, "📊 **كم عدد الجلسات الكلي؟**")
+            await update.callback_query.edit_message_text(
+                prompt,
+                reply_markup=_nav_buttons(show_back=True),
+                parse_mode="Markdown"
+            )
+            return target_step
+
+        elif target_step == ONCOLOGY_QUEUE_CURRENT:
+            await update.callback_query.edit_message_text(
+                "🔢 **رقم الجلسة الحالية؟**\n\n(إن كانت هذه أول جلسة أدخل 1)",
+                reply_markup=_nav_buttons(show_back=True),
+                parse_mode="Markdown"
+            )
+            return target_step
+
+        elif target_step == ONCOLOGY_DELIVERY_DAYS:
+            await update.callback_query.edit_message_text(
+                "🛏️ رقود — كم عدد الأيام المتوقعة؟",
                 reply_markup=_nav_buttons(show_back=True),
                 parse_mode="Markdown"
             )
