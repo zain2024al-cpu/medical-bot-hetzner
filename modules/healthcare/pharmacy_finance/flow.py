@@ -23,6 +23,7 @@ from modules.healthcare.pharmacy_finance.views import (
     build_invoice_number_prompt, build_expense_item_prompt,
     build_invoice_total_prompt, build_manifest_type_prompt,
     build_review, build_success, build_cancelled, build_error,
+    build_delete_confirm, build_deleted,
 )
 
 logger = logging.getLogger(__name__)
@@ -373,6 +374,61 @@ async def _handle_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     await _edit_or_reply(update, *build_success(saved["net_amount"], patient_name))
 
 
+async def _handle_delete_ask(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """يعرض شاشة تأكيد حذف الفاتورة (لا يحذف شيئاً بعد)."""
+    session = PharmacyFinanceSession.load(context.user_data)
+    if session is None or not session.existing_financial_id:
+        await _edit_or_reply(update, *build_error("لا توجد فاتورة محفوظة لحذفها."))
+        return
+    await _edit_or_reply(update, *build_delete_confirm(session))
+
+
+async def _handle_delete_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """ينفّذ الحذف الناعم بعد التأكيد."""
+    from modules.healthcare.pharmacy_finance.models import delete_financial_record
+
+    session = PharmacyFinanceSession.load(context.user_data)
+    if session is None or not session.existing_financial_id:
+        await _edit_or_reply(update, *build_error("لا توجد فاتورة محفوظة لحذفها."))
+        return
+
+    user = update.effective_user
+    # ✅ حارس ملكية: نفس قاعدة الفتح/التعديل — غير الأدمن لا يحذف فاتورة غيره.
+    if not (user and is_admin(user.id)):
+        from modules.healthcare.pharmacy_finance.models import get_financial_record
+        existing = get_financial_record(session.source_type, session.source_record_id)
+        owner = (existing or {}).get("created_by")
+        if owner is not None and user and owner != user.id:
+            await _edit_or_reply(update, *build_error("هذا التقرير المالي يخص مستخداً آخر."))
+            return
+
+    try:
+        ok = delete_financial_record(
+            session.existing_financial_id, deleted_by=user.id if user else None
+        )
+    except Exception as exc:
+        logger.error(f"[pharmacy_finance] delete failed: {exc}", exc_info=True)
+        await _edit_or_reply(update, *build_error("فشل حذف الفاتورة."))
+        return
+
+    if not ok:
+        await _edit_or_reply(update, *build_error("الفاتورة غير موجودة أو محذوفة مسبقاً."))
+        return
+
+    patient_name = session.patient_name
+    PharmacyFinanceSession.clear(context.user_data)
+    await _edit_or_reply(update, *build_deleted(patient_name))
+
+
+async def _handle_delete_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """تراجع عن الحذف — العودة لشاشة المراجعة كما كانت."""
+    session = PharmacyFinanceSession.load(context.user_data)
+    if session is None:
+        await _show_list(update, context, page=0)
+        return
+    await _edit_or_reply(update, *build_review(session))
+
+
 async def _handle_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     PharmacyFinanceSession.clear(context.user_data)
     await _edit_or_reply(update, *build_cancelled())
@@ -406,6 +462,16 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return
     if action == "confirm":
         await _handle_confirm(update, context)
+        return
+    # ✅ حذف الفاتورة — تأكيد ثم تنفيذ (حذف ناعم: تختفي من المسير)
+    if action == "delete_ask":
+        await _handle_delete_ask(update, context)
+        return
+    if action == "delete_yes":
+        await _handle_delete_confirm(update, context)
+        return
+    if action == "delete_no":
+        await _handle_delete_cancel(update, context)
         return
     if action == "page":
         page = int(parts[2]) if len(parts) > 2 else 0

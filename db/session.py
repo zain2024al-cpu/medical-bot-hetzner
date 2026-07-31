@@ -214,6 +214,13 @@ def _ensure_schema_compatibility(target_engine=None) -> None:
                 _add_column_if_missing(conn, "gs_arrival_companions", ac_cols, "escort_entity",       "VARCHAR(255)")
                 _add_column_if_missing(conn, "gs_arrival_companions", ac_cols, "residence_address",   "TEXT")
 
+            # ── Phase 1e: pharmacy financial records — حذف ناعم للفاتورة ──────
+            if _table_exists(conn, "pharmacy_financial_records"):
+                pfr_cols = _table_columns(conn, "pharmacy_financial_records")
+                _add_column_if_missing(conn, "pharmacy_financial_records", pfr_cols, "is_deleted", "BOOLEAN DEFAULT 0")
+                _add_column_if_missing(conn, "pharmacy_financial_records", pfr_cols, "deleted_by", "INTEGER")
+                _add_column_if_missing(conn, "pharmacy_financial_records", pfr_cols, "deleted_at", "DATETIME")
+
             # ── Phase 2: translator link (optional) ───────────────────────────
             # This block is entirely optional — it only runs when the legacy
             # `translators` directory table is present.  Nothing above depends on it.

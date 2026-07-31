@@ -91,6 +91,10 @@ def _get_evacuation_ledger_rows_sync(
             financial_query = s.query(PharmacyFinancialRecord).filter(
                 PharmacyFinancialRecord.source_type.in_({k[0] for k in keys}),
                 PharmacyFinancialRecord.source_record_id.in_({k[1] for k in keys}),
+                # ✅ الفواتير المحذوفة (حذف ناعم) لا تظهر في المسير إطلاقاً.
+                # is_deleted قد تكون NULL في السجلات الأقدم من إضافة العمود.
+                (PharmacyFinancialRecord.is_deleted.is_(None))
+                | (PharmacyFinancialRecord.is_deleted == False),  # noqa: E712
             )
             if manifest_type:
                 # ✅ السجلات القديمة (قبل إضافة هذا التصنيف) لها manifest_type

@@ -186,7 +186,7 @@ def build_review(session: PharmacyFinanceSession) -> tuple[str, InlineKeyboardMa
         "",
         "هل تريد الحفظ؟",
     ]
-    kb = InlineKeyboardMarkup([
+    rows = [
         [InlineKeyboardButton("💾 حفظ", callback_data=f"{HCPHFIN}:confirm"),
          InlineKeyboardButton("❌ إلغاء", callback_data=f"{HCPHFIN}:cancel")],
         [InlineKeyboardButton("✏️ عدد الأصناف", callback_data=f"{HCPHFIN}:edit_item_count"),
@@ -194,7 +194,47 @@ def build_review(session: PharmacyFinanceSession) -> tuple[str, InlineKeyboardMa
         [InlineKeyboardButton("✏️ بند الصرف", callback_data=f"{HCPHFIN}:edit_expense_item"),
          InlineKeyboardButton("✏️ المبلغ النهائي", callback_data=f"{HCPHFIN}:edit_invoice_total")],
         [InlineKeyboardButton("✏️ نوع المسير", callback_data=f"{HCPHFIN}:edit_manifest_type")],
+    ]
+    # ✅ حذف الفاتورة — يظهر فقط لفاتورة محفوظة فعلاً (وضع التعديل)؛
+    # فاتورة قيد الإدخال لأول مرة يكفيها زر "إلغاء".
+    # (تُبنى الصفوف كقائمة ثم تُمرَّر للـ markup — inline_keyboard في PTB
+    #  عنصر غير قابل للتعديل بعد الإنشاء.)
+    if session.is_edit and session.existing_financial_id:
+        rows.append(
+            [InlineKeyboardButton("🗑️ حذف الفاتورة", callback_data=f"{HCPHFIN}:delete_ask")]
+        )
+    return "\n".join(lines), InlineKeyboardMarkup(rows)
+
+
+def build_delete_confirm(session: PharmacyFinanceSession) -> tuple[str, InlineKeyboardMarkup]:
+    """تأكيد حذف الفاتورة — خطوة إلزامية قبل التنفيذ."""
+    lines = [
+        "🗑️ **تأكيد حذف الفاتورة**", "",
+        *_source_header(session),
+        "─────────────────────",
+        f"🧾 رقم الفاتورة: {session.invoice_number}",
+        f"📋 بند الصرف: {session.expense_item}",
+        f"💵 المبلغ النهائي: {session.net_amount:.2f}",
+        "",
+        "⚠️ بعد الحذف **لن تظهر هذه الفاتورة في مسير الإخلاء عند الطباعة**، "
+        "وتعود الحالة كأنها بلا بيانات مالية (يمكن إدخال فاتورة جديدة لها).",
+        "",
+        "هل أنت متأكد؟",
+    ]
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🗑️ نعم، احذف", callback_data=f"{HCPHFIN}:delete_yes")],
+        [InlineKeyboardButton("🔙 تراجع", callback_data=f"{HCPHFIN}:delete_no")],
     ])
+    return "\n".join(lines), kb
+
+
+def build_deleted(patient_name: str) -> tuple[str, InlineKeyboardMarkup]:
+    lines = [
+        "🗑️ **تم حذف الفاتورة**", "",
+        f"👤 {patient_name}",
+        "لن تظهر في مسير الإخلاء عند الطباعة.",
+    ]
+    kb = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 قائمة أخرى", callback_data=f"{HCPHFIN}:page:0")]])
     return "\n".join(lines), kb
 
 

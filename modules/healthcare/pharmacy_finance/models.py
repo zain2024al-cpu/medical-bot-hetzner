@@ -97,6 +97,10 @@ def list_pharmacy_source_records(
                 .filter(
                     PharmacyFinancialRecord.source_type.in_({k[0] for k in financial_keys}),
                     PharmacyFinancialRecord.source_record_id.in_({k[1] for k in financial_keys}),
+                    # ✅ الفاتورة المحذوفة تختفي من القائمة فتظهر الحالة
+                    # كأنها بلا بيانات مالية (قابلة لإدخال فاتورة جديدة).
+                    (PharmacyFinancialRecord.is_deleted.is_(None))
+                    | (PharmacyFinancialRecord.is_deleted == False),  # noqa: E712
                 )
                 .all()
             )
@@ -154,6 +158,12 @@ def get_financial_record(source_type: str, source_record_id: int) -> dict | None
         r = (
             db.query(PharmacyFinancialRecord)
             .filter_by(source_type=source_type, source_record_id=source_record_id)
+            # ✅ الفاتورة المحذوفة تُعامَل كغير موجودة: تختفي من الشاشة،
+            # ويستطيع المستخدم إدخال فاتورة جديدة لنفس عملية الصرف.
+            .filter(
+                (PharmacyFinancialRecord.is_deleted.is_(None))
+                | (PharmacyFinancialRecord.is_deleted == False)  # noqa: E712
+            )
             .first()
         )
         if not r:
@@ -235,6 +245,39 @@ def save_financial_record(
         "net_amount": net_amount,
         "manifest_type": manifest_type,
     }
+
+
+def delete_financial_record(financial_id: int, deleted_by: int | None = None) -> bool:
+    """حذف ناعم لفاتورة مالية.
+
+    الصف يبقى في القاعدة (بيانات مالية — لا تُمحى فعلياً، تبقى للتدقيق)،
+    لكن يُعلَّم is_deleted=True فتختفي الفاتورة من:
+      • مسير الإخلاء عند الطباعة (المطلوب الأساسي)
+      • قائمة التقارير المالية
+      • شاشة المراجعة (تُعامَل الحالة كأنها بلا بيانات مالية)
+    وبذلك يمكن إدخال فاتورة جديدة لنفس عملية الصرف بعد الحذف.
+
+    يعيد True إن وُجد السجل وحُذف، وFalse إن لم يوجد أو كان محذوفاً أصلاً.
+    """
+    from db.session import get_db
+    from db.models import PharmacyFinancialRecord
+
+    with get_db() as db:
+        record = db.query(PharmacyFinancialRecord).filter_by(id=financial_id).first()
+        if record is None or getattr(record, "is_deleted", False):
+            logger.warning(
+                f"[pharmacy_finance] delete skipped — financial_id={financial_id} "
+                f"غير موجود أو محذوف مسبقاً"
+            )
+            return False
+        record.is_deleted = True
+        record.deleted_by = deleted_by
+        record.deleted_at = datetime.utcnow()
+
+    logger.info(
+        f"[pharmacy_finance] soft-deleted financial record id={financial_id} by={deleted_by}"
+    )
+    return True
 
 
 def update_source_item_count(source_type: str, source_record_id: int, new_item_count: str) -> bool:

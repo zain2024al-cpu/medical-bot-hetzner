@@ -459,6 +459,12 @@ class PharmacyFinancialRecord(Base):
     created_by        = Column(Integer, nullable=True, index=True)
     created_at        = Column(DateTime, default=datetime.utcnow, index=True, nullable=True)
     updated_at        = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
+    # ✅ حذف ناعم للفاتورة: تختفي من مسير الإخلاء عند الطباعة ومن قائمة
+    # التقارير المالية، لكن يبقى صفّها في القاعدة للتدقيق (بيانات مالية
+    # لا تُمحى فعلياً). بعد الحذف يمكن إدخال فاتورة جديدة لنفس عملية الصرف.
+    is_deleted        = Column(Boolean, default=False, nullable=True, index=True)
+    deleted_by        = Column(Integer, nullable=True)
+    deleted_at        = Column(DateTime, nullable=True)
 
     def __repr__(self):
         return f"<PharmacyFinancialRecord(id={self.id}, {self.source_type}#{self.source_record_id}, net={self.net_amount})>"
