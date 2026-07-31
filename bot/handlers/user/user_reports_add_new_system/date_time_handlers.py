@@ -58,6 +58,13 @@ async def start_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not await ensure_approved(update, context):
             return ConversationHandler.END
 
+        # ✅ حارس الوحدة — يُطبَّق فقط على الدخول الاعتيادي (بلا مدينة).
+        # مترجم مُخصَّص لقسم تشناي وحده يجب ألا يفتح التقارير الاعتيادية
+        # (بكل أسماء المرضى) عبر زر قديم باقٍ في لوحته المخزَّنة.
+        if not context.user_data.get("_force_report_city"):
+            if not await _ensure_module(update, context, "user_reports", "قسم التقارير الاعتيادية"):
+                return ConversationHandler.END
+
         # ✅ تهيئة Navigation Stack
         nav_push(context, STATE_SELECT_DATE)
         context.user_data['_conversation_state'] = STATE_SELECT_DATE
@@ -95,12 +102,52 @@ async def start_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
 
 
+async def _ensure_module(update, context, module_key: str, section_label: str) -> bool:
+    """يمنع دخول قسم لا يملك المستخدم وحدته.
+
+    ⚠️ ضروري للعزل: لوحة المفاتيح في تيليجرام تبقى مخزَّنة عند المستخدم
+    حتى تُستبدَل، فمترجم مُنح "🏙️ تقارير تشناي" وحده قد يظل يرى الزر
+    الاعتيادي القديم؛ ضغطه كان يفتح التقارير الاعتيادية بكل أسماء
+    المرضى ويتجاوز العزل تماماً. هنا نرفض الدخول ونُحدِّث لوحته فوراً.
+    """
+    user = update.effective_user
+    if not user:
+        return False
+    try:
+        from bot.shared_auth import is_admin
+        if is_admin(user.id):
+            return True
+        from core.access.access_service import user_has_module
+        if user_has_module(user.id, module_key):
+            return True
+    except Exception as exc:
+        logger.error(f"❌ _ensure_module({module_key}) failed: {exc}", exc_info=True)
+        return True  # لا نمنع المستخدم بسبب خطأ فني
+
+    logger.warning(
+        f"🚫 user={user.id} حاول دخول {section_label!r} بلا وحدة {module_key!r}"
+    )
+    try:
+        from bot.keyboards import dynamic_user_kb
+        await update.message.reply_text(
+            f"🚫 **{section_label} غير متاح لك**\n\n"
+            "تم تحديث أزرارك بالأسفل — استخدم الأزرار الظاهرة الآن.",
+            reply_markup=dynamic_user_kb(user.id),
+            parse_mode="Markdown",
+        )
+    except Exception:
+        pass
+    return False
+
+
 async def start_report_chennai(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """بدء تقرير في قسم "🏙️ تقارير تشناي" — نفس تدفق التقارير حرفياً
     (نفس المستشفيات والأقسام وأنواع الإجراءات)، الفارق الوحيد:
       • قائمة المرضى تعرض مرضى تشناي حصراً.
       • التقرير ومرفقاته الورقية تُنشَر في مجموعة تشناي.
     """
+    if not await _ensure_module(update, context, "chennai_reports", "قسم تقارير تشناي"):
+        return ConversationHandler.END
     context.user_data["_force_report_city"] = "chennai"
     return await start_report(update, context)
 
