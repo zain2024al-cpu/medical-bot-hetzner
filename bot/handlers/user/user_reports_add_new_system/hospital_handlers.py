@@ -14,17 +14,24 @@ from .selector_context import SelectorContext
 
 logger = logging.getLogger(__name__)
 
-# ✅ مستشفيات مثبَّتة في أعلى الصفحة الأولى دائماً — بصرف النظر عن عدد
-# مرات استخدامها. السبب: الترتيب الافتراضي حسب الاستخدام يدفع أي مستشفى
-# جديد (بلا تقارير سابقة) إلى آخر القائمة فيصعب الوصول إليه.
-# المطابقة بجزء من الاسم وبلا حساسية لحالة الأحرف، فتعمل مهما كان الاسم
-# المخزَّن بالضبط ("Rela Hospital, Chennai" / "rela hospital" ...).
-_PINNED_HOSPITAL_KEYWORDS = ("rela",)
+# ✅ مستشفيات مثبَّتة في مرتبة محدَّدة داخل القائمة:
+#   المفتاح = جزء من الاسم (بلا حساسية لحالة الأحرف، فيعمل مهما كان
+#             الاسم المخزَّن بالضبط: "Rela Hospital, Chennai" / "rela ...")
+#   القيمة  = المرتبة المطلوبة (1 = الأول).
+# السبب: الترتيب الافتراضي حسب الاستخدام يدفع أي مستشفى جديد (بلا تقارير
+# سابقة) إلى آخر القائمة فيصعب الوصول إليه.
+# ما عدا المثبَّتة يبقى مرتَّباً حسب الاستخدام تماماً كما كان — الأكثر
+# استخداماً يتصدَّر، ويتزحزح ما بعد مرتبة التثبيت خطوةً واحدة فقط.
+_PINNED_HOSPITAL_POSITIONS = {"rela": 4}
 
 
-def _is_pinned_hospital(name: str) -> bool:
+def _pinned_position(name: str):
+    """المرتبة المطلوبة لهذا المستشفى إن كان مثبَّتاً، وإلا None."""
     low = (name or "").strip().lower()
-    return any(kw in low for kw in _PINNED_HOSPITAL_KEYWORDS)
+    for kw, pos in _PINNED_HOSPITAL_POSITIONS.items():
+        if kw in low:
+            return pos
+    return None
 
 
 def _get_usage_counts() -> dict:
@@ -90,17 +97,25 @@ def get_hospitals_list() -> list:
             seen.add(key)
             unique.append(name)
 
-    # المثبَّتة أولاً، ثم الباقي حسب الاستخدام (تنازلياً) ثم أبجدياً — بقية
-    # القائمة تحتفظ بترتيبها السابق تماماً بلا أي تغيير في السلوك.
+    # ترتيب حسب الاستخدام (تنازلياً) ثم أبجدياً كفاصل — كما كان تماماً،
+    # لكن بعد استبعاد المثبَّتة مؤقتاً.
     usage = _get_usage_counts()
-    unique.sort(key=lambda n: (
-        0 if _is_pinned_hospital(n) else 1,
-        -usage.get(n.strip().lower(), 0),
-        n,
-    ))
+    pinned = [n for n in unique if _pinned_position(n) is not None]
+    others = [n for n in unique if _pinned_position(n) is None]
+    others.sort(key=lambda n: (-usage.get(n.strip().lower(), 0), n))
 
-    logger.info(f"✅ Hospitals sorted (pinned first, then usage): {len(unique)} total")
-    return unique
+    # إدراج كل مثبَّت في مرتبته المطلوبة — تصاعدياً حتى لا تتزحزح مراتب
+    # المثبَّتة اللاحقة بإدراج ما قبلها.
+    ordered = list(others)
+    for name in sorted(pinned, key=lambda n: _pinned_position(n)):
+        idx = max(0, _pinned_position(name) - 1)
+        ordered.insert(min(idx, len(ordered)), name)
+
+    logger.info(
+        f"✅ Hospitals sorted by usage ({len(ordered)} total)"
+        + (f", pinned: {pinned}" if pinned else "")
+    )
+    return ordered
 
 def _build_hospitals_keyboard(page=0, search_query="", context=None):
     """بناء لوحة مفاتيح المستشفيات مع بحث"""
