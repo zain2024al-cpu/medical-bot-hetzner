@@ -52,17 +52,35 @@ def get_user_modules(tg_user_id: int) -> list[str]:
         from db.models import UserModuleAccess, Translator, TranslatorDirectory
 
         with SessionLocal() as s:
-            records = (
+            # ✅ نجلب كل السجلات (النشطة والمُلغاة) لا النشطة فقط.
+            # السبب: الهجرة الكسولة أدناه كانت تُدرِج user_reports لكل من
+            # "لا سجل نشط له"، فتصطدم بقيد UNIQUE(tg_user_id, module_key)
+            # إن وُجد سجل مُلغى لنفس الوحدة ⇒ IntegrityError ⇒ تُرجِع []
+            # فيفقد المستخدم كل أزراره.
+            # وهذا يقع بالضبط في حالة مشروعة: مترجم مخصَّص لقسم واحد (مثل
+            # "🏙️ تقارير تشناي") أُلغيت عنه user_reports عمداً.
+            all_records = (
                 s.query(UserModuleAccess)
-                .filter_by(tg_user_id=tg_user_id, is_active=True)
+                .filter_by(tg_user_id=tg_user_id)
                 .order_by(UserModuleAccess.granted_at)
                 .all()
             )
+            active_records = [r for r in all_records if r.is_active]
 
-            if records:
-                return [r.module_key for r in records]
+            if active_records:
+                return [r.module_key for r in active_records]
 
-            # No records — check if user is an approved platform user.
+            # ✅ توجد سجلات لكنها كلها مُلغاة ⇒ الوصول أُدير صراحةً من الأدمن.
+            # لا نُعيد منح الوحدة الافتراضية تلقائياً — ذلك ينقض قرار الأدمن
+            # ويُعيد للمستخدم قسماً سُحب منه عمداً.
+            if all_records:
+                logger.info(
+                    f"[access] tg_user_id={tg_user_id}: كل سجلات الوصول مُلغاة "
+                    f"— لا هجرة كسولة (قرار أدمن صريح)"
+                )
+                return []
+
+            # لا سجلات إطلاقاً — مستخدم جديد: تحقّق أنه معتمَد ثم امنحه الافتراضي.
             user = s.query(Translator).filter_by(tg_user_id=tg_user_id).first()
             if user and getattr(user, "is_approved", False) and not getattr(user, "is_suspended", False):
                 _insert_access(s, tg_user_id, _DEFAULT_TRANSLATOR_MODULE, granted_by=None)
@@ -234,8 +252,26 @@ def list_user_module_access(tg_user_id: int) -> list[dict]:
 # ── Internal helpers ──────────────────────────────────────────────────────────
 
 def _insert_access(session, tg_user_id: int, module_key: str, granted_by: int | None) -> None:
-    """Insert a new active access record into an open SQLAlchemy session (no commit)."""
+    """Insert (or re-activate) an active access record — no commit.
+
+    ✅ يُعيد تفعيل السجل الموجود بدل الإدراج الأعمى: الجدول عليه قيد
+    UNIQUE(tg_user_id, module_key) يشمل السجلات المُلغاة أيضاً، وكان
+    الإدراج الأعمى يرمي IntegrityError فتفشل العملية المُستدعية كلها.
+    """
     from db.models import UserModuleAccess
+
+    existing = (
+        session.query(UserModuleAccess)
+        .filter_by(tg_user_id=tg_user_id, module_key=module_key)
+        .first()
+    )
+    if existing is not None:
+        existing.is_active = True
+        existing.granted_by = granted_by
+        existing.granted_at = datetime.utcnow()
+        existing.revoked_by = None
+        existing.revoked_at = None
+        return
 
     record = UserModuleAccess(
         tg_user_id=tg_user_id,
