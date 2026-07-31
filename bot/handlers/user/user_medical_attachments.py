@@ -527,6 +527,30 @@ def _persist_ma_sent_files(sent, report_id, uploaded_by, uploaded_by_tg_id, orde
     return saved
 
 
+def _resolve_attachment_group_id(report_id):
+    """مجموعة المرفقات لهذا التقرير — مرضى تشناي لمجموعتهم الخاصة.
+
+    يُشتق من نوع مريض التقرير نفسه (لا من جلسة المستخدم)، فيبقى صحيحاً
+    مهما تأخّر رفع المرفق الورقي عن وقت نشر التقرير.
+    """
+    if not report_id:
+        return None
+    try:
+        from db.session import SessionLocal
+        from db.models import Report, Patient
+        from config.settings import CHENNAI_REPORTS_GROUP_ID
+        with SessionLocal() as s:
+            rep = s.query(Report).filter_by(id=report_id).first()
+            if not rep or not rep.patient_id:
+                return None
+            pat = s.query(Patient).filter_by(id=rep.patient_id).first()
+            if pat is not None and (getattr(pat, "patient_type", None) or "") == "chennai":
+                return CHENNAI_REPORTS_GROUP_ID or None
+    except Exception as exc:
+        logger.warning(f"⚠️ _resolve_attachment_group_id({report_id}) failed: {exc}")
+    return None
+
+
 async def _publish_attachments(query, context, complete_all: bool = False):
     ma = context.user_data.get("ma_state", {})
     ma["complete_all"] = complete_all  # يُستخدم لو فشل النشر وأعاد المستخدم المحاولة
@@ -538,7 +562,12 @@ async def _publish_attachments(query, context, complete_all: bool = False):
         return
 
     bot = context.bot
-    group_id = MEDICAL_REPORTS_GROUP_ID or REPORTS_GROUP_ID
+    # ✅ الأقسام المنفصلة (تشناي) تنزل مرفقاتها الورقية في مجموعتها الخاصة
+    group_id = (
+        _resolve_attachment_group_id(report.get("id"))
+        or MEDICAL_REPORTS_GROUP_ID
+        or REPORTS_GROUP_ID
+    )
 
     if not group_id:
         await query.edit_message_text("❌ معرف المجموعة غير مضبوط في الإعدادات.")

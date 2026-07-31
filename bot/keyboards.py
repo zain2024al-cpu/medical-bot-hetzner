@@ -58,11 +58,20 @@ def dynamic_user_kb(tg_user_id: int) -> ReplyKeyboardMarkup:
 
         modules = get_user_modules(tg_user_id)
         rows: list[list[str]] = []
+        # ✅ إزالة تكرار الأزرار عبر الوحدات: وحدات تشترك في أزرار عامة
+        # (تعديل/حذف التقارير، المرفقات الطبية، جدول اليوم، ابدأ) — مثل
+        # user_reports و chennai_reports — فمن يملك الاثنين كان سيرى كل زر
+        # مشترك مرتين. نُبقي أول ظهور فقط، ونحذف الصف إن فرغ تماماً.
+        seen: set[str] = set()
         for module_key in modules:
             reg = registry.get(module_key)
             if reg and reg.keyboard_rows:
                 for row in reg.keyboard_rows:
-                    rows.append(list(row))
+                    deduped = [b for b in row if b not in seen]
+                    if not deduped:
+                        continue
+                    seen.update(deduped)
+                    rows.append(deduped)
 
         if not rows:
             return user_main_kb()
