@@ -134,6 +134,64 @@ def test_editable_fields_mapping():
 
     return all_passed
 
+# ===========================================================================
+# ✅ doctor_decision عمود «مركّب»: يخزّن عدة حقول في نص واحد مفصولة بـ\n\n
+#    (التشخيص / قرار الطبيب / الفحوصات المطلوبة / وضع الحالة / ملاحظات
+#    الرقود / نوع الترقيد / التوصيات الطبية ...) لأن بعضها بلا أعمدة مخصصة
+#    في جدول Report إطلاقاً.
+#    شاشة التعديل بعد النشر تعرضه كحقل نصّي واحد باسم «📝 قرار الطبيب»،
+#    وكانت الكتابة تتم فوق النص كاملاً (setattr) — فتُمحى كل المقاطع
+#    الأخرى نهائياً، ثم يفشل استخراجها في handle_republish فتختفي من
+#    البطاقة المعاد نشرها. الدالة أدناه تستبدل مقطع «قرار الطبيب» فقط.
+# ===========================================================================
+_COMPOSITE_DECISION_ACTIONS = {
+    'استشارة جديدة', 'طوارئ', 'متابعة', 'متابعة في الرقود',
+    'مراجعة / عودة دورية', 'استشارة أخيرة',
+}
+
+# بدايات المقاطع المعروفة داخل doctor_decision — تُستخدَم لتمييز النص
+# المركّب عن نص حر بسيط عند إعادة الاستخراج.
+_DECISION_SEGMENT_PREFIXES = (
+    'التشخيص:', 'التشخيص النهائي:', 'قرار الطبيب:', 'الفحوصات المطلوبة:',
+    'وضع الحالة:', 'ملاحظات الرقود:', 'نوع الترقيد:', 'التوصيات الطبية:',
+    'تفاصيل العملية:', 'ملخص الرقود:', 'سبب الرقود:', 'رقم الغرفة:',
+    'تفاصيل الجلسة:', 'تفاصيل جلسة العلاج الطبيعي:', 'تفاصيل الجهاز:',
+    'نوع الإشعاعي:', 'سبب تأجيل الموعد:',
+)
+
+
+def _replace_decision_segment(existing_decision, new_decision):
+    """يستبدل مقطع «قرار الطبيب:» داخل doctor_decision المركّب مع الحفاظ
+    الكامل على بقية المقاطع (التشخيص/الفحوصات/وضع الحالة/ملاحظات الرقود...).
+
+    إن لم يوجد المقطع (تقرير قديم أو نص حر) يُضاف بعلامته الصحيحة حتى
+    ينجح استخراجه في أي إعادة نشر لاحقة.
+    """
+    existing = (existing_decision or '').strip()
+    new_decision = (new_decision or '').strip()
+    if not existing:
+        return f"قرار الطبيب: {new_decision}"
+
+    segments = existing.split('\n\n')
+    rebuilt = []
+    replaced = False
+    for seg in segments:
+        if seg.strip().startswith('قرار الطبيب:'):
+            rebuilt.append(f"قرار الطبيب: {new_decision}")
+            replaced = True
+        else:
+            rebuilt.append(seg)
+
+    if not replaced:
+        # نص حرّ بلا علامات (غالباً تقرير تضرّر سابقاً بالكتابة فوقه):
+        # نستبدله كاملاً لكن بعلامة صحيحة هذه المرة.
+        if not existing.lstrip().startswith(_DECISION_SEGMENT_PREFIXES):
+            return f"قرار الطبيب: {new_decision}"
+        rebuilt.append(f"قرار الطبيب: {new_decision}")
+
+    return '\n\n'.join(rebuilt)
+
+
 def _has_field_value_in_report(report, current_report_data, field_name):
     """
     التحقق من وجود قيمة فعلية للحقل في التقرير المنشور
@@ -1196,7 +1254,12 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if action in ['استشارة جديدة', 'متابعة', 'متابعة في الرقود', 'مراجعة / عودة دورية', 'طوارئ', 'استشارة أخيرة']:
                 if 'قرار الطبيب:' in dd:
                     extracted_decision_for_broadcast = dd.split('قرار الطبيب:', 1)[1].split('\n\n')[0].strip()
-                elif dd and 'التشخيص:' not in dd and 'تفاصيل' not in dd:
+                # ✅ نص حرّ بلا علامة «قرار الطبيب:» (تقارير تضرّرت سابقاً
+                # بالكتابة فوق العمود المركّب): نعرضه كما هو بدل إسقاطه.
+                # الشرط السابق كان يتحقق من عدم احتواء النص على كلمة
+                # «تفاصيل» — وهي كلمة شائعة جداً في القرارات الطبية، فكان
+                # أي قرار يذكرها يختفي من البطاقة نهائياً.
+                elif dd and not dd.lstrip().startswith(_DECISION_SEGMENT_PREFIXES):
                     extracted_decision_for_broadcast = dd.strip()
             elif action == 'استشارة مع قرار عملية':
                 if 'قرار الطبيب:' in dd:
@@ -2156,6 +2219,17 @@ async def save_edit_to_database(query, context):
             # إذا أدخل سبباً يعني لا يوجد تقرير → has_paper_report=0
             report.has_paper_report = 0
             logger.info(f"✅ تم تحديث no_paper_report_reason = {new_value}")
+
+        # ✅ تعديل «قرار الطبيب» للمسارات التي تخزّنه داخل doctor_decision
+        # المركّب: نستبدل مقطعه فقط بدل الكتابة فوق النص كاملاً — الكتابة
+        # الكاملة كانت تمحو التشخيص/الفحوصات/وضع الحالة/ملاحظات الرقود
+        # المخزَّنة في نفس العمود، فتختفي من البطاقة عند إعادة النشر.
+        elif field_name == 'doctor_decision' and (report.medical_action or '').strip() in _COMPOSITE_DECISION_ACTIONS:
+            report.doctor_decision = _replace_decision_segment(report.doctor_decision, new_value)
+            logger.info(
+                f"✅ تم تحديث مقطع «قرار الطبيب» مع الحفاظ على بقية مقاطع "
+                f"doctor_decision للتقرير #{report_id} ({report.medical_action})"
+            )
 
         else:
             setattr(report, field_name, new_value)
