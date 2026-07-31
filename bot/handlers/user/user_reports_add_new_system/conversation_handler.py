@@ -602,10 +602,17 @@ def register(app):
             CallbackQueryHandler(start_report, pattern="^start_report$"),
             CallbackQueryHandler(start_report, pattern="^user_action:add_report$"),
             CallbackQueryHandler(start_report, pattern="^add_report$"),
-            # ✅ قسم تشناي — يُسجَّل قبل النمط العام حتى لا يلتقطه أولاً
-            # (زر تشناي يحتوي كلمتَي "تقرير" و"تشناي" وليس "إضافة تقرير جديد").
-            MessageHandler(filters.TEXT & filters.Regex(r"تقارير\s*تشناي"), start_report_chennai),
-            MessageHandler(filters.TEXT & filters.Regex(r"إضافة\s*تقرير\s*جديد"), start_report),
+            # ✅ قسم تشناي — زرّه "🏙️ إضافة تقرير جديد - تشناي" يحتوي نفس
+            # عبارة الزر الاعتيادي، لذا:
+            #   1) يُسجَّل أولاً ويُطابَق على الكلمة المميِّزة "تشناي".
+            #   2) النمط الاعتيادي أدناه يستثني "تشناي" صراحةً (نفي أمامي)
+            #      حتى لا يلتقط زر تشناي لو تغيّر ترتيب المعالجات مستقبلاً
+            #      فيفتح التقارير الاعتيادية بكل أسماء المرضى.
+            MessageHandler(filters.TEXT & filters.Regex(r"تشناي"), start_report_chennai),
+            MessageHandler(
+                filters.TEXT & filters.Regex(r"^(?!.*تشناي).*إضافة\s*تقرير\s*جديد"),
+                start_report,
+            ),
         ],
         states={
             # ── DATE ──────────────────────────────────────────────────────────
@@ -1263,7 +1270,11 @@ def register(app):
             MessageHandler(filters.Regex(r"^/start$"),                        sh['handle_restart_from_start']),
             MessageHandler(filters.Regex(r"^🚀\s*(ابدأ( الآن)?|أبدا استخدام النظام)\s*$"), sh['handle_restart_from_start']),
             CallbackQueryHandler(sh['handle_restart_from_start_main_menu'],   pattern="^start_main_menu$"),
-            MessageHandler(filters.TEXT & filters.Regex(r".*إضافة.*تقرير.*جديد.*"), start_report),
+            # ✅ نفس منطق نقاط الدخول: زر تشناي يُوجَّه لمساره، والنمط
+            # الاعتيادي يستثني "تشناي" حتى لا يبتلع زر تشناي هنا فيفتح
+            # التقارير الاعتيادية بكل أسماء المرضى.
+            MessageHandler(filters.TEXT & filters.Regex(r"تشناي"), start_report_chennai),
+            MessageHandler(filters.TEXT & filters.Regex(r"^(?!.*تشناي).*إضافة.*تقرير.*جديد"), start_report),
             CallbackQueryHandler(sh['handle_smart_back_navigation'],          pattern="^nav:back$"),
             CallbackQueryHandler(sh['debug_all_callbacks'],                   pattern=".*"),
         ],
