@@ -80,7 +80,7 @@ from .states import (
 
 # --- Date & Time (modular) ---
 from .date_time_handlers import (
-    start_report, render_date_selection, handle_date_choice,
+    start_report, start_report_chennai, render_date_selection, handle_date_choice,
     handle_main_calendar_nav, handle_main_calendar_day,
     handle_date_time_hour, handle_date_time_skip,
     handle_step_back_date,
@@ -602,6 +602,9 @@ def register(app):
             CallbackQueryHandler(start_report, pattern="^start_report$"),
             CallbackQueryHandler(start_report, pattern="^user_action:add_report$"),
             CallbackQueryHandler(start_report, pattern="^add_report$"),
+            # ✅ قسم تشناي — يُسجَّل قبل النمط العام حتى لا يلتقطه أولاً
+            # (زر تشناي يحتوي كلمتَي "تقرير" و"تشناي" وليس "إضافة تقرير جديد").
+            MessageHandler(filters.TEXT & filters.Regex(r"تقارير\s*تشناي"), start_report_chennai),
             MessageHandler(filters.TEXT & filters.Regex(r"إضافة\s*تقرير\s*جديد"), start_report),
         ],
         states={

@@ -85,6 +85,23 @@ def bootstrap_all() -> None:
         },
     )
 
+    # ── Chennai reports: مرضى مدينة تشناي ────────────────────────────────────
+    # قسم منفصل داخل بوت المترجمين — نفس تدفق التقارير حرفياً (نفس
+    # المستشفيات/الأقسام/أنواع الإجراءات)، لكن:
+    #   • قائمة المرضى: مرضى تشناي حصراً (patient_type="chennai").
+    #   • النشر: مجموعة تشناي (CHENNAI_REPORTS_GROUP_ID) للتقرير والمرفقات.
+    # يُمنح من "إدارة الوصول" كبقية الوحدات، ويمكن لمترجم أن يملك هذا
+    # القسم والقسم الاعتيادي معاً.
+    registry.register(
+        name="chennai_reports",
+        menu_buttons={"🏙️ تقارير تشناي"},
+        keyboard_rows=[["🏙️ تقارير تشناي"]],
+        extra_wipe_keys={
+            "report_city",
+            "_force_report_city",
+        },
+    )
+
     # ── General Services: arrivals, departures, public services ──────────────
     registry.register(
         name="general_services",

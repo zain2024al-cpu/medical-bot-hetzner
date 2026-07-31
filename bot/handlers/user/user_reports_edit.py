@@ -160,6 +160,18 @@ _DECISION_SEGMENT_PREFIXES = (
 )
 
 
+def _resolve_target_group_id(patient):
+    """مجموعة إعادة النشر — مرضى تشناي لمجموعتهم الخاصة، وإلا الاعتيادية.
+    نسخة مطابقة لتلك في flows/shared.py (نفس القاعدة، مشتقّة من المريض)."""
+    try:
+        if patient is not None and (getattr(patient, "patient_type", None) or "") == "chennai":
+            from config.settings import CHENNAI_REPORTS_GROUP_ID
+            return CHENNAI_REPORTS_GROUP_ID or None
+    except Exception:
+        pass
+    return None
+
+
 def _replace_decision_segment(existing_decision, new_decision):
     """يستبدل مقطع «قرار الطبيب:» داخل doctor_decision المركّب مع الحفاظ
     الكامل على بقية المقاطع (التشخيص/الفحوصات/وضع الحالة/ملاحظات الرقود...).
@@ -1274,6 +1286,9 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 'department_name': department.name if department else 'غير محدد',
                 'doctor_name': doctor.full_name if doctor else 'لم يتم التحديد',
                 'medical_action': report.medical_action or 'غير محدد',
+                # ✅ إعادة النشر تحترم مجموعة القسم: مرضى تشناي → مجموعة
+                # تشناي (البطاقة والمرفقات)، ويُشتق من نوع المريض نفسه.
+                'target_group_id': _resolve_target_group_id(patient),
                 # الحقول النصية — doctor_decision فارغ لمنع التكرار في format_report_message
                 'complaint_text': report.complaint_text or '',
                 'complaint': report.complaint_text or '',

@@ -48,6 +48,24 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
+def _resolve_target_group_id(patient):
+    """مجموعة النشر المناسبة لهذا التقرير — تُشتق من نوع المريض نفسه.
+
+    مرضى تشناي (patient_type="chennai") → مجموعة تشناي الخاصة (البطاقة
+    والمرفقات الورقية معاً). أي نوع آخر → None ⇒ المجموعة الاعتيادية.
+
+    الاشتقاق من المريض (لا من جلسة المستخدم) يجعل التوجيه صحيحاً تلقائياً
+    في إعادة النشر بعد التعديل أيضاً، بلا عمود إضافي في جدول التقارير.
+    """
+    try:
+        if patient is not None and (getattr(patient, "patient_type", None) or "") == "chennai":
+            from config.settings import CHENNAI_REPORTS_GROUP_ID
+            return CHENNAI_REPORTS_GROUP_ID or None
+    except Exception as exc:
+        logger.warning(f"⚠️ _resolve_target_group_id failed: {exc}")
+    return None
+
+
 # =============================
 # Helper Functions
 # =============================
@@ -2540,6 +2558,10 @@ async def save_report_to_database(query, context, flow_type):
                 'doctor_name': doctor_name or 'لم يتم التحديد',
                 'medical_action': final_medical_action,
                 'current_flow': flow_type,
+                # ✅ توجيه مجموعة النشر: مرضى تشناي → مجموعة تشناي (التقرير
+                # ومرفقاته الورقية معاً). يُشتق من نوع المريض نفسه فيبقى
+                # صحيحاً في أي إعادة نشر لاحقة بلا عمود إضافي.
+                'target_group_id': _resolve_target_group_id(patient),
                 'complaint_text': complaint_text,
                 'doctor_decision': decision_text,
                 'followup_date': followup_display,

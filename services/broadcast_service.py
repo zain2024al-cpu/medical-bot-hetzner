@@ -230,6 +230,7 @@ async def _send_medical_attachments(
     report_id: int | None = None,
     uploaded_by: str | None = None,
     uploaded_by_tg_id: int | None = None,
+    target_group_id: str | int | None = None,
 ):
     """
     إرسال الملفات الطبية:
@@ -247,7 +248,9 @@ async def _send_medical_attachments(
     if not attachments:
         return 0, 0
 
-    target_group = MEDICAL_REPORTS_GROUP_ID or REPORTS_GROUP_ID
+    # ✅ target_group_id (إن مُرِّر) له الأولوية المطلقة — أقسام منفصلة مثل
+    # "🏙️ تقارير تشناي" تُنزِّل تقاريرها الورقية في نفس مجموعتها الخاصة.
+    target_group = target_group_id or MEDICAL_REPORTS_GROUP_ID or REPORTS_GROUP_ID
     if not target_group:
         logger.warning("⚠️ لا يوجد معرف مجموعة للمرفقات الطبية")
         return len(attachments), 0
@@ -380,7 +383,14 @@ async def broadcast_new_report(bot: Bot, report_data: dict):
         bot: كائن البوت
         report_data: بيانات التقرير كـ dictionary
     """
-    logger.info(f"📤 broadcast_new_report: بدء البث - report_id={report_data.get('report_id')}, medical_action={report_data.get('medical_action')}")
+    # ✅ توجيه المجموعة حسب التقرير: أقسام منفصلة (مثل "🏙️ تقارير تشناي")
+    # تُمرِّر target_group_id فتُنشَر بطاقة التقرير ومرفقاتها الورقية في
+    # مجموعتها الخاصة بدل مجموعة التقارير الاعتيادية. الإسناد هنا يجعل
+    # الاسم محلياً لكامل الدالة، فتلتقطه تلقائياً كل مواضع الإرسال أدناه
+    # بلا أي تعديل عليها (ولا يمسّ القيمة العامة للوحدة).
+    REPORTS_GROUP_ID = report_data.get('target_group_id') or globals()['REPORTS_GROUP_ID']
+
+    logger.info(f"📤 broadcast_new_report: بدء البث - report_id={report_data.get('report_id')}, medical_action={report_data.get('medical_action')}, group={REPORTS_GROUP_ID}")
 
     # ✅ نتيجة إرسال المرفقات الطبية (None إن لم توجد مرفقات أصلاً أو لم يُصَل
     # لخطوة البث) — يسمح للمستدعي باكتشاف فشل إرسال المرفقات بصمت.
@@ -570,6 +580,8 @@ async def broadcast_new_report(bot: Bot, report_data: dict):
                     report_id=report_id,
                     uploaded_by=report_data.get("translator_name"),
                     uploaded_by_tg_id=report_data.get("user_id") or report_data.get("translator_id"),
+                    # ✅ نفس مجموعة التقرير للأقسام المنفصلة (تشناي)
+                    target_group_id=report_data.get("target_group_id"),
                 )
                 attachments_result = {"attempted": attempted, "sent": sent_count}
                 if sent_count < attempted:

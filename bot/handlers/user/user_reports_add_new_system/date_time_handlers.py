@@ -66,7 +66,15 @@ async def start_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["report_tmp"] = {
             "action_type": None
         }
-        
+
+        # ✅ مدينة التقرير — تُضبَط حصراً من نقطة الدخول:
+        #   • "🏙️ تقارير تشناي"     → _force_report_city="chennai"
+        #   • "📝 إضافة تقرير جديد" → لا مفتاح ⇒ تُمسَح (None)
+        # المسح الصريح هنا يمنع تسرّب وضع تشناي إلى تقرير اعتيادي لاحق
+        # (نفس نمط تسرّب الحالة الذي عالجناه سابقاً في هذا المسار).
+        context.user_data["report_city"] = context.user_data.pop("_force_report_city", None)
+        logger.info(f"🏙️ report_city = {context.user_data['report_city']!r}")
+
         # ✅ تنظيف أي بيانات من التقرير الأولي لضمان عدم التعارض
         context.user_data.pop("initial_case_search", None)
         context.user_data['_current_search_type'] = 'patient'  # تعيين نوع البحث الافتراضي
@@ -85,6 +93,16 @@ async def start_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except:
                 pass
         return ConversationHandler.END
+
+
+async def start_report_chennai(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """بدء تقرير في قسم "🏙️ تقارير تشناي" — نفس تدفق التقارير حرفياً
+    (نفس المستشفيات والأقسام وأنواع الإجراءات)، الفارق الوحيد:
+      • قائمة المرضى تعرض مرضى تشناي حصراً.
+      • التقرير ومرفقاته الورقية تُنشَر في مجموعة تشناي.
+    """
+    context.user_data["_force_report_city"] = "chennai"
+    return await start_report(update, context)
 
 
 async def render_date_selection(message, context, query=None):

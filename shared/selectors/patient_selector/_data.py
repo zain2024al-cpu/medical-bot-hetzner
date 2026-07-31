@@ -25,9 +25,33 @@ _DB_LIMIT = 500   # max rows fetched per query — covers any realistic patient 
 # "general" في كل الشاشات الأخرى (تقارير طبية...) — نفس القاعدة "أي نوع
 # غير معروف صراحةً هنا = ظاهر افتراضياً" تشمله تلقائياً. يُستخدَم فقط
 # لتمييزه عند طلب only_companion_flow (انظر أدناه).
+#
+# ✅ "chennai" — مرضى مدينة تشناي. قسم منفصل داخل بوت المترجمين:
+# يظهرون في "🏙️ تقارير تشناي" حصراً، ولا يظهرون إطلاقاً في تقارير
+# المترجمين الاعتيادية (بنغالور). أما بقية أقسام المنصة (الرعاية الصحية/
+# الصيدلية/المستلزمات) فيظهرون فيها بشكل طبيعي عبر القاعدة الافتراضية
+# "أي نوع غير معروف صراحةً هنا = ظاهر" — لا يُلمَس أي مستدعٍ منها.
 _PHARMACY_ONLY = "pharmacy_only"
 _COMPANION = "companion"
 _COMPANION_PARENT = "companion_parent"
+_CHENNAI = "chennai"
+
+CITY_CHENNAI = _CHENNAI
+
+
+def report_flow_patient_visible(patient_type, city=None) -> bool:
+    """مصدر الحقيقة الوحيد لظهور المريض داخل تدفق تقارير المترجمين.
+
+    city == "chennai" → قسم تشناي: مرضى تشناي حصراً.
+    غير ذلك          → التقارير الاعتيادية: الكل عدا pharmacy_only ومرضى تشناي.
+
+    تُستدعى من كل مواضع سرد/بحث المرضى في التدفق (القائمة المرقَّمة والبحث
+    inline) — موضع واحد للمنطق يمنع تباعد النسخ.
+    """
+    pt = patient_type or "general"
+    if city == _CHENNAI:
+        return pt == _CHENNAI
+    return pt not in (_PHARMACY_ONLY, _CHENNAI)
 
 
 def _type_visible(

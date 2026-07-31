@@ -644,6 +644,7 @@ async def handle_add_patient_name(update: Update, context: ContextTypes.DEFAULT_
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("🌍 جميع المستخدمين", callback_data="ptype:general")],
         [InlineKeyboardButton("💊 مرضى صرف الأدوية والمستلزمات الطبية", callback_data="ptype:pharmacy")],
+        [InlineKeyboardButton("🏙️ مرضى تشناي", callback_data="ptype:chennai")],
         [InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")],
         [InlineKeyboardButton("❌ إلغاء", callback_data="cancel_patient_input")]
     ])
@@ -653,7 +654,11 @@ async def handle_add_patient_name(update: Update, context: ContextTypes.DEFAULT_
         "👁️ **أين يظهر اسم هذا المريض؟**\n\n"
         "🌍 **جميع المستخدمين** — يظهر في كل الأقسام والتقارير (كالمعتاد).\n\n"
         "💊 **مرضى صرف الأدوية والمستلزمات الطبية** — يظهر فقط داخل "
-        "💊 صرف الأدوية و🩺 المستلزمات الطبية، ولا يظهر لأي قسم آخر.",
+        "💊 صرف الأدوية و🩺 المستلزمات الطبية، ولا يظهر لأي قسم آخر.\n\n"
+        "🏙️ **مرضى تشناي** — يظهر في قسم «🏙️ تقارير تشناي» حصراً ولا يظهر "
+        "في تقارير المترجمين الاعتيادية، وتُنشَر تقاريره ومرفقاتها الورقية "
+        "في مجموعة تشناي الخاصة. يبقى ظاهراً بشكل طبيعي في الرعاية الصحية "
+        "والصيدلية.",
         reply_markup=keyboard,
         parse_mode=ParseMode.MARKDOWN
     )
@@ -669,6 +674,9 @@ async def handle_patient_type_choice(update: Update, context: ContextTypes.DEFAU
     if choice == "pharmacy":
         context.user_data['new_patient_type'] = "pharmacy_only"
         type_label = "💊 مرضى صرف الأدوية والمستلزمات الطبية"
+    elif choice == "chennai":
+        context.user_data['new_patient_type'] = "chennai"
+        type_label = "🏙️ مرضى تشناي"
     else:
         context.user_data['new_patient_type'] = None  # general — الافتراضي
         type_label = "🌍 جميع المستخدمين"
@@ -1757,7 +1765,7 @@ def register(app):
             # ✅ خطوة جديدة قبل إدخال الاسم: اختيار نوع ظهور المريض
             # (🌍 جميع المستخدمين / 💊 صرف الأدوية والمستلزمات فقط)
             "ADD_PATIENT_TYPE": [
-                CallbackQueryHandler(handle_patient_type_choice, pattern="^ptype:(general|pharmacy)$")
+                CallbackQueryHandler(handle_patient_type_choice, pattern="^ptype:(general|pharmacy|chennai)$")
             ],
             "ADD_PATIENT_NAME": [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_patient_name_input),

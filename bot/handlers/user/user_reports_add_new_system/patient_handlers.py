@@ -66,14 +66,17 @@ async def patient_inline_query_handler(update: Update, context: ContextTypes.DEF
                         Patient.full_name != ""
                     ).order_by(Patient.full_name).limit(50).all()
 
-                # ✅ تقارير المترجمين تعرض مرضى general فقط — مرضى
-                # "pharmacy_only" مخصصون لزرّي صرف الأدوية/المستلزمات حصراً.
+                # ✅ فلترة موحَّدة عبر مصدر حقيقة واحد: "pharmacy_only"
+                # مخصص لصرف الأدوية/المستلزمات، و"chennai" لقسم
+                # "🏙️ تقارير تشناي" حصراً (وداخل ذلك القسم لا يظهر سواهم).
+                from shared.selectors.patient_selector._data import report_flow_patient_visible
+                _city = context.user_data.get("report_city")
                 patients = [
                     p for p in patients
-                    if (p.patient_type or "general") != "pharmacy_only"
+                    if report_flow_patient_visible(p.patient_type, _city)
                 ]
 
-                logger.info(f"✅ تم العثور على {len(patients)} مريض في قاعدة البيانات")
+                logger.info(f"✅ تم العثور على {len(patients)} مريض في قاعدة البيانات (city={_city})")
 
                 for patient in patients:
                     if not patient.full_name:
@@ -243,8 +246,10 @@ async def show_patient_list(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 
         with SessionLocal() as s:
             # ✅ جلب جميع المرضى من قاعدة البيانات مباشرة (أحدث البيانات)
-            # مع استبعاد مرضى "pharmacy_only" — تقارير المترجمين تعرض
-            # مرضى general فقط.
+            # مع فلترة موحَّدة عبر مصدر الحقيقة الواحد: "pharmacy_only" لصرف
+            # الأدوية/المستلزمات، و"chennai" لقسم "🏙️ تقارير تشناي" حصراً.
+            from shared.selectors.patient_selector._data import report_flow_patient_visible
+            _city = context.user_data.get("report_city")
             all_patients = s.query(Patient).filter(
                 Patient.full_name.isnot(None),
                 Patient.full_name != ""
@@ -252,9 +257,9 @@ async def show_patient_list(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             patient_names = [
                 p.full_name.strip() for p in all_patients
                 if p.full_name and p.full_name.strip()
-                and (p.patient_type or "general") != "pharmacy_only"
+                and report_flow_patient_visible(p.patient_type, _city)
             ]
-            logger.info(f"✅ تم تحميل {len(patient_names)} اسم من قاعدة البيانات مباشرة في show_patient_list")
+            logger.info(f"✅ تم تحميل {len(patient_names)} اسم من قاعدة البيانات مباشرة في show_patient_list (city={_city})")
         
         # التحقق من وجود أسماء
         if not patient_names:

@@ -66,6 +66,11 @@ GENERAL_SERVICES_GROUP_ID = os.getenv("GENERAL_SERVICES_GROUP_ID", "")
 # 🪪 معرف مجموعة الإقامات (نشر أحداث الإقامات)
 RESIDENCY_GROUP_ID = os.getenv("RESIDENCY_GROUP_ID", "")
 
+# 🏙️ معرف مجموعة تقارير مرضى تشناي — قسم منفصل داخل بوت المترجمين:
+# تقارير مرضى تشناي (patient_type="chennai") تُنشَر هنا بدل مجموعة
+# التقارير الاعتيادية، وكذلك مرفقاتها الطبية الورقية (نفس المجموعة).
+CHENNAI_REPORTS_GROUP_ID = os.getenv("CHENNAI_REPORTS_GROUP_ID", "-1002202795419")
+
 # 🗂️ مسار قاعدة البيانات
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "..", "db", "medical_reports.db")

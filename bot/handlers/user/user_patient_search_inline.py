@@ -74,6 +74,7 @@ async def patient_search_inline_handler(update: Update, context: ContextTypes.DE
         include_pharmacy = False
         include_companions = False
         only_companion_flow = False
+        _sel_state = None
         try:
             from shared.selectors.patient_selector._session import load as _sel_load
             _sel_state = _sel_load(context.user_data)
@@ -105,11 +106,25 @@ async def patient_search_inline_handler(update: Update, context: ContextTypes.DE
 
                     logger.info(f"✅ عرض آخر {len(patients)} مريض (بدون بحث)")
 
-                from shared.selectors.patient_selector._data import _type_visible
-                patients = [
-                    p for p in patients
-                    if _type_visible(p.patient_type, include_pharmacy, include_companions, only_companion_flow)
-                ]
+                # ✅ لا توجد جلسة مُنتقي مشترك ⇒ المستخدم داخل تدفق تقارير
+                # المترجمين: تُطبَّق قاعدة التقارير نفسها المستخدَمة في
+                # القائمة المرقَّمة (استبعاد pharmacy_only ومرضى تشناي، أو
+                # مرضى تشناي حصراً داخل قسم "🏙️ تقارير تشناي") — حتى لا
+                # يسرّب البحث أسماء مخفية عن هذا القسم.
+                from shared.selectors.patient_selector._data import (
+                    _type_visible, report_flow_patient_visible,
+                )
+                if _sel_state is None:
+                    _city = context.user_data.get("report_city")
+                    patients = [
+                        p for p in patients
+                        if report_flow_patient_visible(p.patient_type, _city)
+                    ]
+                else:
+                    patients = [
+                        p for p in patients
+                        if _type_visible(p.patient_type, include_pharmacy, include_companions, only_companion_flow)
+                    ]
 
                 # ✅ إنشاء النتائج
                 for idx, patient in enumerate(patients):
