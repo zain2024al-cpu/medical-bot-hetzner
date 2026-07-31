@@ -14,6 +14,19 @@ from .selector_context import SelectorContext
 
 logger = logging.getLogger(__name__)
 
+# ✅ مستشفيات مثبَّتة في أعلى الصفحة الأولى دائماً — بصرف النظر عن عدد
+# مرات استخدامها. السبب: الترتيب الافتراضي حسب الاستخدام يدفع أي مستشفى
+# جديد (بلا تقارير سابقة) إلى آخر القائمة فيصعب الوصول إليه.
+# المطابقة بجزء من الاسم وبلا حساسية لحالة الأحرف، فتعمل مهما كان الاسم
+# المخزَّن بالضبط ("Rela Hospital, Chennai" / "rela hospital" ...).
+_PINNED_HOSPITAL_KEYWORDS = ("rela",)
+
+
+def _is_pinned_hospital(name: str) -> bool:
+    low = (name or "").strip().lower()
+    return any(kw in low for kw in _PINNED_HOSPITAL_KEYWORDS)
+
+
 def _get_usage_counts() -> dict:
     """
     يجلب عدد التقارير لكل مستشفى من جدول Report.
@@ -77,11 +90,16 @@ def get_hospitals_list() -> list:
             seen.add(key)
             unique.append(name)
 
-    # ترتيب حسب الاستخدام (تنازلياً) ثم أبجدياً كفاصل
+    # المثبَّتة أولاً، ثم الباقي حسب الاستخدام (تنازلياً) ثم أبجدياً — بقية
+    # القائمة تحتفظ بترتيبها السابق تماماً بلا أي تغيير في السلوك.
     usage = _get_usage_counts()
-    unique.sort(key=lambda n: (-usage.get(n.strip().lower(), 0), n))
+    unique.sort(key=lambda n: (
+        0 if _is_pinned_hospital(n) else 1,
+        -usage.get(n.strip().lower(), 0),
+        n,
+    ))
 
-    logger.info(f"✅ Hospitals sorted by usage: {len(unique)} total")
+    logger.info(f"✅ Hospitals sorted (pinned first, then usage): {len(unique)} total")
     return unique
 
 def _build_hospitals_keyboard(page=0, search_query="", context=None):
