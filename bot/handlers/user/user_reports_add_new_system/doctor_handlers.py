@@ -840,10 +840,28 @@ async def handle_doctor(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             f" → id={resolved_dept.id} '{resolved_dept.name}'"
                         )
                     else:
-                        logger.warning(
-                            f"[doctor_handlers] Department NOT resolved: '{department_name}'"
-                            f" — doctor will be saved without department_id"
-                        )
+                        # ✅ مستشفى حديث لا أقسام له في القاعدة بعد: نُنشئ صفّ
+                        # القسم له بدل ترك الطبيب بلا قسم. الترك كان يعني أن
+                        # البحث اللاحق عن الأطباء (مستشفى + قسم) يُرجع صفراً،
+                        # فيضطر المترجم لإدخال اسم الطبيب يدوياً في كل تقرير.
+                        try:
+                            resolved_dept = Department(
+                                name=en_dept,
+                                hospital_id=resolved_hospital.id,
+                                hospital_name=resolved_hospital.name,
+                            )
+                            s.add(resolved_dept)
+                            s.flush()   # للحصول على id قبل ربط الطبيب
+                            logger.info(
+                                f"[doctor_handlers] Department auto-created: '{en_dept}'"
+                                f" → id={resolved_dept.id}  hospital_id={resolved_hospital.id}"
+                            )
+                        except Exception as dept_exc:
+                            resolved_dept = None
+                            logger.warning(
+                                f"[doctor_handlers] Department auto-create failed for "
+                                f"'{department_name}': {dept_exc} — doctor saved without department_id"
+                            )
 
                 # ── 4. Upsert doctor with guaranteed hospital_id ───────────────
                 doctor = (
