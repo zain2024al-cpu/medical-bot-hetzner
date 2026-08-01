@@ -678,7 +678,7 @@ async def show_translator_selection(message, context, flow_type):
         # لا نمنع اختيار المترجم إذا حدث خطأ في البوابة
         pass
 
-    text, keyboard = _build_translator_picker(flow_type, 0)
+    text, keyboard = _build_translator_picker(flow_type, 0, context)
 
     if not keyboard:
         await message.reply_text("❌ خطأ: لا توجد أسماء مترجمين متاحة")
@@ -696,12 +696,21 @@ async def show_translator_selection(message, context, flow_type):
 _TRANSLATOR_PICKER_PAGE_SIZE = 18
 
 
-def _build_translator_picker(flow_type: str, page: int):
+_TRANSLATOR_PICKER_NAMES_KEY = "_translator_picker_names"
+
+
+def _build_translator_picker(flow_type: str, page: int, context=None):
     """
     يبني نصّ ولوحة أزرار صفحة واحدة من شاشة اختيار المترجم.
     الترتيب: الأسماء العربية أولاً (الأكثر نشراً للتقارير أولاً)، ثم
     الأسماء غير العربية في آخر صفحة/صفحات. مقسّم على عدة شاشات بدل عرض
     الكل دفعة واحدة.
+
+    ⚠️ callback_data يحمل **فهرس** الاسم لا الاسم نفسه: تيليجرام يحدّ
+    callback_data بـ64 بايت، والحرف العربي بايتان في UTF-8 — فاسم كامل
+    مثل "ياسر ابو عمار" مع مسار طويل مثل "appointment_reschedule" كان
+    يتجاوز الحد ويُفشل بناء اللوحة كلها بـBadRequest: Button_data_invalid.
+    القائمة المعروضة تُحفَظ في context ليُحلّ الفهرس مقابلها بالضبط.
 
     Returns: (text, InlineKeyboardMarkup) أو (None, None) إن لم توجد أسماء.
     """
@@ -710,6 +719,12 @@ def _build_translator_picker(flow_type: str, page: int):
     names = get_translator_names_for_picker()
     if not names:
         return None, None
+
+    if context is not None:
+        try:
+            context.user_data[_TRANSLATOR_PICKER_NAMES_KEY] = list(names)
+        except Exception:
+            pass
 
     per_page = _TRANSLATOR_PICKER_PAGE_SIZE
     total = len(names)
@@ -722,7 +737,11 @@ def _build_translator_picker(flow_type: str, page: int):
     keyboard_buttons = []
     row = []
     for i, name in enumerate(page_names):
-        row.append(InlineKeyboardButton(name, callback_data=f"simple_translator:{flow_type}:{name}"))
+        # الفهرس العام داخل القائمة الكاملة (لا فهرس الصفحة) — قصير دائماً
+        # فلا يتجاوز حدّ 64 بايت مهما طال الاسم أو اسم المسار.
+        row.append(InlineKeyboardButton(
+            name, callback_data=f"simple_translator:{flow_type}:{start + i}"
+        ))
         if len(row) == 3 or i == len(page_names) - 1:
             keyboard_buttons.append(row)
             row = []
@@ -985,11 +1004,22 @@ async def handle_simple_translator_choice(update: Update, context: ContextTypes.
             translator_id = None
             logger.debug("translator callback: skip")
         elif choice.lstrip('-').isdigit():
-            # ── IDX-format (legacy, draining) ──────────────────────────────
-            # Emitted by old renders before the IDX→NAME migration deployment.
-            # Kept permanently for coexistence safety; cost is zero.
+            # ── IDX-format ────────────────────────────────────────────────
+            # الصيغة المعتمدة الآن: الاسم لا يُوضَع في callback_data لتجاوزه
+            # حدّ 64 بايت مع الأسماء الكاملة (انظر _build_translator_picker).
+            # ⚠️ يُحلّ الفهرس مقابل **نفس القائمة التي عُرِضت** والمحفوظة في
+            # context — لا مقابل load_translator_names() التي ترتيبها مختلف
+            # فتُرجِع مترجماً خاطئاً.
             logger.debug("translator callback: IDX-format  idx=%s  flow=%s", choice, flow_type)
-            translator_names = load_translator_names()
+            translator_names = context.user_data.get(_TRANSLATOR_PICKER_NAMES_KEY)
+            if not translator_names:
+                try:
+                    from services.translators_service import get_translator_names_for_picker
+                    translator_names = get_translator_names_for_picker()
+                except Exception:
+                    translator_names = None
+            if not translator_names:
+                translator_names = load_translator_names()
             try:
                 index = int(choice)
                 translator_name = translator_names[index]
@@ -3240,7 +3270,7 @@ async def handle_translator_page_navigation(update: Update, context: ContextType
         elif flow_type not in valid_flow_types:
             flow_type = current_flow if current_flow in valid_flow_types else "new_consult"
 
-        text, keyboard = _build_translator_picker(flow_type, page)
+        text, keyboard = _build_translator_picker(flow_type, page, context)
         if not keyboard:
             return
 
