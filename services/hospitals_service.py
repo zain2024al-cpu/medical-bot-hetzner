@@ -206,22 +206,27 @@ def get_hospital_departments(hospital_name: str) -> List[str]:
     return [d['name'] for d in hospital.get('departments', [])]
 
 
-def add_hospital(hospital_name: str) -> bool:
-    """إضافة مستشفى جديد — DB هي المصدر الوحيد."""
+def add_hospital(hospital_name: str, city=None) -> bool:
+    """إضافة مستشفى جديد — DB هي المصدر الوحيد.
+
+    city="chennai" → يظهر في قسم «🏙️ تقارير تشناي» حصراً.
+    city=None      → القوائم الاعتيادية كما كان (سلوك غير متغيّر).
+    """
     name_clean = (hospital_name or "").strip()
     if not name_clean:
         return False
     if name_clean in _INVALID_HOSPITAL_NAMES:
         logger.warning("Rejected invalid hospital name: %r", name_clean)
         return False
+    city_clean = (city or "").strip().lower() or None
     try:
         from db.session import SessionLocal
         from db.models import Hospital
         with SessionLocal() as s:
             if not s.query(Hospital).filter(Hospital.name == name_clean).first():
-                s.add(Hospital(name=name_clean))
+                s.add(Hospital(name=name_clean, city=city_clean))
                 s.commit()
-                logger.info("Added hospital to DB: %s", name_clean)
+                logger.info("Added hospital to DB: %s (city=%s)", name_clean, city_clean)
         return True
     except Exception as e:
         logger.error("Failed to add hospital to DB: %s", e)

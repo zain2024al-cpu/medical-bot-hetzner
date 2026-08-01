@@ -214,6 +214,17 @@ def _ensure_schema_compatibility(target_engine=None) -> None:
                 _add_column_if_missing(conn, "gs_arrival_companions", ac_cols, "escort_entity",       "VARCHAR(255)")
                 _add_column_if_missing(conn, "gs_arrival_companions", ac_cols, "residence_address",   "TEXT")
 
+            # ── Phase 1f: hospitals — مدينة المستشفى (فصل قوائم تشناي) ────────
+            if _table_exists(conn, "hospitals"):
+                hosp_cols = _table_columns(conn, "hospitals")
+                _add_column_if_missing(conn, "hospitals", hosp_cols, "city", "VARCHAR(50)")
+                # وسم تلقائي لمرة واحدة: المستشفيات التي يحوي اسمها "chennai"
+                # تُعلَّم مدينتها تشناي — حتى لا يحتاج الأدمن ضبطها يدوياً.
+                conn.execute(text(
+                    "UPDATE hospitals SET city = 'chennai' "
+                    "WHERE (city IS NULL OR city = '') AND LOWER(name) LIKE '%chennai%'"
+                ))
+
             # ── Phase 1e: pharmacy financial records — حذف ناعم للفاتورة ──────
             if _table_exists(conn, "pharmacy_financial_records"):
                 pfr_cols = _table_columns(conn, "pharmacy_financial_records")

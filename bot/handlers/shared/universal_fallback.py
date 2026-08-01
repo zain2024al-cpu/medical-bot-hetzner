@@ -141,6 +141,7 @@ KNOWN_CALLBACKS = [
     # ✅ أنماط مُسجَّلة فعلاً في ConversationHandler لكنها كانت غائبة عن هذه
     # القائمة، فيُطلق الفلبَك (المجموعة 999) تحذير "زر غير متاح" لكل ضغطة
     # رغم نجاحها — ضوضاء تُخفي الأعطال الحقيقية في السجل.
+    r"^hcity:(default|chennai)$",
     r"^reschedule_cal_day:",
     r"^reschedule_cal_nav:",
     r"^patient:show_list:",

@@ -15,14 +15,15 @@ from .selector_context import SelectorContext
 logger = logging.getLogger(__name__)
 
 # ✅ مستشفيات مثبَّتة في مرتبة محدَّدة داخل القائمة:
-#   المفتاح = جزء من الاسم (بلا حساسية لحالة الأحرف، فيعمل مهما كان
-#             الاسم المخزَّن بالضبط: "Rela Hospital, Chennai" / "rela ...")
+#   المفتاح = جزء من الاسم (بلا حساسية لحالة الأحرف)
 #   القيمة  = المرتبة المطلوبة (1 = الأول).
 # السبب: الترتيب الافتراضي حسب الاستخدام يدفع أي مستشفى جديد (بلا تقارير
 # سابقة) إلى آخر القائمة فيصعب الوصول إليه.
-# ما عدا المثبَّتة يبقى مرتَّباً حسب الاستخدام تماماً كما كان — الأكثر
-# استخداماً يتصدَّر، ويتزحزح ما بعد مرتبة التثبيت خطوةً واحدة فقط.
-_PINNED_HOSPITAL_POSITIONS = {"rela": 4}
+# ملاحظة: تثبيت Rela المؤقت أُزيل بعد فصل قوائم المدن — لم يعد لازماً
+# لأن قسم تشناي صار يعرض مستشفيات تشناي حصراً.
+_PINNED_HOSPITAL_POSITIONS: dict[str, int] = {}
+
+_CHENNAI_CITY = "chennai"
 
 
 def _pinned_position(name: str):
@@ -32,6 +33,17 @@ def _pinned_position(name: str):
         if kw in low:
             return pos
     return None
+
+
+def _is_chennai_hospital(name: str, city) -> bool:
+    """هل المستشفى تابع لمدينة تشناي؟
+
+    يعتمد عمود city أولاً، ويستنتج من الاسم كاحتياط للسجلات القديمة التي
+    أُضيفت قبل وجود العمود (الهجرة تسمها تلقائياً، وهذا حزام أمان إضافي).
+    """
+    if (city or "").strip().lower() == _CHENNAI_CITY:
+        return True
+    return _CHENNAI_CITY in (name or "").lower()
 
 
 def _get_usage_counts() -> dict:
@@ -56,11 +68,15 @@ def _get_usage_counts() -> dict:
         return {}
 
 
-def get_hospitals_list() -> list:
+def get_hospitals_list(city=None) -> list:
     """
     جلب المستشفيات مرتبةً حسب الاستخدام (الأكثر استخداماً أولاً).
     المصدر: Hospital table مع ترتيب من Report.hospital_name.
     Fallback للأبجدية إذا لم تتوفر إحصاءات.
+
+    city="chennai" → مستشفيات تشناي حصراً (قسم «🏙️ تقارير تشناي»).
+    city=None      → كل المستشفيات عدا مستشفيات تشناي (التقارير الاعتيادية).
+    نفس مبدأ فصل المرضى بين القسمين.
     """
     db_hospitals = []
 
@@ -71,9 +87,11 @@ def get_hospitals_list() -> list:
             hospitals = s.query(Hospital).all()
             if hospitals:
                 from services.hospitals_service import _INVALID_HOSPITAL_NAMES
+                want_chennai = (city or "").strip().lower() == _CHENNAI_CITY
                 db_hospitals = [
                     h.name for h in hospitals
                     if h.name and h.name.strip() not in _INVALID_HOSPITAL_NAMES
+                    and _is_chennai_hospital(h.name, getattr(h, "city", None)) == want_chennai
                 ]
     except Exception as e:
         logger.warning(f"⚠️ Could not load hospitals from database: {e}", exc_info=True)
@@ -82,7 +100,14 @@ def get_hospitals_list() -> list:
         try:
             from services.hospitals_service import get_all_hospitals
             json_hospitals = get_all_hospitals() or []
-            logger.warning(f"⚠️ Hospitals DB empty — JSON fallback ({len(json_hospitals)})")
+            # ✅ نفس فصل المدن يُطبَّق على المسار الاحتياطي أيضاً، وإلا
+            # تسرّبت كل المستشفيات لقسم تشناي عند فراغ القاعدة.
+            want_chennai = (city or "").strip().lower() == _CHENNAI_CITY
+            json_hospitals = [
+                n for n in json_hospitals
+                if _is_chennai_hospital(n, None) == want_chennai
+            ]
+            logger.warning(f"⚠️ Hospitals DB empty — JSON fallback ({len(json_hospitals)}, city={city})")
             return list(json_hospitals)
         except Exception as e:
             logger.error(f"❌ Failed to load hospitals from JSON fallback: {e}", exc_info=True)
@@ -112,14 +137,17 @@ def get_hospitals_list() -> list:
         ordered.insert(min(idx, len(ordered)), name)
 
     logger.info(
-        f"✅ Hospitals sorted by usage ({len(ordered)} total)"
+        f"✅ Hospitals sorted by usage ({len(ordered)} total, city={city or 'default'})"
         + (f", pinned: {pinned}" if pinned else "")
     )
     return ordered
 
 def _build_hospitals_keyboard(page=0, search_query="", context=None):
     """بناء لوحة مفاتيح المستشفيات مع بحث"""
-    all_hospitals = get_hospitals_list()
+    # ✅ مدينة القسم الحالي — قسم تشناي يعرض مستشفيات تشناي حصراً،
+    # والتقارير الاعتيادية تُخفيها.
+    _city = context.user_data.get("report_city") if context else None
+    all_hospitals = get_hospitals_list(_city)
 
     if search_query:
         search_lower = search_query.lower()

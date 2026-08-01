@@ -144,18 +144,55 @@ async def handle_add_hospital(update: Update, context: ContextTypes.DEFAULT_TYPE
     query = update.callback_query
     await query.answer()
 
+    # ✅ خطوة المدينة أولاً — تحدّد أي قسم يرى هذا المستشفى
     keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🏥 القائمة الاعتيادية", callback_data="hcity:default")],
+        [InlineKeyboardButton("🏙️ مستشفى تشناي", callback_data="hcity:chennai")],
         [InlineKeyboardButton("❌ إلغاء", callback_data="cancel_hospital_input")]
     ])
 
     await query.edit_message_text(
         "➕ **إضافة مستشفى جديد**\n\n"
-        "📝 اكتب اسم المستشفى:\n"
-        "مثال: Manipal Hospital - Whitefield",
+        "🏙️ **أين يظهر هذا المستشفى؟**\n\n"
+        "🏥 **القائمة الاعتيادية** — يظهر في «📝 إضافة تقرير جديد» كالمعتاد.\n\n"
+        "🏙️ **مستشفى تشناي** — يظهر في «🏙️ إضافة تقرير جديد - تشناي» حصراً، "
+        "ولا يظهر في التقارير الاعتيادية.",
+        reply_markup=keyboard,
+        parse_mode=ParseMode.MARKDOWN
+    )
+    return "ADD_HOSPITAL_CITY"
+
+
+@require_admin
+async def handle_hospital_city_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """اختيار مدينة المستشفى ثم طلب الاسم."""
+    query = update.callback_query
+    await query.answer()
+
+    choice = (query.data or "").split(":", 1)[-1]
+    if choice == "chennai":
+        context.user_data['new_hospital_city'] = "chennai"
+        city_label = "🏙️ مستشفى تشناي"
+        example = "مثال: Rela Hospital, Chennai"
+    else:
+        context.user_data['new_hospital_city'] = None
+        city_label = "🏥 القائمة الاعتيادية"
+        example = "مثال: Manipal Hospital - Whitefield"
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔙 رجوع", callback_data="add_hospital")],
+        [InlineKeyboardButton("❌ إلغاء", callback_data="cancel_hospital_input")]
+    ])
+
+    await query.edit_message_text(
+        f"➕ **إضافة مستشفى جديد**\n\n"
+        f"🏙️ **الظهور:** {city_label}\n\n"
+        f"📝 اكتب اسم المستشفى:\n{example}",
         reply_markup=keyboard,
         parse_mode=ParseMode.MARKDOWN
     )
     return "ADD_HOSPITAL_NAME"
+
 
 @require_admin
 async def handle_hospital_name_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -174,7 +211,7 @@ async def handle_hospital_name_input(update: Update, context: ContextTypes.DEFAU
         )
         return "ADD_HOSPITAL_NAME"
     
-    ok = service_add_hospital(name)
+    ok = service_add_hospital(name, city=context.user_data.pop('new_hospital_city', None))
     if not ok:
         await update.message.reply_text(
             f"❌ **فشل الحفظ أو المستشفى موجود مسبقاً:** {name}",
@@ -548,7 +585,13 @@ def register(app):
                 CallbackQueryHandler(handle_cancel_hospital_input, pattern="^cancel_hospital_input$"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_edit_hospital_input)
             ],
+            # ✅ خطوة اختيار مدينة المستشفى (تشناي / الاعتيادية)
+            "ADD_HOSPITAL_CITY": [
+                CallbackQueryHandler(handle_hospital_city_choice, pattern="^hcity:(default|chennai)$"),
+                CallbackQueryHandler(handle_cancel_hospital_input, pattern="^cancel_hospital_input$"),
+            ],
             "ADD_HOSPITAL_NAME": [
+                CallbackQueryHandler(handle_add_hospital, pattern="^add_hospital$"),   # رجوع لخطوة المدينة
                 CallbackQueryHandler(handle_cancel_hospital_input, pattern="^cancel_hospital_input$"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_hospital_name_input)
             ]

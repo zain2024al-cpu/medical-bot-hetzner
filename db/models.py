@@ -97,6 +97,13 @@ class Hospital(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(255), nullable=True, index=True)
     address = Column(Text, nullable=True)
+    # ✅ مدينة المستشفى — تفصل قوائم المستشفيات بين الأقسام:
+    #   "chennai" → يظهر في قسم «🏙️ تقارير تشناي» حصراً
+    #   NULL/غيرها → القوائم الاعتيادية (بنغالور وغيرها) كما كان
+    # الفراغ في السجلات القديمة يُعامَل تلقائياً كـ"غير تشناي"، مع
+    # استنتاج احتياطي من الاسم (يحوي "chennai") للسجلات التي أُضيفت
+    # قبل وجود هذا العمود.
+    city = Column(String(50), nullable=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
 
