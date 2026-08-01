@@ -718,7 +718,16 @@ def _build_translator_picker(flow_type: str, page: int, context=None):
     """
     from services.translators_service import get_translator_names_for_picker
 
-    names = get_translator_names_for_picker()
+    # ✅ مترجمو القسم الحالي: قسم تشناي يعرض من مُنح وحدة chennai_reports
+    # من إدارة الوصول حصراً — أي إضافة مستقبلية تُدار من هناك بلا لمس الكود.
+    _city = None
+    if context is not None:
+        try:
+            _city = context.user_data.get("report_city")
+        except Exception:
+            _city = None
+
+    names = get_translator_names_for_picker(_city)
     if not names:
         return None, None
 
@@ -1017,7 +1026,10 @@ async def handle_simple_translator_choice(update: Update, context: ContextTypes.
             if not translator_names:
                 try:
                     from services.translators_service import get_translator_names_for_picker
-                    translator_names = get_translator_names_for_picker()
+                    # نفس مدينة القسم — وإلا اختلف الترتيب فحُلّ الفهرس لاسم خاطئ
+                    translator_names = get_translator_names_for_picker(
+                        context.user_data.get("report_city")
+                    )
                 except Exception:
                     translator_names = None
             if not translator_names:

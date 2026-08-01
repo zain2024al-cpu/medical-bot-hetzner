@@ -458,15 +458,84 @@ def _get_report_counts_by_translator_name() -> Dict[str, int]:
         return {}
 
 
-def get_translator_names_for_picker() -> List[str]:
+_CHENNAI_MODULE = "chennai_reports"
+_DEFAULT_MODULE = "user_reports"
+
+
+def _tg_ids_with_module(module_key: str) -> set:
+    """معرّفات تيليجرام التي مُنحت هذه الوحدة (نشطة) من إدارة الوصول."""
+    try:
+        from db.session import SessionLocal
+        from db.models import UserModuleAccess
+        with SessionLocal() as s:
+            rows = (
+                s.query(UserModuleAccess.tg_user_id)
+                .filter_by(module_key=module_key, is_active=True)
+                .all()
+            )
+        return {r[0] for r in rows if r[0] is not None}
+    except Exception as e:
+        logger.error(f"Error loading module holders for {module_key}: {e}")
+        return set()
+
+
+def _names_by_city(city) -> Optional[set]:
+    """أسماء المترجمين المسموح ظهورها في قسم معيّن — مشتقّة من إدارة الوصول.
+
+    مترجم تشناي = من مُنح وحدة chennai_reports. يظهر في قسم تشناي حصراً،
+    ويختفي من التقارير الاعتيادية إلا إن مُنح user_reports أيضاً (فيظهر
+    في القسمين). أي إضافة مستقبلية تُدار من إدارة الوصول بلا لمس الكود.
+
+    يعيد None إن تعذّر الربط (لا فلترة — سلوك احتياطي آمن).
+    """
+    try:
+        chennai_ids = _tg_ids_with_module(_CHENNAI_MODULE)
+        translators = get_all_translators() or []
+        chennai_names = {
+            (t.get("name") or "").strip()
+            for t in translators
+            if t.get("id") in chennai_ids and (t.get("name") or "").strip()
+        }
+
+        if (city or "").strip().lower() == "chennai":
+            return chennai_names
+
+        # القائمة الاعتيادية: تُستثنى أسماء تشناي إلا من يملك الوحدة
+        # الاعتيادية أيضاً.
+        default_ids = _tg_ids_with_module(_DEFAULT_MODULE)
+        both_names = {
+            (t.get("name") or "").strip()
+            for t in translators
+            if t.get("id") in chennai_ids and t.get("id") in default_ids
+        }
+        excluded = chennai_names - both_names
+        return {
+            (t.get("name") or "").strip()
+            for t in translators
+            if (t.get("name") or "").strip() and (t.get("name") or "").strip() not in excluded
+        }
+    except Exception as e:
+        logger.error(f"Error computing city translator names: {e}")
+        return None
+
+
+def get_translator_names_for_picker(city=None) -> List[str]:
     """
     ترتيب أسماء المترجمين لشاشة الاختيار عند إنشاء تقرير:
     الأسماء العربية أولاً (الأكثر نشراً للتقارير أولاً)، ثم الأسماء غير
     العربية (الإنجليزية) في النهاية بنفس منطق الترتيب حسب النشاط.
+
+    city="chennai" → مترجمو تشناي حصراً (من مُنحوا وحدة chennai_reports).
+    city=None      → القائمة الاعتيادية، وتُستثنى منها أسماء تشناي.
     """
     names = get_all_translator_names()
     if not names:
         return names
+
+    allowed = _names_by_city(city)
+    if allowed is not None:
+        names = [n for n in names if (n or "").strip() in allowed]
+        logger.info(f"Translator picker filtered: {len(names)} name(s) for city={city or 'default'}")
 
     counts = _get_report_counts_by_translator_name()
 
