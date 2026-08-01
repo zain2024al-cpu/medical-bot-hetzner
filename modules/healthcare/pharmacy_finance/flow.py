@@ -12,6 +12,7 @@ from core.access.access_service import user_has_module
 
 from shared.calendar_picker import build_calendar
 
+from modules.healthcare._tz import now_ist
 from modules.healthcare.pharmacy_finance.session import (
     PharmacyFinanceSession,
     STEP_LIST, STEP_ITEM_COUNT, STEP_INVOICE_NUMBER, STEP_EXPENSE_ITEM,
@@ -86,7 +87,7 @@ async def _show_list(update: Update, context: ContextTypes.DEFAULT_TYPE, page: i
 
 async def _show_date_calendar(update: Update, context: ContextTypes.DEFAULT_TYPE, year: int = None, month: int = None) -> None:
     from datetime import datetime
-    now = datetime.utcnow()
+    now = now_ist()
     year = year or now.year
     month = month or now.month
     text, kb = build_calendar(year, month, HCPHFIN, back_callback=f"{HCPHFIN}:page:0")

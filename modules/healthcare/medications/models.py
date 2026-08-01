@@ -4,6 +4,7 @@ import json
 import logging
 from dataclasses import dataclass
 from datetime import datetime
+from modules.healthcare._tz import now_ist
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +63,7 @@ def save_medication_record(
             # كان العمود يأخذ القيمة الافتراضية (datetime.utcnow عند الحفظ)،
             # فيتجاهل اختيار المستخدم تماماً ويظهر تاريخ خاطئ لاحقاً في مسير
             # إخلاء الصيدلية (الذي يقرأ هذا العمود بالضبط).
-            created_at=               created_at or datetime.utcnow(),
+            created_at=               created_at or now_ist(),
         )
         db.add(record)
         db.flush()

@@ -411,7 +411,7 @@ class MedicationRecord(Base):
     notes                    = Column(Text, nullable=True)
     specialist_name          = Column(String(255), nullable=True)
     created_by               = Column(Integer, nullable=True, index=True)
-    created_at               = Column(DateTime, default=datetime.utcnow, index=True, nullable=True)
+    created_at               = Column(DateTime, default=_now_ist_naive, index=True, nullable=True)
     updated_at               = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
 
 
@@ -435,7 +435,7 @@ class SuppliesRecord(Base):
     notes                    = Column(Text, nullable=True)
     specialist_name          = Column(String(255), nullable=True)
     created_by               = Column(Integer, nullable=True, index=True)
-    created_at               = Column(DateTime, default=datetime.utcnow, index=True, nullable=True)
+    created_at               = Column(DateTime, default=_now_ist_naive, index=True, nullable=True)
     updated_at               = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
 
 
@@ -464,7 +464,7 @@ class PharmacyFinancialRecord(Base):
     #   "A" = نسبة ثابتة (22%) | "B" = نسبة مختلفة | "C" = إخلاء لجهة أخرى
     manifest_type     = Column(String(5), nullable=True)
     created_by        = Column(Integer, nullable=True, index=True)
-    created_at        = Column(DateTime, default=datetime.utcnow, index=True, nullable=True)
+    created_at        = Column(DateTime, default=_now_ist_naive, index=True, nullable=True)
     updated_at        = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
     # ✅ حذف ناعم للفاتورة: تختفي من مسير الإخلاء عند الطباعة ومن قائمة
     # التقارير المالية، لكن يبقى صفّها في القاعدة للتدقيق (بيانات مالية

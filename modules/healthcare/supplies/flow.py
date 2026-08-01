@@ -26,6 +26,7 @@ from shared.selectors.patient_selector import selector as patient_selector
 from shared.multiselect import engine as multiselect
 from shared.uploads import collector as uploads
 
+from modules.healthcare._tz import now_ist
 from modules.healthcare.views import DEPARTMENT_OPTIONS
 from modules.healthcare.custom_options import (
     save_custom_option, load_custom_options, CTX_HC_DEPARTMENT,
@@ -188,7 +189,7 @@ async def _handle_date_calendar(update: Update, context: ContextTypes.DEFAULT_TY
         session = SuppliesSession.create(context.user_data)
     session.step = STEP_DATE_CUSTOM
     session.save(context.user_data)
-    now = datetime.utcnow()
+    now = now_ist()
     text, kb = build_calendar(now.year, now.month, HCSUP, f"{HCSUP}:start")
     try:
         if query:

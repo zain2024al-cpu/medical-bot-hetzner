@@ -4,6 +4,7 @@
 import logging
 from dataclasses import dataclass
 from datetime import datetime
+from modules.healthcare._tz import now_ist
 
 logger = logging.getLogger(__name__)
 
@@ -272,7 +273,7 @@ def delete_financial_record(financial_id: int, deleted_by: int | None = None) ->
             return False
         record.is_deleted = True
         record.deleted_by = deleted_by
-        record.deleted_at = datetime.utcnow()
+        record.deleted_at = now_ist()
 
     logger.info(
         f"[pharmacy_finance] soft-deleted financial record id={financial_id} by={deleted_by}"

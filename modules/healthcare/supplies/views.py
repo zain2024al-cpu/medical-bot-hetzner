@@ -9,6 +9,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from modules.healthcare.supplies.constants import STAFF_LIST  # noqa: F401
 from modules.healthcare.supplies.session import SuppliesSession
 from modules.healthcare.views import format_arabic_date, format_arabic_datetime, format_image_count
+from modules.healthcare._tz import now_ist
 
 HC    = "hc"
 HCSUP = "hcsup"
@@ -22,7 +23,7 @@ _THIN    = "─────────────────────"
 def build_date_prompt() -> tuple[str, InlineKeyboardMarkup]:
     from datetime import datetime
     from modules.healthcare.views import format_arabic_date
-    today_str = format_arabic_date(datetime.utcnow())
+    today_str = format_arabic_date(now_ist())
     lines = [
         _DIVIDER,
         "📅  **اختر التاريخ**",
