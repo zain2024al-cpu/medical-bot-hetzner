@@ -245,6 +245,46 @@
   `requester_id=None` (الافتراضي) يبقي بلا فلترة — سكربتات التشخيص
   (`diag_manifest_date.py`, `diag_dispense_range.py`) غير متأثرة عمداً.
 
+### 2026-08-02 — نوع إجراء جديد "🫁 معاملة الزراعة" (Chennai-only)
+- **الميزة**: نوع إجراء جديد داخل قائمة "⚕️ نوع الإجراء" الموحَّدة (لا زر
+  منفصل) — نوع الزراعة (كبد/كلى) → الجهة (اختيار متعدد: محكمة/محامي/
+  مكتب تنسيق) → تفاصيل المعاملة (نص حر) → تاريخ العودة → سبب العودة →
+  المترجم → نشر. **يظهر حصراً** عند `report_city == "chennai"` — مخفي
+  تماماً في قائمة نوع الإجراء الاعتيادية. (`304f2bb`)
+- **تطبيق النمط الجذري #1 صراحة قبل الوقوع فيه**: `broadcast_data` في
+  `save_report_to_database`/`handle_republish` يُبنى يدوياً حقلاً حقلاً
+  ولا يرث من `report_tmp`/`Report` تلقائياً — أُضيفت حقول الزراعة الثلاثة
+  لكلا الموضعين مسبقاً (بدل اكتشاف "بطاقة فارغة رغم الحفظ الصحيح" لاحقاً
+  كما حدث مع جلسات العلاج والمناظير سابقاً في هذا السجل).
+- **أعمدة قاعدة بيانات جديدة**: `transplant_type`/`transplant_parties`/
+  `transplant_details` على `Report` — migration في `db/maintenance.py`
+  (`_migrate_column`)، بنفس نمط `endoscopy_type`/`treatment_plan_summary`
+  تماماً. **ملاحظة مهمة اكتُشفت أثناء البحث**: migration جدول `reports`
+  موجود في `db/maintenance.py` حصراً (`_migrate_column`)، **وليس** في
+  `db/session.py` (`_add_column_if_missing`) كبقية الجداول — نمط مختلف
+  لنفس الغرض، سبق أن ضلَّل البحث عن أعمدة `reports` القديمة.
+- **قائمة تحقق أي نوع إجراء جديد يظهر لقسم واحد فقط (تشناي أو غيره)**:
+  1) `PREDEFINED_ACTIONS` (`user_reports_add_helpers.py`).
+  2) `_get_action_routing()` (`action_type_handlers.py`).
+  3) تمرير `city`/`context` عبر **كل** استدعاءات `_build_action_type_keyboard`
+     (4 مواضع) — دالة بلا `context` أصلاً قبل هذه الميزة.
+  4) حالات جديدة في `states.py` + تسجيلها في `conversation_handler.py`
+     (states dict + دالة `_xxx_handlers()` + استيراد الحالات).
+  5) `get_translator_state`/`get_confirm_state` + **3** نسخ من
+     `valid_flow_types` في `flows/shared.py`.
+  6) `get_editable_fields_by_flow_type` (قبل النشر) و
+     `get_editable_fields_by_action_type` (بعد النشر، بمفتاح `medical_action`
+     لا `flow_type`).
+  7) `_build_xxx_fields()` جديدة في `broadcast_service.py` + فرع
+     `elif medical_action == '...'` في `format_report_message`.
+  8) أعمدة DB جديدة (`db/models.py` + `db/maintenance.py`) إن لم تُعِد
+     استخدام حقل موجود.
+  9) حقول `broadcast_data` في **كلا** الموضعين: `save_report_to_database`
+     و`handle_republish` (`user_reports_edit.py`).
+  10) خرائط `execute_smart_state_action.py`: إما `step_name` العامة (لو
+      الحالة تُعيد استخدام منطقاً مشتركاً كـFOLLOWUP_DATE/TRANSLATOR) أو
+      فرع `elif target_step == ...` مخصَّص (لحالات فريدة بلا نظير عام).
+
 ---
 
 ## 🔍 تدقيقات مكتملة — نظيفة (لا تُعَد)
