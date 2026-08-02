@@ -72,6 +72,7 @@ from .states import (
     CHEMO_CYCLES_UNIFORM_COUNT, CHEMO_CYCLES_CUSTOM_ENTRY,
     ONCOLOGY_QUEUE_TOTAL, ONCOLOGY_QUEUE_CURRENT,
     ONCOLOGY_DELIVERY_MODE, ONCOLOGY_DELIVERY_DAYS,
+    TREATMENT_DIALYSIS_SESSION, TREATMENT_DIALYSIS_UPLOAD,
 )
 
 # =============================
@@ -354,6 +355,8 @@ def _treatment_handlers():
             handle_treatment_plan_edit_reason_skip, handle_treatment_plan_manual_session,
             handle_treatment_complaint,
             handle_treatment_notes, handle_treatment_notes_skip, handle_treatment_followup_reason,
+            handle_treatment_dialysis_session_number,
+            handle_treatment_dialysis_upload_file, handle_treatment_dialysis_upload_skip,
         )
         return {
             'chemo_cycles_total':       handle_chemo_cycles_total,
@@ -370,6 +373,9 @@ def _treatment_handlers():
             'notes':                    handle_treatment_notes,
             'notes_skip':                handle_treatment_notes_skip,
             'followup_reason':          handle_treatment_followup_reason,
+            'dialysis_session_number':  handle_treatment_dialysis_session_number,
+            'dialysis_upload_file':     handle_treatment_dialysis_upload_file,
+            'dialysis_upload_skip':     handle_treatment_dialysis_upload_skip,
         }
     except ImportError as e:
         logger.error(f"❌ Cannot import treatment_sessions handlers: {e}")
@@ -1228,6 +1234,19 @@ def register(app):
             TREATMENT_NOTES: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, _tracked(tp.get('notes'), TREATMENT_NOTES)),
                 CallbackQueryHandler(_tracked(tp.get('notes_skip'), TREATMENT_NOTES), pattern="^treatment_notes_skip$"),
+                CallbackQueryHandler(sh['handle_smart_back_navigation'],   pattern="^nav:back$"),
+                CallbackQueryHandler(sh['handle_smart_cancel_navigation'], pattern="^nav:cancel$"),
+            ],
+            # ── غسيل الكلى فقط: رقم الجلسة اليدوي → رفع الدفتر/تخطي ──────────
+            TREATMENT_DIALYSIS_SESSION: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, _tracked(tp.get('dialysis_session_number'), TREATMENT_DIALYSIS_SESSION)),
+                CallbackQueryHandler(sh['handle_smart_back_navigation'],   pattern="^nav:back$"),
+                CallbackQueryHandler(sh['handle_smart_cancel_navigation'], pattern="^nav:cancel$"),
+            ],
+            TREATMENT_DIALYSIS_UPLOAD: [
+                MessageHandler(filters.PHOTO | filters.Document.ALL | filters.VIDEO,
+                                _tracked(tp.get('dialysis_upload_file'), TREATMENT_DIALYSIS_UPLOAD)),
+                CallbackQueryHandler(_tracked(tp.get('dialysis_upload_skip'), TREATMENT_DIALYSIS_UPLOAD), pattern="^treatment_dialysis_upload_skip$"),
                 CallbackQueryHandler(sh['handle_smart_back_navigation'],   pattern="^nav:back$"),
                 CallbackQueryHandler(sh['handle_smart_cancel_navigation'], pattern="^nav:cancel$"),
             ],

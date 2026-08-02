@@ -8,11 +8,17 @@
 # الملف — لا يزال في flows/radiation_therapy.py، معدَّلاً ليستخدم نفس
 # المحرك لكن مع الحفاظ على أعمدة Report القديمة لعدم كسر بطاقة تقريره.
 #
-# التسلسل المشترك (targeted / immuno / dialysis):
+# التسلسل المشترك (targeted / immuno):
 #   [لا خطة نشطة] → "كم عدد الجلسات الكلي؟" → إنشاء الخطة (جلسة 1)
 #   [خطة نشطة]    → تقدُّم تلقائي (+1) → عرض "الجلسة الحالية: N من X"
 #                    + [✅ متابعة] [✏️ تعديل الخطة]
 #   ← ثم: الملاحظات → تاريخ العودة → سبب العودة → المترجم/البوابة/النشر
+#
+# غسيل الكلى (dialysis) مختلف تماماً — لا TreatmentPlan ولا "عدد جلسات
+# كلي" إطلاقاً (بناءً على طلب المستخدم):
+#   شكوى المريض → قرار الطبيب → رقم الجلسة الحالية (يدوي، كل تقرير من
+#   الصفر بلا تذكّر) → رفع دفتر جلسات الغسيل (اختياري) → تاريخ العودة →
+#   سبب العودة → المترجم/البوابة/النشر
 #
 # العلاج الكيماوي إضافياً: يُتابَع دائماً "حسب الدورات" (لا يوجد خيار
 # "حسب الجلسات" — أُزيل بناءً على طلب المستخدم): عدد الدورات، ثم هل نفسه
@@ -32,6 +38,7 @@ from ..states import (
     TREATMENT_FOLLOWUP_REASON, TREATMENT_TRANSLATOR,
     CHEMO_CYCLES_TOTAL, CHEMO_CYCLES_UNIFORM_CHOICE,
     CHEMO_CYCLES_UNIFORM_COUNT, CHEMO_CYCLES_CUSTOM_ENTRY,
+    TREATMENT_DIALYSIS_SESSION, TREATMENT_DIALYSIS_UPLOAD,
 )
 from ..utils import _nav_buttons
 from ...user_reports_add_helpers import validate_text_input
@@ -94,7 +101,20 @@ async def start_immuno_flow(message, context):
 
 
 async def start_dialysis_flow(message, context):
-    return await _start_simple_session_flow(message, context, "dialysis")
+    """
+    غسيل الكلى: بلا TreatmentPlan وبلا "عدد جلسات كلي" — ينتقل مباشرة
+    لشكوى المريض. رقم الجلسة يُطلَب لاحقاً يدوياً (انظر
+    handle_treatment_dialysis_session_number)، لا يُشتَق من خطة محفوظة.
+    """
+    data = context.user_data.setdefault("report_tmp", {})
+    data["medical_action"] = TREATMENT_MEDICAL_ACTION["dialysis"]
+    data["current_flow"] = "treatment_dialysis"
+    data["_treatment_key"] = "dialysis"
+    data.pop("_tp_editing_plan_id", None)
+
+    await _prompt_complaint(message, context)
+    context.user_data['_conversation_state'] = TREATMENT_COMPLAINT
+    return TREATMENT_COMPLAINT
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -475,21 +495,44 @@ async def handle_treatment_complaint(update: Update, context: ContextTypes.DEFAU
     return TREATMENT_NOTES
 
 
-def _notes_keyboard() -> InlineKeyboardMarkup:
+def _notes_keyboard(treatment_key: str = "") -> InlineKeyboardMarkup:
+    skip_label = "⏭️ لا يوجد" if treatment_key == "dialysis" else "⏭️ لا توجد ملاحظات"
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("⏭️ لا توجد ملاحظات", callback_data="treatment_notes_skip")],
+        [InlineKeyboardButton(skip_label, callback_data="treatment_notes_skip")],
         [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
          InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")],
     ])
 
 
 async def _prompt_notes(message, context):
-    await message.reply_text(
-        "📝 **ملاحظات الطبيب**\n\n"
-        "يرجى إدخال أي ملاحظات إضافية، أو اضغط الزر أدناه إذا لا توجد ملاحظات:",
-        reply_markup=_notes_keyboard(),
-        parse_mode="Markdown",
-    )
+    treatment_key = context.user_data.get("report_tmp", {}).get("_treatment_key", "")
+    if treatment_key == "dialysis":
+        text = (
+            "📝 **قرار الطبيب**\n\n"
+            "يرجى إدخال قرار الطبيب، أو اضغط الزر أدناه إذا لا يوجد:"
+        )
+    else:
+        text = (
+            "📝 **ملاحظات الطبيب**\n\n"
+            "يرجى إدخال أي ملاحظات إضافية، أو اضغط الزر أدناه إذا لا توجد ملاحظات:"
+        )
+    await message.reply_text(text, reply_markup=_notes_keyboard(treatment_key), parse_mode="Markdown")
+
+
+async def _after_notes(message_or_query, context):
+    """
+    ما بعد قرار الطبيب/الملاحظات: غسيل الكلى ينتقل لرقم الجلسة اليدوي،
+    وبقية الأنواع (targeted/immuno/chemo) تنتقل لتاريخ العودة كالسابق.
+    """
+    treatment_key = context.user_data.get("report_tmp", {}).get("_treatment_key", "")
+    if treatment_key == "dialysis":
+        await _prompt_dialysis_session(message_or_query, context)
+        context.user_data['_conversation_state'] = TREATMENT_DIALYSIS_SESSION
+        return TREATMENT_DIALYSIS_SESSION
+
+    await _render_followup_calendar(message_or_query, context)
+    context.user_data['_conversation_state'] = TREATMENT_FOLLOWUP_DATE
+    return TREATMENT_FOLLOWUP_DATE
 
 
 async def handle_treatment_notes(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -500,15 +543,122 @@ async def handle_treatment_notes(update: Update, context: ContextTypes.DEFAULT_T
     context.user_data.setdefault("report_tmp", {})["notes"] = text
 
     await update.message.reply_text("✅ تم الحفظ")
-    await _render_followup_calendar(update.message, context)
-    context.user_data['_conversation_state'] = TREATMENT_FOLLOWUP_DATE
-    return TREATMENT_FOLLOWUP_DATE
+    return await _after_notes(update.message, context)
 
 
 async def handle_treatment_notes_skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     context.user_data.setdefault("report_tmp", {})["notes"] = "لا يوجد"
+    return await _after_notes(query, context)
+
+
+# ═══════════════════════════════════════════════════════════════════
+# غسيل الكلى فقط: رقم الجلسة الحالية (يدوي) → رفع دفتر الجلسات/تخطي
+# ═══════════════════════════════════════════════════════════════════
+async def _prompt_dialysis_session(message_or_query, context):
+    text = (
+        "🔢 **رقم الجلسة الحالية**\n\n"
+        "أدخل رقم الجلسة الحالية (مثال: 5):"
+    )
+    kb = _nav_buttons(show_back=True)
+    if hasattr(message_or_query, "edit_message_text"):
+        try:
+            await message_or_query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
+            return
+        except Exception:
+            pass
+    await message_or_query.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+
+
+async def handle_treatment_dialysis_session_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """رقم الجلسة الحالية — إدخال يدوي بحت في كل تقرير، بلا خطة محفوظة
+    وبلا تذكّر أو اقتراح (بناءً على طلب المستخدم صراحةً)."""
+    context.user_data['_conversation_state'] = TREATMENT_DIALYSIS_SESSION
+    text = update.message.text.strip()
+    if not text.isdigit() or int(text) <= 0:
+        await update.message.reply_text(
+            "⚠️ يرجى إدخال رقم صحيح أكبر من صفر (رقم الجلسة الحالية):",
+            reply_markup=_nav_buttons(show_back=True),
+        )
+        return TREATMENT_DIALYSIS_SESSION
+
+    data = context.user_data.setdefault("report_tmp", {})
+    data["treatment_plan_summary"] = f"🩸 **جلسات غسيل الكلى**\n\nرقم الجلسة الحالية: {int(text)}"
+
+    await update.message.reply_text("✅ تم الحفظ")
+    await _prompt_dialysis_upload(update.message, context)
+    context.user_data['_conversation_state'] = TREATMENT_DIALYSIS_UPLOAD
+    return TREATMENT_DIALYSIS_UPLOAD
+
+
+def _dialysis_upload_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("⏭️ تخطي", callback_data="treatment_dialysis_upload_skip")],
+        [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
+         InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")],
+    ])
+
+
+async def _prompt_dialysis_upload(message_or_query, context):
+    text = (
+        "📎 **رفع دفتر جلسات الغسيل / التقرير النهائي**\n\n"
+        "أرسل صورة أو ملف الدفتر/التقرير (يمكن أكثر من ملف)، أو اضغط "
+        "**تخطي** للمتابعة بلا رفع:"
+    )
+    kb = _dialysis_upload_keyboard()
+    if hasattr(message_or_query, "edit_message_text"):
+        try:
+            await message_or_query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
+            return
+        except Exception:
+            pass
+    await message_or_query.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+
+
+async def handle_treatment_dialysis_upload_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """استقبال ملف (صورة/مستند/فيديو) لدفتر جلسات الغسيل وتجميعه في
+    report_tmp["_medical_attachments"] — نفس المفتاح الذي تقرأه
+    broadcast_data['medical_attachments'] بشكل عام لكل التدفقات، فيُرسَل
+    تلقائياً لمجموعة المرفقات الطبية (بما فيها توجيه تشناي إن انطبق) بلا
+    أي تعديل إضافي في مسار النشر."""
+    context.user_data['_conversation_state'] = TREATMENT_DIALYSIS_UPLOAD
+    report_tmp = context.user_data.setdefault("report_tmp", {})
+    attachments = report_tmp.setdefault("_medical_attachments", [])
+
+    msg = update.message
+    file_info = None
+    if msg.photo:
+        file_info = {"type": "photo", "file_id": msg.photo[-1].file_id}
+    elif msg.document:
+        file_info = {"type": "document", "file_id": msg.document.file_id,
+                     "file_name": msg.document.file_name or "document"}
+    elif msg.video:
+        file_info = {"type": "video", "file_id": msg.video.file_id}
+    else:
+        await msg.reply_text(
+            "⚠️ نوع الملف غير مدعوم. أرسل صورة أو ملف PDF أو فيديو.\n"
+            "أو اضغط **تخطي** للمتابعة.",
+            reply_markup=_dialysis_upload_keyboard(),
+            parse_mode="Markdown",
+        )
+        return TREATMENT_DIALYSIS_UPLOAD
+
+    attachments.append(file_info)
+    count = len(attachments)
+    await msg.reply_text(
+        f"✅ تم استلام الملف ({count} {'ملف' if count == 1 else 'ملفات'} حتى الآن)\n\n"
+        "أرسل المزيد، أو اضغط **تخطي** للمتابعة.",
+        reply_markup=_dialysis_upload_keyboard(),
+        parse_mode="Markdown",
+    )
+    return TREATMENT_DIALYSIS_UPLOAD
+
+
+async def handle_treatment_dialysis_upload_skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تخطي رفع الدفتر (أو الانتهاء منه) → متابعة تاريخ العودة."""
+    query = update.callback_query
+    await query.answer()
     await _render_followup_calendar(query, context)
     context.user_data['_conversation_state'] = TREATMENT_FOLLOWUP_DATE
     return TREATMENT_FOLLOWUP_DATE
@@ -546,5 +696,7 @@ __all__ = [
     'handle_treatment_plan_edit_reason_skip', 'handle_treatment_plan_manual_session',
     'handle_treatment_complaint',
     'handle_treatment_notes', 'handle_treatment_notes_skip', 'handle_treatment_followup_reason',
+    'handle_treatment_dialysis_session_number',
+    'handle_treatment_dialysis_upload_file', 'handle_treatment_dialysis_upload_skip',
     'TREATMENT_MEDICAL_ACTION',
 ]

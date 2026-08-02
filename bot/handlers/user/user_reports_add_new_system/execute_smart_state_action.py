@@ -47,6 +47,7 @@ from .states import (
     TREATMENT_COMPLAINT, TREATMENT_NOTES, TREATMENT_FOLLOWUP_DATE,
     TREATMENT_FOLLOWUP_REASON, TREATMENT_TRANSLATOR, TREATMENT_CONFIRM,
     ONCOLOGY_QUEUE_TOTAL, ONCOLOGY_QUEUE_CURRENT, ONCOLOGY_DELIVERY_DAYS,
+    TREATMENT_DIALYSIS_SESSION, TREATMENT_DIALYSIS_UPLOAD,
 )
 from .utils import _nav_buttons
 from .smart_state_renderer import SmartStateRenderer
@@ -394,6 +395,8 @@ async def execute_smart_state_action(target_step, flow_type, update, context):
         elif 'NOTES' in step_name:
             if flow_type == 'radiation_therapy':
                 notes_label = "📝 **ملاحظات أو توصيات**\n\nيرجى إدخال أي ملاحظات أو توصيات خاصة بالجلسة:\n(اختياري - أرسل 'تخطي' للمتابعة)"
+            elif flow_type == 'treatment_dialysis':
+                notes_label = "📝 **قرار الطبيب**\n\nيرجى إدخال قرار الطبيب، أو اضغط الزر أدناه إذا لا يوجد:"
             else:
                 notes_label = "📝 **ملاحظات**\n\nيرجى إدخال أي ملاحظات إضافية:\n(أو اكتب 'لا يوجد')"
             await update.callback_query.edit_message_text(
@@ -700,6 +703,28 @@ async def execute_smart_state_action(target_step, flow_type, update, context):
             await update.callback_query.edit_message_text(
                 "🔢 **إدخال رقم الجلسة الحالية**\n\nأدخل رقم الجلسة الحالية (مثال: 5):",
                 reply_markup=_nav_buttons(show_back=True),
+                parse_mode="Markdown"
+            )
+            return target_step
+
+        elif target_step == TREATMENT_DIALYSIS_SESSION:
+            await update.callback_query.edit_message_text(
+                "🔢 **رقم الجلسة الحالية**\n\nأدخل رقم الجلسة الحالية (مثال: 5):",
+                reply_markup=_nav_buttons(show_back=True),
+                parse_mode="Markdown"
+            )
+            return target_step
+
+        elif target_step == TREATMENT_DIALYSIS_UPLOAD:
+            await update.callback_query.edit_message_text(
+                "📎 **رفع دفتر جلسات الغسيل / التقرير النهائي**\n\n"
+                "أرسل صورة أو ملف الدفتر/التقرير (يمكن أكثر من ملف)، أو اضغط "
+                "**تخطي** للمتابعة بلا رفع:",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("⏭️ تخطي", callback_data="treatment_dialysis_upload_skip")],
+                    [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
+                     InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")],
+                ]),
                 parse_mode="Markdown"
             )
             return target_step
