@@ -2089,8 +2089,9 @@ async def save_report_to_database(query, context, flow_type):
             "treatment_targeted": "العلاج الموجه",
             "treatment_immuno": "العلاج المناعي",
             "treatment_dialysis": "جلسات غسيل الكلى",
+            "transplant": "معاملة الزراعة",
         }
-        
+
         # استخدام medical_action من data إذا كان موجوداً، وإلا استخدام flow_type
         medical_action_from_data = data.get("medical_action")
         current_flow_from_data = data.get("current_flow")
