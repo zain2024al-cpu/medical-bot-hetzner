@@ -40,6 +40,7 @@ def _format_dispense_statement(item_count, kind: str) -> str:
 
 async def get_evacuation_ledger_rows(
     start_date: date, end_date: date, manifest_type: str | None = None,
+    *, requester_id: int | None = None, is_admin: bool = False,
 ) -> list[dict]:
     """manifest_type: "A" | "B" | "C" لتقييد المسير على تصنيف واحد فقط،
     أو None لعدم الفلترة (كل التصنيفات معاً — السلوك القديم بلا تغيير).
@@ -48,40 +49,48 @@ async def get_evacuation_ledger_rows(
     (MedicationRecord/SuppliesRecord.created_at) — وليس على تاريخ إدخال
     البيانات المالية (PharmacyFinancialRecord). حالة صُرِفت يوم 10 وأُدخلت
     بياناتها المالية يوم 15 تظهر دائماً في مسير يوم 10، وتبقى غائبة تماماً
-    عن أي مسير يُطبَع لنطاق يوم 15 فقط."""
-    return await asyncio.to_thread(_get_evacuation_ledger_rows_sync, start_date, end_date, manifest_type)
+    عن أي مسير يُطبَع لنطاق يوم 15 فقط.
+
+    ✅ عزل حسب المستخدم (نفس قاعدة list_pharmacy_source_records):
+    requester_id غير None وis_admin=False ⇒ يُقتصَر المسير على سجلات
+    الصرف التي أدخلها هذا المستخدم نفسه (created_by == requester_id) —
+    بصرف النظر عمّن أدخل بياناتها المالية لاحقاً. is_admin=True أو
+    requester_id=None ⇒ بلا فلترة (كل المستخدمين، السلوك القديم)."""
+    return await asyncio.to_thread(
+        _get_evacuation_ledger_rows_sync, start_date, end_date, manifest_type,
+        requester_id, is_admin,
+    )
 
 
 def _get_evacuation_ledger_rows_sync(
     start_date: date, end_date: date, manifest_type: str | None = None,
+    requester_id: int | None = None, is_admin: bool = False,
 ) -> list[dict]:
     from db.session import SessionLocal
     from db.models import MedicationRecord, SuppliesRecord, PharmacyFinancialRecord
 
     start_dt = datetime.combine(start_date, time.min)
     end_dt = datetime.combine(end_date, time.max)
+    isolate = bool(requester_id) and not is_admin
 
     rows: list[dict] = []
     try:
         with SessionLocal() as s:
-            med_rows = (
-                s.query(MedicationRecord)
-                .filter(
-                    MedicationRecord.dispense_source == _PHARMACY_SOURCE,
-                    MedicationRecord.created_at >= start_dt,
-                    MedicationRecord.created_at <= end_dt,
-                )
-                .all()
+            med_query = s.query(MedicationRecord).filter(
+                MedicationRecord.dispense_source == _PHARMACY_SOURCE,
+                MedicationRecord.created_at >= start_dt,
+                MedicationRecord.created_at <= end_dt,
             )
-            sup_rows = (
-                s.query(SuppliesRecord)
-                .filter(
-                    SuppliesRecord.dispense_source == _PHARMACY_SOURCE,
-                    SuppliesRecord.created_at >= start_dt,
-                    SuppliesRecord.created_at <= end_dt,
-                )
-                .all()
+            sup_query = s.query(SuppliesRecord).filter(
+                SuppliesRecord.dispense_source == _PHARMACY_SOURCE,
+                SuppliesRecord.created_at >= start_dt,
+                SuppliesRecord.created_at <= end_dt,
             )
+            if isolate:
+                med_query = med_query.filter(MedicationRecord.created_by == requester_id)
+                sup_query = sup_query.filter(SuppliesRecord.created_by == requester_id)
+            med_rows = med_query.all()
+            sup_rows = sup_query.all()
 
             source_records = [("medication", r) for r in med_rows] + [("supplies", r) for r in sup_rows]
             if not source_records:

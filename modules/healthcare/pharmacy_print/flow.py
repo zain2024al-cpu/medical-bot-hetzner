@@ -191,8 +191,15 @@ async def _generate_and_show_export_choice(update: Update, context: ContextTypes
         await _show_period_menu(update)
         return
 
+    user = update.effective_user
     manifest_type = state.get("manifest_type")  # None = الكل، بلا فلترة
-    rows = await get_evacuation_ledger_rows(start, end, manifest_type=manifest_type)
+    # ✅ عزل: كل مستخدم يطبع مسيره الخاص (ما أدخله هو فقط)، إلا الأدمن
+    # فيرى الكل — نفس قاعدة العزل المعتمدة في pharmacy_finance.
+    rows = await get_evacuation_ledger_rows(
+        start, end, manifest_type=manifest_type,
+        requester_id=user.id if user else None,
+        is_admin=bool(user and is_admin(user.id)),
+    )
     state["rows"] = rows
     context.user_data[_KEY] = state
 
