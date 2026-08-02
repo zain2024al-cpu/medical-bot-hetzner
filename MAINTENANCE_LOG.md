@@ -183,6 +183,25 @@
   (`flows/shared.py`, `user_reports_edit.py`) صار يقبل `patient_type`
   نصاً لا كائناً، واللقطة تُؤخذ قبل `commit()`/`close()`.
 
+### 2026-08-02 — طباعة مسير الإخلاء تعرض بيانات كل المستخدمين لا مستخدم واحد
+- **البلاغ**: "طباعة المسير من تاريخ إلى تاريخ يطبع حق الكل المستخدمين
+  لا يطبع لهذا المستخدم فقط".
+- **السبب**: `_get_evacuation_ledger_rows_sync` لم يكن بها أي فلترة حسب
+  المستخدم إطلاقاً — أي مستخدم مُصرَّح له بوحدة `pharmacy_print` يطبع
+  **كل** سجلات الصرف في الفترة المطلوبة، بصرف النظر عمّن أدخلها. هذا رغم
+  أن نمط العزل («created_by == requester_id»، أدمن=الكل) موجود بالفعل
+  ومطبَّق في `pharmacy_finance.list_pharmacy_source_records` لنفس نوع
+  البيانات — لكنه لم يُطبَّق هنا عند الطباعة.
+- **قرار عمل صريح من المستخدم**: العزل مطلوب حتى لو أدّى لتجزئة مسير
+  اليوم الواحد على عدة مترجمين (بدل مستند شحن واحد شامل). راجع الفلترة
+  إن تغيّر هذا القرار لاحقاً.
+- **أُصلح**: `c161c43` — أُضيف `requester_id`/`is_admin` لـ
+  `get_evacuation_ledger_rows`/`_get_evacuation_ledger_rows_sync`،
+  يفلتران `MedicationRecord.created_by`/`SuppliesRecord.created_by` عند
+  `is_admin=False`. `pharmacy_print/flow.py` يمرّر هوية طالب الطباعة.
+  `requester_id=None` (الافتراضي) يبقي بلا فلترة — سكربتات التشخيص
+  (`diag_manifest_date.py`, `diag_dispense_range.py`) غير متأثرة عمداً.
+
 ---
 
 ## 🔍 تدقيقات مكتملة — نظيفة (لا تُعَد)
