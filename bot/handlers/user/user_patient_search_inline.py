@@ -74,6 +74,7 @@ async def patient_search_inline_handler(update: Update, context: ContextTypes.DE
         include_pharmacy = False
         include_companions = False
         only_companion_flow = False
+        _sel_city = None
         _sel_state = None
         try:
             from shared.selectors.patient_selector._session import load as _sel_load
@@ -82,6 +83,10 @@ async def patient_search_inline_handler(update: Update, context: ContextTypes.DE
                 include_pharmacy = _sel_state.include_pharmacy
                 include_companions = _sel_state.include_companions
                 only_companion_flow = _sel_state.only_companion_flow
+                # ✅ قسم "🏙️ الرعاية الصحية - تشناي": يقيّد نتائج البحث
+                # inline لمرضى تشناي حصراً، بنفس صرامة القائمة المرقَّمة —
+                # وإلا يسرّب زر "🔍 بحث" مرضى غير تشناي رغم القيد في القائمة.
+                _sel_city = _sel_state.city
         except Exception:
             pass
 
@@ -123,7 +128,7 @@ async def patient_search_inline_handler(update: Update, context: ContextTypes.DE
                 else:
                     patients = [
                         p for p in patients
-                        if _type_visible(p.patient_type, include_pharmacy, include_companions, only_companion_flow)
+                        if _type_visible(p.patient_type, include_pharmacy, include_companions, only_companion_flow, _sel_city)
                     ]
 
                 # ✅ إنشاء النتائج

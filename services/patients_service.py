@@ -133,7 +133,8 @@ def get_patient_by_id(patient_id: int) -> Optional[Dict]:
                 return {
                     'id': patient.id,
                     'name': patient.full_name,
-                    'created_at': patient.created_at
+                    'created_at': patient.created_at,
+                    'patient_type': patient.patient_type,
                 }
     except Exception as e:
         logger.error(f"Error getting patient by id: {e}")

@@ -81,10 +81,15 @@ _RKEY_SUPPLIES     = "hc.woundcare.supplies"
 _RKEY_IMAGES       = "hc.woundcare.images"
 
 _MODULE_KEY = "healthcare"
+_CHENNAI_MODULE_KEY = "chennai_healthcare"
 
 
 def _is_authorized(user_id: int) -> bool:
-    return is_admin(user_id) or user_has_module(user_id, _MODULE_KEY)
+    return (
+        is_admin(user_id)
+        or user_has_module(user_id, _MODULE_KEY)
+        or user_has_module(user_id, _CHENNAI_MODULE_KEY)
+    )
 
 
 # ── Review edit routes ────────────────────────────────────────────────────────
@@ -232,7 +237,7 @@ async def _handle_date_today(update: Update, context: ContextTypes.DEFAULT_TYPE)
     session.step = STEP_PATIENT
     session.save(context.user_data)
     logger.info(f"[woundcare] date confirmed (today)  user={update.effective_user.id}")
-    await patient_selector.enter(update, context, return_to=_RKEY_PATIENT)
+    await patient_selector.enter(update, context, return_to=_RKEY_PATIENT, city=context.user_data.get("hc_city"))
 
 
 # ── Step 1b: date calendar — show inline calendar picker ────────────────────
@@ -292,7 +297,7 @@ async def _handle_cal_action(
         logger.info(
             f"[woundcare] date picked: {y}-{m:02d}-{d:02d}  user={update.effective_user.id}"
         )
-        await patient_selector.enter(update, context, return_to=_RKEY_PATIENT)
+        await patient_selector.enter(update, context, return_to=_RKEY_PATIENT, city=context.user_data.get("hc_city"))
 
 
 # ── Step 2 → 3: patient selected ─────────────────────────────────────────────
@@ -535,7 +540,7 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
         session.step = STEP_PATIENT
         session.save(context.user_data)
         logger.info(f"[woundcare] date set manually: {dt.date()}  user={update.effective_user.id}")
-        await patient_selector.enter(update, context, return_to=_RKEY_PATIENT)
+        await patient_selector.enter(update, context, return_to=_RKEY_PATIENT, city=context.user_data.get("hc_city"))
         return
 
     elif session.step == STEP_DEPT_OTHER:
@@ -818,6 +823,9 @@ async def _handle_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     # Publish report
     user = update.effective_user
+    from services.patients_service import get_patient_by_id
+    _patient_info = get_patient_by_id(session.patient_id) if session.patient_id else None
+    _patient_type = (_patient_info or {}).get("patient_type") or ""
     logger.info(
         f"[woundcare] calling publish  record_id={saved.record_id}"
         f"  images_snap={len(images_snap)}"
@@ -832,6 +840,7 @@ async def _handle_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 workflow_icon=   "🩺",
                 record_id=       saved.record_id,
                 patient_name=    saved.patient_name,
+                patient_type=    _patient_type,
                 extra_sections=  extra_sections,
                 operations=      [],
                 images=          images_snap,
@@ -1054,7 +1063,7 @@ async def _handle_hc_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     action = data[len(HC) + 1:]  # strip "hc:"
 
     if action == "main":
-        text, kb = build_healthcare_menu()
+        text, kb = build_healthcare_menu(city=context.user_data.get("hc_city"))
         try:
             await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
         except Exception:

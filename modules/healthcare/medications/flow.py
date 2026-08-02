@@ -55,10 +55,15 @@ _RKEY_DEPARTMENTS = "hc.medications.departments"
 _RKEY_IMAGES      = "hc.medications.images"
 
 _MODULE_KEY = "healthcare"
+_CHENNAI_MODULE_KEY = "chennai_healthcare"
 
 
 def _is_authorized(user_id: int) -> bool:
-    return is_admin(user_id) or user_has_module(user_id, _MODULE_KEY)
+    return (
+        is_admin(user_id)
+        or user_has_module(user_id, _MODULE_KEY)
+        or user_has_module(user_id, _CHENNAI_MODULE_KEY)
+    )
 
 
 # ── Review edit routes ────────────────────────────────────────────────────────
@@ -180,7 +185,7 @@ async def _handle_date_today(update: Update, context: ContextTypes.DEFAULT_TYPE)
     session.step = STEP_PATIENT
     session.save(context.user_data)
     logger.info(f"[medications] date confirmed (today)  user={update.effective_user.id}")
-    await patient_selector.enter(update, context, return_to=_RKEY_PATIENT, include_pharmacy=True)
+    await patient_selector.enter(update, context, return_to=_RKEY_PATIENT, include_pharmacy=True, city=context.user_data.get("hc_city"))
 
 
 async def _handle_date_calendar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -238,7 +243,7 @@ async def _handle_cal_action(
         logger.info(
             f"[medications] date picked: {y}-{m:02d}-{d:02d}  user={update.effective_user.id}"
         )
-        await patient_selector.enter(update, context, return_to=_RKEY_PATIENT, include_pharmacy=True)
+        await patient_selector.enter(update, context, return_to=_RKEY_PATIENT, include_pharmacy=True, city=context.user_data.get("hc_city"))
 
 
 # ── Step 2: patient selected ──────────────────────────────────────────────────
@@ -390,7 +395,7 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
         session.step = STEP_PATIENT
         session.save(context.user_data)
         logger.info(f"[medications] date set manually: {dt.date()}  user={update.effective_user.id}")
-        await patient_selector.enter(update, context, return_to=_RKEY_PATIENT, include_pharmacy=True)
+        await patient_selector.enter(update, context, return_to=_RKEY_PATIENT, include_pharmacy=True, city=context.user_data.get("hc_city"))
         return
 
     # ── 3b. Department free-text ("أخرى") ──
@@ -573,6 +578,13 @@ async def _handle_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     ]
 
     user = update.effective_user
+    # ✅ نوع المريض يحدد مجموعة النشر (تشناي أو الرعاية الصحية الاعتيادية)
+    # — يُشتق من المريض نفسه لا من قسم الدخول، فيبقى صحيحاً بصرف النظر عن
+    # الشاشة المُستخدَمة لإضافة التقرير.
+    from services.patients_service import get_patient_by_id
+    _patient_info = get_patient_by_id(session.patient_id) if session.patient_id else None
+    _patient_type = (_patient_info or {}).get("patient_type") or ""
+
     from modules.healthcare.report_publisher import HealthcarePublishData, publish as _publish
     await _publish(
         bot=context.bot,
@@ -590,6 +602,7 @@ async def _handle_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             created_by_id=   user.id if user else None,
             created_by_name= (user.full_name or user.username or "مجهول") if user else "مجهول",
             record_date=     date_snap,
+            patient_type=    _patient_type,
         ),
     )
 

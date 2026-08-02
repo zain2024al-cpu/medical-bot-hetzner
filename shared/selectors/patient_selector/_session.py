@@ -30,6 +30,11 @@ class PatientSelectorState:
     # (يتجاوز include_pharmacy/include_companions). نفس سبب الحفظ في
     # الجلسة — تحترمه إعادة الجلب عند فقدان الـsnapshot.
     only_companion_flow: bool = False
+    # ✅ None (الافتراضي) = لا قيد على المدينة (كل الشاشات الحالية، بلا
+    # تغيير). "chennai" = يقتصر الظهور على مرضى تشناي حصراً (قسم "🏙️
+    # الرعاية الصحية - تشناي"). يُحفظ في الجلسة لنفس سبب include_pharmacy —
+    # تحترمه إعادة الجلب عند فقدان الـsnapshot وبحث inline النشط.
+    city: str | None = None
     # names-only snapshot for idx resolution (avoids re-querying on every tap)
     snapshot: list[str] = field(default_factory=list)
 
@@ -42,6 +47,7 @@ def save(user_data: dict, state: PatientSelectorState) -> None:
         "include_pharmacy":    state.include_pharmacy,
         "include_companions":  state.include_companions,
         "only_companion_flow": state.only_companion_flow,
+        "city":                state.city,
         "snapshot":            state.snapshot,
     }
 
@@ -57,6 +63,7 @@ def load(user_data: dict) -> PatientSelectorState | None:
         include_pharmacy=raw.get("include_pharmacy", False),
         include_companions=raw.get("include_companions", False),
         only_companion_flow=raw.get("only_companion_flow", False),
+        city=raw.get("city"),
         snapshot=raw.get("snapshot", []),
     )
 

@@ -21,7 +21,7 @@ from typing import Optional
 import io
 import re
 
-from config.settings import ADMIN_IDS, HEALTHCARE_GROUP_ID
+from config.settings import ADMIN_IDS, HEALTHCARE_GROUP_ID, CHENNAI_REPORTS_GROUP_ID
 from modules.healthcare.views import format_arabic_datetime, format_image_count
 
 logger = logging.getLogger(__name__)
@@ -46,6 +46,12 @@ class HealthcarePublishData:
     specialist_name:  str           # may be empty
     created_by_id:    Optional[int] # Telegram user ID of the submitter
     created_by_name:  str           # display name of the submitter
+    # ✅ نوع المريض (patient.patient_type) — نصّاً فقط، لا كائن ORM (نفس
+    # درس _resolve_target_group_id في نظام التقارير: قراءة كائن ORM بعد
+    # إغلاق الجلسة تفشل صامتاً). "chennai" ⇒ ينشر في مجموعة تشناي بدل
+    # مجموعة الرعاية الصحية الاعتيادية، بصرف النظر عن قسم الدخول
+    # (الرعاية الصحية الاعتيادية أو قسم تشناي) — التوجيه يتبع المريض نفسه.
+    patient_type:     str = ""
     # Workflow-specific sections rendered before operations in the report.
     # Each tuple: (header_with_markdown, content_text)
     # If content is non-empty  → header on its own line, then content on the next line(s)
@@ -108,7 +114,7 @@ async def publish(bot, data: HealthcarePublishData) -> None:
             )
 
     # 2. Publish to healthcare documentation group
-    group_id = _resolve_group_id()
+    group_id = _resolve_group_id(data.patient_type)
     logger.info(f"[report_publisher] group_id resolved → {group_id!r}")
     if group_id:
         try:
@@ -295,9 +301,16 @@ async def _send_pdf_to_targets(
             logger.exception(f"[report_publisher] PDF send FAILED  file={filename}  chat={chat_id}")
 
 
-def _resolve_group_id() -> int | str | None:
-    """Return the configured healthcare group ID, or None if not set."""
-    gid = HEALTHCARE_GROUP_ID
+def _resolve_group_id(patient_type: str = "") -> int | str | None:
+    """
+    مجموعة النشر المناسبة لهذا التقرير — تُشتق من نوع المريض نفسه، نفس
+    مبدأ _resolve_target_group_id في نظام تقارير المترجمين تماماً.
+
+    patient_type == "chennai" → مجموعة تشناي (CHENNAI_REPORTS_GROUP_ID).
+    أي نوع آخر (أو فارغ)      → مجموعة الرعاية الصحية الاعتيادية (السلوك
+    القديم بلا تغيير، حتى مع استدعاءات لم تُحدَّث بعد لتمرير patient_type).
+    """
+    gid = CHENNAI_REPORTS_GROUP_ID if patient_type == "chennai" else HEALTHCARE_GROUP_ID
     if not gid:
         return None
     try:

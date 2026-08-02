@@ -96,16 +96,21 @@ DEPARTMENT_OPTIONS: list[Option] = _get_dept_opts()
 
 # ── Healthcare main menu ──────────────────────────────────────────────────────
 
-def build_healthcare_menu() -> tuple[str, InlineKeyboardMarkup]:
+def build_healthcare_menu(city: str | None = None) -> tuple[str, InlineKeyboardMarkup]:
     """
-    Full 4-item healthcare main menu.
-    Triggered by pressing '🏥 الرعاية الصحية' on the reply keyboard.
-    Includes today's rotating medical term at the bottom.
+    Full 5-item healthcare main menu.
+    Triggered by pressing '▶️ ابدأ الآن' (أو '🏙️ الرعاية الصحية - تشناي')
+    على لوحة المفاتيح. Includes today's rotating medical term at the bottom.
+
+    city — None (الافتراضي): العنوان الاعتيادي. "chennai": عنوان قسم تشناي.
+    الأزرار وcallback_data ثابتة في الحالتين — التوجيه يتبع context.user_data
+    ["hc_city"] لا الزر نفسه (نفس مبدأ تقارير تشناي).
     """
     ar_term, en_term, ar_def = get_daily_term()
+    title = "🏙️  **الرعاية الصحية - تشناي**" if city == "chennai" else "🏥  **الرعاية الصحية**"
     text = (
         f"{_DIVIDER}\n"
-        f"🏥  **الرعاية الصحية**\n\n"
+        f"{title}\n\n"
         f"اختر القسم الصحي:\n\n"
         f"{_THIN}\n"
         f"📚 *مصطلح طبي اليوم*\n"

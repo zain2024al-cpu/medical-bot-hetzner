@@ -59,8 +59,17 @@ def _type_visible(
     include_pharmacy: bool,
     include_companions: bool = False,
     only_companion_flow: bool = False,
+    city: str | None = None,
 ) -> bool:
     pt = patient_type or "general"
+
+    # ✅ فلتر المدينة: أعلى أولوية، يتجاوز كل الفلاتر الأخرى — نفس منطق
+    # report_flow_patient_visible تماماً. city="chennai" (شاشات الرعاية
+    # الصحية لقسم تشناي) ⇒ مرضى تشناي حصراً. city=None (الافتراضي، كل
+    # الشاشات الأخرى) ⇒ لا قيد على المدينة، السلوك الحالي بلا تغيير
+    # (مرضى تشناي يظهرون بشكل طبيعي كـ"أي نوع غير معروف صراحةً هنا").
+    if city == _CHENNAI:
+        return pt == _CHENNAI
 
     # ✅ فلتر مقيِّد حصراً: يُظهر فقط المرضى/المرافقين المُضافين عبر زر
     # "مريض جديد مع مرافقين" — يتجاوز include_pharmacy/include_companions
@@ -123,6 +132,7 @@ def fetch_all(
     include_pharmacy: bool = False,
     include_companions: bool = False,
     only_companion_flow: bool = False,
+    city: str | None = None,
 ) -> list[PatientRecord]:
     """
     Fetch every patient from the database, sorted alphabetically.
@@ -136,6 +146,8 @@ def fetch_all(
     only_companion_flow — False (الافتراضي). True: يقتصر الظهور فقط على
                        المرضى/المرافقين المُضافين عبر زر "مريض جديد مع
                        مرافقين" (يتجاوز include_pharmacy/include_companions).
+    city — None (الافتراضي): لا قيد على المدينة. "chennai": يقتصر الظهور
+                       على مرضى تشناي حصراً (قسم "🏙️ الرعاية الصحية - تشناي").
 
     Returns an empty list on any error (caller must handle gracefully).
     """
@@ -154,7 +166,7 @@ def fetch_all(
             seen: set[str] = set()
             records: list[PatientRecord] = []
             for p in rows:
-                if not _type_visible(p.patient_type, include_pharmacy, include_companions, only_companion_flow):
+                if not _type_visible(p.patient_type, include_pharmacy, include_companions, only_companion_flow, city):
                     continue
                 name = (p.full_name or "").strip()
                 if name and name not in seen:
@@ -175,12 +187,13 @@ def search(
     include_pharmacy: bool = False,
     include_companions: bool = False,
     only_companion_flow: bool = False,
+    city: str | None = None,
 ) -> list[PatientRecord]:
     """
     Search for patients whose full_name contains query (case-insensitive).
     Falls back to fetch_all() when query is blank.
 
-    include_pharmacy / include_companions / only_companion_flow — نفس دلالة fetch_all().
+    include_pharmacy / include_companions / only_companion_flow / city — نفس دلالة fetch_all().
 
     Returns an empty list on any error.
     """
@@ -190,6 +203,7 @@ def search(
             include_pharmacy=include_pharmacy,
             include_companions=include_companions,
             only_companion_flow=only_companion_flow,
+            city=city,
         )
 
     try:
@@ -212,7 +226,7 @@ def search(
                 PatientRecord(id=p.id, name=(p.full_name or "").strip())
                 for p in rows
                 if (p.full_name or "").strip()
-                and _type_visible(p.patient_type, include_pharmacy, include_companions, only_companion_flow)
+                and _type_visible(p.patient_type, include_pharmacy, include_companions, only_companion_flow, city)
             ]
             logger.debug(
                 f"[patient_selector._data] search({query!r}) → {len(records)} records"
