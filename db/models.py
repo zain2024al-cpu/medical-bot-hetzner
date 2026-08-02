@@ -254,6 +254,16 @@ class Report(Base):
     # فتبقى بطاقة تقريره كما هي دون أي تعديل.
     treatment_plan_summary = Column(Text, nullable=True)
 
+    # ✅ 🫁 معاملة الزراعة — نوع إجراء يظهر حصراً في قسم "الرعاية الصحية -
+    # تشناي". لا خطة علاجية ولا مريض طبي بالمعنى المعتاد؛ معاملة إدارية/
+    # قانونية مرتبطة بزراعة عضو. nullable بالكامل — لا تؤثر على أي مسار آخر.
+    #   transplant_type    = "زراعة كبد" / "زراعة كلى"
+    #   transplant_parties = الجهات المختارة مدموجة بفاصل، مثال: "المحكمة، المحامي"
+    #   transplant_details = تفاصيل المعاملة (نص حر يدوي)
+    transplant_type = Column(String(100), nullable=True)
+    transplant_parties = Column(Text, nullable=True)
+    transplant_details = Column(Text, nullable=True)
+
 
 # ================================================
 # Schedule Model

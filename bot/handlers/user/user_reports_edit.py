@@ -107,6 +107,7 @@ def test_editable_fields_mapping():
         ('العلاج الموجه', 5),  # 5 حقول
         ('العلاج المناعي', 5),  # 5 حقول
         ('جلسات غسيل الكلى', 5),  # 5 حقول
+        ('معاملة الزراعة', 7),  # 7 حقول (transplant_type, transplant_parties, transplant_details, followup_date, followup_reason, no_paper_report_reason, translator)
         ('المناظير', 7),  # 7 حقول (complaint, endoscopy_type, endoscopy_result, followup_date, followup_reason, no_paper_report_reason, translator)
         ('نوع غير معروف', 4),  # 4 حقول افتراضية
     ]
@@ -502,6 +503,17 @@ def get_editable_fields_by_action_type(medical_action):
         # (نوع إجراء مدمج من اختيار متعدد لجلسات الأورام يُعامَل بنفس الحقول)
         return [
             ('notes', '📝 ملاحظات'),
+            ('followup_date', '📅 موعد العودة'),
+            ('followup_reason', '✍️ سبب العودة'),
+            ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
+            ('translator_name', '👤 المترجم'),
+        ]
+
+    elif action_clean == 'معاملة الزراعة':
+        return [
+            ('transplant_type', '🫁 نوع الزراعة'),
+            ('transplant_parties', '🏢 الجهة'),
+            ('transplant_details', '📝 تفاصيل المعاملة'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
             ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
@@ -1353,6 +1365,10 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 'endoscopy_type': getattr(report, 'endoscopy_type', '') or '',
                 'endoscopy_result': getattr(report, 'endoscopy_result', '') or '',
                 'endoscopy_procedures': getattr(report, 'endoscopy_procedures', '') or '',
+                # ✅ حقول 🫁 معاملة الزراعة — نفس السبب أعلاه.
+                'transplant_type': getattr(report, 'transplant_type', '') or '',
+                'transplant_parties': getattr(report, 'transplant_parties', '') or '',
+                'transplant_details': getattr(report, 'transplant_details', '') or '',
                 # ✅ المترجم - استخدام الاسم المحفوظ في التقرير
                 'translator_name': translator_name,
                 # ✅ حالة التقرير الطبي الورقي

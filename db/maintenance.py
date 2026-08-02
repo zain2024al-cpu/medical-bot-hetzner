@@ -167,6 +167,12 @@ class DatabaseMaintenance:
                 # تلقائياً عبر Base.metadata.create_all عند بدء التشغيل، بلا
                 # حاجة لأي migration صريح هنا.
                 _migrate_column(conn, "reports", "treatment_plan_summary", "TEXT")
+                # ✅ حقول 🫁 معاملة الزراعة (قسم "الرعاية الصحية - تشناي" فقط)
+                # — أعمدة جديدة في reports. الصفوف الحالية تحصل على NULL
+                # تلقائياً (لا تخص مسار الزراعة)، فلا يتغيّر أي تقرير قائم.
+                _migrate_column(conn, "reports", "transplant_type", "VARCHAR(100)")
+                _migrate_column(conn, "reports", "transplant_parties", "TEXT")
+                _migrate_column(conn, "reports", "transplant_details", "TEXT")
                 logger.info("🔎 Migration check finished.")
 
                 if check == "ok":

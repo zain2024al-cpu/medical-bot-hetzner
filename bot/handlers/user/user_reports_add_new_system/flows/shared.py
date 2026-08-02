@@ -25,6 +25,7 @@ from ..states import (
     RADIATION_THERAPY_CONFIRM,
     ENDOSCOPY_TRANSLATOR, ENDOSCOPY_CONFIRM,
     TREATMENT_TRANSLATOR, TREATMENT_CONFIRM,
+    TRANSPLANT_TRANSLATOR, TRANSPLANT_CONFIRM,
     R_ACTION_TYPE
 )
 from ..utils import _nav_buttons, format_time_12h_str
@@ -499,6 +500,16 @@ def get_editable_fields_by_flow_type(flow_type):
             ("no_report_reason",  "📋 سبب عدم وجود تقرير طبي"),
             ("translator_name",   "👤 المترجم"),
         ],
+        "transplant": [
+            ("transplant_type",     "🫁 نوع الزراعة"),
+            ("transplant_parties",  "🏢 الجهة"),
+            ("transplant_details",  "📝 تفاصيل المعاملة"),
+            ("followup_date",       "📅 موعد العودة"),
+            ("followup_time",       "⏰ وقت العودة"),
+            ("followup_reason",     "✍️ سبب العودة"),
+            ("no_report_reason",    "📋 سبب عدم وجود تقرير طبي"),
+            ("translator_name",     "👤 المترجم"),
+        ],
         "appointment_reschedule": [
             ("app_reschedule_reason",      "📅 سبب تأجيل الموعد"),
             ("app_reschedule_return_date", "📅 تاريخ العودة الجديد"),
@@ -549,6 +560,7 @@ def get_translator_state(flow_type):
         "treatment_immuno": TREATMENT_TRANSLATOR,
         "treatment_dialysis": TREATMENT_TRANSLATOR,
         "treatment_combined": TREATMENT_TRANSLATOR,
+        "transplant": TRANSPLANT_TRANSLATOR,
     }
     return states.get(flow_type, NEW_CONSULT_TRANSLATOR)
 
@@ -578,6 +590,7 @@ def get_confirm_state(flow_type):
         "treatment_immuno": TREATMENT_CONFIRM,
         "treatment_dialysis": TREATMENT_CONFIRM,
         "treatment_combined": TREATMENT_CONFIRM,
+        "transplant": TRANSPLANT_CONFIRM,
     }
     return states.get(flow_type, NEW_CONSULT_CONFIRM)
 
@@ -1813,7 +1826,7 @@ async def handle_final_confirm(update: Update, context: ContextTypes.DEFAULT_TYP
     valid_flow_types = ["new_consult", "followup", "emergency", "admission", "surgery_consult",
                          "operation", "final_consult", "discharge", "rehab_physical", "rehab_device", "radiology", "appointment_reschedule",
                          "radiation_therapy", "periodic_followup", "inpatient_followup", "device", "endoscopy",
-                         "treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis", "treatment_combined"]
+                         "treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis", "treatment_combined", "transplant"]
 
     logger.info(f"🔍 [HANDLE_FINAL_CONFIRM] report_tmp current_flow: {current_flow}")
     logger.info(f"🔍 [HANDLE_FINAL_CONFIRM] report_tmp medical_action: {data.get('medical_action', '')}")
@@ -1920,7 +1933,7 @@ async def save_report_to_database(query, context, flow_type):
     valid_flow_types = ["new_consult", "followup", "emergency", "admission", "surgery_consult",
                          "operation", "final_consult", "discharge", "rehab_physical", "rehab_device", "radiology", "appointment_reschedule",
                          "radiation_therapy", "periodic_followup", "inpatient_followup", "device", "endoscopy",
-                         "treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis", "treatment_combined"]
+                         "treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis", "treatment_combined", "transplant"]
 
     # ✅ إصلاح: إذا كان current_flow أكثر تحديداً (مثل periodic_followup بدلاً من followup)، استخدمه
     # المسارات الأكثر تحديداً لها الأولوية
@@ -2483,6 +2496,12 @@ async def save_report_to_database(query, context, flow_type):
             # flow_type لنفس السبب أعلاه (مفتاح خاص بهذه المسارات فقط).
             treatment_plan_summary=data.get("treatment_plan_summary", "") or None,
 
+            # ✅ حقول 🫁 معاملة الزراعة — بلا شرط flow_type لنفس السبب أعلاه
+            # (مفاتيح خاصة بهذا المسار فقط، None تلقائياً لبقية المسارات).
+            transplant_type=data.get("transplant_type", "") or None,
+            transplant_parties=data.get("transplant_parties", "") or None,
+            transplant_details=data.get("transplant_details", "") or None,
+
             # ✅ حقول العلاج الإشعاعي (فقط إذا كان المسار هو radiation_therapy)
             radiation_therapy_type=(data.get("radiation_therapy_type", "") or None) if flow_type == "radiation_therapy" else None,
             radiation_therapy_session_number=(data.get("radiation_therapy_session_number", "") or None) if flow_type == "radiation_therapy" else None,
@@ -2842,6 +2861,23 @@ async def save_report_to_database(query, context, flow_type):
                 logger.info(
                     f"💊 save_report_to_database: حقول جلسات العلاج - "
                     f"plan_summary={plan_summary!r}, notes={data.get('notes')!r}"
+                )
+
+            # ✅ إضافة حقول مسار 🫁 معاملة الزراعة — نفس سبب الحقول أعلاه:
+            # broadcast_data يُبنى يدوياً حقلاً حقلاً ولا يرث من data تلقائياً.
+            if flow_type == "transplant":
+                for field in ("transplant_type", "transplant_parties", "transplant_details"):
+                    value = data.get(field, "")
+                    if not value:
+                        report_tmp = context.user_data.get("report_tmp", {})
+                        value = report_tmp.get(field, "")
+                    if value:
+                        broadcast_data[field] = value
+                logger.info(
+                    f"🫁 save_report_to_database: حقول معاملة الزراعة - "
+                    f"type={broadcast_data.get('transplant_type')!r}, "
+                    f"parties={broadcast_data.get('transplant_parties')!r}, "
+                    f"details={broadcast_data.get('transplant_details')!r}"
                 )
 
             # ✅ إضافة حقول مسار المناظير — نفس السبب أعلاه، كانت مفقودة من
@@ -3295,6 +3331,7 @@ async def handle_translator_page_navigation(update: Update, context: ContextType
             "discharge", "rehab_physical", "rehab_device", "device",
             "radiology", "appointment_reschedule", "radiation_therapy", "endoscopy",
             "treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis", "treatment_combined",
+            "transplant",
         ]
         current_flow = context.user_data.get("report_tmp", {}).get("current_flow", "")
         more_specific = {"followup": ["periodic_followup", "inpatient_followup"]}

@@ -73,6 +73,9 @@ from .states import (
     ONCOLOGY_QUEUE_TOTAL, ONCOLOGY_QUEUE_CURRENT,
     ONCOLOGY_DELIVERY_MODE, ONCOLOGY_DELIVERY_DAYS,
     TREATMENT_DIALYSIS_SESSION, TREATMENT_DIALYSIS_UPLOAD,
+    TRANSPLANT_TYPE, TRANSPLANT_PARTY, TRANSPLANT_DETAILS,
+    TRANSPLANT_FOLLOWUP_DATE, TRANSPLANT_FOLLOWUP_REASON,
+    TRANSPLANT_TRANSLATOR, TRANSPLANT_CONFIRM,
 )
 
 # =============================
@@ -382,6 +385,26 @@ def _treatment_handlers():
         return {}
 
 
+def _transplant_handlers():
+    """Import and return transplant flow handlers by name."""
+    try:
+        from bot.handlers.user.user_reports_add_new_system.flows.transplant import (
+            handle_transplant_type_choice,
+            handle_transplant_party_toggle, handle_transplant_party_next,
+            handle_transplant_details, handle_transplant_followup_reason,
+        )
+        return {
+            'type_choice':      handle_transplant_type_choice,
+            'party_toggle':     handle_transplant_party_toggle,
+            'party_next':       handle_transplant_party_next,
+            'details':          handle_transplant_details,
+            'followup_reason':  handle_transplant_followup_reason,
+        }
+    except ImportError as e:
+        logger.error(f"❌ Cannot import transplant handlers: {e}")
+        return {}
+
+
 def _oncology_handlers():
     """Import and return oncology_multiselect flow handlers by name."""
     try:
@@ -476,6 +499,9 @@ def register(app):
     # --- Treatment sessions handlers (chemo/targeted/immuno/dialysis) ---
     tp = _treatment_handlers()
     onc = _oncology_handlers()
+
+    # --- Transplant handlers (Chennai-only action type) ---
+    trp = _transplant_handlers()
 
     # --- Flow handlers — direct imports from package (no monolith dependency) ---
     from .flows.new_consult import (
@@ -1251,6 +1277,30 @@ def register(app):
                 CallbackQueryHandler(sh['handle_smart_cancel_navigation'], pattern="^nav:cancel$"),
             ],
             TREATMENT_FOLLOWUP_DATE: _followup_date_state_handlers(sh, TREATMENT_FOLLOWUP_DATE),
+            # ── 🫁 معاملة الزراعة (Chennai-only) ──────────────────────────────
+            TRANSPLANT_TYPE: [
+                CallbackQueryHandler(_tracked(trp.get('type_choice'), TRANSPLANT_TYPE), pattern="^transplant_type:"),
+                CallbackQueryHandler(sh['handle_smart_cancel_navigation'], pattern="^nav:cancel$"),
+            ],
+            TRANSPLANT_PARTY: [
+                CallbackQueryHandler(_tracked(trp.get('party_toggle'), TRANSPLANT_PARTY), pattern="^transplant_party:"),
+                CallbackQueryHandler(_tracked(trp.get('party_next'), TRANSPLANT_PARTY),   pattern="^transplant_party_next$"),
+                CallbackQueryHandler(sh['handle_smart_back_navigation'],   pattern="^nav:back$"),
+                CallbackQueryHandler(sh['handle_smart_cancel_navigation'], pattern="^nav:cancel$"),
+            ],
+            TRANSPLANT_DETAILS: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, _tracked(trp.get('details'), TRANSPLANT_DETAILS)),
+                CallbackQueryHandler(sh['handle_smart_back_navigation'],   pattern="^nav:back$"),
+                CallbackQueryHandler(sh['handle_smart_cancel_navigation'], pattern="^nav:cancel$"),
+            ],
+            TRANSPLANT_FOLLOWUP_DATE: _followup_date_state_handlers(sh, TRANSPLANT_FOLLOWUP_DATE),
+            TRANSPLANT_FOLLOWUP_REASON: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, _tracked(trp.get('followup_reason'), TRANSPLANT_FOLLOWUP_REASON)),
+                CallbackQueryHandler(sh['handle_smart_back_navigation'],   pattern="^nav:back$"),
+                CallbackQueryHandler(sh['handle_smart_cancel_navigation'], pattern="^nav:cancel$"),
+            ],
+            TRANSPLANT_TRANSLATOR: _translator_state_handlers(sh, TRANSPLANT_TRANSLATOR),
+            TRANSPLANT_CONFIRM: _confirm_state_handlers(sh, route_sel, route_inp),
             TREATMENT_FOLLOWUP_REASON: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, _tracked(tp.get('followup_reason'), TREATMENT_FOLLOWUP_REASON)),
                 CallbackQueryHandler(sh['handle_smart_back_navigation'],   pattern="^nav:back$"),

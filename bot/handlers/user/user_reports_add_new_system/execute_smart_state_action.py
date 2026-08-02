@@ -48,6 +48,9 @@ from .states import (
     TREATMENT_FOLLOWUP_REASON, TREATMENT_TRANSLATOR, TREATMENT_CONFIRM,
     ONCOLOGY_QUEUE_TOTAL, ONCOLOGY_QUEUE_CURRENT, ONCOLOGY_DELIVERY_DAYS,
     TREATMENT_DIALYSIS_SESSION, TREATMENT_DIALYSIS_UPLOAD,
+    TRANSPLANT_TYPE, TRANSPLANT_PARTY, TRANSPLANT_DETAILS,
+    TRANSPLANT_FOLLOWUP_DATE, TRANSPLANT_FOLLOWUP_REASON,
+    TRANSPLANT_TRANSLATOR, TRANSPLANT_CONFIRM,
 )
 from .utils import _nav_buttons
 from .smart_state_renderer import SmartStateRenderer
@@ -173,6 +176,10 @@ async def execute_smart_state_action(target_step, flow_type, update, context):
         TREATMENT_FOLLOWUP_REASON: 'FOLLOWUP_REASON',
         TREATMENT_TRANSLATOR: 'TRANSLATOR',
         TREATMENT_CONFIRM: 'CONFIRM',
+        TRANSPLANT_FOLLOWUP_DATE: 'FOLLOWUP_DATE_TIME',
+        TRANSPLANT_FOLLOWUP_REASON: 'FOLLOWUP_REASON',
+        TRANSPLANT_TRANSLATOR: 'TRANSLATOR',
+        TRANSPLANT_CONFIRM: 'CONFIRM',
     }
 
     if isinstance(target_step, int):
@@ -725,6 +732,34 @@ async def execute_smart_state_action(target_step, flow_type, update, context):
                     [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
                      InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")],
                 ]),
+                parse_mode="Markdown"
+            )
+            return target_step
+
+        elif target_step == TRANSPLANT_TYPE:
+            from .flows.transplant import _type_keyboard, MEDICAL_ACTION_LABEL
+            await update.callback_query.edit_message_text(
+                f"🫁 **{MEDICAL_ACTION_LABEL}**\n\nاختر نوع الزراعة:",
+                reply_markup=_type_keyboard(),
+                parse_mode="Markdown"
+            )
+            return target_step
+
+        elif target_step == TRANSPLANT_PARTY:
+            from .flows.transplant import _party_keyboard, _PARTY_SCREEN_TEXT
+            rt = context.user_data.get("report_tmp", {})
+            selected = set(rt.get("_transplant_parties_selected") or [])
+            await update.callback_query.edit_message_text(
+                _PARTY_SCREEN_TEXT,
+                reply_markup=_party_keyboard(selected),
+                parse_mode="Markdown"
+            )
+            return target_step
+
+        elif target_step == TRANSPLANT_DETAILS:
+            await update.callback_query.edit_message_text(
+                "📝 **تفاصيل المعاملة**\n\nيرجى إدخال تفاصيل المعاملة:",
+                reply_markup=_nav_buttons(show_back=True),
                 parse_mode="Markdown"
             )
             return target_step

@@ -867,6 +867,16 @@ def format_report_message(data: dict) -> str:
             lines.append(f"👨‍⚕️ المترجم: {data['translator_name']}")
         return "\n".join(lines)
 
+    elif medical_action == 'معاملة الزراعة':
+        lines.extend(_build_transplant_fields(data))
+        lines.append("")
+        lines.append("━━━━━━━━━━━━━━━━━━━━")
+        lines.append("")
+        lines.extend(_build_medical_report_status(data))
+        if data.get('translator_name'):
+            lines.append(f"👨‍⚕️ المترجم: {data['translator_name']}")
+        return "\n".join(lines)
+
     else:
         # ✅ معالجة الحقول العامة (new_consult, followup, emergency, etc.)
         lines.extend(_build_general_fields(data))
@@ -1282,6 +1292,31 @@ def _build_treatment_session_fields(data: dict) -> list:
         # الخطوة الفعلية في flows/treatment_sessions.py::_prompt_notes.
         notes_label = "قرار الطبيب" if (data.get('medical_action') or '').strip() == 'جلسات غسيل الكلى' else "ملاحظات الطبيب"
         lines.append(f"📝 **{notes_label}:** {escape_markdown(str(notes).strip())}")
+        lines.append("")
+
+    lines.extend(_build_followup_fields(data))
+
+    return lines
+
+
+def _build_transplant_fields(data: dict) -> list:
+    """بناء حقول 🫁 معاملة الزراعة (قسم تشناي فقط)."""
+    lines = []
+
+    transplant_type = data.get('transplant_type', '')
+    if transplant_type and str(transplant_type).strip():
+        lines.append(f"🫁 **نوع الزراعة:** {escape_markdown(str(transplant_type).strip())}")
+        lines.append("")
+
+    parties = data.get('transplant_parties', '')
+    if parties and str(parties).strip():
+        lines.append(f"🏢 **الجهة:** {escape_markdown(str(parties).strip())}")
+        lines.append("")
+
+    details = data.get('transplant_details', '')
+    if details and str(details).strip():
+        lines.append("📝 **تفاصيل المعاملة:**")
+        lines.append(escape_markdown(str(details).strip()))
         lines.append("")
 
     lines.extend(_build_followup_fields(data))

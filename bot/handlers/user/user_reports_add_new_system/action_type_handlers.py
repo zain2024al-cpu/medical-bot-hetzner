@@ -37,6 +37,7 @@ def _get_action_routing():
             start_immuno_flow,
             start_dialysis_flow,
         )
+        from .flows.transplant import start_transplant_flow
         logger.debug(f"✅ start_radiation_therapy_flow imported successfully: {start_radiation_therapy_flow}")
     except ImportError as e:
         logger.error(f"❌ Error importing flow functions: {e}")
@@ -49,7 +50,7 @@ def _get_action_routing():
         ADMISSION_REASON, OPERATION_DETAILS_AR, SURGERY_CONSULT_DIAGNOSIS,
         FINAL_CONSULT_DIAGNOSIS, DISCHARGE_TYPE, REHAB_TYPE, RADIOLOGY_TYPE,
         APP_RESCHEDULE_REASON, RADIATION_THERAPY_TYPE, ENDOSCOPY_COMPLAINT,
-        CHEMO_CYCLES_TOTAL, TREATMENT_PLAN_SETUP,
+        CHEMO_CYCLES_TOTAL, TREATMENT_PLAN_SETUP, TRANSPLANT_TYPE,
     )
     
     routing_dict = {
@@ -143,6 +144,11 @@ def _get_action_routing():
             "flow": start_dialysis_flow,
             "pre_process": None
         },
+        "معاملة الزراعة": {
+            "state": TRANSPLANT_TYPE,
+            "flow": start_transplant_flow,
+            "pre_process": None
+        },
     }
 
     return routing_dict
@@ -191,9 +197,21 @@ _TOP_LEVEL_ACTIONS = [
     ("علاج طبيعي وإعادة تأهيل",   "🏃"),
 ]
 
+# ✅ أزرار تظهر حصراً داخل قسم "🏙️ الرعاية الصحية - تشناي"
+# (context.user_data["report_city"] == "chennai") — مخفية تماماً في قائمة
+# نوع الإجراء الاعتيادية. راجع _build_action_type_keyboard(city=...).
+_CHENNAI_ONLY_ACTIONS = [
+    ("معاملة الزراعة",           "🫁"),
+]
 
-def _build_action_type_keyboard(page=0):
-    """القائمة الرئيسية لنوع الإجراء: أزرار التصنيفات + الأزرار غير المصنّفة."""
+
+def _build_action_type_keyboard(page=0, city=None):
+    """القائمة الرئيسية لنوع الإجراء: أزرار التصنيفات + الأزرار غير المصنّفة.
+
+    city — None (الافتراضي): القائمة الاعتيادية، بلا أزرار قسم تشناي.
+    "chennai": يُضاف صف "🫁 معاملة الزراعة" (ولاحقاً أي زر Chennai-only
+    آخر) بعد الأزرار غير المصنَّفة — بنفس callback_data (action_idx) تماماً.
+    """
     idx_map = {name: i for i, name in enumerate(PREDEFINED_ACTIONS)}
 
     keyboard = []
@@ -224,6 +242,20 @@ def _build_action_type_keyboard(page=0):
             row = []
     if row:
         keyboard.append(row)
+
+    # ✅ أزرار حصرية لقسم "🏙️ الرعاية الصحية - تشناي"
+    if city == "chennai":
+        row = []
+        for action_name, icon in _CHENNAI_ONLY_ACTIONS:
+            idx = idx_map.get(action_name)
+            if idx is None:
+                continue
+            row.append(InlineKeyboardButton(f"{icon} {action_name}", callback_data=f"action_idx:{idx}"))
+            if len(row) == 2:
+                keyboard.append(row)
+                row = []
+        if row:
+            keyboard.append(row)
 
     keyboard.append([
         InlineKeyboardButton("🔙 رجوع", callback_data="go_to_search_doctor_screen"),
@@ -258,11 +290,11 @@ def _build_leaves_keyboard(subs, back_target: str):
     return keyboard
 
 
-def _build_category_submenu(cat_key):
+def _build_category_submenu(cat_key, city=None):
     """القائمة الفرعية لتصنيف معيّن — أزرار الإجراءات بنفس callback القديم."""
     cat = next((c for c in ACTION_CATEGORIES if c[0] == cat_key), None)
     if not cat:
-        return _build_action_type_keyboard()
+        return _build_action_type_keyboard(city=city)
     _key, cat_label, subs = cat
     keyboard = _build_leaves_keyboard(subs, back_target="main")
     text = f"⚕️ **{cat_label}**\n\nاختر نوع الإجراء:"
@@ -296,15 +328,16 @@ async def handle_action_category(update: Update, context: ContextTypes.DEFAULT_T
     await query.answer()
     cat_key = query.data.split(":", 1)[1]
     context.user_data['_conversation_state'] = R_ACTION_TYPE
+    city = context.user_data.get("report_city")
     if cat_key == "main":
-        text, keyboard, _ = _build_action_type_keyboard()
+        text, keyboard, _ = _build_action_type_keyboard(city=city)
     elif cat_key == TREATMENT_SESSIONS_KEY:
         text, keyboard, _ = _build_treatment_sessions_menu()
     elif cat_key == ONCOLOGY_KEY:
         from .flows.oncology_multiselect import build_oncology_multiselect_screen
         text, keyboard = build_oncology_multiselect_screen(context)
     else:
-        text, keyboard, _ = _build_category_submenu(cat_key)
+        text, keyboard, _ = _build_category_submenu(cat_key, city=city)
     try:
         await query.edit_message_text(text, reply_markup=keyboard, parse_mode="Markdown")
     except Exception as e:
@@ -323,7 +356,7 @@ async def show_action_type_menu(message, context, page=0, query=None):
     logger.info("SHOW_ACTION_TYPE_MENU: Function called")
     logger.info(f"SHOW_ACTION_TYPE_MENU: Total actions = {len(PREDEFINED_ACTIONS)}")
 
-    text, keyboard, total_pages = _build_action_type_keyboard(0)
+    text, keyboard, total_pages = _build_action_type_keyboard(0, city=context.user_data.get("report_city"))
 
     if query:
         try:
@@ -352,7 +385,7 @@ async def handle_action_page(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     try:
         page = int(query.data.split(":", 1)[1])
-        text, keyboard, total_pages = _build_action_type_keyboard(page)
+        text, keyboard, total_pages = _build_action_type_keyboard(page, city=context.user_data.get("report_city"))
         
         if page < 0 or page >= total_pages:
             await query.answer("⚠️ رقم الصفحة غير صحيح", show_alert=True)
