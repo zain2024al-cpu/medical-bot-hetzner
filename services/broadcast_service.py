@@ -1278,7 +1278,10 @@ def _build_treatment_session_fields(data: dict) -> list:
 
     notes = data.get('notes', '')
     if notes and str(notes).strip() and str(notes) != 'لا يوجد':
-        lines.append(f"📝 **ملاحظات الطبيب:** {escape_markdown(str(notes).strip())}")
+        # ✅ غسيل الكلى: نفس الحقل (notes) لكن بتسمية "قرار الطبيب" — يطابق
+        # الخطوة الفعلية في flows/treatment_sessions.py::_prompt_notes.
+        notes_label = "قرار الطبيب" if (data.get('medical_action') or '').strip() == 'جلسات غسيل الكلى' else "ملاحظات الطبيب"
+        lines.append(f"📝 **{notes_label}:** {escape_markdown(str(notes).strip())}")
         lines.append("")
 
     lines.extend(_build_followup_fields(data))
