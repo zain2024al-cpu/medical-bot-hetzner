@@ -604,11 +604,17 @@ def register(app):
             CallbackQueryHandler(start_report, pattern="^add_report$"),
             # ✅ قسم تشناي — زرّه "🏙️ إضافة تقرير جديد - تشناي" يحتوي نفس
             # عبارة الزر الاعتيادي، لذا:
-            #   1) يُسجَّل أولاً ويُطابَق على الكلمة المميِّزة "تشناي".
+            #   1) يُسجَّل أولاً ويُطابَق على عبارة الزر كاملةً (إضافة+تقرير+
+            #      جديد+تشناي معاً)، لا على الكلمة "تشناي" وحدها — نمط
+            #      "تشناي" فقط كان يلتقط أي زر آخر يحتوي هذه الكلمة (مثل
+            #      "🏙️ الرعاية الصحية - تشناي") ويُحوِّله خطأً لهذا المسار.
             #   2) النمط الاعتيادي أدناه يستثني "تشناي" صراحةً (نفي أمامي)
             #      حتى لا يلتقط زر تشناي لو تغيّر ترتيب المعالجات مستقبلاً
             #      فيفتح التقارير الاعتيادية بكل أسماء المرضى.
-            MessageHandler(filters.TEXT & filters.Regex(r"تشناي"), start_report_chennai),
+            MessageHandler(
+                filters.TEXT & filters.Regex(r"إضافة.*تقرير.*جديد.*تشناي"),
+                start_report_chennai,
+            ),
             MessageHandler(
                 filters.TEXT & filters.Regex(r"^(?!.*تشناي).*إضافة\s*تقرير\s*جديد"),
                 start_report,
@@ -1270,10 +1276,13 @@ def register(app):
             MessageHandler(filters.Regex(r"^/start$"),                        sh['handle_restart_from_start']),
             MessageHandler(filters.Regex(r"^🚀\s*(ابدأ( الآن)?|أبدا استخدام النظام)\s*$"), sh['handle_restart_from_start']),
             CallbackQueryHandler(sh['handle_restart_from_start_main_menu'],   pattern="^start_main_menu$"),
-            # ✅ نفس منطق نقاط الدخول: زر تشناي يُوجَّه لمساره، والنمط
-            # الاعتيادي يستثني "تشناي" حتى لا يبتلع زر تشناي هنا فيفتح
-            # التقارير الاعتيادية بكل أسماء المرضى.
-            MessageHandler(filters.TEXT & filters.Regex(r"تشناي"), start_report_chennai),
+            # ✅ نفس منطق نقاط الدخول: زر تشناي يُوجَّه لمساره — بمطابقة
+            # عبارة الزر كاملةً لا كلمة "تشناي" وحدها (كانت تلتقط أي زر آخر
+            # يحوي هذه الكلمة، مثل "🏙️ الرعاية الصحية - تشناي"، فترفضه
+            # هنا بلا مبرر لأنه ليس تقرير تشناي أصلاً). والنمط الاعتيادي
+            # يستثني "تشناي" حتى لا يبتلع زر تشناي هنا فيفتح التقارير
+            # الاعتيادية بكل أسماء المرضى.
+            MessageHandler(filters.TEXT & filters.Regex(r"إضافة.*تقرير.*جديد.*تشناي"), start_report_chennai),
             MessageHandler(filters.TEXT & filters.Regex(r"^(?!.*تشناي).*إضافة.*تقرير.*جديد"), start_report),
             CallbackQueryHandler(sh['handle_smart_back_navigation'],          pattern="^nav:back$"),
             CallbackQueryHandler(sh['debug_all_callbacks'],                   pattern=".*"),
