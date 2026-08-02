@@ -160,11 +160,15 @@ _DECISION_SEGMENT_PREFIXES = (
 )
 
 
-def _resolve_target_group_id(patient):
+def _resolve_target_group_id(patient_type):
     """مجموعة إعادة النشر — مرضى تشناي لمجموعتهم الخاصة، وإلا الاعتيادية.
-    نسخة مطابقة لتلك في flows/shared.py (نفس القاعدة، مشتقّة من المريض)."""
+    نسخة مطابقة لتلك في flows/shared.py (نفس القاعدة، مشتقّة من المريض).
+
+    ⚠️ المعامل **نص** لا كائن `Patient` — عمداً. تمرير الكائن نفسه معرّض
+    لـ`DetachedInstanceError` الصامت إن أُعيد ترتيب الكود لاحقاً بحيث
+    يُقرأ بعد `commit()`/`close()` الجلسة (كما وقع فعلاً في shared.py)."""
     try:
-        if patient is not None and (getattr(patient, "patient_type", None) or "") == "chennai":
+        if (patient_type or "") == "chennai":
             from config.settings import CHENNAI_REPORTS_GROUP_ID
             return CHENNAI_REPORTS_GROUP_ID or None
     except Exception:
@@ -1288,7 +1292,7 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 'medical_action': report.medical_action or 'غير محدد',
                 # ✅ إعادة النشر تحترم مجموعة القسم: مرضى تشناي → مجموعة
                 # تشناي (البطاقة والمرفقات)، ويُشتق من نوع المريض نفسه.
-                'target_group_id': _resolve_target_group_id(patient),
+                'target_group_id': _resolve_target_group_id(patient.patient_type if patient else None),
                 # الحقول النصية — doctor_decision فارغ لمنع التكرار في format_report_message
                 'complaint_text': report.complaint_text or '',
                 'complaint': report.complaint_text or '',

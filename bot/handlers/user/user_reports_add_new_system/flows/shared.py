@@ -48,17 +48,21 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-def _resolve_target_group_id(patient):
+def _resolve_target_group_id(patient_type):
     """مجموعة النشر المناسبة لهذا التقرير — تُشتق من نوع المريض نفسه.
 
     مرضى تشناي (patient_type="chennai") → مجموعة تشناي الخاصة (البطاقة
     والمرفقات الورقية معاً). أي نوع آخر → None ⇒ المجموعة الاعتيادية.
 
-    الاشتقاق من المريض (لا من جلسة المستخدم) يجعل التوجيه صحيحاً تلقائياً
-    في إعادة النشر بعد التعديل أيضاً، بلا عمود إضافي في جدول التقارير.
+    ⚠️ المعامل **نص** لا كائن ORM، عمداً. تمرير كائن `Patient` كان يفشل
+    صامتاً: الكائن تُبطَل صفاته عند `session.commit()` ويُفصَل عند
+    `session.close()`، فقراءة أي صفة بعدهما ترفع `DetachedInstanceError`
+    يبتلعها `except` وتُرجَع `None` ⇒ يُنشر تقرير تشناي في المجموعة
+    الرئيسة. خُذ لقطة نصية من `patient.patient_type` **والجلسة مفتوحة**
+    ومرّرها هنا.
     """
     try:
-        if patient is not None and (getattr(patient, "patient_type", None) or "") == "chennai":
+        if (patient_type or "") == "chennai":
             from config.settings import CHENNAI_REPORTS_GROUP_ID
             return CHENNAI_REPORTS_GROUP_ID or None
     except Exception as exc:
@@ -1952,11 +1956,25 @@ async def save_report_to_database(query, context, flow_type):
 
         # حفظ المريض
         patient_name = data.get("patient_name", "غير محدد")
-        patient = session.query(Patient).filter_by(full_name=patient_name).first()
+        # ✅ الأولوية لمعرّف المريض الذي اختاره المستخدم فعلاً من المنتقي.
+        # البحث بالاسم وحده يُخطئ عند تشابه الأسماء (مريض عام ومريض تشناي
+        # بالاسم نفسه ⇒ .first() يختار الأول) ويُنشئ مريضاً جديداً بنوع
+        # افتراضي عند أي فرق حرفي — وكلاهما يوجّه التقرير لمجموعة خاطئة.
+        patient = None
+        selected_patient_id = data.get("patient_id")
+        if selected_patient_id:
+            patient = session.query(Patient).filter_by(id=selected_patient_id).first()
+        if patient is None:
+            patient = session.query(Patient).filter_by(full_name=patient_name).first()
         if not patient:
             patient = Patient(full_name=patient_name)
             session.add(patient)
             session.flush()
+
+        # ✅ لقطة نصية لنوع المريض **والجلسة ما زالت مفتوحة**. تُقرأ لاحقاً
+        # عند بناء بيانات البث بعد commit()+close()، حيث يكون الكائن
+        # مفصولاً وقراءة صفاته ترفع DetachedInstanceError.
+        patient_type_snapshot = patient.patient_type
 
         # حفظ المستشفى
         hospital_name = data.get("hospital_name", "غير محدد")
@@ -2604,8 +2622,9 @@ async def save_report_to_database(query, context, flow_type):
                 'current_flow': flow_type,
                 # ✅ توجيه مجموعة النشر: مرضى تشناي → مجموعة تشناي (التقرير
                 # ومرفقاته الورقية معاً). يُشتق من نوع المريض نفسه فيبقى
-                # صحيحاً في أي إعادة نشر لاحقة بلا عمود إضافي.
-                'target_group_id': _resolve_target_group_id(patient),
+                # صحيحاً في أي إعادة نشر لاحقة بلا عمود إضافي. يستخدم
+                # اللقطة النصية لا كائن `patient` — الجلسة أُغلقت أعلاه.
+                'target_group_id': _resolve_target_group_id(patient_type_snapshot),
                 'complaint_text': complaint_text,
                 'doctor_decision': decision_text,
                 'followup_date': followup_display,
