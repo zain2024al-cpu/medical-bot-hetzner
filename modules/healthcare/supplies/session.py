@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 from datetime import datetime
-from modules.healthcare._tz import now_ist
 
 _KEY = "_hcsup_add"
 
@@ -68,7 +67,7 @@ class SuppliesSession:
             images=                   [],
             notes=                    "",
             specialist_name=          "",
-            created_at=               now_ist().isoformat(),
+            created_at=               datetime.utcnow().isoformat(),
             edit_from_review=         False,
         )
         session.save(user_data)

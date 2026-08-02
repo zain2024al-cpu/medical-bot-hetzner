@@ -4,7 +4,6 @@ import json
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from modules.healthcare._tz import now_ist
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +54,7 @@ def save_supplies_record(
             # التاريخ" — وليس وقت النشر الفعلي. نفس سبب التعديل في
             # medications/models.py: بدونه يتجاهل العمود اختيار المستخدم
             # ويظهر تاريخ خاطئ في مسير إخلاء الصيدلية.
-            created_at=               created_at or now_ist(),
+            created_at=               created_at or datetime.utcnow(),
         )
         db.add(record)
         db.flush()
