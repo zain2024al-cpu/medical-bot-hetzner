@@ -249,6 +249,7 @@ def build_specialist_prompt(session: WoundcareAddSession) -> tuple[str, InlineKe
         ],
         [
             InlineKeyboardButton("د. زكريا", callback_data=f"{WCA}:sp_zakariya"),
+            InlineKeyboardButton("د. مبروك", callback_data=f"{WCA}:sp_mabrook"),
         ],
         [
             InlineKeyboardButton("🔙 رجوع", callback_data=f"{WCA}:back"),
