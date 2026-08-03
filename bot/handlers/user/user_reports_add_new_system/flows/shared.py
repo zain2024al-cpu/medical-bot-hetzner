@@ -2045,16 +2045,21 @@ async def save_report_to_database(query, context, flow_type):
                 if return_reason:
                     decision_text += f"سبب العودة: {return_reason}"
         elif flow_type in ["new_consult", "followup", "periodic_followup", "inpatient_followup", "emergency"]:
-            complaint_text = data.get("complaint", "")
+            # ✅ complaint_text هو المفتاح الموحَّد الجديد (field_registry.py) —
+            # لكن مسارات الإدخال الفعلية ما زالت تكتب "complaint" (سيُوحَّد لاحقاً).
+            # الأولوية لـ complaint_text لأن شاشة التعديل قبل النشر تكتب فيه فقط.
+            complaint_text = data.get("complaint_text") or data.get("complaint", "")
             diagnosis = data.get("diagnosis", "")
             decision = data.get("decision", "")
             decision_text = f"التشخيص: {diagnosis}\n\nقرار الطبيب: {decision}"
-            
+
             if flow_type == "new_consult":
                 tests = data.get("tests", "لا يوجد")
                 decision_text += f"\n\nالفحوصات المطلوبة: {tests}"
             elif flow_type == "emergency":
-                status = data.get("status", "")
+                # ✅ نفس منطق complaint_text أعلاه: case_status هو المفتاح
+                # الموحَّد الجديد الذي تكتبه شاشة التعديل، status هو القديم.
+                status = data.get("case_status") or data.get("status", "")
                 decision_text += f"\n\nوضع الحالة: {status}"
                 # ✅ ملاحظات الرقود/نوع الترقيد/تفاصيل العملية لا أعمدة مخصصة
                 # لها في Report — كانت تُرسَل إلى broadcast_data عند النشر
@@ -2241,9 +2246,29 @@ async def save_report_to_database(query, context, flow_type):
             diagnosis=data.get("diagnosis", ""),  # ✅ حفظ التشخيص بشكل منفصل
             medications=medications_field,  # ✅ حفظ tests في medications لـ new_consult
             notes=notes_value,  # ✅ حفظ notes (أو ملاحظات/توصيات لمسار العلاج الإشعاعي)
-            treatment_plan=data.get("treatment_plan", ""),  # ✅ حفظ treatment_plan
-            case_status=data.get("status", ""),  # ✅ حفظ حالة الطوارئ
-            
+            # ✅ recommendations (استشارة أخيرة) يُحفَظ في treatment_plan —
+            # كان يُكتب فقط في doctor_decision المركّب ويُقرأ من treatment_plan
+            # الفارغ دائماً، فيختفي بعد النشر (خلل حقيقي، مُصلَح الآن).
+            treatment_plan=data.get("recommendations") or data.get("treatment_plan", ""),
+            # ✅ case_status هو المفتاح الموحَّد الجديد لحالة الطوارئ، status القديم.
+            case_status=data.get("case_status") or data.get("status", ""),
+
+            # ✅ حقول قديمة كانت تُدمَج فقط في doctor_decision المركّب بلا عمود
+            # مستقل، فتُفقَد أي إعادة قراءة منفصلة لها (عملية/خروج/ترقيد/طوارئ/
+            # علاج طبيعي/أجهزة تعويضية) — أعمدة مستقلة الآن (field_registry.py).
+            # بلا شرط flow_type: كل مفتاح خاص بمسار واحد فقط، None تلقائياً لبقية المسارات.
+            operation_details=data.get("operation_details") or None,
+            operation_name_en=data.get("operation_name_en") or None,
+            success_rate=data.get("success_rate") or None,
+            benefit_rate=data.get("benefit_rate") or None,
+            admission_reason=data.get("admission_reason") or None,
+            discharge_type=data.get("discharge_type") or None,
+            admission_summary=data.get("admission_summary") or None,
+            therapy_details=data.get("therapy_details") or None,
+            device_details=(data.get("device_details") or data.get("device_name")) or None,
+            admission_notes=data.get("admission_notes") or None,
+            admission_type=data.get("admission_type") or None,
+
             # ✅ حقول خاصة
             room_number=data.get("room_number", "") or None,  # ✅ حفظ room_number
             
@@ -2472,8 +2497,10 @@ async def save_report_to_database(query, context, flow_type):
             # ✅ إضافة حقول الطوارئ الخاصة
             if flow_type == "emergency":
                 # وضع الحالة (تم الخروج / تم الترقيد / تم إجراء عملية)
-                if data.get('status'):
-                    broadcast_data['status'] = data.get('status')
+                # ✅ case_status هو المفتاح الموحَّد الجديد (تكتبه شاشة التعديل)، status القديم.
+                _emergency_status = data.get('case_status') or data.get('status')
+                if _emergency_status:
+                    broadcast_data['status'] = _emergency_status
                 # ملاحظات الرقود (عند اختيار "تم الترقيد")
                 if data.get('admission_notes'):
                     broadcast_data['admission_notes'] = data.get('admission_notes')
