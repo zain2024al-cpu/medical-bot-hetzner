@@ -33,15 +33,24 @@ def build_calendar(
     month: int,
     callback_prefix: str,
     back_callback: str,
+    quick_jump: bool = False,
 ) -> tuple[str, InlineKeyboardMarkup]:
     """
     Return (prompt_text, inline_keyboard) for an interactive month calendar.
 
     callback_prefix  — flow prefix without trailing colon, e.g. "wca" or "hcfu"
     back_callback    — full callback_data for the ⬅️ رجوع button, e.g. "wca:start"
+    quick_jump       — add ±1-year buttons and make the month/year label tappable
+                       (opens the year picker). Off by default so every existing
+                       caller keeps its current single-month stepping unchanged.
+
+    Use quick_jump=True for far-future dates (passport / visa / residence
+    expiry): stepping a month at a time to 2032 is ~96 taps, whereas
+    year-picker → month-picker → day is three.
 
     The resulting keyboard is:
         Row 0 : [◀️]  [Month Year]  [▶️]     — navigation header
+                (quick_jump: [«] [◀️] [Month Year] [▶️] [»])
         Row 1 : [م]  [ث]  [أر]  [خ]  [ج]  [س]  [ح]  — weekday labels
         Row 2+ : day numbers (empty cells are invisible noop buttons)
         Last  : [⬅️ رجوع]
@@ -59,15 +68,35 @@ def build_calendar(
     rows: list[list[InlineKeyboardButton]] = []
 
     # ── Row 0: navigation ─────────────────────────────────────────────────────
-    rows.append([
-        InlineKeyboardButton(
-            "◀️", callback_data=f"{callback_prefix}:cal_prev:{prev_y}:{prev_m}"
-        ),
-        InlineKeyboardButton(month_label, callback_data=noop),
-        InlineKeyboardButton(
-            "▶️", callback_data=f"{callback_prefix}:cal_next:{next_y}:{next_m}"
-        ),
-    ])
+    if quick_jump:
+        rows.append([
+            InlineKeyboardButton(
+                "«", callback_data=f"{callback_prefix}:cal_yprev:{year - 1}:{month}"
+            ),
+            InlineKeyboardButton(
+                "◀️", callback_data=f"{callback_prefix}:cal_prev:{prev_y}:{prev_m}"
+            ),
+            # Tappable label → year picker (the entry point to the fast path)
+            InlineKeyboardButton(
+                month_label, callback_data=f"{callback_prefix}:cal_years:{year}"
+            ),
+            InlineKeyboardButton(
+                "▶️", callback_data=f"{callback_prefix}:cal_next:{next_y}:{next_m}"
+            ),
+            InlineKeyboardButton(
+                "»", callback_data=f"{callback_prefix}:cal_ynext:{year + 1}:{month}"
+            ),
+        ])
+    else:
+        rows.append([
+            InlineKeyboardButton(
+                "◀️", callback_data=f"{callback_prefix}:cal_prev:{prev_y}:{prev_m}"
+            ),
+            InlineKeyboardButton(month_label, callback_data=noop),
+            InlineKeyboardButton(
+                "▶️", callback_data=f"{callback_prefix}:cal_next:{next_y}:{next_m}"
+            ),
+        ])
 
     # ── Row 1: weekday column headers ─────────────────────────────────────────
     rows.append([InlineKeyboardButton(d, callback_data=noop) for d in _DAY_HEADERS])
@@ -91,3 +120,72 @@ def build_calendar(
 
     text = "📆 *اختر التاريخ*"
     return text, InlineKeyboardMarkup(rows)
+
+
+# ── Fast path: year → month → day (for far-future expiry dates) ───────────────
+# Only reachable from a calendar built with quick_jump=True.
+
+_YEAR_PAGE_SIZE = 16   # 4 rows × 4 columns
+
+
+def build_year_picker(
+    base_year: int,
+    callback_prefix: str,
+    back_callback: str,
+) -> tuple[str, InlineKeyboardMarkup]:
+    """
+    Grid of years starting at base_year, with page navigation.
+
+    Callbacks produced:
+        {prefix}:cal_yearpage:{y}  — show another block of years
+        {prefix}:cal_setyear:{y}   — year chosen → month picker
+    """
+    rows: list[list[InlineKeyboardButton]] = []
+
+    years = list(range(base_year, base_year + _YEAR_PAGE_SIZE))
+    for i in range(0, len(years), 4):
+        rows.append([
+            InlineKeyboardButton(
+                str(y), callback_data=f"{callback_prefix}:cal_setyear:{y}"
+            )
+            for y in years[i:i + 4]
+        ])
+
+    rows.append([
+        InlineKeyboardButton(
+            "◀️ أقدم",
+            callback_data=f"{callback_prefix}:cal_yearpage:{base_year - _YEAR_PAGE_SIZE}",
+        ),
+        InlineKeyboardButton(
+            "أحدث ▶️",
+            callback_data=f"{callback_prefix}:cal_yearpage:{base_year + _YEAR_PAGE_SIZE}",
+        ),
+    ])
+    rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data=back_callback)])
+
+    return "📆 *اختر السنة*", InlineKeyboardMarkup(rows)
+
+
+def build_month_picker(
+    year: int,
+    callback_prefix: str,
+    back_callback: str,
+) -> tuple[str, InlineKeyboardMarkup]:
+    """
+    Grid of the 12 months for `year`.
+
+    Callback produced:
+        {prefix}:cal_setmonth:{y}:{m}  — month chosen → back to the day grid
+    """
+    rows: list[list[InlineKeyboardButton]] = []
+    for i in range(1, 13, 3):
+        rows.append([
+            InlineKeyboardButton(
+                _AR_MONTHS[m],
+                callback_data=f"{callback_prefix}:cal_setmonth:{year}:{m}",
+            )
+            for m in range(i, min(i + 3, 13))
+        ])
+    rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data=back_callback)])
+
+    return f"📆 *اختر الشهر — {year}*", InlineKeyboardMarkup(rows)
