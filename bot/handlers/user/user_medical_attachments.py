@@ -137,7 +137,7 @@ async def start_medical_attachments(update: Update, context: ContextTypes.DEFAUL
     context.user_data["ma_state"] = {}          # تنظيف أي جلسة سابقة
     context.user_data["ma_state"]["tg_id"] = tg_id
 
-    await _show_today_reports(update, context, page=0)
+    await _show_reports_list(update, context, page=0)
 
 
 # ─────────────────────────────────────────────
@@ -152,21 +152,28 @@ def _today_start_end():
     return start.replace(tzinfo=None), end.replace(tzinfo=None)
 
 
-def _get_reports_for_date(tg_id: int, target_date: date):
+def _get_reports_for_date(tg_id: int, target_date: date, open_mode: bool = False):
+    """open_mode=False (افتراضي): فقط التقارير "لم يجهز بعد" (has_paper_report=2)
+    — تُستبعَد التقارير المكتملة (=1) وتلك التي لا يوجد لها تقرير طبي أصلاً
+    (=0) لأن القائمة كانت تتراكم بأسماء منتهية وتُربك المترجم.
+
+    open_mode=True: بلا أي فلترة على has_paper_report — بحث مفتوح لأي تقرير
+    من تقارير هذا المترجم بهذا التاريخ (حتى لو اكتمل مسبقاً أو لم يُطلَب له
+    تقرير ورقي أصلاً)، لحالات مثل: أُدخل عدد فحوصات متوقَّع أقل من الفعلي
+    فأُغلق التقرير تلقائياً قبل رفع كل الملفات."""
     start = datetime(target_date.year, target_date.month, target_date.day)
     end   = start + timedelta(days=1)
     with SessionLocal() as s:
+        filters = [
+            Report.submitted_by_user_id == tg_id,
+            Report.created_at >= start,
+            Report.created_at < end,
+        ]
+        if not open_mode:
+            filters.append(Report.has_paper_report == 2)
         rows = (
             s.query(Report)
-            .filter(
-                Report.submitted_by_user_id == tg_id,
-                Report.created_at >= start,
-                Report.created_at < end,
-                # ✅ فقط التقارير "لم يجهز بعد" (has_paper_report=2) — تُستبعَد
-                # التقارير المكتملة (=1) وتلك التي لا يوجد لها تقرير طبي أصلاً
-                # (=0) لأن القائمة كانت تتراكم بأسماء منتهية وتُربك المترجم.
-                Report.has_paper_report == 2,
-            )
+            .filter(*filters)
             .order_by(Report.created_at.desc())
             .all()
         )
@@ -186,26 +193,41 @@ def _get_reports_for_date(tg_id: int, target_date: date):
         ]
 
 
-async def _show_today_reports(update: Update, context: ContextTypes.DEFAULT_TYPE, page: int = 0):
+async def _show_reports_list(update: Update, context: ContextTypes.DEFAULT_TYPE, page: int = 0):
     tg_id = update.effective_user.id
     today = datetime.now(TZ).date()
 
     ma = context.user_data.setdefault("ma_state", {})
     target_date = ma.get("target_date", today)
+    open_mode = ma.get("mode", "pending") == "open"
 
-    reports = _get_reports_for_date(tg_id, target_date)
+    reports = _get_reports_for_date(tg_id, target_date, open_mode=open_mode)
     ma["reports"] = reports
     ma["page"]    = page
 
     date_label = "اليوم" if target_date == today else target_date.strftime("%Y-%m-%d")
+    date_button_cb = "ma:open_search" if open_mode else "ma:pick_date"
+    # ✅ زر التبديل بين القائمتين — يظهر في كل شاشة حتى يتنقّل المترجم بينهما بلا رجوع كامل
+    toggle_row = (
+        [InlineKeyboardButton("📌 التقارير المعلّقة فقط", callback_data="ma:pick_date")]
+        if open_mode else
+        [InlineKeyboardButton("🔍 بحث عن تقرير بأي تاريخ (بلا قيود)", callback_data="ma:open_search")]
+    )
 
     if not reports:
-        text = f"📎 **المرفقات الطبية**\n\nلا توجد تقارير بتاريخ {date_label}."
+        empty_line = (
+            f"لا توجد تقارير بتاريخ {date_label}." if open_mode else
+            f"لا توجد تقارير معلَّقة (لم يجهز تقريرها الورقي بعد) بتاريخ {date_label}."
+        )
+        text = f"📎 **المرفقات الطبية**\n\n{empty_line}"
         keyboard = [
-            [InlineKeyboardButton("📅 تاريخ آخر", callback_data="ma:pick_date")],
+            [InlineKeyboardButton("📅 تاريخ آخر", callback_data=date_button_cb)],
+            toggle_row,
         ]
     else:
-        text = f"📎 **المرفقات الطبية**\n\nاختر التقرير الذي تريد إضافة مرفقات له:\n📅 {date_label} — {len(reports)} تقرير"
+        header = "🔍 **المرفقات الطبية — بحث بلا قيود**" if open_mode else "📎 **المرفقات الطبية**"
+        count_label = "تقرير" if open_mode else "تقرير معلّق"
+        text = f"{header}\n\nاختر التقرير الذي تريد إضافة مرفقات له:\n📅 {date_label} — {len(reports)} {count_label}"
 
         total_pages = (len(reports) - 1) // REPORTS_PER_PAGE + 1
         start_i = page * REPORTS_PER_PAGE
@@ -229,7 +251,8 @@ async def _show_today_reports(update: Update, context: ContextTypes.DEFAULT_TYPE
         if nav_row:
             keyboard.append(nav_row)
 
-        keyboard.append([InlineKeyboardButton("📅 تاريخ آخر", callback_data="ma:pick_date")])
+        keyboard.append([InlineKeyboardButton("📅 تاريخ آخر", callback_data=date_button_cb)])
+        keyboard.append(toggle_row)
 
     markup = InlineKeyboardMarkup(keyboard)
     query = update.callback_query
@@ -267,13 +290,14 @@ async def handle_ma_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     # ─── تغيير الصفحة ───
     if parts[1] == "page":
         page = int(parts[2])
-        await _show_today_reports(update, context, page=page)
+        await _show_reports_list(update, context, page=page)
         return
 
-    # ─── اختيار تاريخ آخر ───
+    # ─── اختيار تاريخ آخر (التقارير المعلّقة فقط) ───
     if parts[1] == "pick_date":
         now = datetime.now(TZ)
         ma = context.user_data.setdefault("ma_state", {})
+        ma["mode"] = "pending"
         ma["cal_year"]  = now.year
         ma["cal_month"] = now.month
         markup = _build_ma_calendar(now.year, now.month)
@@ -284,11 +308,26 @@ async def handle_ma_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
         return
 
+    # ─── بحث مفتوح عن أي تقرير بأي تاريخ (بلا قيود عدد الفحوصات المتوقَّع) ───
+    if parts[1] == "open_search":
+        now = datetime.now(TZ)
+        ma = context.user_data.setdefault("ma_state", {})
+        ma["mode"] = "open"
+        ma["cal_year"]  = now.year
+        ma["cal_month"] = now.month
+        markup = _build_ma_calendar(now.year, now.month)
+        await query.edit_message_text(
+            f"🔍 **بحث بلا قيود — اختر التاريخ**\n\n{MONTH_NAMES_AR[now.month]} {now.year}",
+            reply_markup=markup,
+            parse_mode="Markdown"
+        )
+        return
+
     # ─── العودة لقائمة التقارير ───
     if parts[1] == "back_list":
         ma = context.user_data.get("ma_state", {})
         ma.pop("awaiting_date", None)
-        await _show_today_reports(update, context, page=ma.get("page", 0))
+        await _show_reports_list(update, context, page=ma.get("page", 0))
         return
 
     # ─── اختيار تقرير ───
@@ -439,7 +478,7 @@ async def handle_ma_calendar(update: Update, context: ContextTypes.DEFAULT_TYPE)
         ymd = parts[2]  # YYYY-MM-DD
         target = datetime.strptime(ymd, "%Y-%m-%d").date()
         ma["target_date"] = target
-        await _show_today_reports(update, context, page=0)
+        await _show_reports_list(update, context, page=0)
         return
 
 
@@ -750,7 +789,10 @@ async def _publish_attachments(query, context, complete_all: bool = False):
         report_id = report.get("id")
         report_medical_action = report.get("medical_action")
         upload_progress = None
-        if report_id:
+        # ✅ البحث المفتوح (بلا قيود) لا يمسّ آلية العدد المتوقَّع/has_paper_report
+        # إطلاقاً — الغرض منه إضافة مرفق مباشرة لأي تقرير (حتى لو اكتمل مسبقاً
+        # أو لم يكن ضمن التقارير المعلَّقة أصلاً) بلا أي أثر جانبي على حالته.
+        if report_id and ma.get("mode") != "open":
             try:
                 from services.pending_reports_service import increment_pending_upload, complete_pending_upload
                 if complete_all:
