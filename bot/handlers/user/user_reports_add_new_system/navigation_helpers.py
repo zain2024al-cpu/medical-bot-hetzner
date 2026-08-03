@@ -308,7 +308,7 @@ async def handle_smart_back_navigation(update: Update, context: ContextTypes.DEF
             # reset gate-related data so gate re-appears (not skipped)
             report_tmp.pop("_medical_report_step_done", None)
             report_tmp.pop("_medical_attachments", None)
-            report_tmp.pop("no_report_reason", None)
+            report_tmp.pop("no_paper_report_reason", None)
             report_tmp.pop("_medical_report_pending", None)
             report_tmp.pop("_pending_translator_flow", None)
             report_tmp["_pending_translator_flow"] = flow_type

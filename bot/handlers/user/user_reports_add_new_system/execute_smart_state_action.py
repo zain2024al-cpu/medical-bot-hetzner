@@ -251,7 +251,7 @@ async def execute_smart_state_action(target_step, flow_type, update, context):
             _rt = context.user_data.get("report_tmp", {})
             _rt.pop("_medical_report_step_done", None)
             _rt.pop("_medical_attachments", None)
-            _rt.pop("no_report_reason", None)
+            _rt.pop("no_paper_report_reason", None)
 
             _pending_flow = _rt.get("_pending_translator_flow", flow_type)
             if flow_type == "operation":

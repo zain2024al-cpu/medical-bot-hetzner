@@ -30,6 +30,7 @@ from ..states import (
 )
 from ..utils import _nav_buttons, format_time_12h_str
 from ..navigation_helpers import handle_cancel_navigation
+from ..field_registry import get_fields_for_flow_type
 
 # External imports
 try:
@@ -301,239 +302,13 @@ def _has_field_value(data, field_key):
 
 def get_editable_fields_by_flow_type(flow_type):
     """
-    القائمة الموحدة والمرجعية للحقول القابلة للتعديل لكل نوع مسار.
-    مصدر الحقيقة الوحيد — يُستخدم من shared.py والمونوليث معاً.
+    القائمة الموحدة والمرجعية للحقول القابلة للتعديل لكل نوع مسار — قبل النشر.
+    دالة رقيقة تقرأ من field_registry.REPORT_FIELD_REGISTRY (مصدر الحقيقة
+    الوحيد المشترك مع get_editable_fields_by_action_type بعد النشر).
     الحقول الأساسية (اسم المريض، المستشفى، القسم، الطبيب) مُستبعدة لأنها
     تُحدد قبل بدء المسار.
     """
-    fields_map = {
-        "new_consult": [
-            ("complaint",        "💬 شكوى المريض"),
-            ("diagnosis",        "🔬 التشخيص الطبي"),
-            ("decision",         "📝 قرار الطبيب"),
-            ("tests",            "🧪 الفحوصات والأشعة"),
-            ("followup_date",    "📅 موعد العودة"),
-            ("followup_time",    "⏰ وقت العودة"),
-            ("followup_reason",  "✍️ سبب العودة"),
-            ("no_report_reason", "📋 سبب عدم وجود تقرير طبي"),
-            ("translator_name",  "👤 المترجم"),
-        ],
-        "followup": [
-            ("complaint",        "🛏️ حالة المريض اليومية"),
-            ("decision",         "📝 قرار الطبيب اليومي"),
-            ("room_number",      "🏥 رقم الغرفة والطابق"),
-            ("followup_date",    "📅 موعد العودة"),
-            ("followup_time",    "⏰ وقت العودة"),
-            ("followup_reason",  "✍️ سبب العودة"),
-            ("no_report_reason", "📋 سبب عدم وجود تقرير طبي"),
-            ("translator_name",  "👤 المترجم"),
-        ],
-        "periodic_followup": [
-            ("complaint",        "💬 شكوى المريض"),
-            ("diagnosis",        "🔬 التشخيص الطبي"),
-            ("decision",         "📝 قرار الطبيب"),
-            ("followup_date",    "📅 موعد العودة"),
-            ("followup_time",    "⏰ وقت العودة"),
-            ("followup_reason",  "✍️ سبب العودة"),
-            ("no_report_reason", "📋 سبب عدم وجود تقرير طبي"),
-            ("translator_name",  "👤 المترجم"),
-        ],
-        "inpatient_followup": [
-            ("complaint",        "🛏️ حالة المريض اليومية"),
-            ("decision",         "📝 قرار الطبيب اليومي"),
-            ("room_number",      "🏥 رقم الغرفة والطابق"),
-            ("followup_date",    "📅 موعد العودة"),
-            ("followup_time",    "⏰ وقت العودة"),
-            ("followup_reason",  "✍️ سبب العودة"),
-            ("no_report_reason", "📋 سبب عدم وجود تقرير طبي"),
-            ("translator_name",  "👤 المترجم"),
-        ],
-        "emergency": [
-            ("complaint",        "💬 شكوى المريض"),
-            ("diagnosis",        "🔬 التشخيص الطبي"),
-            ("decision",         "📝 قرار الطبيب وماذا تم"),
-            ("status",           "🏥 وضع الحالة"),
-            ("room_number",      "🚪 رقم الغرفة"),
-            ("followup_date",    "📅 موعد العودة"),
-            ("followup_time",    "⏰ وقت العودة"),
-            ("followup_reason",  "✍️ سبب العودة"),
-            ("no_report_reason", "📋 سبب عدم وجود تقرير طبي"),
-            ("translator_name",  "👤 المترجم"),
-        ],
-        "admission": [
-            ("admission_reason", "🛏️ سبب الرقود"),
-            ("room_number",      "🚪 رقم الغرفة"),
-            ("notes",            "📝 ملاحظات"),
-            ("followup_date",    "📅 موعد العودة"),
-            ("followup_time",    "⏰ وقت العودة"),
-            ("followup_reason",  "✍️ سبب العودة"),
-            ("no_report_reason", "📋 سبب عدم وجود تقرير طبي"),
-            ("translator_name",  "👤 المترجم"),
-        ],
-        "surgery_consult": [
-            ("diagnosis",         "🔬 التشخيص"),
-            ("decision",          "📝 قرار الطبيب وتفاصيل العملية"),
-            ("operation_name_en", "🔤 اسم العملية بالإنجليزي"),
-            ("success_rate",      "📊 نسبة نجاح العملية"),
-            ("benefit_rate",      "💡 نسبة الاستفادة"),
-            ("tests",             "🧪 الفحوصات والأشعة"),
-            ("followup_date",     "📅 موعد العودة"),
-            ("followup_time",     "⏰ وقت العودة"),
-            ("followup_reason",   "✍️ سبب العودة"),
-            ("no_report_reason",  "📋 سبب عدم وجود تقرير طبي"),
-            ("translator_name",   "👤 المترجم"),
-        ],
-        "operation": [
-            ("operation_details", "⚕️ تفاصيل العملية بالعربي"),
-            ("operation_name_en", "🔤 اسم العملية بالإنجليزي"),
-            ("notes",             "📝 ملاحظات"),
-            ("followup_date",     "📅 موعد العودة"),
-            ("followup_time",     "⏰ وقت العودة"),
-            ("followup_reason",   "✍️ سبب العودة"),
-            ("no_report_reason",  "📋 سبب عدم وجود تقرير طبي"),
-            ("translator_name",   "👤 المترجم"),
-        ],
-        "final_consult": [
-            ("diagnosis",        "🔬 التشخيص النهائي"),
-            ("decision",         "📝 قرار الطبيب"),
-            ("recommendations",  "💡 التوصيات الطبية"),
-            ("no_report_reason", "📋 سبب عدم وجود تقرير طبي"),
-            ("translator_name",  "👤 المترجم"),
-        ],
-        "discharge": [
-            ("discharge_type",    "🚪 نوع الخروج"),
-            ("admission_summary", "📋 ملخص الرقود"),
-            ("operation_details", "⚕️ تفاصيل العملية"),
-            ("operation_name_en", "🔤 اسم العملية بالإنجليزي"),
-            ("followup_date",     "📅 موعد العودة"),
-            ("followup_time",     "⏰ وقت العودة"),
-            ("followup_reason",   "✍️ سبب العودة"),
-            ("no_report_reason",  "📋 سبب عدم وجود تقرير طبي"),
-            ("translator_name",   "👤 المترجم"),
-        ],
-        "rehab_physical": [
-            ("therapy_details",  "🏃 تفاصيل جلسة العلاج الطبيعي"),
-            ("followup_date",    "📅 موعد العودة"),
-            ("followup_time",    "⏰ وقت العودة"),
-            ("followup_reason",  "✍️ سبب العودة"),
-            ("no_report_reason", "📋 سبب عدم وجود تقرير طبي"),
-            ("translator_name",  "👤 المترجم"),
-        ],
-        "rehab_device": [
-            ("device_name",      "🦾 اسم الجهاز والتفاصيل"),
-            ("followup_date",    "📅 موعد العودة"),
-            ("followup_time",    "⏰ وقت العودة"),
-            ("followup_reason",  "✍️ سبب العودة"),
-            ("no_report_reason", "📋 سبب عدم وجود تقرير طبي"),
-            ("translator_name",  "👤 المترجم"),
-        ],
-        "radiology": [
-            ("radiology_type",   "🔬 نوع الأشعة/الفحص"),
-            ("delivery_date",    "📅 تاريخ الاستلام"),
-            ("no_report_reason", "📋 سبب عدم وجود تقرير طبي"),
-            ("translator_name",  "👤 المترجم"),
-        ],
-        "endoscopy": [
-            ("complaint_text",   "💬 شكوى المريض"),
-            ("endoscopy_type",   "🔬 نوع المنظار"),
-            ("endoscopy_result", "📋 نتيجة المنظار / خطة الطبيب"),
-            ("notes",            "📝 ملاحظات"),
-            ("followup_date",    "📅 موعد العودة"),
-            ("followup_time",    "⏰ وقت العودة"),
-            ("followup_reason",  "✍️ سبب العودة"),
-            ("no_report_reason", "📋 سبب عدم وجود تقرير طبي"),
-            ("translator_name",  "👤 المترجم"),
-        ],
-        "radiation_therapy": [
-            ("radiation_therapy_type",           "☢️ نوع الإشعاعي"),
-            ("radiation_therapy_session_number", "🔢 رقم الجلسة"),
-            ("radiation_therapy_remaining",      "📊 الجلسات المتبقية"),
-            ("radiation_therapy_recommendations","📝 ملاحظات / توصيات"),
-            ("followup_date",    "📅 تاريخ العودة"),
-            ("followup_time",    "⏰ وقت العودة"),
-            ("followup_reason",  "✍️ سبب العودة"),
-            ("no_report_reason", "📋 سبب عدم وجود تقرير طبي"),
-            ("translator_name",  "👤 المترجم"),
-        ],
-        "treatment_chemo": [
-            ("session_number",    "🔢 رقم الجلسة الحالية"),
-            ("complaint",         "💬 شكوى المريض"),
-            ("notes",             "📝 ملاحظات الطبيب"),
-            ("followup_date",     "📅 موعد العودة"),
-            ("followup_time",     "⏰ وقت العودة"),
-            ("followup_reason",   "✍️ سبب العودة"),
-            ("no_report_reason",  "📋 سبب عدم وجود تقرير طبي"),
-            ("translator_name",   "👤 المترجم"),
-        ],
-        "treatment_targeted": [
-            ("session_number",    "🔢 رقم الجلسة الحالية"),
-            ("complaint",         "💬 شكوى المريض"),
-            ("notes",             "📝 ملاحظات الطبيب"),
-            ("followup_date",     "📅 موعد العودة"),
-            ("followup_time",     "⏰ وقت العودة"),
-            ("followup_reason",   "✍️ سبب العودة"),
-            ("no_report_reason",  "📋 سبب عدم وجود تقرير طبي"),
-            ("translator_name",   "👤 المترجم"),
-        ],
-        "treatment_immuno": [
-            ("session_number",    "🔢 رقم الجلسة الحالية"),
-            ("complaint",         "💬 شكوى المريض"),
-            ("notes",             "📝 ملاحظات الطبيب"),
-            ("followup_date",     "📅 موعد العودة"),
-            ("followup_time",     "⏰ وقت العودة"),
-            ("followup_reason",   "✍️ سبب العودة"),
-            ("no_report_reason",  "📋 سبب عدم وجود تقرير طبي"),
-            ("translator_name",   "👤 المترجم"),
-        ],
-        "treatment_dialysis": [
-            # ✅ لا يوجد "no_report_reason" هنا عمداً — غسيل الكلى لا يمر ببوابة
-            # "هل يوجد تقرير طبي؟" إطلاقاً (أُزيلت بناءً على طلب المستخدم)،
-            # فلا معنى لعرض حقل تعديل لسبب لا يُسأل عنه أصلاً في هذا المسار.
-            ("session_number",    "🔢 رقم الجلسة الحالية"),
-            ("followup_date",     "📅 تاريخ الجلسة القادمة"),
-            ("translator_name",   "👤 المترجم"),
-        ],
-        "treatment_combined": [
-            ("complaint",         "💬 شكوى المريض"),
-            ("notes",             "📝 ملاحظات الطبيب"),
-            ("followup_date",     "📅 موعد العودة"),
-            ("followup_time",     "⏰ وقت العودة"),
-            ("followup_reason",   "✍️ سبب العودة"),
-            ("no_report_reason",  "📋 سبب عدم وجود تقرير طبي"),
-            ("translator_name",   "👤 المترجم"),
-        ],
-        "transplant": [
-            ("transplant_type",     "🫁 نوع الزراعة"),
-            ("transplant_parties",  "🏢 الجهة"),
-            ("transplant_details",  "📝 تفاصيل المعاملة"),
-            ("followup_date",       "📅 موعد العودة"),
-            ("followup_time",       "⏰ وقت العودة"),
-            ("followup_reason",     "✍️ سبب العودة"),
-            ("no_report_reason",    "📋 سبب عدم وجود تقرير طبي"),
-            ("translator_name",     "👤 المترجم"),
-        ],
-        "appointment_reschedule": [
-            ("app_reschedule_reason",      "📅 سبب تأجيل الموعد"),
-            ("app_reschedule_return_date", "📅 تاريخ العودة الجديد"),
-            ("app_reschedule_return_reason","✍️ سبب العودة"),
-            ("translator_name",            "👤 المترجم"),
-        ],
-        "app_reschedule": [
-            ("app_reschedule_reason",      "📅 سبب تأجيل الموعد"),
-            ("app_reschedule_return_date", "📅 تاريخ العودة الجديد"),
-            ("app_reschedule_return_reason","✍️ سبب العودة"),
-            ("translator_name",            "👤 المترجم"),
-        ],
-        "device": [
-            ("device_name",      "🦾 اسم الجهاز والتفاصيل"),
-            ("followup_date",    "📅 موعد العودة"),
-            ("followup_time",    "⏰ وقت العودة"),
-            ("followup_reason",  "✍️ سبب العودة"),
-            ("no_report_reason", "📋 سبب عدم وجود تقرير طبي"),
-            ("translator_name",  "👤 المترجم"),
-        ],
-    }
-    return list(fields_map.get(flow_type, []))
+    return [(f.key, f.label) for f in get_fields_for_flow_type(flow_type)]
 
 
 def get_translator_state(flow_type):
@@ -841,7 +616,7 @@ async def handle_medical_report_choice(update: Update, context: ContextTypes.DEF
         report_tmp["_medical_report_pending"] = True
         report_tmp["_medical_report_step_done"] = True
         report_tmp.pop("_medical_attachments", None)
-        report_tmp.pop("no_report_reason", None)
+        report_tmp.pop("no_paper_report_reason", None)
         await query.edit_message_text(
             "🟡 **تم الحفظ — التقرير لم يجهز بعد**\n\n"
             "🔢 **كم عدد الفحوصات/التقارير المنتظرة لهذه الحالة؟**\n"
@@ -1005,7 +780,7 @@ async def handle_medical_report_no_reason(update: Update, context: ContextTypes.
         return "MEDICAL_REPORT_NO_REASON"
 
     report_tmp = context.user_data.setdefault("report_tmp", {})
-    report_tmp["no_report_reason"] = text
+    report_tmp["no_paper_report_reason"] = text
     report_tmp["_medical_report_step_done"] = True
 
     flow_type = report_tmp.get("_pending_translator_flow", "new_consult")
@@ -2526,7 +2301,7 @@ async def save_report_to_database(query, context, flow_type):
                 0
             ) if data.get("_medical_report_step_done") is not None else None,
             no_paper_report_reason=(
-                data.get("no_report_reason") or None
+                data.get("no_paper_report_reason") or None
             ) if (
                 data.get("_medical_report_step_done") is not None
                 and not data.get("_medical_attachments")
@@ -2658,7 +2433,7 @@ async def save_report_to_database(query, context, flow_type):
                 'user_id': user_id,  # إضافة معرف المستخدم
                 'translator_id': data.get("translator_id"),  # إضافة معرف المترجم أيضاً
                 'medical_attachments': data.get("_medical_attachments", []),
-                'no_report_reason': data.get("no_report_reason", ""),
+                'no_report_reason': data.get("no_paper_report_reason", ""),
                 '_medical_report_step_done': data.get("_medical_report_step_done"),
                 # ✅ علامة الحالة "🟡 لم يجهز بعد" — تُستخدم في بناء سطر حالة
                 # التقرير الطبي داخل بطاقة المجموعة (_build_medical_report_status).

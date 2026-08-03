@@ -731,8 +731,7 @@ async def broadcast_initial_case(bot: Bot, case_data: dict):
 def _build_medical_report_status(data: dict) -> list:
     """يبني سطر حالة التقرير الطبي المرفق للإدراج في نص التقرير."""
     attachments = data.get('medical_attachments', [])
-    # دعم الاسمين القديم والجديد للحقل
-    no_reason = data.get('no_paper_report_reason', '') or data.get('no_report_reason', '')
+    no_reason = data.get('no_paper_report_reason', '')
 
     lines = [""]
     if attachments:

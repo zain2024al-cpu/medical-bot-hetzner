@@ -216,14 +216,14 @@ async def route_edit_field_selection(update: Update, context: ContextTypes.DEFAU
                 return ConversationHandler.END
 
         # ✅ اعتراض مشترك لحقل سبب عدم وجود تقرير طبي — نص حر لجميع المسارات
-        if field_key == "no_report_reason":
+        if field_key == "no_paper_report_reason":
             data = context.user_data.get("report_tmp", {})
-            current_value = data.get("no_report_reason", "غير محدد")
+            current_value = data.get("no_paper_report_reason", "غير محدد")
             if isinstance(current_value, str) and len(current_value) > 200:
                 current_value_display = current_value[:200] + "..."
             else:
                 current_value_display = str(current_value) if current_value else "غير محدد"
-            context.user_data["edit_field_key"] = "no_report_reason"
+            context.user_data["edit_field_key"] = "no_paper_report_reason"
             context.user_data["edit_flow_type"] = flow_type
             try:
                 from bot.handlers.user.user_reports_add_new_system.flows.shared import get_confirm_state
@@ -474,7 +474,7 @@ async def route_edit_field_input(update: Update, context: ContextTypes.DEFAULT_T
 
         # ✅ اعتراض مشترك لحقل سبب عدم وجود تقرير طبي — نفس المنطق لجميع المسارات
         field_key = context.user_data.get("edit_field_key")
-        if field_key == "no_report_reason":
+        if field_key == "no_paper_report_reason":
             text = update.message.text.strip() if update.message else ""
             if not text:
                 await update.message.reply_text(
@@ -487,7 +487,7 @@ async def route_edit_field_input(update: Update, context: ContextTypes.DEFAULT_T
                 except Exception:
                     return ConversationHandler.END
             data = context.user_data.setdefault("report_tmp", {})
-            data["no_report_reason"] = text
+            data["no_paper_report_reason"] = text
             data["_medical_report_step_done"] = True
             context.user_data.pop("edit_field_key", None)
             logger.info(f"✅ [ROUTER] no_report_reason updated: {text[:50]}")
