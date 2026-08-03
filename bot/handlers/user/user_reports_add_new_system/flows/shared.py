@@ -486,9 +486,11 @@ def get_editable_fields_by_flow_type(flow_type):
             ("translator_name",   "👤 المترجم"),
         ],
         "treatment_dialysis": [
+            # ✅ لا يوجد "no_report_reason" هنا عمداً — غسيل الكلى لا يمر ببوابة
+            # "هل يوجد تقرير طبي؟" إطلاقاً (أُزيلت بناءً على طلب المستخدم)،
+            # فلا معنى لعرض حقل تعديل لسبب لا يُسأل عنه أصلاً في هذا المسار.
             ("session_number",    "🔢 رقم الجلسة الحالية"),
             ("followup_date",     "📅 تاريخ الجلسة القادمة"),
-            ("no_report_reason",  "📋 سبب عدم وجود تقرير طبي"),
             ("translator_name",   "👤 المترجم"),
         ],
         "treatment_combined": [

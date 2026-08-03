@@ -106,7 +106,7 @@ def test_editable_fields_mapping():
         ('العلاج الكيماوي', 5),  # 5 حقول (notes, followup_date, followup_reason, no_paper_report_reason, translator)
         ('العلاج الموجه', 5),  # 5 حقول
         ('العلاج المناعي', 5),  # 5 حقول
-        ('جلسات غسيل الكلى', 3),  # 3 حقول (followup_date, no_paper_report_reason, translator)
+        ('جلسات غسيل الكلى', 3),  # 3 حقول (session_number, followup_date, translator)
         ('معاملة الزراعة', 7),  # 7 حقول (transplant_type, transplant_parties, transplant_details, followup_date, followup_reason, no_paper_report_reason, translator)
         ('المناظير', 7),  # 7 حقول (complaint, endoscopy_type, endoscopy_result, followup_date, followup_reason, no_paper_report_reason, translator)
         ('نوع غير معروف', 4),  # 4 حقول افتراضية
@@ -584,10 +584,11 @@ def get_editable_fields_by_action_type(medical_action):
         # ✅ رقم الجلسة الحالية قابل للتعديل — لا TreatmentPlan لغسيل الكلى
         # (بالتصميم)، فالتعديل يستبدل الرقم المضمَّن في نص
         # treatment_plan_summary المخزَّن مباشرة (انظر save_edit_to_database).
+        # ✅ لا "no_paper_report_reason" هنا عمداً — غسيل الكلى لا يمر ببوابة
+        # "هل يوجد تقرير طبي؟" إطلاقاً (أُزيلت بناءً على طلب المستخدم).
         return [
             ('session_number', '🔢 رقم الجلسة الحالية'),
             ('followup_date', '📅 تاريخ الجلسة القادمة'),
-            ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
             ('translator_name', '👤 المترجم'),
         ]
 
