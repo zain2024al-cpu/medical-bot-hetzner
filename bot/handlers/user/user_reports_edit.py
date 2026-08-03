@@ -954,6 +954,11 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
                 # ✅ حقول المناظير
                 'endoscopy_type': getattr(report, 'endoscopy_type', None) or "لا يوجد",
                 'endoscopy_result': getattr(report, 'endoscopy_result', None) or "لا يوجد",
+                # ✅ حقول معاملة الزراعة — كانت مفقودة هنا فيظهر التعديل بعد
+                # النشر بقيمة "لا يوجد" رغم وجود القيمة الحقيقية في القاعدة.
+                'transplant_type': getattr(report, 'transplant_type', None) or "لا يوجد",
+                'transplant_parties': getattr(report, 'transplant_parties', None) or "لا يوجد",
+                'transplant_details': getattr(report, 'transplant_details', None) or "لا يوجد",
             }
             
             # تحويل موعد العودة إلى صيغة 12 ساعة للعرض
@@ -1494,6 +1499,14 @@ async def handle_field_selection(update: Update, context: ContextTypes.DEFAULT_T
             'radiation_therapy_remaining': 'الجلسات المتبقية',
             'radiation_therapy_recommendations': 'ملاحظات / توصيات',
             'no_paper_report_reason': 'سبب عدم وجود تقرير طبي',
+            # ✅ حقول المناظير — كانت مفقودة فيظهر اسم الحقل الداخلي الخام
+            # (endoscopy_type) بدل تسمية عربية في عنوان شاشة التعديل.
+            'endoscopy_type': 'نوع المنظار',
+            'endoscopy_result': 'نتيجة المنظار / خطة الطبيب',
+            # ✅ حقول معاملة الزراعة
+            'transplant_type': 'نوع الزراعة',
+            'transplant_parties': 'الجهة',
+            'transplant_details': 'تفاصيل المعاملة',
         }
         
         field_display = field_names.get(field_name, field_name)
