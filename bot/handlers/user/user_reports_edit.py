@@ -28,7 +28,12 @@ from services.inline_calendar import create_calendar_keyboard, create_quick_date
 from sqlalchemy import or_, and_
 
 # حالات المحادثة
-SELECT_REPORT, SELECT_FIELD, EDIT_VALUE, CONFIRM_EDIT, EDIT_DATE_CALENDAR, EDIT_DATE_TIME, EDIT_TRANSLATOR = range(7)
+(
+    SELECT_REPORT, SELECT_FIELD, EDIT_VALUE, CONFIRM_EDIT, EDIT_DATE_CALENDAR, EDIT_DATE_TIME, EDIT_TRANSLATOR,
+    # ✅ حالتان جديدتان: نفس شاشة الاختيار المتعدد الأصلية (flows/endoscopy.py)
+    # لحقل 'الإجراءات التي تمت أثناء المنظار' بعد النشر، بدل نص حر بسيط.
+    EDIT_ENDOSCOPY_PROCEDURES, EDIT_ENDOSCOPY_PROCEDURES_OTHER,
+) = range(9)
 
 
 def format_time_12h(time_str):
@@ -1409,6 +1414,11 @@ async def handle_field_selection(update: Update, context: ContextTypes.DEFAULT_T
         # إذا كان الحقل هو المترجم، نعرض قائمة المترجمين
         if field_name == "translator_name":
             return await show_translator_selection_for_edit(query, context)
+
+        # ✅ 'الإجراءات التي تمت أثناء المنظار' — نفس شاشة الاختيار المتعدد
+        # الأصلية بدل نص حر (مطابقة الفورمه الأصلية، كما طُلب صراحة).
+        if field_name == "endoscopy_procedures":
+            return await show_endoscopy_procedures_edit(query, context)
         
         # حقول التاريخ — تمر جميعها بالتقويم (DateTime columns)
         if field_name in ("followup_date", "app_reschedule_return_date", "radiology_delivery_date"):
@@ -1474,6 +1484,158 @@ async def handle_field_selection(update: Update, context: ContextTypes.DEFAULT_T
         except:
             pass
         return ConversationHandler.END
+
+
+# =============================================================================
+# تعديل 'الإجراءات التي تمت أثناء المنظار' بعد النشر — نفس شاشة الاختيار
+# المتعدد الأصلية (flows/endoscopy.py) بدل نص حر، بطلب صريح من المستخدم
+# لمطابقة كاملة مع الفورمه الأصلية. يعيد استخدام آلية "معاينة ثم تأكيد"
+# القياسية (confirm_text_edit/save_edit_to_database) بعد بناء JSON صحيح.
+# =============================================================================
+
+_ENDO_PROC_EDIT_KEY = "_edit_endoscopy_selected"
+
+
+def _build_endo_procedures_edit_keyboard(selected: list) -> InlineKeyboardMarkup:
+    from bot.handlers.user.user_reports_add_new_system.flows.endoscopy import ENDOSCOPY_PROCEDURE_OPTIONS
+    rows = []
+    for code, label in ENDOSCOPY_PROCEDURE_OPTIONS:
+        mark = "✅" if code in selected else "☐"
+        rows.append([InlineKeyboardButton(f"{mark} {label}", callback_data=f"edit_endo_proc:{code}")])
+    rows.append([InlineKeyboardButton("✅ متابعة", callback_data="edit_endo_proc_done")])
+    rows.append([
+        InlineKeyboardButton("🔙 رجوع", callback_data="edit_back_to_fields"),
+        InlineKeyboardButton("❌ إلغاء", callback_data="edit_cancel"),
+    ])
+    return InlineKeyboardMarkup(rows)
+
+
+def _endo_procedures_text() -> str:
+    return (
+        "🔧 **الإجراءات التي تمت أثناء المنظار**\n\n"
+        "اختر كل ما تم (يمكن اختيار أكثر من إجراء)، ثم اضغط **✅ متابعة**.\n"
+        "إن لم يُجرَ أي إجراء، اضغط **✅ متابعة** مباشرة (منظار تشخيصي)."
+    )
+
+
+async def show_endoscopy_procedures_edit(query, context):
+    """يفتح نفس شاشة الاختيار المتعدد الأصلية، معلَّمة مسبقاً حسب القيمة
+    الحالية المخزَّنة فعلياً في التقرير (JSON)."""
+    import json as _json
+    from bot.handlers.user.user_reports_add_new_system.flows.endoscopy import _PROC_LABEL
+
+    report_id = context.user_data.get('edit_report_id')
+    with SessionLocal() as s:
+        report = s.query(Report).filter_by(id=report_id).first()
+        raw = report.endoscopy_procedures if report else None
+
+    label_to_code = {label: code for code, label in _PROC_LABEL.items()}
+    selected = []
+    if raw:
+        try:
+            parsed = _json.loads(raw) if isinstance(raw, str) else raw
+            if isinstance(parsed, dict):
+                selected = [label_to_code[l] for l in (parsed.get('list') or []) if l in label_to_code]
+                if parsed.get('other'):
+                    selected.append('other')
+        except Exception:
+            selected = []
+
+    context.user_data[_ENDO_PROC_EDIT_KEY] = selected
+    await query.edit_message_text(
+        _endo_procedures_text(),
+        reply_markup=_build_endo_procedures_edit_keyboard(selected),
+        parse_mode=ParseMode.MARKDOWN,
+    )
+    return EDIT_ENDOSCOPY_PROCEDURES
+
+
+async def handle_edit_endoscopy_procedure_toggle(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تبديل اختيار إجراء (checkbox)."""
+    query = update.callback_query
+    await query.answer()
+    from bot.handlers.user.user_reports_add_new_system.flows.endoscopy import _PROC_LABEL
+    code = query.data.split(":", 1)[1]
+    if code not in _PROC_LABEL:
+        return EDIT_ENDOSCOPY_PROCEDURES
+
+    selected = context.user_data.setdefault(_ENDO_PROC_EDIT_KEY, [])
+    if code in selected:
+        selected.remove(code)
+    else:
+        selected.append(code)
+
+    await query.edit_message_text(
+        _endo_procedures_text(),
+        reply_markup=_build_endo_procedures_edit_keyboard(selected),
+        parse_mode=ParseMode.MARKDOWN,
+    )
+    return EDIT_ENDOSCOPY_PROCEDURES
+
+
+def _finalize_endo_procedures_edit(selected: list, other_text) -> str:
+    """يبني JSON نهائي من الاختيارات + نص 'أخرى' — نفس منطق
+    flows/endoscopy.py::_finalize_procedures بالضبط."""
+    import json as _json
+    from bot.handlers.user.user_reports_add_new_system.flows.endoscopy import _PROC_LABEL
+    labels = [_PROC_LABEL[c] for c in selected if c != "other" and c in _PROC_LABEL]
+    payload = {"list": labels, "other": (other_text or None)}
+    return _json.dumps(payload, ensure_ascii=False)
+
+
+async def handle_edit_endoscopy_procedures_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """إنهاء اختيار الإجراءات → (نص 'أخرى' إن اختير) أو → شاشة المعاينة/التأكيد."""
+    query = update.callback_query
+    await query.answer()
+    selected = context.user_data.get(_ENDO_PROC_EDIT_KEY, [])
+
+    if "other" in selected:
+        await query.edit_message_text(
+            "✍️ **إجراء آخر**\n\nاكتب الإجراء الذي تم (أو الإجراءات الإضافية):",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        return EDIT_ENDOSCOPY_PROCEDURES_OTHER
+
+    new_json = _finalize_endo_procedures_edit(selected, other_text=None)
+    context.user_data['edit_field'] = 'endoscopy_procedures'
+    context.user_data['_endoscopy_procedures_new_json'] = new_json
+    from bot.handlers.user.user_reports_add_new_system.field_registry import format_endoscopy_procedures
+    preview = format_endoscopy_procedures(new_json)
+    context.user_data['new_value'] = preview
+    return await confirm_text_edit(query.message, context, preview)
+
+
+async def handle_edit_endoscopy_procedures_back_or_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """رجوع/إلغاء من شاشتي الاختيار المتعدد ('أخرى' أو الأزرار) — نفس
+    منطق handle_confirm_edit لهذين الاثنين تحديداً، بدل استدعاء
+    handle_field_selection مباشرة (يفترض 'edit_field:x' بفاصلة، فينهار
+    على 'edit_back_to_fields' التي لا فاصلة فيها)."""
+    query = update.callback_query
+    await query.answer()
+    if query.data == "edit_cancel":
+        await query.edit_message_text("❌ **تم إلغاء عملية التعديل**")
+        return ConversationHandler.END
+    return await show_field_selection(query, context)
+
+
+async def handle_edit_endoscopy_procedures_other(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نص إجراء 'أخرى' → شاشة المعاينة/التأكيد."""
+    text = update.message.text.strip() if update.message else ""
+    if not text:
+        await update.message.reply_text(
+            "⚠️ يرجى إدخال الإجراء الذي تم:",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        return EDIT_ENDOSCOPY_PROCEDURES_OTHER
+
+    selected = context.user_data.get(_ENDO_PROC_EDIT_KEY, [])
+    new_json = _finalize_endo_procedures_edit(selected, other_text=text)
+    context.user_data['edit_field'] = 'endoscopy_procedures'
+    context.user_data['_endoscopy_procedures_new_json'] = new_json
+    from bot.handlers.user.user_reports_add_new_system.field_registry import format_endoscopy_procedures
+    preview = format_endoscopy_procedures(new_json)
+    context.user_data['new_value'] = preview
+    return await confirm_text_edit(update.message, context, preview)
 
 
 def load_translator_names():
@@ -2198,13 +2360,15 @@ async def save_edit_to_database(query, context):
         # ✅ 'الإجراءات التي تمت أثناء المنظار' مخزَّن كـ JSON
         # {"list":[...],"other":...} — بطاقة النشر (broadcast_service.py)
         # تحلّله كـ JSON وتتجاهل صامتاً أي نص لا ينجح تحليله (تعرض "منظار
-        # تشخيصي" بدل النص المُدخَل فعلياً). التعديل بعد النشر نص حر بسيط
-        # (لا شاشة اختيار متعدد هنا)، فيُغلَّف في نفس بنية JSON قبل الحفظ
-        # حتى لا يختفي عند إعادة النشر.
+        # تشخيصي" بدل النص المُدخَل فعلياً). show_endoscopy_procedures_edit
+        # (نفس شاشة الاختيار المتعدد الأصلية) يبني JSON صحيحاً في
+        # _endoscopy_procedures_new_json؛ إن لم يكن موجوداً (احتياط فقط) يُغلَّف
+        # new_value الخام في نفس البنية حتى لا يختفي عند إعادة النشر.
         elif field_name == 'endoscopy_procedures':
             import json as _json
-            report.endoscopy_procedures = _json.dumps({"list": [], "other": new_value}, ensure_ascii=False)
-            logger.info(f"✅ تم تحديث endoscopy_procedures = {new_value[:50]}")
+            new_json = context.user_data.pop('_endoscopy_procedures_new_json', None)
+            report.endoscopy_procedures = new_json or _json.dumps({"list": [], "other": new_value}, ensure_ascii=False)
+            logger.info(f"✅ تم تحديث endoscopy_procedures = {report.endoscopy_procedures[:80]}")
 
         # ✅ رقم الجلسة الحالية لأنواع جلسات العلاج — يُحدِّث TreatmentPlan
         # الفعلية (chemo/targeted/immuno) أو نص treatment_plan_summary
@@ -2688,6 +2852,17 @@ def register(app):
                 CallbackQueryHandler(handle_translator_selection, pattern="^edit_translator:"),
                 CallbackQueryHandler(handle_translator_selection, pattern="^edit_back_to_fields$"),
                 CallbackQueryHandler(handle_translator_selection, pattern="^edit_cancel$"),
+            ],
+            EDIT_ENDOSCOPY_PROCEDURES: [
+                CallbackQueryHandler(handle_edit_endoscopy_procedure_toggle,        pattern="^edit_endo_proc:"),
+                CallbackQueryHandler(handle_edit_endoscopy_procedures_done,         pattern="^edit_endo_proc_done$"),
+                CallbackQueryHandler(handle_edit_endoscopy_procedures_back_or_cancel, pattern="^edit_back_to_fields$"),
+                CallbackQueryHandler(handle_edit_endoscopy_procedures_back_or_cancel, pattern="^edit_cancel$"),
+            ],
+            EDIT_ENDOSCOPY_PROCEDURES_OTHER: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_edit_endoscopy_procedures_other),
+                CallbackQueryHandler(handle_edit_endoscopy_procedures_back_or_cancel, pattern="^edit_back_to_fields$"),
+                CallbackQueryHandler(handle_edit_endoscopy_procedures_back_or_cancel, pattern="^edit_cancel$"),
             ],
             CONFIRM_EDIT: [
                 CallbackQueryHandler(handle_confirm_edit)
