@@ -647,7 +647,9 @@ async def show_translator_selection(message, context, flow_type):
     try:
         report_tmp = context.user_data.setdefault("report_tmp", {})
         skip_medical_gate = bool(context.user_data.get("_skip_medical_gate_once"))
-        flows_without_gate = {"appointment_reschedule"}
+        # ✅ غسيل الكلى: لا يمر ببوابة "هل يوجد تقرير طبي؟" — بناءً على طلب
+        # المستخدم صراحةً (المسار مبسَّط لرقم الجلسة + تاريخ الجلسة القادمة فقط).
+        flows_without_gate = {"appointment_reschedule", "treatment_dialysis"}
 
         if (
             flow_type not in flows_without_gate
