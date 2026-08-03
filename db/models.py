@@ -264,6 +264,25 @@ class Report(Base):
     transplant_parties = Column(Text, nullable=True)
     transplant_details = Column(Text, nullable=True)
 
+    # ✅ أعمدة مستقلة لحقول كانت تُدمَج سابقاً في نص doctor_decision واحد
+    # مركّب (بعلامات عربية) لأنواع الإجراءات "القديمة" — عملية/خروج من
+    # المستشفى/ترقيد/طوارئ (فرع الترقيد)/علاج طبيعي/أجهزة تعويضية/استشارة
+    # مع قرار عملية. الدمج النصي كان يتطلب إعادة تحليل النص عند كل فتح
+    # لشاشة التعديل بعد النشر (نمط جذري موثَّق في MAINTENANCE_LOG.md)،
+    # وسبَّب أخطاء فعلية (حقول تختفي/تُقرأ من عمود خاطئ). كل حقل الآن
+    # عموده الخاص — nullable بالكامل، لا يؤثر على أي مسار أو تقرير قائم.
+    operation_details = Column(Text, nullable=True)
+    operation_name_en = Column(String(255), nullable=True)
+    success_rate = Column(String(50), nullable=True)
+    benefit_rate = Column(String(50), nullable=True)
+    admission_reason = Column(Text, nullable=True)
+    discharge_type = Column(String(100), nullable=True)
+    admission_summary = Column(Text, nullable=True)
+    therapy_details = Column(Text, nullable=True)
+    device_details = Column(Text, nullable=True)
+    admission_notes = Column(Text, nullable=True)
+    admission_type = Column(String(100), nullable=True)
+
 
 # ================================================
 # Schedule Model

@@ -173,6 +173,23 @@ class DatabaseMaintenance:
                 _migrate_column(conn, "reports", "transplant_type", "VARCHAR(100)")
                 _migrate_column(conn, "reports", "transplant_parties", "TEXT")
                 _migrate_column(conn, "reports", "transplant_details", "TEXT")
+                # ✅ أعمدة مستقلة لحقول أنواع الإجراءات القديمة (عملية/خروج/
+                # ترقيد/طوارئ/علاج طبيعي/أجهزة تعويضية/استشارة مع قرار عملية)
+                # — كانت مدموجة في نص doctor_decision واحد فقط، انظر التعليق
+                # في db/models.py::Report لتفصيل السبب. الصفوف الحالية تحصل
+                # على NULL — سكربت backfill منفصل (scripts/backfill_legacy_
+                # report_fields.py) يملأ التقارير القديمة من doctor_decision.
+                _migrate_column(conn, "reports", "operation_details", "TEXT")
+                _migrate_column(conn, "reports", "operation_name_en", "VARCHAR(255)")
+                _migrate_column(conn, "reports", "success_rate", "VARCHAR(50)")
+                _migrate_column(conn, "reports", "benefit_rate", "VARCHAR(50)")
+                _migrate_column(conn, "reports", "admission_reason", "TEXT")
+                _migrate_column(conn, "reports", "discharge_type", "VARCHAR(100)")
+                _migrate_column(conn, "reports", "admission_summary", "TEXT")
+                _migrate_column(conn, "reports", "therapy_details", "TEXT")
+                _migrate_column(conn, "reports", "device_details", "TEXT")
+                _migrate_column(conn, "reports", "admission_notes", "TEXT")
+                _migrate_column(conn, "reports", "admission_type", "VARCHAR(100)")
                 logger.info("🔎 Migration check finished.")
 
                 if check == "ok":
