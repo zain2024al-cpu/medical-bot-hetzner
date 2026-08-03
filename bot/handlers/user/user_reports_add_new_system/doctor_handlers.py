@@ -844,24 +844,49 @@ async def handle_doctor(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         # القسم له بدل ترك الطبيب بلا قسم. الترك كان يعني أن
                         # البحث اللاحق عن الأطباء (مستشفى + قسم) يُرجع صفراً،
                         # فيضطر المترجم لإدخال اسم الطبيب يدوياً في كل تقرير.
-                        try:
-                            resolved_dept = Department(
-                                name=en_dept,
-                                hospital_id=resolved_hospital.id,
-                                hospital_name=resolved_hospital.name,
-                            )
-                            s.add(resolved_dept)
-                            s.flush()   # للحصول على id قبل ربط الطبيب
+                        #
+                        # ⚠️ عمود departments.name له فهرس UNIQUE على مستوى القاعدة
+                        # كاملة (وليس composite مع hospital_id) — غير موثَّق في
+                        # نموذج SQLAlchemy نفسه، وغير متوافق مع بحثنا أعلاه الذي
+                        # يُقيَّد بـhospital_id. فإذا وُجد قسم بهذا الاسم لمستشفى
+                        # آخر، تفشل عملية الإنشاء بـIntegrityError. نتحقق أولاً
+                        # عالمياً (بلا تقييد hospital_id) قبل محاولة الإنشاء، وإن
+                        # فشل الإنشاء رغم ذلك (تعارض تزامني) نتراجع (rollback)
+                        # فوراً ونُعيد البحث — الجلسة تبقى معطوبة وتُسقط حفظ
+                        # الطبيب بالكامل بصمت إن لم نتراجع قبل أي استعلام لاحق.
+                        resolved_dept = s.query(Department).filter_by(name=en_dept).first()
+                        if resolved_dept:
                             logger.info(
-                                f"[doctor_handlers] Department auto-created: '{en_dept}'"
-                                f" → id={resolved_dept.id}  hospital_id={resolved_hospital.id}"
+                                f"[doctor_handlers] Department reused (exists globally under a "
+                                f"different hospital): '{en_dept}' → id={resolved_dept.id}"
                             )
-                        except Exception as dept_exc:
-                            resolved_dept = None
-                            logger.warning(
-                                f"[doctor_handlers] Department auto-create failed for "
-                                f"'{department_name}': {dept_exc} — doctor saved without department_id"
-                            )
+                        else:
+                            try:
+                                resolved_dept = Department(
+                                    name=en_dept,
+                                    hospital_id=resolved_hospital.id,
+                                    hospital_name=resolved_hospital.name,
+                                )
+                                s.add(resolved_dept)
+                                s.flush()   # للحصول على id قبل ربط الطبيب
+                                logger.info(
+                                    f"[doctor_handlers] Department auto-created: '{en_dept}'"
+                                    f" → id={resolved_dept.id}  hospital_id={resolved_hospital.id}"
+                                )
+                            except Exception as dept_exc:
+                                s.rollback()
+                                resolved_dept = s.query(Department).filter_by(name=en_dept).first()
+                                if resolved_dept:
+                                    logger.info(
+                                        f"[doctor_handlers] Department recovered after create race "
+                                        f"for '{en_dept}': {dept_exc} → id={resolved_dept.id}"
+                                    )
+                                else:
+                                    resolved_dept = None
+                                    logger.warning(
+                                        f"[doctor_handlers] Department auto-create failed for "
+                                        f"'{department_name}': {dept_exc} — doctor saved without department_id"
+                                    )
 
                 # ── 4. Upsert doctor with guaranteed hospital_id ───────────────
                 doctor = (
