@@ -26,9 +26,6 @@ from db.models import Report, Translator, Patient, Hospital, Department, Doctor
 from bot.shared_auth import is_admin
 from services.inline_calendar import create_calendar_keyboard, create_quick_date_buttons, MONTHS_AR
 from sqlalchemy import or_, and_
-from bot.handlers.user.user_reports_add_new_system.field_registry import (
-    get_fields_for_medical_action, resolve_flow_type_from_medical_action,
-)
 
 # حالات المحادثة
 SELECT_REPORT, SELECT_FIELD, EDIT_VALUE, CONFIRM_EDIT, EDIT_DATE_CALENDAR, EDIT_DATE_TIME, EDIT_TRANSLATOR = range(7)
@@ -377,6 +374,16 @@ def get_editable_fields_by_action_type(medical_action):
     """
     import logging
     logger = logging.getLogger(__name__)
+
+    # ✅ استيراد محلي عمداً (لا في أعلى الملف) — field_registry.py جزء من
+    # حزمة user_reports_add_new_system، واستيراده على مستوى الملف كان يجبر
+    # تحميل __init__.py الخاص بتلك الحزمة أثناء استيراد هذا الملف نفسه، وهي
+    # تستورد (عبر conversation_handler.py) edit_handlers/draft/handlers.py
+    # التي تستورد هذا الملف — استيراد دائري حقيقي كان يفشل صامتاً (fallback
+    # يُرجع [] دائماً) أثناء التسجيل الفعلي في register_all_handlers().
+    from bot.handlers.user.user_reports_add_new_system.field_registry import (
+        get_fields_for_medical_action, resolve_flow_type_from_medical_action,
+    )
 
     if not medical_action:
         logger.warning("⚠️ get_editable_fields_by_action_type: medical_action is empty!")
