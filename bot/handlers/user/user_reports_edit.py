@@ -744,6 +744,26 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
             logger.info(f"✅ [EDIT] operation_details: {extracted_operation_details[:50] if extracted_operation_details else 'None'}...")
             logger.info(f"✅ [EDIT] therapy_details: {extracted_therapy_details[:50] if extracted_therapy_details else 'None'}...")
 
+            # ✅ الأعمدة المخصصة (Phase 1/5) هي المصدر الأول الآن لهذه الحقول —
+            # الاستخراج من doctor_decision أعلاه يبقى fallback فقط للتقارير
+            # القديمة المنشورة قبل توفر عمود مستقل (قبل الـ backfill).
+            if report.operation_details:
+                extracted_operation_details = report.operation_details
+            if report.operation_name_en:
+                extracted_operation_name_en = report.operation_name_en
+            if report.therapy_details:
+                extracted_therapy_details = report.therapy_details
+            if report.device_details:
+                extracted_device_details = report.device_details
+            if report.admission_reason:
+                extracted_admission_reason = report.admission_reason
+            if report.admission_summary:
+                extracted_admission_summary = report.admission_summary
+            if report.success_rate:
+                extracted_success_rate = report.success_rate
+            if report.benefit_rate:
+                extracted_benefit_rate = report.benefit_rate
+
             context.user_data['current_report_data'] = {
                 'patient_name': patient.full_name if patient else "غير معروف",
                 'hospital_name': hospital.name if hospital else "غير معروف",
@@ -777,6 +797,12 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
                 'device_details': extracted_device_details,
                 'admission_reason': extracted_admission_reason,
                 'admission_summary': extracted_admission_summary,
+                # ✅ حقول جديدة بأعمدة مستقلة (Phase 1/5) — لم يكن لها استخراج
+                # مخصص أصلاً (discharge_type) أو تُقرأ مباشرة من العمود لأن
+                # مسار الطوارئ لا يبني نص doctor_decision مركّب بها إطلاقاً.
+                'discharge_type': getattr(report, 'discharge_type', None) or "لا يوجد",
+                'admission_notes': getattr(report, 'admission_notes', None) or "لا يوجد",
+                'admission_type': getattr(report, 'admission_type', None) or "لا يوجد",
                 # ✅ حقول استشارة مع قرار عملية (مستخرجة من doctor_decision)
                 'decision': extracted_decision,
                 'success_rate': extracted_success_rate,
@@ -1175,19 +1201,23 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 'notes': report.notes or '',
                 'medications': report.medications or '',
                 'case_status': report.case_status or '',
-                # ✅ حقول الطوارئ الإضافية (ترقيد/عملية) — مستخرجة أعلاه من doctor_decision
-                'admission_notes': emergency_admission_notes,
-                'admission_type': emergency_admission_type,
+                # ✅ حقول الطوارئ الإضافية (ترقيد/عملية) — العمود المخصص
+                # (Phase 1/5) هو المصدر الأول الآن، النص المستخرَج أعلاه fallback
+                # فقط للتقارير القديمة (قبل توفر العمود، أو قبل الـ backfill).
+                'admission_notes': getattr(report, 'admission_notes', '') or emergency_admission_notes or '',
+                'admission_type': getattr(report, 'admission_type', '') or emergency_admission_type or '',
                 # ✅ موعد العودة
                 'followup_date': followup_display if followup_display and followup_display != 'لا يوجد' else '',
                 'followup_time': report.followup_time or '',
                 'followup_reason': report.followup_reason or '',
                 # ✅ حقول خاصة - استخدام القيم المستخرجة من doctor_decision
                 'room_number': getattr(report, 'room_number', '') or '',
-                'operation_name_en': operation_name_en or getattr(report, 'operation_name_en', '') or '',
-                'operation_details': operation_details or getattr(report, 'operation_details', '') or '',
-                'success_rate': (success_rate if report.medical_action == 'استشارة مع قرار عملية' else '') or getattr(report, 'success_rate', '') or '',
-                'benefit_rate': (benefit_rate if report.medical_action == 'استشارة مع قرار عملية' else '') or getattr(report, 'benefit_rate', '') or '',
+                # ✅ العمود المخصص (Phase 1/5) هو المصدر الأول — النص المستخرَج
+                # من doctor_decision أعلاه fallback فقط للتقارير القديمة.
+                'operation_name_en': getattr(report, 'operation_name_en', '') or operation_name_en or '',
+                'operation_details': getattr(report, 'operation_details', '') or operation_details or '',
+                'success_rate': getattr(report, 'success_rate', '') or (success_rate if report.medical_action == 'استشارة مع قرار عملية' else '') or '',
+                'benefit_rate': getattr(report, 'benefit_rate', '') or (benefit_rate if report.medical_action == 'استشارة مع قرار عملية' else '') or '',
                 # ✅ حقول الفحوصات (مهمة لاستشارة جديدة)
                 'tests': tests_value,
                 # ✅ حقول تأجيل الموعد
@@ -1197,15 +1227,15 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 # ✅ حقول الأشعة
                 'radiology_type': getattr(report, 'radiology_type', '') or '',
                 'radiology_delivery_date': getattr(report, 'radiology_delivery_date', '') or '',
-                # ✅ حقول العلاج الطبيعي - استخدام القيمة المستخرجة
-                'therapy_details': therapy_details or getattr(report, 'therapy_details', '') or '',
-                # ✅ حقول الأجهزة التعويضية - استخدام القيمة المستخرجة
-                'device_details': device_details or getattr(report, 'device_details', '') or '',
-                # ✅ حقول الخروج - استخدام القيم المستخرجة
+                # ✅ حقول العلاج الطبيعي - العمود المخصص أولاً
+                'therapy_details': getattr(report, 'therapy_details', '') or therapy_details or '',
+                # ✅ حقول الأجهزة التعويضية - العمود المخصص أولاً
+                'device_details': getattr(report, 'device_details', '') or device_details or '',
+                # ✅ حقول الخروج - العمود المخصص أولاً
                 'discharge_type': getattr(report, 'discharge_type', '') or '',
-                'admission_summary': admission_summary or getattr(report, 'admission_summary', '') or '',
-                # ✅ حقول الترقيد - استخدام القيمة المستخرجة
-                'admission_reason': admission_reason or getattr(report, 'admission_reason', '') or '',
+                'admission_summary': getattr(report, 'admission_summary', '') or admission_summary or '',
+                # ✅ حقول الترقيد - العمود المخصص أولاً
+                'admission_reason': getattr(report, 'admission_reason', '') or admission_reason or '',
                 # ✅ حقول العلاج الإشعاعي
                 'radiation_therapy_type': getattr(report, 'radiation_therapy_type', '') or '',
                 'radiation_therapy_session_number': getattr(report, 'radiation_therapy_session_number', '') or '',
@@ -2006,6 +2036,11 @@ async def save_edit_to_database(query, context):
             current_data[field_name] = new_value
             context.user_data['current_report_data'] = current_data
 
+            # ✅ الكتابة المباشرة على العمود المخصص (Phase 1/5) — المصدر الأول
+            # الآن لقراءة هذا الحقل لاحقاً. doctor_decision المركّب أدناه يبقى
+            # للتوافق مع الكود القديم الذي لم يُهاجَر بعد (سيُحذف لاحقاً).
+            setattr(report, field_name, new_value)
+
             # إعادة بناء doctor_decision حسب نوع الإجراء
             medical_action = report.medical_action
 
@@ -2064,7 +2099,17 @@ async def save_edit_to_database(query, context):
             current_data = context.user_data.get('current_report_data', {})
             current_data[field_name] = new_value
             context.user_data['current_report_data'] = current_data
-            
+
+            # ✅ الكتابة المباشرة على العمود المخصص (Phase 1/5) لكل حقل له
+            # عمود مستقل — operation_name_en/success_rate/benefit_rate أعمدة
+            # جديدة، tests يُحفَظ في medications (نفس مكانه عند الإنشاء).
+            # decision/diagnosis ليس لهما عمود منفصل عن doctor_decision هنا
+            # (diagnosis يُحدَّث أدناه، decision يبقى فقط داخل النص المركّب).
+            if field_name in ('operation_name_en', 'success_rate', 'benefit_rate'):
+                setattr(report, field_name, new_value)
+            elif field_name == 'tests':
+                report.medications = new_value
+
             # إعادة بناء doctor_decision من الحقول الفرعية
             diagnosis_val = current_data.get('diagnosis', '') or (report.diagnosis or '')
             decision_val = current_data.get('decision', new_value if field_name == 'decision' else '')
