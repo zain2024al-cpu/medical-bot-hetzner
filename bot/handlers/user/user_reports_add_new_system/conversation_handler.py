@@ -1204,17 +1204,23 @@ def register(app):
                 CallbackQueryHandler(sh['handle_smart_back_navigation'],    pattern="^nav:back$"),
                 CallbackQueryHandler(sh['handle_smart_cancel_navigation'],  pattern="^nav:cancel$"),
             ],
+            # ✅ back_to_edit_fields مسجَّل هنا فقط لسياق إعادة فتح هذه الشاشة
+            # من "التعديل قبل النشر" (زر 'الإجراءات التي تمت') — نفس سبب
+            # back_to_edit_fields في حالات بوابة "هل يوجد تقرير طبي؟" أعلاه؛
+            # لا أثر على المسار الطبيعي أثناء إدخال تقرير جديد.
             ENDOSCOPY_PROCEDURES: [
                 CallbackQueryHandler(_tracked(en_proc_toggle, ENDOSCOPY_PROCEDURES),  pattern="^endo_proc:"),
                 CallbackQueryHandler(_tracked(en_proc_done, ENDOSCOPY_PROCEDURES),    pattern="^endo_proc_done$"),
                 CallbackQueryHandler(sh['handle_smart_back_navigation'],    pattern="^nav:back$"),
                 CallbackQueryHandler(sh['handle_smart_cancel_navigation'],  pattern="^nav:cancel$"),
+                CallbackQueryHandler(sh['handle_back_to_edit_fields'],      pattern="^back_to_edit_fields"),
                 CallbackQueryHandler(handle_noop,                           pattern="^noop$"),
             ],
             ENDOSCOPY_PROCEDURES_OTHER: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, _tracked(en_proc_other, ENDOSCOPY_PROCEDURES_OTHER)),
                 CallbackQueryHandler(sh['handle_smart_back_navigation'],    pattern="^nav:back$"),
                 CallbackQueryHandler(sh['handle_smart_cancel_navigation'],  pattern="^nav:cancel$"),
+                CallbackQueryHandler(sh['handle_back_to_edit_fields'],      pattern="^back_to_edit_fields"),
             ],
             ENDOSCOPY_NOTES: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, _tracked(en_notes, ENDOSCOPY_NOTES)),

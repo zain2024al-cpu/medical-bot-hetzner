@@ -142,6 +142,11 @@ REPORT_FIELD_REGISTRY: dict[str, list[FieldDef]] = {
         _f("complaint_text", "💬 شكوى المريض"),
         _f("endoscopy_type", "🔬 نوع المنظار"),
         _f("endoscopy_result", "📋 نتيجة المنظار / خطة الطبيب"),
+        # ✅ حقل رابع من فورمه المناظير كان مفقوداً تماماً من هذا السجل —
+        # غير مرئي إطلاقاً في التعديل قبل/بعد النشر رغم أنه عمود DB فعلي
+        # (Report.endoscopy_procedures) وحقل حقيقي في فورمه الإدخال (اختيار
+        # متعدد + "أخرى"، مخزَّن كـ JSON {"list":[...],"other":...}).
+        _f("endoscopy_procedures", "🔧 الإجراءات التي تمت أثناء المنظار"),
         _f("notes", "📝 ملاحظات"),
     ),
     "radiation_therapy": _with_followup_and_gate(
@@ -268,3 +273,31 @@ def get_fields_for_medical_action(medical_action: str) -> list[FieldDef]:
             _TRANSLATOR,
         ]
     return get_fields_for_flow_type(flow_type)
+
+
+# =============================================================================
+# endoscopy_procedures — تنسيق العرض لحقل JSON (اختيار متعدد + "أخرى")
+# =============================================================================
+# مصدر واحد يستورده show_edit_fields_menu (قبل النشر) وuser_reports_edit.py
+# (بعد النشر) وservices/broadcast_service.py (البطاقة المنشورة) — بدل تكرار
+# نفس منطق فك JSON في كل موضع بصيغة مختلفة قليلاً.
+
+def format_endoscopy_procedures(raw) -> str:
+    """يحوّل قيمة endoscopy_procedures المخزَّنة (JSON {"list":[...],"other":...}
+    أو نص قديم بلا تنسيق) إلى نص عربي قابل للعرض. يعيد نص "منظار تشخيصي..."
+    إن لم يُختَر أي إجراء، أو النص كما هو إن لم يكن JSON صالحاً (توافق مع
+    تقارير قديمة محتملة قبل توحيد الحقل)."""
+    if not raw:
+        return "منظار تشخيصي — لم يُجرَ أي إجراء"
+    try:
+        import json
+        parsed = json.loads(raw) if isinstance(raw, str) else raw
+        if isinstance(parsed, dict):
+            parts = list(parsed.get("list") or [])
+            other = parsed.get("other")
+            if other:
+                parts.append(f"أخرى: {other}")
+            return "، ".join(parts) if parts else "منظار تشخيصي — لم يُجرَ أي إجراء"
+    except Exception:
+        pass
+    return str(raw)

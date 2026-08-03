@@ -240,6 +240,37 @@ async def route_edit_field_selection(update: Update, context: ContextTypes.DEFAU
             context.user_data["_conversation_state"] = "MEDICAL_REPORT_ASK"
             return "MEDICAL_REPORT_ASK"
 
+        # ✅ اعتراض مشترك لحقل 'الإجراءات التي تمت أثناء المنظار' — مخزَّن
+        # كـ JSON (اختيار متعدد + "أخرى")، وكان غائباً تماماً من سجل الحقول
+        # فلا يظهر إطلاقاً في التعديل قبل النشر. الآن يعيد فتح نفس شاشة
+        # الاختيار المتعدد الأصلية (endo_proc:*) بعلامات ✅/☐ محسوبة من
+        # القيمة الحالية، بدل نص خام أو غياب تام.
+        if field_key == "endoscopy_procedures":
+            from bot.handlers.user.user_reports_add_new_system.flows.endoscopy import (
+                _show_procedures, _PROC_LABEL,
+            )
+            from bot.handlers.user.user_reports_add_new_system.states import ENDOSCOPY_PROCEDURES
+            import json as _json
+            data = context.user_data.setdefault("report_tmp", {})
+            data["current_flow"] = flow_type
+            label_to_code = {label: code for code, label in _PROC_LABEL.items()}
+            selected_codes = []
+            raw = data.get("endoscopy_procedures")
+            if raw:
+                try:
+                    parsed = _json.loads(raw) if isinstance(raw, str) else raw
+                    if isinstance(parsed, dict):
+                        selected_codes = [label_to_code[l] for l in (parsed.get("list") or []) if l in label_to_code]
+                        if parsed.get("other"):
+                            selected_codes.append("other")
+                except Exception:
+                    selected_codes = []
+            data["_endoscopy_selected"] = selected_codes
+            context.user_data["_endoscopy_procedures_edit_return"] = True
+            await _show_procedures(query.message, context, edit_query=query)
+            context.user_data["_conversation_state"] = ENDOSCOPY_PROCEDURES
+            return ENDOSCOPY_PROCEDURES
+
         # ✅ التوجيه حسب flow_type - كل flow type له handler منفصل
         if flow_type == "new_consult":
             if handle_new_consult_edit_field_selection:

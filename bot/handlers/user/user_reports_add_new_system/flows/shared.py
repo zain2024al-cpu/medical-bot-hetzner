@@ -3023,6 +3023,21 @@ async def show_edit_fields_menu(query, context, flow_type):
                 ])
                 continue
 
+            # ✅ 'الإجراءات التي تمت أثناء المنظار' مخزَّن كـ JSON (اختيار
+            # متعدد + "أخرى") — لا يُعرَض كنص خام، بل مُنسَّقاً عربياً.
+            if field_key == "endoscopy_procedures":
+                from ..field_registry import format_endoscopy_procedures
+                current_value = format_endoscopy_procedures(data.get("endoscopy_procedures"))
+                if len(current_value) > 30:
+                    current_value = current_value[:27] + "..."
+                keyboard.append([
+                    InlineKeyboardButton(
+                        f"{field_display} ({current_value})",
+                        callback_data=f"edit_field:{flow_type}:{field_key}",
+                    )
+                ])
+                continue
+
             # الحصول على القيمة الحالية (مع التحقق من الحقول المشتقة)
             current_value = data.get(field_key)
 

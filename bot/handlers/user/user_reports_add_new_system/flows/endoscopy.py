@@ -34,7 +34,7 @@ from ..states import (
 )
 from ..utils import _nav_buttons
 from ...user_reports_add_helpers import validate_text_input
-from .shared import show_translator_selection
+from .shared import show_translator_selection, show_final_summary, get_confirm_state
 from .new_consult import _render_followup_calendar
 
 logger = logging.getLogger(__name__)
@@ -190,27 +190,38 @@ async def handle_endoscopy_result(update: Update, context: ContextTypes.DEFAULT_
 # ═══════════════════════════════════════════════════════════════════
 # 4) الإجراءات التي تمت أثناء المنظار (اختيار متعدد)
 # ═══════════════════════════════════════════════════════════════════
-def _build_procedures_keyboard(selected: list) -> InlineKeyboardMarkup:
+def _build_procedures_keyboard(selected: list, back_callback: str = "nav:back") -> InlineKeyboardMarkup:
     rows = []
     for code, label in ENDOSCOPY_PROCEDURE_OPTIONS:
         mark = "✅" if code in selected else "☐"
         rows.append([InlineKeyboardButton(f"{mark} {label}", callback_data=f"endo_proc:{code}")])
     rows.append([InlineKeyboardButton("✅ متابعة", callback_data="endo_proc_done")])
     rows.append([
-        InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
+        InlineKeyboardButton("🔙 رجوع", callback_data=back_callback),
         InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel"),
     ])
     return InlineKeyboardMarkup(rows)
 
 
 async def _show_procedures(message, context, edit_query=None):
-    selected = context.user_data.setdefault("report_tmp", {}).setdefault("_endoscopy_selected", [])
+    data = context.user_data.setdefault("report_tmp", {})
+    selected = data.setdefault("_endoscopy_selected", [])
     text = (
         "🔧 **الإجراءات التي تمت أثناء المنظار**\n\n"
         "اختر كل ما تم (يمكن اختيار أكثر من إجراء)، ثم اضغط **✅ متابعة**.\n"
         "إن لم يُجرَ أي إجراء، اضغط **✅ متابعة** مباشرة (منظار تشخيصي)."
     )
-    markup = _build_procedures_keyboard(selected)
+    # ✅ عند إعادة فتح هذه الشاشة لتعديل الحقل من شاشة "التعديل قبل النشر"
+    # (edit_handlers/before_publish/router.py)، "🔙 رجوع" يجب أن يعود لقائمة
+    # الحقول القابلة للتعديل — لا لمكدس التنقل العادي (لم يُدفَع إليه شيء
+    # عند الدخول من هذه الشاشة، نفس نمط عطل مكدس التنقل المُصلَح سابقاً).
+    flow_type = data.get("current_flow", FLOW_KEY)
+    back_callback = (
+        f"back_to_edit_fields:{flow_type}"
+        if context.user_data.get("_endoscopy_procedures_edit_return")
+        else "nav:back"
+    )
+    markup = _build_procedures_keyboard(selected, back_callback=back_callback)
     if edit_query is not None:
         await edit_query.edit_message_text(text, reply_markup=markup, parse_mode="Markdown")
     else:
@@ -236,6 +247,20 @@ async def handle_endoscopy_procedure_toggle(update: Update, context: ContextType
     return ENDOSCOPY_PROCEDURES
 
 
+async def _complete_procedures_edit(message, context, flow_type):
+    """إن كانت شاشة الإجراءات أُعيد فتحها لتعديل حقلها من شاشة 'التعديل
+    قبل النشر' (`_endoscopy_procedures_edit_return`)، نعود لشاشة الملخص —
+    نفس سلوك أي حقل آخر يُعدَّل من تلك الشاشة. غير ذلك: لا شيء (المتصل
+    يكمل المسار الطبيعي نحو الملاحظات)."""
+    if not context.user_data.pop("_endoscopy_procedures_edit_return", None):
+        return None
+    flow_type = context.user_data.get("report_tmp", {}).get("current_flow", flow_type)
+    await show_final_summary(message, context, flow_type)
+    confirm_state = get_confirm_state(flow_type)
+    context.user_data['_conversation_state'] = confirm_state
+    return confirm_state
+
+
 async def handle_endoscopy_procedures_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """إنهاء اختيار الإجراءات → (نص 'أخرى' إن اختير) أو → الملاحظات."""
     query = update.callback_query
@@ -253,6 +278,11 @@ async def handle_endoscopy_procedures_done(update: Update, context: ContextTypes
 
     _finalize_procedures(data, other_text=None)
     await query.edit_message_text("✅ تم حفظ الإجراءات", parse_mode="Markdown")
+
+    edit_result = await _complete_procedures_edit(query.message, context, FLOW_KEY)
+    if edit_result is not None:
+        return edit_result
+
     await _prompt_notes(query.message, context)
     context.user_data['_conversation_state'] = ENDOSCOPY_NOTES
     return ENDOSCOPY_NOTES
@@ -275,6 +305,11 @@ async def handle_endoscopy_procedures_other(update: Update, context: ContextType
     _finalize_procedures(data, other_text=text)
 
     await update.message.reply_text("✅ تم الحفظ")
+
+    edit_result = await _complete_procedures_edit(update.message, context, FLOW_KEY)
+    if edit_result is not None:
+        return edit_result
+
     await _prompt_notes(update.message, context)
     context.user_data['_conversation_state'] = ENDOSCOPY_NOTES
     return ENDOSCOPY_NOTES

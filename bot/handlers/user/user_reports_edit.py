@@ -365,6 +365,13 @@ def _has_field_value_in_report(report, current_report_data, field_name):
     return False
 
 
+def _format_endoscopy_procedures_field(raw):
+    """استيراد محلي عمداً — نفس سبب الاستيراد المحلي في
+    get_editable_fields_by_action_type أدناه (تفادي الاستيراد الدائري)."""
+    from bot.handlers.user.user_reports_add_new_system.field_registry import format_endoscopy_procedures
+    return format_endoscopy_procedures(raw)
+
+
 def get_editable_fields_by_action_type(medical_action):
     """
     تحديد الحقول القابلة للتعديل حسب نوع الإجراء — بعد النشر.
@@ -827,6 +834,10 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
                 # ✅ حقول المناظير
                 'endoscopy_type': getattr(report, 'endoscopy_type', None) or "لا يوجد",
                 'endoscopy_result': getattr(report, 'endoscopy_result', None) or "لا يوجد",
+                # ✅ 'الإجراءات التي تمت' — كان غائباً تماماً من هنا فلا يظهر
+                # إطلاقاً في التعديل بعد النشر رغم كونه عمود DB فعلي. مخزَّن
+                # كـ JSON، يُعرَض منسَّقاً عبر format_endoscopy_procedures.
+                'endoscopy_procedures': _format_endoscopy_procedures_field(getattr(report, 'endoscopy_procedures', None)),
                 # ✅ حقول معاملة الزراعة — كانت مفقودة هنا فيظهر التعديل بعد
                 # النشر بقيمة "لا يوجد" رغم وجود القيمة الحقيقية في القاعدة.
                 'transplant_type': getattr(report, 'transplant_type', None) or "لا يوجد",
@@ -1384,6 +1395,7 @@ async def handle_field_selection(update: Update, context: ContextTypes.DEFAULT_T
             # (endoscopy_type) بدل تسمية عربية في عنوان شاشة التعديل.
             'endoscopy_type': 'نوع المنظار',
             'endoscopy_result': 'نتيجة المنظار / خطة الطبيب',
+            'endoscopy_procedures': 'الإجراءات التي تمت أثناء المنظار',
             # ✅ حقول معاملة الزراعة
             'transplant_type': 'نوع الزراعة',
             'transplant_parties': 'الجهة',
@@ -2182,6 +2194,17 @@ async def save_edit_to_database(query, context):
             # إذا أدخل سبباً يعني لا يوجد تقرير → has_paper_report=0
             report.has_paper_report = 0
             logger.info(f"✅ تم تحديث no_paper_report_reason = {new_value}")
+
+        # ✅ 'الإجراءات التي تمت أثناء المنظار' مخزَّن كـ JSON
+        # {"list":[...],"other":...} — بطاقة النشر (broadcast_service.py)
+        # تحلّله كـ JSON وتتجاهل صامتاً أي نص لا ينجح تحليله (تعرض "منظار
+        # تشخيصي" بدل النص المُدخَل فعلياً). التعديل بعد النشر نص حر بسيط
+        # (لا شاشة اختيار متعدد هنا)، فيُغلَّف في نفس بنية JSON قبل الحفظ
+        # حتى لا يختفي عند إعادة النشر.
+        elif field_name == 'endoscopy_procedures':
+            import json as _json
+            report.endoscopy_procedures = _json.dumps({"list": [], "other": new_value}, ensure_ascii=False)
+            logger.info(f"✅ تم تحديث endoscopy_procedures = {new_value[:50]}")
 
         # ✅ رقم الجلسة الحالية لأنواع جلسات العلاج — يُحدِّث TreatmentPlan
         # الفعلية (chemo/targeted/immuno) أو نص treatment_plan_summary
