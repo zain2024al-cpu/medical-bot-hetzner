@@ -49,7 +49,7 @@ def _f(key, label, db_column=None, is_date=False):
     return FieldDef(key, label, db_column or key, is_date)
 
 
-_NO_REPORT_REASON = _f("no_paper_report_reason", "📋 سبب عدم وجود تقرير طبي")
+_NO_REPORT_REASON = _f("no_paper_report_reason", "📎 حالة التقرير الطبي")
 _TRANSLATOR = _f("translator_name", "👤 المترجم")
 _FOLLOWUP_DATE = _f("followup_date", "📅 موعد العودة", is_date=True)
 _FOLLOWUP_REASON = _f("followup_reason", "✍️ سبب العودة")

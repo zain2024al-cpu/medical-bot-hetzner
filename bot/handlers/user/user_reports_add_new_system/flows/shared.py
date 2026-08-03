@@ -384,7 +384,7 @@ def _is_medical_report_step_enabled(context) -> bool:
     return True
 
 
-def build_medical_report_gate_keyboard() -> InlineKeyboardMarkup:
+def build_medical_report_gate_keyboard(back_callback: str = "nav:back") -> InlineKeyboardMarkup:
     """بوابة التقرير الطبي الموحّدة بثلاث حالات — مصدر واحد تستورده كل
     مواضع عرض البوابة (shared / navigation_helpers / execute_smart_state_action)
     لتفادي تباعد النسخ. لا تعتمد على flow_type إطلاقاً (بوابة موحّدة لكل
@@ -392,13 +392,44 @@ def build_medical_report_gate_keyboard() -> InlineKeyboardMarkup:
       medrep:yes     → ✅ يوجد تقرير طبي (رفع الملفات)
       medrep:pending → 🟡 لم يجهز بعد (يُحفظ Pending ويظهر في المعلقة)
       medrep:no      → ❌ لا يوجد تقرير (مربع سبب، حالة منتهية)
+
+    ✅ back_callback: يُستخدَم لإعادة فتح البوابة من شاشة "تعديل قبل النشر"
+    (edit_handlers/before_publish/router.py) — هناك "رجوع" يجب أن يعود
+    لقائمة الحقول القابلة للتعديل (`back_to_edit_fields:{flow_type}`) لا
+    لمكدس التنقل العادي (الذي لم يُدفَع إليه شيء عند الدخول من هذه الشاشة).
     """
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("✅ يوجد تقرير طبي", callback_data="medrep:yes")],
         [InlineKeyboardButton("🟡 لم يجهز بعد",   callback_data="medrep:pending")],
         [InlineKeyboardButton("❌ لا يوجد تقرير", callback_data="medrep:no")],
-        [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back")],
+        [InlineKeyboardButton("🔙 رجوع", callback_data=back_callback)],
     ])
+
+
+def build_medical_report_gate_text(flow_type: str) -> str:
+    """نص بوابة 'هل يوجد تقرير طبي؟' — مصدر واحد (كان مكرَّراً بين
+    show_translator_selection وإعادة فتح البوابة من شاشة التعديل قبل
+    النشر)."""
+    if flow_type == "operation":
+        return (
+            "📎 **هل يوجد تقرير طبي او صور للعملية؟**\n\n"
+            "• ✅ يوجد تقرير طبي — لرفع التقرير أو الصور الآن\n"
+            "• 🟡 لم يجهز بعد — ستحضره لاحقاً (يظهر في المعلقة)\n"
+            "• ❌ لا يوجد تقرير — مع كتابة السبب"
+        )
+    if flow_type in ("rehab_physical", "rehab_device", "device"):
+        return (
+            "📎 **هل يوجد صور او فيدوهات للتمارين؟**\n\n"
+            "• ✅ يوجد تقرير طبي — لرفع الصور أو الفيديوهات الآن\n"
+            "• 🟡 لم يجهز بعد — ستحضرها لاحقاً (تظهر في المعلقة)\n"
+            "• ❌ لا يوجد تقرير — مع كتابة السبب"
+        )
+    return (
+        "📎 **هل يوجد تقرير طبي؟**\n\n"
+        "• ✅ يوجد تقرير طبي — لرفع التقرير الآن\n"
+        "• 🟡 لم يجهز بعد — سيُحضَر لاحقاً (يظهر في المعلقة)\n"
+        "• ❌ لا يوجد تقرير — مع كتابة السبب"
+    )
 
 
 def build_pending_count_keyboard() -> InlineKeyboardMarkup:
@@ -441,27 +472,7 @@ async def show_translator_selection(message, context, flow_type):
             report_tmp["_pending_translator_flow"] = flow_type
             # ✅ بوابة موحّدة بثلاث حالات لكل المسارات (بلا زر "تخطي")
             keyboard = build_medical_report_gate_keyboard()
-            if flow_type == "operation":
-                gate_text = (
-                    "📎 **هل يوجد تقرير طبي او صور للعملية؟**\n\n"
-                    "• ✅ يوجد تقرير طبي — لرفع التقرير أو الصور الآن\n"
-                    "• 🟡 لم يجهز بعد — ستحضره لاحقاً (يظهر في المعلقة)\n"
-                    "• ❌ لا يوجد تقرير — مع كتابة السبب"
-                )
-            elif flow_type in ("rehab_physical", "rehab_device", "device"):
-                gate_text = (
-                    "📎 **هل يوجد صور او فيدوهات للتمارين؟**\n\n"
-                    "• ✅ يوجد تقرير طبي — لرفع الصور أو الفيديوهات الآن\n"
-                    "• 🟡 لم يجهز بعد — ستحضرها لاحقاً (تظهر في المعلقة)\n"
-                    "• ❌ لا يوجد تقرير — مع كتابة السبب"
-                )
-            else:
-                gate_text = (
-                    "📎 **هل يوجد تقرير طبي؟**\n\n"
-                    "• ✅ يوجد تقرير طبي — لرفع التقرير الآن\n"
-                    "• 🟡 لم يجهز بعد — سيُحضَر لاحقاً (يظهر في المعلقة)\n"
-                    "• ❌ لا يوجد تقرير — مع كتابة السبب"
-                )
+            gate_text = build_medical_report_gate_text(flow_type)
             await message.reply_text(
                 gate_text,
                 reply_markup=keyboard,
@@ -650,6 +661,26 @@ async def handle_medical_report_choice(update: Update, context: ContextTypes.DEF
     return "MEDICAL_REPORT_IMAGE"
 
 
+async def _complete_medical_report_gate(message, context, flow_type):
+    """يُستدعى بعد إتمام أي فرع من فروع بوابة 'هل يوجد تقرير طبي؟' الثلاثة
+    (رفع ملفات / عدد الفحوصات المنتظرة / سبب عدم الوجود).
+
+    إذا كانت البوابة أُعيد فتحها لتعديل حقلها من شاشة 'التعديل قبل النشر'
+    (`_medical_report_edit_return`، يضبطها router.py عند إعادة فتح البوابة
+    من زر الحقل)، نعود لشاشة الملخص — نفس سلوك أي حقل آخر يُعدَّل من تلك
+    الشاشة. غير ذلك (المسار الطبيعي أثناء إدخال تقرير جديد): نكمل لاختيار
+    المترجم كالمعتاد.
+    """
+    if context.user_data.pop("_medical_report_edit_return", None):
+        flow_type = context.user_data.get("report_tmp", {}).get("current_flow", flow_type)
+        await show_final_summary(message, context, flow_type)
+        confirm_state = get_confirm_state(flow_type)
+        context.user_data['_conversation_state'] = confirm_state
+        return confirm_state
+    await show_translator_selection(message, context, flow_type)
+    return get_translator_state(flow_type)
+
+
 async def handle_medical_report_pending_count(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     معالجة اختيار عدد الفحوصات/التقارير المنتظرة بعد '🟡 لم يجهز بعد' —
@@ -693,8 +724,7 @@ async def handle_medical_report_pending_count(update: Update, context: ContextTy
         await update.message.reply_text(f"✅ تم — {label}")
         message_target = update.message
 
-    await show_translator_selection(message_target, context, flow_type)
-    return get_translator_state(flow_type)
+    return await _complete_medical_report_gate(message_target, context, flow_type)
 
 
 async def handle_medical_report_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -761,8 +791,7 @@ async def handle_medical_report_image_done(update: Update, context: ContextTypes
     else:
         await query.edit_message_text("✅ تم. (لم يتم رفع أي ملفات)")
 
-    await show_translator_selection(query.message, context, flow_type)
-    return get_translator_state(flow_type)
+    return await _complete_medical_report_gate(query.message, context, flow_type)
 
 
 async def handle_medical_report_no_reason(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -786,8 +815,7 @@ async def handle_medical_report_no_reason(update: Update, context: ContextTypes.
     flow_type = report_tmp.get("_pending_translator_flow", "new_consult")
 
     await update.message.reply_text("✅ تم.")
-    await show_translator_selection(update.message, context, flow_type)
-    return get_translator_state(flow_type)
+    return await _complete_medical_report_gate(update.message, context, flow_type)
 
 
 async def handle_simple_translator_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2971,9 +2999,33 @@ async def show_edit_fields_menu(query, context, flow_type):
         
         keyboard = []
         for field_key, field_display in editable_fields:
+            # ✅ 'حالة التقرير الطبي' حقل تفرّعي بثلاث حالات (بوابة
+            # medrep:yes/pending/no) — لا قيمة نصية واحدة تمثّله، والمعاينة
+            # يجب أن تعكس الحالة الفعلية المُختارة لا افتراض "لا يوجد" دائماً
+            # (خلل حقيقي مبلَّغ: اختيار "لم يجهز بعد" كان يعرض هنا "سبب عدم
+            # وجود تقرير طبي" بلا قيمة، موحياً بحالة مختلفة تماماً عمّا اختير).
+            if field_key == "no_paper_report_reason":
+                if data.get("_medical_attachments"):
+                    n = len(data["_medical_attachments"])
+                    current_value = f"✅ يوجد ({n} ملف)" if n else "✅ يوجد تقرير طبي"
+                elif data.get("_medical_report_pending"):
+                    current_value = "🟡 لم يجهز بعد"
+                elif data.get("no_paper_report_reason"):
+                    current_value = f"❌ {data['no_paper_report_reason']}"
+                else:
+                    current_value = "غير محدد"
+                current_value_str = str(current_value).strip()
+                if len(current_value_str) > 30:
+                    current_value = current_value_str[:27] + "..."
+                button_text = f"{field_display} ({current_value})"
+                keyboard.append([
+                    InlineKeyboardButton(button_text, callback_data=f"edit_field:{flow_type}:{field_key}")
+                ])
+                continue
+
             # الحصول على القيمة الحالية (مع التحقق من الحقول المشتقة)
             current_value = data.get(field_key)
-            
+
             # ✅ البحث في الحقول المشتقة إذا لم توجد قيمة مباشرة
             if not current_value:
                 field_aliases = {

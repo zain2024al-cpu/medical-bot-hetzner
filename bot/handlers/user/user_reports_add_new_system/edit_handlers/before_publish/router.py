@@ -215,32 +215,30 @@ async def route_edit_field_selection(update: Update, context: ContextTypes.DEFAU
                 await query.edit_message_text("❌ حدث خطأ أثناء تحميل قائمة المترجمين")
                 return ConversationHandler.END
 
-        # ✅ اعتراض مشترك لحقل سبب عدم وجود تقرير طبي — نص حر لجميع المسارات
+        # ✅ اعتراض مشترك لحقل 'حالة التقرير الطبي' — ليس نصاً حراً واحداً،
+        # بل نفس بوابة "هل يوجد تقرير طبي؟" الثلاثية الأصلية (medrep:yes/
+        # pending/no) بكل تفرعاتها (رفع ملفات / عدد الفحوصات المنتظرة /
+        # سبب عدم الوجود). كان هذا الاعتراض يقفز مباشرة لطلب "السبب" بلا
+        # شرط، حتى لو كانت الحالة الفعلية المُختارة "✅ يوجد" أو "🟡 لم يجهز
+        # بعد" — يعرض زراً مضلِّلاً ولا يتيح تغيير الحالة نفسها، فقط نصاً
+        # لا معنى له خارج حالة "❌ لا يوجد". الآن يعيد فتح البوابة الأصلية
+        # بنفس الأزرار الثلاثة، وأي اختيار يشغّل نفس تفرعه الأصلي بالضبط
+        # (handle_medical_report_choice، مسجَّل أصلاً لحالة MEDICAL_REPORT_ASK).
         if field_key == "no_paper_report_reason":
-            data = context.user_data.get("report_tmp", {})
-            current_value = data.get("no_paper_report_reason", "غير محدد")
-            if isinstance(current_value, str) and len(current_value) > 200:
-                current_value_display = current_value[:200] + "..."
-            else:
-                current_value_display = str(current_value) if current_value else "غير محدد"
-            context.user_data["edit_field_key"] = "no_paper_report_reason"
-            context.user_data["edit_flow_type"] = flow_type
-            try:
-                from bot.handlers.user.user_reports_add_new_system.flows.shared import get_confirm_state
-                confirm_state = get_confirm_state(flow_type)
-            except Exception:
-                confirm_state = ConversationHandler.END
-            await query.edit_message_text(
-                f"✏️ **تعديل سبب عدم وجود تقرير طبي**\n\n"
-                f"**القيمة الحالية:**\n{current_value_display}\n\n"
-                f"📝 أرسل السبب الجديد:",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🔙 رجوع", callback_data=f"back_to_edit_fields:{flow_type}")],
-                ]),
-                parse_mode="Markdown"
+            from bot.handlers.user.user_reports_add_new_system.flows.shared import (
+                build_medical_report_gate_keyboard, build_medical_report_gate_text,
             )
-            context.user_data['_conversation_state'] = confirm_state
-            return confirm_state
+            data = context.user_data.setdefault("report_tmp", {})
+            data["_pending_translator_flow"] = flow_type
+            context.user_data["_medical_report_edit_return"] = True
+            keyboard = build_medical_report_gate_keyboard(back_callback=f"back_to_edit_fields:{flow_type}")
+            await query.edit_message_text(
+                build_medical_report_gate_text(flow_type),
+                reply_markup=keyboard,
+                parse_mode="Markdown",
+            )
+            context.user_data["_conversation_state"] = "MEDICAL_REPORT_ASK"
+            return "MEDICAL_REPORT_ASK"
 
         # ✅ التوجيه حسب flow_type - كل flow type له handler منفصل
         if flow_type == "new_consult":
@@ -471,35 +469,6 @@ async def route_edit_field_input(update: Update, context: ContextTypes.DEFAULT_T
                     parse_mode="Markdown"
                 )
             return ConversationHandler.END
-
-        # ✅ اعتراض مشترك لحقل سبب عدم وجود تقرير طبي — نفس المنطق لجميع المسارات
-        field_key = context.user_data.get("edit_field_key")
-        if field_key == "no_paper_report_reason":
-            text = update.message.text.strip() if update.message else ""
-            if not text:
-                await update.message.reply_text(
-                    "⚠️ **خطأ:** النص فارغ\n\nيرجى إرسال قيمة صحيحة.",
-                    parse_mode="Markdown"
-                )
-                try:
-                    from bot.handlers.user.user_reports_add_new_system.flows.shared import get_confirm_state
-                    return get_confirm_state(flow_type)
-                except Exception:
-                    return ConversationHandler.END
-            data = context.user_data.setdefault("report_tmp", {})
-            data["no_paper_report_reason"] = text
-            data["_medical_report_step_done"] = True
-            context.user_data.pop("edit_field_key", None)
-            logger.info(f"✅ [ROUTER] no_report_reason updated: {text[:50]}")
-            try:
-                from bot.handlers.user.user_reports_add_new_system.flows.shared import show_final_summary, get_confirm_state
-                await show_final_summary(update.message, context, flow_type)
-                confirm_state = get_confirm_state(flow_type)
-                context.user_data['_conversation_state'] = confirm_state
-                return confirm_state
-            except Exception as e:
-                logger.error(f"❌ [ROUTER] خطأ في عرض الملخص بعد تعديل no_report_reason: {e}", exc_info=True)
-                return ConversationHandler.END
 
         logger.info(f"🔀 [ROUTER] route_edit_field_input: flow_type={flow_type}")
         

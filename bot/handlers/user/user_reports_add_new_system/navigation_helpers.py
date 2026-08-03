@@ -304,6 +304,16 @@ async def handle_smart_back_navigation(update: Update, context: ContextTypes.DEF
 
         # States between content steps and translator: back from any of these returns to the gate
         if current_conv_state in ("MEDICAL_REPORT_NO_REASON", "MEDICAL_REPORT_IMAGE", "TRANSLATOR_SELECTING"):
+            # ✅ إن كانت البوابة أُعيد فتحها لتعديل حقلها من شاشة "التعديل قبل
+            # النشر" (_medical_report_edit_return)، الرجوع من هنا يجب أن يعود
+            # لقائمة الحقول القابلة للتعديل — لا إعادة عرض البوابة (بلوحتها
+            # الأصلية التي لا تعرف عن سياق التعديل) ولا مسح الحالة الفعلية
+            # الحالية للحقل (كانت قد تكون صحيحة قبل أن يضغط المستخدم زراً
+            # بالخطأ ثم يتراجع).
+            if context.user_data.pop("_medical_report_edit_return", None):
+                logger.info(f"🔙 BACK: from {current_conv_state} (edit mode) → back to edit fields list")
+                from .flows.shared import show_edit_fields_menu
+                return await show_edit_fields_menu(query, context, flow_type)
             logger.info(f"🔙 BACK: from {current_conv_state} → re-show MEDICAL_REPORT_ASK gate")
             # reset gate-related data so gate re-appears (not skipped)
             report_tmp.pop("_medical_report_step_done", None)

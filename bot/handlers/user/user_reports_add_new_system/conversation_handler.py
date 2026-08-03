@@ -794,21 +794,32 @@ def register(app):
             NEW_CONSULT_TRANSLATOR: _translator_state_handlers(sh, NEW_CONSULT_TRANSLATOR),
             NEW_CONSULT_CONFIRM:    _confirm_state_handlers(sh, route_sel, route_inp),
             # ── MEDICAL REPORT GATE (string-keyed, shared across all flows) ───
+            # ✅ back_to_edit_fields مسجَّل في كل حالات البوابة الأربع — تُستخدَم
+            # فقط عند إعادة فتح البوابة لتعديل حقلها من شاشة "التعديل قبل
+            # النشر" (edit_handlers/before_publish/router.py، زر 'حالة التقرير
+            # الطبي')، حيث "🔙 رجوع" يجب أن يعود لقائمة الحقول القابلة للتعديل
+            # لا لمكدس التنقل العادي (لم يُدفَع إليه شيء عند الدخول من هذه
+            # الشاشة، فالمعالج العام كان سيقفز لقائمة نوع الإجراء خطأً). بلا
+            # أثر على المسار الطبيعي أثناء إدخال تقرير جديد — لا زر هناك يرسل
+            # هذا الـ callback.
             "MEDICAL_REPORT_ASK": [
                 CallbackQueryHandler(handle_medical_report_choice,          pattern="^medrep:(yes|no|pending)$"),
                 CallbackQueryHandler(handle_cancel_navigation,              pattern="^nav:cancel$"),
                 CallbackQueryHandler(sh['handle_smart_back_navigation'],    pattern="^nav:back$"),
+                CallbackQueryHandler(sh['handle_back_to_edit_fields'],      pattern="^back_to_edit_fields"),
             ],
             "MEDICAL_REPORT_PENDING_COUNT": [
                 CallbackQueryHandler(handle_medical_report_pending_count,   pattern="^medrep_count:"),
                 CallbackQueryHandler(handle_cancel_navigation,              pattern="^nav:cancel$"),
                 CallbackQueryHandler(sh['handle_smart_back_navigation'],    pattern="^nav:back$"),
+                CallbackQueryHandler(sh['handle_back_to_edit_fields'],      pattern="^back_to_edit_fields"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND,            handle_medical_report_pending_count),
             ],
             "MEDICAL_REPORT_IMAGE": [
                 CallbackQueryHandler(handle_medical_report_image_done,      pattern="^medrep_done:yes$"),
                 CallbackQueryHandler(handle_cancel_navigation,              pattern="^nav:cancel$"),
                 CallbackQueryHandler(sh['handle_smart_back_navigation'],    pattern="^nav:back$"),
+                CallbackQueryHandler(sh['handle_back_to_edit_fields'],      pattern="^back_to_edit_fields"),
                 MessageHandler(filters.PHOTO,                               handle_medical_report_image),
                 MessageHandler(filters.Document.ALL,                        handle_medical_report_image),
                 MessageHandler(filters.VIDEO,                               handle_medical_report_image),
@@ -819,6 +830,7 @@ def register(app):
             "MEDICAL_REPORT_NO_REASON": [
                 CallbackQueryHandler(handle_cancel_navigation,              pattern="^nav:cancel$"),
                 CallbackQueryHandler(sh['handle_smart_back_navigation'],    pattern="^nav:back$"),
+                CallbackQueryHandler(sh['handle_back_to_edit_fields'],      pattern="^back_to_edit_fields"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND,            handle_medical_report_no_reason),
             ],
             # ── EDIT DRAFT (string-keyed) ─────────────────────────────────────
