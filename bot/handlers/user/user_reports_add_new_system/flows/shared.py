@@ -456,6 +456,7 @@ def get_editable_fields_by_flow_type(flow_type):
             ("translator_name",  "👤 المترجم"),
         ],
         "treatment_chemo": [
+            ("session_number",    "🔢 رقم الجلسة الحالية"),
             ("complaint",         "💬 شكوى المريض"),
             ("notes",             "📝 ملاحظات الطبيب"),
             ("followup_date",     "📅 موعد العودة"),
@@ -465,6 +466,7 @@ def get_editable_fields_by_flow_type(flow_type):
             ("translator_name",   "👤 المترجم"),
         ],
         "treatment_targeted": [
+            ("session_number",    "🔢 رقم الجلسة الحالية"),
             ("complaint",         "💬 شكوى المريض"),
             ("notes",             "📝 ملاحظات الطبيب"),
             ("followup_date",     "📅 موعد العودة"),
@@ -474,6 +476,7 @@ def get_editable_fields_by_flow_type(flow_type):
             ("translator_name",   "👤 المترجم"),
         ],
         "treatment_immuno": [
+            ("session_number",    "🔢 رقم الجلسة الحالية"),
             ("complaint",         "💬 شكوى المريض"),
             ("notes",             "📝 ملاحظات الطبيب"),
             ("followup_date",     "📅 موعد العودة"),
@@ -483,6 +486,7 @@ def get_editable_fields_by_flow_type(flow_type):
             ("translator_name",   "👤 المترجم"),
         ],
         "treatment_dialysis": [
+            ("session_number",    "🔢 رقم الجلسة الحالية"),
             ("followup_date",     "📅 تاريخ الجلسة القادمة"),
             ("no_report_reason",  "📋 سبب عدم وجود تقرير طبي"),
             ("translator_name",   "👤 المترجم"),

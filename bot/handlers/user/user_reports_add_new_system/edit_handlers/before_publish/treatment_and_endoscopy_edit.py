@@ -41,7 +41,67 @@ _FIELD_NAMES = {
     "followup_date":     "📅 موعد العودة",
     "followup_time":     "⏰ وقت العودة",
     "followup_reason":   "✍️ سبب العودة",
+    "session_number":    "🔢 رقم الجلسة الحالية",
 }
+
+# ✅ رقم الجلسة الحالية — نفس منطق التعديل بعد النشر تماماً (انظر
+# _current_session_number_display/_apply_session_number_edit في
+# user_reports_edit.py)، لكن على report_tmp الحي بدل صف Report منشور.
+# chemo/targeted/immuno لها TreatmentPlan فعلية فيُقرأ/يُحدَّث الرقم منها
+# مباشرة عبر get_active_plan/edit_plan، أما dialysis فالرقم مضمَّن فقط
+# داخل نص treatment_plan_summary فيُستبدَل بالنص مباشرة.
+_TREATMENT_KEY_BY_FLOW = {
+    "treatment_chemo": "chemo",
+    "treatment_targeted": "targeted",
+    "treatment_immuno": "immuno",
+    "treatment_dialysis": "dialysis",
+}
+_DIALYSIS_SESSION_PATTERN = r'رقم الجلسة الحالية:\s*(\d+)'
+
+
+def _current_session_number_display(data: dict, flow_type: str) -> str:
+    import re
+    treatment_key = _TREATMENT_KEY_BY_FLOW.get(flow_type)
+    if not treatment_key:
+        return "غير محدد"
+    if treatment_key == "dialysis":
+        m = re.search(_DIALYSIS_SESSION_PATTERN, data.get("treatment_plan_summary") or "")
+        return m.group(1) if m else "غير محدد"
+    patient_id = data.get("patient_id")
+    if not patient_id:
+        return "غير محدد"
+    from services.treatment_plan_service import get_active_plan
+    plan = get_active_plan(patient_id, treatment_key)
+    if plan and plan.get("current_session") is not None:
+        return str(plan["current_session"])
+    return "غير محدد"
+
+
+def _apply_session_number_edit(data: dict, flow_type: str, new_value: str) -> None:
+    import re
+    treatment_key = _TREATMENT_KEY_BY_FLOW.get(flow_type)
+    if treatment_key == "dialysis":
+        summary = data.get("treatment_plan_summary") or ""
+        if re.search(_DIALYSIS_SESSION_PATTERN, summary):
+            data["treatment_plan_summary"] = re.sub(
+                _DIALYSIS_SESSION_PATTERN, f"رقم الجلسة الحالية: {new_value}", summary,
+            )
+        else:
+            data["treatment_plan_summary"] = f"🩸 **جلسات غسيل الكلى**\n\nرقم الجلسة الحالية: {new_value}"
+        return
+    if treatment_key:
+        patient_id = data.get("patient_id")
+        if patient_id:
+            from services.treatment_plan_service import get_active_plan, edit_plan, format_progress_text
+            plan = get_active_plan(patient_id, treatment_key)
+            if plan:
+                updated_plan = edit_plan(
+                    plan["id"], {"current_session": int(new_value)},
+                    changed_by=None, changed_by_name="تعديل قبل النشر",
+                    reason="تصحيح رقم الجلسة قبل نشر التقرير",
+                )
+                data["treatment_plan_summary"] = format_progress_text(updated_plan)
+                data["_tp_plan_id"] = plan["id"]
 
 
 async def handle_treatment_endoscopy_edit_field_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -58,7 +118,10 @@ async def handle_treatment_endoscopy_edit_field_selection(update: Update, contex
         field_key = parts[2]
 
         data = context.user_data.get("report_tmp", {})
-        current_value = data.get(field_key, "غير محدد")
+        if field_key == "session_number":
+            current_value = _current_session_number_display(data, flow_type)
+        else:
+            current_value = data.get(field_key, "غير محدد")
 
         context.user_data["edit_field_key"] = field_key
         context.user_data["edit_flow_type"] = flow_type
@@ -124,6 +187,12 @@ async def handle_treatment_endoscopy_edit_field_input(update: Update, context: C
             )
             return get_confirm_state(flow_type)
 
+        if field_key == "session_number" and (not text.isdigit() or int(text) <= 0):
+            await update.message.reply_text(
+                "⚠️ يرجى إدخال رقم صحيح أكبر من صفر (رقم الجلسة الحالية):",
+            )
+            return get_confirm_state(flow_type)
+
         data = context.user_data.setdefault("report_tmp", {})
 
         # ✅ شكوى المريض: المسارات المدمجة/العلاجية تخزّنها في "complaint"،
@@ -131,6 +200,11 @@ async def handle_treatment_endoscopy_edit_field_input(update: Update, context: C
         if field_key in ("complaint", "complaint_text"):
             data["complaint"] = text
             data["complaint_text"] = text
+        elif field_key == "session_number":
+            # ✅ يُحدِّث TreatmentPlan الفعلية (chemo/targeted/immuno) أو نص
+            # treatment_plan_summary مباشرة (dialysis، بلا خطة) — وليس مجرد
+            # مفتاح جديد في report_tmp لا يقرأه شيء.
+            _apply_session_number_edit(data, flow_type, text)
         else:
             data[field_key] = text
 
