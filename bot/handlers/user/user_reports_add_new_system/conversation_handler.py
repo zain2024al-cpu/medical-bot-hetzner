@@ -122,7 +122,7 @@ from .action_type_handlers import (
 )
 
 # --- Navigation (modular) ---
-from .navigation_helpers import handle_cancel_navigation, handle_go_to_state
+from .navigation_helpers import handle_cancel_navigation
 
 # --- flows/shared.py (translator, confirm, save, edit) ---
 from .flows.shared import (
@@ -745,7 +745,16 @@ def register(app):
                 CallbackQueryHandler(_tracked(onc.get('onc_toggle'), R_ACTION_TYPE),            pattern="^onc_toggle:"),
                 CallbackQueryHandler(_tracked(onc.get('onc_next'), R_ACTION_TYPE),              pattern="^onc_next$"),
                 CallbackQueryHandler(handle_noop,                                               pattern="^noop$"),
-                CallbackQueryHandler(_tracked(handle_go_to_state, R_ACTION_TYPE),              pattern="^go_to_search_doctor_screen$"),
+                # ✅ زر "🔙 رجوع" من قائمة نوع الإجراء إلى شاشة الطبيب — كان
+                # يستخدم _tracked(handle_go_to_state, ...) الذي يدفع الحالة
+                # الحالية (R_ACTION_TYPE) على مكدس التنقل كأنه انتقال للأمام،
+                # فيتراكم إدخال زائد قيمته 7 — يصادف تماماً نفس رقم
+                # NEW_CONSULT_COMPLAINT (انظر التعليق أعلاه) فيُعاد عرض قائمة
+                # نوع الإجراء بدل الرجوع للقسم عند ضغط "رجوع" مرة ثانية من
+                # شاشة الطبيب. الحل: نفس معالج الرجوع العام (يسحب من المكدس
+                # فقط، لا يدفع إليه) المستخدم لكل أزرار الرجوع الأخرى في هذا
+                # المسار (go_to_hospital_selection/go_to_department_selection).
+                CallbackQueryHandler(sh['handle_smart_back_navigation'],                        pattern="^go_to_search_doctor_screen$"),
                 CallbackQueryHandler(sh['handle_smart_back_navigation'],                        pattern="^nav:back$"),
                 CallbackQueryHandler(handle_stale_callback,
                     pattern="^(hosp_page|hospital_page|dept_page|department_page|subdept_page|subdepartment_page|doctor_idx|hospital_idx|dept_idx|subdept|subdept_idx):"),
