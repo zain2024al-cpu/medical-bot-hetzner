@@ -160,6 +160,65 @@ _DECISION_SEGMENT_PREFIXES = (
     'نوع الإشعاعي:', 'سبب تأجيل الموعد:',
 )
 
+# ✅ رقم الجلسة الحالية — قابل للتعديل بعد النشر لأنواع جلسات العلاج.
+# chemo/targeted/immuno لها TreatmentPlan فعلية (services/treatment_plan_service.py)
+# فالتعديل يُحدِّثها مباشرة عبر edit_plan (تماماً كزر "✏️ تعديل الخطة" أثناء
+# إنشاء تقرير جديد)، أما dialysis فبلا خطة إطلاقاً (بالتصميم) والرقم مضمَّن
+# فقط داخل نص treatment_plan_summary المخزَّن، فيُستبدَل بالنص مباشرة.
+_TREATMENT_KEY_BY_ACTION = {
+    'العلاج الكيماوي': 'chemo',
+    'العلاج الموجه': 'targeted',
+    'العلاج المناعي': 'immuno',
+    'جلسات غسيل الكلى': 'dialysis',
+}
+_DIALYSIS_SESSION_PATTERN = r'رقم الجلسة الحالية:\s*(\d+)'
+
+
+def _current_session_number_display(report) -> str:
+    """القيمة المعروضة حالياً لحقل 'رقم الجلسة الحالية' — من TreatmentPlan
+    الفعلية (chemo/targeted/immuno) أو من نص treatment_plan_summary
+    (dialysis). يعيد 'لا يوجد' إن تعذّر إيجاد رقم (فيختفي الزر تلقائياً،
+    نفس سلوك بقية الحقول)."""
+    import re
+    treatment_key = _TREATMENT_KEY_BY_ACTION.get((report.medical_action or '').strip())
+    if not treatment_key:
+        return "لا يوجد"
+    if treatment_key == 'dialysis':
+        m = re.search(_DIALYSIS_SESSION_PATTERN, report.treatment_plan_summary or '')
+        return m.group(1) if m else "لا يوجد"
+    from services.treatment_plan_service import get_active_plan
+    plan = get_active_plan(report.patient_id, treatment_key)
+    if plan and plan.get('current_session') is not None:
+        return str(plan['current_session'])
+    return "لا يوجد"
+
+
+def _apply_session_number_edit(report, new_value: str) -> None:
+    """يطبّق تعديل 'رقم الجلسة الحالية' على التقرير المنشور — يُحدِّث
+    TreatmentPlan الفعلية (chemo/targeted/immuno) أو نص treatment_plan_summary
+    مباشرة (dialysis، بلا خطة)."""
+    import re
+    treatment_key = _TREATMENT_KEY_BY_ACTION.get((report.medical_action or '').strip())
+    if treatment_key == 'dialysis':
+        summary = report.treatment_plan_summary or ""
+        if re.search(_DIALYSIS_SESSION_PATTERN, summary):
+            report.treatment_plan_summary = re.sub(
+                _DIALYSIS_SESSION_PATTERN, f'رقم الجلسة الحالية: {new_value}', summary,
+            )
+        else:
+            report.treatment_plan_summary = f"🩸 **جلسات غسيل الكلى**\n\nرقم الجلسة الحالية: {new_value}"
+        return
+    if treatment_key:
+        from services.treatment_plan_service import get_active_plan, edit_plan, format_progress_text
+        plan = get_active_plan(report.patient_id, treatment_key)
+        if plan:
+            updated_plan = edit_plan(
+                plan['id'], {"current_session": int(new_value)},
+                changed_by=None, changed_by_name="تعديل بعد النشر",
+                reason="تصحيح رقم الجلسة بعد نشر التقرير",
+            )
+            report.treatment_plan_summary = format_progress_text(updated_plan)
+
 
 def _resolve_target_group_id(patient_type):
     """مجموعة إعادة النشر — مرضى تشناي لمجموعتهم الخاصة، وإلا الاعتيادية.
@@ -491,16 +550,28 @@ def get_editable_fields_by_action_type(medical_action):
             ('translator_name', '👤 المترجم'),
         ]
 
-    elif (
-        action_clean in ('العلاج الكيماوي', 'العلاج الموجه', 'العلاج المناعي')
-        or (action_clean and ' + ' in action_clean and any(
-            lbl in action_clean for lbl in
-            ('العلاج الكيماوي', 'العلاج الموجه', 'العلاج المناعي', 'جلسات غسيل الكلى', 'جلسة إشعاعي')
-        ))
+    elif action_clean in ('العلاج الكيماوي', 'العلاج الموجه', 'العلاج المناعي'):
+        # ✅ رقم الجلسة الحالية قابل للتعديل هنا الآن — التعديل يُحدِّث
+        # TreatmentPlan الفعلية (get_active_plan/edit_plan) وليس فقط النص
+        # المعروض، فيبقى التقرير التالي لنفس المريض متابعاً من الرقم
+        # الصحيح. انظر save_edit_to_database لفرع 'session_number'.
+        return [
+            ('session_number', '🔢 رقم الجلسة الحالية'),
+            ('notes', '📝 ملاحظات'),
+            ('followup_date', '📅 موعد العودة'),
+            ('followup_reason', '✍️ سبب العودة'),
+            ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
+            ('translator_name', '👤 المترجم'),
+        ]
+
+    elif action_clean and ' + ' in action_clean and any(
+        lbl in action_clean for lbl in
+        ('العلاج الكيماوي', 'العلاج الموجه', 'العلاج المناعي', 'جلسات غسيل الكلى', 'جلسة إشعاعي')
     ):
-        # ⚠️ ملخص الخطة العلاجية (عدد الجلسات/الدورات) غير قابل للتعديل هنا لنفس
-        # السبب أعلاه — التعديل الصحيح يتم عبر "✏️ تعديل الخطة" أثناء إنشاء تقرير جديد
-        # (نوع إجراء مدمج من اختيار متعدد لجلسات الأورام يُعامَل بنفس الحقول)
+        # نوع إجراء مدمج من اختيار متعدد لجلسات الأورام — قد يشمل أكثر من
+        # خطة علاج واحدة في نفس التقرير، فلا يوجد "رقم جلسة" واحد واضح
+        # يُعدَّل هنا؛ التعديل الصحيح لكل خطة يتم عبر "✏️ تعديل الخطة" أثناء
+        # إنشاء تقرير جديد لكل نوع على حدة.
         return [
             ('notes', '📝 ملاحظات'),
             ('followup_date', '📅 موعد العودة'),
@@ -510,10 +581,11 @@ def get_editable_fields_by_action_type(medical_action):
         ]
 
     elif action_clean == 'جلسات غسيل الكلى':
-        # مبسّط جداً عن بقية أنواع جلسات العلاج — بلا شكوى/ملاحظات، ورقم
-        # الجلسة الحالية (treatment_plan_summary) غير قابل للتعديل هنا (نص
-        # مُنسَّق وليس حقلاً حراً).
+        # ✅ رقم الجلسة الحالية قابل للتعديل — لا TreatmentPlan لغسيل الكلى
+        # (بالتصميم)، فالتعديل يستبدل الرقم المضمَّن في نص
+        # treatment_plan_summary المخزَّن مباشرة (انظر save_edit_to_database).
         return [
+            ('session_number', '🔢 رقم الجلسة الحالية'),
             ('followup_date', '📅 تاريخ الجلسة القادمة'),
             ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
             ('translator_name', '👤 المترجم'),
@@ -959,6 +1031,10 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
                 'transplant_type': getattr(report, 'transplant_type', None) or "لا يوجد",
                 'transplant_parties': getattr(report, 'transplant_parties', None) or "لا يوجد",
                 'transplant_details': getattr(report, 'transplant_details', None) or "لا يوجد",
+                # ✅ رقم الجلسة الحالية لأنواع جلسات العلاج — من TreatmentPlan
+                # الفعلية (chemo/targeted/immuno) أو من نص treatment_plan_summary
+                # المخزَّن (dialysis، بلا خطة).
+                'session_number': _current_session_number_display(report),
             }
             
             # تحويل موعد العودة إلى صيغة 12 ساعة للعرض
@@ -1507,6 +1583,7 @@ async def handle_field_selection(update: Update, context: ContextTypes.DEFAULT_T
             'transplant_type': 'نوع الزراعة',
             'transplant_parties': 'الجهة',
             'transplant_details': 'تفاصيل المعاملة',
+            'session_number': 'رقم الجلسة الحالية',
         }
         
         field_display = field_names.get(field_name, field_name)
@@ -2056,6 +2133,14 @@ async def handle_new_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return EDIT_DATE_TIME
     
+    # ✅ رقم الجلسة الحالية — رقم صحيح موجب فقط
+    if field_name == "session_number":
+        if not new_value.isdigit() or int(new_value) <= 0:
+            await update.message.reply_text(
+                "⚠️ يرجى إدخال رقم صحيح أكبر من صفر (رقم الجلسة الحالية):",
+            )
+            return EDIT_VALUE
+
     # التحقق من صحة القيمة (للحقول الأخرى)
     if field_name == "followup_date" and new_value != "لا يوجد":
         try:
@@ -2277,6 +2362,13 @@ async def save_edit_to_database(query, context):
             # إذا أدخل سبباً يعني لا يوجد تقرير → has_paper_report=0
             report.has_paper_report = 0
             logger.info(f"✅ تم تحديث no_paper_report_reason = {new_value}")
+
+        # ✅ رقم الجلسة الحالية لأنواع جلسات العلاج — يُحدِّث TreatmentPlan
+        # الفعلية (chemo/targeted/immuno) أو نص treatment_plan_summary
+        # مباشرة (dialysis، بلا خطة). انظر _apply_session_number_edit أعلاه.
+        elif field_name == 'session_number':
+            _apply_session_number_edit(report, new_value)
+            logger.info(f"✅ تم تحديث رقم الجلسة الحالية للتقرير #{report_id} = {new_value}")
 
         # ✅ تعديل «قرار الطبيب» للمسارات التي تخزّنه داخل doctor_decision
         # المركّب: نستبدل مقطعه فقط بدل الكتابة فوق النص كاملاً — الكتابة
