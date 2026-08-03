@@ -26,6 +26,9 @@ from db.models import Report, Translator, Patient, Hospital, Department, Doctor
 from bot.shared_auth import is_admin
 from services.inline_calendar import create_calendar_keyboard, create_quick_date_buttons, MONTHS_AR
 from sqlalchemy import or_, and_
+from bot.handlers.user.user_reports_add_new_system.field_registry import (
+    get_fields_for_medical_action, resolve_flow_type_from_medical_action,
+)
 
 # حالات المحادثة
 SELECT_REPORT, SELECT_FIELD, EDIT_VALUE, CONFIRM_EDIT, EDIT_DATE_CALENDAR, EDIT_DATE_TIME, EDIT_TRANSLATOR = range(7)
@@ -87,29 +90,33 @@ def test_editable_fields_mapping():
     دالة اختبار للتأكد من أن كل نوع إجراء يحصل على الحقول الصحيحة
     ✅ تم تحديث عدد الحقول ليتطابق مع get_editable_fields_by_action_type
     """
+    # ✅ الأعداد مُشتقة الآن من field_registry.py (مصدر واحد مشترك مع قبل
+    # النشر) بدل قوائم يدوية منفصلة — بعضها ارتفع عمداً عن الأعداد القديمة
+    # لأنه يصلح ثغرات كانت موجودة فعلياً (طوارئ/خروج المستشفى/استشارة أخيرة
+    # كانت تُخفي حقولاً لا تظهر إطلاقاً بعد النشر رغم حفظها في القاعدة).
     test_cases = [
-        ('استشارة جديدة', 7),  # 7 حقول (complaint, diagnosis, decision, notes, followup_date, followup_reason, translator)
-        ('استشارة مع قرار عملية', 10),  # 10 حقول
-        ('استشارة أخيرة', 4),  # 4 حقول (diagnosis, decision, treatment_plan, translator)
-        ('طوارئ', 7),  # 7 حقول (complaint, diagnosis, decision, case_status, followup_date, followup_reason, translator)
-        ('متابعة في الرقود', 6),  # 6 حقول (complaint, decision, room, followup_date, followup_reason, translator)
-        ('مراجعة / عودة دورية', 6),  # 6 حقول (complaint, diagnosis, decision, followup_date, followup_reason, translator)
-        ('عملية', 6),  # 6 حقول (operation_details, operation_name_en, notes, followup_date, followup_reason, translator)
-        ('علاج طبيعي وإعادة تأهيل', 4),  # 4 حقول (therapy_details, followup_date, followup_reason, translator)
-        ('علاج طبيعي', 4),  # 4 حقول
-        ('أجهزة تعويضية', 4),  # 4 حقول
-        ('ترقيد', 6),  # 6 حقول (admission_reason, room, notes, followup_date, followup_reason, translator)
-        ('خروج من المستشفى', 6),  # 6 حقول
-        ('تأجيل موعد', 4),  # 4 حقول
-        ('أشعة وفحوصات', 3),  # 3 حقول
-        ('جلسة إشعاعي', 6),  # 6 حقول (type, recommendations, followup_date, followup_reason, no_paper_report_reason, translator)
-        ('العلاج الكيماوي', 5),  # 5 حقول (notes, followup_date, followup_reason, no_paper_report_reason, translator)
-        ('العلاج الموجه', 5),  # 5 حقول
-        ('العلاج المناعي', 5),  # 5 حقول
-        ('جلسات غسيل الكلى', 3),  # 3 حقول (session_number, followup_date, translator)
-        ('معاملة الزراعة', 7),  # 7 حقول (transplant_type, transplant_parties, transplant_details, followup_date, followup_reason, no_paper_report_reason, translator)
-        ('المناظير', 7),  # 7 حقول (complaint, endoscopy_type, endoscopy_result, followup_date, followup_reason, no_paper_report_reason, translator)
-        ('نوع غير معروف', 4),  # 4 حقول افتراضية
+        ('استشارة جديدة', 8),  # complaint_text, diagnosis, decision, tests, followup_date, followup_reason, no_paper_report_reason, translator
+        ('استشارة مع قرار عملية', 10),
+        ('استشارة أخيرة', 5),  # diagnosis, decision, recommendations, no_paper_report_reason, translator
+        ('طوارئ', 12),  # + admission_type/admission_notes/operation_details (كانت مفقودة تماماً)
+        ('متابعة في الرقود', 7),
+        ('مراجعة / عودة دورية', 7),
+        ('عملية', 7),
+        ('علاج طبيعي وإعادة تأهيل', 5),
+        ('علاج طبيعي', 5),
+        ('أجهزة تعويضية', 5),
+        ('ترقيد', 7),
+        ('خروج من المستشفى', 8),  # + discharge_type (كان لا يُحفَظ إطلاقاً)
+        ('تأجيل موعد', 4),
+        ('أشعة وفحوصات', 4),
+        ('جلسة إشعاعي', 6),
+        ('العلاج الكيماوي', 7),  # + session_number (أُضيف جلسة سابقة)
+        ('العلاج الموجه', 7),
+        ('العلاج المناعي', 7),
+        ('جلسات غسيل الكلى', 3),
+        ('معاملة الزراعة', 7),
+        ('المناظير', 8),
+        ('نوع غير معروف', 4),
     ]
 
     print("🧪 اختبار تعيين الحقول القابلة للتعديل:")
@@ -363,16 +370,15 @@ def _has_field_value_in_report(report, current_report_data, field_name):
 
 def get_editable_fields_by_action_type(medical_action):
     """
-    تحديد الحقول القابلة للتعديل حسب نوع الإجراء بدقة عالية
-    - كل نوع إجراء له حقوله المحددة فقط
-    - لا حقول إضافية أو غير ضرورية
+    تحديد الحقول القابلة للتعديل حسب نوع الإجراء — بعد النشر.
+    دالة رقيقة تقرأ من field_registry.REPORT_FIELD_REGISTRY (مصدر الحقيقة
+    الوحيد المشترك مع get_editable_fields_by_flow_type قبل النشر) عبر
+    resolve_flow_type_from_medical_action.
     """
     import logging
     logger = logging.getLogger(__name__)
-    logger.info(f"🔍 get_editable_fields_by_action_type: received medical_action = {repr(medical_action)}")
-    
+
     if not medical_action:
-        # الحد الأدنى من الحقول للحالات غير المحددة
         logger.warning("⚠️ get_editable_fields_by_action_type: medical_action is empty!")
         return [
             ('complaint_text', '💬 شكوى المريض'),
@@ -380,252 +386,13 @@ def get_editable_fields_by_action_type(medical_action):
         ]
 
     action_clean = medical_action.strip()
-    logger.info(f"🔍 get_editable_fields_by_action_type: action_clean = {repr(action_clean)}")
-
-    # ===========================================
-    # 1. استشارة جديدة - الحقول الأساسية للتشخيص
-    # ===========================================
-    if action_clean == 'استشارة جديدة':
-        return [
-            ('complaint_text', '💬 شكوى المريض'),
-            ('diagnosis', '🔬 التشخيص'),
-            ('doctor_decision', '📝 قرار الطبيب'),
-            ('notes', '🧪 الفحوصات'),
-            ('followup_date', '📅 موعد العودة'),
-            ('followup_reason', '✍️ سبب العودة'),
-            ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
-            ('translator_name', '👤 المترجم'),
-        ]
-
-    # ===========================================
-    # 2. استشارة مع قرار عملية - التركيز على العملية
-    # ===========================================
-    elif action_clean == 'استشارة مع قرار عملية':
-        return [
-            ('complaint_text', '💬 شكوى المريض'),
-            ('diagnosis', '🔬 التشخيص'),
-            ('decision', '📝 قرار الطبيب'),
-            ('operation_name_en', '🔤 اسم العملية بالإنجليزي'),
-            ('success_rate', '📊 نسبة نجاح العملية'),
-            ('benefit_rate', '💡 نسبة الاستفادة'),
-            ('tests', '🧪 الفحوصات والأشعة'),
-            ('followup_date', '📅 موعد العودة'),
-            ('followup_reason', '✍️ سبب العودة'),
-            ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
-            ('translator_name', '👤 المترجم'),
-        ]
-
-    elif action_clean == 'استشارة أخيرة':
-        return [
-            ('diagnosis', '🔬 التشخيص'),
-            ('doctor_decision', '📝 قرار الطبيب'),
-            ('treatment_plan', '📋 التوصيات'),
-            ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
-            ('translator_name', '👤 المترجم'),
-        ]
-
-    elif action_clean == 'طوارئ':
-        return [
-            ('complaint_text', '💬 شكوى المريض'),
-            ('diagnosis', '🔬 التشخيص'),
-            ('doctor_decision', '📝 قرار الطبيب'),
-            ('case_status', '🚨 وضع الحالة'),
-            ('followup_date', '📅 موعد العودة'),
-            ('followup_reason', '✍️ سبب العودة'),
-            ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
-            ('translator_name', '👤 المترجم'),
-        ]
-
-    elif 'متابعة في الرقود' in action_clean:
-        return [
-            ('complaint_text', '🛏️ حالة المريض اليومية'),
-            ('doctor_decision', '📝 قرار الطبيب اليومي'),
-            ('room_number', '🏥 رقم الغرفة والطابق'),
-            ('followup_date', '📅 موعد العودة'),
-            ('followup_reason', '✍️ سبب العودة'),
-            ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
-            ('translator_name', '👤 المترجم'),
-        ]
-
-    elif action_clean == 'مراجعة / عودة دورية':
-        return [
-            ('complaint_text', '💬 شكوى المريض'),
-            ('diagnosis', '🔬 التشخيص'),
-            ('doctor_decision', '📝 قرار الطبيب'),
-            ('followup_date', '📅 موعد العودة'),
-            ('followup_reason', '✍️ سبب العودة'),
-            ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
-            ('translator_name', '👤 المترجم'),
-        ]
-
-    elif action_clean == 'عملية':
-        return [
-            ('operation_details', '⚕️ تفاصيل العملية'),
-            ('operation_name_en', '🔤 اسم العملية بالإنجليزي'),
-            ('notes', '📝 ملاحظات'),
-            ('followup_date', '📅 موعد العودة'),
-            ('followup_reason', '✍️ سبب العودة'),
-            ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
-            ('translator_name', '👤 المترجم'),
-        ]
-
-    elif action_clean == 'علاج طبيعي وإعادة تأهيل':
-        return [
-            ('therapy_details', '🏃 تفاصيل جلسة العلاج الطبيعي'),
-            ('followup_date', '📅 موعد العودة'),
-            ('followup_reason', '✍️ سبب العودة'),
-            ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
-            ('translator_name', '👤 المترجم'),
-        ]
-
-    elif action_clean == 'ترقيد':
-        return [
-            ('admission_reason', '🛏️ سبب الرقود'),
-            ('room_number', '🏥 رقم الغرفة والطابق'),
-            ('notes', '📝 ملاحظات'),
-            ('followup_date', '📅 موعد العودة'),
-            ('followup_reason', '✍️ سبب العودة'),
-            ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
-            ('translator_name', '👤 المترجم'),
-        ]
-
-    elif action_clean == 'خروج من المستشفى' or action_clean == 'خروج':
-        return [
-            ('admission_summary', '📋 ملخص الرقود'),
-            ('operation_details', '⚕️ تفاصيل العملية'),
-            ('operation_name_en', '🔤 اسم العملية بالإنجليزي'),
-            ('followup_date', '📅 موعد العودة'),
-            ('followup_reason', '✍️ سبب العودة'),
-            ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
-            ('translator_name', '👤 المترجم'),
-        ]
-
-    # تأجيل موعد — لا يمر بالبوابة فلا يوجد no_paper_report_reason
-    elif action_clean == 'تأجيل موعد':
-        return [
-            ('app_reschedule_reason', '📅 سبب تأجيل الموعد'),
-            ('app_reschedule_return_date', '📅 موعد العودة الجديد'),
-            ('app_reschedule_return_reason', '✍️ سبب العودة'),
-            ('translator_name', '👤 المترجم'),
-        ]
-
-    elif action_clean == 'أشعة وفحوصات':
-        return [
-            ('radiology_type', '🔬 نوع الأشعة والفحوصات'),
-            ('radiology_delivery_date', '📅 تاريخ التسليم'),
-            ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
-            ('translator_name', '👤 المترجم'),
-        ]
-
-    elif action_clean == 'علاج طبيعي':
-        return [
-            ('therapy_details', '🏃 تفاصيل الجلسة'),
-            ('followup_date', '📅 موعد العودة'),
-            ('followup_reason', '✍️ سبب العودة'),
-            ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
-            ('translator_name', '👤 المترجم'),
-        ]
-
-    elif action_clean == 'أجهزة تعويضية':
-        return [
-            ('device_details', '🦾 تفاصيل الجهاز'),
-            ('followup_date', '📅 موعد العودة'),
-            ('followup_reason', '✍️ سبب العودة'),
-            ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
-            ('translator_name', '👤 المترجم'),
-        ]
-
-    elif action_clean == 'جلسة إشعاعي':
-        # ⚠️ رقم الجلسة والجلسات المتبقية لم يعودا قابلين للتعديل هنا:
-        # أصبحا يُحسَبان تلقائياً من TreatmentPlan (services/treatment_plan_service.py)
-        # وتعديلهما مباشرة على التقرير سيفصلهما عن الخطة الفعلية (بلا سجل تغييرات)
-        # ويجعل التقرير التالي للمريض نفسه يتابع من الرقم القديم غير المعدَّل.
-        # التعديل الصحيح لرقم الجلسة يتم عبر "✏️ تعديل الخطة" أثناء إنشاء تقرير جديد.
-        return [
-            ('radiation_therapy_type', '☢️ نوع الإشعاعي'),
-            ('radiation_therapy_recommendations', '📝 ملاحظات / توصيات'),
-            ('followup_date', '📅 موعد العودة'),
-            ('followup_reason', '✍️ سبب العودة'),
-            ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
-            ('translator_name', '👤 المترجم'),
-        ]
-
-    elif action_clean in ('العلاج الكيماوي', 'العلاج الموجه', 'العلاج المناعي'):
-        # ✅ رقم الجلسة الحالية قابل للتعديل هنا الآن — التعديل يُحدِّث
-        # TreatmentPlan الفعلية (get_active_plan/edit_plan) وليس فقط النص
-        # المعروض، فيبقى التقرير التالي لنفس المريض متابعاً من الرقم
-        # الصحيح. انظر save_edit_to_database لفرع 'session_number'.
-        return [
-            ('session_number', '🔢 رقم الجلسة الحالية'),
-            ('notes', '📝 ملاحظات'),
-            ('followup_date', '📅 موعد العودة'),
-            ('followup_reason', '✍️ سبب العودة'),
-            ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
-            ('translator_name', '👤 المترجم'),
-        ]
-
-    elif action_clean and ' + ' in action_clean and any(
-        lbl in action_clean for lbl in
-        ('العلاج الكيماوي', 'العلاج الموجه', 'العلاج المناعي', 'جلسات غسيل الكلى', 'جلسة إشعاعي')
-    ):
-        # نوع إجراء مدمج من اختيار متعدد لجلسات الأورام — قد يشمل أكثر من
-        # خطة علاج واحدة في نفس التقرير، فلا يوجد "رقم جلسة" واحد واضح
-        # يُعدَّل هنا؛ التعديل الصحيح لكل خطة يتم عبر "✏️ تعديل الخطة" أثناء
-        # إنشاء تقرير جديد لكل نوع على حدة.
-        return [
-            ('notes', '📝 ملاحظات'),
-            ('followup_date', '📅 موعد العودة'),
-            ('followup_reason', '✍️ سبب العودة'),
-            ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
-            ('translator_name', '👤 المترجم'),
-        ]
-
-    elif action_clean == 'جلسات غسيل الكلى':
-        # ✅ رقم الجلسة الحالية قابل للتعديل — لا TreatmentPlan لغسيل الكلى
-        # (بالتصميم)، فالتعديل يستبدل الرقم المضمَّن في نص
-        # treatment_plan_summary المخزَّن مباشرة (انظر save_edit_to_database).
-        # ✅ لا "no_paper_report_reason" هنا عمداً — غسيل الكلى لا يمر ببوابة
-        # "هل يوجد تقرير طبي؟" إطلاقاً (أُزيلت بناءً على طلب المستخدم).
-        return [
-            ('session_number', '🔢 رقم الجلسة الحالية'),
-            ('followup_date', '📅 تاريخ الجلسة القادمة'),
-            ('translator_name', '👤 المترجم'),
-        ]
-
-    elif action_clean == 'معاملة الزراعة':
-        return [
-            ('transplant_type', '🫁 نوع الزراعة'),
-            ('transplant_parties', '🏢 الجهة'),
-            ('transplant_details', '📝 تفاصيل المعاملة'),
-            ('followup_date', '📅 موعد العودة'),
-            ('followup_reason', '✍️ سبب العودة'),
-            ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
-            ('translator_name', '👤 المترجم'),
-        ]
-
-    elif action_clean == 'المناظير':
-        # ⚠️ الإجراءات التي تمت أثناء المنظار (endoscopy_procedures) غير قابلة
-        # للتعديل هنا — قائمة اختيار مركّبة (JSON)، لا نص حر بسيط.
-        return [
-            ('complaint_text', '💬 شكوى المريض'),
-            ('endoscopy_type', '🔬 نوع المنظار'),
-            ('endoscopy_result', '📋 نتيجة المنظار / خطة الطبيب'),
-            ('notes', '📝 ملاحظات'),
-            ('followup_date', '📅 موعد العودة'),
-            ('followup_reason', '✍️ سبب العودة'),
-            ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
-            ('translator_name', '👤 المترجم'),
-        ]
-
-    else:
+    flow_type = resolve_flow_type_from_medical_action(action_clean)
+    if not flow_type:
         logger.warning(f"⚠️ نوع إجراء غير معروف: '{action_clean}' - استخدام الحقول الافتراضية")
-        print(f"⚠️ نوع إجراء غير معروف: '{action_clean}' - استخدام الحقول الافتراضية")
-        return [
-            ('complaint_text', '💬 شكوى المريض'),
-            ('doctor_decision', '📝 قرار الطبيب'),
-            ('followup_date', '📅 موعد العودة'),
-            ('translator_name', '👤 المترجم'),
-        ]
+    fields = get_fields_for_medical_action(action_clean)
+    logger.info(f"🔍 get_editable_fields_by_action_type: action='{action_clean}' flow_type='{flow_type}' fields={[f.key for f in fields]}")
+    return [(f.key, f.label) for f in fields]
+
 
 async def start_edit_reports(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """بداية عملية تعديل التقارير"""
