@@ -72,7 +72,7 @@ from .states import (
     CHEMO_CYCLES_UNIFORM_COUNT, CHEMO_CYCLES_CUSTOM_ENTRY,
     ONCOLOGY_QUEUE_TOTAL, ONCOLOGY_QUEUE_CURRENT,
     ONCOLOGY_DELIVERY_MODE, ONCOLOGY_DELIVERY_DAYS,
-    TREATMENT_DIALYSIS_SESSION, TREATMENT_DIALYSIS_UPLOAD,
+    TREATMENT_DIALYSIS_SESSION, TREATMENT_DIALYSIS_NEXT_DATE,
     TRANSPLANT_TYPE, TRANSPLANT_PARTY, TRANSPLANT_DETAILS,
     TRANSPLANT_FOLLOWUP_DATE, TRANSPLANT_FOLLOWUP_REASON,
     TRANSPLANT_TRANSLATOR, TRANSPLANT_CONFIRM,
@@ -359,7 +359,7 @@ def _treatment_handlers():
             handle_treatment_complaint,
             handle_treatment_notes, handle_treatment_notes_skip, handle_treatment_followup_reason,
             handle_treatment_dialysis_session_number,
-            handle_treatment_dialysis_upload_file, handle_treatment_dialysis_upload_skip,
+            handle_dialysis_next_date_nav, handle_dialysis_next_date_day,
         )
         return {
             'chemo_cycles_total':       handle_chemo_cycles_total,
@@ -377,8 +377,8 @@ def _treatment_handlers():
             'notes_skip':                handle_treatment_notes_skip,
             'followup_reason':          handle_treatment_followup_reason,
             'dialysis_session_number':  handle_treatment_dialysis_session_number,
-            'dialysis_upload_file':     handle_treatment_dialysis_upload_file,
-            'dialysis_upload_skip':     handle_treatment_dialysis_upload_skip,
+            'dialysis_next_date_nav':   handle_dialysis_next_date_nav,
+            'dialysis_next_date_day':   handle_dialysis_next_date_day,
         }
     except ImportError as e:
         logger.error(f"❌ Cannot import treatment_sessions handlers: {e}")
@@ -1263,16 +1263,15 @@ def register(app):
                 CallbackQueryHandler(sh['handle_smart_back_navigation'],   pattern="^nav:back$"),
                 CallbackQueryHandler(sh['handle_smart_cancel_navigation'], pattern="^nav:cancel$"),
             ],
-            # ── غسيل الكلى فقط: رقم الجلسة اليدوي → رفع الدفتر/تخطي ──────────
+            # ── غسيل الكلى فقط: رقم الجلسة اليدوي → تاريخ الجلسة القادمة فقط ──
             TREATMENT_DIALYSIS_SESSION: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, _tracked(tp.get('dialysis_session_number'), TREATMENT_DIALYSIS_SESSION)),
                 CallbackQueryHandler(sh['handle_smart_back_navigation'],   pattern="^nav:back$"),
                 CallbackQueryHandler(sh['handle_smart_cancel_navigation'], pattern="^nav:cancel$"),
             ],
-            TREATMENT_DIALYSIS_UPLOAD: [
-                MessageHandler(filters.PHOTO | filters.Document.ALL | filters.VIDEO,
-                                _tracked(tp.get('dialysis_upload_file'), TREATMENT_DIALYSIS_UPLOAD)),
-                CallbackQueryHandler(_tracked(tp.get('dialysis_upload_skip'), TREATMENT_DIALYSIS_UPLOAD), pattern="^treatment_dialysis_upload_skip$"),
+            TREATMENT_DIALYSIS_NEXT_DATE: [
+                CallbackQueryHandler(_tracked(tp.get('dialysis_next_date_nav'), TREATMENT_DIALYSIS_NEXT_DATE), pattern="^dlx_cal_(prev|next):"),
+                CallbackQueryHandler(_tracked(tp.get('dialysis_next_date_day'), TREATMENT_DIALYSIS_NEXT_DATE), pattern="^dlx_cal_day:"),
                 CallbackQueryHandler(sh['handle_smart_back_navigation'],   pattern="^nav:back$"),
                 CallbackQueryHandler(sh['handle_smart_cancel_navigation'], pattern="^nav:cancel$"),
             ],

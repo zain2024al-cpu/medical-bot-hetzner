@@ -47,7 +47,7 @@ from .states import (
     TREATMENT_COMPLAINT, TREATMENT_NOTES, TREATMENT_FOLLOWUP_DATE,
     TREATMENT_FOLLOWUP_REASON, TREATMENT_TRANSLATOR, TREATMENT_CONFIRM,
     ONCOLOGY_QUEUE_TOTAL, ONCOLOGY_QUEUE_CURRENT, ONCOLOGY_DELIVERY_DAYS,
-    TREATMENT_DIALYSIS_SESSION, TREATMENT_DIALYSIS_UPLOAD,
+    TREATMENT_DIALYSIS_SESSION, TREATMENT_DIALYSIS_NEXT_DATE,
     TRANSPLANT_TYPE, TRANSPLANT_PARTY, TRANSPLANT_DETAILS,
     TRANSPLANT_FOLLOWUP_DATE, TRANSPLANT_FOLLOWUP_REASON,
     TRANSPLANT_TRANSLATOR, TRANSPLANT_CONFIRM,
@@ -722,18 +722,15 @@ async def execute_smart_state_action(target_step, flow_type, update, context):
             )
             return target_step
 
-        elif target_step == TREATMENT_DIALYSIS_UPLOAD:
-            await update.callback_query.edit_message_text(
-                "📎 **رفع دفتر جلسات الغسيل / التقرير النهائي**\n\n"
-                "أرسل صورة أو ملف الدفتر/التقرير (يمكن أكثر من ملف)، أو اضغط "
-                "**تخطي** للمتابعة بلا رفع:",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("⏭️ تخطي", callback_data="treatment_dialysis_upload_skip")],
-                    [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
-                     InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")],
-                ]),
-                parse_mode="Markdown"
-            )
+        elif target_step == TREATMENT_DIALYSIS_NEXT_DATE:
+            from datetime import datetime as _datetime
+            from .flows.treatment_sessions import _build_dialysis_next_date_markup
+            report_tmp = context.user_data.get("report_tmp", {})
+            now = _datetime.now()
+            year = report_tmp.get("followup_calendar_year", now.year)
+            month = report_tmp.get("followup_calendar_month", now.month)
+            text, markup = _build_dialysis_next_date_markup(year, month)
+            await update.callback_query.edit_message_text(text, reply_markup=markup, parse_mode="Markdown")
             return target_step
 
         elif target_step == TRANSPLANT_TYPE:

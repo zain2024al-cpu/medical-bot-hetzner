@@ -106,7 +106,7 @@ def test_editable_fields_mapping():
         ('العلاج الكيماوي', 5),  # 5 حقول (notes, followup_date, followup_reason, no_paper_report_reason, translator)
         ('العلاج الموجه', 5),  # 5 حقول
         ('العلاج المناعي', 5),  # 5 حقول
-        ('جلسات غسيل الكلى', 5),  # 5 حقول
+        ('جلسات غسيل الكلى', 3),  # 3 حقول (followup_date, no_paper_report_reason, translator)
         ('معاملة الزراعة', 7),  # 7 حقول (transplant_type, transplant_parties, transplant_details, followup_date, followup_reason, no_paper_report_reason, translator)
         ('المناظير', 7),  # 7 حقول (complaint, endoscopy_type, endoscopy_result, followup_date, followup_reason, no_paper_report_reason, translator)
         ('نوع غير معروف', 4),  # 4 حقول افتراضية
@@ -492,7 +492,7 @@ def get_editable_fields_by_action_type(medical_action):
         ]
 
     elif (
-        action_clean in ('العلاج الكيماوي', 'العلاج الموجه', 'العلاج المناعي', 'جلسات غسيل الكلى')
+        action_clean in ('العلاج الكيماوي', 'العلاج الموجه', 'العلاج المناعي')
         or (action_clean and ' + ' in action_clean and any(
             lbl in action_clean for lbl in
             ('العلاج الكيماوي', 'العلاج الموجه', 'العلاج المناعي', 'جلسات غسيل الكلى', 'جلسة إشعاعي')
@@ -505,6 +505,16 @@ def get_editable_fields_by_action_type(medical_action):
             ('notes', '📝 ملاحظات'),
             ('followup_date', '📅 موعد العودة'),
             ('followup_reason', '✍️ سبب العودة'),
+            ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
+            ('translator_name', '👤 المترجم'),
+        ]
+
+    elif action_clean == 'جلسات غسيل الكلى':
+        # مبسّط جداً عن بقية أنواع جلسات العلاج — بلا شكوى/ملاحظات، ورقم
+        # الجلسة الحالية (treatment_plan_summary) غير قابل للتعديل هنا (نص
+        # مُنسَّق وليس حقلاً حراً).
+        return [
+            ('followup_date', '📅 تاريخ الجلسة القادمة'),
             ('no_paper_report_reason', '📋 سبب عدم وجود تقرير طبي'),
             ('translator_name', '👤 المترجم'),
         ]

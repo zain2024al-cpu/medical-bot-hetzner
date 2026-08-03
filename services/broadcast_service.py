@@ -1272,8 +1272,13 @@ def _build_radiation_therapy_fields(data: dict) -> list:
 
 
 def _build_treatment_session_fields(data: dict) -> list:
-    """بناء حقول جلسات العلاج (كيماوي/موجه/مناعي/غسيل الكلى)"""
+    """بناء حقول جلسات العلاج (كيماوي/موجه/مناعي/غسيل الكلى).
+
+    غسيل الكلى مبسّط جداً عن بقية الأنواع (بلا شكوى مريض وبلا ملاحظات
+    طبيب) — الحقول التالية تبقى فارغة له وتُتخطّى تلقائياً، وتاريخ العودة
+    يُعرض له بتسمية مختلفة (تاريخ الجلسة القادمة، بلا وقت وبلا سبب)."""
     lines = []
+    is_dialysis = (data.get('medical_action') or '').strip() == 'جلسات غسيل الكلى'
 
     summary = data.get('treatment_plan_summary', '')
     if summary and str(summary).strip():
@@ -1288,13 +1293,19 @@ def _build_treatment_session_fields(data: dict) -> list:
 
     notes = data.get('notes', '')
     if notes and str(notes).strip() and str(notes) != 'لا يوجد':
-        # ✅ غسيل الكلى: نفس الحقل (notes) لكن بتسمية "قرار الطبيب" — يطابق
-        # الخطوة الفعلية في flows/treatment_sessions.py::_prompt_notes.
-        notes_label = "قرار الطبيب" if (data.get('medical_action') or '').strip() == 'جلسات غسيل الكلى' else "ملاحظات الطبيب"
-        lines.append(f"📝 **{notes_label}:** {escape_markdown(str(notes).strip())}")
+        lines.append(f"📝 **ملاحظات الطبيب:** {escape_markdown(str(notes).strip())}")
         lines.append("")
 
-    lines.extend(_build_followup_fields(data))
+    if is_dialysis:
+        date_str = _format_followup_date(data.get('followup_date'), None)
+        if date_str:
+            lines.append("")
+            lines.append("━━━━━━━━━━━━━━━━━━━━")
+            lines.append("")
+            lines.append(f"📅 تاريخ الجلسة القادمة: {date_str}")
+            lines.append("")
+    else:
+        lines.extend(_build_followup_fields(data))
 
     return lines
 

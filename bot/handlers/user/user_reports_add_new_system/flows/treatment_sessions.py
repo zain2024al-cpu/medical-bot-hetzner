@@ -15,10 +15,10 @@
 #   ← ثم: الملاحظات → تاريخ العودة → سبب العودة → المترجم/البوابة/النشر
 #
 # غسيل الكلى (dialysis) مختلف تماماً — لا TreatmentPlan ولا "عدد جلسات
-# كلي" إطلاقاً (بناءً على طلب المستخدم):
-#   شكوى المريض → قرار الطبيب → رقم الجلسة الحالية (يدوي، كل تقرير من
-#   الصفر بلا تذكّر) → رفع دفتر جلسات الغسيل (اختياري) → تاريخ العودة →
-#   سبب العودة → المترجم/البوابة/النشر
+# كلي"، ولا شكوى مريض، ولا قرار طبيب، ولا رفع مرفقات (بناءً على طلب
+# المستخدم — تبسيط الفورمه لأقصى حد):
+#   رقم الجلسة الحالية (يدوي، كل تقرير من الصفر بلا تذكّر) → تاريخ الجلسة
+#   القادمة (تقويم فقط — بلا وقت وبلا سبب) → المترجم/البوابة/النشر
 #
 # العلاج الكيماوي إضافياً: يُتابَع دائماً "حسب الدورات" (لا يوجد خيار
 # "حسب الجلسات" — أُزيل بناءً على طلب المستخدم): عدد الدورات، ثم هل نفسه
@@ -26,8 +26,10 @@
 # (خطط قديمة أُنشئت سابقاً بنمط mode="sessions" تبقى تعمل ويمكن تعديلها
 # بشكل طبيعي — فقط شاشة الاختيار عند إنشاء خطة جديدة أُزيلت.)
 
+import calendar
 import json
 import logging
+from datetime import datetime
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 
@@ -38,9 +40,9 @@ from ..states import (
     TREATMENT_FOLLOWUP_REASON, TREATMENT_TRANSLATOR,
     CHEMO_CYCLES_TOTAL, CHEMO_CYCLES_UNIFORM_CHOICE,
     CHEMO_CYCLES_UNIFORM_COUNT, CHEMO_CYCLES_CUSTOM_ENTRY,
-    TREATMENT_DIALYSIS_SESSION, TREATMENT_DIALYSIS_UPLOAD,
+    TREATMENT_DIALYSIS_SESSION, TREATMENT_DIALYSIS_NEXT_DATE,
 )
-from ..utils import _nav_buttons
+from ..utils import _nav_buttons, MONTH_NAMES_AR, WEEKDAYS_AR
 from ...user_reports_add_helpers import validate_text_input
 from .shared import show_translator_selection
 from .new_consult import _render_followup_calendar
@@ -102,9 +104,9 @@ async def start_immuno_flow(message, context):
 
 async def start_dialysis_flow(message, context):
     """
-    غسيل الكلى: بلا TreatmentPlan وبلا "عدد جلسات كلي" — ينتقل مباشرة
-    لشكوى المريض. رقم الجلسة يُطلَب لاحقاً يدوياً (انظر
-    handle_treatment_dialysis_session_number)، لا يُشتَق من خطة محفوظة.
+    غسيل الكلى: بلا TreatmentPlan وبلا "عدد جلسات كلي" وبلا شكوى/قرار طبيب
+    — ينتقل مباشرة لرقم الجلسة الحالية (إدخال يدوي، بلا تذكّر أو خطة
+    محفوظة)، ثم تاريخ الجلسة القادمة فقط.
     """
     data = context.user_data.setdefault("report_tmp", {})
     data["medical_action"] = TREATMENT_MEDICAL_ACTION["dialysis"]
@@ -112,9 +114,9 @@ async def start_dialysis_flow(message, context):
     data["_treatment_key"] = "dialysis"
     data.pop("_tp_editing_plan_id", None)
 
-    await _prompt_complaint(message, context)
-    context.user_data['_conversation_state'] = TREATMENT_COMPLAINT
-    return TREATMENT_COMPLAINT
+    await _prompt_dialysis_session(message, context)
+    context.user_data['_conversation_state'] = TREATMENT_DIALYSIS_SESSION
+    return TREATMENT_DIALYSIS_SESSION
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -495,41 +497,26 @@ async def handle_treatment_complaint(update: Update, context: ContextTypes.DEFAU
     return TREATMENT_NOTES
 
 
-def _notes_keyboard(treatment_key: str = "") -> InlineKeyboardMarkup:
-    skip_label = "⏭️ لا يوجد" if treatment_key == "dialysis" else "⏭️ لا توجد ملاحظات"
+def _notes_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton(skip_label, callback_data="treatment_notes_skip")],
+        [InlineKeyboardButton("⏭️ لا توجد ملاحظات", callback_data="treatment_notes_skip")],
         [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
          InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")],
     ])
 
 
 async def _prompt_notes(message, context):
-    treatment_key = context.user_data.get("report_tmp", {}).get("_treatment_key", "")
-    if treatment_key == "dialysis":
-        text = (
-            "📝 **قرار الطبيب**\n\n"
-            "يرجى إدخال قرار الطبيب، أو اضغط الزر أدناه إذا لا يوجد:"
-        )
-    else:
-        text = (
-            "📝 **ملاحظات الطبيب**\n\n"
-            "يرجى إدخال أي ملاحظات إضافية، أو اضغط الزر أدناه إذا لا توجد ملاحظات:"
-        )
-    await message.reply_text(text, reply_markup=_notes_keyboard(treatment_key), parse_mode="Markdown")
+    """ملاحظات الطبيب — targeted/immuno/chemo فقط (غسيل الكلى لا يمر بهذه
+    الخطوة إطلاقاً، انظر start_dialysis_flow)."""
+    text = (
+        "📝 **ملاحظات الطبيب**\n\n"
+        "يرجى إدخال أي ملاحظات إضافية، أو اضغط الزر أدناه إذا لا توجد ملاحظات:"
+    )
+    await message.reply_text(text, reply_markup=_notes_keyboard(), parse_mode="Markdown")
 
 
 async def _after_notes(message_or_query, context):
-    """
-    ما بعد قرار الطبيب/الملاحظات: غسيل الكلى ينتقل لرقم الجلسة اليدوي،
-    وبقية الأنواع (targeted/immuno/chemo) تنتقل لتاريخ العودة كالسابق.
-    """
-    treatment_key = context.user_data.get("report_tmp", {}).get("_treatment_key", "")
-    if treatment_key == "dialysis":
-        await _prompt_dialysis_session(message_or_query, context)
-        context.user_data['_conversation_state'] = TREATMENT_DIALYSIS_SESSION
-        return TREATMENT_DIALYSIS_SESSION
-
+    """ما بعد الملاحظات (targeted/immuno/chemo فقط) → تاريخ العودة."""
     await _render_followup_calendar(message_or_query, context)
     context.user_data['_conversation_state'] = TREATMENT_FOLLOWUP_DATE
     return TREATMENT_FOLLOWUP_DATE
@@ -554,7 +541,8 @@ async def handle_treatment_notes_skip(update: Update, context: ContextTypes.DEFA
 
 
 # ═══════════════════════════════════════════════════════════════════
-# غسيل الكلى فقط: رقم الجلسة الحالية (يدوي) → رفع دفتر الجلسات/تخطي
+# غسيل الكلى فقط: رقم الجلسة الحالية (يدوي) → تاريخ الجلسة القادمة فقط
+# (بلا وقت وبلا سبب — بناءً على طلب المستخدم صراحةً) → المترجم مباشرة
 # ═══════════════════════════════════════════════════════════════════
 async def _prompt_dialysis_session(message_or_query, context):
     text = (
@@ -587,81 +575,113 @@ async def handle_treatment_dialysis_session_number(update: Update, context: Cont
     data["treatment_plan_summary"] = f"🩸 **جلسات غسيل الكلى**\n\nرقم الجلسة الحالية: {int(text)}"
 
     await update.message.reply_text("✅ تم الحفظ")
-    await _prompt_dialysis_upload(update.message, context)
-    context.user_data['_conversation_state'] = TREATMENT_DIALYSIS_UPLOAD
-    return TREATMENT_DIALYSIS_UPLOAD
+    await _render_dialysis_next_date_calendar(update.message, context)
+    context.user_data['_conversation_state'] = TREATMENT_DIALYSIS_NEXT_DATE
+    return TREATMENT_DIALYSIS_NEXT_DATE
 
 
-def _dialysis_upload_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("⏭️ تخطي", callback_data="treatment_dialysis_upload_skip")],
-        [InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
-         InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel")],
+def _build_dialysis_next_date_markup(year: int, month: int):
+    """تقويم تاريخ الجلسة القادمة — نسخة مبسّطة عن تقويم تاريخ العودة العام
+    في new_consult.py (بلا خطوة وقت وبلا سبب بعدها)، بـ callback_data
+    مستقلة تماماً (dlx_cal_*) حتى لا تتداخل مع أي حالة أخرى."""
+    cal = calendar.Calendar(firstweekday=calendar.SATURDAY)
+    weeks = cal.monthdayscalendar(year, month)
+    today = datetime.now().date()
+
+    keyboard = [
+        [
+            InlineKeyboardButton("⬅️", callback_data=f"dlx_cal_prev:{year}-{month:02d}"),
+            InlineKeyboardButton(f"{MONTH_NAMES_AR.get(month, month)} {year}", callback_data="noop"),
+            InlineKeyboardButton("➡️", callback_data=f"dlx_cal_next:{year}-{month:02d}"),
+        ],
+        [InlineKeyboardButton(day, callback_data="noop") for day in WEEKDAYS_AR],
+    ]
+
+    for week in weeks:
+        row = []
+        for day in week:
+            if day == 0:
+                row.append(InlineKeyboardButton(" ", callback_data="noop"))
+                continue
+            date_str = f"{year}-{month:02d}-{day:02d}"
+            date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
+            if date_obj < today:
+                row.append(InlineKeyboardButton(" ", callback_data="noop"))
+            else:
+                mark = "📍" if date_obj == today else ""
+                row.append(InlineKeyboardButton(f"{mark}{day:02d}", callback_data=f"dlx_cal_day:{date_str}"))
+        keyboard.append(row)
+
+    keyboard.append([
+        InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
+        InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel"),
     ])
 
+    text = f"📅 **تاريخ الجلسة القادمة**\n\n{MONTH_NAMES_AR.get(month, str(month))} {year}\n\nاختر التاريخ من التقويم:"
+    return text, InlineKeyboardMarkup(keyboard)
 
-async def _prompt_dialysis_upload(message_or_query, context):
-    text = (
-        "📎 **رفع دفتر جلسات الغسيل / التقرير النهائي**\n\n"
-        "أرسل صورة أو ملف الدفتر/التقرير (يمكن أكثر من ملف)، أو اضغط "
-        "**تخطي** للمتابعة بلا رفع:"
-    )
-    kb = _dialysis_upload_keyboard()
+
+async def _render_dialysis_next_date_calendar(message_or_query, context, year=None, month=None):
+    data = context.user_data.setdefault("report_tmp", {})
+    if year is None or month is None:
+        now = datetime.now()
+        year = data.get("followup_calendar_year", now.year)
+        month = data.get("followup_calendar_month", now.month)
+
+    text, markup = _build_dialysis_next_date_markup(year, month)
+    data["followup_calendar_year"] = year
+    data["followup_calendar_month"] = month
+
     if hasattr(message_or_query, "edit_message_text"):
-        try:
-            await message_or_query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
-            return
-        except Exception:
-            pass
-    await message_or_query.reply_text(text, reply_markup=kb, parse_mode="Markdown")
-
-
-async def handle_treatment_dialysis_upload_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """استقبال ملف (صورة/مستند/فيديو) لدفتر جلسات الغسيل وتجميعه في
-    report_tmp["_medical_attachments"] — نفس المفتاح الذي تقرأه
-    broadcast_data['medical_attachments'] بشكل عام لكل التدفقات، فيُرسَل
-    تلقائياً لمجموعة المرفقات الطبية (بما فيها توجيه تشناي إن انطبق) بلا
-    أي تعديل إضافي في مسار النشر."""
-    context.user_data['_conversation_state'] = TREATMENT_DIALYSIS_UPLOAD
-    report_tmp = context.user_data.setdefault("report_tmp", {})
-    attachments = report_tmp.setdefault("_medical_attachments", [])
-
-    msg = update.message
-    file_info = None
-    if msg.photo:
-        file_info = {"type": "photo", "file_id": msg.photo[-1].file_id}
-    elif msg.document:
-        file_info = {"type": "document", "file_id": msg.document.file_id,
-                     "file_name": msg.document.file_name or "document"}
-    elif msg.video:
-        file_info = {"type": "video", "file_id": msg.video.file_id}
+        await message_or_query.edit_message_text(text, reply_markup=markup, parse_mode="Markdown")
     else:
-        await msg.reply_text(
-            "⚠️ نوع الملف غير مدعوم. أرسل صورة أو ملف PDF أو فيديو.\n"
-            "أو اضغط **تخطي** للمتابعة.",
-            reply_markup=_dialysis_upload_keyboard(),
-            parse_mode="Markdown",
-        )
-        return TREATMENT_DIALYSIS_UPLOAD
-
-    attachments.append(file_info)
-    count = len(attachments)
-    await msg.reply_text(
-        f"✅ تم استلام الملف ({count} {'ملف' if count == 1 else 'ملفات'} حتى الآن)\n\n"
-        "أرسل المزيد، أو اضغط **تخطي** للمتابعة.",
-        reply_markup=_dialysis_upload_keyboard(),
-        parse_mode="Markdown",
-    )
-    return TREATMENT_DIALYSIS_UPLOAD
+        await message_or_query.reply_text(text, reply_markup=markup, parse_mode="Markdown")
 
 
-async def handle_treatment_dialysis_upload_skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تخطي رفع الدفتر (أو الانتهاء منه) → متابعة تاريخ العودة."""
+async def handle_dialysis_next_date_nav(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """التنقل بين الشهور في تقويم تاريخ الجلسة القادمة."""
     query = update.callback_query
     await query.answer()
-    await _render_followup_calendar(query, context)
-    context.user_data['_conversation_state'] = TREATMENT_FOLLOWUP_DATE
-    return TREATMENT_FOLLOWUP_DATE
+    action, ym = query.data.split(":", 1)
+    year, month = (int(x) for x in ym.split("-"))
+    if action == "dlx_cal_prev":
+        month -= 1
+        if month == 0:
+            month, year = 12, year - 1
+    else:
+        month += 1
+        if month == 13:
+            month, year = 1, year + 1
+    await _render_dialysis_next_date_calendar(query, context, year, month)
+    return TREATMENT_DIALYSIS_NEXT_DATE
+
+
+async def handle_dialysis_next_date_day(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """اختيار تاريخ الجلسة القادمة من التقويم → المترجم مباشرة (بلا وقت
+    وبلا سبب — بناءً على طلب المستخدم صراحةً)."""
+    query = update.callback_query
+    await query.answer()
+    date_str = query.data.split(":", 1)[1]
+    date_value = datetime.strptime(date_str, "%Y-%m-%d").date()
+
+    data = context.user_data.setdefault("report_tmp", {})
+    data["followup_date"] = date_value
+    data["followup_time"] = None
+
+    days_ar = {0: 'الاثنين', 1: 'الثلاثاء', 2: 'الأربعاء', 3: 'الخميس', 4: 'الجمعة', 5: 'السبت', 6: 'الأحد'}
+    day_name = days_ar.get(date_value.weekday(), '')
+    await query.edit_message_text(
+        f"✅ **تم اختيار تاريخ الجلسة القادمة**\n\n"
+        f"📅 {date_value.strftime('%d')} {MONTH_NAMES_AR.get(date_value.month, date_value.month)} "
+        f"{date_value.year} ({day_name})",
+        parse_mode="Markdown",
+    )
+
+    flow_type = data.get("current_flow", "treatment_dialysis")
+    gate_result = await show_translator_selection(query.message, context, flow_type)
+    if gate_result == "MEDICAL_REPORT_ASK":
+        return gate_result
+    return TREATMENT_TRANSLATOR
 
 
 async def handle_treatment_followup_reason(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -697,6 +717,6 @@ __all__ = [
     'handle_treatment_complaint',
     'handle_treatment_notes', 'handle_treatment_notes_skip', 'handle_treatment_followup_reason',
     'handle_treatment_dialysis_session_number',
-    'handle_treatment_dialysis_upload_file', 'handle_treatment_dialysis_upload_skip',
+    'handle_dialysis_next_date_nav', 'handle_dialysis_next_date_day',
     'TREATMENT_MEDICAL_ACTION',
 ]

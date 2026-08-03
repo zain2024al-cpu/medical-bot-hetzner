@@ -483,11 +483,7 @@ def get_editable_fields_by_flow_type(flow_type):
             ("translator_name",   "👤 المترجم"),
         ],
         "treatment_dialysis": [
-            ("complaint",         "💬 شكوى المريض"),
-            ("notes",             "📝 قرار الطبيب"),
-            ("followup_date",     "📅 موعد العودة"),
-            ("followup_time",     "⏰ وقت العودة"),
-            ("followup_reason",   "✍️ سبب العودة"),
+            ("followup_date",     "📅 تاريخ الجلسة القادمة"),
             ("no_report_reason",  "📋 سبب عدم وجود تقرير طبي"),
             ("translator_name",   "👤 المترجم"),
         ],
