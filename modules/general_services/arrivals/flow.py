@@ -14,7 +14,7 @@ from telegram.ext import ContextTypes, CallbackQueryHandler, MessageHandler, fil
 from bot.shared_auth import is_admin
 from core.access.access_service import user_has_module
 
-from shared.calendar_picker import build_calendar
+from shared.calendar_picker import build_calendar, build_year_picker, build_month_picker
 from shared.selectors.patient_selector import selector as patient_selector
 from shared.result_router import register as _register_route
 from modules.general_services.views import parse_date_input, build_gs_menu
@@ -113,6 +113,41 @@ _TEXT_STEPS = {
     STEP_C_ESCORT_ENTITY,
     STEP_C_RESIDENCE_ADDRESS,
 }
+
+
+# ── Calendar rendering — one source for all date steps ────────────────────────
+# زر "⬅️ رجوع" داخل التقويم يعتمد على أي تقويم مفتوح حالياً.
+_STEP_TO_CAL_BACK_CB: dict[str, str] = {
+    STEP_P_ARRIVAL_DATE:     f"{GSA}:p_arrival_date_prompt",
+    STEP_P_PASSPORT_EXPIRY:  f"{GSA}:p_passport_expiry_prompt",
+    STEP_P_VISA_EXPIRY:      f"{GSA}:visa_expiry_prompt",
+    STEP_P_RESIDENCE_EXPIRY: f"{GSA}:p_residence_expiry_prompt",
+    STEP_C_ARRIVAL_DATE:     f"{GSA}:c_arrival_date_prompt",
+    STEP_C_PASSPORT_EXPIRY:  f"{GSA}:c_passport_expiry_prompt",
+    STEP_C_VISA_EXPIRY:      f"{GSA}:c_visa_expiry_prompt",
+}
+
+# ✅ خطوات "تاريخ انتهاء" — تواريخها بعيدة بسنوات (جواز ينتهي 2032 مثلاً)،
+# فتُعرض بتقويم فيه قفز سريع للسنة/الشهر (4 ضغطات بدل ~96). تاريخ الوصول
+# وتاريخ الدفعة قريبان دائماً فيبقيان بالتقويم العادي.
+_QUICK_JUMP_STEPS: set[str] = {
+    STEP_P_PASSPORT_EXPIRY,
+    STEP_P_VISA_EXPIRY,
+    STEP_P_RESIDENCE_EXPIRY,
+    STEP_C_PASSPORT_EXPIRY,
+    STEP_C_VISA_EXPIRY,
+}
+
+
+def _cal_for_step(step: str | None, year: int, month: int):
+    """يبني التقويم المناسب للخطوة الحالية (زر الرجوع + القفز السريع)."""
+    return build_calendar(
+        year=year,
+        month=month,
+        callback_prefix=GSA,
+        back_callback=_STEP_TO_CAL_BACK_CB.get(step, f"{GSA}:start"),
+        quick_jump=step in _QUICK_JUMP_STEPS,
+    )
 
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
@@ -540,11 +575,7 @@ async def _dispatch_callback_inner(
         logger.info(f"[arrivals.cb] date_calendar → STEP_DATE_CUSTOM (calendar shown)  user={uid}")
         from datetime import datetime
         now = datetime.utcnow()
-        cal_text, cal_kb = build_calendar(
-            year=now.year, month=now.month,
-            callback_prefix=GSA,
-            back_callback=f"{GSA}:start",
-        )
+        cal_text, cal_kb = _cal_for_step(session.step, now.year, now.month)
         await query.edit_message_text(cal_text, reply_markup=cal_kb, parse_mode="Markdown")
         return
 
@@ -555,10 +586,7 @@ async def _dispatch_callback_inner(
             await _cancel(update, context); return
         from datetime import datetime
         now = datetime.utcnow()
-        cal_text, cal_kb = build_calendar(
-            year=now.year, month=now.month, callback_prefix=GSA,
-            back_callback=f"{GSA}:p_arrival_date_prompt",
-        )
+        cal_text, cal_kb = _cal_for_step(session.step, now.year, now.month)
         await query.edit_message_text(cal_text, reply_markup=cal_kb, parse_mode="Markdown")
         return
 
@@ -575,10 +603,7 @@ async def _dispatch_callback_inner(
             await _cancel(update, context); return
         from datetime import datetime
         now = datetime.utcnow()
-        cal_text, cal_kb = build_calendar(
-            year=now.year, month=now.month, callback_prefix=GSA,
-            back_callback=f"{GSA}:p_passport_expiry_prompt",
-        )
+        cal_text, cal_kb = _cal_for_step(session.step, now.year, now.month)
         await query.edit_message_text(cal_text, reply_markup=cal_kb, parse_mode="Markdown")
         return
 
@@ -595,10 +620,7 @@ async def _dispatch_callback_inner(
             await _cancel(update, context); return
         from datetime import datetime
         now = datetime.utcnow()
-        cal_text, cal_kb = build_calendar(
-            year=now.year, month=now.month, callback_prefix=GSA,
-            back_callback=f"{GSA}:c_arrival_date_prompt",
-        )
+        cal_text, cal_kb = _cal_for_step(session.step, now.year, now.month)
         await query.edit_message_text(cal_text, reply_markup=cal_kb, parse_mode="Markdown")
         return
 
@@ -615,10 +637,7 @@ async def _dispatch_callback_inner(
             await _cancel(update, context); return
         from datetime import datetime
         now = datetime.utcnow()
-        cal_text, cal_kb = build_calendar(
-            year=now.year, month=now.month, callback_prefix=GSA,
-            back_callback=f"{GSA}:c_passport_expiry_prompt",
-        )
+        cal_text, cal_kb = _cal_for_step(session.step, now.year, now.month)
         await query.edit_message_text(cal_text, reply_markup=cal_kb, parse_mode="Markdown")
         return
 
@@ -638,11 +657,7 @@ async def _dispatch_callback_inner(
         logger.info(f"[arrivals.cb] visa_expiry_cal → calendar shown  user={uid}")
         from datetime import datetime
         now = datetime.utcnow()
-        cal_text, cal_kb = build_calendar(
-            year=now.year, month=now.month,
-            callback_prefix=GSA,
-            back_callback=f"{GSA}:visa_expiry_prompt",
-        )
+        cal_text, cal_kb = _cal_for_step(session.step, now.year, now.month)
         await query.edit_message_text(cal_text, reply_markup=cal_kb, parse_mode="Markdown")
         return
 
@@ -664,11 +679,7 @@ async def _dispatch_callback_inner(
         logger.info(f"[arrivals.cb] c_visa_expiry_cal → calendar shown  user={uid}")
         from datetime import datetime
         now = datetime.utcnow()
-        cal_text, cal_kb = build_calendar(
-            year=now.year, month=now.month,
-            callback_prefix=GSA,
-            back_callback=f"{GSA}:c_visa_expiry_prompt",
-        )
+        cal_text, cal_kb = _cal_for_step(session.step, now.year, now.month)
         await query.edit_message_text(cal_text, reply_markup=cal_kb, parse_mode="Markdown")
         return
 
@@ -692,11 +703,7 @@ async def _dispatch_callback_inner(
         logger.info(f"[arrivals.cb] p_residence_expiry_cal → calendar shown  user={uid}")
         from datetime import datetime as _dt
         now = _dt.utcnow()
-        cal_text, cal_kb = build_calendar(
-            year=now.year, month=now.month,
-            callback_prefix=GSA,
-            back_callback=f"{GSA}:p_residence_expiry_prompt",
-        )
+        cal_text, cal_kb = _cal_for_step(session.step, now.year, now.month)
         await query.edit_message_text(cal_text, reply_markup=cal_kb, parse_mode="Markdown")
         return
 
@@ -711,31 +718,66 @@ async def _dispatch_callback_inner(
         await _show_p_residence_expiry(update, context, session)
         return
 
-    if action.startswith("cal_nav:"):
+    # ── Calendar navigation ───────────────────────────────────────────────────
+    # cal_nav (توافق قديم) + cal_prev/cal_next (شهر) + cal_yprev/cal_ynext (سنة)
+    # كلها تُعيد رسم شبكة الأيام لسنة/شهر معيّنين.
+    if action.startswith(("cal_nav:", "cal_prev:", "cal_next:", "cal_yprev:", "cal_ynext:")):
         parts = action.split(":")
         try:
             y, m = int(parts[1]), int(parts[2])
         except (IndexError, ValueError):
-            logger.warning(f"[arrivals.cb] cal_nav parse error  action={action!r}  user={uid}")
+            logger.warning(f"[arrivals.cb] cal nav parse error  action={action!r}  user={uid}")
             return
-        # Back callback depends on which calendar is currently open.
         _nav_session = ArrivalSession.load(context.user_data)
-        _step_to_back_cb = {
-            STEP_P_ARRIVAL_DATE:     f"{GSA}:p_arrival_date_prompt",
-            STEP_P_PASSPORT_EXPIRY:  f"{GSA}:p_passport_expiry_prompt",
-            STEP_P_VISA_EXPIRY:      f"{GSA}:visa_expiry_prompt",
-            STEP_P_RESIDENCE_EXPIRY: f"{GSA}:p_residence_expiry_prompt",
-            STEP_C_ARRIVAL_DATE:     f"{GSA}:c_arrival_date_prompt",
-            STEP_C_PASSPORT_EXPIRY:  f"{GSA}:c_passport_expiry_prompt",
-            STEP_C_VISA_EXPIRY:      f"{GSA}:c_visa_expiry_prompt",
-        }
-        _back_cb = _step_to_back_cb.get(_nav_session.step if _nav_session else None, f"{GSA}:start")
-        logger.info(f"[arrivals.cb] cal_nav → {y}/{m}  back={_back_cb!r}  user={uid}")
-        cal_text, cal_kb = build_calendar(
-            year=y, month=m,
-            callback_prefix=GSA,
-            back_callback=_back_cb,
-        )
+        _step = _nav_session.step if _nav_session else None
+        logger.info(f"[arrivals.cb] cal nav → {y}/{m}  step={_step!r}  user={uid}")
+        cal_text, cal_kb = _cal_for_step(_step, y, m)
+        await query.edit_message_text(cal_text, reply_markup=cal_kb, parse_mode="Markdown")
+        return
+
+    # ── Quick jump: year grid → month grid → day grid ─────────────────────────
+    # يُفتح فقط من تقويم بُني بـquick_jump=True (خطوات تواريخ الانتهاء).
+    if action.startswith(("cal_years:", "cal_yearpage:")):
+        parts = action.split(":")
+        try:
+            base_y = int(parts[1])
+        except (IndexError, ValueError):
+            logger.warning(f"[arrivals.cb] cal_years parse error  action={action!r}  user={uid}")
+            return
+        _nav_session = ArrivalSession.load(context.user_data)
+        _step = _nav_session.step if _nav_session else None
+        back_cb = _STEP_TO_CAL_BACK_CB.get(_step, f"{GSA}:start")
+        logger.info(f"[arrivals.cb] cal_years base={base_y}  step={_step!r}  user={uid}")
+        text, kb = build_year_picker(base_y, GSA, back_cb)
+        await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
+        return
+
+    if action.startswith("cal_setyear:"):
+        parts = action.split(":")
+        try:
+            y = int(parts[1])
+        except (IndexError, ValueError):
+            logger.warning(f"[arrivals.cb] cal_setyear parse error  action={action!r}  user={uid}")
+            return
+        _nav_session = ArrivalSession.load(context.user_data)
+        _step = _nav_session.step if _nav_session else None
+        back_cb = _STEP_TO_CAL_BACK_CB.get(_step, f"{GSA}:start")
+        logger.info(f"[arrivals.cb] cal_setyear={y}  step={_step!r}  user={uid}")
+        text, kb = build_month_picker(y, GSA, back_cb)
+        await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
+        return
+
+    if action.startswith("cal_setmonth:"):
+        parts = action.split(":")
+        try:
+            y, m = int(parts[1]), int(parts[2])
+        except (IndexError, ValueError):
+            logger.warning(f"[arrivals.cb] cal_setmonth parse error  action={action!r}  user={uid}")
+            return
+        _nav_session = ArrivalSession.load(context.user_data)
+        _step = _nav_session.step if _nav_session else None
+        logger.info(f"[arrivals.cb] cal_setmonth → {y}/{m}  step={_step!r}  user={uid}")
+        cal_text, cal_kb = _cal_for_step(_step, y, m)
         await query.edit_message_text(cal_text, reply_markup=cal_kb, parse_mode="Markdown")
         return
 
@@ -792,11 +834,15 @@ async def _dispatch_callback_inner(
             logger.info(f"[arrivals.cb] cal_pick c_passport_expiry={dt.date()} → STEP_C_VISA_EXPIRY  user={uid}")
             await _show_c_visa_expiry(update, context, session)
         elif session.step == STEP_C_VISA_EXPIRY:
-            session.current_companion["residence_expiry"] = dt.strftime("%Y-%m-%d")
+            # ✅ كان يُكتب في "residence_expiry" بالخطأ — تاريخ انتهاء تأشيرة
+            # المرافق كان يُحفظ في حقل الإقامة، فيضيع من عمود visa_expiry
+            # تماماً (ويُفسد تاريخ الإقامة أيضاً). نفس نمط الحقل المُخزَّن
+            # بمفتاح خاطئ الذي أُصلح مراراً هذه الجلسة.
+            session.current_companion["visa_expiry"] = dt.strftime("%d/%m/%Y")
             session.step = STEP_C_PASSPORT
             session.save(context.user_data)
             logger.info(
-                f"[arrivals.cb] cal_pick c_residence_expiry={dt.date()} → STEP_C_PASSPORT  user={uid}"
+                f"[arrivals.cb] cal_pick c_visa_expiry={dt.date()} → STEP_C_PASSPORT  user={uid}"
             )
             await _show_c_passport(update, context, session)
         else:
