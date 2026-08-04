@@ -387,12 +387,14 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
         return
 
     # ── Calendar nav / pick ───────────────────────────────────────────────────
-    if action.startswith("cal_nav:"):
+    # ✅ build_calendar يُصدر cal_prev/cal_next — لا cal_nav. بدونهما كانت
+    # أسهم ◀️/▶️ في التقويم لا تفعل شيئاً إطلاقاً (النقر يسقط بلا معالج).
+    if action.startswith(("cal_nav:", "cal_prev:", "cal_next:")):
         parts = action.split(":")
         try:
             y, m = int(parts[1]), int(parts[2])
         except (IndexError, ValueError):
-            logger.warning(f"[res.profiles.cb] cal_nav parse error  action={action!r}  user={uid}")
+            logger.warning(f"[res.profiles.cb] cal nav parse error  action={action!r}  user={uid}")
             return
         _edit_id = context.user_data.get("_res_edit_expiry_id")
         _s       = AddProfileSession.load(context.user_data)

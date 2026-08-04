@@ -224,7 +224,9 @@ async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await query.edit_message_text(cal_text, reply_markup=cal_kb, parse_mode="Markdown")
         return
 
-    if action.startswith("cal_nav:"):
+    # ✅ build_calendar يُصدر cal_prev/cal_next — لا cal_nav. بدونهما كانت
+    # أسهم ◀️/▶️ في التقويم لا تفعل شيئاً إطلاقاً (النقر يسقط بلا معالج).
+    if action.startswith(("cal_nav:", "cal_prev:", "cal_next:")):
         parts = action.split(":")
         try:
             y, m = int(parts[1]), int(parts[2])
