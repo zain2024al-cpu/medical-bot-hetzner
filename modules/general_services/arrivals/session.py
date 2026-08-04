@@ -46,6 +46,11 @@ STEP_C_ESCORT_ENTITY    = "c_escort_entity"
 STEP_C_RESIDENCE_ADDRESS = "c_residence_address"
 STEP_C_RESIDENCE        = "c_residence"         # kept for legacy session compat only
 STEP_C_RESIDENCE_EXPIRY = "c_residence_expiry"  # kept for legacy session compat only
+# ✅ "هل يوجد مرافق آخر؟" — يسمح بأكثر من مرافق واحد للمريض (كان مرافقاً
+# واحداً فقط: التدفق كان يُنهي المريض فور إتمام أول مرافق).
+STEP_C_MORE             = "c_more"
+# ✅ المختص أصبح خطوة **لكل مريض** (كان سؤالاً واحداً في نهاية الدفعة).
+STEP_P_SPECIALIST       = "p_specialist"
 STEP_REVIEW             = "review"
 
 
@@ -148,6 +153,9 @@ class ArrivalSession:
             "services_provided":   "",
             "escort_entity":       "",
             "residence_address":   "",
+            # ✅ المختص لكل مريض (كان على مستوى الدفعة)
+            "specialist_id":       "",
+            "specialist_label":    "",
             "companions":          [],
         }
         self.current_companion = {}

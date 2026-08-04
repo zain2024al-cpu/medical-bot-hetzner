@@ -61,6 +61,10 @@ def save_arrival_batch(
                 services_provided=    p.get("services_provided", ""),
                 escort_entity=        p.get("escort_entity", ""),
                 residence_address=    p.get("residence_address", ""),
+                # ✅ المختص أصبح لكل مريض — يُقرأ من المريض نفسه، ويرجع
+                # لمختص الدفعة فقط للجلسات القديمة التي لم تسأله لكل مريض.
+                specialist_id=        p.get("specialist_id") or specialist_id,
+                specialist_label=     p.get("specialist_label") or specialist_label,
             )
             db.add(patient_row)
             db.flush()
@@ -72,6 +76,9 @@ def save_arrival_batch(
                     name=                 c.get("name", ""),
                     arrival_date=         c.get("arrival_date", ""),
                     passport_expiry=      c.get("passport_expiry", ""),
+                    # ✅ كان مفقوداً تماماً من الحفظ (ولا عمود له أصلاً) —
+                    # تاريخ انتهاء تأشيرة المرافق كان يضيع بالكامل.
+                    visa_expiry=          c.get("visa_expiry", ""),
                     passport_file_id=     c.get("passport_file_id", ""),
                     visa_file_id=         c.get("visa_file_id", ""),
                     entry_stamp_file_id=  c.get("entry_stamp_file_id", ""),

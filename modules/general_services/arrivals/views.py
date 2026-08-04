@@ -7,7 +7,9 @@ from modules.general_services.views import (
     format_arabic_datetime, format_arabic_date,
     _DIVIDER, _THIN, _NONE,
 )
-from modules.general_services.constants import STAFF_MAP
+from modules.general_services.constants import (
+    STAFF_MAP, ESCORT_ENTITY_MAP, ESCORT_ENTITY_OTHER_ID,
+)
 
 GS  = "gs"
 GSA = "gsa"
@@ -224,12 +226,12 @@ def build_p_visa_prompt(session: ArrivalSession) -> tuple[str, InlineKeyboardMar
     name = session.current_patient.get("name", "—")
     lines = [
         _DIVIDER,
-        f"📄  **المريض {idx} — التأشيرة**",
+        f"📄  **المريض {idx} — التأشيرة مع ختم الدخول**",
         "",
         f"المريض: {name}",
         _THIN,
         "",
-        "أرسل صورة التأشيرة.",
+        "أرسل صورة التأشيرة **مع ختم الدخول**.",
     ]
     kb = InlineKeyboardMarkup([[
         InlineKeyboardButton("⬅️ رجوع", callback_data=f"{GSA}:back_p_passport"),
@@ -362,6 +364,10 @@ def build_p_services_prompt(session: ArrivalSession) -> tuple[str, InlineKeyboar
 
 
 def build_p_escort_entity_prompt(session: ArrivalSession) -> tuple[str, InlineKeyboardMarkup]:
+    """
+    ✅ أصبحت أزراراً بدل نص حر — التسميات موحَّدة من ESCORT_ENTITY_MAP
+    (modules/general_services/constants.py). خيار "أخرى" يفتح الكتابة اليدوية.
+    """
     idx  = session.patient_index + 1
     name = session.current_patient.get("name", "—")
     lines = [
@@ -371,14 +377,107 @@ def build_p_escort_entity_prompt(session: ArrivalSession) -> tuple[str, InlineKe
         f"المريض: {name}",
         _THIN,
         "",
-        "✏️ اكتب الجهة الموصلة لهذا المريض، أو اضغط **⏭️ تخطي**.",
+        "اختر الجهة التي أوصلت المريض:",
+    ]
+    rows = [
+        [InlineKeyboardButton(label, callback_data=f"{GSA}:p_escort_{eid}")]
+        for eid, label in ESCORT_ENTITY_MAP.items()
+    ]
+    rows.append([
+        InlineKeyboardButton("✏️ أخرى (كتابة يدوية)",
+                             callback_data=f"{GSA}:p_escort_{ESCORT_ENTITY_OTHER_ID}")
+    ])
+    rows.append([
+        InlineKeyboardButton("⏭️ تخطي", callback_data=f"{GSA}:skip_p_escort_entity"),
+        InlineKeyboardButton("⬅️ رجوع", callback_data=f"{GSA}:back_p_indiv_notes"),
+        InlineKeyboardButton("❌ إلغاء", callback_data=f"{GS}:arrivals"),
+    ])
+    return "\n".join(lines), InlineKeyboardMarkup(rows)
+
+
+def build_p_escort_entity_manual_prompt(session: ArrivalSession) -> tuple[str, InlineKeyboardMarkup]:
+    """شاشة الكتابة اليدوية بعد اختيار "أخرى"."""
+    idx  = session.patient_index + 1
+    name = session.current_patient.get("name", "—")
+    lines = [
+        _DIVIDER,
+        f"🚐  **المريض {idx} — الجهة الموصلة**",
+        "",
+        f"المريض: {name}",
+        _THIN,
+        "",
+        "✏️ اكتب اسم الجهة الموصلة:",
     ]
     kb = InlineKeyboardMarkup([[
-        InlineKeyboardButton("⏭️ تخطي", callback_data=f"{GSA}:skip_p_escort_entity"),
-        InlineKeyboardButton("⬅️ رجوع", callback_data=f"{GSA}:back_p_services"),
+        InlineKeyboardButton("⬅️ رجوع", callback_data=f"{GSA}:back_p_escort_entity"),
         InlineKeyboardButton("❌ إلغاء", callback_data=f"{GS}:arrivals"),
     ]])
     return "\n".join(lines), kb
+
+
+def build_c_more_prompt(session: ArrivalSession) -> tuple[str, InlineKeyboardMarkup]:
+    """
+    ✅ "هل يوجد مرافق آخر؟" — يسمح بأكثر من مرافق لكل مريض (كان مرافقاً
+    واحداً فقط بلا أي طريقة لإضافة ثانٍ).
+    """
+    idx   = session.patient_index + 1
+    name  = session.current_patient.get("name", "—")
+    done  = len(session.current_patient.get("companions", []))
+    lines = [
+        _DIVIDER,
+        f"👥  **المريض {idx} — المرافقون**",
+        "",
+        f"المريض: {name}",
+        f"تم إدخال: **{done}** مرافق",
+        _THIN,
+        "",
+        "هل يوجد مرافق آخر لهذا المريض؟",
+    ]
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("➕ نعم، أضف مرافقاً آخر", callback_data=f"{GSA}:c_more_yes")],
+        [InlineKeyboardButton("✅ لا، تابع",             callback_data=f"{GSA}:c_more_no")],
+        [InlineKeyboardButton("❌ إلغاء",                callback_data=f"{GS}:arrivals")],
+    ])
+    return "\n".join(lines), kb
+
+
+def build_p_specialist_prompt(session: ArrivalSession) -> tuple[str, InlineKeyboardMarkup]:
+    """
+    ✅ المختص أصبح سؤالاً **لكل مريض** (كان مرة واحدة لكل الدفعة).
+    المختص المختار للمريض السابق يظهر أولاً بعلامة ✅ — ضغطة واحدة لتكراره
+    بدل إعادة البحث عنه في القائمة لكل مريض.
+    """
+    idx  = session.patient_index + 1
+    name = session.current_patient.get("name", "—")
+    prev = ""
+    if session.completed_patients:
+        prev = session.completed_patients[-1].get("specialist_id", "") or ""
+
+    lines = [
+        _DIVIDER,
+        f"👨‍⚕️  **المريض {idx} — المختص المسؤول**",
+        "",
+        f"المريض: {name}",
+        _THIN,
+        "",
+        "اختر المختص المسؤول عن هذا المريض:",
+    ]
+    ordered = list(STAFF_MAP.items())
+    if prev:
+        ordered.sort(key=lambda kv: kv[0] != prev)   # previous choice first
+
+    rows = [
+        [InlineKeyboardButton(
+            f"✅ {label} (نفس السابق)" if sid == prev else label,
+            callback_data=f"{GSA}:p_specialist_{sid}",
+        )]
+        for sid, label in ordered
+    ]
+    rows.append([
+        InlineKeyboardButton("⬅️ رجوع", callback_data=f"{GSA}:back_p_escort_entity"),
+        InlineKeyboardButton("❌ إلغاء", callback_data=f"{GS}:arrivals"),
+    ])
+    return "\n".join(lines), InlineKeyboardMarkup(rows)
 
 
 def build_p_residence_address_prompt(session: ArrivalSession) -> tuple[str, InlineKeyboardMarkup]:
@@ -512,9 +611,9 @@ def build_c_visa_prompt(session: ArrivalSession) -> tuple[str, InlineKeyboardMar
     idx = session.patient_index + 1
     lines = [
         _DIVIDER,
-        f"📄  **مرافق المريض {idx} — التأشيرة**",
+        f"📄  **مرافق المريض {idx} — التأشيرة مع ختم الدخول**",
         "",
-        "أرسل صورة تأشيرة المرافق.",
+        "أرسل صورة تأشيرة المرافق **مع ختم الدخول**.",
     ]
     kb = InlineKeyboardMarkup([[
         InlineKeyboardButton("⬅️ رجوع", callback_data=f"{GSA}:back_c_passport"),
@@ -684,47 +783,40 @@ def _individual_detail_lines(entity: dict, *, is_companion: bool) -> list[str]:
 def build_review(session: ArrivalSession) -> tuple[str, InlineKeyboardMarkup]:
     date_str = format_arabic_datetime(session.created_at)
     count    = len(session.completed_patients)
+    # ✅ الملاحظات/الجهة الموصلة/المختص أصبحت **لكل مريض** — لم تعد قيماً
+    # واحدة للدفعة، فتُعرض ضمن تفاصيل كل مريض بدل ترويسة الدفعة.
+    total_companions = sum(len(p.get("companions", [])) for p in session.completed_patients)
     lines = [
         "🛬 *مراجعة دفعة الوصول*",
         _DIVIDER,
         f"📅 *التاريخ:*  {date_str}",
-        f"👨‍⚕️ *المسؤول:*  {session.specialist_label or _NONE}",
         f"👥 *عدد المرضى:*  {count}",
+        f"🤝 *عدد المرافقين:*  {total_companions}",
         _THIN,
         "*قائمة المرضى:*",
     ]
     for i, p in enumerate(session.completed_patients):
-        pname     = p.get("name", "—")
-        comp_icon = "✅" if p.get("has_companion") else "❌"
+        pname = p.get("name", "—")
+        comps = p.get("companions", [])
         lines += [
             "",
             f"*{i + 1}.* {pname}",
-            f"   🤝 مرافق: {comp_icon}",
-        ] + _individual_detail_lines(p, is_companion=False)
-        for c in p.get("companions", []):
+            f"   🤝 مرافقون: {len(comps)}",
+        ] + _individual_detail_lines(p, is_companion=False) + [
+            f"   🚐 الجهة الموصلة: {p.get('escort_entity') or _NONE}",
+            f"   👨‍⚕️ المختص: {p.get('specialist_label') or _NONE}",
+            f"   📝 ملاحظات: {p.get('notes') or 'لا توجد'}",
+        ]
+        for c in comps:
             lines += [f"   ↳ *{c.get('name', '—')}*"] + [
                 f"      {ln.strip()}" for ln in _individual_detail_lines(c, is_companion=True)
             ]
 
-    lines += [
-        "",
-        _THIN,
-        f"📝 *الملاحظات:*  {session.batch_notes or 'لا توجد ملاحظات'}",
-        "",
-        "هل تريد نشر هذا التقرير؟",
-    ]
-    kb = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("📢 نشر التقرير",   callback_data=f"{GSA}:confirm"),
-            InlineKeyboardButton("❌ إلغاء",          callback_data=f"{GSA}:cancel"),
-        ],
-        [
-            InlineKeyboardButton("✏️ تعديل الملاحظات", callback_data=f"{GSA}:back_to_batch_notes"),
-        ],
-        [
-            InlineKeyboardButton("✏️ تعديل المختص",     callback_data=f"{GSA}:back_to_specialist"),
-        ],
-    ])
+    lines += ["", "هل تريد نشر هذا التقرير؟"]
+    kb = InlineKeyboardMarkup([[
+        InlineKeyboardButton("📢 نشر التقرير", callback_data=f"{GSA}:confirm"),
+        InlineKeyboardButton("❌ إلغاء",        callback_data=f"{GSA}:cancel"),
+    ]])
     return "\n".join(lines), kb
 
 

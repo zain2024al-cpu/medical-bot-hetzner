@@ -190,6 +190,15 @@ class DatabaseMaintenance:
                 _migrate_column(conn, "reports", "device_details", "TEXT")
                 _migrate_column(conn, "reports", "admission_notes", "TEXT")
                 _migrate_column(conn, "reports", "admission_type", "VARCHAR(100)")
+
+                # ✅ الخدمات العامة — الواصلون:
+                #  - المختص أصبح لكل مريض (كان عموداً واحداً على الدفعة).
+                #  - visa_expiry للمرافق لم يكن له عمود إطلاقاً، فكان التدفق
+                #    يكتبه في residence_expiry بالخطأ (يفقد تاريخ الفيزا
+                #    ويُفسد تاريخ الإقامة معاً).
+                _migrate_column(conn, "gs_arrival_patients", "specialist_id", "VARCHAR(50)")
+                _migrate_column(conn, "gs_arrival_patients", "specialist_label", "VARCHAR(255)")
+                _migrate_column(conn, "gs_arrival_companions", "visa_expiry", "VARCHAR(50)")
                 logger.info("🔎 Migration check finished.")
 
                 if check == "ok":

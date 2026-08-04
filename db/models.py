@@ -571,6 +571,9 @@ class ArrivalPatient(Base):
     services_provided   = Column(Text, nullable=True)
     escort_entity       = Column(String(255), nullable=True)
     residence_address   = Column(Text, nullable=True)
+    # ✅ المختص أصبح لكل مريض (كان عموداً واحداً على ArrivalBatch للدفعة كلها)
+    specialist_id       = Column(String(50),  nullable=True)
+    specialist_label    = Column(String(255), nullable=True)
 
 
 class ArrivalCompanion(Base):
@@ -588,6 +591,10 @@ class ArrivalCompanion(Base):
     # ✅ نفس الحقول الإضافية للمريض — المرافق يمر بنفس القائمة الكاملة
     arrival_date        = Column(String(50),  nullable=True)
     passport_expiry     = Column(String(50),  nullable=True)
+    # ✅ لم يكن للمرافق عمود visa_expiry إطلاقاً رغم أن التدفق يسأل عنه —
+    # فكانت القيمة تُكتب في residence_expiry بالخطأ (تضيع الفيزا وتُفسد
+    # تاريخ الإقامة معاً). العمود موجود الآن والتدفق يكتب في مكانه الصحيح.
+    visa_expiry         = Column(String(50),  nullable=True)
     entry_stamp_file_id = Column(String(255), nullable=True)
     tickets_file_id     = Column(String(255), nullable=True)
     notes               = Column(Text, nullable=True)
