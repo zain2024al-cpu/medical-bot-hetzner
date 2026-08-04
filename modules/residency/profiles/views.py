@@ -75,7 +75,10 @@ def build_archive_list(profiles, *, page: int, total: int) -> tuple[str, InlineK
     # ✅ تصدير الأرشيف كاملاً (كل الصفحات لا الصفحة الحالية فقط) — ملف Excel
     # فيه المرضى ومرافقوهم وتواريخ انتهاء الإقامة والجواز، ملوَّن حسب القرب
     # من الانتهاء ومع فلتر تلقائي.
-    rows.append([InlineKeyboardButton("📥 تصدير الأرشيف (Excel)", callback_data=f"{RNA}:export")])
+    rows.append([
+        InlineKeyboardButton("📊 Excel", callback_data=f"{RNA}:export"),
+        InlineKeyboardButton("📄 PDF",   callback_data=f"{RNA}:export_pdf"),
+    ])
 
     rows.append([
         InlineKeyboardButton("➕ إضافة جديد", callback_data=f"{RNA}:start"),

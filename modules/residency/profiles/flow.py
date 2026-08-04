@@ -251,14 +251,19 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
         await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
         return
 
-    # ── Archive export (Excel) ────────────────────────────────────────────────
-    if action == "export":
+    # ── Archive export (Excel / PDF) ──────────────────────────────────────────
+    # نفس المنطق للصيغتين — المُنتِج والامتداد فقط يختلفان.
+    if action in ("export", "export_pdf"):
+        is_pdf = action == "export_pdf"
         await query.answer("⏳ جارٍ تجهيز الملف…")
         try:
-            from services.residency_archive_excel import build_residency_archive_export
-            buf, count = build_residency_archive_export()
+            if is_pdf:
+                from services.residency_archive_pdf import build_residency_archive_pdf as _build
+            else:
+                from services.residency_archive_excel import build_residency_archive_export as _build
+            buf, count = _build()
         except Exception:
-            logger.exception(f"[res.profiles.cb] archive export FAILED  user={uid}")
+            logger.exception(f"[res.profiles.cb] archive export FAILED  pdf={is_pdf}  user={uid}")
             await query.answer("❌ تعذّر تجهيز الملف", show_alert=True)
             return
 
@@ -267,7 +272,8 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
             return
 
         from datetime import date as _date
-        filename = f"residency_archive_{_date.today().strftime('%Y-%m-%d')}.xlsx"
+        ext      = "pdf" if is_pdf else "xlsx"
+        filename = f"residency_archive_{_date.today().strftime('%Y-%m-%d')}.{ext}"
         try:
             await query.message.reply_document(
                 document=buf,
@@ -280,7 +286,9 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
                 ),
                 parse_mode="Markdown",
             )
-            logger.info(f"[res.profiles.cb] archive exported  rows={count}  user={uid}")
+            logger.info(
+                f"[res.profiles.cb] archive exported  fmt={ext}  rows={count}  user={uid}"
+            )
         except Exception:
             logger.exception(f"[res.profiles.cb] failed to send archive file  user={uid}")
             await query.answer("❌ تعذّر إرسال الملف", show_alert=True)
