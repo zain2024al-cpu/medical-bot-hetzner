@@ -7,7 +7,7 @@ from modules.general_services.views import (
     format_arabic_datetime, format_arabic_date, format_image_count,
     _DIVIDER, _THIN, _NONE,
 )
-from modules.general_services.constants import HOSPITAL_MAP, STAFF_MAP
+from modules.general_services.constants import ESCORT_ENTITY_MAP, STAFF_MAP
 
 GS  = "gs"
 GSD = "gsd"
@@ -114,9 +114,11 @@ def build_images_prompt(session: DepartureSession) -> tuple[str, InlineKeyboardM
 
 def build_hospital_prompt() -> tuple[str, InlineKeyboardMarkup]:
     lines = [_DIVIDER, "🏥  **اختر الجهة الموصلة**", "", "اختر الجهة الموصلة:"]
+    # ✅ نفس قائمة "الجهة الموصلة" المستخدمة في الواصلين — كانت هنا قائمة
+    # عربية منفصلة (مانيبال/استر/كيمس...) لنفس المستشفيات بتسميات مختلفة.
     rows = [
         [InlineKeyboardButton(label, callback_data=f"{GSD}:hospital_{hid}")]
-        for hid, label in HOSPITAL_MAP.items()
+        for hid, label in ESCORT_ENTITY_MAP.items()
     ]
     rows.append([
         InlineKeyboardButton("⬅️ رجوع", callback_data=f"{GSD}:back_to_images"),

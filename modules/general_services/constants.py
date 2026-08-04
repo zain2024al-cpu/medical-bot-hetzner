@@ -2,17 +2,6 @@
 
 from shared.multiselect import Option
 
-# ── Hospital map: ID → Arabic label ──────────────────────────────────────────
-HOSPITAL_MAP: dict[str, str] = {
-    "h_manipal":  "مانيبال",
-    "h_aster":    "استر",
-    "h_fortis":   "فورتيز",
-    "h_kims":     "كيمس",
-    "h_apollo":   "ابولو",
-    "h_sparsh":   "سبارش",
-    "h_sakra":    "ساكرا",
-}
-
 # ── Staff (specialist) map: ID → Arabic label ─────────────────────────────────
 STAFF_MAP: dict[str, str] = {
     "sp_ridha": "رضاء",
@@ -20,12 +9,11 @@ STAFF_MAP: dict[str, str] = {
 }
 
 # ── Escort entity ("الجهة الموصلة") options ──────────────────────────────────
-# الجهة التي أوصلت المريض/المرافق عند الوصول. كانت تُدخَل نصاً حراً، فأصبحت
-# أزراراً جاهزة لتوحيد التسميات (نفس نمط STAFF_MAP/HOSPITAL_MAP أعلاه).
+# الجهة التي أوصلت المريض/المرافق. تُستخدَم في **الواصلين والمغادرين معاً**
+# (مصدر واحد لكليهما) بعد حذف HOSPITAL_MAP العربية القديمة التي كانت خاصة
+# بالمغادرين — كان لكل شاشة قائمة مستقلة بتسميات مختلفة لنفس المستشفيات.
 #
-# ⚠️ القيم أدناه **مبدئية مؤقتة** — المستخدم سيزوّدنا بالقائمة الحقيقية.
-# عند وصولها: عدّل هذا الثابت وحده لا غير، لا يوجد أي مكان آخر يسرد الجهات.
-# خيار "أخرى" يُبقي مسار الكتابة اليدوية الأصلي عاملاً لأي جهة خارج القائمة.
+# خيار "أخرى" يُبقي مسار الكتابة اليدوية عاملاً لأي جهة خارج القائمة.
 ESCORT_ENTITY_MAP: dict[str, str] = {
     "ee_manipal": "Manipal Hospital",
     "ee_aster":   "Aster Hospital",
@@ -33,6 +21,7 @@ ESCORT_ENTITY_MAP: dict[str, str] = {
     "ee_sakra":   "Sakra Hospital",
     "ee_sparsh":  "Sparsh Hospital",
     "ee_apollo":  "Apollo Hospital",
+    "ee_kims":    "Kims Hospital",
 }
 
 # مُعرّف خيار "أخرى" — يفتح شاشة الكتابة اليدوية بدل الحفظ المباشر.

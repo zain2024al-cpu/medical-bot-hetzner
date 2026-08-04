@@ -19,7 +19,7 @@ from shared.multiselect import Option
 from shared.uploads import collector as uploads
 from shared.result_router import register as _register_route
 from modules.general_services.views import parse_date_input, build_gs_menu
-from modules.general_services.constants import HOSPITAL_MAP, STAFF_MAP
+from modules.general_services.constants import ESCORT_ENTITY_MAP, STAFF_MAP
 from modules.general_services.arrivals.repository import (
     get_active_arrivals, expand_patient_ids_to_names, mark_patients_departed,
 )
@@ -287,7 +287,7 @@ async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     # ── Hospital ──────────────────────────────────────────────────────────────
     if action.startswith("hospital_"):
         hid = action[len("hospital_"):]
-        label = HOSPITAL_MAP.get(hid, "")
+        label = ESCORT_ENTITY_MAP.get(hid, "")
         if not label:
             return
         session = DepartureSession.load(context.user_data)
