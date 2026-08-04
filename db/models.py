@@ -784,6 +784,10 @@ class ResidencyProfile(Base):
     residency_number         = Column(String(100), default="")
     issue_date               = Column(String(50),  default="")   # ISO date string YYYY-MM-DD
     expiry_date              = Column(String(50),  default="")   # ISO date string YYYY-MM-DD
+    # ✅ تاريخ انتهاء الجواز — يُنسخ من الوصول ويُنبَّه عنه قبل 6 أشهر.
+    # كان يُجمع في الواصلين لكنه يتوقف هناك (لا عمود له هنا إطلاقاً)، فلم
+    # يكن ممكناً التنبيه عن جواز قارب على الانتهاء. ISO YYYY-MM-DD مثل البقية.
+    passport_expiry          = Column(String(50),  default="")
     # Latest known Telegram file_ids for each document
     passport_file_id         = Column(String(255), default="")
     visa_file_id             = Column(String(255), default="")
@@ -810,6 +814,8 @@ class ResidencyCompanion(Base):
     residency_number         = Column(String(100), default="")
     issue_date               = Column(String(50),  default="")
     expiry_date              = Column(String(50),  default="")
+    # ✅ نفس سبب العمود على ResidencyProfile — المرافق له جواز ينتهي أيضاً.
+    passport_expiry          = Column(String(50),  default="")
     passport_file_id         = Column(String(255), default="")
     visa_file_id             = Column(String(255), default="")
     latest_residency_file_id = Column(String(255), default="")

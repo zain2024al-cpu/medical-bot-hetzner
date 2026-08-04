@@ -202,6 +202,10 @@ class DatabaseMaintenance:
                 # ✅ ربط المرافق بمريضه — لم يكن موجوداً إطلاقاً رغم أن الأدمن
                 # يُدخل المريض ومرافقيه في تدفق واحد.
                 _migrate_column(conn, "patients", "companion_of_id", "INTEGER")
+                # ✅ تاريخ انتهاء الجواز في الإقامات — لم يكن له عمود إطلاقاً
+                # رغم جمعه في الواصلين، فتعذّر التنبيه قبل انتهائه بـ6 أشهر.
+                _migrate_column(conn, "res_profiles", "passport_expiry", "VARCHAR(50)")
+                _migrate_column(conn, "res_companions", "passport_expiry", "VARCHAR(50)")
                 logger.info("🔎 Migration check finished.")
 
                 if check == "ok":

@@ -5,6 +5,7 @@
 from __future__ import annotations
 import logging
 from dataclasses import dataclass
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -183,6 +184,28 @@ def save_manual_batch(
     return count
 
 
+def _to_iso_date(value: str) -> str:
+    """
+    يوحّد صيغة التاريخ إلى ISO (YYYY-MM-DD) — الصيغة التي تتوقعها كل
+    استعلامات الإقامات.
+
+    ⚠️ ضروري: تدفق الواصلين يحفظ تاريخ انتهاء **الجواز** بصيغة DD/MM/YYYY
+    بينما يحفظ تاريخ انتهاء **الإقامة** بصيغة ISO. نسخ الجواز كما هو كان
+    سيجعله غير قابل للتحليل في get_passport_expiring_soon (تستخدم %Y-%m-%d
+    الصارمة) فلا يظهر أي تنبيه إطلاقاً.
+    """
+    if not value:
+        return ""
+    raw = str(value).strip()[:10]
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"):
+        try:
+            return datetime.strptime(raw, fmt).date().isoformat()
+        except Exception:
+            continue
+    logger.warning(f"[residency.profiles] unparsable date {value!r} — stored empty")
+    return ""
+
+
 def create_profiles_from_arrival_batch(
     batch_id:  int,
     patients:  list[dict],
@@ -215,7 +238,9 @@ def create_profiles_from_arrival_batch(
                     source=                   "arrivals",
                     name=                     ap.name or "—",
                     status=                   "active",
-                    expiry_date=              ap.residence_expiry or "",
+                    expiry_date=              _to_iso_date(ap.residence_expiry),
+                    # ✅ ينساب من الوصول الآن — أساس تنبيه الجواز قبل 6 أشهر
+                    passport_expiry=          _to_iso_date(ap.passport_expiry),
                     passport_file_id=         ap.passport_file_id  or "",
                     visa_file_id=             ap.visa_file_id       or "",
                     latest_residency_file_id= ap.residence_file_id  or "",
@@ -238,7 +263,8 @@ def create_profiles_from_arrival_batch(
                         arrival_companion_id=    ac.id,
                         name=                    ac.name or "—",
                         status=                  "active",
-                        expiry_date=             ac.residence_expiry   or "",
+                        expiry_date=             _to_iso_date(ac.residence_expiry),
+                        passport_expiry=         _to_iso_date(ac.passport_expiry),
                         passport_file_id=        ac.passport_file_id   or "",
                         visa_file_id=            ac.visa_file_id        or "",
                         latest_residency_file_id=ac.residence_file_id  or "",
@@ -250,7 +276,7 @@ def create_profiles_from_arrival_batch(
                     action_type=  "profile_created",
                     action_label= "إنشاء تلقائي من الوصول",
                     new_status=   "active",
-                    new_expiry_date= ap.residence_expiry or "",
+                    new_expiry_date= _to_iso_date(ap.residence_expiry),
                     performed_by= created_by,
                 )
                 db.add(update)

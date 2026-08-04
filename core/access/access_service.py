@@ -121,6 +121,34 @@ def user_has_module(tg_user_id: int, module_key: str) -> bool:
     return module_key in get_user_modules(tg_user_id)
 
 
+def list_users_with_module(module_key: str) -> list[int]:
+    """
+    كل المستخدمين الذين لديهم وصول **نشط** لوحدة معيّنة.
+
+    عكس user_has_module: يُجيب "من يملك هذه الوحدة؟" بدل "هل يملك هذا
+    المستخدم الوحدة؟" — تحتاجه التنبيهات المجدولة لتعرف لمن تُرسل بلا
+    المرور على كل مستخدمي البوت واحداً واحداً.
+    """
+    try:
+        from db.session import SessionLocal
+        from db.models import UserModuleAccess
+
+        with SessionLocal() as session:
+            rows = (
+                session.query(UserModuleAccess.tg_user_id)
+                .filter(
+                    UserModuleAccess.module_key == module_key,
+                    UserModuleAccess.is_active.is_(True),
+                )
+                .distinct()
+                .all()
+            )
+            return [r[0] for r in rows if r[0]]
+    except Exception as exc:
+        logger.error(f"[access] list_users_with_module({module_key}) failed: {exc}", exc_info=True)
+        return []
+
+
 def grant_module(tg_user_id: int, module_key: str, granted_by: int | None = None) -> bool:
     """
     Grant a module to a user.

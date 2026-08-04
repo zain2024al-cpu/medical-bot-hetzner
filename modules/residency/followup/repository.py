@@ -6,7 +6,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
-from modules.residency.constants import EXPIRING_SOON_DAYS
+from modules.residency.constants import EXPIRING_SOON_DAYS, PASSPORT_EXPIRING_SOON_DAYS
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +107,82 @@ def get_expiring_soon() -> list[ExpiringEntry]:
 
     results.sort(key=lambda e: e.days_remaining)
     logger.debug(f"[residency.followup] get_expiring_soon → {len(results)} entries")
+    return results
+
+
+def get_passport_expiring_soon() -> list[ExpiringEntry]:
+    """
+    Return profiles AND companions whose **passport** expires within
+    PASSPORT_EXPIRING_SOON_DAYS (6 months). Ordered by days_remaining ASC.
+
+    ✅ يعيد استخدام ExpiringEntry نفسه، لكن `expiry_date` هنا يحمل تاريخ
+    انتهاء **الجواز** لا الإقامة (نفس بنية العرض، مصدر مختلف).
+
+    ملاحظة: يتجاهل من انتهى جوازه فعلاً (delta < 0) — تلك حالة متأخرة تحتاج
+    إجراءً مختلفاً لا تنبيهاً مسبقاً، وإبقاؤها كان سيُغرق التنبيه اليومي
+    بأسماء قديمة إلى الأبد. تنبيه الإقامة يُبقيها عمداً (سلوكه الأصلي).
+    """
+    from db.session import get_db
+    from db.models import ResidencyProfile, ResidencyCompanion
+
+    today = datetime.utcnow().date()
+    results: list[ExpiringEntry] = []
+    trackable_statuses = ("active", "expiring", "renewal_submitted", "issued")
+
+    def _delta(raw: str) -> int | None:
+        try:
+            return (datetime.strptime(raw[:10], "%Y-%m-%d").date() - today).days
+        except Exception:
+            return None
+
+    with get_db() as db:
+        for p in (
+            db.query(ResidencyProfile)
+            .filter(
+                ResidencyProfile.status.in_(trackable_statuses),
+                ResidencyProfile.passport_expiry != "",
+                ResidencyProfile.passport_expiry.isnot(None),
+            )
+            .all()
+        ):
+            d = _delta(p.passport_expiry)
+            if d is not None and 0 <= d <= PASSPORT_EXPIRING_SOON_DAYS:
+                results.append(ExpiringEntry(
+                    profile_id=       p.id,
+                    name=             p.name or "—",
+                    status=           p.status or "active",
+                    expiry_date=      p.passport_expiry,
+                    days_remaining=   d,
+                    residency_number= p.residency_number or "",
+                ))
+
+        for c in (
+            db.query(ResidencyCompanion)
+            .filter(
+                ResidencyCompanion.status.in_(trackable_statuses),
+                ResidencyCompanion.passport_expiry != "",
+                ResidencyCompanion.passport_expiry.isnot(None),
+            )
+            .all()
+        ):
+            d = _delta(c.passport_expiry)
+            if d is None or not (0 <= d <= PASSPORT_EXPIRING_SOON_DAYS):
+                continue
+            profile = db.query(ResidencyProfile).filter(ResidencyProfile.id == c.profile_id).first()
+            results.append(ExpiringEntry(
+                profile_id=       c.profile_id,
+                name=             profile.name if profile else "—",
+                status=           c.status or "active",
+                expiry_date=      c.passport_expiry,
+                days_remaining=   d,
+                is_companion=     True,
+                companion_id=     c.id,
+                companion_name=   c.name or "—",
+                residency_number= c.residency_number or "",
+            ))
+
+    results.sort(key=lambda e: e.days_remaining)
+    logger.debug(f"[residency.followup] get_passport_expiring_soon → {len(results)} entries")
     return results
 
 

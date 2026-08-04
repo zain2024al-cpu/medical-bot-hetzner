@@ -265,6 +265,17 @@ async def main():
             name="daily_maintenance"
         )
         logger.info(f"🔧 Scheduled daily maintenance at 03:00 ({TIMEZONE})")
+
+        # 🔔 3. تنبيه انتهاء الإقامات/الجوازات (الساعة 9:00 صباحاً)
+        # صباحاً عمداً — تنبيه إجرائي يحتاج وقت عمل للتصرّف فيه، بخلاف
+        # تنبيه المواعيد المسائي الذي يخص اليوم التالي.
+        from services.residency_alerts_service import send_daily_residency_alerts
+        app.job_queue.run_daily(
+            lambda context: send_daily_residency_alerts(context.application),
+            time=dt_time(hour=9, minute=0, tzinfo=tz),
+            name="daily_residency_alerts"
+        )
+        logger.info(f"🔔 Scheduled daily residency/passport alerts at 09:00 ({TIMEZONE})")
     else:
         logger.warning("⚠️ JobQueue is not available! Scheduled tasks will not run.")
     

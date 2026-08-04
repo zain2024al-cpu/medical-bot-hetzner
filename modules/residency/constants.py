@@ -26,6 +26,7 @@ RESIDENCY_STATUS_ICONS: dict[str, str] = {
 
 # ── Thresholds ────────────────────────────────────────────────────────────────
 
-EXPIRING_SOON_DAYS = 30       # Show in المتابعة if expiry within N days
+EXPIRING_SOON_DAYS = 30       # الإقامة: تنبيه قبل الانتهاء بشهر
+PASSPORT_EXPIRING_SOON_DAYS = 180   # الجواز: تنبيه قبل الانتهاء بـ6 أشهر
 PROFILES_PAGE_SIZE = 8        # Profiles per page in archive list
 HISTORY_DISPLAY_LIMIT = 5     # Timeline entries shown in profile detail view

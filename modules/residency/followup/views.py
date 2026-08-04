@@ -13,6 +13,30 @@ RNF = "rnf"
 
 # ── المتابعة (expiring soon) ──────────────────────────────────────────────────
 
+def _passport_section_lines() -> list[str]:
+    """
+    قسم إعلامي بالجوازات القاربة على الانتهاء (6 أشهر).
+
+    ✅ بلا أزرار إجراء عمداً: تجديد الجواز ليس من إجراءات هذا البوت
+    (بخلاف تجديد الإقامة الذي له مسار كامل) — الغرض إظهاره للمتابعة فقط،
+    ونفس القائمة تصل يومياً عبر التنبيه التلقائي.
+    """
+    from modules.residency.followup.repository import get_passport_expiring_soon
+    from modules.residency.constants import PASSPORT_EXPIRING_SOON_DAYS
+    from modules.residency.views import format_expiry_date
+
+    entries = get_passport_expiring_soon()
+    if not entries:
+        return []
+
+    months = PASSPORT_EXPIRING_SOON_DAYS // 30
+    out = ["", _THIN, "", f"🛂 **جوازات تنتهي خلال {months} أشهر** ({len(entries)})"]
+    for e in entries:
+        who = f"{e.name} › {e.companion_name}" if e.is_companion else e.name
+        out.append(f"  • {who} — {format_expiry_date(e.expiry_date)} ({e.days_remaining} يوم)")
+    return out
+
+
 def build_followup_list(entries) -> tuple[str, InlineKeyboardMarkup]:
     lines = [
         _DIVIDER,
@@ -20,8 +44,11 @@ def build_followup_list(entries) -> tuple[str, InlineKeyboardMarkup]:
         "",
     ]
 
+    passport_lines = _passport_section_lines()
+
     if not entries:
         lines += ["✅ لا توجد إقامات منتهية أو قريبة الانتهاء خلال الـ 30 يوم القادمة."]
+        lines += passport_lines
         kb = InlineKeyboardMarkup([[
             InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:main"),
         ]])
@@ -66,6 +93,8 @@ def build_followup_list(entries) -> tuple[str, InlineKeyboardMarkup]:
             callback_data=f"rna:view_{e.profile_id}",
         )
         rows.append([btn_submit, btn_issue, btn_view])
+
+    lines += passport_lines
 
     rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:main")])
     return "\n".join(lines), InlineKeyboardMarkup(rows)
