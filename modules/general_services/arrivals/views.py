@@ -766,18 +766,18 @@ def build_c_residence_address_prompt(session: ArrivalSession) -> tuple[str, Inli
 
 def _individual_detail_lines(entity: dict, *, is_companion: bool) -> list[str]:
     """سطور العرض المشتركة لمريض أو مرافق في شاشة المراجعة/التقرير المنشور."""
-    vis_exp   = entity.get("visa_expiry") or entity.get("residence_expiry") or "—"
-    p_pass    = "✅" if entity.get("passport_file_id")    else "⬜"
-    p_visa    = "✅" if entity.get("visa_file_id")         else "⬜"
-    p_stamp   = "✅" if entity.get("entry_stamp_file_id")  else "⬜"
-    p_tickets = "✅" if entity.get("tickets_file_id")      else "⬜"
-    escort    = entity.get("escort_entity") or "—"
-    lines = [
+    vis_exp   = entity.get("visa_expiry") or "—"
+    p_pass    = "✅" if entity.get("passport_file_id") else "⬜"
+    p_visa    = "✅" if entity.get("visa_file_id")      else "⬜"
+    p_tickets = "✅" if entity.get("tickets_file_id")   else "⬜"
+    # ✅ لا سطر "الجهة الموصلة" هنا: المريض تعرضها build_review ضمن كتلة
+    # الختام (كانت تظهر مرتين)، والمرافق لم يعد يُسأل عنها أصلاً — تُسأل
+    # مرة واحدة للمريض ومرافقيه معاً.
+    return [
         f"   📋 تأشيرة: {vis_exp}",
-        f"   📎 جواز {p_pass}   تأشيرة {p_visa}   ختم {p_stamp}   تذاكر {p_tickets}",
-        f"   🚐 الجهة الموصلة: {escort}",
+        # ✅ "ختم" لم يعد عنصراً مستقلاً — الفيزا وختم الدخول رفعة واحدة.
+        f"   📎 جواز {p_pass}   تأشيرة+ختم {p_visa}   تذاكر {p_tickets}",
     ]
-    return lines
 
 
 def build_review(session: ArrivalSession) -> tuple[str, InlineKeyboardMarkup]:
