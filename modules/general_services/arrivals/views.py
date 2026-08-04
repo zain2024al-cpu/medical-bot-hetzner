@@ -388,8 +388,9 @@ def build_p_escort_entity_prompt(session: ArrivalSession) -> tuple[str, InlineKe
                              callback_data=f"{GSA}:p_escort_{ESCORT_ENTITY_OTHER_ID}")
     ])
     rows.append([
+        # ✅ الخدمات تسبق الجهة الموصلة الآن داخل كتلة الختام
         InlineKeyboardButton("⏭️ تخطي", callback_data=f"{GSA}:skip_p_escort_entity"),
-        InlineKeyboardButton("⬅️ رجوع", callback_data=f"{GSA}:back_p_indiv_notes"),
+        InlineKeyboardButton("⬅️ رجوع", callback_data=f"{GSA}:back_p_services"),
         InlineKeyboardButton("❌ إلغاء", callback_data=f"{GS}:arrivals"),
     ])
     return "\n".join(lines), InlineKeyboardMarkup(rows)
@@ -494,7 +495,9 @@ def build_p_residence_address_prompt(session: ArrivalSession) -> tuple[str, Inli
     ]
     kb = InlineKeyboardMarkup([[
         InlineKeyboardButton("⏭️ تخطي", callback_data=f"{GSA}:skip_p_residence_address"),
-        InlineKeyboardButton("⬅️ رجوع", callback_data=f"{GSA}:back_p_escort_entity"),
+        # ✅ عنوان السكن يتبع تاريخ انتهاء الإقامة الآن (كلاهما من حقول
+        # المريض نفسه)، والجهة الموصلة انتقلت لكتلة الختام.
+        InlineKeyboardButton("⬅️ رجوع", callback_data=f"{GSA}:back_p_residence_expiry"),
         InlineKeyboardButton("❌ إلغاء", callback_data=f"{GS}:arrivals"),
     ]])
     return "\n".join(lines), kb
@@ -756,7 +759,9 @@ def build_c_residence_address_prompt(session: ArrivalSession) -> tuple[str, Inli
     ]
     kb = InlineKeyboardMarkup([[
         InlineKeyboardButton("⏭️ تخطي", callback_data=f"{GSA}:skip_c_residence_address"),
-        InlineKeyboardButton("⬅️ رجوع", callback_data=f"{GSA}:back_c_escort_entity"),
+        # ✅ عنوان السكن آخر حقل للمرافق الآن (لا خدمات/جهة موصلة له —
+        # تُسألان مرة واحدة للمريض ومرافقيه في كتلة الختام).
+        InlineKeyboardButton("⬅️ رجوع", callback_data=f"{GSA}:back_c_residence"),
         InlineKeyboardButton("❌ إلغاء", callback_data=f"{GS}:arrivals"),
     ]])
     return "\n".join(lines), kb
