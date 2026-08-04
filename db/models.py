@@ -82,6 +82,12 @@ class Patient(Base):
     #   "pharmacy_only"   → يظهر فقط داخل 💊 صرف الأدوية و🩺 المستلزمات الطبية.
     # كل المرضى الحاليين NULL تلقائياً = general، فلا يتغيّر أي سلوك قائم.
     patient_type = Column(String(30), nullable=True, index=True)
+    # ✅ ربط المرافق بمريضه. كان النوعان "companion"/"companion_parent" يُسجَّلان
+    # بلا أي رابط بينهما إطلاقاً — أي أن "مرافقي هذا المريض" معلومة لم تكن
+    # موجودة في القاعدة رغم أن الأدمن يُدخلهم معاً في تدفق واحد. بدونها كان
+    # تدفق الواصلين مضطراً لسؤال "هل يوجد مرافق؟" ثم اختيار كل مرافق يدوياً
+    # من قائمة كل المرافقين في النظام.
+    companion_of_id = Column(Integer, nullable=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow, index=True, nullable=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
 

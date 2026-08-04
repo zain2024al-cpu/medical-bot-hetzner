@@ -199,6 +199,9 @@ class DatabaseMaintenance:
                 _migrate_column(conn, "gs_arrival_patients", "specialist_id", "VARCHAR(50)")
                 _migrate_column(conn, "gs_arrival_patients", "specialist_label", "VARCHAR(255)")
                 _migrate_column(conn, "gs_arrival_companions", "visa_expiry", "VARCHAR(50)")
+                # ✅ ربط المرافق بمريضه — لم يكن موجوداً إطلاقاً رغم أن الأدمن
+                # يُدخل المريض ومرافقيه في تدفق واحد.
+                _migrate_column(conn, "patients", "companion_of_id", "INTEGER")
                 logger.info("🔎 Migration check finished.")
 
                 if check == "ok":

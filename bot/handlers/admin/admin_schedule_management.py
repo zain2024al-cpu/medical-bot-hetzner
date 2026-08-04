@@ -973,7 +973,14 @@ async def handle_companion_name_input(update: Update, context: ContextTypes.DEFA
         from services.patients_service import add_patient
         # ✅ أسماء المرافقين لا تُفحص للتكرار عمداً — قد يتكرر نفس الاسم
         # لمرافقين مختلفين لمرضى مختلفين، وهذا مقبول (راجع الخطة المعتمدة).
-        add_patient(name, patient_type="companion")
+        # ✅ الربط بالمريض: بدونه كانت معلومة "مرافقو هذا المريض" غير موجودة
+        # في القاعدة إطلاقاً رغم إدخالهما معاً هنا — فيضطر تدفق الواصلين
+        # لسؤال "هل يوجد مرافق؟" ثم اختيار كل مرافق يدوياً من قائمة الجميع.
+        add_patient(
+            name,
+            patient_type="companion",
+            companion_of_id=context.user_data.get("new_patient_id"),
+        )
     except Exception as e:
         logger.error(f"Error adding companion: {e}")
         await update.message.reply_text(

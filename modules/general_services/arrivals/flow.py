@@ -408,12 +408,33 @@ async def _advance_after_p_core_done(update, context, session):
     ✅ الملاحظات/الجهة الموصلة/المختص **لم تعد** هنا — انتقلت لكتلة الختام
     التي تلي كل المرافقين (مريض ومرافقوه = وحدة واحدة، بطلب المستخدم).
     """
-    if session.current_patient.get("has_companion"):
-        session.step = STEP_C_NAME
-        session.save(context.user_data)
-        await _show_c_name(update, context, session)
-    else:
+    await _start_next_companion(update, context, session)
+
+
+async def _start_next_companion(update, context, session):
+    """
+    يبدأ إدخال بيانات المرافق التالي من قائمة مرافقي المريض المعروفة مسبقاً
+    من السجل. إن انتهت القائمة (أو كانت فارغة) ⇒ كتلة الختام مباشرة.
+
+    ✅ لا سؤال "هل يوجد مرافق؟" ولا "هل يوجد مرافق آخر؟" — الأدمن أدخل
+    المريض ومرافقيه معاً، فالبوت يعرفهم ويكمل بياناتهم تلقائياً بالاسم.
+    """
+    queue = session.current_patient.get("companion_queue") or []
+    done  = len(session.current_patient.get("companions", []))
+
+    if done >= len(queue):
         await _advance_to_patient_closing(update, context, session)
+        return
+
+    nxt = queue[done]
+    session.current_companion = {"name": nxt.get("name", "")}
+    session.step = STEP_C_ARRIVAL_DATE
+    session.save(context.user_data)
+    logger.info(
+        f"[arrivals] companion {done + 1}/{len(queue)} = {nxt.get('name')!r}"
+        f" → STEP_C_ARRIVAL_DATE (auto, from registry)"
+    )
+    await _show_c_arrival_date(update, context, session)
 
 
 async def _advance_to_patient_closing(update, context, session):
@@ -433,9 +454,9 @@ async def _advance_after_companion_done(update, context, session):
     """
     session.add_companion_to_current(session.current_companion)
     session.current_companion = {}
-    session.step = STEP_C_MORE
     session.save(context.user_data)
-    await _show_c_more(update, context, session)
+    # ✅ المرافق التالي (إن بقي) يبدأ تلقائياً بلا سؤال
+    await _start_next_companion(update, context, session)
 
 
 async def _finish_patient_and_advance(update, context, session):
@@ -481,10 +502,26 @@ async def _on_p_name_selected(result, update: Update, context: ContextTypes.DEFA
         return
 
     session.current_patient["name"] = name
+
+    # ✅ مرافقو هذا المريض معروفون مسبقاً من إدخال الأدمن ("مريض جديد مع
+    # مرافقين") — نجلبهم هنا بدل سؤال المستخدم "هل يوجد مرافق؟" ثم اختيار
+    # كل مرافق يدوياً من قائمة كل المرافقين في النظام. أسماؤهم تُملأ تلقائياً
+    # وتُطلب بياناتهم واحداً تلو الآخر بعد إتمام المريض.
+    try:
+        from services.patients_service import get_companions_for_patient
+        _pid = getattr(patient, "id", None)
+        queue = get_companions_for_patient(int(_pid)) if _pid else []
+    except Exception:
+        logger.exception("[arrivals] failed to load registry companions — continuing without")
+        queue = []
+
+    session.current_patient["companion_queue"] = queue
+    session.current_patient["has_companion"] = bool(queue)
     session.step = STEP_P_ARRIVAL_DATE
     session.save(context.user_data)
     logger.info(
-        f"[arrivals] p_name selected={name!r} → STEP_P_ARRIVAL_DATE"
+        f"[arrivals] p_name selected={name!r} companions={[c['name'] for c in queue]}"
+        f" → STEP_P_ARRIVAL_DATE"
         f"  patient_index={session.patient_index}/{session.patient_count}"
     )
     await _show_p_arrival_date(update, context, session)
@@ -846,12 +883,14 @@ async def _dispatch_callback_inner(
             await _show_p_visa_expiry(update, context, session)
         elif session.step == STEP_P_VISA_EXPIRY:
             session.current_patient["visa_expiry"] = dt.strftime("%d/%m/%Y")
-            session.step = STEP_P_HAS_COMPANION
+            # ✅ لا سؤال "هل يوجد مرافق؟" — معروف مسبقاً من السجل عند اختيار
+            # الاسم (companion_queue). ننتقل مباشرة لرفع الوثائق.
+            session.step = STEP_P_PASSPORT
             session.save(context.user_data)
             logger.info(
-                f"[arrivals.cb] cal_pick p_visa_expiry={dt.date()} → STEP_P_HAS_COMPANION  user={uid}"
+                f"[arrivals.cb] cal_pick p_visa_expiry={dt.date()} → STEP_P_PASSPORT  user={uid}"
             )
-            await _show_p_has_companion(update, context, session)
+            await _show_p_passport(update, context, session)
         elif session.step == STEP_P_RESIDENCE_EXPIRY:
             session.current_patient["residence_expiry"] = dt.strftime("%Y-%m-%d")
             session.save(context.user_data)

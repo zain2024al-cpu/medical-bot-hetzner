@@ -142,11 +142,17 @@ def get_patient_by_id(patient_id: int) -> Optional[Dict]:
     return None
 
 
-def add_patient(name: str, patient_type: Optional[str] = None) -> Optional[int]:
+def add_patient(
+    name: str,
+    patient_type: Optional[str] = None,
+    companion_of_id: Optional[int] = None,
+) -> Optional[int]:
     """
     إضافة مريض جديد
     patient_type: None/"general" = يظهر للجميع (الافتراضي)،
                   "pharmacy_only" = يظهر فقط في صرف الأدوية والمستلزمات الطبية.
+    companion_of_id: معرّف المريض الذي يرافقه (للنوع "companion" فقط) —
+                  يسمح لاحقاً بجلب "مرافقي هذا المريض" مباشرة بدل السؤال عنهم.
     إن كان الاسم موجوداً مسبقاً يُعاد id الموجود دون تغيير نوعه.
     Returns patient id or None
     """
@@ -161,16 +167,48 @@ def add_patient(name: str, patient_type: Optional[str] = None) -> Optional[int]:
                 logger.info(f"Patient already exists: {name}")
                 return existing.id
 
-            new_patient = Patient(full_name=name, patient_type=patient_type)
+            new_patient = Patient(
+                full_name=name,
+                patient_type=patient_type,
+                companion_of_id=companion_of_id,
+            )
             session.add(new_patient)
             session.commit()
 
-            logger.info(f"Added new patient: {name}  type={patient_type or 'general'}")
+            logger.info(
+                f"Added new patient: {name}  type={patient_type or 'general'}"
+                f"  companion_of={companion_of_id}"
+            )
             return new_patient.id
 
     except Exception as e:
         logger.error(f"Error adding patient: {e}")
         return None
+
+
+def get_companions_for_patient(patient_id: int) -> List[Dict]:
+    """
+    مرافقو مريض معيّن — يُقرأون من الرابط الذي يُسجّله الأدمن عند إضافة
+    "مريض جديد مع مرافقين". يُستخدم في تدفق الواصلين ليُكمل بيانات المرافقين
+    تلقائياً بلا سؤال المستخدم عن وجودهم ولا اختيارهم يدوياً.
+
+    Returns: [{"id": int, "name": str}, ...]  (فارغة إن لم يكن له مرافقون)
+    """
+    try:
+        from db.session import SessionLocal
+        from db.models import Patient
+
+        with SessionLocal() as session:
+            rows = (
+                session.query(Patient)
+                .filter(Patient.companion_of_id == patient_id)
+                .order_by(Patient.id)
+                .all()
+            )
+            return [{"id": r.id, "name": r.full_name or ""} for r in rows]
+    except Exception as e:
+        logger.error(f"Error fetching companions for patient {patient_id}: {e}")
+        return []
 
 
 def search_patients(query: str, limit: int = 20) -> List[Dict]:

@@ -27,11 +27,12 @@ STAFF_MAP: dict[str, str] = {
 # عند وصولها: عدّل هذا الثابت وحده لا غير، لا يوجد أي مكان آخر يسرد الجهات.
 # خيار "أخرى" يُبقي مسار الكتابة اليدوية الأصلي عاملاً لأي جهة خارج القائمة.
 ESCORT_ENTITY_MAP: dict[str, str] = {
-    "ee_ministry": "الملحقية الطبية",
-    "ee_hospital": "المستشفى",
-    "ee_office":   "المكتب",
-    "ee_relative": "أحد الأقارب",
-    "ee_self":     "بمفرده",
+    "ee_manipal": "Manipal Hospital",
+    "ee_aster":   "Aster Hospital",
+    "ee_fortis":  "Fortis Hospital",
+    "ee_sakra":   "Sakra Hospital",
+    "ee_sparsh":  "Sparsh Hospital",
+    "ee_apollo":  "Apollo Hospital",
 }
 
 # مُعرّف خيار "أخرى" — يفتح شاشة الكتابة اليدوية بدل الحفظ المباشر.
