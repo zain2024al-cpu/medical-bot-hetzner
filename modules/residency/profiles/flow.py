@@ -251,6 +251,41 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
         await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
         return
 
+    # ── Archive export (Excel) ────────────────────────────────────────────────
+    if action == "export":
+        await query.answer("⏳ جارٍ تجهيز الملف…")
+        try:
+            from services.residency_archive_excel import build_residency_archive_export
+            buf, count = build_residency_archive_export()
+        except Exception:
+            logger.exception(f"[res.profiles.cb] archive export FAILED  user={uid}")
+            await query.answer("❌ تعذّر تجهيز الملف", show_alert=True)
+            return
+
+        if buf is None:
+            await query.answer("لا يوجد مرضى في الأرشيف بعد.", show_alert=True)
+            return
+
+        from datetime import date as _date
+        filename = f"residency_archive_{_date.today().strftime('%Y-%m-%d')}.xlsx"
+        try:
+            await query.message.reply_document(
+                document=buf,
+                filename=filename,
+                caption=(
+                    f"📁 **أرشيف الإقامات**\n"
+                    f"👥 {count} شخص (مرضى ومرافقون)\n"
+                    f"📅 {_date.today().strftime('%d/%m/%Y')}\n\n"
+                    f"🔴 منتهية  🟠 خلال 30 يوم  🟡 خلال 90 يوم"
+                ),
+                parse_mode="Markdown",
+            )
+            logger.info(f"[res.profiles.cb] archive exported  rows={count}  user={uid}")
+        except Exception:
+            logger.exception(f"[res.profiles.cb] failed to send archive file  user={uid}")
+            await query.answer("❌ تعذّر إرسال الملف", show_alert=True)
+        return
+
     # ── Profile view ──────────────────────────────────────────────────────────
     if action.startswith("view_"):
         profile_id = int(action[5:])
