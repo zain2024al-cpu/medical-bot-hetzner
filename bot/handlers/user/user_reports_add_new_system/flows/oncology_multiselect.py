@@ -26,7 +26,9 @@ from ..states import (
     CHEMO_CYCLES_TOTAL, TREATMENT_COMPLAINT,
 )
 from ..utils import _nav_buttons
-from services.treatment_plan_service import get_active_plan, advance_plan, create_plan, format_progress_text
+from services.treatment_plan_service import (
+    get_active_plan, advance_plan, create_plan, format_progress_text, unit_labels,
+)
 from .treatment_sessions import start_chemo_flow, start_immuno_flow, start_targeted_flow, _prompt_complaint
 from .radiation_therapy import start_radiation_therapy_flow
 
@@ -49,7 +51,7 @@ _SINGLE_START_FUNCS = {
 }
 
 _QUEUE_TOTAL_PROMPTS = {
-    "chemo":     "💉 **الكيماوي**\n\n📊 **كم عدد الجلسات الكلي؟**\n\nأدخل رقماً (مثال: 6):",
+    "chemo":     "💉 **الكيماوي**\n\n📊 **كم عدد الدورات الكلي؟**\n\nأدخل رقماً (مثال: 6):",
     "immuno":    "🧬 **المناعي**\n\n📊 **كم عدد الجلسات الكلي؟**\n\nأدخل رقماً (مثال: 12):",
     "targeted":  "🎯 **الموجّه**\n\n📊 **كم عدد الجلسات الكلي؟**\n\nأدخل رقماً (مثال: 8):",
     "radiation": "☢️ **الإشعاعي**\n\n📊 **كم عدد الجلسات الكلي؟**\n\nأدخل رقماً (مثال: 30):",
@@ -211,8 +213,9 @@ async def handle_oncology_queue_total(update: Update, context: ContextTypes.DEFA
 
     data = context.user_data.setdefault("report_tmp", {})
     data["_onc_pending_total"] = int(text)
+    _the = unit_labels(data.get("_onc_current_type"))[1]
     await update.message.reply_text(
-        "✅ تم الحفظ\n\n🔢 **رقم الجلسة الحالية؟**\n\n(إن كانت هذه أول جلسة أدخل 1)",
+        f"✅ تم الحفظ\n\n🔢 **رقم {_the} الحالية؟**\n\n(إن كانت هذه الأولى أدخل 1)",
         reply_markup=_nav_buttons(show_back=True),
         parse_mode="Markdown",
     )

@@ -48,6 +48,7 @@ from .shared import show_translator_selection
 from .new_consult import _render_followup_calendar
 from services.treatment_plan_service import (
     get_active_plan, create_plan, advance_plan, edit_plan, format_progress_text,
+    unit_labels,
 )
 
 logger = logging.getLogger(__name__)
@@ -84,9 +85,11 @@ async def _start_simple_session_flow(message, context, treatment_key: str):
         advanced = advance_plan(plan["id"])
         return await _show_plan_display(message, context, advanced)
 
+    # وحدة العدّ تُشتق من نوع العلاج: الكيماوي «دورة»، وغيره «جلسة».
+    _one, _the, plural = unit_labels(treatment_key)
     await message.reply_text(
         f"💉 **{TREATMENT_MEDICAL_ACTION[treatment_key]}**\n\n"
-        "📊 **كم عدد الجلسات الكلي؟**\n\n"
+        f"📊 **كم عدد ال{plural} الكلي؟**\n\n"
         "أدخل رقماً (مثال: 12):",
         reply_markup=_nav_buttons(show_back=True),
         parse_mode="Markdown",
@@ -287,9 +290,10 @@ async def _commit_chemo_plan(update, context, mode, total_cycles=None, sessions_
 async def handle_treatment_plan_setup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """يُستقبَل فيه رقم الجلسات الكلي — إما إنشاء أول مرة أو تعديل خطة قائمة."""
     text = update.message.text.strip()
+    _unit = unit_labels(context.user_data.get("report_tmp", {}).get("_treatment_key"))[2]
     if not text.isdigit() or int(text) <= 0:
         await update.message.reply_text(
-            "⚠️ يرجى إدخال رقم صحيح أكبر من صفر (عدد الجلسات الكلي):",
+            f"⚠️ يرجى إدخال رقم صحيح أكبر من صفر (عدد ال{_unit} الكلي):",
             reply_markup=_nav_buttons(show_back=True),
         )
         return TREATMENT_PLAN_SETUP
@@ -333,7 +337,9 @@ async def _show_plan_display(message, context, plan: dict):
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("✅ متابعة", callback_data="tp_display:continue"),
          InlineKeyboardButton("✏️ تعديل الخطة", callback_data="tp_display:edit")],
-        [InlineKeyboardButton("🔢 إدخال رقم الجلسة الحالية", callback_data="tp_display:manual")],
+        [InlineKeyboardButton(
+            f"🔢 إدخال رقم {unit_labels(data.get('_treatment_key'))[1]} الحالية",
+            callback_data="tp_display:manual")],
     ])
     await message.reply_text(f"{summary}", reply_markup=keyboard, parse_mode="Markdown")
     return TREATMENT_PLAN_DISPLAY
@@ -355,9 +361,10 @@ async def handle_treatment_plan_display_choice(update: Update, context: ContextT
         # ✅ إدخال يدوي لرقم الجلسة الحالية — لمرضى بدأوا الجلسات فعلياً قبل
         # إنشاء الخطة في هذا النظام، فيحتاج المترجم مطابقة العدّاد مباشرة
         # بدل الاعتماد فقط على "متابعة" (+1) أو "تعديل الخطة" (العدد الكلي).
+        _the = unit_labels(data.get("_treatment_key"))[1]
         await query.edit_message_text(
-            "🔢 **إدخال رقم الجلسة الحالية**\n\n"
-            "أدخل رقم الجلسة الحالية (مثال: 5):",
+            f"🔢 **إدخال رقم {_the} الحالية**\n\n"
+            f"أدخل رقم {_the} الحالية (مثال: 5):",
             parse_mode="Markdown",
         )
         return TREATMENT_PLAN_MANUAL_SESSION
@@ -372,7 +379,8 @@ async def handle_treatment_plan_display_choice(update: Update, context: ContextT
 
     if mode == "sessions":
         await query.edit_message_text(
-            "✏️ **تعديل الخطة**\n\n📊 **العدد الكلي الجديد للجلسات؟**",
+            f"✏️ **تعديل الخطة**\n\n"
+            f"📊 **العدد الكلي الجديد لل{unit_labels(treatment_key)[2]}؟**",
             parse_mode="Markdown",
         )
         return TREATMENT_PLAN_EDIT_VALUE

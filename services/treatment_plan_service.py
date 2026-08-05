@@ -190,6 +190,24 @@ def edit_plan(
         return d
 
 
+# ── وحدة العدّ لكل نوع علاج ────────────────────────────────────────────────────
+# الكيماوي يُعدّ طبياً بالدورات، وبقية الأنواع (المناعي/الموجّه/الإشعاعي)
+# بالجلسات. مصدر واحد للتسمية حتى لا تتناقض الشاشات: سؤال الإنشاء، وعرض
+# التقدّم، والتعديل، والإدخال اليدوي — كلها تقرأ من هنا لا من نص مكتوب فيها.
+# ⚠️ الجمع مخزَّن صراحةً ولا يُشتق بإلحاق "ات" على المفرد: «دورة» جمعها
+# «دورات» لا «دورةات»، و«جلسة» → «جلسات». الاشتقاق النصّي أنتج فعلاً
+# «الدورةات» في الشاشة قبل التصحيح.
+_UNIT_BY_KEY: dict[str, tuple[str, str, str]] = {
+    "chemo": ("دورة", "الدورة", "دورات"),
+}
+_UNIT_DEFAULT = ("جلسة", "الجلسة", "جلسات")
+
+
+def unit_labels(treatment_key: str | None) -> tuple[str, str, str]:
+    """(مفرد, مفرد معرَّف, جمع) — للكيماوي «دورة/الدورة/دورات»، وإلا «جلسة/الجلسة/جلسات»."""
+    return _UNIT_BY_KEY.get(treatment_key or "", _UNIT_DEFAULT)
+
+
 def format_progress_text(plan: dict) -> str:
     """نص عربي جاهز للعرض في الشاشة وفي التقرير — يُستخدَم أيضاً كلقطة
     ثابتة تُحفظ في Report.treatment_plan_summary."""
@@ -198,7 +216,8 @@ def format_progress_text(plan: dict) -> str:
     if plan["mode"] == "sessions":
         total = plan.get("total_sessions")
         cur = plan.get("current_session")
-        return f"📋 **الخطة العلاجية:** {total} جلسة\n📍 **الجلسة الحالية:** {cur} من {total}"
+        one, the, _pl = unit_labels(plan.get("treatment_key"))
+        return f"📋 **الخطة العلاجية:** {total} {one}\n📍 **{the} الحالية:** {cur} من {total}"
     # cycles_uniform / cycles_custom
     total_cycles = plan.get("total_cycles")
     cur_cycle = plan.get("current_cycle")
