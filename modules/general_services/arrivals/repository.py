@@ -19,7 +19,11 @@ class ActiveArrivalEntry:
     def display_label(self) -> str:
         if self.companion_count == 0:
             return self.patient_name
-        return f"{self.patient_name} (+ {self.companion_count} مرافق)"
+        # ✅ أسماء المرافقين ظاهرة بالكامل هنا وليست عدداً فقط — طلب
+        # المستخدم كانت شاشة اختيار المغادرين تعرض "أحمد (+ مرافق واحد)"
+        # فلا يعرف من هو المرافق قبل التأكيد.
+        names = "، ".join(self.companion_names)
+        return f"{self.patient_name} (+ {names})"
 
 
 def get_active_arrivals() -> list[ActiveArrivalEntry]:

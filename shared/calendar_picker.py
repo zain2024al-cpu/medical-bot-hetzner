@@ -50,7 +50,7 @@ def build_calendar(
 
     The resulting keyboard is:
         Row 0 : [◀️]  [Month Year]  [▶️]     — navigation header
-                (quick_jump: [«] [◀️] [Month Year] [▶️] [»])
+                (quick_jump adds Row 0b: [« سنة سابقة] [سنة تالية »])
         Row 1 : [م]  [ث]  [أر]  [خ]  [ج]  [س]  [ح]  — weekday labels
         Row 2+ : day numbers (empty cells are invisible noop buttons)
         Last  : [⬅️ رجوع]
@@ -69,10 +69,12 @@ def build_calendar(
 
     # ── Row 0: navigation ─────────────────────────────────────────────────────
     if quick_jump:
+        # ⚠️ لا تحشر أزرار قفز السنة في نفس صف الشهر/السنة: 5 أزرار بجانب
+        # بعضها تُضغِط عرض زر "الشهر السنة" حتى يختفي النص فعلياً على
+        # شاشات الجوال (هذا هو سبب "لا يظهر أي سنة" الذي أبلغ عنه المستخدم،
+        # وليس حد أحرف). الحل: صفّان منفصلان — صف الشهر بـ3 أزرار (نفس عرض
+        # المسار العادي أدناه الذي يعمل بلا مشاكل)، وصف ثانٍ مخصص لقفز السنة.
         rows.append([
-            InlineKeyboardButton(
-                "«", callback_data=f"{callback_prefix}:cal_yprev:{year - 1}:{month}"
-            ),
             InlineKeyboardButton(
                 "◀️", callback_data=f"{callback_prefix}:cal_prev:{prev_y}:{prev_m}"
             ),
@@ -83,8 +85,15 @@ def build_calendar(
             InlineKeyboardButton(
                 "▶️", callback_data=f"{callback_prefix}:cal_next:{next_y}:{next_m}"
             ),
+        ])
+        rows.append([
             InlineKeyboardButton(
-                "»", callback_data=f"{callback_prefix}:cal_ynext:{year + 1}:{month}"
+                "« سنة سابقة",
+                callback_data=f"{callback_prefix}:cal_yprev:{year - 1}:{month}",
+            ),
+            InlineKeyboardButton(
+                "سنة تالية »",
+                callback_data=f"{callback_prefix}:cal_ynext:{year + 1}:{month}",
             ),
         ])
     else:
