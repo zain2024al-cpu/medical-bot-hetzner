@@ -53,6 +53,10 @@ def _menu_kb() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("📆 المواعيد القادمة", callback_data="goto:appointments")],
         [InlineKeyboardButton("📋 التقارير المعلقة", callback_data="pndrep:page:0")],
         [InlineKeyboardButton("📎 تقارير ناقصة المرفقات", callback_data="msngatt:page:0")],
+        # ✅ زر مسير الصيدلية — انتقل من الشاشة الرئيسية إلى هنا بطلب صريح.
+        # الأدمن يرى كل السجلات بلا عزل (is_admin=True يُسقط الفلترة في
+        # get_evacuation_ledger_rows تلقائياً — لا تغيير هناك).
+        [InlineKeyboardButton("🖨️ طباعة مسير الإخلاء", callback_data=f"{_PFX}:pharmacy_print")],
         [InlineKeyboardButton("❌ إغلاق", callback_data=f"{_PFX}:close")],
     ])
 
@@ -123,6 +127,15 @@ async def handle_system_menu_choice(
             )
         except Exception as exc:
             logger.error(f"[sys_menu] Failed to show accounts submenu: {exc}")
+        return
+
+    if data == f"{_PFX}:pharmacy_print":
+        # نقطة الدخول الحقيقية لوحدة pharmacy_print — تعمل بلا أي تعديل هناك:
+        # _edit_or_reply في تلك الوحدة تتحقق من update.callback_query أولاً
+        # وتُحرِّر هذه الرسالة نفسها إلى شاشة اختيار الفترة. كل أزرارها
+        # التالية (hcphprint:...) مسجَّلة مستقلة ومسبقاً فتعمل بلا تغيير.
+        from modules.healthcare.pharmacy_print.flow import start_pharmacy_print
+        await start_pharmacy_print(update, context)
         return
 
     if data == f"{_PFX}:back":
