@@ -286,18 +286,30 @@ def delete_patient(patient_id: int) -> bool:
 
 def get_patients_paginated(page: int = 0, per_page: int = 10) -> tuple:
     """
-    الحصول على المرضى مع التصفح بالصفحات
+    الحصول على المرضى مع التصفح بالصفحات (شاشات إدارة أسماء المرضى في الادمن)
     Returns: (patients_list, total_count, total_pages)
+
+    ✅ المرافقون (patient_type="companion") مستبعدون من هذه الشاشات —
+    شاشة "أسماء المرضى" تعرض المريض الرئيسي فقط، أما المرافقون فيظهرون
+    فقط أثناء الإدخال الفعلي في زر "الواصلين" (عبر get_companions_for_patient،
+    استعلام مستقل تماماً لا علاقة له بهذه الدالة).
     """
     try:
         from db.session import SessionLocal
         from db.models import Patient
-        
+        from sqlalchemy import or_
+
         with SessionLocal() as session:
-            total_count = session.query(Patient).count()
+            # ⚠️ patient_type فارغ (NULL) للمرضى العاديين — "!=" وحدها في SQL
+            # تستبعد صفوف NULL أيضاً (NULL != 'companion' ليست TRUE)، فلا بد
+            # من or_(...is_(None)) صراحة وإلا اختفى كل المرضى العاديين من القائمة.
+            base_query = session.query(Patient).filter(
+                or_(Patient.patient_type != "companion", Patient.patient_type.is_(None))
+            )
+            total_count = base_query.count()
             total_pages = (total_count + per_page - 1) // per_page
-            
-            patients = session.query(Patient).order_by(
+
+            patients = base_query.order_by(
                 Patient.created_at.desc()
             ).offset(page * per_page).limit(per_page).all()
 
@@ -384,14 +396,17 @@ def sync_file_to_database() -> int:
 
 def get_patients_count() -> int:
     """
-    عدد المرضى
+    عدد المرضى (مستبعِداً المرافقين — نفس فلتر get_patients_paginated)
     """
     try:
         from db.session import SessionLocal
         from db.models import Patient
-        
+        from sqlalchemy import or_
+
         with SessionLocal() as session:
-            return session.query(Patient).count()
+            return session.query(Patient).filter(
+                or_(Patient.patient_type != "companion", Patient.patient_type.is_(None))
+            ).count()
     except Exception:
         return len(get_patients_from_file())
 
