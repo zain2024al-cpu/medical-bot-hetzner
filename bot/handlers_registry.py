@@ -14,6 +14,11 @@ def register_all_handlers(app):
     from core.modules_bootstrap import bootstrap_all
     bootstrap_all()
 
+    # ── Group guard (group -100, before every other handler) ─────────────────
+    # مجموعات المتابعة تستقبل التقارير فقط؛ الأوامر من المحادثة الخاصة وحدها.
+    from bot.group_guard import register_group_guard
+    register_group_guard(app)
+
     # ── Upload message capture (group -1, before ConversationHandlers) ────────
     from shared.uploads import collector as uploads
     uploads.register_handler(app)
