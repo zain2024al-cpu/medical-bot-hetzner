@@ -209,6 +209,14 @@ class DatabaseMaintenance:
                 # ✅ فورم C — ملف واحد للعائلة (المريض ومرافقوه) على مستوى
                 # الملف لا لكل شخص، فهو استمارة إقامة واحدة تُقدَّم للعائلة.
                 _migrate_column(conn, "res_profiles", "form_c_file_id", "VARCHAR(255)")
+                # ✅ daily_patients لم يكن له أي ترحيل إطلاقاً، وقاعدة السيرفر
+                # تسبق هذه الأعمدة. `s.query(DailyPatient)` يختار كل أعمدة
+                # الموديل، فكان يسقط بـ`no such column: daily_patients.
+                # translator_id` ⇒ شاشة «إدارة المرضى اليوميين» معطّلة كلياً.
+                # لا يظهر محلياً لأن القاعدة المحلية تُبنى من الموديل.
+                _migrate_column(conn, "daily_patients", "translator_id", "INTEGER")
+                _migrate_column(conn, "daily_patients", "translator_name", "VARCHAR(255)")
+                _migrate_column(conn, "daily_patients", "patient_count", "INTEGER")
                 logger.info("🔎 Migration check finished.")
 
                 if check == "ok":
