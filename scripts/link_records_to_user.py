@@ -158,13 +158,35 @@ def main() -> None:
             print("  لا شيء. جرّب جزءاً أقصر من الاسم — قد يكون مخزَّناً بصيغة مختلفة.")
 
         print("\n── للعلم فقط: الاسم يظهر هنا لكنه ليس مالكاً (لن يُلمَس) ──")
-        for model, name_col, _cols in _safe(_NAME_ONLY):
+        for model, name_col, cols in _safe(_NAME_ONLY):
             NC = getattr(model, name_col)
             # model.id لا s.query(model) — نفس سبب الانتقاء أعلاه
-            n = s.query(model.id).filter(NC.isnot(None), NC.like(like)).count()
-            if n:
-                print(f"  {model.__tablename__}.{name_col}: {n} صف"
-                      f"  — الطبيب المعنيّ بالسجل، لا مُدخِله (created_by)")
+            if "created_by" in cols:
+                rows = s.query(model.id, model.created_by).filter(
+                    NC.isnot(None), NC.like(like)).all()
+            else:
+                rows = [(r[0], None) for r in
+                        s.query(model.id).filter(NC.isnot(None), NC.like(like)).all()]
+            if not rows:
+                continue
+            print(f"  {model.__tablename__}.{name_col}: {len(rows)} صف"
+                  f"  — الطبيب المعنيّ بالسجل، لا مُدخِله (created_by)")
+
+            # ✅ يحسم السؤال: هل هذه السجلات مُدخَلة منه أصلاً أم من غيره؟
+            # تطابق العددين لا يكفي دليلاً — قد تكون مجموعتين مختلفتين
+            # بالحجم نفسه صدفةً، فيُعرَض توزيع created_by الفعلي.
+            by = {}
+            for _id, cb in rows:
+                by[cb] = by.get(cb, 0) + 1
+            print(f"     توزيع من أدخلها (created_by): {by}")
+            if a.id is not None:
+                mine = by.get(a.id, 0)
+                if mine == len(rows):
+                    print(f"     ✅ كلها مُدخَلة من {a.id} — منسوبة له سلفاً، لا حاجة لأي ربط")
+                elif mine:
+                    print(f"     ⚠️ {mine} من {len(rows)} فقط مُدخَلة منه؛ الباقي أدخله غيره")
+                else:
+                    print(f"     ⚠️ لا شيء منها مُدخَل من {a.id} — اسمه كأخصائي فقط")
 
         if a.apply and total_changed:
             s.commit()
