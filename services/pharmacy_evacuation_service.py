@@ -41,6 +41,7 @@ def _format_dispense_statement(item_count, kind: str) -> str:
 async def get_evacuation_ledger_rows(
     start_date: date, end_date: date, manifest_type: str | None = None,
     *, requester_id: int | None = None, is_admin: bool = False,
+    specialist_name: str | None = None,
 ) -> list[dict]:
     """manifest_type: "A" | "B" | "C" لتقييد المسير على تصنيف واحد فقط،
     أو None لعدم الفلترة (كل التصنيفات معاً — السلوك القديم بلا تغيير).
@@ -55,16 +56,22 @@ async def get_evacuation_ledger_rows(
     requester_id غير None وis_admin=False ⇒ يُقتصَر المسير على سجلات
     الصرف التي أدخلها هذا المستخدم نفسه (created_by == requester_id) —
     بصرف النظر عمّن أدخل بياناتها المالية لاحقاً. is_admin=True أو
-    requester_id=None ⇒ بلا فلترة (كل المستخدمين، السلوك القديم)."""
+    requester_id=None ⇒ بلا فلترة (كل المستخدمين، السلوك القديم).
+
+    ✅ specialist_name: فلتر مستقل تماماً عن العزل أعلاه — "من أدخل
+    السجل" (created_by) شيء، و"المختص الصحي المسؤول عن الحالة"
+    (specialist_name، أحد الأسماء الثابتة في modules/healthcare/staff.py)
+    شيء آخر. قيمة None ⇒ كل المختصين معاً (السلوك القديم بلا تغيير)."""
     return await asyncio.to_thread(
         _get_evacuation_ledger_rows_sync, start_date, end_date, manifest_type,
-        requester_id, is_admin,
+        requester_id, is_admin, specialist_name,
     )
 
 
 def _get_evacuation_ledger_rows_sync(
     start_date: date, end_date: date, manifest_type: str | None = None,
     requester_id: int | None = None, is_admin: bool = False,
+    specialist_name: str | None = None,
 ) -> list[dict]:
     from db.session import SessionLocal
     from db.models import MedicationRecord, SuppliesRecord, PharmacyFinancialRecord
@@ -89,6 +96,9 @@ def _get_evacuation_ledger_rows_sync(
             if isolate:
                 med_query = med_query.filter(MedicationRecord.created_by == requester_id)
                 sup_query = sup_query.filter(SuppliesRecord.created_by == requester_id)
+            if specialist_name:
+                med_query = med_query.filter(MedicationRecord.specialist_name == specialist_name)
+                sup_query = sup_query.filter(SuppliesRecord.specialist_name == specialist_name)
             med_rows = med_query.all()
             sup_rows = sup_query.all()
 

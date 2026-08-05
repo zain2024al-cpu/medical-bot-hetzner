@@ -172,6 +172,32 @@ async def _show_manifest_type_menu(update: Update, context: ContextTypes.DEFAULT
 async def _handle_manifest_type_select(update: Update, context: ContextTypes.DEFAULT_TYPE, code: str) -> None:
     state = context.user_data.setdefault(_KEY, {})
     state["manifest_type"] = None if code == "ALL" else code
+    await _show_specialist_menu(update, context)
+
+
+# ── اختيار المختص (فلتر — بدل مسير واحد لكل المختصين معاً) ───────────────────
+#
+# ✅ مصدر الأسماء الوحيد modules/healthcare/staff.py (HC_SP_MAP) — نفس
+# القائمة المستخدَمة عند إدخال الصرف في medications/supplies، فأي مختص
+# يُضاف هناك يظهر هنا تلقائياً بلا تعديل ثانٍ.
+
+async def _show_specialist_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    from modules.healthcare.staff import HC_SP_MAP
+
+    text = "🖨️ *طباعة مسير الإخلاء*\n\nاختر المختص (أو الكل):"
+    rows = [[InlineKeyboardButton(f"👨‍⚕️ {name}", callback_data=f"{_PFX}:spec:{code}")]
+            for code, name in HC_SP_MAP.items()]
+    rows.append([InlineKeyboardButton("📋 الكل", callback_data=f"{_PFX}:spec:ALL")])
+    rows.append([InlineKeyboardButton("🔙 رجوع", callback_data=f"{_PFX}:back_to_mtype")])
+    rows.append([InlineKeyboardButton("❌ إلغاء", callback_data=f"{_PFX}:cancel")])
+    await _edit_or_reply(update, text, InlineKeyboardMarkup(rows))
+
+
+async def _handle_specialist_select(update: Update, context: ContextTypes.DEFAULT_TYPE, code: str) -> None:
+    from modules.healthcare.staff import HC_SP_MAP
+
+    state = context.user_data.setdefault(_KEY, {})
+    state["specialist_name"] = None if code == "ALL" else HC_SP_MAP.get(code)
     await _generate_and_show_export_choice(update, context)
 
 
@@ -193,23 +219,30 @@ async def _generate_and_show_export_choice(update: Update, context: ContextTypes
 
     user = update.effective_user
     manifest_type = state.get("manifest_type")  # None = الكل، بلا فلترة
+    specialist_name = state.get("specialist_name")  # None = كل المختصين
     # ✅ عزل: كل مستخدم يطبع مسيره الخاص (ما أدخله هو فقط)، إلا الأدمن
     # فيرى الكل — نفس قاعدة العزل المعتمدة في pharmacy_finance.
+    # specialist_name فلتر مستقل تماماً: "من أدخل السجل" لا علاقة له
+    # بـ"المختص الصحي المسؤول عن الحالة" — انظر التعليق في
+    # services/pharmacy_evacuation_service.py.
     rows = await get_evacuation_ledger_rows(
         start, end, manifest_type=manifest_type,
         requester_id=user.id if user else None,
         is_admin=bool(user and is_admin(user.id)),
+        specialist_name=specialist_name,
     )
     state["rows"] = rows
     context.user_data[_KEY] = state
 
     manifest_label = _MANIFEST_TYPE_LABELS.get(manifest_type, "📋 الكل")
+    specialist_label = specialist_name or "📋 الكل"
 
     if not rows:
         text = (
             f"⚠️ لا توجد بيانات مطابقة لمعايير البحث المحددة.\n\n"
             f"الفترة: من {start.strftime('%Y-%m-%d')} إلى {end.strftime('%Y-%m-%d')}\n"
-            f"نوع المسير: {manifest_label}"
+            f"نوع المسير: {manifest_label}\n"
+            f"المختص: {specialist_label}"
         )
         kb = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data=f"{_PFX}:back_to_period")]])
         await _edit_or_reply(update, text, kb)
@@ -220,6 +253,7 @@ async def _generate_and_show_export_choice(update: Update, context: ContextTypes
         f"✅ *تم إعداد المسير*\n\n"
         f"الفترة: من {start.strftime('%Y-%m-%d')} إلى {end.strftime('%Y-%m-%d')}\n"
         f"نوع المسير: {manifest_label}\n"
+        f"المختص: {specialist_label}\n"
         f"عدد السجلات: {len(rows)}\n"
         f"إجمالي المبلغ: {total:,.2f}\n\n"
         f"اختر صيغة التصدير:"
@@ -305,6 +339,9 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     if action == "back_to_period":
         await _show_period_menu(update)
         return
+    if action == "back_to_mtype":
+        await _show_manifest_type_menu(update, context)
+        return
     if action == "period":
         kind = parts[2] if len(parts) > 2 else "day"
         await _handle_period(update, context, kind)
@@ -321,6 +358,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     if action == "mtype":
         code = parts[2] if len(parts) > 2 else "ALL"
         await _handle_manifest_type_select(update, context, code)
+        return
+    if action == "spec":
+        code = parts[2] if len(parts) > 2 else "ALL"
+        await _handle_specialist_select(update, context, code)
         return
     if action == "export":
         choice = parts[2] if len(parts) > 2 else "pdf"
