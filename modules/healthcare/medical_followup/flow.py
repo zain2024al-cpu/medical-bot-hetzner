@@ -311,6 +311,11 @@ async def _on_department(result, update: Update, context: ContextTypes.DEFAULT_T
 
     session.medical_department_ids    = result.ids
     session.medical_department_labels = result.labels
+    # ⚠️ الحفظ فوراً بعد الكتابة — لا داخل فرع واحد: `_go_to_review`
+    # **يُعيد تحميل الجلسة من user_data**، فأي قيمة لم تُحفَظ تُمحى.
+    # كان فرع «التعديل من شاشة المراجعة» يعود بلا حفظ، فيضيع اختيار
+    # المستخدم بصمت ويظهر الحقل فارغاً في التقرير المنشور.
+    session.save(context.user_data)
 
     if session.edit_from_review:
         if DEPT_OTHER_ID in result.ids:
@@ -359,6 +364,7 @@ async def _on_proc_type(result, update: Update, context: ContextTypes.DEFAULT_TY
 
     session.procedure_type_ids    = result.ids
     session.procedure_type_labels = result.labels
+    session.save(context.user_data)
 
     if session.edit_from_review:
         await _go_to_review(update, context)
@@ -395,6 +401,7 @@ async def _on_complaint(result, update: Update, context: ContextTypes.DEFAULT_TY
 
     session.complaint_ids    = result.ids
     session.complaint_labels = result.labels
+    session.save(context.user_data)
 
     if session.edit_from_review:
         if COMPLAINT_OTHER_ID in result.ids:
@@ -433,6 +440,7 @@ async def _on_meds_supply(result, update: Update, context: ContextTypes.DEFAULT_
 
     session.meds_supply_ids    = result.ids
     session.meds_supply_labels = result.labels
+    session.save(context.user_data)
 
     if session.edit_from_review:
         if MEDS_SUPPLY_OTHER_ID in result.ids:
@@ -481,6 +489,7 @@ async def _on_images(result, update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
     session.images = [f.to_dict() for f in result.files]
+    session.save(context.user_data)
 
     if session.edit_from_review:
         await _go_to_review(update, context)

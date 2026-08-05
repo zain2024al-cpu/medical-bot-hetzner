@@ -482,6 +482,9 @@ async def _on_images(result, update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
     session.images = [f.to_dict() if hasattr(f, "to_dict") else f for f in result.files]
+    # ⚠️ الحفظ فوراً — `_go_to_review` يُعيد تحميل الجلسة من user_data،
+    # فالصور المُعدَّلة من شاشة المراجعة كانت تُمحى بصمت.
+    session.save(context.user_data)
     if session.edit_from_review:
         await _go_to_review(update, context); return
 
