@@ -14,17 +14,24 @@ def is_admin(user_id: int) -> bool:
     return user_id in ADMIN_IDS
 
 
-# ✅ إنشاء سجل للمترجم إن لم يكن موجودًا (مع الموافقة التلقائية)
+# إنشاء سجل للمستخدم إن لم يكن موجوداً — **بلا موافقة تلقائية**.
+#
+# ⚠️ كانت تُنشئ المستخدم بـ`is_approved=True`: أي شخص يصل للبوت يصبح
+# معتمداً فوراً ويرى بيانات المرضى. لم تكن مُستدعاة من أي مكان (مستورَدة
+# في user_start.py وغير مستعملة) فلم يظهر أثرها — لكنها لغم: أول استدعاء
+# لها كان سيفتح البوت للجميع بصمت، ولن يكشفه شيء لأن لا خطأ يقع.
+#
+# المسار الصحيح هو register_pending_user أدناه (وهو ما يفعله /start فعلاً):
+# يُنشئ بـis_approved=False ويُشعر الأدمن ليوافق يدوياً.
 def ensure_translator_record(tg_id, full_name=None):
     with SessionLocal() as s:
         t = s.query(Translator).filter_by(tg_user_id=tg_id).first()
         if not t:
-            # ✅ الموافقة التلقائية مفعّلة
             t = Translator(
-                tg_user_id=tg_id, 
+                tg_user_id=tg_id,
                 full_name=full_name or "بدون اسم",
                 is_active=True,
-                is_approved=True  # ✅ الموافقة التلقائية
+                is_approved=False,   # ← الاعتماد بيد الأدمن وحده
             )
             s.add(t)
             s.commit()
