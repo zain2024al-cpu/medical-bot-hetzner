@@ -76,7 +76,13 @@ exports/
 *.html
 
 # 🖼️ Uploads (if any)
-uploads/
+# ⚠️ مثبَّت على الجذر عمداً (`/uploads/` لا `uploads/`): النمط بلا شرطة
+# بادئة يطابق **أي** مجلد بهذا الاسم على أي عمق، فابتلع صامتاً
+# `modules/residency/uploads/` — وهو كود مصدري كامل. `git add -A` لم يحذّر،
+# والـcommit نجح، والاختبارات المحلية كلها خضراء لأن الملفات موجودة محلياً —
+# ثم انهار البوت على السيرفر بـModuleNotFoundError. المجلدان الوحيدان بهذا
+# الاسم في المشروع (shared/uploads و modules/residency/uploads) كلاهما مصدر.
+/uploads/
 *.jpg
 *.jpeg
 *.png
