@@ -242,6 +242,12 @@ async def main():
     )
     app.add_error_handler(error_handler)
 
+    # 🧾 مراقب السجلات — يلتقط كل ERROR فأعلى من أي ملف في المشروع ويكتبه
+    # في ملف اليوم، ليُرسَل ملخّصاً للأدمن آخر اليوم. يُركَّب هنا مبكراً حتى
+    # يلتقط أخطاء التسجيل والإقلاع نفسها.
+    from services.error_digest import install as install_error_digest
+    install_error_digest()
+
     # ✅ إعداد المجدول الزمني (JobQueue)
     if app.job_queue:
         from services.notification_service import send_daily_appointments_reminder
@@ -276,6 +282,19 @@ async def main():
             name="daily_residency_alerts"
         )
         logger.info(f"🔔 Scheduled daily residency/passport alerts at 09:00 ({TIMEZONE})")
+
+        # 🧾 4. تقرير أخطاء اليوم (23:55) — آخر اليوم عمداً ليشمله كاملاً.
+        # صامت تماماً لو لم يقع أي خطأ، فلا رسالة يومية بلا فائدة.
+        from services.error_digest import send_daily_error_report, cleanup_old
+        async def _error_report_job(context):
+            await send_daily_error_report(context.application)
+            cleanup_old(days=30)
+        app.job_queue.run_daily(
+            _error_report_job,
+            time=dt_time(hour=23, minute=55, tzinfo=tz),
+            name="daily_error_report",
+        )
+        logger.info(f"🧾 Scheduled daily error report at 23:55 ({TIMEZONE})")
     else:
         logger.warning("⚠️ JobQueue is not available! Scheduled tasks will not run.")
     
