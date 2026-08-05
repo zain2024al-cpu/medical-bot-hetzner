@@ -166,7 +166,7 @@ async def handle_message(
         try:
             await msg.reply_text("⚠️ نوع الملف غير مدعوم في هذه العملية.")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_message", exc_info=True)
         raise ApplicationHandlerStop
 
     uploaded_file, is_photo = file_info
@@ -190,7 +190,7 @@ async def handle_message(
             try:
                 await msg.reply_text(error.message)
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في handle_message", exc_info=True)
         else:
             logger.debug(
                 f"[uploads] duplicate discarded  unique_id={uploaded_file.file_unique_id!r}"
@@ -227,7 +227,7 @@ async def handle_callback(
     try:
         await query.answer()
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في handle_callback", exc_info=True)
 
     if not data.startswith(f"{CB}:"):
         return
@@ -293,7 +293,7 @@ async def _handle_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         try:
             await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _handle_confirm", exc_info=True)
         return
 
     # Enforce minimum
@@ -303,7 +303,7 @@ async def _handle_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         try:
             await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _handle_confirm", exc_info=True)
         return
 
     files     = session.get_files()
@@ -341,7 +341,7 @@ async def _handle_remove(
         try:
             await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _handle_remove", exc_info=True)
         return
 
     if idx < 0 or idx >= len(session.collected):
@@ -441,7 +441,7 @@ async def _show_error(query, message: str) -> None:
         if query:
             await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في _show_error", exc_info=True)
 
 
 # ── File extraction ───────────────────────────────────────────────────────────

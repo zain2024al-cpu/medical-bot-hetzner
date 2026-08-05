@@ -103,7 +103,7 @@ async def handle_system_menu_choice(
     try:
         await query.answer()
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في handle_system_menu_choice", exc_info=True)
 
     data = query.data or ""
 
@@ -111,7 +111,7 @@ async def handle_system_menu_choice(
         try:
             await query.edit_message_text("✅ تم الإغلاق.")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_system_menu_choice", exc_info=True)
         return
 
     if data == f"{_PFX}:accounts":

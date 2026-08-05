@@ -222,7 +222,7 @@ async def handle_hospital_name_input(update: Update, context: ContextTypes.DEFAU
     try:
         _reload_doctors_cache()
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في handle_hospital_name_input", exc_info=True)
 
     keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_hospitals")]])
     await update.message.reply_text(
@@ -341,7 +341,7 @@ async def handle_confirm_delete_hospital(update: Update, context: ContextTypes.D
             try:
                 _reload_doctors_cache()
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في handle_confirm_delete_hospital", exc_info=True)
             with get_db() as s:
                 remaining = s.query(Hospital).count()
             await query.edit_message_text(
@@ -518,7 +518,7 @@ async def handle_edit_hospital_input(update: Update, context: ContextTypes.DEFAU
         try:
             _reload_doctors_cache()
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_edit_hospital_input", exc_info=True)
         keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_hospitals")]])
         await update.message.reply_text(
             f"✅ **تم تعديل اسم المستشفى بنجاح**\n\n"

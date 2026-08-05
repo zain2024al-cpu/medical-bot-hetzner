@@ -431,7 +431,7 @@ async def cancel_draft_edit(update, context):
                 reply_markup=None
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في cancel_draft_edit", exc_info=True)
 
     # مسح بيانات التعديل المؤقت
     context.user_data.pop('editing_draft', None)
@@ -463,7 +463,7 @@ async def cancel_report_edit(update, context):
                 parse_mode="Markdown"
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في cancel_report_edit", exc_info=True)
 
     # مسح بيانات التعديل
     context.user_data.pop('current_report_data', None)
@@ -493,13 +493,13 @@ async def cancel_report_creation(update, context):
         if state_mgr:
             state_mgr.clear_history()
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في cancel_report_creation", exc_info=True)
     
     # إعادة تعيين سياق البحث
     try:
         smart_nav_manager.clear_search_context()
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في cancel_report_creation", exc_info=True)
     
     query = update.callback_query
     if query:
@@ -512,7 +512,7 @@ async def cancel_report_creation(update, context):
                 parse_mode="Markdown"
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في cancel_report_creation", exc_info=True)
     elif update.message:
         await update.message.reply_text(
             "❌ تم إلغاء إنشاء التقرير\n\n"
@@ -537,7 +537,7 @@ async def cancel_search(update, context):
                 reply_markup=None
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في cancel_search", exc_info=True)
 
     # مسح سياق البحث
     smart_nav_manager.clear_search_context()
@@ -570,7 +570,7 @@ async def cancel_general(update, context):
                 parse_mode="Markdown"
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في cancel_general", exc_info=True)
     elif update.message:
         await update.message.reply_text(
             "❌ تم إلغاء العملية\n\n"
@@ -585,7 +585,7 @@ async def cancel_general(update, context):
     try:
         smart_nav_manager.clear_search_context()
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في cancel_general", exc_info=True)
 
     return ConversationHandler.END
 
@@ -1402,7 +1402,7 @@ async def handle_smart_back_navigation(update: Update, context: ContextTypes.DEF
                     ]])
                 )
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في handle_smart_back_navigation", exc_info=True)
             return previous_step
 
         return previous_step
@@ -1417,7 +1417,7 @@ async def handle_smart_back_navigation(update: Update, context: ContextTypes.DEF
                 ]])
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_smart_back_navigation", exc_info=True)
         return ConversationHandler.END
 
 # الدوال القديمة تم استبدالها بـ Smart Navigation System
@@ -1540,7 +1540,7 @@ async def render_patient_selection(message, context, page=0, search_query="", qu
             await query.edit_message_text(text, reply_markup=keyboard, parse_mode="Markdown")
             return
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في render_patient_selection", exc_info=True)
     await message.reply_text(text, reply_markup=keyboard, parse_mode="Markdown")
 
 async def render_hospital_selection(message, context, query=None,
@@ -1560,7 +1560,7 @@ async def render_hospital_selection(message, context, query=None,
                 await query.edit_message_text(text, reply_markup=keyboard, parse_mode="Markdown")
                 return
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في render_hospital_selection", exc_info=True)
         await message.reply_text(text, reply_markup=keyboard, parse_mode="Markdown")
 
 async def render_department_selection(message, context, query=None,
@@ -1579,7 +1579,7 @@ async def render_department_selection(message, context, query=None,
                 await query.edit_message_text(text, reply_markup=keyboard, parse_mode="Markdown")
                 return
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في render_department_selection", exc_info=True)
         await message.reply_text(text, reply_markup=keyboard, parse_mode="Markdown")
 
 # =============================
@@ -1725,7 +1725,7 @@ async def render_doctor_selection(message, context, page=0, query=None):
         await _modular_render(message, context, query=query)
         return
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في render_doctor_selection", exc_info=True)
 
     import logging
     logger = logging.getLogger(__name__)
@@ -1762,7 +1762,7 @@ async def render_doctor_selection(message, context, page=0, query=None):
                 await query.edit_message_text(text, reply_markup=keyboard, parse_mode="Markdown")
                 return
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في render_doctor_selection", exc_info=True)
         await message.reply_text(text, reply_markup=keyboard, parse_mode="Markdown")
     except Exception as e:
         logger.error(f"❌ خطأ في عرض قائمة اختيار الطبيب: {e}", exc_info=True)
@@ -1790,7 +1790,7 @@ async def start_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
             try:
                 await message.reply_text("❌ حدث خطأ في بدء العملية، يرجى المحاولة مرة أخرى.")
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في start_report", exc_info=True)
         return ConversationHandler.END
 
 
@@ -1938,7 +1938,7 @@ async def handle_doctor_page(update: Update, context: ContextTypes.DEFAULT_TYPE)
             parse_mode="Markdown"
         )
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في handle_doctor_page", exc_info=True)
     
     return STATE_SELECT_DOCTOR
 
@@ -2301,7 +2301,7 @@ async def handle_restart_from_start(update: Update, context: ContextTypes.DEFAUL
     try:
         context.user_data.clear()
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في handle_restart_from_start", exc_info=True)
     try:
         from bot.handlers.user.user_start import user_start
         await user_start(update, context)
@@ -2314,7 +2314,7 @@ async def handle_restart_from_start_main_menu(update: Update, context: ContextTy
     try:
         context.user_data.clear()
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في handle_restart_from_start_main_menu", exc_info=True)
     try:
         from bot.handlers.user.user_start import handle_start_main_menu
         await handle_start_main_menu(update, context)
@@ -2463,7 +2463,7 @@ async def handle_view_reschedule_callback(update: Update, context: ContextTypes.
         try:
             await update.callback_query.message.reply_text("⚠️ حدث خطأ أثناء جلب بيانات التأجيل.")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_view_reschedule_callback", exc_info=True)
 
 
 async def doctor_inline_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2829,7 +2829,7 @@ async def handle_simple_translator_choice(update: Update, context: ContextTypes.
                         f"اضغط على زر '📢 نشر التقرير' للمتابعة."
                     )
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في handle_simple_translator_choice", exc_info=True)
 
         try:
             confirm_state = get_confirm_state(flow_type)
@@ -2846,5 +2846,5 @@ async def handle_simple_translator_choice(update: Update, context: ContextTypes.
         try:
             await query.edit_message_text("❌ حدث خطأ في معالجة الاختيار")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_simple_translator_choice", exc_info=True)
         return

@@ -121,7 +121,7 @@ async def handle_onc_toggle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         await query.edit_message_text(_SCREEN_TEXT, reply_markup=_build_multiselect_keyboard(set(selected)), parse_mode="Markdown")
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في handle_onc_toggle", exc_info=True)
     return R_ACTION_TYPE
 
 
@@ -142,7 +142,7 @@ async def handle_onc_next(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             await query.edit_message_text(f"تم اختيار نوع الإجراء\n\nالنوع:\n{_full_label(key)}")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_onc_next", exc_info=True)
         result = await _SINGLE_START_FUNCS[key](query.message, context)
         return result
 
@@ -153,7 +153,7 @@ async def handle_onc_next(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         await query.edit_message_text("✅ تم اختيار: " + " + ".join(_short_label(k) for k in selected))
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في handle_onc_next", exc_info=True)
     return await _process_next_in_queue(query.message, context)
 
 
@@ -277,7 +277,7 @@ async def handle_oncology_delivery_mode(update: Update, context: ContextTypes.DE
         try:
             await query.edit_message_text("🏠 عيادة يومية")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_oncology_delivery_mode", exc_info=True)
         return await _advance_queue_after_delivery(query.message, context)
 
     try:
@@ -286,7 +286,7 @@ async def handle_oncology_delivery_mode(update: Update, context: ContextTypes.DE
             reply_markup=_nav_buttons(show_back=True),
         )
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في handle_oncology_delivery_mode", exc_info=True)
     return ONCOLOGY_DELIVERY_DAYS
 
 

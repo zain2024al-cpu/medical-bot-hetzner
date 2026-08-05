@@ -310,7 +310,7 @@ async def handle_inline_patient_selected(update: Update, context: ContextTypes.D
     try:
         await update.message.delete()
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في handle_inline_patient_selected", exc_info=True)
 
     try:
         reports = _load_reports(patient_id)

@@ -111,7 +111,7 @@ def send_backup_via_email(backup_path: str) -> bool:
             if os.path.exists(gz_path):
                 os.remove(gz_path)
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في send_backup_via_email", exc_info=True)
 
 
 def send_project_backup_email(archive_path: str) -> bool:

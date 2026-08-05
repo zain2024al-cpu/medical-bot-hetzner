@@ -1056,7 +1056,7 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
                 try:
                     _wk[datetime.strptime(_d, "%Y-%m-%d").weekday()] += int(_c)
                 except Exception:
-                    pass
+                    logger.debug("تم تجاهل استثناء في _generate_pdf", exc_info=True)
             if sum(_wk) > 0:
                 wdraw = Drawing(536, 190)
                 wdraw.add(String(530, 176, r("النشاط الأسبوعي (مجموع التقارير لكل يوم)"),
@@ -2224,11 +2224,11 @@ async def _cancel_evaluation(update: Update, context: ContextTypes.DEFAULT_TYPE)
         try:
             await query.answer()
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _cancel_evaluation", exc_info=True)
         try:
             await query.edit_message_text("✅ تم إلغاء التقييم.")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _cancel_evaluation", exc_info=True)
     context.user_data.pop('eval_data', None)
     return ConversationHandler.END
 

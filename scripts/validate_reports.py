@@ -23,6 +23,10 @@ from datetime import datetime
 from pathlib import Path
 import sys
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 # Ensure project root is on sys.path so local packages can be imported
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -120,7 +124,7 @@ def run_validation():
             from services.reporting_engine.filters.patient_filter import PatientFilter
             filters2.add("patient", PatientFilter(patient_id=patient_id))
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في run_validation", exc_info=True)
 
         start = time.time()
         report2 = engine.build_report(ReportType.PATIENT, filters2, title=f"تقرير مريض - {patient_id}", patient_id=patient_id)

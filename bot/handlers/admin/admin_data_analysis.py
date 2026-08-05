@@ -882,7 +882,7 @@ async def _run_analysis(query, context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
         await query.edit_message_text("⏳ جارٍ إعداد التحليل...", parse_mode="Markdown")
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في _run_analysis", exc_info=True)
 
     try:
         from services.reports_repository import (
@@ -1056,7 +1056,7 @@ async def _run_analysis(query, context: ContextTypes.DEFAULT_TYPE) -> None:
         try:
             await query.edit_message_text("❌ حدث خطأ أثناء إعداد التحليل.", parse_mode="Markdown")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _run_analysis", exc_info=True)
 
 
 async def _export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1066,13 +1066,13 @@ async def _export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         try:
             await query.answer("⚠️ انتهت صلاحية الجلسة، أعد إنشاء التحليل من جديد.", show_alert=True)
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _export_pdf", exc_info=True)
         return
 
     try:
         await query.edit_message_text("⏳ جارٍ إنشاء ملف PDF...", parse_mode="Markdown")
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في _export_pdf", exc_info=True)
 
     try:
         from services.data_analysis_pdf import build_analysis_pdf
@@ -1095,7 +1095,7 @@ async def _export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         try:
             await query.edit_message_text("❌ حدث خطأ أثناء إنشاء ملف PDF.", parse_mode="Markdown")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _export_pdf", exc_info=True)
 
 
 # ── Main callback dispatcher ────────────────────────────────────────────────────
@@ -1106,7 +1106,7 @@ async def handle_data_analysis_callback(update: Update, context: ContextTypes.DE
     try:
         await query.answer()
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في handle_data_analysis_callback", exc_info=True)
 
     data = query.data or ""
     parts = data[len(_PFX) + 1:].split(":")  # strip "da:"
@@ -1116,7 +1116,7 @@ async def handle_data_analysis_callback(update: Update, context: ContextTypes.DE
         try:
             await query.edit_message_text("✅ تم الإلغاء.")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_data_analysis_callback", exc_info=True)
         context.user_data.pop(_KEY, None)
         context.user_data.pop("_da_pdf_payload", None)
         return
@@ -1132,7 +1132,7 @@ async def handle_data_analysis_callback(update: Update, context: ContextTypes.DE
                 reply_markup=_main_menu_kb(), parse_mode="Markdown",
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_data_analysis_callback", exc_info=True)
         return
 
     if action == "export_pdf":

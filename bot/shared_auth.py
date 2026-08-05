@@ -7,6 +7,9 @@ from config.settings import ADMIN_IDS
 from db.session import SessionLocal
 from db.models import Translator
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 # ✅ التحقق إن كان المستخدم إدمن
@@ -126,7 +129,7 @@ async def ensure_approved(update, context) -> bool:
                     "🚫 لا يمكنك استخدام البوت قبل موافقة الإدارة."
                 )
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في ensure_approved", exc_info=True)
         return cached_approved
 
     # الاستعلام من قاعدة البيانات وحفظ في cache
@@ -139,7 +142,7 @@ async def ensure_approved(update, context) -> bool:
                 "🚫 لا يمكنك استخدام البوت قبل موافقة الإدارة."
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في ensure_approved", exc_info=True)
         return False
 
     return True

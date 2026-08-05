@@ -41,7 +41,7 @@ def _json_labels(raw: Optional[str]) -> str:
         if isinstance(parsed, list):
             return "، ".join(str(x) for x in parsed if x)
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في _json_labels", exc_info=True)
     return ""
 
 

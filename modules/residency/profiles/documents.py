@@ -71,7 +71,7 @@ async def send_patient_pdf(*, bot, message, profile_id: int) -> None:
         try:
             await progress.delete()
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في send_patient_pdf", exc_info=True)
 
 
 async def send_patient_documents(*, bot, message, profile_id: int) -> None:

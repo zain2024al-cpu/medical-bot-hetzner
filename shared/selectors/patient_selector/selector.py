@@ -137,7 +137,7 @@ async def handle_callback(
     try:
         await query.answer()
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في handle_callback", exc_info=True)
 
     if not data.startswith(f"{CB}:"):
         return
@@ -206,7 +206,7 @@ async def handle_inline_selection(
     try:
         await message.delete()
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في handle_inline_selection", exc_info=True)
 
     # Parse  __PATIENT_SELECTED__:{id}:{name}
     try:
@@ -366,7 +366,7 @@ async def _handle_selection(
     try:
         await query.edit_message_text(conf_text, reply_markup=conf_kb, parse_mode="Markdown")
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في _handle_selection", exc_info=True)
 
     # Resolve full record (with DB id) — runs in thread pool
     record: PatientRecord | None = await asyncio.get_event_loop().run_in_executor(
@@ -448,7 +448,7 @@ async def _show_error(query, message: str) -> None:
     try:
         await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في _show_error", exc_info=True)
 
 
 async def _show_session_lost(query) -> None:
@@ -457,4 +457,4 @@ async def _show_session_lost(query) -> None:
         if query:
             await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في _show_session_lost", exc_info=True)

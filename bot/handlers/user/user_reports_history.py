@@ -16,6 +16,9 @@ from bot.shared_auth import ensure_approved
 from db.session import SessionLocal
 from db.models import Report, Patient, Hospital
 from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
 
 SELECT_PERIOD = range(1)
 
@@ -133,7 +136,7 @@ async def handle_abort_callback(update: Update, context: ContextTypes.DEFAULT_TY
     try:
         await q.edit_message_text("❌ تم إلغاء المحادثة.")
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في handle_abort_callback", exc_info=True)
     return ConversationHandler.END
 
 

@@ -440,7 +440,7 @@ async def route_edit_field_selection(update: Update, context: ContextTypes.DEFAU
                 parse_mode="Markdown"
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في route_edit_field_selection", exc_info=True)
         return ConversationHandler.END
 
 

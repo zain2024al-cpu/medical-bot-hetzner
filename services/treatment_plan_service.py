@@ -107,7 +107,7 @@ def _cap_for_cycle(plan: TreatmentPlan, cycle_number: int) -> int:
             if 0 <= idx < len(lst):
                 return int(lst[idx])
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _cap_for_cycle", exc_info=True)
     return 1
 
 

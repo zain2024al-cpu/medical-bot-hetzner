@@ -625,7 +625,7 @@ def register(app):
     try:
         app.add_handler(CallbackQueryHandler(handle_view_reschedule_callback, pattern="^view_reschedule:"))
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في register", exc_info=True)
 
     try:
         from bot.handlers.shared.medical_files_access import handle_medical_files_callback

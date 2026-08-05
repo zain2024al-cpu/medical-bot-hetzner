@@ -555,7 +555,7 @@ async def _prompt_dialysis_session(message_or_query, context):
             await message_or_query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
             return
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _prompt_dialysis_session", exc_info=True)
     await message_or_query.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
 

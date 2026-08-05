@@ -125,7 +125,7 @@ async def _handle_render_error(query, exc: Exception, page: int) -> None:
         try:
             await query.answer("✅ القائمة محدَّثة بالفعل.")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _handle_render_error", exc_info=True)
         return
     logger.error(f"[pndrep] Failed to render list (page={page}): {exc}")
 
@@ -139,7 +139,7 @@ async def handle_pending_reports_callback(update: Update, context: ContextTypes.
     try:
         await query.answer()
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في handle_pending_reports_callback", exc_info=True)
 
     data = query.data or ""
     parts = data.split(":")

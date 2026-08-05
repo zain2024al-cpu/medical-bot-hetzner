@@ -226,7 +226,7 @@ def safe_unlink(path: Optional[str]) -> None:
         try:
             os.remove(path)
         except OSError:
-            pass
+            logger.debug("تم تجاهل استثناء في safe_unlink", exc_info=True)
 
 
 # ─── استيراد Excel / CSV: صف عناوين ثم بيانات — يُستورد كل الصفوف ───

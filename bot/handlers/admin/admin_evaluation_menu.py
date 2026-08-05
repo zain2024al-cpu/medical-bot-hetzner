@@ -84,11 +84,11 @@ async def handle_menu_cancel(
     try:
         await query.answer()
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في handle_menu_cancel", exc_info=True)
     try:
         await query.edit_message_text("✅ تم الإلغاء.")
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في handle_menu_cancel", exc_info=True)
 
 
 # ── Registration ───────────────────────────────────────────────────────────────

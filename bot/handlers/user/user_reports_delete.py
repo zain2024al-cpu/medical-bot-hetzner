@@ -423,7 +423,7 @@ async def handle_confirm_delete(update: Update, context: ContextTypes.DEFAULT_TY
                 parse_mode=ParseMode.MARKDOWN
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_confirm_delete", exc_info=True)
         return ConversationHandler.END
 
 
@@ -449,7 +449,7 @@ async def cancel_delete(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=user_main_kb()
             )
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في cancel_delete", exc_info=True)
     
     # تنظيف البيانات
     context.user_data.pop('delete_report_id', None)

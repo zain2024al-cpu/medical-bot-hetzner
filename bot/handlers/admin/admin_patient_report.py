@@ -343,7 +343,7 @@ async def handle_period_picked(
         try:
             await query.edit_message_text("✅ تم الإلغاء.")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_period_picked", exc_info=True)
         context.user_data.clear()
         return ConversationHandler.END
 
@@ -411,7 +411,7 @@ async def handle_period_picked(
         try:
             await query.delete_message()
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_period_picked", exc_info=True)
 
         await context.bot.send_document(
             chat_id=update.effective_chat.id,
@@ -434,7 +434,7 @@ async def handle_period_picked(
                 parse_mode=ParseMode.MARKDOWN,
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_period_picked", exc_info=True)
 
     finally:
         context.user_data.clear()
@@ -454,7 +454,7 @@ async def cancel_patient_report(
         try:
             await query.edit_message_text("✅ تم الإلغاء.")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في cancel_patient_report", exc_info=True)
     context.user_data.clear()
     return ConversationHandler.END
 

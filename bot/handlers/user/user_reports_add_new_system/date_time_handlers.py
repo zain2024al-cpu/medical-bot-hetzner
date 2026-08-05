@@ -98,7 +98,7 @@ async def start_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
             try:
                 await update.message.reply_text("❌ حدث خطأ في بدء العملية، يرجى المحاولة مرة أخرى.")
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في start_report", exc_info=True)
         return ConversationHandler.END
 
 
@@ -136,7 +136,7 @@ async def _ensure_module(update, context, module_key: str, section_label: str) -
             parse_mode="Markdown",
         )
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في _ensure_module", exc_info=True)
     return False
 
 
@@ -180,7 +180,7 @@ async def render_date_selection(message, context, query=None):
             await query.edit_message_text(text, reply_markup=keyboard, parse_mode="Markdown")
             return
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في render_date_selection", exc_info=True)
 
     await message.reply_text(text, reply_markup=keyboard, parse_mode="Markdown")
 

@@ -105,7 +105,7 @@ def run_pipeline(
             pdf.seek(0)
             logger.info(f"[pipeline] debug PDF saved: {debug_pdf_path}")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في run_pipeline", exc_info=True)
 
     logger.info(f"[pipeline] done  job={job_id}  pages={len(processed_images)}")
     return pdf
@@ -153,7 +153,7 @@ def _save_debug(image: np.ndarray, debug_cfg, job_id: str, page: int, stage: str
         path = os.path.join(debug_cfg.output_dir, filename)
         cv2.imwrite(path, image, [cv2.IMWRITE_JPEG_QUALITY, 90])
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في _save_debug", exc_info=True)
 
 
 def _ensure_debug_dir(debug_cfg):

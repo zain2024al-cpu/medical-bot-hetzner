@@ -195,7 +195,7 @@ async def render_patient_selection(message, context, query=None):
             await query.edit_message_text(text, reply_markup=markup, parse_mode="Markdown")
             return
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في render_patient_selection", exc_info=True)
     await message.reply_text(text, reply_markup=markup, parse_mode="Markdown")
 
 
@@ -568,7 +568,7 @@ async def handle_patient(update: Update, context: ContextTypes.DEFAULT_TYPE):
             try:
                 await update.message.delete()
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في handle_patient", exc_info=True)
 
             # إرسال رسالة تأكيد
             await update.message.reply_text(

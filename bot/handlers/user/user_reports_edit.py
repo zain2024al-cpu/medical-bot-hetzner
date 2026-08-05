@@ -11,6 +11,9 @@ from telegram.ext import (
 from telegram.constants import ParseMode
 from datetime import datetime, date, timedelta
 from db.session import SessionLocal
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def _ist_now() -> datetime:
@@ -243,7 +246,7 @@ def _resolve_target_group_id(patient_type):
             from config.settings import CHENNAI_REPORTS_GROUP_ID
             return CHENNAI_REPORTS_GROUP_ID or None
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في _resolve_target_group_id", exc_info=True)
     return None
 
 
@@ -552,7 +555,7 @@ async def start_edit_reports(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 parse_mode=ParseMode.MARKDOWN
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في start_edit_reports", exc_info=True)
         return ConversationHandler.END
 
 async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -707,12 +710,12 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
                     try:
                         extracted_therapy_details = doctor_decision_text.split('تفاصيل جلسة العلاج الطبيعي:', 1)[1].strip()
                     except Exception:
-                        pass
+                        logger.debug("تم تجاهل استثناء في handle_report_selection", exc_info=True)
                 elif 'تفاصيل الجلسة:' in doctor_decision_text:
                     try:
                         extracted_therapy_details = doctor_decision_text.split('تفاصيل الجلسة:', 1)[1].strip()
                     except Exception:
-                        pass
+                        logger.debug("تم تجاهل استثناء في handle_report_selection", exc_info=True)
                 elif doctor_decision_text and doctor_decision_text != "لا يوجد":
                     extracted_therapy_details = doctor_decision_text
 
@@ -722,7 +725,7 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
                     try:
                         extracted_device_details = doctor_decision_text.split('تفاصيل الجهاز:', 1)[1].strip()
                     except Exception:
-                        pass
+                        logger.debug("تم تجاهل استثناء في handle_report_selection", exc_info=True)
                 elif doctor_decision_text and doctor_decision_text != "لا يوجد":
                     extracted_device_details = doctor_decision_text
 
@@ -739,7 +742,7 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
                             else:
                                 extracted_admission_reason = rest.strip()
                     except Exception:
-                        pass
+                        logger.debug("تم تجاهل استثناء في handle_report_selection", exc_info=True)
                 elif doctor_decision_text and doctor_decision_text != "لا يوجد":
                     extracted_admission_reason = doctor_decision_text
 
@@ -966,7 +969,7 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
                 parse_mode=ParseMode.MARKDOWN
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_report_selection", exc_info=True)
         return ConversationHandler.END
 
 async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -985,7 +988,7 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await query.edit_message_text(text, **kw)
                 return
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في _reply", exc_info=True)
         msg = update.message or (update.callback_query.message if update.callback_query else None)
         if msg:
             await msg.reply_text(text, **kw)
@@ -1038,7 +1041,7 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         if len(parts) > 1:
                             tests_value = parts[1].strip()
                     except Exception:
-                        pass
+                        logger.debug("تم تجاهل استثناء في handle_republish", exc_info=True)
                 logger.info(f"✅ استخراج tests لتقرير 'استشارة جديدة' #{report_id}: tests_value='{tests_value[:50] if tests_value else 'فارغ'}...'")
             elif report.medical_action == 'استشارة مع قرار عملية':
                 # محاولة استخراج من doctor_decision
@@ -1048,7 +1051,7 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         if len(parts) > 1:
                             tests_value = parts[1].strip()
                     except Exception:
-                        pass
+                        logger.debug("تم تجاهل استثناء في handle_republish", exc_info=True)
 
             # ✅ استخراج الحقول الخاصة من doctor_decision بناءً على نوع الإجراء
             operation_details = ''
@@ -1083,7 +1086,7 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             else:
                                 operation_details = rest.strip()
                     except Exception:
-                        pass
+                        logger.debug("تم تجاهل استثناء في handle_republish", exc_info=True)
 
             elif report.medical_action in ['علاج طبيعي', 'علاج طبيعي وإعادة تأهيل']:
                 # استخراج تفاصيل الجلسة - يدعم عدة صيغ
@@ -1091,12 +1094,12 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     try:
                         therapy_details = doctor_decision_text.split('تفاصيل جلسة العلاج الطبيعي:', 1)[1].strip()
                     except Exception:
-                        pass
+                        logger.debug("تم تجاهل استثناء في handle_republish", exc_info=True)
                 elif 'تفاصيل الجلسة:' in doctor_decision_text:
                     try:
                         therapy_details = doctor_decision_text.split('تفاصيل الجلسة:', 1)[1].strip()
                     except Exception:
-                        pass
+                        logger.debug("تم تجاهل استثناء في handle_republish", exc_info=True)
                 elif doctor_decision_text and doctor_decision_text.strip():
                     # إذا لم يكن هناك تنسيق، استخدم القيمة كاملة
                     therapy_details = doctor_decision_text.strip()
@@ -1107,7 +1110,7 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     try:
                         device_details = doctor_decision_text.split('تفاصيل الجهاز:', 1)[1].strip()
                     except Exception:
-                        pass
+                        logger.debug("تم تجاهل استثناء في handle_republish", exc_info=True)
 
             elif report.medical_action == 'ترقيد':
                 # استخراج سبب الرقود
@@ -1123,7 +1126,7 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             else:
                                 admission_reason = rest.strip()
                     except Exception:
-                        pass
+                        logger.debug("تم تجاهل استثناء في handle_republish", exc_info=True)
 
             elif report.medical_action == 'خروج من المستشفى':
                 # استخراج ملخص الرقود أو تفاصيل العملية
@@ -1131,7 +1134,7 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     try:
                         admission_summary = doctor_decision_text.split('ملخص الرقود:', 1)[1].strip()
                     except Exception:
-                        pass
+                        logger.debug("تم تجاهل استثناء في handle_republish", exc_info=True)
                 elif 'تفاصيل العملية:' in doctor_decision_text:
                     try:
                         parts = doctor_decision_text.split('تفاصيل العملية:', 1)
@@ -1143,7 +1146,7 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             else:
                                 operation_details = rest.strip()
                     except Exception:
-                        pass
+                        logger.debug("تم تجاهل استثناء في handle_republish", exc_info=True)
 
             # ✅ استخراج حقول استشارة مع قرار عملية
             elif report.medical_action == 'استشارة مع قرار عملية':
@@ -1495,7 +1498,7 @@ async def handle_field_selection(update: Update, context: ContextTypes.DEFAULT_T
                 parse_mode=ParseMode.MARKDOWN
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_field_selection", exc_info=True)
         return ConversationHandler.END
 
 
@@ -2231,7 +2234,7 @@ async def save_edit_to_database(query, context):
                             h, m = new_time.split(':')
                             dt = dt.replace(hour=int(h), minute=int(m))
                         except Exception:
-                            pass
+                            logger.debug("تم تجاهل استثناء في save_edit_to_database", exc_info=True)
                 setattr(report, field_name, dt)
                 if field_name == "followup_date":
                     report.followup_time = dt.strftime('%H:%M') if (dt.hour or dt.minute) else context.user_data.get('new_time')
@@ -2592,7 +2595,7 @@ async def show_field_selection(query, context):
                     elif section.startswith('الفحوصات المطلوبة:'):
                         current_data['tests'] = section.replace('الفحوصات المطلوبة:', '', 1).strip() or "لا يوجد"
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في show_field_selection", exc_info=True)
         
         elif report.medical_action == 'عملية':
             try:
@@ -2613,7 +2616,7 @@ async def show_field_selection(query, context):
                 elif dd_text and dd_text.strip() and dd_text != "لا يوجد":
                     current_data['operation_details'] = dd_text.strip()
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في show_field_selection", exc_info=True)
         
         elif report.medical_action in ['خروج من المستشفى', 'خروج']:
             try:
@@ -2641,7 +2644,7 @@ async def show_field_selection(query, context):
                         else:
                             current_data['operation_details'] = rest.strip() or "لا يوجد"
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في show_field_selection", exc_info=True)
         
         elif report.medical_action in ['علاج طبيعي', 'علاج طبيعي وإعادة تأهيل']:
             try:
@@ -2652,7 +2655,7 @@ async def show_field_selection(query, context):
                 elif dd_text and dd_text.strip() and dd_text != "لا يوجد":
                     current_data['therapy_details'] = dd_text.strip()
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في show_field_selection", exc_info=True)
         
         elif report.medical_action == 'أجهزة تعويضية':
             try:
@@ -2661,7 +2664,7 @@ async def show_field_selection(query, context):
                 elif dd_text and dd_text.strip() and dd_text != "لا يوجد":
                     current_data['device_details'] = dd_text.strip()
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في show_field_selection", exc_info=True)
         
         elif report.medical_action == 'ترقيد':
             try:
@@ -2677,7 +2680,7 @@ async def show_field_selection(query, context):
                 elif dd_text and dd_text.strip() and dd_text != "لا يوجد":
                     current_data['admission_reason'] = dd_text.strip()
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في show_field_selection", exc_info=True)
             # fallback: استخدام complaint_text كـ admission_reason
             if current_data.get('admission_reason', 'لا يوجد') == 'لا يوجد':
                 if report.complaint_text and report.complaint_text != "لا يوجد":

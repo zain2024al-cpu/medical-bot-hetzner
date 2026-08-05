@@ -127,7 +127,7 @@ async def handle_discharge_edit_field_selection(update: Update, context: Context
                 parse_mode="Markdown"
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_discharge_edit_field_selection", exc_info=True)
         return ConversationHandler.END
 
 
@@ -227,6 +227,6 @@ async def handle_discharge_edit_field_input(update: Update, context: ContextType
                 parse_mode="Markdown"
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_discharge_edit_field_input", exc_info=True)
         return ConversationHandler.END
 

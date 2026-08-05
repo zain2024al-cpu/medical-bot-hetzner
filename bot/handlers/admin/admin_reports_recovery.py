@@ -264,7 +264,7 @@ async def cancel_recovery(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             await query.edit_message_text("✅ تم الإلغاء.")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في cancel_recovery", exc_info=True)
     return ConversationHandler.END
 
 

@@ -823,7 +823,7 @@ async def execute_smart_state_action(target_step, flow_type, update, context):
                 ]])
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في execute_smart_state_action", exc_info=True)
         return target_step
 
 

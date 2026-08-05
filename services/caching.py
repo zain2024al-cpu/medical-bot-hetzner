@@ -106,7 +106,7 @@ class CacheManager:
             try:
                 await self._cleanup_task
             except asyncio.CancelledError:
-                pass
+                logger.debug("تم تجاهل استثناء في stop_cleanup_task", exc_info=True)
             logger.info("🛑 Cache cleanup task stopped")
 
 # 🚀 إنشاء instance عالمي للـ cache

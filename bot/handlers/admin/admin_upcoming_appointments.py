@@ -127,7 +127,7 @@ async def handle_menu_choice(
     try:
         await query.answer()
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في handle_menu_choice", exc_info=True)
 
     data = query.data or ""
 
@@ -135,7 +135,7 @@ async def handle_menu_choice(
         try:
             await query.edit_message_text("✅ تم الإلغاء.")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_menu_choice", exc_info=True)
         context.user_data.clear()
         return ConversationHandler.END
 
@@ -148,7 +148,7 @@ async def handle_menu_choice(
                 parse_mode=ParseMode.MARKDOWN,
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_menu_choice", exc_info=True)
         return SELECT_DATE
 
     if data == f"{_PFX}:tomorrow":
@@ -168,7 +168,7 @@ async def handle_date_selection(
     try:
         await query.answer()
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في handle_date_selection", exc_info=True)
 
     data = query.data or ""
 
@@ -182,7 +182,7 @@ async def handle_date_selection(
                 parse_mode=ParseMode.MARKDOWN,
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_date_selection", exc_info=True)
         return SHOW_MENU
 
     if data.startswith(f"{_PFX}:date:"):
@@ -197,7 +197,7 @@ async def handle_date_selection(
             try:
                 await query.edit_message_text("❌ خطأ في معالجة التاريخ.")
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في handle_date_selection", exc_info=True)
 
         return ConversationHandler.END
 
@@ -286,14 +286,14 @@ async def _show_appointments(query, target_date: date) -> None:
                     parse_mode=ParseMode.MARKDOWN,
                 )
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في _show_appointments", exc_info=True)
 
     except Exception as exc:
         logger.error(f"[upcoming_apt] Failed to show appointments: {exc}")
         try:
             await query.edit_message_text("❌ خطأ في جلب المواعيد.")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _show_appointments", exc_info=True)
 
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -304,7 +304,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             await query.answer()
             await query.edit_message_text("✅ تم الإلغاء.")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في cancel", exc_info=True)
     context.user_data.clear()
     return ConversationHandler.END
 

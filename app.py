@@ -47,7 +47,7 @@ class _RedactSecretsFilter(logging.Filter):
                     record.args = ()
         except Exception:
             # Never break logging
-            pass
+            logger.debug("تم تجاهل استثناء في filter", exc_info=True)
         return True
 
 
@@ -69,12 +69,12 @@ def _harden_logging():
     try:
         root.addFilter(flt)
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في _harden_logging", exc_info=True)
     for h in list(root.handlers):
         try:
             h.addFilter(flt)
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _harden_logging", exc_info=True)
 
 
 _harden_logging()
@@ -110,7 +110,7 @@ def _acquire_single_instance_lock() -> bool:
         try:
             lock_file.close()
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _acquire_single_instance_lock", exc_info=True)
         return False
 
     _instance_lock_handle = lock_file
@@ -127,11 +127,11 @@ def _release_single_instance_lock():
             import fcntl
             fcntl.flock(_instance_lock_handle.fileno(), fcntl.LOCK_UN)
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في _release_single_instance_lock", exc_info=True)
     try:
         _instance_lock_handle.close()
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في _release_single_instance_lock", exc_info=True)
     _instance_lock_handle = None
 
 # ================================================

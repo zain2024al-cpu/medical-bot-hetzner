@@ -212,7 +212,7 @@ async def render_hospital_selection(message, context, query=None,
             await query.edit_message_text(text, reply_markup=keyboard, parse_mode="Markdown")
             return
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في render_hospital_selection", exc_info=True)
     await message.reply_text(text, reply_markup=keyboard, parse_mode="Markdown")
 
 

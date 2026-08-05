@@ -50,7 +50,7 @@ async def start_paste_report(update: Update, context: ContextTypes.DEFAULT_TYPE)
             try:
                 await query.edit_message_text("🚫 هذا الإجراء **للأدمن فقط**.", parse_mode=ParseMode.MARKDOWN)
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في start_paste_report", exc_info=True)
         elif update.message:
             await update.message.reply_text("🚫 هذا الإجراء للأدمن فقط.")
         return ConversationHandler.END
@@ -251,7 +251,7 @@ async def cancel_paste_callback(update: Update, context: ContextTypes.DEFAULT_TY
         try:
             await query.edit_message_text("✅ تم الإلغاء.")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في cancel_paste_callback", exc_info=True)
     return ConversationHandler.END
 
 

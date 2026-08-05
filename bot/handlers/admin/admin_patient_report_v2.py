@@ -159,7 +159,7 @@ async def show_patient_selector(
     try:
         await query.answer()
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في show_patient_selector", exc_info=True)
 
     # Initialize context for patient report flow
     context.user_data["_report_type"] = "patient"
@@ -204,7 +204,7 @@ async def _on_patient_selected(
                 parse_mode=ParseMode.MARKDOWN,
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _on_patient_selected", exc_info=True)
         # Clear context for clean state
         context.user_data.clear()
         return
@@ -234,7 +234,7 @@ async def _on_patient_selected(
                 parse_mode=ParseMode.MARKDOWN,
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _on_patient_selected", exc_info=True)
 
     # Set state for ConversationHandler to enter PR_DEPTS
     context._conversation_state = PR_DEPTS
@@ -258,7 +258,7 @@ async def _show_depts_multiselect(query, context: ContextTypes.DEFAULT_TYPE, pat
                 reply_markup=_actions_kb(patient_id), parse_mode=ParseMode.MARKDOWN,
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _show_depts_multiselect", exc_info=True)
         return
 
     selected = context.user_data.get("_pr_selected_depts", set())
@@ -291,7 +291,7 @@ async def _show_actions_multiselect(query, context: ContextTypes.DEFAULT_TYPE, p
                 reply_markup=_period_kb(patient_id), parse_mode=ParseMode.MARKDOWN,
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _show_actions_multiselect", exc_info=True)
         return
 
     selected = context.user_data.get("_pr_selected_actions", set())
@@ -378,7 +378,7 @@ async def handle_departments(
     try:
         await query.answer()
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في handle_departments", exc_info=True)
 
     data = query.data or ""
 
@@ -386,7 +386,7 @@ async def handle_departments(
         try:
             await query.edit_message_text("✅ تم الإلغاء.")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_departments", exc_info=True)
         context.user_data.clear()
         return ConversationHandler.END
 
@@ -436,7 +436,7 @@ async def handle_departments(
                     parse_mode=ParseMode.MARKDOWN,
                 )
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في handle_departments", exc_info=True)
             return PR_ACTIONS
 
         # action == "select" → افتح شاشة الاختيار المتعدد الفعلية
@@ -457,7 +457,7 @@ async def handle_actions(
     try:
         await query.answer()
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في handle_actions", exc_info=True)
 
     data = query.data or ""
 
@@ -465,7 +465,7 @@ async def handle_actions(
         try:
             await query.edit_message_text("✅ تم الإلغاء.")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_actions", exc_info=True)
         context.user_data.clear()
         return ConversationHandler.END
 
@@ -479,7 +479,7 @@ async def handle_actions(
                 parse_mode=ParseMode.MARKDOWN,
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_actions", exc_info=True)
         return PR_DEPTS
 
     parts = data.split(":")
@@ -509,7 +509,7 @@ async def handle_actions(
                         reply_markup=_period_kb(patient_id), parse_mode=ParseMode.MARKDOWN,
                     )
                 except Exception:
-                    pass
+                    logger.debug("تم تجاهل استثناء في handle_actions", exc_info=True)
                 return PR_PERIOD
             return PR_ACTIONS
 
@@ -526,7 +526,7 @@ async def handle_actions(
                     parse_mode=ParseMode.MARKDOWN,
                 )
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في handle_actions", exc_info=True)
             return PR_PERIOD
 
         # action_val == "select" → افتح شاشة الاختيار المتعدد الفعلية
@@ -616,7 +616,7 @@ async def _finalize_and_generate(
         try:
             await query.delete_message()
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _finalize_and_generate", exc_info=True)
 
         await context.bot.send_document(
             chat_id=update.effective_chat.id,
@@ -639,7 +639,7 @@ async def _finalize_and_generate(
                 parse_mode=ParseMode.MARKDOWN,
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _finalize_and_generate", exc_info=True)
 
     finally:
         context.user_data.clear()
@@ -656,7 +656,7 @@ async def handle_period(
     try:
         await query.answer()
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في handle_period", exc_info=True)
 
     data = query.data or ""
 
@@ -664,7 +664,7 @@ async def handle_period(
         try:
             await query.edit_message_text("✅ تم الإلغاء.")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_period", exc_info=True)
         context.user_data.clear()
         return ConversationHandler.END
 
@@ -681,7 +681,7 @@ async def handle_period(
                 parse_mode=ParseMode.MARKDOWN,
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_period", exc_info=True)
         return PR_ACTIONS
 
     # ── Custom date-range calendar callbacks: pr2:cal:{step}:{patient_id}:{sub}[:extra] ─

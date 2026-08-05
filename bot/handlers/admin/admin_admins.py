@@ -29,7 +29,7 @@ async def start_admin_management(update: Update, context: ContextTypes.DEFAULT_T
             try:
                 await update.callback_query.answer("🚫 هذه الخاصية مخصصة للإدمن فقط.", show_alert=True)
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في start_admin_management", exc_info=True)
         return ConversationHandler.END
 
     # لوحة إدارة الأدمنين
@@ -47,7 +47,7 @@ async def start_admin_management(update: Update, context: ContextTypes.DEFAULT_T
         try:
             await query.answer()
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في start_admin_management", exc_info=True)
         try:
             await query.edit_message_text(
                 "👑 **إدارة الأدمنين**\n\n"
@@ -66,7 +66,7 @@ async def start_admin_management(update: Update, context: ContextTypes.DEFAULT_T
                         parse_mode="Markdown"
                     )
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في start_admin_management", exc_info=True)
     elif update.message:
         await update.message.reply_text(
             "👑 **إدارة الأدمنين**\n\n"
@@ -372,7 +372,7 @@ async def _aa_entry_from_button(update: Update, context: ContextTypes.DEFAULT_TY
         try:
             await query.answer("🚫 هذه الخاصية مخصصة للإدمن فقط.", show_alert=True)
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _aa_entry_from_button", exc_info=True)
         return ConversationHandler.END
 
     # معالجة الزر مباشرة بدلاً من إعادة عرض القائمة

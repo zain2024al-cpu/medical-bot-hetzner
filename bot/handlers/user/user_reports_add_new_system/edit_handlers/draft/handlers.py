@@ -421,7 +421,7 @@ async def handle_finish_edit_draft(update: Update, context: ContextTypes.DEFAULT
         try:
             await query.edit_message_text("❌ حدث خطأ في إنهاء التعديل. اضغط /start للبدء من جديد.")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_finish_edit_draft", exc_info=True)
 
 
 # =============================
@@ -483,7 +483,7 @@ async def handle_back_to_summary(update: Update, context: ContextTypes.DEFAULT_T
                 parse_mode="Markdown"
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_back_to_summary", exc_info=True)
         return ConversationHandler.END
 
 

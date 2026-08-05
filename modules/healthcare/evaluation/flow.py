@@ -82,7 +82,7 @@ async def _show_specialist_list(
             await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
             return
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في _show_specialist_list", exc_info=True)
     await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
 
@@ -316,7 +316,7 @@ async def _handle_callback(
     try:
         await query.answer()
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في _handle_callback", exc_info=True)
     # ✅ الحماية داخل المعالِج نفسه — أدمن فقط، مستقلة عن ظهور الزر.
     if not query.from_user or not is_admin(query.from_user.id):
         logger.warning(f"[evaluation] 🚫 blocked non-admin user={getattr(query.from_user, 'id', '?')}")
@@ -399,7 +399,7 @@ async def _handle_callback(
         try:
             await query.edit_message_text("✅ تم إلغاء العملية.")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _handle_callback", exc_info=True)
 
 
 # ── Registration ──────────────────────────────────────────────────────────────

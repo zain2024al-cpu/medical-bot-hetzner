@@ -133,7 +133,7 @@ async def handle_followup_edit_field_selection(update: Update, context: ContextT
                 parse_mode="Markdown"
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_followup_edit_field_selection", exc_info=True)
         return ConversationHandler.END
 
 
@@ -227,6 +227,6 @@ async def handle_followup_edit_field_input(update: Update, context: ContextTypes
                 parse_mode="Markdown"
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_followup_edit_field_input", exc_info=True)
         return ConversationHandler.END
 

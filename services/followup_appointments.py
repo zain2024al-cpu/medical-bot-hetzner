@@ -98,7 +98,7 @@ async def extract_and_create_followups_from_today_reports(bot, admin_ids: List[i
                     try:
                         await bot.send_message(chat_id=admin_id, text=message)
                     except Exception:
-                        pass
+                        logger.debug("تم تجاهل استثناء في extract_and_create_followups_from_today_reports", exc_info=True)
                 
                 logger.info(f"✅ تم إنشاء {len(new_followups)} متابعة من تقارير اليوم")
         
@@ -203,7 +203,7 @@ async def send_daily_followups_reminder(bot, admin_ids: List[int]):
                     try:
                         await bot.send_message(chat_id=admin_id, text=message)
                     except Exception:
-                        pass
+                        logger.debug("تم تجاهل استثناء في send_daily_followups_reminder", exc_info=True)
                 
                 logger.info(f"✅ تم إرسال تذكير المتابعات اليومي: {len(today_followups)} موعد")
         

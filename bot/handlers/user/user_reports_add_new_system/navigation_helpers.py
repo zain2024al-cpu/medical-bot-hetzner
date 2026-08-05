@@ -30,7 +30,7 @@ async def handle_cancel_navigation(update: Update, context: ContextTypes.DEFAULT
                 try:
                     await query.message.delete()
                 except Exception:
-                    pass
+                    logger.debug("تم تجاهل استثناء في handle_cancel_navigation", exc_info=True)
 
             # ✅ تصفير كامل لـ report_tmp بدل حذف قائمة مفاتيح يدوية — كانت
             # هذه القائمة تُنسى تحديثها مع كل نوع إجراء جديد (لم تشمل قط
@@ -186,7 +186,7 @@ async def handle_back_navigation(update, context: ContextTypes.DEFAULT_TYPE):
             try:
                 await query.message.delete()
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في handle_back_navigation", exc_info=True)
             return previous_step
 
     except Exception as e:
@@ -373,7 +373,7 @@ async def handle_smart_back_navigation(update: Update, context: ContextTypes.DEF
                     ]])
                 )
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في handle_smart_back_navigation", exc_info=True)
             return previous_step
 
         return previous_step
@@ -388,5 +388,5 @@ async def handle_smart_back_navigation(update: Update, context: ContextTypes.DEF
                 ]])
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_smart_back_navigation", exc_info=True)
         return ConversationHandler.END

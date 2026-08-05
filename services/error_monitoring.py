@@ -274,7 +274,7 @@ async def comprehensive_error_handler(update: Optional[Update], context: Context
         try:
             await error_monitor.notify_admin(error_info, context.bot)
         except Exception:
-            pass
+            error_logger.debug("تم تجاهل استثناء في comprehensive_error_handler", exc_info=True)
     
     # محاولة إرسال رسالة للمستخدم
     if update and update.effective_message:
@@ -284,7 +284,7 @@ async def comprehensive_error_handler(update: Optional[Update], context: Context
                 "إذا استمرت المشكلة، يرجى التواصل مع الإدارة."
             )
         except Exception:
-            pass
+            error_logger.debug("تم تجاهل استثناء في comprehensive_error_handler", exc_info=True)
     
     # محاولة الرد على callback query
     if update and update.callback_query:
@@ -294,7 +294,7 @@ async def comprehensive_error_handler(update: Optional[Update], context: Context
                 show_alert=True
             )
         except Exception:
-            pass
+            error_logger.debug("تم تجاهل استثناء في comprehensive_error_handler", exc_info=True)
 
 
 def setup_logging():

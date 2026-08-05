@@ -75,7 +75,7 @@ def get_expiring_soon() -> list[ExpiringEntry]:
                         residency_number= p.residency_number or "",
                     ))
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في get_expiring_soon", exc_info=True)
 
         companions = (
             db.query(ResidencyCompanion)
@@ -106,7 +106,7 @@ def get_expiring_soon() -> list[ExpiringEntry]:
                         residency_number= c.residency_number or "",
                     ))
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في get_expiring_soon", exc_info=True)
 
     results.sort(key=lambda e: e.days_remaining)
     logger.debug(f"[residency.followup] get_expiring_soon → {len(results)} entries")

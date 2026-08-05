@@ -28,7 +28,7 @@ def _resolve_bot(bot_like):
             if isinstance(resolved_bot, Bot):
                 return resolved_bot
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _resolve_bot", exc_info=True)
 
     nested_message = getattr(bot_like, "message", None)
     nested_bot = getattr(nested_message, "bot", None) if nested_message else None

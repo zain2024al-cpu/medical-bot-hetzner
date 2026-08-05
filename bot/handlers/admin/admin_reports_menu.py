@@ -77,7 +77,7 @@ async def handle_type_selection(
     try:
         await query.answer()
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في handle_type_selection", exc_info=True)
 
     data = query.data or ""
 
@@ -85,7 +85,7 @@ async def handle_type_selection(
         try:
             await query.edit_message_text("✅ تم إلغاء العملية.")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_type_selection", exc_info=True)
         context.user_data.clear()
         return ConversationHandler.END
 
@@ -108,7 +108,7 @@ async def handle_type_selection(
             try:
                 await query.edit_message_text("❌ حدث خطأ. حاول الضغط على '🖨️ طباعة التقارير' مرة أخرى.")
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في handle_type_selection", exc_info=True)
         return ConversationHandler.END
 
     if data == f"{_PFX}:patient":
@@ -131,7 +131,7 @@ async def handle_type_selection(
             try:
                 await query.edit_message_text("❌ حدث خطأ. حاول الضغط على '🖨️ طباعة التقارير' مرة أخرى.")
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في handle_type_selection", exc_info=True)
         return ConversationHandler.END
 
     if data == f"{_PFX}:attachments":
@@ -146,7 +146,7 @@ async def handle_type_selection(
             try:
                 await query.edit_message_text("❌ حدث خطأ. حاول الضغط على '🖨️ طباعة التقارير' مرة أخرى.")
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في handle_type_selection", exc_info=True)
         return ConversationHandler.END
 
     return MENU_CHOOSE_TYPE
@@ -165,7 +165,7 @@ async def cancel_reports_menu(
             await query.answer()
             await query.edit_message_text("✅ تم الإلغاء.")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في cancel_reports_menu", exc_info=True)
     context.user_data.clear()
     return ConversationHandler.END
 

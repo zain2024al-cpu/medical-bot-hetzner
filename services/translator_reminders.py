@@ -193,7 +193,7 @@ async def send_late_warning_to_admin(bot, admin_ids: List[int]):
                             text=message
                         )
                     except Exception:
-                        pass
+                        logger.debug("تم تجاهل استثناء في send_late_warning_to_admin", exc_info=True)
                 
                 logger.info(f"✅ تم إرسال تقرير التأخير للأدمن: {len(late_translators)} متأخر")
         

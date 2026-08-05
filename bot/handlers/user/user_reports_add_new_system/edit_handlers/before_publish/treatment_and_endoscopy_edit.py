@@ -187,7 +187,7 @@ async def handle_treatment_endoscopy_edit_field_selection(update: Update, contex
                 parse_mode="Markdown"
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_treatment_endoscopy_edit_field_selection", exc_info=True)
         return ConversationHandler.END
 
 
@@ -301,5 +301,5 @@ async def handle_treatment_endoscopy_edit_field_input(update: Update, context: C
                 parse_mode="Markdown"
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_treatment_endoscopy_edit_field_input", exc_info=True)
         return ConversationHandler.END

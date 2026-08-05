@@ -83,7 +83,7 @@ async def handle_transplant_type_choice(update: Update, context: ContextTypes.DE
     try:
         await query.edit_message_text(f"✅ تم اختيار: {label}")
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في handle_transplant_type_choice", exc_info=True)
     await _prompt_party(query.message, context)
     return TRANSPLANT_PARTY
 
@@ -122,7 +122,7 @@ async def _prompt_party(message_or_query, context):
             await message_or_query.edit_message_text(_PARTY_SCREEN_TEXT, reply_markup=kb, parse_mode="Markdown")
             return
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _prompt_party", exc_info=True)
     await message_or_query.reply_text(_PARTY_SCREEN_TEXT, reply_markup=kb, parse_mode="Markdown")
 
 
@@ -144,7 +144,7 @@ async def handle_transplant_party_toggle(update: Update, context: ContextTypes.D
             _PARTY_SCREEN_TEXT, reply_markup=_party_keyboard(set(selected)), parse_mode="Markdown"
         )
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في handle_transplant_party_toggle", exc_info=True)
     return TRANSPLANT_PARTY
 
 
@@ -165,7 +165,7 @@ async def handle_transplant_party_next(update: Update, context: ContextTypes.DEF
     try:
         await query.edit_message_text(f"✅ تم اختيار: {data['transplant_parties']}")
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في handle_transplant_party_next", exc_info=True)
     await _prompt_details(query.message, context)
     return TRANSPLANT_DETAILS
 
@@ -184,7 +184,7 @@ async def _prompt_details(message_or_query, context):
             await message_or_query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
             return
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _prompt_details", exc_info=True)
     await message_or_query.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
 

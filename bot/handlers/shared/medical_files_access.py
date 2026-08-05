@@ -111,7 +111,7 @@ async def handle_medical_files_callback(update: Update, context: ContextTypes.DE
         try:
             await update.callback_query.answer("⚠️ حدث خطأ أثناء جلب الملفات.", show_alert=True)
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_medical_files_callback", exc_info=True)
 
 
 __all__ = ["handle_medical_files_callback"]

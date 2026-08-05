@@ -131,7 +131,7 @@ async def user_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             try:
                 await update.message.reply_text("❌ حدث خطأ، يرجى المحاولة مرة أخرى.")
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في user_start", exc_info=True)
         return
 
     try:
@@ -322,7 +322,7 @@ async def user_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     reply_markup=start_persistent_kb()
                 )
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في user_start", exc_info=True)
 
 
 # 🎯 معالجة زر "ابدأ" (legacy inline button — role-aware)

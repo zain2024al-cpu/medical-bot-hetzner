@@ -11,6 +11,9 @@ from db.session import SessionLocal
 from db.models import Translator
 from datetime import datetime
 from bot.handlers.admin.decorators import require_admin
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 # 🟣 أمر /admin لفتح لوحة تحكم الأدمن
@@ -146,7 +149,7 @@ async def handle_user_approval(update: Update, context: ContextTypes.DEFAULT_TYP
                         text="✅ تم قبولك! اضغط /start للبدء."
                     )
                 except Exception:
-                    pass
+                    logger.debug("تم تجاهل استثناء في handle_user_approval", exc_info=True)
 
         elif action == "reject":
             # حذف من SQLite
@@ -162,7 +165,7 @@ async def handle_user_approval(update: Update, context: ContextTypes.DEFAULT_TYP
                     text="❌ تم رفض طلبك. يرجى التواصل مع الإدارة لمزيد من التفاصيل."
                 )
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في handle_user_approval", exc_info=True)
 
 
 # دالة معالجة العودة للقائمة الرئيسية
@@ -186,7 +189,7 @@ async def handle_back_to_main(update: Update, context: ContextTypes.DEFAULT_TYPE
     try:
         await query.message.delete()
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في handle_back_to_main", exc_info=True)
 
 
 async def handle_admin_buttons(update, context):
@@ -412,7 +415,7 @@ async def handle_group_settings(update, context):
             if query:
                 await query.answer(f"❌ حدث خطأ: {str(e)[:50]}", show_alert=True)
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_group_settings", exc_info=True)
 
 
 # ✅ معالج زر إيقاف/تفعيل إرسال التقارير من لوحة المفاتيح

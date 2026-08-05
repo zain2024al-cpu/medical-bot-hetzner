@@ -485,7 +485,7 @@ async def show_translator_selection(message, context, flow_type):
         context.user_data.pop("_skip_medical_gate_once", None)
     except Exception:
         # لا نمنع اختيار المترجم إذا حدث خطأ في البوابة
-        pass
+        logger.debug("تم تجاهل استثناء في show_translator_selection", exc_info=True)
 
     text, keyboard = _build_translator_picker(flow_type, 0, context)
 
@@ -542,7 +542,7 @@ def _build_translator_picker(flow_type: str, page: int, context=None):
         try:
             context.user_data[_TRANSLATOR_PICKER_NAMES_KEY] = list(names)
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _build_translator_picker", exc_info=True)
 
     per_page = _TRANSLATOR_PICKER_PAGE_SIZE
     total = len(names)
@@ -1208,7 +1208,7 @@ async def handle_translator_choice(update: Update, context: ContextTypes.DEFAULT
                     try:
                         await query.message.reply_text("✅ تم اختيار المترجم")
                     except Exception:
-                        pass
+                        logger.debug("تم تجاهل استثناء في handle_translator_choice", exc_info=True)
                 try:
                     await show_final_summary(query.message, context, flow_type)
                 except Exception as e:
@@ -1270,7 +1270,7 @@ async def handle_translator_choice(update: Update, context: ContextTypes.DEFAULT
             if query:
                 await query.answer("⚠️ حدث خطأ غير متوقع، يرجى المحاولة مرة أخرى", show_alert=True)
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_translator_choice", exc_info=True)
         flow_type = context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
         return get_translator_state(flow_type)
 
@@ -1573,7 +1573,7 @@ async def show_final_summary(message, context, flow_type):
         try:
             await message.reply_text("❌ حدث خطأ في عرض الملخص")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في show_final_summary", exc_info=True)
 
 
 async def show_review_screen(query, context, flow_type):
@@ -2129,22 +2129,22 @@ async def save_report_to_database(query, context, flow_type):
                             try:
                                 return dt_module.strptime(dt, '%Y-%m-%d %H:%M')
                             except ValueError:
-                                pass
+                                logger.debug("تم تجاهل استثناء في to_naive_datetime", exc_info=True)
                     # صيغة: YYYY-MM-DD
                     try:
                         return dt_module.strptime(dt, '%Y-%m-%d')
                     except ValueError:
-                        pass
+                        logger.debug("تم تجاهل استثناء في to_naive_datetime", exc_info=True)
                     # صيغة: DD/MM/YYYY
                     try:
                         return dt_module.strptime(dt, '%d/%m/%Y')
                     except ValueError:
-                        pass
+                        logger.debug("تم تجاهل استثناء في to_naive_datetime", exc_info=True)
                     # صيغة: DD-MM-YYYY
                     try:
                         return dt_module.strptime(dt, '%d-%m-%Y')
                     except ValueError:
-                        pass
+                        logger.debug("تم تجاهل استثناء في to_naive_datetime", exc_info=True)
                     logger.warning(f"⚠️ Could not parse date string: {dt}")
                     return None
                 except Exception as e:
@@ -2936,7 +2936,7 @@ async def save_report_to_database(query, context, flow_type):
                 session.rollback()
                 session.close()
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في save_report_to_database", exc_info=True)
 
         # ✅ محاولة تعديل الرسالة - مع fallback إذا فشل
         try:

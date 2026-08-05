@@ -117,7 +117,7 @@ def _effective_ist_hour_for_late(visit_time, report_date, created_at):
                     h = 0
                 return h
         except ValueError:
-            pass
+            logger.debug("تم تجاهل استثناء في _effective_ist_hour_for_late", exc_info=True)
     cd = _parse_datetime(created_at)
     if not cd:
         return 0

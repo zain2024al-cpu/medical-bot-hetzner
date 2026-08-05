@@ -31,6 +31,9 @@
 # =============================================================================
 
 from dataclasses import dataclass
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -299,5 +302,5 @@ def format_endoscopy_procedures(raw) -> str:
                 parts.append(f"أخرى: {other}")
             return "، ".join(parts) if parts else "منظار تشخيصي — لم يُجرَ أي إجراء"
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في format_endoscopy_procedures", exc_info=True)
     return str(raw)

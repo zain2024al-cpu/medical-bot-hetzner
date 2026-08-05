@@ -3,6 +3,9 @@
 
 from datetime import datetime
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+import logging
+
+logger = logging.getLogger(__name__)
 
 GS = "gs"
 
@@ -55,7 +58,7 @@ def parse_date_input(text: str) -> datetime | None:
         try:
             return datetime.strptime(text, fmt)
         except ValueError:
-            pass
+            logger.debug("تم تجاهل استثناء في parse_date_input", exc_info=True)
     return None
 
 

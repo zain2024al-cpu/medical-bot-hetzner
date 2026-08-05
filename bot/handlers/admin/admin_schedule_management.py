@@ -113,14 +113,14 @@ async def handle_schedule_choice(update: Update, context: ContextTypes.DEFAULT_T
         try:
             await query.edit_message_text("🔙 تم الرجوع للقائمة الرئيسية.")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_schedule_choice", exc_info=True)
         try:
             await query.message.reply_text(
                 "اختر من القائمة الرئيسية:",
                 reply_markup=admin_main_kb()
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_schedule_choice", exc_info=True)
         return ConversationHandler.END
 
 async def upload_schedule_image(update: Update, context: ContextTypes.DEFAULT_TYPE):

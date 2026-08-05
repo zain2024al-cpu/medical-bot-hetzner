@@ -88,7 +88,7 @@ async def patient_search_inline_handler(update: Update, context: ContextTypes.DE
                 # وإلا يسرّب زر "🔍 بحث" مرضى غير تشناي رغم القيد في القائمة.
                 _sel_city = _sel_state.city
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في patient_search_inline_handler", exc_info=True)
 
         # ✅ البحث مباشرة من قاعدة البيانات
         with SessionLocal() as s:
@@ -211,7 +211,7 @@ async def patient_search_inline_handler(update: Update, context: ContextTypes.DE
         try:
             await update.inline_query.answer([error_result], cache_time=1)
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في patient_search_inline_handler", exc_info=True)
 
 
 def register(app):

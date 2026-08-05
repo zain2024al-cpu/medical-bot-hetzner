@@ -11,6 +11,9 @@ from telegram.ext import ContextTypes, CommandHandler
 
 from bot.shared_auth import is_admin
 from db.session import DATABASE_PATH
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 PM2_OUT_LOG_PATH = os.getenv("PM2_OUT_LOG_PATH", "/home/botuser/.pm2/logs/medbot-out.log")
@@ -86,7 +89,7 @@ async def backup_db(update: Update, context: ContextTypes.DEFAULT_TYPE):
             try:
                 os.remove(snapshot_path)
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في backup_db", exc_info=True)
 
 
 async def send_pm2_logs(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -143,7 +146,7 @@ async def send_pm2_logs(update: Update, context: ContextTypes.DEFAULT_TYPE):
             try:
                 os.remove(temp_tail)
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في send_pm2_logs", exc_info=True)
 
 
 async def sync_translator_names(update: Update, context: ContextTypes.DEFAULT_TYPE):

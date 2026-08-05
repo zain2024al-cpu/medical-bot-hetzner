@@ -94,7 +94,7 @@ async def handle_menu_choice(
     try:
         await query.answer()
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في handle_menu_choice", exc_info=True)
 
     data = query.data or ""
 
@@ -102,7 +102,7 @@ async def handle_menu_choice(
         try:
             await query.edit_message_text("✅ تم الإلغاء.")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_menu_choice", exc_info=True)
         context.user_data.clear()
         return ConversationHandler.END
 
@@ -126,7 +126,7 @@ async def handle_menu_choice(
             parse_mode=ParseMode.MARKDOWN,
         )
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في handle_menu_choice", exc_info=True)
 
     # Delegate to the appropriate delete handler
     if context.user_data.get("_delete_type") == "translators":
@@ -141,7 +141,7 @@ async def handle_menu_choice(
             try:
                 await query.edit_message_text("❌ فشل تحميل حذف التقارير.\n\nحاول مرة أخرى.")
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في handle_menu_choice", exc_info=True)
     elif context.user_data.get("_delete_type") == "healthcare":
         await _delete_healthcare_reports(update, context)
     elif context.user_data.get("_delete_type") == "services":
@@ -218,7 +218,7 @@ async def _delete_healthcare_reports(
         try:
             await query.edit_message_text("❌ خطأ في تحميل السنوات.")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _delete_healthcare_reports", exc_info=True)
 
 
 async def _delete_services_reports(
@@ -270,7 +270,7 @@ async def _delete_services_reports(
         try:
             await query.edit_message_text("❌ خطأ في تحميل السنوات.")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _delete_services_reports", exc_info=True)
 
 
 @require_admin
@@ -282,7 +282,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             await query.answer()
             await query.edit_message_text("✅ تم الإلغاء.")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في cancel", exc_info=True)
     context.user_data.clear()
     return ConversationHandler.END
 
@@ -342,7 +342,7 @@ async def _show_hc_months(query, year: int) -> None:
             parse_mode=ParseMode.MARKDOWN,
         )
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في _show_hc_months", exc_info=True)
 
 
 async def _show_hc_list(query, year: int, month: int, page: int = 0) -> None:
@@ -387,7 +387,7 @@ async def _show_hc_list(query, year: int, month: int, page: int = 0) -> None:
                 parse_mode=ParseMode.MARKDOWN,
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _show_hc_list", exc_info=True)
         return
 
     total_pages = (total_count + _HC_ITEMS_PER_PAGE - 1) // _HC_ITEMS_PER_PAGE
@@ -453,7 +453,7 @@ async def handle_healthcare_callback(
     try:
         await query.answer()
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في handle_healthcare_callback", exc_info=True)
 
     data = query.data or ""
 
@@ -461,7 +461,7 @@ async def handle_healthcare_callback(
         try:
             await query.edit_message_text("✅ تم الإلغاء.")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_healthcare_callback", exc_info=True)
         context.user_data.pop("_delete_type", None)
         context.user_data.pop("_hc_year", None)
         return
@@ -507,7 +507,7 @@ async def handle_healthcare_callback(
             try:
                 await query.edit_message_text("❌ نوع تقرير غير معروف.")
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في handle_healthcare_callback", exc_info=True)
             return
 
         with SessionLocal() as s:
@@ -516,7 +516,7 @@ async def handle_healthcare_callback(
                 try:
                     await query.edit_message_text("⚠️ التقرير غير موجود أو تم حذفه مسبقاً.")
                 except Exception:
-                    pass
+                    logger.debug("تم تجاهل استثناء في handle_healthcare_callback", exc_info=True)
                 return
             patient = getattr(rec, "patient_name", None) or "غير محدد"
             specialist = getattr(rec, "specialist_name", None) or "غير محدد"
@@ -542,7 +542,7 @@ async def handle_healthcare_callback(
                 parse_mode=ParseMode.MARKDOWN,
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_healthcare_callback", exc_info=True)
         return
 
     if data.startswith("del_hc:idel:"):
@@ -567,7 +567,7 @@ async def handle_healthcare_callback(
             try:
                 await query.answer("⚠️ التقرير غير موجود أو تم حذفه مسبقاً.", show_alert=True)
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في handle_healthcare_callback", exc_info=True)
 
         await _show_hc_list(query, year, month, page=page)
         return
@@ -605,7 +605,7 @@ async def handle_healthcare_callback(
                 parse_mode=ParseMode.MARKDOWN,
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_healthcare_callback", exc_info=True)
         return
 
     if data.startswith("del_hc:confirm:"):
@@ -648,7 +648,7 @@ async def handle_healthcare_callback(
             try:
                 await query.edit_message_text("❌ فشل الحذف. حاول مرة أخرى.")
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في handle_healthcare_callback", exc_info=True)
 
 
 @require_admin
@@ -660,7 +660,7 @@ async def handle_services_callback(
     try:
         await query.answer()
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في handle_services_callback", exc_info=True)
 
     data = query.data or ""
 
@@ -668,7 +668,7 @@ async def handle_services_callback(
         try:
             await query.edit_message_text("✅ تم الإلغاء.")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_services_callback", exc_info=True)
         context.user_data.pop("_delete_type", None)
         context.user_data.pop("_svc_year", None)
         return
@@ -706,7 +706,7 @@ async def handle_services_callback(
                 parse_mode=ParseMode.MARKDOWN,
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_services_callback", exc_info=True)
 
     elif data.startswith("del_svc:month:"):
         # Month selected - confirm deletion
@@ -744,7 +744,7 @@ async def handle_services_callback(
                 parse_mode=ParseMode.MARKDOWN,
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_services_callback", exc_info=True)
 
     elif data.startswith("del_svc:confirm:"):
         # Confirm deletion
@@ -787,7 +787,7 @@ async def handle_services_callback(
             try:
                 await query.edit_message_text("❌ فشل الحذف. حاول مرة أخرى.")
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في handle_services_callback", exc_info=True)
 
 
 # ── Registration ───────────────────────────────────────────────────────────────

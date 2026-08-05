@@ -8,6 +8,10 @@ import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 # أنماط سطر التاريخ — نفس القالب قد يُلصق مع **Markdown** أو نقطتين عربيتين أو «التاريخ والوقت»
 _DATE_LINE_PATTERNS = [
     r"(?:📅🕐\s*|📅\s*|📆\s*)?التاريخ\s*[:：﹕]\s*(.+?)(?:\n|$)",
@@ -139,7 +143,7 @@ def _parse_ar_report_datetime(line: str) -> Tuple[Optional[datetime], Optional[s
                     visit = f"{h}:{mi:02d}"
             return d, visit or rest or None
         except ValueError:
-            pass
+            logger.debug("تم تجاهل استثناء في _parse_ar_report_datetime", exc_info=True)
 
     m = re.search(r"(\d{1,2})\s+(\S+?)\s+(\d{4})", line)
     visit_str: Optional[str] = None
@@ -201,13 +205,13 @@ def _parse_followup_datetime(s: str) -> Optional[datetime]:
                 int(m.group(3)),
             )
         except ValueError:
-            pass
+            logger.debug("تم تجاهل استثناء في _parse_followup_datetime", exc_info=True)
     m2 = re.match(r"^(\d{4}-\d{2}-\d{2})", s)
     if m2:
         try:
             return datetime.strptime(m2.group(1), "%Y-%m-%d")
         except ValueError:
-            pass
+            logger.debug("تم تجاهل استثناء في _parse_followup_datetime", exc_info=True)
     return None
 
 
@@ -304,7 +308,7 @@ def parse_full_report_text(raw: str) -> Tuple[Dict[str, Any], List[str]]:
             cleaned = _norm_action(out["medical_action"])
             out["medical_action"] = cleaned or None
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في parse_full_report_text", exc_info=True)
 
     case_block, _ = _extract_block(
         text,

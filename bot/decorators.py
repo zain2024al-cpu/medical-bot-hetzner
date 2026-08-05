@@ -87,7 +87,7 @@ def admin_handler(func: Callable) -> Callable:
                 try:
                     context.user_data.clear()
                 except Exception:
-                    pass
+                    logger.debug("تم تجاهل استثناء في wrapper", exc_info=True)
             
             # محاولة إرسال رسالة للمستخدم
             try:
@@ -99,7 +99,7 @@ def admin_handler(func: Callable) -> Callable:
                                 show_alert=True
                             )
                         except Exception:
-                            pass
+                            logger.debug("تم تجاهل استثناء في wrapper", exc_info=True)
                         try:
                             await update.callback_query.edit_message_text(
                                 f"❌ **حدث خطأ**\n\n"
@@ -109,7 +109,7 @@ def admin_handler(func: Callable) -> Callable:
                                 parse_mode="Markdown"
                             )
                         except Exception:
-                            pass
+                            logger.debug("تم تجاهل استثناء في wrapper", exc_info=True)
                     elif hasattr(update, 'message') and update.message:
                         await update.message.reply_text(
                             f"❌ **حدث خطأ**\n\n"

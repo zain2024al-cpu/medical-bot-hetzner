@@ -4,6 +4,9 @@
 
 from telegram import Update
 from telegram.ext import ContextTypes
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 async def can_access(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
@@ -37,4 +40,4 @@ async def deny(update: Update) -> None:
                 "تواصل مع المسؤول للحصول على الإذن."
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في deny", exc_info=True)

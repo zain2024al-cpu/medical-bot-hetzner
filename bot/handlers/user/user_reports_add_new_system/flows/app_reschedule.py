@@ -274,4 +274,4 @@ async def handle_view_reschedule_callback(update: Update, context: ContextTypes.
         try:
             await update.callback_query.message.reply_text("⚠️ حدث خطأ أثناء جلب بيانات التأجيل.")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_view_reschedule_callback", exc_info=True)

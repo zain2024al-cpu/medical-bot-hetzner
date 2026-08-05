@@ -93,7 +93,7 @@ async def _go_to_review(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         try:
             await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown"); return
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _go_to_review", exc_info=True)
     await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
 
@@ -112,7 +112,7 @@ async def _route_to_edit_step(
             try:
                 await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown"); return
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في _safe_edit", exc_info=True)
         await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
     if step == STEP_DEPARTMENT:
@@ -171,7 +171,7 @@ async def _start_flow(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
             return
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في _start_flow", exc_info=True)
     await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
 
@@ -200,7 +200,7 @@ async def _handle_date_calendar(update: Update, context: ContextTypes.DEFAULT_TY
             await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
             return
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في _handle_date_calendar", exc_info=True)
     await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
 
@@ -223,7 +223,7 @@ async def _handle_cal_action(
                 await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
                 return
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _handle_cal_action", exc_info=True)
         await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
         return
 
@@ -523,7 +523,7 @@ async def _handle_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         try:
             await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _handle_confirm", exc_info=True)
         return
 
     SuppliesSession.clear(context.user_data)
@@ -581,7 +581,7 @@ async def _handle_back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             if query:
                 await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown"); return
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _edit_or_reply", exc_info=True)
         await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
     if session.edit_from_review:
@@ -637,7 +637,7 @@ async def _cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if query:
             await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown"); return
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في _cancel", exc_info=True)
     try:
         await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
     except Exception as exc:
@@ -654,7 +654,7 @@ async def _handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     try:
         await query.answer()
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في _handle_callback", exc_info=True)
     # ✅ الحماية داخل المعالِج نفسه — مستقلة تماماً عن ظهور الزر في القائمة.
     if not query.from_user or not _is_authorized(query.from_user.id):
         logger.warning(f"[supplies] 🚫 blocked unauthorized user={getattr(query.from_user, 'id', '?')}")

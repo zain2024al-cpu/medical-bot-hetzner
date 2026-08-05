@@ -281,7 +281,7 @@ class PDFBuilder:
                         img.drawWidth = PDFConfig.CHART_WIDTH
                         img.drawHeight = PDFConfig.CHART_HEIGHT
                     except Exception:
-                        pass
+                        logger.debug("تم تجاهل استثناء في _add_charts", exc_info=True)
                     self.elements.append(img)
                     self.elements.append(Spacer(1, 12*pt))
 

@@ -613,7 +613,7 @@ async def render_doctor_selection(message, context, query=None):
             await query.edit_message_text(text, reply_markup=markup, parse_mode="Markdown")
             return
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في render_doctor_selection", exc_info=True)
     try:
         await message.reply_text(text, reply_markup=markup, parse_mode="Markdown")
     except Exception as e:
@@ -722,7 +722,7 @@ async def handle_doctor_selection(update: Update, context: ContextTypes.DEFAULT_
                     parse_mode="Markdown"
                 )
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في handle_doctor_selection", exc_info=True)
         
         context.user_data["report_tmp"]["doctor_manual_mode"] = True
         logger.info("✅ تم تفعيل وضع الإدخال اليدوي للطبيب")

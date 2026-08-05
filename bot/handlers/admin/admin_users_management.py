@@ -302,7 +302,7 @@ async def _apply_action(query, context: ContextTypes.DEFAULT_TYPE, action: str, 
             try:
                 await context.bot.send_message(chat_id=tg, text="❌ تم رفض طلبك. تواصل مع الإدارة.")
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في _apply_action", exc_info=True)
             await query.edit_message_text(f"🚫 تم رفض المستخدم: {name}", reply_markup=_home_kb())
             return
 
@@ -314,7 +314,7 @@ async def _apply_action(query, context: ContextTypes.DEFAULT_TYPE, action: str, 
             try:
                 await context.bot.send_message(chat_id=tg, text="🔒 تم إيقاف حسابك مؤقتًا. تواصل مع الإدارة.")
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في _apply_action", exc_info=True)
             await query.edit_message_text(f"🔒 تم تجميد المستخدم: {name}", reply_markup=_home_kb())
             return
 
@@ -326,7 +326,7 @@ async def _apply_action(query, context: ContextTypes.DEFAULT_TYPE, action: str, 
             try:
                 await context.bot.send_message(chat_id=tg, text="🔓 تم إعادة تفعيل حسابك. اضغط /start للمتابعة.")
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في _apply_action", exc_info=True)
             await query.edit_message_text(f"🔓 تم فك تجميد المستخدم: {name}", reply_markup=_home_kb())
             return
 
@@ -370,7 +370,7 @@ async def handle_approve_entry(update: Update, context: ContextTypes.DEFAULT_TYP
     try:
         await context.bot.send_message(chat_id=tg, text="✅ تم تفعيل حسابك. اضغط /start للبدء.")
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في handle_approve_entry", exc_info=True)
 
     if not tg:
         # لا يوجد آيدي تيليجرام حقيقي — لا يمكن ربطه بدليل المترجمين

@@ -137,7 +137,7 @@ async def handle_callback(
     try:
         await query.answer()
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في handle_callback", exc_info=True)
 
     if not data.startswith(f"{CB}:"):
         return
@@ -228,7 +228,7 @@ async def _handle_toggle(
                     show_alert=False,
                 )
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في _handle_toggle", exc_info=True)
             return   # do not re-render — nothing changed
         state.selected_ids.add(opt_id)
         logger.debug(f"[multiselect] selected id={opt_id!r}  idx={idx}")
@@ -279,7 +279,7 @@ async def _handle_confirm(
                 show_alert=True,
             )
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _handle_confirm", exc_info=True)
         # Re-render with warning prepended
         state_dict = _state_as_raw(state)
         text, kb = build_min_warning(state_dict, state.selected_ids, state.min_select)
@@ -352,7 +352,7 @@ async def _show_session_lost(query) -> None:
         if query:
             await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في _show_session_lost", exc_info=True)
 
 
 async def _show_error(query, message: str) -> None:
@@ -361,7 +361,7 @@ async def _show_error(query, message: str) -> None:
         if query:
             await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في _show_error", exc_info=True)
 
 
 async def _route_cancelled(update, context, return_to: str) -> None:

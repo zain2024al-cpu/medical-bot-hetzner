@@ -364,7 +364,7 @@ async def show_action_type_menu(message, context, page=0, query=None):
             logger.info("SHOW_ACTION_TYPE_MENU: Message edited successfully (restore path)")
             return
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في show_action_type_menu", exc_info=True)
 
     try:
         await message.reply_text(text, reply_markup=keyboard, parse_mode="Markdown")
@@ -639,7 +639,7 @@ async def handle_restart_from_start(update: Update, context: ContextTypes.DEFAUL
     try:
         context.user_data.clear()
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في handle_restart_from_start", exc_info=True)
     try:
         from bot.handlers.user.user_start import user_start
         await user_start(update, context)
@@ -655,7 +655,7 @@ async def handle_restart_from_start_main_menu(update: Update, context: ContextTy
     try:
         context.user_data.clear()
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في handle_restart_from_start_main_menu", exc_info=True)
     try:
         from bot.handlers.user.user_start import handle_start_main_menu
         await handle_start_main_menu(update, context)

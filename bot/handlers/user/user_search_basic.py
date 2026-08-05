@@ -17,6 +17,9 @@ from db.session import SessionLocal
 from db.models import Report, Patient, Hospital, Department, Doctor
 from datetime import datetime
 import hashlib
+import logging
+
+logger = logging.getLogger(__name__)
 
 SELECT_FIELD, ENTER_QUERY, SHOW_RESULTS = range(3)
 
@@ -56,7 +59,7 @@ async def handle_view_patient_reports(update: Update, context: ContextTypes.DEFA
             parse_mode="Markdown"
         )
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في handle_view_patient_reports", exc_info=True)
 
 
 async def handle_cancel_search(update: Update, context: ContextTypes.DEFAULT_TYPE):

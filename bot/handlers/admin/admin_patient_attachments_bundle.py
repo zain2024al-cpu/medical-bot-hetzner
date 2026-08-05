@@ -73,7 +73,7 @@ async def show_patient_selector(update: Update, context: ContextTypes.DEFAULT_TY
     try:
         await query.answer()
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في show_patient_selector", exc_info=True)
     await patient_selector.enter(update, context, return_to=_RKEY_PATIENT)
 
 
@@ -178,7 +178,7 @@ async def _on_patient_selected(result, update: Update, context: ContextTypes.DEF
         try:
             await query.edit_message_text("✅ تم الإلغاء.")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _on_patient_selected", exc_info=True)
         return
 
     patient_id = result.id
@@ -189,7 +189,7 @@ async def _on_patient_selected(result, update: Update, context: ContextTypes.DEF
             f"⏳ جارٍ تجميع مرفقات *{patient_name}*...", parse_mode=ParseMode.MARKDOWN
         )
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في _on_patient_selected", exc_info=True)
 
     try:
         from services.medical_attachment_files_service import (
@@ -233,7 +233,7 @@ async def _on_patient_selected(result, update: Update, context: ContextTypes.DEF
             try:
                 await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN)
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في _on_patient_selected", exc_info=True)
             return
 
         pdf_buf, page_count, leftovers = await _build_combined_pdf(context.bot, attachments)
@@ -277,7 +277,7 @@ async def _on_patient_selected(result, update: Update, context: ContextTypes.DEF
         try:
             await query.delete_message()
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _on_patient_selected", exc_info=True)
 
         logger.info(
             f"[patient_attachments_bundle] patient_id={patient_id}  "
@@ -290,7 +290,7 @@ async def _on_patient_selected(result, update: Update, context: ContextTypes.DEF
         try:
             await query.edit_message_text("❌ حدث خطأ أثناء تجميع المرفقات.")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _on_patient_selected", exc_info=True)
 
     finally:
         context.user_data.clear()

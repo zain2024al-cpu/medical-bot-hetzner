@@ -322,7 +322,7 @@ async def _show_period_menu_edit(query, context: ContextTypes.DEFAULT_TYPE) -> N
             reply_markup=_period_kb(), parse_mode=ParseMode.MARKDOWN,
         )
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في _show_period_menu_edit", exc_info=True)
 
 
 # ── Summary + generate ─────────────────────────────────────────────────────────
@@ -413,7 +413,7 @@ async def _generate_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         try:
             await query.delete_message()
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _generate_report", exc_info=True)
 
         await context.bot.send_document(
             chat_id=update.effective_chat.id,
@@ -428,7 +428,7 @@ async def _generate_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         try:
             await query.edit_message_text("❌ حدث خطأ أثناء إعداد التقرير.", parse_mode=ParseMode.MARKDOWN)
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _generate_report", exc_info=True)
     finally:
         context.user_data.pop(_KEY, None)
 
@@ -444,7 +444,7 @@ async def handle_period(
     try:
         await query.answer()
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في handle_period", exc_info=True)
 
     data = query.data or ""
     parts = data[len(_PFX) + 1:].split(":")  # strip "cr:"
@@ -454,7 +454,7 @@ async def handle_period(
         try:
             await query.edit_message_text("✅ تم الإلغاء.")
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_period", exc_info=True)
         context.user_data.pop(_KEY, None)
         return ConversationHandler.END
 

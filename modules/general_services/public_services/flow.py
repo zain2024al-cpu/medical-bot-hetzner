@@ -70,7 +70,7 @@ async def _safe_edit(update, text, kb):
             await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
             return
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _safe_edit", exc_info=True)
     await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
 
@@ -93,7 +93,7 @@ async def _go_to_review(update, context):
         try:
             await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown"); return
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _go_to_review", exc_info=True)
     await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
 

@@ -47,7 +47,7 @@ async def _edit_or_reply(update: Update, text: str, kb) -> None:
             await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
             return
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _edit_or_reply", exc_info=True)
     await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
 
@@ -266,14 +266,14 @@ async def _handle_export(update: Update, context: ContextTypes.DEFAULT_TYPE, cho
         try:
             await query.answer("❌ فشل إنشاء الملف.", show_alert=True)
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في _handle_export", exc_info=True)
         return
 
     context.user_data.pop(_KEY, None)
     try:
         await query.answer("✅ تم الإرسال")
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في _handle_export", exc_info=True)
 
 
 # ── Callback dispatcher ──────────────────────────────────────────────────────
@@ -286,7 +286,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     try:
         await query.answer()
     except Exception:
-        pass
+        logger.debug("تم تجاهل استثناء في handle_callback", exc_info=True)
     if not user or not _is_authorized(user.id):
         return
 

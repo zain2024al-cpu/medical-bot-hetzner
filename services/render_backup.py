@@ -109,7 +109,7 @@ def create_local_backup(prefix: str = "backup") -> Optional[str]:
             try:
                 os.remove(backup_path)
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في create_local_backup", exc_info=True)
             logger.error("❌ النسخة الاحتياطية فشلت integrity_check وتم حذفها")
             return None
         
@@ -328,7 +328,7 @@ def create_monthly_archive(year: Optional[int] = None, month: Optional[int] = No
             try:
                 os.remove(archive_path)
             except Exception:
-                pass
+                logger.debug("تم تجاهل استثناء في create_monthly_archive", exc_info=True)
             logger.error(f"❌ الأرشيف الشهري فشل integrity_check: {archive_name}")
             return None
 

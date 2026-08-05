@@ -353,7 +353,7 @@ async def handle_any_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         try:
             await query.answer()
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_any_callback", exc_info=True)
         return
     
     try:
@@ -361,7 +361,7 @@ async def handle_any_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         try:
             await query.answer()
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_any_callback", exc_info=True)
         
         logger.warning(f"⚠️ Unhandled callback received: {callback_data}")
         
@@ -370,7 +370,7 @@ async def handle_any_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         try:
             await query.answer("⚠️ هذا الزر غير متاح حالياً", show_alert=False)
         except Exception:
-            pass
+            logger.debug("تم تجاهل استثناء في handle_any_callback", exc_info=True)
         
     except Exception as e:
         logger.error(f"❌ Error in handle_any_callback: {e}")
