@@ -26,6 +26,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from sqlalchemy import text
+
 from db.session import SessionLocal
 from db import models as M
 
@@ -50,13 +52,40 @@ _NAME_ONLY = [
 
 
 def _safe(pairs):
-    """يتجاهل أي موديل/عمود غير موجود في هذه النسخة من المخطط."""
+    """
+    يُبقي الجداول الموجودة فعلاً **في قاعدة البيانات** بكل الأعمدة المطلوبة.
+
+    ⚠️ الفحص على القاعدة الحيّة لا على الموديل عمداً: الموديل يعرّف أعمدة قد
+    لا تكون موجودة في قاعدة قديمة لم تُرحَّل (مثال واقعي:
+    `daily_patients.translator_id` معرَّف في models.py وغير موجود في قاعدة
+    السيرفر). الفحص على `__table__.columns` يمرّ بنجاح ثم ينهار الاستعلام
+    بـ`no such column`، ولا يظهر ذلك محلياً إطلاقاً لأن القاعدة المحلية
+    تُبنى من الموديل فتكون مطابقة له دائماً.
+    """
+    from sqlalchemy import inspect as sa_inspect
+    from db.session import engine
+
+    insp = sa_inspect(engine)
+    try:
+        tables = set(insp.get_table_names())
+    except Exception:
+        tables = set()
+
     out = []
     for entry in pairs:
         model = entry[0]
-        cols = {c.name for c in model.__table__.columns}
-        if all(c in cols for c in entry[1:]):
-            out.append(entry)
+        table = model.__tablename__
+        if table not in tables:
+            continue
+        try:
+            db_cols = {c["name"] for c in insp.get_columns(table)}
+        except Exception:
+            continue
+        missing = [c for c in entry[1:] if c not in db_cols]
+        if missing:
+            print(f"  ⏭️ تخطّي {table}: أعمدة غير موجودة في القاعدة {missing}")
+            continue
+        out.append((*entry, db_cols))
     return out
 
 
@@ -77,33 +106,51 @@ def main() -> None:
     with SessionLocal() as s:
         print("\n── جداول قابلة للربط (اسم مالك + معرّف مالك) ──")
         found_any = False
-        for model, name_col, id_col in _safe(_PAIRS):
+        for model, name_col, id_col, db_cols in _safe(_PAIRS):
             NC, IC = getattr(model, name_col), getattr(model, id_col)
-            rows = s.query(model).filter(NC.isnot(None), NC.like(like)).all()
+
+            # ⚠️ تُنتقى الأعمدة صراحةً بدل s.query(model): استعلام الموديل
+            # الكامل يختار **كل** أعمدته، فيكفي عمود واحد معرَّف في models.py
+            # وغائب عن قاعدة قديمة ليُسقط الاستعلام كله بـ`no such column` —
+            # حتى لو كانت الأعمدة التي نحتاجها فعلاً موجودة. الانتقاء يجعل
+            # السكربت محصَّناً ضد أي انحراف في بقية الأعمدة.
+            label_col = getattr(model, "patient_name", None) if "patient_name" in db_cols else None
+            sel = [model.id, NC, IC] + ([label_col] if label_col is not None else [])
+            rows = s.query(*sel).filter(NC.isnot(None), NC.like(like)).all()
             if not rows:
                 continue
             found_any = True
-            names = sorted({getattr(r, name_col) for r in rows})
+            names = sorted({r[1] for r in rows})
             by_id = {}
             for r in rows:
-                by_id[getattr(r, id_col)] = by_id.get(getattr(r, id_col), 0) + 1
+                by_id[r[2]] = by_id.get(r[2], 0) + 1
             print(f"\n  {model.__tablename__}  ({len(rows)} صف)")
             print(f"     الأسماء المطابقة : {names}")
             print(f"     المعرّف الحالي    : {by_id}")
 
             if a.id is None:
                 continue
-            need = [r for r in rows if getattr(r, id_col) != a.id]
+            need = [r for r in rows if r[2] != a.id]
             print(f"     سيتغيّر           : {len(need)} صف"
                   + (" (الباقي مربوط سلفاً)" if len(need) != len(rows) else ""))
             if a.apply and need:
-                for r in need:
-                    setattr(r, id_col, a.id)
-                total_changed += len(need)
+                # ⚠️ SQL صريح لا Query.update(): الأخير يضيف تلقائياً أعمدة
+                # onupdate المعرَّفة في الموديل (مثل updated_at)، فينهار على
+                # قاعدة تنقصها. أسماء الجدول والأعمدة من ثوابت هذا الملف لا
+                # من مدخلات المستخدم، والقيم مربوطة كمعاملات.
+                #
+                # `IS NULL` مذكورة صراحةً: `!= :tgt` وحدها لا تطابق NULL في
+                # SQL، فكانت الصفوف بلا مالك — وهي جوهر المشكلة — ستُترك.
+                res = s.execute(text(
+                    f"UPDATE {model.__tablename__} SET {id_col} = :tgt "
+                    f"WHERE {name_col} LIKE :like "
+                    f"  AND ({id_col} IS NULL OR {id_col} != :tgt)"
+                ), {"tgt": a.id, "like": like})
+                total_changed += res.rowcount or 0
             elif need:
                 for r in need[:5]:
-                    who = getattr(r, "patient_name", None) or f"id={r.id}"
-                    print(f"        • {who}   {getattr(r, id_col)} → {a.id}")
+                    who = (r[3] if label_col is not None else None) or f"id={r[0]}"
+                    print(f"        • {who}   {r[2]} → {a.id}")
                 if len(need) > 5:
                     print(f"        … و{len(need) - 5} غيرها")
 
@@ -111,9 +158,10 @@ def main() -> None:
             print("  لا شيء. جرّب جزءاً أقصر من الاسم — قد يكون مخزَّناً بصيغة مختلفة.")
 
         print("\n── للعلم فقط: الاسم يظهر هنا لكنه ليس مالكاً (لن يُلمَس) ──")
-        for model, name_col in _safe(_NAME_ONLY):
+        for model, name_col, _cols in _safe(_NAME_ONLY):
             NC = getattr(model, name_col)
-            n = s.query(model).filter(NC.isnot(None), NC.like(like)).count()
+            # model.id لا s.query(model) — نفس سبب الانتقاء أعلاه
+            n = s.query(model.id).filter(NC.isnot(None), NC.like(like)).count()
             if n:
                 print(f"  {model.__tablename__}.{name_col}: {n} صف"
                       f"  — الطبيب المعنيّ بالسجل، لا مُدخِله (created_by)")
