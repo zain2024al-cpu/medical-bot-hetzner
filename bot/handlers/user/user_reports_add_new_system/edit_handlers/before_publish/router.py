@@ -439,7 +439,7 @@ async def route_edit_field_selection(update: Update, context: ContextTypes.DEFAU
                 "يرجى المحاولة مرة أخرى.",
                 parse_mode="Markdown"
             )
-        except:
+        except Exception:
             pass
         return ConversationHandler.END
 

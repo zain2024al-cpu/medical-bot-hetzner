@@ -932,7 +932,7 @@ def _format_report_date(report_date):
         
         day_name = days_ar.get(date_obj.weekday(), '')
         return f"{date_obj.strftime('%d')} {MONTH_NAMES_AR.get(date_obj.month, date_obj.month)} {date_obj.year} ({day_name}) - {time_str}"
-    except:
+    except Exception:
         return str(report_date)
 
 
@@ -1166,7 +1166,7 @@ def _build_radiology_fields(data: dict) -> list:
                     date_str = delivery_date.strftime('%Y-%m-%d')
                     lines.append(f"📅 تاريخ التسليم: {escape_markdown(date_str)}")
                     lines.append("")
-                except:
+                except Exception:
                     lines.append(f"📅 تاريخ التسليم: {escape_markdown(str(delivery_date))}")
                     lines.append("")
         else:
@@ -1660,7 +1660,7 @@ def _format_followup_date(followup_date, followup_time):
             date_str += f" - {time_str}"
         
         return date_str
-    except:
+    except Exception:
         return str(followup_date)
 
 

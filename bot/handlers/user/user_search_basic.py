@@ -55,7 +55,7 @@ async def handle_view_patient_reports(update: Update, context: ContextTypes.DEFA
             "📋 يرجى استخدام طباعة التقارير من القائمة الرئيسية",
             parse_mode="Markdown"
         )
-    except:
+    except Exception:
         pass
 
 

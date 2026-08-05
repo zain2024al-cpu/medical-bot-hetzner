@@ -422,7 +422,7 @@ async def handle_confirm_delete(update: Update, context: ContextTypes.DEFAULT_TY
                 "❌ **حدث خطأ أثناء الحذف**\n\nيرجى المحاولة مرة أخرى.",
                 parse_mode=ParseMode.MARKDOWN
             )
-        except:
+        except Exception:
             pass
         return ConversationHandler.END
 
@@ -448,7 +448,7 @@ async def cancel_delete(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "📋 اختر العملية المطلوبة:",
                 reply_markup=user_main_kb()
             )
-    except:
+    except Exception:
         pass
     
     # تنظيف البيانات

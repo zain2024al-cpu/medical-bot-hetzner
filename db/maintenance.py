@@ -130,7 +130,7 @@ class DatabaseMaintenance:
                 # Note: 'PRAGMA quick_check' is available in newer SQLite versions
                 try:
                     check = conn.execute(text("PRAGMA quick_check")).scalar()
-                except:
+                except Exception:
                     # Fallback to full check if quick_check not supported
                     check = conn.execute(text("PRAGMA integrity_check")).scalar()
                 

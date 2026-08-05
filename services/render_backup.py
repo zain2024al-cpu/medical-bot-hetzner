@@ -27,7 +27,7 @@ try:
     else:
         DATABASE_PATH = DB_PATH
         BACKUP_DIR = os.path.join(os.path.dirname(DATABASE_PATH), "backups")
-except:
+except Exception:
     # Fallback
     DATABASE_PATH = os.getenv("DATABASE_PATH", "/app/db/medical_reports.db")
     BACKUP_DIR = os.getenv("BACKUP_DIR", "/app/db/backups")

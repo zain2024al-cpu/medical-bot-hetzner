@@ -115,7 +115,7 @@ def format_time_arabic(time_str):
         
         return f"{hour_12}:{minute:02d} {period}"
         
-    except:
+    except Exception:
         return time_str
 
 

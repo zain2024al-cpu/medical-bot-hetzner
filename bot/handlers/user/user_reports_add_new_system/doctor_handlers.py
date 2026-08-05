@@ -721,7 +721,7 @@ async def handle_doctor_selection(update: Update, context: ContextTypes.DEFAULT_
                     reply_markup=_nav_buttons(show_back=False),
                     parse_mode="Markdown"
                 )
-            except:
+            except Exception:
                 pass
         
         context.user_data["report_tmp"]["doctor_manual_mode"] = True

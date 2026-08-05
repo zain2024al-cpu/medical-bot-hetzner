@@ -130,7 +130,7 @@ async def user_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if update and update.message:
             try:
                 await update.message.reply_text("❌ حدث خطأ، يرجى المحاولة مرة أخرى.")
-            except:
+            except Exception:
                 pass
         return
 
@@ -321,7 +321,7 @@ async def user_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"❌ حدث خطأ: {str(e)}\n\nيرجى المحاولة مرة أخرى أو التواصل مع الإدارة.",
                     reply_markup=start_persistent_kb()
                 )
-            except:
+            except Exception:
                 pass
 
 

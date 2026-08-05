@@ -127,7 +127,7 @@ async def handle_rehab_device_edit_field_selection(update: Update, context: Cont
                 "يرجى المحاولة مرة أخرى.",
                 parse_mode="Markdown"
             )
-        except:
+        except Exception:
             pass
         return ConversationHandler.END
 
@@ -236,7 +236,7 @@ async def handle_rehab_device_edit_field_input(update: Update, context: ContextT
                 "يرجى المحاولة مرة أخرى.",
                 parse_mode="Markdown"
             )
-        except:
+        except Exception:
             pass
         return ConversationHandler.END
 

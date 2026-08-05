@@ -133,7 +133,7 @@ def admin_handler(func: Callable) -> Callable:
             if context and hasattr(context, 'user_data'):
                 try:
                     context.user_data.clear()
-                except:
+                except Exception:
                     pass
             
             # محاولة إرسال رسالة للمستخدم
@@ -147,7 +147,7 @@ def admin_handler(func: Callable) -> Callable:
                                 "⚠️ حدث خطأ، يرجى المحاولة مرة أخرى",
                                 show_alert=True
                             )
-                        except:
+                        except Exception:
                             pass
                         try:
                             await update.callback_query.edit_message_text(
@@ -156,7 +156,7 @@ def admin_handler(func: Callable) -> Callable:
                                 "✅ تم إعادة تعيين الحالة — اضغط الزر مرة أخرى أو /start للبدء من جديد",
                                 parse_mode="Markdown"
                             )
-                        except:
+                        except Exception:
                             pass
                     elif hasattr(update, 'message') and update.message:
                         await update.message.reply_text(

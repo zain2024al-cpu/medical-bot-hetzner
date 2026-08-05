@@ -59,7 +59,7 @@ def format_time_12h(time_str):
             return f"12:{minute} ظهراً"
         else:
             return f"{hour-12}:{minute} مساءً"
-    except:
+    except Exception:
         return str(time_str)
 
 
@@ -551,7 +551,7 @@ async def start_edit_reports(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 "يرجى المحاولة مرة أخرى أو التواصل مع الإدارة.",
                 parse_mode=ParseMode.MARKDOWN
             )
-        except:
+        except Exception:
             pass
         return ConversationHandler.END
 
@@ -706,12 +706,12 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
                 if 'تفاصيل جلسة العلاج الطبيعي:' in doctor_decision_text:
                     try:
                         extracted_therapy_details = doctor_decision_text.split('تفاصيل جلسة العلاج الطبيعي:', 1)[1].strip()
-                    except:
+                    except Exception:
                         pass
                 elif 'تفاصيل الجلسة:' in doctor_decision_text:
                     try:
                         extracted_therapy_details = doctor_decision_text.split('تفاصيل الجلسة:', 1)[1].strip()
-                    except:
+                    except Exception:
                         pass
                 elif doctor_decision_text and doctor_decision_text != "لا يوجد":
                     extracted_therapy_details = doctor_decision_text
@@ -721,7 +721,7 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
                 if 'تفاصيل الجهاز:' in doctor_decision_text:
                     try:
                         extracted_device_details = doctor_decision_text.split('تفاصيل الجهاز:', 1)[1].strip()
-                    except:
+                    except Exception:
                         pass
                 elif doctor_decision_text and doctor_decision_text != "لا يوجد":
                     extracted_device_details = doctor_decision_text
@@ -738,7 +738,7 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
                                 extracted_notes = rest.split('ملاحظات:', 1)[1].strip()
                             else:
                                 extracted_admission_reason = rest.strip()
-                    except:
+                    except Exception:
                         pass
                 elif doctor_decision_text and doctor_decision_text != "لا يوجد":
                     extracted_admission_reason = doctor_decision_text
@@ -882,7 +882,7 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
                         else:
                             time_display = f"{hour_int-12}:{minute} مساءً"
                         followup_display = f"{date_part} - {time_display}"
-                    except:
+                    except Exception:
                         followup_display = f"{date_part} - {followup_time}"
                 else:
                     followup_display = date_part
@@ -965,7 +965,7 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
                 "يرجى المحاولة مرة أخرى.",
                 parse_mode=ParseMode.MARKDOWN
             )
-        except:
+        except Exception:
             pass
         return ConversationHandler.END
 
@@ -1037,7 +1037,7 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         parts = str(report.doctor_decision).split('الفحوصات المطلوبة:', 1)
                         if len(parts) > 1:
                             tests_value = parts[1].strip()
-                    except:
+                    except Exception:
                         pass
                 logger.info(f"✅ استخراج tests لتقرير 'استشارة جديدة' #{report_id}: tests_value='{tests_value[:50] if tests_value else 'فارغ'}...'")
             elif report.medical_action == 'استشارة مع قرار عملية':
@@ -1047,7 +1047,7 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         parts = str(report.doctor_decision).split('الفحوصات المطلوبة:', 1)
                         if len(parts) > 1:
                             tests_value = parts[1].strip()
-                    except:
+                    except Exception:
                         pass
 
             # ✅ استخراج الحقول الخاصة من doctor_decision بناءً على نوع الإجراء
@@ -1082,7 +1082,7 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                     operation_name_en = rest2.strip()
                             else:
                                 operation_details = rest.strip()
-                    except:
+                    except Exception:
                         pass
 
             elif report.medical_action in ['علاج طبيعي', 'علاج طبيعي وإعادة تأهيل']:
@@ -1090,12 +1090,12 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if 'تفاصيل جلسة العلاج الطبيعي:' in doctor_decision_text:
                     try:
                         therapy_details = doctor_decision_text.split('تفاصيل جلسة العلاج الطبيعي:', 1)[1].strip()
-                    except:
+                    except Exception:
                         pass
                 elif 'تفاصيل الجلسة:' in doctor_decision_text:
                     try:
                         therapy_details = doctor_decision_text.split('تفاصيل الجلسة:', 1)[1].strip()
-                    except:
+                    except Exception:
                         pass
                 elif doctor_decision_text and doctor_decision_text.strip():
                     # إذا لم يكن هناك تنسيق، استخدم القيمة كاملة
@@ -1106,7 +1106,7 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if 'تفاصيل الجهاز:' in doctor_decision_text:
                     try:
                         device_details = doctor_decision_text.split('تفاصيل الجهاز:', 1)[1].strip()
-                    except:
+                    except Exception:
                         pass
 
             elif report.medical_action == 'ترقيد':
@@ -1122,7 +1122,7 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                 admission_reason = rest.split('ملاحظات:')[0].strip()
                             else:
                                 admission_reason = rest.strip()
-                    except:
+                    except Exception:
                         pass
 
             elif report.medical_action == 'خروج من المستشفى':
@@ -1130,7 +1130,7 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if 'ملخص الرقود:' in doctor_decision_text:
                     try:
                         admission_summary = doctor_decision_text.split('ملخص الرقود:', 1)[1].strip()
-                    except:
+                    except Exception:
                         pass
                 elif 'تفاصيل العملية:' in doctor_decision_text:
                     try:
@@ -1142,7 +1142,7 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                 operation_name_en = rest.split('اسم العملية بالإنجليزي:', 1)[1].strip()
                             else:
                                 operation_details = rest.strip()
-                    except:
+                    except Exception:
                         pass
 
             # ✅ استخراج حقول استشارة مع قرار عملية
@@ -1494,7 +1494,7 @@ async def handle_field_selection(update: Update, context: ContextTypes.DEFAULT_T
                 "يرجى المحاولة مرة أخرى.",
                 parse_mode=ParseMode.MARKDOWN
             )
-        except:
+        except Exception:
             pass
         return ConversationHandler.END
 

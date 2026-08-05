@@ -1207,7 +1207,7 @@ async def handle_translator_choice(update: Update, context: ContextTypes.DEFAULT
                     logger.warning(f"⚠️ Could not edit message: {e}")
                     try:
                         await query.message.reply_text("✅ تم اختيار المترجم")
-                    except:
+                    except Exception:
                         pass
                 try:
                     await show_final_summary(query.message, context, flow_type)
@@ -1269,7 +1269,7 @@ async def handle_translator_choice(update: Update, context: ContextTypes.DEFAULT
         try:
             if query:
                 await query.answer("⚠️ حدث خطأ غير متوقع، يرجى المحاولة مرة أخرى", show_alert=True)
-        except:
+        except Exception:
             pass
         flow_type = context.user_data.get("report_tmp", {}).get("current_flow", "new_consult")
         return get_translator_state(flow_type)
@@ -1572,7 +1572,7 @@ async def show_final_summary(message, context, flow_type):
         logger.error(f"❌ Error in show_final_summary: {e}", exc_info=True)
         try:
             await message.reply_text("❌ حدث خطأ في عرض الملخص")
-        except:
+        except Exception:
             pass
 
 
@@ -1717,7 +1717,7 @@ async def save_report_to_database(query, context, flow_type):
                     await query.message.reply_text("❌ **خطأ:** لا يمكن حفظ التقرير - قاعدة البيانات غير متاحة.", parse_mode="Markdown")
                 else:
                     await query.answer("❌ قاعدة البيانات غير متاحة", show_alert=True)
-            except:
+            except Exception:
                 await query.answer("❌ خطأ في قاعدة البيانات", show_alert=True)
         return
     

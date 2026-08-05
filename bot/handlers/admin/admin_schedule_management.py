@@ -592,7 +592,7 @@ async def handle_view_patient_names(update: Update, context: ContextTypes.DEFAUL
     if query.data.startswith("sched_patient_page:"):
         try:
             page = int(query.data.split(":")[1])
-        except:
+        except Exception:
             page = 0
     
     ITEMS_PER_PAGE = 10
@@ -1034,7 +1034,7 @@ async def handle_delete_patient_name(update: Update, context: ContextTypes.DEFAU
     if query.data.startswith("delete_patient_page:"):
         try:
             page = int(query.data.split(":")[1])
-        except:
+        except Exception:
             page = 0
     
     ITEMS_PER_PAGE = 8
@@ -1105,7 +1105,7 @@ async def handle_confirm_delete(update: Update, context: ContextTypes.DEFAULT_TY
             patient = get_patient_by_id(patient_id)
             if patient:
                 name_to_delete = patient.get('name', f'مريض #{patient_id}')
-        except:
+        except Exception:
             name_to_delete = f'مريض #{patient_id}'
     
     # حذف المريض باستخدام الخدمة الموحدة
@@ -1146,7 +1146,7 @@ async def handle_edit_patient_name(update: Update, context: ContextTypes.DEFAULT
     if query.data.startswith("edit_patient_page:"):
         try:
             page = int(query.data.split(":")[1])
-        except:
+        except Exception:
             page = 0
     
     ITEMS_PER_PAGE = 8
@@ -1216,7 +1216,7 @@ async def handle_select_edit(update: Update, context: ContextTypes.DEFAULT_TYPE)
             patient = get_patient_by_id(patient_id)
             if patient:
                 old_name = patient.get('name', f'مريض #{patient_id}')
-        except:
+        except Exception:
             old_name = f'مريض #{patient_id}'
     
     # حفظ في context
@@ -1330,7 +1330,7 @@ async def handle_view_hospitals(update: Update, context: ContextTypes.DEFAULT_TY
     if ":" in query.data:
         try:
             page = int(query.data.split(":")[1])
-        except:
+        except Exception:
             page = 0
     
     from services.hospitals_service import get_all_hospitals
@@ -1465,7 +1465,7 @@ async def handle_delete_hospital_menu(update: Update, context: ContextTypes.DEFA
     if ":" in query.data:
         try:
             page = int(query.data.split(":")[1])
-        except:
+        except Exception:
             page = 0
     
     from services.hospitals_service import get_all_hospitals
@@ -1521,7 +1521,7 @@ async def handle_confirm_delete_hospital(update: Update, context: ContextTypes.D
     # استخراج index المستشفى
     try:
         idx = int(query.data.split(":")[1])
-    except:
+    except Exception:
         await query.edit_message_text("❌ خطأ في البيانات")
         return
     
@@ -1591,7 +1591,7 @@ async def handle_edit_hospital_menu(update: Update, context: ContextTypes.DEFAUL
     if ":" in query.data:
         try:
             page = int(query.data.split(":")[1])
-        except:
+        except Exception:
             page = 0
     
     from services.hospitals_service import get_all_hospitals
@@ -1647,7 +1647,7 @@ async def handle_select_edit_hospital(update: Update, context: ContextTypes.DEFA
     # استخراج index المستشفى
     try:
         idx = int(query.data.split(":")[1])
-    except:
+    except Exception:
         await query.edit_message_text("❌ خطأ في البيانات")
         return
     

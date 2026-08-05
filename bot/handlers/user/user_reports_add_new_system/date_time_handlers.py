@@ -97,7 +97,7 @@ async def start_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if update and update.message:
             try:
                 await update.message.reply_text("❌ حدث خطأ في بدء العملية، يرجى المحاولة مرة أخرى.")
-            except:
+            except Exception:
                 pass
         return ConversationHandler.END
 

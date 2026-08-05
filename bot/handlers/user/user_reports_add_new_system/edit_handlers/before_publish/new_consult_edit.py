@@ -136,7 +136,7 @@ async def handle_new_consult_edit_field_selection(update: Update, context: Conte
                 "يرجى المحاولة مرة أخرى.",
                 parse_mode="Markdown"
             )
-        except:
+        except Exception:
             pass
         return ConversationHandler.END
 
@@ -237,7 +237,7 @@ async def handle_new_consult_edit_field_input(update: Update, context: ContextTy
                 "يرجى المحاولة مرة أخرى.",
                 parse_mode="Markdown"
             )
-        except:
+        except Exception:
             pass
         return ConversationHandler.END
 

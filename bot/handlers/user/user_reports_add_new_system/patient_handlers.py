@@ -567,7 +567,7 @@ async def handle_patient(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # حذف الرسالة الخاصة
             try:
                 await update.message.delete()
-            except:
+            except Exception:
                 pass
 
             # إرسال رسالة تأكيد

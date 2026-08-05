@@ -273,7 +273,7 @@ async def comprehensive_error_handler(update: Optional[Update], context: Context
     if any(critical in error_info['error_type'] for critical in critical_errors):
         try:
             await error_monitor.notify_admin(error_info, context.bot)
-        except:
+        except Exception:
             pass
     
     # محاولة إرسال رسالة للمستخدم
@@ -283,7 +283,7 @@ async def comprehensive_error_handler(update: Optional[Update], context: Context
                 "❌ حدث خطأ غير متوقع، يرجى المحاولة مرة أخرى.\n"
                 "إذا استمرت المشكلة، يرجى التواصل مع الإدارة."
             )
-        except:
+        except Exception:
             pass
     
     # محاولة الرد على callback query
@@ -293,7 +293,7 @@ async def comprehensive_error_handler(update: Optional[Update], context: Context
                 f"❌ خطأ: {error_message[:50]}",
                 show_alert=True
             )
-        except:
+        except Exception:
             pass
 
 
@@ -335,7 +335,7 @@ def setup_logging():
         # على Windows، استخدام TextIOWrapper مع UTF-8
         try:
             console_stream = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-        except:
+        except Exception:
             # إذا فشل، استخدم stdout العادي مع errors='replace'
             console_stream = sys.stdout
     else:

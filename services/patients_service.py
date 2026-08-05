@@ -392,7 +392,7 @@ def get_patients_count() -> int:
         
         with SessionLocal() as session:
             return session.query(Patient).count()
-    except:
+    except Exception:
         return len(get_patients_from_file())
 
 

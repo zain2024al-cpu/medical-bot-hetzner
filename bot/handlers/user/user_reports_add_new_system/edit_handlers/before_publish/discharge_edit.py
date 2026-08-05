@@ -126,7 +126,7 @@ async def handle_discharge_edit_field_selection(update: Update, context: Context
                 "يرجى المحاولة مرة أخرى.",
                 parse_mode="Markdown"
             )
-        except:
+        except Exception:
             pass
         return ConversationHandler.END
 
@@ -226,7 +226,7 @@ async def handle_discharge_edit_field_input(update: Update, context: ContextType
                 "يرجى المحاولة مرة أخرى.",
                 parse_mode="Markdown"
             )
-        except:
+        except Exception:
             pass
         return ConversationHandler.END
 

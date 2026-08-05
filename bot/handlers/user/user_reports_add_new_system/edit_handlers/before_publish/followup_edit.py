@@ -132,7 +132,7 @@ async def handle_followup_edit_field_selection(update: Update, context: ContextT
                 "يرجى المحاولة مرة أخرى.",
                 parse_mode="Markdown"
             )
-        except:
+        except Exception:
             pass
         return ConversationHandler.END
 
@@ -226,7 +226,7 @@ async def handle_followup_edit_field_input(update: Update, context: ContextTypes
                 "يرجى المحاولة مرة أخرى.",
                 parse_mode="Markdown"
             )
-        except:
+        except Exception:
             pass
         return ConversationHandler.END
 

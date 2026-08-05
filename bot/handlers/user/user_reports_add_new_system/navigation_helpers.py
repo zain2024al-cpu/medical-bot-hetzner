@@ -29,7 +29,7 @@ async def handle_cancel_navigation(update: Update, context: ContextTypes.DEFAULT
             if query:
                 try:
                     await query.message.delete()
-                except:
+                except Exception:
                     pass
 
             # ✅ تصفير كامل لـ report_tmp بدل حذف قائمة مفاتيح يدوية — كانت
@@ -185,7 +185,7 @@ async def handle_back_navigation(update, context: ContextTypes.DEFAULT_TYPE):
             logger.warning(f"🔙 BACK: Unknown state {previous_step}, using fallback")
             try:
                 await query.message.delete()
-            except:
+            except Exception:
                 pass
             return previous_step
 

@@ -430,7 +430,7 @@ async def cancel_draft_edit(update, context):
                 "يمكنك إعادة التعديل أو الحفظ الآن",
                 reply_markup=None
             )
-        except:
+        except Exception:
             pass
 
     # مسح بيانات التعديل المؤقت
@@ -462,7 +462,7 @@ async def cancel_report_edit(update, context):
                 "اختر *✏️ تعديل التقارير* من القائمة للعودة لقائمة التقارير.",
                 parse_mode="Markdown"
             )
-        except:
+        except Exception:
             pass
 
     # مسح بيانات التعديل
@@ -492,13 +492,13 @@ async def cancel_report_creation(update, context):
         state_mgr = StateHistoryManager.get_state_manager(context)
         if state_mgr:
             state_mgr.clear_history()
-    except:
+    except Exception:
         pass
     
     # إعادة تعيين سياق البحث
     try:
         smart_nav_manager.clear_search_context()
-    except:
+    except Exception:
         pass
     
     query = update.callback_query
@@ -511,7 +511,7 @@ async def cancel_report_creation(update, context):
                 "للبدء من جديد، اضغط على *📝 إضافة تقرير جديد* من القائمة الرئيسية.",
                 parse_mode="Markdown"
             )
-        except:
+        except Exception:
             pass
     elif update.message:
         await update.message.reply_text(
@@ -536,7 +536,7 @@ async def cancel_search(update, context):
                 "العودة للخطوة السابقة...",
                 reply_markup=None
             )
-        except:
+        except Exception:
             pass
 
     # مسح سياق البحث
@@ -569,7 +569,7 @@ async def cancel_general(update, context):
                 "للبدء من جديد، اضغط على *📝 إضافة تقرير جديد* من القائمة الرئيسية.",
                 parse_mode="Markdown"
             )
-        except:
+        except Exception:
             pass
     elif update.message:
         await update.message.reply_text(
@@ -584,7 +584,7 @@ async def cancel_general(update, context):
     # إعادة تعيين سياق البحث
     try:
         smart_nav_manager.clear_search_context()
-    except:
+    except Exception:
         pass
 
     return ConversationHandler.END
@@ -1789,7 +1789,7 @@ async def start_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if message:
             try:
                 await message.reply_text("❌ حدث خطأ في بدء العملية، يرجى المحاولة مرة أخرى.")
-            except:
+            except Exception:
                 pass
         return ConversationHandler.END
 
@@ -2828,7 +2828,7 @@ async def handle_simple_translator_choice(update: Update, context: ContextTypes.
                         f"✅ تم اختيار المترجم: {translator_name}\n\n"
                         f"اضغط على زر '📢 نشر التقرير' للمتابعة."
                     )
-            except:
+            except Exception:
                 pass
 
         try:
@@ -2845,6 +2845,6 @@ async def handle_simple_translator_choice(update: Update, context: ContextTypes.
         logger.error(f"❌ خطأ في handle_simple_translator_choice: {e}", exc_info=True)
         try:
             await query.edit_message_text("❌ حدث خطأ في معالجة الاختيار")
-        except:
+        except Exception:
             pass
         return

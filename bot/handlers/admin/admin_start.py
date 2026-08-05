@@ -145,7 +145,7 @@ async def handle_user_approval(update: Update, context: ContextTypes.DEFAULT_TYP
                         chat_id=user_id,
                         text="✅ تم قبولك! اضغط /start للبدء."
                     )
-                except:
+                except Exception:
                     pass
 
         elif action == "reject":
@@ -185,7 +185,7 @@ async def handle_back_to_main(update: Update, context: ContextTypes.DEFAULT_TYPE
     # محاولة حذف الرسالة القديمة
     try:
         await query.message.delete()
-    except:
+    except Exception:
         pass
 
 
@@ -323,7 +323,7 @@ async def handle_group_management(update, context):
 • معدل الأخطاء: {stats.get('error_rate', 0):.1f}%
 • متوسط زمن الاستجابة: {stats.get('avg_response_time', 0):.2f}s
 • الذاكرة المستخدمة: {stats.get('current_memory_mb', 0):.1f}MB"""
-        except:
+        except Exception:
             status_text += "\n• إحصائيات الأداء: غير متوفرة"
 
         await query.edit_message_text(
@@ -411,7 +411,7 @@ async def handle_group_settings(update, context):
         try:
             if query:
                 await query.answer(f"❌ حدث خطأ: {str(e)[:50]}", show_alert=True)
-        except:
+        except Exception:
             pass
 
 

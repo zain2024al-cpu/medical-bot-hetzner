@@ -123,7 +123,7 @@ async def handle_appointment_reschedule_edit_field_selection(update: Update, con
                 "يرجى المحاولة مرة أخرى.",
                 parse_mode="Markdown"
             )
-        except:
+        except Exception:
             pass
         return ConversationHandler.END
 
@@ -230,7 +230,7 @@ async def handle_appointment_reschedule_edit_field_input(update: Update, context
                 "يرجى المحاولة مرة أخرى.",
                 parse_mode="Markdown"
             )
-        except:
+        except Exception:
             pass
         return ConversationHandler.END
 

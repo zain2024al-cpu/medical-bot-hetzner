@@ -210,7 +210,7 @@ async def patient_search_inline_handler(update: Update, context: ContextTypes.DE
         )
         try:
             await update.inline_query.answer([error_result], cache_time=1)
-        except:
+        except Exception:
             pass
 
 

@@ -97,7 +97,7 @@ async def extract_and_create_followups_from_today_reports(bot, admin_ids: List[i
                 for admin_id in admin_ids:
                     try:
                         await bot.send_message(chat_id=admin_id, text=message)
-                    except:
+                    except Exception:
                         pass
                 
                 logger.info(f"✅ تم إنشاء {len(new_followups)} متابعة من تقارير اليوم")
@@ -152,7 +152,7 @@ def extract_followup_date(text: str) -> date:
         
         return None
         
-    except:
+    except Exception:
         return None
 
 
@@ -202,7 +202,7 @@ async def send_daily_followups_reminder(bot, admin_ids: List[int]):
                 for admin_id in admin_ids:
                     try:
                         await bot.send_message(chat_id=admin_id, text=message)
-                    except:
+                    except Exception:
                         pass
                 
                 logger.info(f"✅ تم إرسال تذكير المتابعات اليومي: {len(today_followups)} موعد")

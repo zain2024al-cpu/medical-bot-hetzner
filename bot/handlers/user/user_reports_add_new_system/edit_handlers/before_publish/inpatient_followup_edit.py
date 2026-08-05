@@ -121,7 +121,7 @@ async def handle_inpatient_followup_edit_field_selection(update: Update, context
                 "يرجى المحاولة مرة أخرى.",
                 parse_mode="Markdown"
             )
-        except:
+        except Exception:
             pass
         return ConversationHandler.END
 
@@ -233,7 +233,7 @@ async def handle_inpatient_followup_edit_field_input(update: Update, context: Co
                 "يرجى المحاولة مرة أخرى.",
                 parse_mode="Markdown"
             )
-        except:
+        except Exception:
             pass
         return ConversationHandler.END
 
