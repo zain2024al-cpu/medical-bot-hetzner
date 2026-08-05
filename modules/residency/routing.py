@@ -45,4 +45,12 @@ def register_all(app) -> None:
     reg_renewal(app)
     reg_renewal_routes()
 
+    # ── Uploads: الرفع والمتابعة (rnu:) ────────────────────────────────────────
+    from modules.residency.uploads.flow import (
+        register_handlers as reg_uploads,
+        register_result_routes as reg_uploads_routes,
+    )
+    reg_uploads(app)
+    reg_uploads_routes()
+
     logger.info("[residency] all handlers and result routes registered")

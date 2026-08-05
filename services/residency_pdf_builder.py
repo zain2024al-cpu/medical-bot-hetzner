@@ -74,15 +74,10 @@ def _days_remaining(s: str | None) -> str:
 
 
 def _status_label(s: str | None) -> str:
-    mapping = {
-        "active":            "نشطة",
-        "expiring":          "قريبة الانتهاء",
-        "renewal_submitted": "تم التقديم",
-        "issued":            "تم الإصدار",
-        "dependent_pending": "مرافق معلق",
-        "expired":           "منتهية",
-    }
-    return mapping.get(s or "", s or "—")
+    # ✅ يفوَّض للمصدر الواحد بدل نسخة رابعة مكتوبة يدوياً — كانت هذه الخريطة
+    # تفوّت أي حالة جديدة فتعرضها بمفتاحها الإنجليزي الخام في الـPDF.
+    from modules.residency.views import format_status
+    return format_status(s or "")
 
 
 # ── Telegram image download ────────────────────────────────────────────────────

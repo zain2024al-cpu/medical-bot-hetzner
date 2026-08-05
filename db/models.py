@@ -792,6 +792,9 @@ class ResidencyProfile(Base):
     passport_file_id         = Column(String(255), default="")
     visa_file_id             = Column(String(255), default="")
     latest_residency_file_id = Column(String(255), default="")
+    # ✅ فورم C — استمارة واحدة للعائلة كلها (المريض ومرافقوه)، لذلك على
+    # الملف لا على كل شخص. تُرفع من وحدة «📤 الرفع والمتابعة».
+    form_c_file_id           = Column(String(255), default="")
     # Extra
     notes                    = Column(Text, default="")
     created_by               = Column(Integer, nullable=True, index=True)

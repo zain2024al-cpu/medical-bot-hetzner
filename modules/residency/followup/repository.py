@@ -6,7 +6,10 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
-from modules.residency.constants import EXPIRING_SOON_DAYS, PASSPORT_EXPIRING_SOON_DAYS
+from modules.residency.constants import (
+    EXPIRING_SOON_DAYS, PASSPORT_EXPIRING_SOON_DAYS,
+    TRACKABLE_STATUSES, COMPANION_PENDING_STATUSES,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +49,7 @@ def get_expiring_soon() -> list[ExpiringEntry]:
 
     results: list[ExpiringEntry] = []
 
-    trackable_statuses = ("active", "expiring", "renewal_submitted", "issued")
+    trackable_statuses = TRACKABLE_STATUSES
 
     with get_db() as db:
         profiles = (
@@ -127,7 +130,7 @@ def get_passport_expiring_soon() -> list[ExpiringEntry]:
 
     today = datetime.utcnow().date()
     results: list[ExpiringEntry] = []
-    trackable_statuses = ("active", "expiring", "renewal_submitted", "issued")
+    trackable_statuses = TRACKABLE_STATUSES
 
     def _delta(raw: str) -> int | None:
         try:
@@ -204,7 +207,7 @@ def get_dependent_pending() -> list[PendingEntry]:
                 db.query(ResidencyCompanion)
                 .filter(
                     ResidencyCompanion.profile_id == p.id,
-                    ResidencyCompanion.status.in_(("active", "expiring", "renewal_submitted")),
+                    ResidencyCompanion.status.in_(COMPANION_PENDING_STATUSES),
                 )
                 .all()
             )

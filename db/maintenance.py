@@ -206,6 +206,9 @@ class DatabaseMaintenance:
                 # رغم جمعه في الواصلين، فتعذّر التنبيه قبل انتهائه بـ6 أشهر.
                 _migrate_column(conn, "res_profiles", "passport_expiry", "VARCHAR(50)")
                 _migrate_column(conn, "res_companions", "passport_expiry", "VARCHAR(50)")
+                # ✅ فورم C — ملف واحد للعائلة (المريض ومرافقوه) على مستوى
+                # الملف لا لكل شخص، فهو استمارة إقامة واحدة تُقدَّم للعائلة.
+                _migrate_column(conn, "res_profiles", "form_c_file_id", "VARCHAR(255)")
                 logger.info("🔎 Migration check finished.")
 
                 if check == "ok":

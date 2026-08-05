@@ -62,6 +62,11 @@ async def _dispatch(update, context, action: str, uid) -> None:
         await _start_add(update, context)
         return
 
+    if action == "uploads":
+        from modules.residency.uploads.flow import show_hub
+        await show_hub(update, context)
+        return
+
     if action == "followup":
         from modules.residency.followup.repository import get_expiring_soon
         from modules.residency.followup.views import build_followup_list

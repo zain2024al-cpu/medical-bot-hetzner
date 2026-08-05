@@ -105,6 +105,8 @@ async def send_patient_documents(*, bot, message, profile_id: int) -> None:
     await _try_send(profile.passport_file_id,         f"📎 جواز — {profile.name}")
     await _try_send(profile.visa_file_id,              f"📎 تأشيرة — {profile.name}")
     await _try_send(profile.latest_residency_file_id,  f"🪪 إقامة — {profile.name}")
+    # فورم C استمارة واحدة للعائلة، فتُرسَل مرة واحدة مع المريض لا مع كل مرافق
+    await _try_send(getattr(profile, "form_c_file_id", ""), f"📄 فورم C — {profile.name}")
 
     for c in companions:
         await _try_send(c.passport_file_id,         f"📎 جواز مرافق — {c.name}")

@@ -19,11 +19,13 @@ RNA = "rna"
 
 def build_residency_main_menu() -> tuple[str, InlineKeyboardMarkup]:
     text = f"{_DIVIDER}\n🪪  **الإقامات**\n\nاختر القسم:"
+    # ✅ ثلاثة أزرار لا أربعة: «المتابعة» و«التحديثات المعلقة» انتقلتا داخل
+    # «الرفع والمتابعة» كتبويبين، فكلتاهما مرحلة من دورة الأوراق نفسها ولم
+    # يكن هناك سبب لتفرّقهما على مستوى القائمة الرئيسية.
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("📁 أرشيف المرضى",      callback_data=f"{RN}:archive")],
-        [InlineKeyboardButton("➕ إضافة مريض جديد",   callback_data=f"{RNA}:start")],
-        [InlineKeyboardButton("⏰ المتابعة",           callback_data=f"{RN}:followup")],
-        [InlineKeyboardButton("📦 التحديثات المعلقة", callback_data=f"{RN}:pending")],
+        [InlineKeyboardButton("📁 أرشيف المرضى",    callback_data=f"{RN}:archive")],
+        [InlineKeyboardButton("➕ إضافة مريض جديد", callback_data=f"{RNA}:start")],
+        [InlineKeyboardButton("📤 الرفع والمتابعة", callback_data=f"{RN}:uploads")],
     ])
     return text, kb
 
@@ -135,7 +137,8 @@ def build_profile_detail(profile, companions, history) -> tuple[str, InlineKeybo
         "📎 *الوثائق:*",
         f"  {doc_icon(profile.passport_file_id)} جواز   "
         f"{doc_icon(profile.visa_file_id)} تأشيرة   "
-        f"{doc_icon(profile.latest_residency_file_id)} إقامة",
+        f"{doc_icon(profile.latest_residency_file_id)} إقامة   "
+        f"{doc_icon(getattr(profile, 'form_c_file_id', ''))} فورم C",
     ]
 
     lines.append(_THIN)
