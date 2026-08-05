@@ -202,16 +202,12 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
             
             # التحقق: إذا كان submitted_by_user_id موجوداً في التقرير، يجب أن يطابق المستخدم الحالي
             # إذا كان None (تقرير قديم)، نتحقق من translator_id
-            if report.submitted_by_user_id is not None:
-                if report.submitted_by_user_id != current_user_id:
-                    await query.edit_message_text("⚠️ **خطأ:** لا يمكنك حذف هذا التقرير")
-                    return ConversationHandler.END
-            else:
-                # تقرير قديم - التحقق من translator_id
-                translator = s.query(Translator).filter_by(tg_user_id=current_user_id).first()
-                if translator and report.translator_id != translator.id:
-                    await query.edit_message_text("⚠️ **خطأ:** لا يمكنك حذف هذا التقرير")
-                    return ConversationHandler.END
+            # ✅ قاعدة واحدة ترفض افتراضياً — انظر can_modify_report في
+            # shared_auth.py. الفحص السابق كان يمرّ لمن لا صفَّ له في users.
+            from bot.shared_auth import can_modify_report
+            if not can_modify_report(report, current_user_id, s):
+                await query.edit_message_text("⚠️ **خطأ:** لا يمكنك حذف هذا التقرير")
+                return ConversationHandler.END
             
             # جلب بيانات التقرير الكاملة
             patient = s.query(Patient).filter_by(id=report.patient_id).first()
@@ -377,16 +373,12 @@ async def handle_confirm_delete(update: Update, context: ContextTypes.DEFAULT_TY
                 
                 # التحقق: إذا كان submitted_by_user_id موجوداً في التقرير، يجب أن يطابق المستخدم الحالي
                 # إذا كان None (تقرير قديم)، نتحقق من translator_id
-                if report.submitted_by_user_id is not None:
-                    if report.submitted_by_user_id != current_user_id:
-                        await query.edit_message_text("⚠️ **خطأ:** لا يمكنك حذف هذا التقرير")
-                        return ConversationHandler.END
-                else:
-                    # تقرير قديم - التحقق من translator_id
-                    translator = s.query(Translator).filter_by(tg_user_id=current_user_id).first()
-                    if translator and report.translator_id != translator.id:
-                        await query.edit_message_text("⚠️ **خطأ:** لا يمكنك حذف هذا التقرير")
-                        return ConversationHandler.END
+                # ✅ قاعدة واحدة ترفض افتراضياً — انظر can_modify_report في
+                # shared_auth.py. الفحص السابق كان يمرّ لمن لا صفَّ له في users.
+                from bot.shared_auth import can_modify_report
+                if not can_modify_report(report, current_user_id, s):
+                    await query.edit_message_text("⚠️ **خطأ:** لا يمكنك حذف هذا التقرير")
+                    return ConversationHandler.END
                 
                 # حفظ معرف الرسالة قبل الحذف (إذا كان موجوداً)
                 group_message_id = getattr(report, 'group_message_id', None)

@@ -9,8 +9,17 @@ from telegram import Update
 from telegram.error import BadRequest
 from telegram.ext import ContextTypes, CallbackQueryHandler
 
+from bot.shared_auth import is_admin
+from core.access.access_service import user_has_module
+
 logger = logging.getLogger(__name__)
 RN = "rn"
+
+_MODULE_KEY = "residency"
+
+
+def _is_authorized(user_id: int) -> bool:
+    return is_admin(user_id) or user_has_module(user_id, _MODULE_KEY)
 
 
 async def _safe_edit(query, text: str, kb) -> None:
@@ -30,6 +39,14 @@ async def _handle_nav(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     data   = query.data or ""
     action = data[len(f"{RN}:"):]
     uid    = query.from_user.id if query.from_user else "?"
+
+    # ✅ الحماية داخل المعالِج نفسه — نفس ما تفعله rna:/rnf:/rnr:/rnu: وكان
+    # هذا المعالِج وحده بلا فحص. إخفاء الأزرار لا يكفي: الأزرار المرسَلة
+    # سابقاً تبقى قابلة للضغط في محادثة المستخدم بعد سحب صلاحيته، و`rn:archive`
+    # يعرض أسماء المرضى وأرقام إقاماتهم وتواريخ انتهائها.
+    if not query.from_user or not _is_authorized(query.from_user.id):
+        logger.warning(f"[residency.nav] 🚫 blocked unauthorized user={uid}  action={action!r}")
+        return
 
     logger.info(f"[residency.nav] action={action!r}  user={uid}")
 

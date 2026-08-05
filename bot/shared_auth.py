@@ -136,3 +136,41 @@ async def ensure_approved(update, context) -> bool:
         return False
 
     return True
+
+
+def can_modify_report(report, actor_id: int, session) -> bool:
+    """
+    هل يحقّ لهذا المستخدم تعديل/حذف هذا التقرير؟
+
+    ⚠️ **يرفض افتراضياً** (fail-closed). الفحص السابق كان يرفض بشرطٍ موجب:
+
+        translator = session.query(Translator).filter_by(tg_user_id=actor_id).first()
+        if translator and report.translator_id != translator.id:
+            → رفض
+
+    فإذا لم يكن للمستخدم صفٌّ في `users` إطلاقاً صارت `translator = None`،
+    فلا يتحقّق الشرط ولا يُرفض شيء — **فيمرّ الحذف**. أي أن مستخدماً غير
+    مسجَّل كان يستطيع حذف أي تقرير قديم (submitted_by_user_id = NULL)
+    لأي مترجم. أُثبِت بالتشغيل قبل الإصلاح.
+
+    القاعدة الآن:
+      • الأدمن                     ⇒ مسموح
+      • تقرير حديث (له مالك مصرَّح) ⇒ يجب أن يطابق المالك
+      • تقرير قديم (بلا مالك)      ⇒ يجب أن يكون المستخدم مسجَّلاً **و**
+                                     يطابق translator_id للتقرير
+      • ما عدا ذلك                 ⇒ مرفوض
+    """
+    if actor_id is None or report is None:
+        return False
+    if is_admin(actor_id):
+        return True
+
+    owner = getattr(report, "submitted_by_user_id", None)
+    if owner is not None:
+        return owner == actor_id
+
+    # تقرير قديم: لا يُسمح إلا لمترجم مسجَّل يطابق معرّفه معرّف التقرير
+    translator = session.query(Translator).filter_by(tg_user_id=actor_id).first()
+    if translator is None:
+        return False
+    return report.translator_id == translator.id

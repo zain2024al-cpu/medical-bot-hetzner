@@ -585,11 +585,17 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
                 await query.edit_message_text("⚠️ **خطأ:** لم يتم العثور على التقرير")
                 return ConversationHandler.END
             
-            # ✅ التحقق من أن المستخدم هو من أنشأ التقرير
-            # السماح بالتعديل إذا كان submitted_by_user_id مطابقاً أو None (للتقارير القديمة)
-            current_user_id = context.user_data.get('submitted_by_user_id')
-            report_user_id = getattr(report, 'submitted_by_user_id', None)
-            if report_user_id is not None and report_user_id != current_user_id:
+            # ✅ نفس قاعدة الحذف حرفياً (can_modify_report في shared_auth.py):
+            # كان التقرير القديم (submitted_by_user_id = NULL) **بلا أي فحص
+            # إطلاقاً** هنا — الشرط يمرّ فوراً حين يكون report_user_id = None،
+            # فأي مستخدم مصرَّح له يفتح شاشة التعديل كان يستطيع تعديل تقرير
+            # أي مترجم آخر. والهوية تُؤخذ الآن من تليجرام لا من user_data.
+            from bot.shared_auth import can_modify_report
+            current_user_id = (
+                query.from_user.id if query.from_user
+                else context.user_data.get('submitted_by_user_id')
+            )
+            if not can_modify_report(report, current_user_id, s):
                 await query.edit_message_text("⚠️ **خطأ:** لا يمكنك تعديل هذا التقرير")
                 return ConversationHandler.END
             
