@@ -23,7 +23,7 @@ async def send_patient_pdf(*, bot, message, profile_id: int) -> None:
         get_companions_for_profile,
         get_history_for_profile,
     )
-    from services.residency_pdf_builder import build_residency_pdf
+    from services.residency_profile_pdf import build_profile_pdf
 
     profile = get_profile_by_id(profile_id)
     if profile is None:
@@ -36,11 +36,14 @@ async def send_patient_pdf(*, bot, message, profile_id: int) -> None:
     progress = await message.reply_text("⏳ جارٍ إنشاء ملف PDF…")
 
     try:
-        pdf_bytes = await build_residency_pdf(
-            bot=bot,
-            profile=profile,
-            companions=companions,
-            history=history,
+        # reportlab متزامن وسريع، لكنه يُنفَّذ في خيط منفصل حتى لا يوقف
+        # حلقة الأحداث عن بقية المستخدمين أثناء بناء ملف كبير.
+        import asyncio
+        pdf_bytes = await asyncio.get_running_loop().run_in_executor(
+            None,
+            lambda: build_profile_pdf(
+                profile=profile, companions=companions, history=history,
+            ),
         )
 
         safe_name = (profile.name or "profile").replace(" ", "_")[:30]

@@ -22,6 +22,7 @@ class ProfileRow:
     latest_residency_file_id: str
     # ✅ فورم C — استمارة واحدة للعائلة، تُرفع من وحدة «الرفع والمتابعة»
     form_c_file_id:   str
+    passport_expiry:  str
     notes:            str
     source:           str
     companion_count:  int = 0
@@ -81,6 +82,7 @@ def get_profiles_page(page: int = 0) -> tuple[list[ProfileRow], int]:
                 visa_file_id=r.visa_file_id or "",
                 latest_residency_file_id=r.latest_residency_file_id or "",
                 form_c_file_id=r.form_c_file_id or "",
+                passport_expiry=r.passport_expiry or "",
                 notes=r.notes or "", source=r.source or "arrivals",
                 companion_count=comp_count,
             ))
@@ -109,6 +111,7 @@ def get_profile_by_id(profile_id: int) -> ProfileRow | None:
             visa_file_id=r.visa_file_id or "",
             latest_residency_file_id=r.latest_residency_file_id or "",
             form_c_file_id=r.form_c_file_id or "",
+                passport_expiry=r.passport_expiry or "",
             notes=r.notes or "", source=r.source or "arrivals",
             companion_count=comp_count,
         )
@@ -184,6 +187,7 @@ def search_profiles(query: str) -> list[ProfileRow]:
                 visa_file_id=r.visa_file_id or "",
                 latest_residency_file_id=r.latest_residency_file_id or "",
                 form_c_file_id=r.form_c_file_id or "",
+                passport_expiry=r.passport_expiry or "",
                 notes=r.notes or "", source=r.source or "arrivals",
                 companion_count=0,
             )
