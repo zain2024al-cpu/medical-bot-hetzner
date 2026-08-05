@@ -177,16 +177,23 @@ async def _handle_manifest_type_select(update: Update, context: ContextTypes.DEF
 
 # ── اختيار المختص (فلتر — بدل مسير واحد لكل المختصين معاً) ───────────────────
 #
-# ✅ مصدر الأسماء الوحيد modules/healthcare/staff.py (HC_SP_MAP) — نفس
-# القائمة المستخدَمة عند إدخال الصرف في medications/supplies، فأي مختص
-# يُضاف هناك يظهر هنا تلقائياً بلا تعديل ثانٍ.
+# ✅ الأسماء من modules/healthcare/staff.py (HC_SP_MAP) — نفس القائمة
+# المستخدَمة عند إدخال الصرف، فأي مختص يُضاف هناك يظهر هنا تلقائياً.
+#
+# ⚠️ استثناء خاص بشاشة الطباعة في الأدمن وحدها (بطلب صريح): "د. فضل"
+# و"د. زكريا" لا يظهران كخيار فلترة هنا. **لم يُلمَس HC_SP_MAP** — هما
+# يبقيان خيارين عاديين عند إدخال الصرف في medications/supplies/...، وأي
+# سجل قديم أو جديد باسمهما يظهر بلا نقصان تحت "📋 الكل". الاستثناء هنا
+# فقط لتقصير قائمة الفلترة، لا لحذفهما من النظام.
+_PRINT_SPECIALIST_HIDE = {"sp_fadl", "sp_zakariya"}
+
 
 async def _show_specialist_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     from modules.healthcare.staff import HC_SP_MAP
 
     text = "🖨️ *طباعة مسير الإخلاء*\n\nاختر المختص (أو الكل):"
     rows = [[InlineKeyboardButton(f"👨‍⚕️ {name}", callback_data=f"{_PFX}:spec:{code}")]
-            for code, name in HC_SP_MAP.items()]
+            for code, name in HC_SP_MAP.items() if code not in _PRINT_SPECIALIST_HIDE]
     rows.append([InlineKeyboardButton("📋 الكل", callback_data=f"{_PFX}:spec:ALL")])
     rows.append([InlineKeyboardButton("🔙 رجوع", callback_data=f"{_PFX}:back_to_mtype")])
     rows.append([InlineKeyboardButton("❌ إلغاء", callback_data=f"{_PFX}:cancel")])
