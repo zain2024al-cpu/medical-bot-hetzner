@@ -141,6 +141,32 @@ async def handle_treatment_endoscopy_edit_field_selection(update: Update, contex
                 context.user_data['_conversation_state'] = "EDIT_DRAFT_FOLLOWUP_CALENDAR"
                 return "EDIT_DRAFT_FOLLOWUP_CALENDAR"
 
+        # ✅ نوع المنظار: نفس قائمة الفورمه الأصلية بدل كتابة القيمة يدوياً.
+        # القائمة تُقرأ من flows/endoscopy.py مباشرةً — لا نسخة ثانية تنحرف
+        # عن الأصل عند إضافة نوع جديد.
+        if field_key == "endoscopy_type":
+            from bot.handlers.user.user_reports_add_new_system.flows.endoscopy import (
+                ENDOSCOPY_TYPES,
+            )
+            rows = [
+                [InlineKeyboardButton(
+                    f"{'✅ ' if label == current_value else ''}{label}",
+                    callback_data=f"edit_endo_type:{code}",
+                )]
+                for code, label in ENDOSCOPY_TYPES
+            ]
+            rows.append([InlineKeyboardButton(
+                "🔙 رجوع", callback_data=f"back_to_edit_fields:{flow_type}")])
+            await query.edit_message_text(
+                f"✏️ **تعديل {field_display_name}**\n\n"
+                f"**القيمة الحالية:** {current_value_display}\n\n"
+                f"اختر نوع المنظار:",
+                reply_markup=InlineKeyboardMarkup(rows),
+                parse_mode="Markdown",
+            )
+            context.user_data['_conversation_state'] = confirm_state
+            return confirm_state
+
         await query.edit_message_text(
             f"✏️ **تعديل {field_display_name}**\n\n"
             f"**القيمة الحالية:**\n{current_value_display}\n\n"
@@ -162,6 +188,49 @@ async def handle_treatment_endoscopy_edit_field_selection(update: Update, contex
             )
         except Exception:
             pass
+        return ConversationHandler.END
+
+
+async def handle_treatment_endoscopy_type_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """اختيار نوع المنظار من القائمة أثناء التعديل قبل النشر.
+
+    يقابل handle_treatment_endoscopy_edit_field_input لكن بضغطة زر بدل نص،
+    وينتهي بنفس نهايته تماماً (حفظ + إعادة عرض الملخص) حتى لا يختلف مسارا
+    التعديل في سلوكهما بعد الحفظ.
+    """
+    query = update.callback_query
+    try:
+        await query.answer()
+        from bot.handlers.user.user_reports_add_new_system.flows.endoscopy import (
+            ENDOSCOPY_TYPES,
+        )
+        code = query.data.split(":", 1)[1]
+        label = dict(ENDOSCOPY_TYPES).get(code)
+        flow_type = context.user_data.get("edit_flow_type") or "endoscopy"
+
+        if not label:
+            await query.answer("نوع غير صحيح", show_alert=True)
+            return get_confirm_state(flow_type)
+
+        data = context.user_data.setdefault("report_tmp", {})
+        data["endoscopy_type"] = label
+        data["current_flow"] = flow_type
+        context.user_data.pop("edit_field_key", None)
+
+        await query.edit_message_text(
+            f"✅ **تم حفظ التعديل**\n\n🔬 نوع المنظار: {label}",
+            parse_mode="Markdown",
+        )
+        confirm_state = get_confirm_state(flow_type)
+        try:
+            await show_final_summary(query.message, context, flow_type)
+        except Exception as e:
+            logger.error(f"❌ [ENDOSCOPY] خطأ في عرض الملخص بعد اختيار النوع: {e}", exc_info=True)
+        context.user_data['_conversation_state'] = confirm_state
+        return confirm_state
+
+    except Exception as e:
+        logger.error(f"❌ [ENDOSCOPY] خطأ في handle_treatment_endoscopy_type_pick: {e}", exc_info=True)
         return ConversationHandler.END
 
 

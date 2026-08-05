@@ -269,6 +269,15 @@ from .flows.radiology import (
 
 
 
+async def _endo_type_pick(update, context):
+    """وسيط كسول لاختيار نوع المنظار — الاستيراد داخل الدالة تفادياً
+    لاستيراد دائري مع حزمة edit_handlers عند تحميل هذا الملف."""
+    from .edit_handlers.before_publish.treatment_and_endoscopy_edit import (
+        handle_treatment_endoscopy_type_pick,
+    )
+    return await handle_treatment_endoscopy_type_pick(update, context)
+
+
 def _confirm_state_handlers(sh, route_sel, route_inp):
     """Return the standard handler list for any *_CONFIRM state."""
     return [
@@ -285,6 +294,11 @@ def _confirm_state_handlers(sh, route_sel, route_inp):
         CallbackQueryHandler(sh['handle_edit_draft_field'],         pattern="^edit_field_draft:"),
         CallbackQueryHandler(sh['handle_draft_edit_translator'],    pattern="^draft_edit_translator:"),
         CallbackQueryHandler(sh['handle_back_to_edit_fields'],      pattern="^back_to_edit_fields"),
+        # ✅ نوع المنظار يُعدَّل باختيار من القائمة لا بكتابة يدوية. مسجَّل هنا
+        # في القائمة المشتركة لكل حالات *_CONFIRM لأن التعديل قبل النشر يعود
+        # لحالة تأكيد المسار نفسه؛ والزر لا يظهر إلا في تعديل المناظير فلا
+        # أثر له على بقية المسارات.
+        CallbackQueryHandler(_endo_type_pick,                       pattern="^edit_endo_type:"),
         MessageHandler(
             filters.TEXT & ~filters.COMMAND,
             route_inp if route_inp else sh['handle_draft_field_input'],

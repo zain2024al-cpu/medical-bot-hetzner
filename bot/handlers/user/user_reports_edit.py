@@ -33,7 +33,9 @@ from sqlalchemy import or_, and_
     # ✅ حالتان جديدتان: نفس شاشة الاختيار المتعدد الأصلية (flows/endoscopy.py)
     # لحقل 'الإجراءات التي تمت أثناء المنظار' بعد النشر، بدل نص حر بسيط.
     EDIT_ENDOSCOPY_PROCEDURES, EDIT_ENDOSCOPY_PROCEDURES_OTHER,
-) = range(9)
+    # ✅ 'نوع المنظار' — نفس قائمة الفورمه الأصلية بدل نص حر.
+    EDIT_ENDOSCOPY_TYPE,
+) = range(10)
 
 
 def format_time_12h(time_str):
@@ -1419,7 +1421,12 @@ async def handle_field_selection(update: Update, context: ContextTypes.DEFAULT_T
         # الأصلية بدل نص حر (مطابقة الفورمه الأصلية، كما طُلب صراحة).
         if field_name == "endoscopy_procedures":
             return await show_endoscopy_procedures_edit(query, context)
-        
+
+        # ✅ 'نوع المنظار' — نفس قائمة الفورمه الأصلية بدل كتابة القيمة
+        # يدوياً (مطابقة الفورمه الأصلية، كما طُلب صراحة).
+        if field_name == "endoscopy_type":
+            return await show_endoscopy_type_edit(query, context)
+
         # حقول التاريخ — تمر جميعها بالتقويم (DateTime columns)
         if field_name in ("followup_date", "app_reschedule_return_date", "radiology_delivery_date"):
             text = f"📅 **تعديل {field_display}**\n\n"
@@ -1581,6 +1588,55 @@ def _finalize_endo_procedures_edit(selected: list, other_text) -> str:
     labels = [_PROC_LABEL[c] for c in selected if c != "other" and c in _PROC_LABEL]
     payload = {"list": labels, "other": (other_text or None)}
     return _json.dumps(payload, ensure_ascii=False)
+
+
+async def show_endoscopy_type_edit(query, context):
+    """قائمة أنواع المنظار للتعديل بعد النشر — بدل طلب كتابة القيمة يدوياً.
+
+    القائمة تُقرأ من flows/endoscopy.py مباشرةً، فأي نوع يُضاف للفورمه
+    الأصلية يظهر هنا تلقائياً بلا تعديل ثانٍ.
+    """
+    from bot.handlers.user.user_reports_add_new_system.flows.endoscopy import (
+        ENDOSCOPY_TYPES,
+    )
+    current = context.user_data.get('current_report_data', {}).get('endoscopy_type', '')
+    rows = [
+        [InlineKeyboardButton(
+            f"{'✅ ' if label == current else ''}{label}",
+            callback_data=f"edit_endo_type_pick:{code}",
+        )]
+        for code, label in ENDOSCOPY_TYPES
+    ]
+    rows.append([
+        InlineKeyboardButton("🔙 رجوع", callback_data="edit_back_to_fields"),
+        InlineKeyboardButton("❌ إلغاء", callback_data="edit_cancel"),
+    ])
+    await query.edit_message_text(
+        f"✏️ **تعديل نوع المنظار**\n\n"
+        f"**القيمة الحالية:** {current or 'لا يوجد'}\n\n"
+        f"اختر نوع المنظار:",
+        reply_markup=InlineKeyboardMarkup(rows),
+        parse_mode=ParseMode.MARKDOWN,
+    )
+    return EDIT_ENDOSCOPY_TYPE
+
+
+async def handle_edit_endoscopy_type_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """اختيار النوع → شاشة المعاينة/التأكيد — نفس مسار بقية الحقول."""
+    query = update.callback_query
+    await query.answer()
+    from bot.handlers.user.user_reports_add_new_system.flows.endoscopy import (
+        ENDOSCOPY_TYPES,
+    )
+    code = query.data.split(":", 1)[1]
+    label = dict(ENDOSCOPY_TYPES).get(code)
+    if not label:
+        await query.answer("نوع غير صحيح", show_alert=True)
+        return EDIT_ENDOSCOPY_TYPE
+
+    context.user_data['edit_field'] = 'endoscopy_type'
+    context.user_data['new_value'] = label
+    return await confirm_text_edit(query.message, context, label)
 
 
 async def handle_edit_endoscopy_procedures_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2861,6 +2917,11 @@ def register(app):
             ],
             EDIT_ENDOSCOPY_PROCEDURES_OTHER: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_edit_endoscopy_procedures_other),
+                CallbackQueryHandler(handle_edit_endoscopy_procedures_back_or_cancel, pattern="^edit_back_to_fields$"),
+                CallbackQueryHandler(handle_edit_endoscopy_procedures_back_or_cancel, pattern="^edit_cancel$"),
+            ],
+            EDIT_ENDOSCOPY_TYPE: [
+                CallbackQueryHandler(handle_edit_endoscopy_type_pick,                pattern="^edit_endo_type_pick:"),
                 CallbackQueryHandler(handle_edit_endoscopy_procedures_back_or_cancel, pattern="^edit_back_to_fields$"),
                 CallbackQueryHandler(handle_edit_endoscopy_procedures_back_or_cancel, pattern="^edit_cancel$"),
             ],
