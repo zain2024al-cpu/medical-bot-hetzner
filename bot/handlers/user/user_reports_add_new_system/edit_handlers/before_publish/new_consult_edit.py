@@ -79,6 +79,11 @@ async def handle_new_consult_edit_field_selection(update: Update, context: Conte
             current_value_display = current_value[:200] + "..."
         else:
             current_value_display = str(current_value) if current_value else "غير محدد"
+
+        # ✅ تهريب محارف Markdown من القيمة الحرة قبل حشرها في رسالة
+        # parse_mode="Markdown" — انظر شرح السبب في escape_md_v1 (utils.py).
+        from ...utils import escape_md_v1
+        current_value_display = escape_md_v1(current_value_display)
         
         # عرض واجهة التعديل
         if field_key == "followup_date":

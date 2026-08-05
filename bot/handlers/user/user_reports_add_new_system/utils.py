@@ -17,6 +17,26 @@ from .states import (
     STATE_SELECT_DOCTOR, STATE_SELECT_ACTION_TYPE
 )
 
+
+def escape_md_v1(text) -> str:
+    """
+    يهرّب محارف Markdown (النسخة القديمة v1 التي يستخدمها parse_mode="Markdown"
+    في كل شاشات التعديل) من نص المستخدم الحر قبل حشره في رسالة.
+
+    ⚠️ لماذا هذه الدالة موجودة: شاشات "تعديل قبل النشر" تعرض القيمة الحالية
+    لحقل نصّي حرّ (شكوى/تشخيص/قرار الطبيب...) داخل رسالة بـ parse_mode=
+    "Markdown". لو كتب المترجم نصاً فيه محرف واحد غير متزاوج من
+    `_ * ` [` (شائع في نص طبي حر: "الحالة مستقرة* يحتاج متابعة" أو
+    "جرعة 500_مجم")، يفشل تحليل Telegram للرسالة بـ:
+    `BadRequest: Can't parse entities: can't find end of the entity...`
+    فيسقط المعالِج لخطأ عام بدل عرض شاشة التعديل — رُصِد هذا فعلياً في
+    new_consult_edit.py عبر تقرير أخطاء البوت اليومي.
+
+    escape_markdown(version=1) من مكتبة telegram هي التطبيق الرسمي لقواعد
+    Telegram نفسها (وليست دالة مكتوبة يدوياً هنا قد تنحرف عنها)."""
+    from telegram.helpers import escape_markdown
+    return escape_markdown(str(text) if text is not None else "", version=1)
+
 # ثوابت
 MONTH_NAMES_AR = {
     1: "يناير", 2: "فبراير", 3: "مارس", 4: "أبريل",
