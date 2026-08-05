@@ -120,29 +120,22 @@ async def start_dialysis_flow(message, context):
 
 
 # ═══════════════════════════════════════════════════════════════════
-# نقطة الدخول: العلاج الكيماوي (اختيار جلسات/دورات أول مرة فقط)
+# نقطة الدخول: العلاج الكيماوي — نفس منطق المناعي/الموجّه
 # ═══════════════════════════════════════════════════════════════════
 async def start_chemo_flow(message, context):
-    data = context.user_data.setdefault("report_tmp", {})
-    data["medical_action"] = TREATMENT_MEDICAL_ACTION["chemo"]
-    data["current_flow"] = "treatment_chemo"
-    data["_treatment_key"] = "chemo"
-    data.pop("_tp_editing_plan_id", None)
+    """
+    سؤال واحد عن عدد الجلسات الكلي، ثم تقدّم تلقائي في كل تقرير لاحق —
+    تماماً كالمناعي والموجّه.
 
-    patient_id = data.get("patient_id")
-    plan = get_active_plan(patient_id, "chemo") if patient_id else None
-    if plan:
-        advanced = advance_plan(plan["id"])
-        return await _show_plan_display(message, context, advanced)
+    ⚠️ كان يسأل عن الدورات: عدد الدورات ← هل عددها موحّد؟ ← وإن لا،
+    **إدخال يدوي لكل دورة على حدة** (6 دورات = 8 خطوات لتقرير واحد).
+    أُزيل بطلب المستخدم لأنه مُتعب بلا مقابل.
 
-    data["_chemo_mode"] = "cycles"
-    await message.reply_text(
-        "💉 **العلاج الكيماوي**\n\n"
-        "🔄 **حسب الدورات العلاجية**\n\n📊 **كم عدد الدورات العلاجية؟**\n\nمثال: 6",
-        reply_markup=_nav_buttons(show_back=True),
-        parse_mode="Markdown",
-    )
-    return CHEMO_CYCLES_TOTAL
+    الخطط القديمة بنمط الدورات تبقى تعمل: التقدّم والعرض لا يعتمدان على
+    النمط، ومسار «✏️ تعديل الخطة» ما زال يتفرّع على `mode` فيعيد أسئلة
+    الدورات لتلك الخطط وحدها. لذلك تبقى معالِجات CHEMO_CYCLES_* مسجَّلة.
+    """
+    return await _start_simple_session_flow(message, context, "chemo")
 
 
 async def handle_chemo_cycles_total(update: Update, context: ContextTypes.DEFAULT_TYPE):

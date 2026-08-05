@@ -49,6 +49,7 @@ _SINGLE_START_FUNCS = {
 }
 
 _QUEUE_TOTAL_PROMPTS = {
+    "chemo":     "💉 **الكيماوي**\n\n📊 **كم عدد الجلسات الكلي؟**\n\nأدخل رقماً (مثال: 6):",
     "immuno":    "🧬 **المناعي**\n\n📊 **كم عدد الجلسات الكلي؟**\n\nأدخل رقماً (مثال: 12):",
     "targeted":  "🎯 **الموجّه**\n\n📊 **كم عدد الجلسات الكلي؟**\n\nأدخل رقماً (مثال: 8):",
     "radiation": "☢️ **الإشعاعي**\n\n📊 **كم عدد الجلسات الكلي؟**\n\nأدخل رقماً (مثال: 30):",
@@ -177,15 +178,11 @@ async def _process_next_in_queue(message, context):
         await message.reply_text(f"{_icon(key)} **{_short_label(key)}**\n{summary}", parse_mode="Markdown")
         return await _ask_delivery_mode(message, context)
 
-    if key == "chemo":
-        data["_treatment_key"] = "chemo"
-        await message.reply_text(
-            "💉 **الكيماوي**\n\n🔄 **كم عدد الدورات العلاجية؟**\n\nمثال: 6",
-            reply_markup=_nav_buttons(show_back=True),
-            parse_mode="Markdown",
-        )
-        return CHEMO_CYCLES_TOTAL
-
+    # ✅ الكيماوي لم يعد استثناءً: كان يتفرّع هنا لأسئلة الدورات، وصار يمرّ
+    # بنفس مسار بقية الأنواع (عدد الجلسات الكلي ← رقم الجلسة الحالية) —
+    # مطابقةً لتبسيط start_chemo_flow. لولا ذلك لاختلف النوع نفسه بين
+    # الاختيار المفرد والاختيار المُدمج.
+    data["_treatment_key"] = key
     await message.reply_text(
         _QUEUE_TOTAL_PROMPTS[key], reply_markup=_nav_buttons(show_back=True), parse_mode="Markdown",
     )
