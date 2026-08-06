@@ -85,6 +85,25 @@ async def _go_to_review(update, context):
     session = DepartureSession.load(context.user_data)
     if session is None:
         await _cancel(update, context); return
+
+    # ⚠️ لا شاشة مراجعة (وبالتالي لا زر نشر) قبل اختيار المختص — نفس الحارس
+    # المطبَّق في public_services/flow.py وللسبب نفسه: معالِج "confirm" هنا
+    # لا يتحقّق من أي حقل قبل الحفظ، فأي طريق يبلغ المراجعة بلا مختص كان
+    # ينشر السجل بـspecialist_label فارغ بصمت. وهذه الدالة نقطة الاختناق
+    # الوحيدة التي تمرّ منها كل الطرق المؤدية للمراجعة.
+    # لا يوجد مسار "تخطي المختص" في هذا التدفق، فالحقل إلزامي دائماً.
+    if not session.specialist_label:
+        session.edit_from_review = False
+        session.step             = STEP_SPECIALIST
+        session.save(context.user_data)
+        logger.info(
+            "[departures] review requested without a specialist — "
+            "routing to the specialist step instead"
+        )
+        text, kb = build_specialist_prompt(session)
+        await _safe_edit(update, text, kb)
+        return
+
     session.edit_from_review = False
     session.step             = STEP_REVIEW
     session.save(context.user_data)
