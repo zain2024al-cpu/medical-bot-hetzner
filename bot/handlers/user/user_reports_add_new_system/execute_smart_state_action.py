@@ -51,6 +51,15 @@ from .states import (
     TRANSPLANT_TYPE, TRANSPLANT_PARTY, TRANSPLANT_DETAILS,
     TRANSPLANT_FOLLOWUP_DATE, TRANSPLANT_FOLLOWUP_REASON,
     TRANSPLANT_TRANSLATOR, TRANSPLANT_CONFIRM,
+    RADIATION_THERAPY_TYPE, RADIATION_THERAPY_SESSION_NUMBER,
+    RADIATION_THERAPY_REMAINING, RADIATION_THERAPY_EDIT_REASON,
+    RADIATION_THERAPY_NOTES, RADIATION_THERAPY_RETURN_DATE,
+    RADIATION_THERAPY_RETURN_REASON, RADIATION_THERAPY_TRANSLATOR,
+    RADIATION_THERAPY_CONFIRM,
+    ENDOSCOPY_COMPLAINT, ENDOSCOPY_TYPE, ENDOSCOPY_RESULT,
+    ENDOSCOPY_PROCEDURES, ENDOSCOPY_PROCEDURES_OTHER, ENDOSCOPY_NOTES,
+    ENDOSCOPY_FOLLOWUP_DATE, ENDOSCOPY_FOLLOWUP_REASON,
+    ENDOSCOPY_TRANSLATOR, ENDOSCOPY_CONFIRM,
 )
 from .utils import _nav_buttons
 from .smart_state_renderer import SmartStateRenderer
@@ -180,6 +189,23 @@ async def execute_smart_state_action(target_step, flow_type, update, context):
         TRANSPLANT_FOLLOWUP_REASON: 'FOLLOWUP_REASON',
         TRANSPLANT_TRANSLATOR: 'TRANSLATOR',
         TRANSPLANT_CONFIRM: 'CONFIRM',
+        # ✅ جلسة إشعاعي + المناظير — الحقول التي تغطّيها الفروع العامة أدناه
+        # بالاسم (TRANSLATOR/CONFIRM/التواريخ/الأسباب/الملاحظات/الشكوى).
+        # ⚠️ الحقول ذات الشاشات الخاصة (نوع الإشعاعي، عدد الجلسات، نوع
+        # المنظار، الإجراءات...) عمداً **ليست هنا**: تركها بلا اسم يُبقي
+        # step_name رقماً فلا يلتقطها أي فرع عام بالخطأ، ويصل التنفيذ
+        # لفرعها المخصَّص في نهاية السلسلة — نفس نمط TRANSPLANT/ONCOLOGY.
+        RADIATION_THERAPY_NOTES:         'NOTES',
+        RADIATION_THERAPY_RETURN_DATE:   'RETURN_DATE',
+        RADIATION_THERAPY_RETURN_REASON: 'RETURN_REASON',
+        RADIATION_THERAPY_TRANSLATOR:    'TRANSLATOR',
+        RADIATION_THERAPY_CONFIRM:       'CONFIRM',
+        ENDOSCOPY_COMPLAINT:             'COMPLAINT',
+        ENDOSCOPY_NOTES:                 'NOTES',
+        ENDOSCOPY_FOLLOWUP_DATE:         'FOLLOWUP_DATE',
+        ENDOSCOPY_FOLLOWUP_REASON:       'FOLLOWUP_REASON',
+        ENDOSCOPY_TRANSLATOR:            'TRANSLATOR',
+        ENDOSCOPY_CONFIRM:               'CONFIRM',
     }
 
     if isinstance(target_step, int):
@@ -784,6 +810,98 @@ async def execute_smart_state_action(target_step, flow_type, update, context):
         elif target_step == ONCOLOGY_DELIVERY_DAYS:
             await update.callback_query.edit_message_text(
                 "🛏️ رقود — كم عدد الأيام المتوقعة؟",
+                reply_markup=_nav_buttons(show_back=True),
+                parse_mode="Markdown"
+            )
+            return target_step
+
+        # ── جلسة إشعاعي: الشاشات ذات المحتوى الخاص ────────────────────────
+        elif target_step == RADIATION_THERAPY_TYPE:
+            await update.callback_query.edit_message_text(
+                "☢️ **نوع الإشعاعي**\n\n"
+                "يرجى إدخال نوع العلاج الإشعاعي:\n"
+                "(مثال: External Beam Radiation, Brachytherapy, IMRT, إلخ)",
+                reply_markup=_nav_buttons(show_back=True),
+                parse_mode="Markdown"
+            )
+            return target_step
+
+        elif target_step == RADIATION_THERAPY_SESSION_NUMBER:
+            await update.callback_query.edit_message_text(
+                "🔢 **عدد الجلسات الكلي**\n\n"
+                "يرجى إدخال العدد الكلي لجلسات العلاج الإشعاعي:",
+                reply_markup=_nav_buttons(show_back=True),
+                parse_mode="Markdown"
+            )
+            return target_step
+
+        elif target_step == RADIATION_THERAPY_REMAINING:
+            await update.callback_query.edit_message_text(
+                "🔢 **العدد الكلي الجديد**\n\n"
+                "يرجى إدخال العدد الكلي الجديد للجلسات:",
+                reply_markup=_nav_buttons(show_back=True),
+                parse_mode="Markdown"
+            )
+            return target_step
+
+        elif target_step == RADIATION_THERAPY_EDIT_REASON:
+            # نفس شاشة handle_radiation_therapy_remaining — زر التخطي جزء
+            # أصيل منها، فبدونه يعلق المستخدم بلا مخرج عند الرجوع إليها.
+            await update.callback_query.edit_message_text(
+                "✍️ **سبب التعديل** (اختياري)\n\n"
+                "اكتب السبب، أو اضغط الزر أدناه للتخطي:",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("⏭️ بدون سبب", callback_data="rad_edit_reason_skip")],
+                ]),
+                parse_mode="Markdown"
+            )
+            return target_step
+
+        # ── المناظير: الشاشات ذات المحتوى الخاص ───────────────────────────
+        elif target_step == ENDOSCOPY_TYPE:
+            from .flows.endoscopy import ENDOSCOPY_TYPES
+            rows = [[InlineKeyboardButton(label, callback_data=f"endo_type:{code}")]
+                    for code, label in ENDOSCOPY_TYPES]
+            rows.append([
+                InlineKeyboardButton("🔙 رجوع", callback_data="nav:back"),
+                InlineKeyboardButton("❌ إلغاء", callback_data="nav:cancel"),
+            ])
+            await update.callback_query.edit_message_text(
+                "🔬 **نوع المنظار**\n\nاختر نوع المنظار:",
+                reply_markup=InlineKeyboardMarkup(rows),
+                parse_mode="Markdown"
+            )
+            return target_step
+
+        elif target_step == ENDOSCOPY_RESULT:
+            await update.callback_query.edit_message_text(
+                "📋 **نتيجة المنظار / خطة الطبيب**\n\n"
+                "اكتب النتيجة أو خطة الطبيب (مثال: المنظار طبيعي، يحتاج عملية، "
+                "أخذ خزعة، مراجعة بعد أسبوع، علاج دوائي...):",
+                reply_markup=_nav_buttons(show_back=True),
+                parse_mode="Markdown"
+            )
+            return target_step
+
+        elif target_step == ENDOSCOPY_PROCEDURES:
+            # ⚠️ يُعاد بناء الشاشة عبر _build_procedures_keyboard بالاختيارات
+            # المحفوظة، لا بلوحة فارغة — الرجوع لهذه الخطوة يجب أن يُبقي ما
+            # أشّر عليه المستخدم قبل خروجه منها.
+            from .flows.endoscopy import _build_procedures_keyboard
+            rt = context.user_data.get("report_tmp", {})
+            selected = rt.get("_endoscopy_selected") or []
+            await update.callback_query.edit_message_text(
+                "🔧 **الإجراءات التي تمت أثناء المنظار**\n\n"
+                "اختر كل ما تم (يمكن اختيار أكثر من إجراء)، ثم اضغط **✅ متابعة**.\n"
+                "إن لم يُجرَ أي إجراء، اضغط **✅ متابعة** مباشرة (منظار تشخيصي).",
+                reply_markup=_build_procedures_keyboard(selected),
+                parse_mode="Markdown"
+            )
+            return target_step
+
+        elif target_step == ENDOSCOPY_PROCEDURES_OTHER:
+            await update.callback_query.edit_message_text(
+                "✍️ **إجراء آخر**\n\nاكتب الإجراء الذي تم (أو الإجراءات الإضافية):",
                 reply_markup=_nav_buttons(show_back=True),
                 parse_mode="Markdown"
             )
