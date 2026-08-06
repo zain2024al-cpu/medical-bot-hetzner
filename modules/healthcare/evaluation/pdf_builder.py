@@ -36,14 +36,39 @@ if not os.path.isfile(_FONT_BOLD):
 
 # ── Arabic text helper ────────────────────────────────────────────────────────
 
+import re
+
+# نطاقات الحروف العربية (أساسي + مكمّل + أشكال العرض)
+_ARABIC_RE = re.compile(r"[؀-ۿݐ-ݿﭐ-﷿ﹰ-﻿]")
+
+
 def _ar(text: str) -> str:
-    """Reshape + apply bidi so ReportLab renders Arabic correctly (RTL)."""
+    """Reshape + apply bidi so ReportLab renders Arabic correctly (RTL).
+
+    ⚠️ نقطتان حرجتان تعلّمناهما من نصوص معكوسة في التقرير المطبوع:
+
+    1. **النص الخالي من العربية يُترك كما هو تماماً.** تمرير تاريخ أو رقم
+       مثل "2026/07/01 — 2026/08/05" عبر get_display بأساس RTL يقلب ترتيب
+       التاريخين فعلياً (تحقّقنا: يخرج "2026/08/05 — 2026/07/01"). فالأرقام
+       والتواريخ واللاتينية البحتة لا تمرّ بالخوارزمية إطلاقاً.
+
+    2. **base_dir="R" صراحةً للنص العربي.** get_display بلا وسيط يستنتج
+       اتجاه الأساس من أول حرف قوي في النص؛ فنص طبي مثل
+       "500mg باراسيتامول" أول حرف قوي فيه لاتيني ⇒ يُعامَل كفقرة LTR
+       فيُوضَع الجزء العربي في الطرف الخاطئ ويظهر "معكوساً" للمستخدم،
+       بينما جاره في نفس الجدول (اسم عربي صرف) يظهر سليماً — وهذا بالضبط
+       سبب "بعض النصوص معكوسة" دون بقيتها. تثبيت الأساس على R يجعل كل
+       خلية عربية تُرسم باتجاه واحد ثابت مهما بدأت.
+    """
+    s = str(text)
+    if not _ARABIC_RE.search(s):
+        return s
     try:
         import arabic_reshaper
         from bidi.algorithm import get_display
-        return get_display(arabic_reshaper.reshape(str(text)))
+        return get_display(arabic_reshaper.reshape(s), base_dir="R")
     except Exception:
-        return str(text)
+        return s
 
 
 # ── Color palette ─────────────────────────────────────────────────────────────
@@ -225,13 +250,13 @@ def _bar_chart(data: dict[str, int], title: str, color: str = "#2E86C1") -> io.B
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     import matplotlib.font_manager as fm
-    import arabic_reshaper
-    from bidi.algorithm import get_display
 
     if not data:
         return None
 
-    labels = [get_display(arabic_reshaper.reshape(k)) for k in data.keys()]
+    # ✅ عبر _ar نفسها لا get_display مباشرة — حتى تسري قاعدة base_dir="R"
+    # على تسميات الرسوم أيضاً، وإلا انعكست هي دون خلايا الجداول.
+    labels = [_ar(k) for k in data.keys()]
     values = list(data.values())
 
     fig, ax = plt.subplots(figsize=(7, max(2, len(labels) * 0.45)))
@@ -245,7 +270,7 @@ def _bar_chart(data: dict[str, int], title: str, color: str = "#2E86C1") -> io.B
     ax.set_xlim(0, max(values) * 1.2 if values else 1)
     ax.invert_yaxis()
     ax.set_xlabel("")
-    ax.set_title(get_display(arabic_reshaper.reshape(title)), fontsize=10, pad=8)
+    ax.set_title(_ar(title), fontsize=10, pad=8)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.tick_params(axis="both", labelsize=8)
@@ -263,13 +288,10 @@ def _pie_chart(data: dict[str, int], title: str) -> io.BytesIO:
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    import arabic_reshaper
-    from bidi.algorithm import get_display
-
     if not data or sum(data.values()) == 0:
         return None
 
-    labels = [get_display(arabic_reshaper.reshape(f"{k} ({v})")) for k, v in data.items()]
+    labels = [_ar(f"{k} ({v})") for k, v in data.items()]
     values = list(data.values())
     palette = ["#2E86C1", "#1E8449", "#B7950B", "#922B21", "#7D3C98",
                "#117A65", "#D35400", "#1A5276"]
@@ -284,7 +306,7 @@ def _pie_chart(data: dict[str, int], title: str) -> io.BytesIO:
     for at in autotexts:
         at.set_fontsize(7)
         at.set_color("white")
-    ax.set_title(get_display(arabic_reshaper.reshape(title)), fontsize=10, pad=8)
+    ax.set_title(_ar(title), fontsize=10, pad=8)
     plt.tight_layout()
 
     buf = io.BytesIO()
@@ -313,7 +335,7 @@ def _activity_chart(cases_by_date: dict[str, int]) -> io.BytesIO:
     ax.bar(range(len(dates)), counts, color="#2E86C1", edgecolor="white", width=0.7)
     ax.set_xticks(range(len(dates)))
     ax.set_xticklabels(short, rotation=45, ha="right", fontsize=7)
-    ax.set_ylabel("الحالات", fontsize=8)
+    ax.set_ylabel(_ar("الحالات"), fontsize=8)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.tick_params(axis="y", labelsize=8)
@@ -354,7 +376,10 @@ def build_evaluation_pdf(data) -> io.BytesIO:
     story = []
 
     # ── 1. Cover content (inside the header area, drawn by canvas) ────────────
-    period_str = _ar(
+    # ⚠️ بلا _ar هنا — النص يمرّ عبر _ar مرة واحدة فقط عند بنائه كاملاً أدناه.
+    # تمريره مرتين (هنا ثم داخل f-string) يعالج نصاً مُعالَجاً سلفاً، وهو فخّ
+    # ينفجر صامتاً لحظة إضافة أي حرف عربي لهذا السطر مستقبلاً.
+    period_str = (
         f"{data.period_start.strftime('%Y/%m/%d')} — {data.period_end.strftime('%Y/%m/%d')}"
     )
     story.append(Spacer(1, -5.5 * cm))   # pull up into the blue header zone
@@ -384,7 +409,8 @@ def build_evaluation_pdf(data) -> io.BytesIO:
         (str(data.medication_count), "صيدلية",             C_WARNING),
         (str(data.supplies_count),   "مستلزمات",           C_DANGER),
     ]
-    card_row = [[StatCard(v, l, c) for v, l, c in cards]]
+    # RTL: أول بطاقة منطقياً (إجمالي الحالات) تُرسم في أقصى اليمين
+    card_row = [[StatCard(v, l, c) for v, l, c in reversed(cards)]]
     card_table = Table(card_row, colWidths=[3.8 * cm] * 5, hAlign="CENTER")
     card_table.setStyle(TableStyle([("ALIGN", (0,0), (-1,-1), "CENTER")]))
     story.append(card_table)
@@ -405,6 +431,8 @@ def build_evaluation_pdf(data) -> io.BytesIO:
             _p(_ar(f"{doc_pct}%"),             S["stat_value"]),
         ],
     ]
+    # RTL: نفس منطق _make_table — العمود المنطقي الأول يمينـاً
+    sec_data  = [list(reversed(r)) for r in sec_data]
     sec_table = Table(sec_data, colWidths=[4.3 * cm] * 4, hAlign="CENTER")
     sec_table.setStyle(TableStyle([
         ("ALIGN",      (0,0), (-1,-1), "CENTER"),
@@ -626,6 +654,21 @@ def _p(text: str, style) -> Paragraph:
 
 
 def _make_table(rows, col_widths, row_colors: bool = False) -> Table:
+    """يبني جدولاً بترتيب أعمدة من اليمين لليسار (RTL).
+
+    ⚠️ ReportLab يرسم العمود رقم 0 في أقصى **اليسار** دائماً. الجداول هنا
+    تُكتب بالترتيب المنطقي العربي (البيان ثم القيمة)، فكان العمود الأول
+    (البيان) ينتهي يساراً والقيمة يميناً — أي أن القارئ العربي يبدأ من
+    اليمين فيرى "القيمة" أولاً ثم "البيان"، وهو معكوس تماماً عمّا يجب.
+    نعكس الأعمدة (والعروض معها) هنا في مكان واحد، فتبقى كل الجداول
+    مكتوبة بترتيبها المنطقي الطبيعي في مواضع الاستدعاء.
+
+    أوامر TableStyle أدناه كلها صفّية النطاق ((0,r) → (-1,r)) فلا يتأثر
+    أيٌّ منها بعكس الأعمدة، ومحاذاة كل خلية محمولة في نمط فقرتها نفسها.
+    """
+    rows       = [list(reversed(r)) for r in rows]
+    col_widths = list(reversed(col_widths))
+
     t = Table(rows, colWidths=col_widths, repeatRows=1, hAlign="CENTER")
     style_cmds = [
         ("BACKGROUND",  (0, 0), (-1, 0),  C_PRIMARY),
