@@ -84,6 +84,26 @@ async def _go_to_review(update, context):
     session = PublicServiceSession.load(context.user_data)
     if session is None:
         await _cancel(update, context); return
+
+    # ⚠️ لا شاشة مراجعة (وبالتالي لا زر نشر) قبل اختيار المختص.
+    # كل الطرق المؤدية للمراجعة تمرّ من هنا، فهذه نقطة الاختناق الوحيدة
+    # التي تضمن عدم تخطّي خطوة المختص مهما كان المسار — بما فيها الحالة
+    # التي بقيت فيها edit_from_review=True من جلسة سابقة مهجورة، فتقفز
+    # الملاحظات مباشرة للمراجعة ويظهر زر النشر بلا مختص. بدون هذا الحارس
+    # كان معالِج "confirm" ينشر السجل بـ specialist_label فارغ **بصمت**
+    # (لا تحقّق من أي حقل هناك إطلاقاً).
+    if not session.specialist_label:
+        session.edit_from_review = False
+        session.step             = STEP_SPECIALIST
+        session.save(context.user_data)
+        logger.info(
+            "[public_services] review requested without a specialist — "
+            "routing to the specialist step instead"
+        )
+        text, kb = build_specialist_prompt(session)
+        await _safe_edit(update, text, kb)
+        return
+
     session.edit_from_review = False
     session.step             = STEP_REVIEW
     session.save(context.user_data)
