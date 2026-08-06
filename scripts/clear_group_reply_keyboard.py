@@ -89,23 +89,31 @@ async def _clear(bot: Bot, name: str, chat_id: str, apply: bool) -> bool:
     try:
         # ⚠️ نصّ مرئي فعلي — تيليجرام يرفض الرسالة الفارغة أو المكوَّنة من
         # مسافة صفرية (U+200B) بـ"Text must be non-empty"، ولا يمكن إرسال
-        # ReplyKeyboardRemove بلا رسالة تحملها. تُحذف الرسالة بعد ثانية.
+        # ReplyKeyboardRemove بلا رسالة تحملها.
         msg = await bot.send_message(
             chat_id=chat_id,
-            text="🔄 تحديث لوحة الأزرار…",
+            text="🔄 تم تحديث لوحة الأزرار — لا تحذف هذه الرسالة.",
             reply_markup=ReplyKeyboardRemove(),
         )
     except TelegramError as exc:
         print(f"  ❌ {name} ({chat_id}) — {title}: فشل الإرسال — {exc}")
         return False
 
-    print(f"  ✅ {name} ({chat_id}) — {title}: تم مسح اللوحة")
+    print(f"  ✅ {name} ({chat_id}) — {title}: أُرسل أمر المسح  (msg_id={msg.message_id})")
 
-    try:
-        await bot.delete_message(chat_id=chat_id, message_id=msg.message_id)
-        print("     ↳ وحُذفت رسالة المسح، فلا أثر لها في المجموعة")
-    except TelegramError:
-        print("     ↳ (تعذّر حذف رسالة المسح — احذفها يدوياً، المسح نفسه تمّ)")
+    # ⚠️⚠️ لا تُحذَف رسالة المسح — وهذا سبب فشل المحاولة الأولى فعلياً:
+    # عميل تيليجرام يستنتج لوحة الأزرار الحالية من **آخر رسالة قائمة** في
+    # المحادثة. فحذف الرسالة الحاملة لـReplyKeyboardRemove يُسقط الأمر نفسه،
+    # فيرجع العميل لآخر رسالة ثبّتت لوحة قبلها وتظهر الأزرار من جديد —
+    # ولهذا أبلغ السكربت "4/4 ✅" بينما بقيت اللوحة ظاهرة على الهاتف:
+    # الـAPI قَبِل الإرسال فعلاً، ثم أبطلَه الحذف الذي كنّا نُجريه بعده.
+    # تبقى الرسالة في المجموعة عمداً — وهي الثمن الوحيد لمسح دائم.
+    if "--delete-message" in sys.argv:
+        try:
+            await bot.delete_message(chat_id=chat_id, message_id=msg.message_id)
+            print("     ↳ ⚠️ حُذفت رسالة المسح بطلبك — قد تعود اللوحة للظهور")
+        except TelegramError:
+            print("     ↳ (تعذّر الحذف — وهذا أفضل)")
     return True
 
 
@@ -161,7 +169,13 @@ async def main() -> int:
         return 1
     if ok < len(groups):
         print(f"⚠️ نجح {ok} وفشل {len(groups) - ok} — راجع الأسباب أعلاه.")
-    print("افتح المجموعة على هاتفك — يجب أن تكون لوحة الأزرار اختفت.")
+    print(
+        "\nافتح المجموعة على هاتفك — يجب أن تكون لوحة الأزرار اختفت."
+        "\n⚠️ اترك رسالة «تم تحديث لوحة الأزرار» في المجموعة ولا تحذفها:"
+        "\n   حذفها يُسقط أمر المسح فتعود الأزرار للظهور."
+        "\n💡 إن بقيت الأزرار ظاهرة عندك: أغلق تيليجرام وافتحه (تخزين مؤقت"
+        "\n   في العميل)، فالمسح نفسه تمّ على الخادم."
+    )
     return 0
 
 
