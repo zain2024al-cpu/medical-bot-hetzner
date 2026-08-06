@@ -43,15 +43,25 @@ def _resolve_bot(bot_like):
 
 
 def escape_markdown(text):
-    """تنظيف النص من الأحرف الخاصة بـ Markdown"""
+    """يهرّب محارف Markdown **القديم** فقط: ``_ * ` [``.
+
+    ⚠️ الإصدار السابق كان يُهرّب 18 محرفاً من قواعد **MarkdownV2**
+    (`. - ( ) ! # + = | { } ~ >` …) بينما بطاقة المجموعة تُرسَل بـ
+    `ParseMode.MARKDOWN` (النسخة القديمة) التي لا تعرف هذه المحارف
+    خاصةً. فكانت الشرطة المائلة تصل لأعضاء المجموعة **حرفية ومرئية**:
+      "Apollo Hospital (Chennai)"  ⇐  "Apollo Hospital \\(Chennai\\)"
+      "د. سرور"                    ⇐  "د\\. سرور"
+    وهذا كان ظاهراً في كل تقرير فيه قوس أو نقطة في اسم مستشفى أو طبيب.
+
+    نفس العطب كان في user_reports_edit.py وأُصلح هناك بحذف النسخة
+    المحلية. هنا يُحتفَظ بالاسم لأن له 68 موضع استدعاء، ويُستبدل
+    **جسمها** بالتطبيق الرسمي (`telegram.helpers.escape_markdown`
+    بـversion=1) — فيُصحَّح كل المواضع دفعة واحدة بلا لمسها.
+    """
     if not text:
         return text
-    text = str(text)
-    # الأحرف الخاصة التي تحتاج escape في Markdown
-    special_chars = ['*', '_', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
-    for char in special_chars:
-        text = text.replace(char, '\\' + char)
-    return text
+    from telegram.helpers import escape_markdown as _tg_escape
+    return _tg_escape(str(text), version=1)
 
 
 def _is_similar_text(text1: str, text2: str, threshold: float = 0.7) -> bool:
@@ -805,7 +815,7 @@ def format_report_message(data: dict) -> str:
         lines.append("")
         lines.extend(_build_medical_report_status(data))
         if data.get('translator_name'):
-            lines.append(f"👨‍⚕️ المترجم: {data['translator_name']}")
+            lines.append(f"👨‍⚕️ المترجم: {escape_markdown(str(data['translator_name']))}")
         return "\n".join(lines)
 
     elif medical_action == 'استشارة مع قرار عملية':
@@ -815,7 +825,7 @@ def format_report_message(data: dict) -> str:
         lines.append("")
         lines.extend(_build_medical_report_status(data))
         if data.get('translator_name'):
-            lines.append(f"👨‍⚕️ المترجم: {data['translator_name']}")
+            lines.append(f"👨‍⚕️ المترجم: {escape_markdown(str(data['translator_name']))}")
         return "\n".join(lines)
 
     elif medical_action == 'أشعة وفحوصات':
@@ -823,7 +833,7 @@ def format_report_message(data: dict) -> str:
         lines.extend(_build_medical_report_status(data))
         if data.get('translator_name'):
             lines.append("")
-            lines.append(f"👨‍⚕️ المترجم: {data['translator_name']}")
+            lines.append(f"👨‍⚕️ المترجم: {escape_markdown(str(data['translator_name']))}")
         return "\n".join(lines)
 
     elif medical_action == 'استشارة أخيرة':
@@ -841,7 +851,7 @@ def format_report_message(data: dict) -> str:
         lines.append("")
         lines.extend(_build_medical_report_status(data))
         if data.get('translator_name'):
-            lines.append(f"👨‍⚕️ المترجم: {data['translator_name']}")
+            lines.append(f"👨‍⚕️ المترجم: {escape_markdown(str(data['translator_name']))}")
         return "\n".join(lines)
 
     elif (
@@ -863,7 +873,7 @@ def format_report_message(data: dict) -> str:
         lines.append("")
         lines.extend(_build_medical_report_status(data))
         if data.get('translator_name'):
-            lines.append(f"👨‍⚕️ المترجم: {data['translator_name']}")
+            lines.append(f"👨‍⚕️ المترجم: {escape_markdown(str(data['translator_name']))}")
         return "\n".join(lines)
 
     elif medical_action == 'معاملة الزراعة':
@@ -873,7 +883,7 @@ def format_report_message(data: dict) -> str:
         lines.append("")
         lines.extend(_build_medical_report_status(data))
         if data.get('translator_name'):
-            lines.append(f"👨‍⚕️ المترجم: {data['translator_name']}")
+            lines.append(f"👨‍⚕️ المترجم: {escape_markdown(str(data['translator_name']))}")
         return "\n".join(lines)
 
     else:
@@ -894,7 +904,7 @@ def format_report_message(data: dict) -> str:
 
     # ✅ المترجم بعد التقرير الطبي
     if data.get('translator_name'):
-        lines.append(f"👨‍⚕️ المترجم: {data['translator_name']}")
+        lines.append(f"👨‍⚕️ المترجم: {escape_markdown(str(data['translator_name']))}")
 
     return "\n".join(lines)
 
