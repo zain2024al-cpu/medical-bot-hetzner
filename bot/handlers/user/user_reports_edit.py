@@ -27,6 +27,22 @@ def _ist_now() -> datetime:
         return datetime.now(timezone.utc).astimezone(ist).replace(tzinfo=None)
 from db.models import Report, Translator, Patient, Hospital, Department, Doctor
 from bot.shared_auth import is_admin
+from bot.handlers.user.user_reports_add_new_system.utils import escape_md_v1
+
+
+def _safe_code_block(value) -> str:
+    """يُحيّد العلامة الخلفية فقط داخل كتلة ``` — لا يُهرّب _ * [.
+
+    ⚠️ لا تستبدل هذه الدالة بـescape_md_v1 هنا: داخل كتلة الكود يعامل
+    تيليجرام المحتوى حرفياً، فالمحارف `_ * [` **آمنة أصلاً** بلا تهريب،
+    وتهريبها يجعل المترجم يرى شرطات مائلة حقيقية في النص المعروض
+    (تحقّقنا: "جرعة 500\\_مجم" بدل "جرعة 500_مجم").
+
+    المحرف الخطِر الوحيد هنا هو العلامة الخلفية نفسها: واحدة في القيمة
+    تُغلق الكتلة قبل أوانها فينهار تحليل الرسالة كلها. نستبدلها بعلامة
+    اقتباس مفردة مائلة (U+2018) — تُشبهها بصرياً ولا تعني شيئاً لتيليجرام.
+    """
+    return str(value if value is not None else "").replace("`", "‘")
 from services.inline_calendar import create_calendar_keyboard, create_quick_date_buttons, MONTHS_AR
 from sqlalchemy import or_, and_
 
@@ -66,16 +82,12 @@ def format_time_12h(time_str):
         return str(time_str)
 
 
-def escape_markdown(text):
-    """تنظيف النص من الأحرف الخاصة بـ Markdown"""
-    if not text:
-        return text
-    text = str(text)
-    # الأحرف الخاصة التي تحتاج escape في Markdown
-    special_chars = ['*', '_', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
-    for char in special_chars:
-        text = text.replace(char, '\\' + char)
-    return text
+# ⚠️ حُذفت دالة escape_markdown المحلية التي كانت هنا — كانت تُهرّب محارف
+# **MarkdownV2** (`. - ( ) ! # + = | { }` …) بينما كل رسائل هذا الملف تُرسَل
+# بـ ParseMode.MARKDOWN (النسخة القديمة). فكان تاريخ مثل "2026-08-05" يخرج
+# للمترجم "2026\-08\-05" بشرطات مائلة مرئية، وكانت تُطبَّق أيضاً **داخل**
+# كتل ``` حيث لا يحتاج شيء تهريباً أصلاً فتضاعف التشويه.
+# البديل: escape_md_v1 للنص العادي، و_safe_code_block داخل كتل ```.
 
 
 def get_all_editable_fields():
@@ -1444,11 +1456,11 @@ async def handle_field_selection(update: Update, context: ContextTypes.DEFAULT_T
                     followup_time = context.user_data['current_report_data'].get('followup_time', '')
                     if followup_time:
                         time_12h = format_time_12h(followup_time)
-                        text += f"**القيمة الحالية:** {current_value} - {time_12h}\n\n"
+                        text += f"**القيمة الحالية:** {escape_md_v1(current_value)} - {escape_md_v1(time_12h)}\n\n"
                     else:
-                        text += f"**القيمة الحالية:** {current_value}\n\n"
+                        text += f"**القيمة الحالية:** {escape_md_v1(current_value)}\n\n"
                 else:
-                    text += f"**القيمة الحالية:** {current_value}\n\n"
+                    text += f"**القيمة الحالية:** {escape_md_v1(current_value)}\n\n"
             else:
                 text += "**القيمة الحالية:** لا يوجد تاريخ\n\n"
             text += "✅ **اختر التاريخ من التقويم أدناه:**\n"
@@ -1472,7 +1484,7 @@ async def handle_field_selection(update: Update, context: ContextTypes.DEFAULT_T
         else:
             context.user_data['edit_field_display'] = field_display
             text = f"✏️ **تعديل: {field_display}**\n\n"
-            text += f"**القيمة الحالية:**\n```\n{current_value}\n```\n\n"
+            text += f"**القيمة الحالية:**\n```\n{_safe_code_block(current_value)}\n```\n\n"
             text += f"📝 **أرسل القيمة الجديدة لـ ({field_display}):**"
             
             keyboard = [
@@ -1622,7 +1634,7 @@ async def show_endoscopy_type_edit(query, context):
     ])
     await query.edit_message_text(
         f"✏️ **تعديل نوع المنظار**\n\n"
-        f"**القيمة الحالية:** {current or 'لا يوجد'}\n\n"
+        f"**القيمة الحالية:** {escape_md_v1(current) if current else 'لا يوجد'}\n\n"
         f"اختر نوع المنظار:",
         reply_markup=InlineKeyboardMarkup(rows),
         parse_mode=ParseMode.MARKDOWN,
@@ -1862,11 +1874,11 @@ async def handle_text_during_date_calendar(update: Update, context: ContextTypes
             followup_time = context.user_data['current_report_data'].get('followup_time', '')
             if followup_time:
                 time_12h = format_time_12h(followup_time)
-                text += f"**القيمة الحالية:** {current_value} - {time_12h}\n\n"
+                text += f"**القيمة الحالية:** {escape_md_v1(current_value)} - {escape_md_v1(time_12h)}\n\n"
             else:
-                text += f"**القيمة الحالية:** {current_value}\n\n"
+                text += f"**القيمة الحالية:** {escape_md_v1(current_value)}\n\n"
         else:
-            text += f"**القيمة الحالية:** {current_value}\n\n"
+            text += f"**القيمة الحالية:** {escape_md_v1(current_value)}\n\n"
     else:
         text += "**القيمة الحالية:** لا يوجد تاريخ\n\n"
     text += "✅ **اختر التاريخ من التقويم أدناه:**\n"
@@ -2065,8 +2077,9 @@ async def confirm_date_edit(message_or_query, context, selected_date, selected_t
     else:
         new_display = selected_date.strftime('%Y-%m-%d')
 
-    old_display_safe = escape_markdown(old_display)
-    new_display_safe = escape_markdown(new_display)
+    # نصّ عادي (خارج كتلة ```) ⇒ تهريب Markdown القديم هو الصحيح هنا
+    old_display_safe = escape_md_v1(old_display)
+    new_display_safe = escape_md_v1(new_display)
 
     text = "📝 **تأكيد التعديل**\n\n"
     text += f"**الحقل:** {field_label}\n\n"
@@ -2106,8 +2119,9 @@ async def confirm_text_edit(message, context, new_value: str):
 
     old_display = str(old_value) if old_value and old_value != "None" else "لا يوجد"
 
-    old_display_safe = escape_markdown(old_display)
-    new_display_safe = escape_markdown(new_value)
+    # داخل كتلة ``` ⇒ العلامة الخلفية فقط، لا تهريب Markdown (انظر _safe_code_block)
+    old_display_safe = _safe_code_block(old_display)
+    new_display_safe = _safe_code_block(new_value)
 
     text = "📝 **تأكيد التعديل**\n\n"
     text += f"**الحقل:** {field_display}\n\n"
