@@ -21,6 +21,9 @@ InlineKeyboardMarkup فقط)، فالعطب بيانات متبقّية لا خ�
     venv/bin/python scripts/clear_group_reply_keyboard.py            # فحص فقط
     venv/bin/python scripts/clear_group_reply_keyboard.py --apply    # التنفيذ
 
+ولمجموعة غير مضبوطة في الإعدادات (أو للتأكد من واحدة بعينها):
+    venv/bin/python scripts/clear_group_reply_keyboard.py --chat-id -1002190577845 --apply
+
 يرسل رسالة قصيرة تحمل ReplyKeyboardRemove ثم يحذفها، فلا يبقى أثر في
 المجموعة. مسح اللوحة يسري لحظة استلام الرسالة ولا يتراجع بحذفها.
 """
@@ -94,6 +97,15 @@ async def _clear(bot: Bot, name: str, chat_id: str, apply: bool) -> bool:
     return True
 
 
+def _explicit_chat_id() -> str | None:
+    if "--chat-id" not in sys.argv:
+        return None
+    i = sys.argv.index("--chat-id")
+    if i + 1 >= len(sys.argv):
+        return None
+    return sys.argv[i + 1].strip()
+
+
 async def main() -> int:
     apply = "--apply" in sys.argv
 
@@ -104,7 +116,11 @@ async def main() -> int:
         print("❌ BOT_TOKEN غير مضبوط — لا يمكن المتابعة.")
         return 1
 
-    groups = _collect_groups()
+    explicit = _explicit_chat_id()
+    if explicit:
+        groups = [("--chat-id", explicit)]
+    else:
+        groups = _collect_groups()
     if not groups:
         print("⚠️ لا توجد أي مجموعة مضبوطة في الإعدادات — لا شيء لعمله.")
         return 0
