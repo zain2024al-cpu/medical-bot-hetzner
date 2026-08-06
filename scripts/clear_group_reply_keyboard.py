@@ -58,10 +58,19 @@ def _collect_groups() -> list[tuple[str, str]]:
     seen: set[str] = set()
     for key in _GROUP_ENV_KEYS:
         raw = str(getattr(settings, key, "") or "").strip()
-        if not raw or raw in seen:
+        if not raw:
             continue
-        seen.add(raw)
-        found.append((key, raw))
+        # ⚠️ بعض المفاتيح تحمل أكثر من معرّف مفصولة بفواصل
+        # (REPORTS_GROUP_ID مثلاً = "-100...388,-100...845")، فتمريرها كما هي
+        # لتيليجرام يعامِلها كمعرّف واحد خاطئ. نفصلها هنا، ونحذف المكرّر —
+        # فالمعرّف نفسه يتكرّر عادةً بين REPORTS_GROUP_ID وMEDICAL_REPORTS_GROUP_ID
+        # ولا داعي لإرسال رسالة مسح مرتين لنفس المجموعة.
+        for part in raw.split(","):
+            cid = part.strip()
+            if not cid or cid in seen:
+                continue
+            seen.add(cid)
+            found.append((key, cid))
     return found
 
 
@@ -78,9 +87,12 @@ async def _clear(bot: Bot, name: str, chat_id: str, apply: bool) -> bool:
         return True
 
     try:
+        # ⚠️ نصّ مرئي فعلي — تيليجرام يرفض الرسالة الفارغة أو المكوَّنة من
+        # مسافة صفرية (U+200B) بـ"Text must be non-empty"، ولا يمكن إرسال
+        # ReplyKeyboardRemove بلا رسالة تحملها. تُحذف الرسالة بعد ثانية.
         msg = await bot.send_message(
             chat_id=chat_id,
-            text="​",  # مسافة صفرية — أقصر رسالة ممكنة
+            text="🔄 تحديث لوحة الأزرار…",
             reply_markup=ReplyKeyboardRemove(),
         )
     except TelegramError as exc:
@@ -140,8 +152,16 @@ async def main() -> int:
     print(f"\n📊 النتيجة: {ok}/{len(groups)} مجموعة.")
     if not apply:
         print("لم يُنفَّذ أي تغيير. أعد التشغيل مع --apply للمسح الفعلي.")
-    else:
-        print("افتح المجموعة على هاتفك — يجب أن تكون لوحة الأزرار اختفت.")
+        return 0
+
+    # ⚠️ لا تُطمئِن المستخدم إلا إذا نجح شيء فعلاً — الإصدار الأول كان يطبع
+    # "اختفت اللوحة" حتى مع 0/4 فاشلة، وهو تقرير نجاح كاذب.
+    if ok == 0:
+        print("❌ لم تُمسَح أي لوحة — راجع أسباب الفشل أعلاه.")
+        return 1
+    if ok < len(groups):
+        print(f"⚠️ نجح {ok} وفشل {len(groups) - ok} — راجع الأسباب أعلاه.")
+    print("افتح المجموعة على هاتفك — يجب أن تكون لوحة الأزرار اختفت.")
     return 0
 
 
