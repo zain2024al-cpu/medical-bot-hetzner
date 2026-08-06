@@ -1675,7 +1675,16 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not update.effective_user or not _is_authorized(update.effective_user.id):
         return
 
-    if not update.message:
+    # ⚠️ effective_message لا update.message — الفارق ليس تجميلياً:
+    # فلتر filters.TEXT الذي سجَّلنا به هذا المعالِج **يقبل الرسائل المعدَّلة
+    # أيضاً** (تحقّقنا عملياً: check_update=True لتحديث edited_message)، وفي
+    # تلك الحالة update.message = None. فكان المعالِج يرتدّ هنا **صامتاً
+    # تماماً** — بلا سجلّ ولا ردّ ولا حتى تحذير — فيبدو للمستخدم أن البوت
+    # "لا يقبل الإدخال اليدوي" في خطوة السكن، بينما زر "تخطي" يعمل لأنه
+    # CallbackQuery لا Message. نفس الإصلاح مطبَّق سابقاً في
+    # admin_daily_patients.py لنفس السبب حرفياً.
+    msg = update.effective_message
+    if msg is None:
         return
 
     session = ArrivalSession.load(context.user_data)
@@ -1684,7 +1693,7 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if session.step not in _TEXT_STEPS:
         return
 
-    text = (update.message.text or "").strip()
+    text = (msg.text or "").strip()
     step = session.step
     uid  = update.effective_user.id if update.effective_user else "unknown"
     logger.info(
@@ -1700,7 +1709,7 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
             dt = parse_date_input(text)
             if dt is None:
                 prompt, kb = build_date_calendar_prompt(error=True)
-                await update.message.reply_text(prompt, reply_markup=kb, parse_mode="Markdown")
+                await msg.reply_text(prompt, reply_markup=kb, parse_mode="Markdown")
                 return
             session.created_at = dt.isoformat()
             session.step = STEP_PATIENT_COUNT

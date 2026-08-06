@@ -500,18 +500,26 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     # ✅ الحماية داخل المعالِج نفسه — معالِج نصوص عام (يطابق أي رسالة نصية).
     if not update.effective_user or not _is_authorized(update.effective_user.id):
         return
+    # ⚠️ effective_message لا update.message — فلتر filters.TEXT المسجَّل به
+    # هذا المعالِج يقبل الرسائل المعدَّلة أيضاً، وفيها update.message=None
+    # فينفجر السطر التالي بـ AttributeError. نفس العطب المُصلَح في
+    # arrivals/flow.py وadmin_daily_patients.py.
+    msg = update.effective_message
+    if msg is None:
+        return
+
     session = DepartureSession.load(context.user_data)
     if session is None or session.step not in _TEXT_STEPS:
         return
 
-    text = (update.message.text or "").strip()
+    text = (msg.text or "").strip()
     step = session.step
 
     if step == STEP_DATE_CUSTOM:
         dt = parse_date_input(text)
         if dt is None:
             prompt, kb = build_date_calendar_prompt(error=True)
-            await update.message.reply_text(prompt, reply_markup=kb, parse_mode="Markdown")
+            await msg.reply_text(prompt, reply_markup=kb, parse_mode="Markdown")
             return
         session.created_at = dt.isoformat()
         session.save(context.user_data)
@@ -525,7 +533,7 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
         session.step = STEP_SPECIALIST
         session.save(context.user_data)
         prompt, kb = build_specialist_prompt(session)
-        await update.message.reply_text(prompt, reply_markup=kb, parse_mode="Markdown")
+        await msg.reply_text(prompt, reply_markup=kb, parse_mode="Markdown")
         return
 
 

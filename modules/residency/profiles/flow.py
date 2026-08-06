@@ -680,7 +680,12 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
 # ── Text handler (group 16) ───────────────────────────────────────────────────
 
 async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not update.message:
+    # ⚠️ effective_message لا update.message — فلتر filters.TEXT المسجّل به
+    # هذا المعالِج يقبل الرسائل المعدَلة أيضاً، وفيها update.message=None
+    # فيرتدّ المعالِج صامتاً بلا سجلّ ولا ردّ. نفس العطب المُصلَح
+    # في arrivals/flow.py وadmin_daily_patients.py.
+    msg = update.effective_message
+    if msg is None:
         return
 
     uid = update.effective_user.id if update.effective_user else "?"
@@ -692,18 +697,18 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     # ── Search mode ───────────────────────────────────────────────────────────
     if context.user_data.get("_res_search_active"):
-        query_text = (update.message.text or "").strip()
+        query_text = (msg.text or "").strip()
         if not query_text:
             return
         context.user_data.pop("_res_search_active", None)
         results = search_profiles(query_text)
         if not results:
             text, kb = build_search_prompt(error=True)
-            await update.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+            await msg.reply_text(text, reply_markup=kb, parse_mode="Markdown")
             context.user_data["_res_search_active"] = True
             return
         text, kb = build_search_results(results, query_text)
-        await update.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+        await msg.reply_text(text, reply_markup=kb, parse_mode="Markdown")
         return
 
     # ── Renewal text steps (residency number + notes) ────────────────────────
@@ -718,7 +723,7 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     )
     _ren = RenewalSession.load(context.user_data)
     if _ren is not None and _ren.step in {_REN_STEP_RES_NUM, _REN_STEP_C_RES_NUM, _REN_STEP_NOTES}:
-        _input = (update.message.text or "").strip()
+        _input = (msg.text or "").strip()
         if _ren.step == _REN_STEP_RES_NUM:
             _ren.new_residency_number = _input
             _ren.step = _REN_STEP_DOC
@@ -744,7 +749,7 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
             logger.info(f"[res.text] STEP_NOTES → STEP_REVIEW  notes={_input[:40]!r}  user={uid}")
             from modules.residency.renewal.views import build_renewal_review as _build_ren_review
             _txt, _kb = _build_ren_review(_ren)
-            await update.message.reply_text(_txt, reply_markup=_kb, parse_mode="Markdown")
+            await msg.reply_text(_txt, reply_markup=_kb, parse_mode="Markdown")
         return
 
     # ── Add-batch text steps ──────────────────────────────────────────────────
@@ -752,7 +757,7 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if session is None or session.step not in _TEXT_STEPS:
         return
 
-    text = (update.message.text or "").strip()
+    text = (msg.text or "").strip()
     step = session.step
 
     logger.info(
@@ -766,7 +771,7 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
         dt = parse_date_input(text)
         if dt is None:
             prompt, kb = build_date_calendar_prompt(error=True)
-            await update.message.reply_text(prompt, reply_markup=kb, parse_mode="Markdown")
+            await msg.reply_text(prompt, reply_markup=kb, parse_mode="Markdown")
             return
         session.created_at = dt.isoformat()
         session.step = STEP_PATIENT_COUNT
@@ -777,7 +782,7 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     if step == STEP_P_NAME:
         if not text:
-            await update.message.reply_text("⚠️ الاسم لا يمكن أن يكون فارغاً.")
+            await msg.reply_text("⚠️ الاسم لا يمكن أن يكون فارغاً.")
             return
         session.current_patient["name"] = text
         session.step = STEP_P_VISA_EXPIRY
@@ -799,7 +804,7 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     if step == STEP_C_NAME:
         if not text:
-            await update.message.reply_text("⚠️ الاسم لا يمكن أن يكون فارغاً.")
+            await msg.reply_text("⚠️ الاسم لا يمكن أن يكون فارغاً.")
             return
         session.current_companion["name"] = text
         session.step = STEP_C_VISA_EXPIRY
