@@ -76,7 +76,14 @@ def _list_kb(kind: str, page: int, total_pages: int, users: list[Translator]) ->
     for u in users:
         icon = "🔒" if getattr(u, "is_suspended", False) else ("✅" if getattr(u, "is_approved", False) else "⏳")
         name = _display_name(u)
-        kb.append([InlineKeyboardButton(f"{icon} {name}", callback_data=f"{CB}:user:{u.id}")])
+        # ✅ آيدي تيليجرام الفعلي ظاهر بجانب كل اسم — بطلب صريح: التمييز
+        # بين حسابين مختلفين لهما اسمان مختلفان (اسم الدليل المعتمَد مقابل
+        # الاسم الخام من بروفايل تيليجرام) لا يظهر إلا بمعرفة الآيدي، وهو
+        # بالضبط ما يكشف تكرار شخص واحد بحسابين (مثال حقيقي: "ادريس" في
+        # الدليل و"Edress" الخام لنفس الشخص بآيديين مختلفين).
+        tg = getattr(u, "tg_user_id", None)
+        id_tag = f" · {tg}" if tg else ""
+        kb.append([InlineKeyboardButton(f"{icon} {name}{id_tag}", callback_data=f"{CB}:user:{u.id}")])
 
     nav: list[InlineKeyboardButton] = []
     if total_pages > 1 and page > 0:
@@ -105,7 +112,8 @@ def _perm_list_kb(page: int, total_pages: int, users: list[Translator]) -> Inlin
         name = _display_name(u)
         access_tg_user_id = _resolve_access_tg_user_id(u)
         if access_tg_user_id:
-            kb.append([InlineKeyboardButton(f"🔐 {name}", callback_data=f"amod:list:{access_tg_user_id}")])
+            kb.append([InlineKeyboardButton(
+                f"🔐 {name} · {access_tg_user_id}", callback_data=f"amod:list:{access_tg_user_id}")])
         else:
             # لا يوجد معرف تليجرام حقيقي لهذا المستخدم — لا يمكن إدارة صلاحياته
             kb.append([InlineKeyboardButton(f"⚠️ {name} (لا يوجد معرف)", callback_data="noop")])

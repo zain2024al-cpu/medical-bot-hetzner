@@ -32,12 +32,14 @@ from __future__ import annotations
 
 import os
 import sys
-from collections import Counter, defaultdict
+from collections import Counter
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from sqlalchemy import func                  # noqa: E402
+
 from db.session import SessionLocal          # noqa: E402
-from db.models import User, TranslatorDirectory  # noqa: E402
+from db.models import User, TranslatorDirectory, Report  # noqa: E402
 
 
 def _norm(s) -> str:
@@ -112,6 +114,34 @@ def main() -> int:
     print("   (لن يظهر اسمه في قائمة المترجمين عند إنشاء تقرير)")
     for tg, nm in missing[:15]:
         print(f"     tg={tg}  {nm!r}")
+
+    # ── 6) كل مستخدم معتمَد: الاسم المعروض + آيدي تيليجرام + عدد تقاريره ──────
+    # ⚠️ لا يكشف السكربت تكراراً بين اسمين بلغتين مختلفتين تلقائياً (مثال
+    # حقيقي: "ادريس" في الدليل مقابل "Edress" الخام لنفس الشخص بآيديين
+    # مختلفين) — الأشكال متباعدة نصّياً ولا رابط برمجي بينهما. هذا الجدول
+    # هو الأداة البديلة: يعرض كل اسم بجانب آيديه الحقيقي وعدد تقاريره،
+    # فيسهل على الأدمن (الذي يعرف الأشخاص فعلياً) اكتشاف الزوج بصرياً
+    # وتقرير أيّهما يُبقيه استناداً لعدد التقارير (الأكثر نشاطاً غالباً
+    # هو الحساب الصحيح الذي يجب الإبقاء عليه).
+    with SessionLocal() as s:
+        report_counts = dict(
+            s.query(Report.translator_id, func.count(Report.id))
+            .group_by(Report.translator_id)
+            .all()
+        )
+    approved = sorted(
+        (u for u in users if getattr(u, "is_approved", False) and u.tg_user_id),
+        key=lambda u: _norm(dir_by_id.get(u.tg_user_id) or u.full_name or ""),
+    )
+    print(f"\n⑥ كل المستخدمين المعتمَدين ({len(approved)}) — بالاسم والآيدي وعدد التقارير:")
+    print(f"   {'الاسم المعروض':22} {'آيدي تيليجرام':14} {'تقارير':7} {'(الاسم الخام لو اختلف)'}")
+    for u in approved:
+        dn = dir_by_id.get(u.tg_user_id)
+        raw = (u.full_name or "").strip()
+        shown = dn or raw
+        cnt = report_counts.get(u.tg_user_id, 0)
+        note = f"(خام: {raw!r})" if dn and _norm(dn) != _norm(raw) else ""
+        print(f"   {shown:22} {u.tg_user_id!s:14} {cnt:<7} {note}")
 
     problems = len(dup_exact) + len(contained) + len(orphan_dirs)
     print("\n" + "=" * 66)
