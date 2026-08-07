@@ -24,14 +24,25 @@ class ArabicTextRenderer:
             النص المشكل
         """
         try:
+            import re
             from arabic_reshaper import reshape
             from bidi.algorithm import get_display
-            
+
             if not text:
                 return text
-            
-            reshaped = reshape(str(text))
-            return get_display(reshaped)
+
+            s = str(text)
+            # ⚠️ النص الخالي من العربية يُعاد كما هو — تمرير تاريخ مثل
+            # "2026/07/01 — 2026/08/05" عبر get_display بأساس RTL يقلب
+            # ترتيب التاريخين فعلياً.
+            if not re.search(r"[؀-ۿݐ-ݿﭐ-﷿ﹰ-﻿]", s):
+                return s
+
+            # ⚠️ base_dir="R" صراحةً — بدونه تستنتج المكتبة الاتجاه من أول
+            # حرف قوي، فنص مثل "500mg باراسيتامول" (اسم دواء لاتيني أولاً)
+            # يُعامَل كفقرة LTR فيظهر جزؤه العربي في الطرف الخاطئ ويبدو
+            # معكوساً، بينما جاره العربي الصرف يظهر سليماً.
+            return get_display(reshape(s), base_dir="R")
         except ImportError:
             logger.warning("⚠️ مكتبات العربية غير متوفرة")
             return text

@@ -25,6 +25,7 @@
 #   )
 
 from __future__ import annotations
+import re
 
 import io
 import logging
@@ -60,13 +61,31 @@ def _pick_font(candidates: list[tuple[str, str]], fallback: str = "Helvetica") -
     return fallback
 
 
+# نطاقات الحروف العربية (أساسي + مكمّل + أشكال العرض)
+_ARABIC_RE = re.compile(r"[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]")
+
+
 def _ar(text) -> str:
+    """يُطبِّق reshape+bidi على النص العربي فقط.
+
+    ⚠️ نقطتان لا تُفصلان (الإصلاح المرجعي في
+    modules/healthcare/evaluation/pdf_builder.py):
+    1. النص الخالي من العربية يُعاد كما هو — تمرير تاريخ مثل
+       "2026/07/01 — 2026/08/05" عبر get_display بأساس RTL يقلب ترتيب
+       التاريخين فعلياً.
+    2. base_dir="R" صراحةً — بدونه تستنتج المكتبة الاتجاه من أول حرف
+       قوي، فنص مثل "500mg باراسيتامول" (اسم دواء لاتيني أولاً) يُعامَل
+       كفقرة LTR فيظهر الجزء العربي في الطرف الخاطئ ويبدو معكوساً،
+       بينما جاره العربي الصرف يظهر سليماً."""
+    s = str(text or "")
+    if not _ARABIC_RE.search(s):
+        return s
     try:
         import arabic_reshaper
         from bidi.algorithm import get_display
-        return get_display(arabic_reshaper.reshape(str(text or "")))
+        return get_display(arabic_reshaper.reshape(s), base_dir="R")
     except Exception:
-        return str(text or "")
+        return s
 
 
 def _colors():
@@ -98,7 +117,7 @@ def _bar_chart(data: dict[str, int], title: str, color: str = "#1565C0") -> io.B
         if not data:
             return None
         items = sorted(data.items(), key=lambda x: -x[1])[:12]
-        labels = [get_display(arabic_reshaper.reshape(k)) for k, _ in items]
+        labels = [_ar(k) for k, _ in items]
         values = [v for _, v in items]
 
         fig, ax = plt.subplots(figsize=(10, max(3, len(items) * 0.5)))
@@ -134,7 +153,7 @@ def _pie_chart(data: dict[str, int], title: str) -> io.BytesIO | None:
         if not data or sum(data.values()) == 0:
             return None
         items = sorted(data.items(), key=lambda x: -x[1])[:8]
-        labels = [get_display(arabic_reshaper.reshape(f"{k} ({v})")) for k, v in items]
+        labels = [_ar(f"{k} ({v})") for k, v in items]
         values = [v for _, v in items]
         palette = ["#1565C0", "#2E7D32", "#B7950B", "#922B21", "#7D3C98",
                    "#117A65", "#D35400", "#1A5276"]

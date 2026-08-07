@@ -68,7 +68,7 @@ def _ar(text) -> str:
     try:
         import arabic_reshaper
         from bidi.algorithm import get_display
-        return get_display(arabic_reshaper.reshape(s))
+        return get_display(arabic_reshaper.reshape(s), base_dir="R")
     except Exception:
         return s
 

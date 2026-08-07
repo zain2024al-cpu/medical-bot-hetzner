@@ -60,13 +60,31 @@ def _pick_font(candidates: list[tuple[str, str]], fallback: str = "Helvetica") -
     return fallback
 
 
+# نطاقات الحروف العربية (أساسي + مكمّل + أشكال العرض)
+_ARABIC_RE = re.compile(r"[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]")
+
+
 def _ar(text: str) -> str:
+    """يُطبِّق reshape+bidi على النص العربي فقط.
+
+    ⚠️ نقطتان لا تُفصلان (الإصلاح المرجعي في
+    modules/healthcare/evaluation/pdf_builder.py):
+    1. النص الخالي من العربية يُعاد كما هو — تمرير تاريخ مثل
+       "2026/07/01 — 2026/08/05" عبر get_display بأساس RTL يقلب ترتيب
+       التاريخين فعلياً.
+    2. base_dir="R" صراحةً — بدونه تستنتج المكتبة الاتجاه من أول حرف
+       قوي، فنص مثل "500mg باراسيتامول" (اسم دواء لاتيني أولاً) يُعامَل
+       كفقرة LTR فيظهر الجزء العربي في الطرف الخاطئ ويبدو معكوساً،
+       بينما جاره العربي الصرف يظهر سليماً."""
+    s = str(text or "")
+    if not _ARABIC_RE.search(s):
+        return s
     try:
         import arabic_reshaper
         from bidi.algorithm import get_display
-        return get_display(arabic_reshaper.reshape(str(text or "")))
+        return get_display(arabic_reshaper.reshape(s), base_dir="R")
     except Exception:
-        return str(text or "")
+        return s
 
 
 def _ar_wrap(text, font_name: str, font_size: float, max_width_pts: float) -> str:
