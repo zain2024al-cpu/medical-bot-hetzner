@@ -81,6 +81,83 @@ def seed_translators_directory() -> int:
         return 0
 
 
+def claim_translator_for_submitter(translator_id: int, submitter_tg_id: int) -> str:
+    """
+    ربط اسم مترجم بآيدي تيليجرام الحقيقي لمن اختاره فعلياً عند إنشاء تقرير.
+
+    ⚠️ السياق: `TranslatorDirectory` تحوي عشرات الصفوف بآيديات **وهمية**
+    (زُرعت آلياً بلا حساب تيليجرام حقيقي — انظر `ensure_default_translators`
+    وSQLite auto-increment المتسلسل من قيمة `TRANSLATORS_SEED` الثابتة).
+    حين يختار مستخدم حقيقي اسماً من القائمة أثناء إنشاء تقرير، هذا دليل
+    قوي على هويته — لكن **ليس دليلاً قاطعاً دائماً** (قد يُدخِل أحدهم
+    تقريراً نيابة عن زميل). فالربط هنا **متحفِّظ عمداً**: يربط فقط حين
+    يكون آمناً بيقين، ويرفض أي حالة قد تسرق هوية حقيقية أخرى.
+
+    الشروط قبل الربط (كلاهما يجب أن يتحقق):
+    1. **المُرسِل نفسه لا يملك صفّاً آخر في الدليل باسم مختلف** — إن كان
+       له اسم معتمَد مسبقاً، فاختياره اسماً آخر الآن أقرب لإدخال نيابة
+       عن غيره، لا اكتشاف هوية.
+    2. **الآيدي الحالي لهذا الاسم لم يُستخدَم فعلياً من قِبل صاحبه** —
+       نتحقّق عبر `Report.submitted_by_user_id` (الحقل الموثوق لهوية من
+       نشر التقرير فعلياً، لا `translator_id` القابل للتلوّث بالمطابقة
+       الاسمية القديمة). إن وُجد تقرير واحد **نُشِر فعلياً** بهذا الآيدي،
+       فهو هوية حقيقية أخرى — لا نُخاطر بسرقتها.
+
+    Returns:
+      "already_correct"              — الاسم مرتبط بآيدي المُرسِل أصلاً
+      "linked"                        — رُبِط الآن بآيدي المُرسِل الحقيقي
+      "skipped_submitter_has_identity" — المُرسِل له اسم آخر معتمَد مسبقاً
+      "skipped_target_has_activity"   — الآيدي الحالي له نشاط نشر حقيقي
+      "not_found"                     — لا صفّ بهذا translator_id
+      None                            — خطأ في قاعدة البيانات
+    """
+    try:
+        from db.session import SessionLocal
+        from db.models import TranslatorDirectory, Report
+
+        with SessionLocal() as s:
+            row = s.query(TranslatorDirectory).filter_by(translator_id=translator_id).first()
+            if not row:
+                return "not_found"
+
+            if row.translator_id == submitter_tg_id:
+                return "already_correct"
+
+            submitter_other_row = (
+                s.query(TranslatorDirectory)
+                .filter(TranslatorDirectory.translator_id == submitter_tg_id)
+                .first()
+            )
+            if submitter_other_row is not None:
+                return "skipped_submitter_has_identity"
+
+            target_has_real_activity = (
+                s.query(Report.id)
+                .filter(Report.submitted_by_user_id == translator_id)
+                .first()
+                is not None
+            )
+            if target_has_real_activity:
+                return "skipped_target_has_activity"
+
+            name = row.name
+            s.delete(row)
+            s.flush()
+            s.add(TranslatorDirectory(translator_id=submitter_tg_id, name=name))
+            s.commit()
+            logger.info(
+                "TD: claimed translator [%s] %s -> %s (real submitter)",
+                name, translator_id, submitter_tg_id,
+            )
+            return "linked"
+    except Exception as e:
+        logger.error(
+            "TD: failed to claim translator_id=%s for submitter=%s: %s",
+            translator_id, submitter_tg_id, e,
+        )
+        return None
+
+
 def sync_reports_translator_ids() -> int:
     """تحديث translator_id في reports بناءً على submitted_by_user_id أو translator_name"""
     try:

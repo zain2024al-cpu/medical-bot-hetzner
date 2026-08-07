@@ -1193,6 +1193,26 @@ async def handle_translator_choice(update: Update, context: ContextTypes.DEFAULT
                             report_tmp["translator_id"] = translator.translator_id
                             logger.info(f"✅ Translator selected: {translator.name}")
                             found_translator = True
+
+                            # ✅ ربط تلقائي متحفِّظ لهوية المترجم بآيدي تيليجرام
+                            # الحقيقي لمن اختاره فعلياً — يعالج جذرياً الأسماء
+                            # الوهمية (آيديات مزروعة آلياً بلا حساب حقيقي).
+                            # آمن دائماً: لا يكسر تدفق إنشاء التقرير مهما حدث،
+                            # ولا يربط إلا حين يكون آمناً بيقين (انظر شروط
+                            # claim_translator_for_submitter — لا يسرق هوية
+                            # حقيقية أخرى أبداً).
+                            try:
+                                submitter_tg_id = query.from_user.id if query.from_user else None
+                                if submitter_tg_id:
+                                    from services.translators_service import claim_translator_for_submitter
+                                    claim_status = claim_translator_for_submitter(
+                                        translator.translator_id, submitter_tg_id)
+                                    if claim_status == "linked":
+                                        # الاسم صار مرتبطاً بآيدي المُرسِل الحقيقي
+                                        # الآن — التقرير الحالي يجب أن يُنسَب له.
+                                        report_tmp["translator_id"] = submitter_tg_id
+                            except Exception:
+                                logger.debug("تم تجاهل استثناء في ربط هوية المترجم", exc_info=True)
                         else:
                             report_tmp = context.user_data.setdefault("report_tmp", {})
                             report_tmp["translator_name"] = "غير محدد"
