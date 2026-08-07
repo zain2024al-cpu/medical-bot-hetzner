@@ -187,7 +187,26 @@ async def error_handler(update: object, context) -> None:
     if any(err in error_str for err in network_errors):
         logger.warning(f"Network error (ignored): {error}")
         return
-    
+
+    # ✅ رفضٌ حميد من تيليجرام لتعديل رسالة — ليس خطأً بأي معنى مفيد:
+    # "Message is not modified" تعني أن الشاشة **تعرض بالفعل** ما أردنا
+    # عرضه (ضغطة مكرَّرة على نفس الزر، أو إعادة رسم نفس الشاشة)، وبقيّة
+    # الحالات تعني أن الرسالة المستهدفة لم تعد قابلة للتعديل (قديمة/محذوفة).
+    # كانت تصل إلى logger.error أدناه فتظهر في تقرير الأخطاء اليومي وتزاحم
+    # الأعطال الحقيقية. وهي معالَجة محلياً في 8 مواضع أصلاً، لكن مئات
+    # استدعاءات edit_message_text الأخرى غير محميّة — فالمكان الصحيح
+    # للحارس هو هنا مركزياً لا تكرار الحماية في كل موضع.
+    benign_edit_rejections = [
+        'message is not modified',
+        "message can't be edited",
+        'message to edit not found',
+        'message_id_invalid',
+        'query is too old',
+    ]
+    if any(err in error_str for err in benign_edit_rejections):
+        logger.debug(f"Benign Telegram edit rejection (ignored): {error}")
+        return
+
     # تسجيل الأخطاء الأخرى
     logger.error(f"Error: {error}", exc_info=True)
 
