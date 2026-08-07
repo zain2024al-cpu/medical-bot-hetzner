@@ -394,15 +394,25 @@ async def handle_approve_entry(update: Update, context: ContextTypes.DEFAULT_TYP
 
 async def handle_translator_name_for_approved_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة إدخال اسم المترجم بعد الموافقة على مستخدم."""
-    text = (update.message.text or "").strip()
+    # ⚠️ effective_message لا update.message — فلتر filters.TEXT المسجَّل به
+    # هذا المعالِج يقبل الرسائل المعدَّلة أيضاً، وفيها update.message=None
+    # فينفجر السطر بـAttributeError ويعلق الأدمن في انتظار الاسم بلا مخرج
+    # سوى "تخطي". يحدث فعلياً حين يُصحّح الأدمن اسماً أرسله بدل كتابته من
+    # جديد. نفس العطب المُصلَح في arrivals/departures/public_services/
+    # residency وadmin_daily_patients.
+    msg = update.effective_message
+    if msg is None:
+        return AWAIT_TRANSLATOR_NAME
+
+    text = (msg.text or "").strip()
 
     tg = context.user_data.get('aum_pending_translator_tg_id')
     if not tg:
-        await update.message.reply_text("❌ خطأ: انتهت صلاحية هذا الطلب.")
+        await msg.reply_text("❌ خطأ: انتهت صلاحية هذا الطلب.")
         return ConversationHandler.END
 
     if not text or len(text) < 2:
-        await update.message.reply_text("⚠️ الاسم قصير جداً. أدخل اسماً صحيحاً، أو اضغط 'تخطي':")
+        await msg.reply_text("⚠️ الاسم قصير جداً. أدخل اسماً صحيحاً، أو اضغط 'تخطي':")
         return AWAIT_TRANSLATOR_NAME
 
     from bot.handlers.admin.admin_translators_management import (
@@ -411,7 +421,7 @@ async def handle_translator_name_for_approved_user(update: Update, context: Cont
 
     status = _db_add_translator_ex(text, telegram_id=tg)
     if status is None:
-        await update.message.reply_text("❌ حدث خطأ في الحفظ في قاعدة البيانات. حاول مرة أخرى:")
+        await msg.reply_text("❌ حدث خطأ في الحفظ في قاعدة البيانات. حاول مرة أخرى:")
         return AWAIT_TRANSLATOR_NAME
 
     if status in ("inserted", "backfilled"):
@@ -423,12 +433,12 @@ async def handle_translator_name_for_approved_user(update: Update, context: Cont
     context.user_data.pop('aum_pending_translator_tg_id', None)
 
     if status == "conflict_skipped":
-        await update.message.reply_text(
+        await msg.reply_text(
             f"⚠️ هذا الآيدي مرتبط مسبقاً باسم آخر في دليل المترجمين — لم يُضَف \"{text}\" لتفادي التكرار.\n"
             "يمكنك تعديل الاسم لاحقاً من دليل المترجمين إن احتجت."
         )
     else:
-        await update.message.reply_text(f"✅ تم حفظ الاسم: {text}\n👥 سيظهر عند إنشاء تقرير جديد.")
+        await msg.reply_text(f"✅ تم حفظ الاسم: {text}\n👥 سيظهر عند إنشاء تقرير جديد.")
 
     return ConversationHandler.END
 
