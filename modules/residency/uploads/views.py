@@ -167,6 +167,57 @@ def build_service_menu(profile, companions) -> tuple[str, InlineKeyboardMarkup]:
     return "\n".join(lines), kb
 
 
+# ── إضافة مرفق (من ملف المريض مباشرةً) ───────────────────────────────────────
+
+def build_attach_menu(profile) -> tuple[str, InlineKeyboardMarkup]:
+    """
+    شاشة «📎 إضافة مرفق» المفتوحة من ملف المريض.
+
+    مقصورة على المرفقات التي لا يجمعها أي مسار آخر: الصورة الشخصية وفورم C.
+    الجواز والتأشيرة والإقامة تُرفع ضمن مساراتها (الإضافة والتجديد) فلا
+    تُكرَّر هنا حتى لا يصير للحقل الواحد مصدران متباينان.
+    """
+    has_form_c = bool(getattr(profile, "form_c_file_id", ""))
+    has_photo  = bool(getattr(profile, "photo_file_id", ""))
+    lines = [
+        _DIVIDER,
+        "📎  **إضافة مرفق**",
+        "",
+        f"👤 *{profile.name}*",
+        _THIN,
+        "",
+        f"🖼️ *الصورة الشخصية:*  {'✅ يوجد' if has_photo else '⬜ لا يوجد'}",
+        f"📄 *فورم C:*  {'✅ يوجد' if has_form_c else '⬜ لا يوجد'}",
+        "",
+        "اختر المرفق الذي تريد رفعه:",
+    ]
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton(
+            "🖼️ استبدال الصورة الشخصية" if has_photo else "🖼️ رفع صورة شخصية",
+            callback_data=f"{RNU}:photo_{profile.id}")],
+        [InlineKeyboardButton(
+            "📄 استبدال فورم C" if has_form_c else "📄 رفع فورم C",
+            callback_data=f"{RNU}:formc_{profile.id}")],
+        [InlineKeyboardButton("⬅️ رجوع", callback_data=f"rna:view_{profile.id}")],
+    ])
+    return "\n".join(lines), kb
+
+
+def build_photo_saved(name: str) -> tuple[str, InlineKeyboardMarkup]:
+    lines = [
+        _DIVIDER,
+        "✅  **تم رفع الصورة الشخصية**",
+        "",
+        f"👤 {name}",
+        "",
+        "الصورة محفوظة على ملف المريض، وتُرسَل مع «📎 إرسال الوثائق».",
+    ]
+    kb = InlineKeyboardMarkup([[
+        InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RNU}:hub"),
+    ]])
+    return "\n".join(lines), kb
+
+
 # ── نتائج ─────────────────────────────────────────────────────────────────────
 
 def build_form_c_saved(name: str) -> tuple[str, InlineKeyboardMarkup]:

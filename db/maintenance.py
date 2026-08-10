@@ -209,6 +209,8 @@ class DatabaseMaintenance:
                 # ✅ فورم C — ملف واحد للعائلة (المريض ومرافقوه) على مستوى
                 # الملف لا لكل شخص، فهو استمارة إقامة واحدة تُقدَّم للعائلة.
                 _migrate_column(conn, "res_profiles", "form_c_file_id", "VARCHAR(255)")
+                # ✅ الصورة الشخصية للمريض — مرفق اختياري من ملف المريض.
+                _migrate_column(conn, "res_profiles", "photo_file_id", "VARCHAR(255)")
                 # ✅ daily_patients لم يكن له أي ترحيل إطلاقاً، وقاعدة السيرفر
                 # تسبق هذه الأعمدة. `s.query(DailyPatient)` يختار كل أعمدة
                 # الموديل، فكان يسقط بـ`no such column: daily_patients.

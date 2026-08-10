@@ -26,6 +26,9 @@ class ProfileRow:
     notes:            str
     source:           str
     companion_count:  int = 0
+    # ✅ الصورة الشخصية — مرفق اختياري من «📎 إضافة مرفق» في ملف المريض.
+    # لها قيمة افتراضية حتى لا ينكسر أي مُنشئ قائم لا يمرّرها.
+    photo_file_id:    str = ""
 
 
 @dataclass
@@ -81,6 +84,7 @@ def get_profiles_page(page: int = 0) -> tuple[list[ProfileRow], int]:
                 passport_file_id=r.passport_file_id or "",
                 visa_file_id=r.visa_file_id or "",
                 latest_residency_file_id=r.latest_residency_file_id or "",
+                photo_file_id=getattr(r, "photo_file_id", "") or "",
                 form_c_file_id=r.form_c_file_id or "",
                 passport_expiry=r.passport_expiry or "",
                 notes=r.notes or "", source=r.source or "arrivals",
@@ -110,8 +114,9 @@ def get_profile_by_id(profile_id: int) -> ProfileRow | None:
             passport_file_id=r.passport_file_id or "",
             visa_file_id=r.visa_file_id or "",
             latest_residency_file_id=r.latest_residency_file_id or "",
+            photo_file_id=getattr(r, "photo_file_id", "") or "",
             form_c_file_id=r.form_c_file_id or "",
-                passport_expiry=r.passport_expiry or "",
+            passport_expiry=r.passport_expiry or "",
             notes=r.notes or "", source=r.source or "arrivals",
             companion_count=comp_count,
         )
@@ -186,6 +191,7 @@ def search_profiles(query: str) -> list[ProfileRow]:
                 passport_file_id=r.passport_file_id or "",
                 visa_file_id=r.visa_file_id or "",
                 latest_residency_file_id=r.latest_residency_file_id or "",
+                photo_file_id=getattr(r, "photo_file_id", "") or "",
                 form_c_file_id=r.form_c_file_id or "",
                 passport_expiry=r.passport_expiry or "",
                 notes=r.notes or "", source=r.source or "arrivals",

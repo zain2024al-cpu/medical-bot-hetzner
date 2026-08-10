@@ -44,11 +44,19 @@ def build_archive_list(profiles, *, page: int, total: int) -> tuple[str, InlineK
     if not profiles:
         lines += ["", "لا يوجد مرضى مسجلون حتى الآن."]
     else:
+        # ✅ الأيام المتبقية تظهر **دائماً** هنا. كانت تُبنى من
+        # `format_expiry_warning_inline` التي تُرجع فراغاً إذا تبقّى أكثر من
+        # 30 يوماً — فبدت الحالات الجديدة (كأنها) بلا أيام متبقية إطلاقاً،
+        # وهي في الحقيقة سليمة وبعيدة عن الانتهاء.
         for p in profiles:
-            icon    = format_status_icon(p.status)
-            warning = format_expiry_warning_inline(p.expiry_date)
-            comp    = f" +{p.companion_count}م" if p.companion_count else ""
-            lines.append(f"{icon} {p.name}{comp}{warning}")
+            icon = format_status_icon(p.status)
+            comp = f"  +{p.companion_count} مرافق" if p.companion_count else ""
+            days = format_days_remaining(p.expiry_date)
+            lines += [
+                "",
+                f"{icon} *{p.name}*{comp}",
+                f"     ⏳ {days}",
+            ]
 
     rows: list[list[InlineKeyboardButton]] = []
 
@@ -97,12 +105,14 @@ def build_profile_detail(profile, companions, history) -> tuple[str, InlineKeybo
     status_icon  = format_status_icon(profile.status)
     status_label = format_status(profile.status)
 
+    # ✅ «رقم الإقامة» أُزيل من هذه الشاشة بطلب المستخدم — الحقل ما زال في
+    # قاعدة البيانات وفي مسار التجديد، لكنه لا يُعرض هنا لأنه غير مطلوب.
     lines = [
         _DIVIDER,
         "🪪  **ملف المريض**",
         "",
         f"👤 *{profile.name}*",
-        f"🪪 *رقم الإقامة:*  {profile.residency_number or _NONE}",
+        "",
         f"📅 *تاريخ الانتهاء:*  {format_expiry_date(profile.expiry_date)}",
         f"⏳ *الأيام المتبقية:*  {format_days_remaining(profile.expiry_date)}",
         f"📊 *الحالة:*  {status_icon} {status_label}",
@@ -120,25 +130,29 @@ def build_profile_detail(profile, companions, history) -> tuple[str, InlineKeybo
             c_label = format_status(c.status)
             c_exp   = format_expiry_date(c.expiry_date)
             c_days  = format_days_remaining(c.expiry_date)
-            c_num   = c.residency_number or _NONE
             lines += [
                 "",
                 f"  *{i}.* 👤 *{c.name}*",
-                f"  🪪 {c_num}",
-                f"  📅 {c_exp}",
-                f"  ⏳ {c_days}",
-                f"  📊 {c_icon} {c_label}",
+                f"  📅 تاريخ الانتهاء:  {c_exp}",
+                f"  ⏳ الأيام المتبقية:  {c_days}",
+                f"  📊 الحالة:  {c_icon} {c_label}",
             ]
 
     lines.append(_THIN)
 
     # ── Documents ─────────────────────────────────────────────────────────────
+    # ✅ نصّ صريح بدل المربعات: المربع الأبيض وحده لا يميّز «غير مرفوع» عن
+    # «لا ينطبق»، وكانت الوثائق الأربع مكدَّسة في سطر واحد يصعب قراءته.
+    def _doc(file_id) -> str:
+        return "✅ يوجد" if file_id else "⬜ لا يوجد"
+
     lines += [
         "📎 *الوثائق:*",
-        f"  {doc_icon(profile.passport_file_id)} جواز   "
-        f"{doc_icon(profile.visa_file_id)} تأشيرة   "
-        f"{doc_icon(profile.latest_residency_file_id)} إقامة   "
-        f"{doc_icon(getattr(profile, 'form_c_file_id', ''))} فورم C",
+        f"  جواز السفر:  {_doc(profile.passport_file_id)}",
+        f"  التأشيرة:  {_doc(profile.visa_file_id)}",
+        f"  الإقامة:  {_doc(profile.latest_residency_file_id)}",
+        f"  فورم C:  {_doc(getattr(profile, 'form_c_file_id', ''))}",
+        f"  الصورة الشخصية:  {_doc(getattr(profile, 'photo_file_id', ''))}",
     ]
 
     lines.append(_THIN)
@@ -161,6 +175,11 @@ def build_profile_detail(profile, companions, history) -> tuple[str, InlineKeybo
         [
             InlineKeyboardButton("📄 ملف PDF",         callback_data=f"{RNA}:pdf_{profile.id}"),
             InlineKeyboardButton("📎 إرسال الوثائق",  callback_data=f"{RNA}:send_docs_{profile.id}"),
+        ],
+        # ✅ إضافة مرفق (صورة شخصية / فورم C) من الملف مباشرةً — كانت متاحة
+        # فقط عبر «الرفع والمتابعة ← إضافة خدمة»، وهو مسار غير بديهي من هنا.
+        [
+            InlineKeyboardButton("📎 إضافة مرفق", callback_data=f"rnu:attach_{profile.id}"),
         ],
         [
             InlineKeyboardButton("⬅️ رجوع",            callback_data=f"{RN}:archive"),

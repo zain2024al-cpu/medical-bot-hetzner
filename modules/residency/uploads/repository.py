@@ -255,6 +255,31 @@ def save_form_c(*, profile_id: int, file_id: str, performed_by: int | None) -> s
     return name
 
 
+def save_patient_photo(*, profile_id: int, file_id: str, performed_by: int | None) -> str:
+    """يحفظ الصورة الشخصية للمريض ويسجّلها في السجل. يعيد اسم المريض."""
+    from db.session import get_db
+    from db.models import ResidencyProfile, ResidencyUpdate
+
+    with get_db() as db:
+        p = db.query(ResidencyProfile).filter(ResidencyProfile.id == profile_id).first()
+        if p is None:
+            return ""
+        p.photo_file_id = file_id
+        db.add(ResidencyUpdate(
+            profile_id=  profile_id,
+            action_type= "photo_uploaded",
+            action_label="تم رفع الصورة الشخصية",
+            old_status=  p.status or "",
+            new_status=  p.status or "",
+            residency_file_id=file_id,
+            performed_by=performed_by,
+        ))
+        name = p.name or ""
+
+    logger.info(f"[residency.uploads] photo saved  profile={profile_id}")
+    return name
+
+
 def get_hub_counts() -> dict[str, int]:
     """أعداد شاشة الوحدة الرئيسية — استعلام واحد لكل مجموعة."""
     from db.session import get_db

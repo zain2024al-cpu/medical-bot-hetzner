@@ -795,6 +795,8 @@ class ResidencyProfile(Base):
     # ✅ فورم C — استمارة واحدة للعائلة كلها (المريض ومرافقوه)، لذلك على
     # الملف لا على كل شخص. تُرفع من وحدة «📤 الرفع والمتابعة».
     form_c_file_id           = Column(String(255), default="")
+    # ✅ الصورة الشخصية للمريض — تُرفع من «📎 إضافة مرفق» في ملف المريض.
+    photo_file_id            = Column(String(255), default="")
     # Extra
     notes                    = Column(Text, default="")
     created_by               = Column(Integer, nullable=True, index=True)

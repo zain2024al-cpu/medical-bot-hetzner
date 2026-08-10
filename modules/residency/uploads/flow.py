@@ -26,16 +26,19 @@ from modules.residency.uploads.views import (
     RNU, build_uploads_hub, build_papers_list,
     build_service_patient_list, build_service_menu,
     build_form_c_saved, build_not_found,
+    build_attach_menu, build_photo_saved,
 )
 
 logger = logging.getLogger(__name__)
 
 _RKEY_FORM_C = "res.uploads.form_c"
+_RKEY_PHOTO  = "res.uploads.photo"
 _MODULE_KEY  = "residency"
 
 # المريض المستهدَف برفع فورم C — يُحفظ خارج جلسة الرفع لأن collector
 # يعيد الملفات فقط ولا يحمل سياق المتصل.
 _CTX_FORM_C_PROFILE = "_rnu_form_c_profile_id"
+_CTX_PHOTO_PROFILE  = "_rnu_photo_profile_id"
 
 
 def _is_authorized(user_id: int) -> bool:
@@ -165,6 +168,32 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
         await _show_papers(update, context)
         return
 
+    # ── شاشة «📎 إضافة مرفق» (تُفتح من ملف المريض) ─────────────────────────────
+    # ⚠️ قبل `formc_` عمداً: كلاهما يبدأ بحرف مختلف فلا التباس، لكن ترتيب
+    # الفحوص هنا هو ما يحدد الأسبقية، فيبقى الأخصّ أولاً.
+    if action.startswith("attach_"):
+        profile_id = int(action[7:])
+        from modules.residency.profiles.repository import get_profile_by_id
+        profile = get_profile_by_id(profile_id)
+        if profile is None:
+            text, kb = build_not_found()
+        else:
+            text, kb = build_attach_menu(profile)
+        await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
+        return
+
+    # ── رفع الصورة الشخصية ────────────────────────────────────────────────────
+    if action.startswith("photo_"):
+        profile_id = int(action[6:])
+        context.user_data[_CTX_PHOTO_PROFILE] = profile_id
+        await uploads.open(
+            update, context,
+            title="🖼️ أرسل الصورة الشخصية للمريض",
+            return_to=_RKEY_PHOTO,
+            max_files=1,
+        )
+        return
+
     # ── رفع فورم C ────────────────────────────────────────────────────────────
     if action.startswith("formc_"):
         profile_id = int(action[6:])
@@ -230,6 +259,33 @@ async def _on_form_c(result, update: Update, context: ContextTypes.DEFAULT_TYPE)
     await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
 
+async def _on_photo(result, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    profile_id = context.user_data.pop(_CTX_PHOTO_PROFILE, None)
+
+    if result.cancelled or not profile_id:
+        text, kb = build_uploads_hub(_counts())
+        await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+        return
+
+    file_id = ""
+    if result.files:
+        f = result.files[0]
+        file_id = f.to_dict().get("file_id", "") if hasattr(f, "to_dict") else ""
+
+    if not file_id:
+        await update.effective_message.reply_text(
+            "⚠️ لم تصل أي صورة. حاول مجدداً.", parse_mode="Markdown")
+        return
+
+    from modules.residency.uploads.repository import save_patient_photo
+    name = save_patient_photo(
+        profile_id=profile_id, file_id=file_id,
+        performed_by=update.effective_user.id if update.effective_user else None,
+    )
+    text, kb = build_photo_saved(name)
+    await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+
+
 def _counts() -> dict:
     from modules.residency.uploads.repository import get_hub_counts
     return get_hub_counts()
@@ -247,4 +303,5 @@ def register_handlers(app) -> None:
 
 def register_result_routes() -> None:
     _register_route(_RKEY_FORM_C, _on_form_c)
+    _register_route(_RKEY_PHOTO,  _on_photo)
     logger.info("[residency.uploads] result routes registered")
