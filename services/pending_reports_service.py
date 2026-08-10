@@ -224,6 +224,41 @@ def mark_report_completed(report_id: int) -> bool:
         return False
 
 
+def drop_pending_for_report(report_id: int) -> int:
+    """يحذف أي سجل معلَّق مرتبط بتقرير — يُستدعى عند حذف التقرير نفسه.
+
+    ⚠️ بدون هذا يتحوّل السجل المعلَّق إلى **يتيم لا سبيل لإغلاقه أبداً**:
+    شاشة الأدمن تقرأ نوع الفحص من جدول `reports` عبر `report_id`، فحين
+    يُحذف التقرير يظهر الصف بـ«🩺 نوع الفحص: —» ويبقى في القائمة إلى
+    الأبد — لا يمكن رفع مرفق لتقرير غير موجود، فلا شيء يُغلقه إطلاقاً.
+    (رُصِد فعلياً على الإنتاج: صف بـ«—» ومنتظر منذ 7 أيام.)
+
+    يجب استدعاؤه من **كل** مسارات حذف التقرير (المترجم والأدمن).
+    Returns: عدد السجلات المحذوفة (0 إن لم يكن التقرير معلَّقاً أصلاً).
+    """
+    if not report_id:
+        return 0
+    try:
+        with SessionLocal() as session:
+            deleted = (
+                session.query(PendingReport)
+                .filter(PendingReport.report_id == report_id)
+                .delete(synchronize_session=False)
+            )
+            session.commit()
+            if deleted:
+                logger.info(
+                    f"🧹 Dropped {deleted} pending record(s) for deleted report_id={report_id}"
+                )
+            return int(deleted or 0)
+    except Exception as e:
+        logger.error(
+            f"❌ Error dropping pending records for report_id={report_id}: {e}",
+            exc_info=True,
+        )
+        return 0
+
+
 def get_pending_reports() -> list:
     """جلب جميع التقارير المعلقة النشطة"""
     try:

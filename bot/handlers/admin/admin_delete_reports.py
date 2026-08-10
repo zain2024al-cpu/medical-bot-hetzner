@@ -420,6 +420,15 @@ async def handle_confirmed_delete(update: Update, context: ContextTypes.DEFAULT_
         session.commit()
         logger.info(f"🗑️ Admin {user.id} deleted report #{report_id} (patient: {patient})")
 
+    # ✅ تنظيف السجل المعلَّق المرتبط — وإلا بقي **يتيماً** في شاشة "التقارير
+    # المعلقة" بـ«نوع الفحص: —» بلا أي طريقة لإغلاقه (لا يمكن رفع مرفق
+    # لتقرير محذوف). خارج كتلة الجلسة أعلاه لأن الدالة تفتح جلستها الخاصة.
+    try:
+        from services.pending_reports_service import drop_pending_for_report
+        drop_pending_for_report(report_id)
+    except Exception:
+        logger.debug("تم تجاهل استثناء في تنظيف السجل المعلَّق", exc_info=True)
+
     # عرض رسالة النجاح مع زر العودة
     buttons = [
         [InlineKeyboardButton("🔙 العودة للقائمة", callback_data="delrep:back_to_list")],

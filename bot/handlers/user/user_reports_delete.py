@@ -386,9 +386,19 @@ async def handle_confirm_delete(update: Update, context: ContextTypes.DEFAULT_TY
                 # حذف التقرير من قاعدة البيانات
                 s.delete(report)
                 s.commit()
-                
+
                 logger.info(f"✅ تم حذف التقرير {report_id} من قاعدة البيانات")
-                
+
+                # ✅ تنظيف السجل المعلَّق المرتبط — وإلا بقي **يتيماً** في شاشة
+                # "التقارير المعلقة" بـ«نوع الفحص: —» بلا أي طريقة لإغلاقه
+                # (لا يمكن رفع مرفق لتقرير محذوف، فيبقى للأبد).
+                try:
+                    from services.pending_reports_service import drop_pending_for_report
+                    drop_pending_for_report(report_id)
+                except Exception:
+                    logger.debug("تم تجاهل استثناء في تنظيف السجل المعلَّق", exc_info=True)
+
+
                 # محاولة حذف الرسالة من المجموعة
                 if group_message_id and REPORTS_GROUP_ID:
                     try:
