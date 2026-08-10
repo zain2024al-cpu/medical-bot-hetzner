@@ -1594,51 +1594,91 @@ async def _dispatch_callback_inner(
         # ── Header ────────────────────────────────────────────────────────────
         with_companion = sum(1 for p in session.completed_patients if p.get("has_companion"))
         companion_note = f"  (منهم {with_companion} بمرافق)" if with_companion else ""
+        # ── تنسيق التقرير ─────────────────────────────────────────────────────
+        # ملاحظات المستخدم التي بُني عليها هذا التنسيق:
+        #   • كل حقل في سطر مستقل مع تباعد — لا حقول مكدَّسة في سطر واحد.
+        #   • الحقل المتخطَّى يُكتب صراحةً "لا يوجد" — الفراغ لا يميّز بين
+        #     "لم يُسأل" و"لا قيمة له".
+        #   • الوثيقة غير المرفوعة تُكتب "لم يُرفق" — المربع ⬜ وحده غامض.
+        #   • ختم الدخول ليس عنصراً مستقلاً: يُرفع مع التأشيرة رفعةً واحدة،
+        #     فعرضه منفصلاً كان يوحي بوثيقة ناقصة وهي غير مطلوبة أصلاً.
+        #   • المسؤول آخر سطر في التقرير لا أوّله.
+        _NONE = "لا يوجد"
+
+        def _doc(file_id) -> str:
+            return "✅ مرفق" if file_id else "⬜ لم يُرفق"
+
+        def _val(v) -> str:
+            return v if v else _NONE
+
+        def _notes(v) -> str:
+            return v if v else "لا توجد"     # «ملاحظات» جمع مؤنث
+
         body = [
-            f"👨‍⚕️ *المسؤول:*  {session.specialist_label}",
             f"👥 *إجمالي المرضى:*  {count}{companion_note}",
+            "",
             "─────────────────",
-            "*قائمة المرضى:*",
             "",
         ]
 
-        # ── Patient list (كل الحقول الجديدة تُعرض هنا: تاريخ الوصول/الجواز،
-        # ختم الدخول/التذاكر، الجهة الموصلة، الخدمات، عنوان السكن، ملاحظات) ──
         for i, p in enumerate(session.completed_patients):
-            p_pass    = "✅" if p.get("passport_file_id")     else "⬜"
-            p_visa    = "✅" if p.get("visa_file_id")          else "⬜"
-            p_stamp   = "✅" if p.get("entry_stamp_file_id")   else "⬜"
-            p_tickets = "✅" if p.get("tickets_file_id")       else "⬜"
-            p_res     = "✅" if p.get("residence_file_id")     else "⬜"
-            vis_exp   = p.get("visa_expiry") or "—"
-            comp_icon = "✅" if p.get("has_companion") else "❌"
+            comps = p.get("companions", [])
             body += [
-                f"*{i + 1}.* {p.get('name', '—')}",
-                f"   📋 تأشيرة: {vis_exp}   🤝 مرافق: {comp_icon}",
-                f"   📎 جواز {p_pass}   تأشيرة {p_visa}   ختم {p_stamp}   تذاكر {p_tickets}   إقامة {p_res}",
-                f"   🚐 الجهة الموصلة: {p.get('escort_entity') or '—'}",
+                f"*{i + 1}.  {p.get('name', '—')}*",
+                "",
+                f"   📋 *انتهاء التأشيرة:*  {_val(p.get('visa_expiry'))}",
+                f"   🛂 *انتهاء الجواز:*  {_val(p.get('passport_expiry'))}",
+                f"   🪪 *انتهاء الإقامة:*  {_val(p.get('residence_expiry'))}",
+                "",
+                f"   🚐 *الجهة الموصلة:*  {_val(p.get('escort_entity'))}",
+                f"   🏠 *عنوان السكن:*  {_val(p.get('residence_address'))}",
+                f"   🛎️ *الخدمات المقدَّمة:*  {_val(p.get('services_provided'))}",
+                f"   📝 *ملاحظات:*  {_notes(p.get('notes'))}",
+                "",
+                "   📎 *الوثائق:*",
+                f"      جواز السفر:  {_doc(p.get('passport_file_id'))}",
+                # ✅ التأشيرة وختم الدخول رفعة واحدة — لا سطر مستقل للختم.
+                f"      التأشيرة + ختم الدخول:  {_doc(p.get('visa_file_id'))}",
+                f"      التذاكر:  {_doc(p.get('tickets_file_id'))}",
+                f"      الإقامة:  {_doc(p.get('residence_file_id'))}",
+                "",
+                f"   🤝 *المرافقون:*  {len(comps) if comps else _NONE}",
+                "",
             ]
-            if p.get("services_provided"):
-                body.append(f"   🛎️ الخدمات: {p['services_provided']}")
-            if p.get("notes"):
-                body.append(f"   📝 ملاحظات: {p['notes']}")
-            body.append("")
-            for c in p.get("companions", []):
-                c_pass    = "✅" if c.get("passport_file_id")   else "⬜"
-                c_visa    = "✅" if c.get("visa_file_id")        else "⬜"
-                c_stamp   = "✅" if c.get("entry_stamp_file_id") else "⬜"
-                c_tickets = "✅" if c.get("tickets_file_id")     else "⬜"
+            for c in comps:
                 body += [
-                    f"   ↳ *{c.get('name', '—')}*",
-                    f"      📎 جواز {c_pass}   تأشيرة {c_visa}   ختم {c_stamp}   تذاكر {c_tickets}",
-                    f"      🚐 الجهة الموصلة: {c.get('escort_entity') or '—'}",
+                    f"      ↳ *{c.get('name', '—')}*",
+                    "",
+                    f"         📋 *انتهاء التأشيرة:*  {_val(c.get('visa_expiry'))}",
+                    f"         🛂 *انتهاء الجواز:*  {_val(c.get('passport_expiry'))}",
+                    f"         🏠 *عنوان السكن:*  {_val(c.get('residence_address'))}",
+                    "",
+                    "         📎 *الوثائق:*",
+                    f"            جواز السفر:  {_doc(c.get('passport_file_id'))}",
+                    f"            التأشيرة + ختم الدخول:  {_doc(c.get('visa_file_id'))}",
+                    f"            التذاكر:  {_doc(c.get('tickets_file_id'))}",
                     "",
                 ]
+            body += ["─────────────────", ""]
 
-        # ── Notes ─────────────────────────────────────────────────────────────
+        # ── الملاحظات ثم المسؤول آخر التقرير ──────────────────────────────────
+        # ✅ المسؤول يُشتقّ من المرضى لا من `session.specialist_label`: خطوة
+        # مختص الدفعة أُلغيت حين صار المختص لكل مريض، فبقي الحقل فارغاً دائماً
+        # وظهر السطر بلا اسم. نفس اشتقاق ترويسة الدفعة عند الحفظ أعلاه.
+        _labels = [p.get("specialist_label") for p in session.completed_patients
+                   if p.get("specialist_label")]
+        _uniq = list(dict.fromkeys(_labels))
+        if len(_uniq) == 1:
+            _sp_line = _uniq[0]
+        elif len(_uniq) > 1:
+            _sp_line = "، ".join(_uniq)
+        else:
+            _sp_line = session.specialist_label or _NONE
+
         body += [
-            "─────────────────",
-            f"📝 *الملاحظات:*  {session.batch_notes or 'لا توجد ملاحظات'}",
+            f"📝 *ملاحظات الدفعة:*  {_notes(session.batch_notes)}",
+            "",
+            f"👨‍⚕️ *المسؤول:*  {_sp_line}",
         ]
 
         from modules.general_services.report_publisher import GSPublishData, publish as _publish
