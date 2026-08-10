@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timedelta
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
@@ -19,6 +20,15 @@ from telegram.ext import ContextTypes, CallbackQueryHandler
 from bot.shared_auth import is_admin
 
 logger = logging.getLogger(__name__)
+
+
+def _ist_now() -> datetime:
+    """الوقت الحالي بتوقيت IST (UTC+5:30) — نفس التوقيت المعروض في بقية الشاشات."""
+    try:
+        from zoneinfo import ZoneInfo
+        return datetime.now(ZoneInfo("Asia/Kolkata")).replace(tzinfo=None)
+    except Exception:
+        return datetime.utcnow() + timedelta(hours=5, minutes=30)
 
 _PFX = "pndrep"
 _PER_PAGE = 8
@@ -89,13 +99,25 @@ async def _render_list(query, page: int) -> None:
     items.sort(key=lambda x: x["days_waiting"], reverse=True)
     total = len(items)
 
+    # ⚠️ سطر وقت التحديث ليس تجميلاً: زر "🔄 تحديث" كان يبدو **معطَّلاً
+    # تماماً** بدونه. السبب أن تيليجرام يرفض edit_message_text إن كان
+    # المحتوى مطابقاً حرفياً للحالي، والمعالِج يكون قد استهلك
+    # query.answer() أصلاً في أعلاه — وanswerCallbackQuery مسموح **مرة
+    # واحدة فقط** لكل استعلام، فمحاولة الردّ بـ"القائمة محدَّثة" تفشل
+    # صامتة ولا يرى الأدمن أي استجابة إطلاقاً (تحقّقنا عملياً).
+    # الطابع الزمني يجعل المحتوى مختلفاً دائماً فينجح التعديل، ويرى
+    # الأدمن دليلاً مرئياً على أن التحديث تمّ فعلاً.
+    stamp = _ist_now().strftime("%H:%M:%S")
+
     if not items:
         try:
             await query.edit_message_text(
                 "📋 التقارير الطبية المعلقة\n\n"
-                "✅ لا توجد تقارير معلقة حالياً — جميع التقارير جاهزة!",
+                "✅ لا توجد تقارير معلقة حالياً — جميع التقارير جاهزة!\n\n"
+                f"🔄 آخر تحديث: {stamp}",
                 reply_markup=_list_kb(0, 1),
             )
+            await _answer_once(query, "✅ تم التحديث.")
         except Exception as exc:
             await _handle_render_error(query, exc, page=0)
         return
@@ -105,7 +127,12 @@ async def _render_list(query, page: int) -> None:
     page = max(0, min(page, total_pages - 1))
     page_items = items[page * per_page: (page + 1) * per_page]
 
-    lines = [f"📋 التقارير الطبية المعلقة", f"العدد الإجمالي: {total}", ""]
+    lines = [
+        "📋 التقارير الطبية المعلقة",
+        f"العدد الإجمالي: {total}",
+        f"🔄 آخر تحديث: {stamp}",
+        "",
+    ]
     lines.extend(_render_item_text(p) + "\n" for p in page_items)
 
     try:
@@ -113,20 +140,27 @@ async def _render_list(query, page: int) -> None:
             "\n".join(lines),
             reply_markup=_list_kb(page, total_pages),
         )
+        await _answer_once(query, "✅ تم التحديث.")
     except Exception as exc:
         await _handle_render_error(query, exc, page=page)
 
 
+async def _answer_once(query, text: str | None = None) -> None:
+    """الردّ على الاستعلام مرة واحدة — تيليجرام لا يسمح بأكثر من ردّ."""
+    try:
+        await query.answer(text)
+    except Exception:
+        logger.debug("تم تجاهل استثناء في _answer_once", exc_info=True)
+
+
 async def _handle_render_error(query, exc: Exception, page: int) -> None:
     """تيليجرام يرفض edit_message_text إن كان المحتوى الجديد مطابقاً
-    تماماً للحالي (مثال: ضغط 'تحديث' على قائمة لم تتغيّر) — هذا سلوك
+    تماماً للحالي (مثال: ضغط 'تحديث' مرّتين في نفس الثانية) — هذا سلوك
     طبيعي متوقَّع وليس خطأ، فنعرض تنبيهاً خفيفاً بدل تسجيله كـERROR."""
     if "message is not modified" in str(exc).lower():
-        try:
-            await query.answer("✅ القائمة محدَّثة بالفعل.")
-        except Exception:
-            logger.debug("تم تجاهل استثناء في _handle_render_error", exc_info=True)
+        await _answer_once(query, "✅ القائمة محدَّثة بالفعل.")
         return
+    await _answer_once(query, "⚠️ تعذّر التحديث — حاول مرة أخرى.")
     logger.error(f"[pndrep] Failed to render list (page={page}): {exc}")
 
 
@@ -136,16 +170,22 @@ async def handle_pending_reports_callback(update: Update, context: ContextTypes.
         return
 
     query = update.callback_query
-    try:
-        await query.answer()
-    except Exception:
-        logger.debug("تم تجاهل استثناء في handle_pending_reports_callback", exc_info=True)
 
     data = query.data or ""
     parts = data.split(":")
     action = parts[1] if len(parts) > 1 else ""
 
+    # ⚠️ لا يُستدعى query.answer() هنا لمسار "page" عمداً: تيليجرام يسمح
+    # بالردّ على الاستعلام **مرة واحدة فقط**، وكان الردّ الفارغ في هذا
+    # الموضع يستهلك تلك الفرصة — فحين يفشل التعديل لاحقاً بـ"message is
+    # not modified" (ضغط 🔄 تحديث مرّتين في نفس الثانية) تفشل محاولة
+    # عرض "✅ القائمة محدَّثة" صامتة، فيبدو الزر معطَّلاً تماماً بلا أي
+    # استجابة. مسار العرض أدناه هو من يملك الردّ الآن ويستدعيه مرة واحدة.
     if action == "noop":
+        try:
+            await query.answer()
+        except Exception:
+            logger.debug("تم تجاهل استثناء في handle_pending_reports_callback", exc_info=True)
         return
 
     if action == "page":
@@ -155,6 +195,11 @@ async def handle_pending_reports_callback(update: Update, context: ContextTypes.
             page = 0
         await _render_list(query, page)
         return
+
+    try:
+        await query.answer()
+    except Exception:
+        logger.debug("تم تجاهل استثناء في handle_pending_reports_callback", exc_info=True)
 
 
 # ── Registration ───────────────────────────────────────────────────────────────
