@@ -11,10 +11,16 @@
      رفع مرفق لتقرير غير موجود فلا شيء يُغلقه. (أُصلح المصدر؛ هذا
      السكربت ينظّف ما تراكم قبل الإصلاح.)
 
-  🅑 **مرفوع فعلاً لكنه لم يُغلَق**: الرفع عبر «🔍 بحث بلا قيود» كان
-     مستثنى من تتبّع الإكمال، فالمرفقات محفوظة فعلاً في
-     `medical_attachment_files` لكن السجل بقي `status='pending'`.
-     (أُصلح المصدر أيضاً؛ هذا السكربت يُغلق ما علق سابقاً.)
+  🅑 **مرفوع ومكتمل العدد**: الرفع عبر «🔍 بحث بلا قيود» كان مستثنى من
+     تتبّع الإكمال، فالمرفقات محفوظة فعلاً في `medical_attachment_files`
+     لكن السجل بقي `status='pending'`. (أُصلح المصدر أيضاً؛ هذا السكربت
+     يُغلق ما علق سابقاً.)
+
+  🅓 **مرفوع جزئياً — لا يُمَسّ**: له مرفقات، لكن `expected_count > 1`
+     و`uploaded_count` لم يبلغه بعد. ⚠️ **وجود مرفق لا يعني الاكتمال**:
+     حالة تنتظر 3 فحوصات قد يكون وصل منها واحد. إغلاقها قسراً يُخفي حالة
+     **ناقصة فعلاً** — وهو بالضبط ما بُنيت آلية expected_count لمنعه.
+     تُعرَض بتقدّمها (uploaded/expected) لقرارك أنت.
 
   🅒 **معلَّق بحق**: لا مرفقات ولا حذف — ينتظر المترجم فعلاً. **لا يُمَسّ.**
 
@@ -30,7 +36,7 @@ from __future__ import annotations
 
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -42,7 +48,8 @@ def main() -> int:
     apply = "--apply" in sys.argv
 
     orphans: list[tuple] = []      # 🅐 تقريره محذوف
-    uploaded: list[tuple] = []     # 🅑 له مرفقات فعلية
+    uploaded: list[tuple] = []     # 🅑 مرفوع ومكتمل العدد
+    partial: list[tuple] = []      # 🅓 مرفوع جزئياً — يحتاج حكمك
     genuine: list[tuple] = []      # 🅒 معلَّق بحق
 
     with SessionLocal() as s:
@@ -72,29 +79,52 @@ def main() -> int:
             ):
                 attach_counts[rid] = cnt
 
+        now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
         for p in pending:
-            days = (datetime.utcnow() - p.created_at).days if p.created_at else 0
+            days = (now_utc - p.created_at).days if p.created_at else 0
+            exp = max(1, int(p.expected_count or 1))
+            up = int(p.uploaded_count or 0)
             row = (p.id, p.report_id, p.patient_name, p.translator_name, days)
+            n_files = attach_counts.get(p.report_id, 0)
+
             if p.report_id and p.report_id not in existing_ids:
                 orphans.append(row)
-            elif attach_counts.get(p.report_id, 0) > 0:
-                uploaded.append(row + (attach_counts[p.report_id],))
+            elif n_files > 0:
+                # ⚠️ وجود مرفقات لا يعني الاكتمال دائماً: حالة تنتظر عدة
+                # فحوصات (expected_count > 1) قد يكون وصل منها واحد فقط.
+                # إغلاقها قسراً يُخفي حالة **ناقصة فعلاً** — وهو بالضبط ما
+                # بُنيت آلية expected_count/uploaded_count لمنعه. تُفصَل هنا
+                # لقرار بشري بدل إغلاق أعمى.
+                if exp <= 1 or up >= exp:
+                    uploaded.append(row + (n_files, up, exp))
+                else:
+                    partial.append(row + (n_files, up, exp))
             else:
                 genuine.append(row)
 
     print("=" * 68)
     print("السجلات العالقة في شاشة التقارير المعلقة")
     print("=" * 68)
-    print(f"الإجمالي بحالة pending: {len(orphans) + len(uploaded) + len(genuine)}")
+    print(f"الإجمالي بحالة pending: "
+          f"{len(orphans) + len(uploaded) + len(partial) + len(genuine)}")
 
     print(f"\n🅐 يتيم — تقريره محذوف: {len(orphans)}   ⇒ يُحذف سجل المتابعة")
     print("   (هذه التي تظهر لك بـ«🩺 نوع الفحص: —»)")
     for pid, rid, name, tr, days in orphans:
         print(f"     pending#{pid}  report#{rid}  {name}  (مترجم: {tr})  منذ {days} يوم")
 
-    print(f"\n🅑 مرفوع فعلاً لكنه لم يُغلَق: {len(uploaded)}   ⇒ يُغلَق (completed)")
-    for pid, rid, name, tr, days, n in uploaded:
-        print(f"     pending#{pid}  report#{rid}  {name}  (مترجم: {tr})  {n} مرفق  منذ {days} يوم")
+    print(f"\n🅑 مرفوع ومكتمل العدد: {len(uploaded)}   ⇒ يُغلَق (completed)")
+    for pid, rid, name, tr, days, n, up, exp in uploaded:
+        print(f"     pending#{pid}  report#{rid}  {name}  (مترجم: {tr})  "
+              f"{n} مرفق  التقدّم {up}/{exp}  منذ {days} يوم")
+
+    print(f"\n🅓 مرفوع **جزئياً** — يحتاج حكمك: {len(partial)}   ⇒ ⚠️ لا يُمَسّ")
+    if partial:
+        print("   له مرفقات لكن عدد الفحوصات المنتظَرة لم يكتمل بعد —")
+        print("   إغلاقه قسراً يُخفي حالة ناقصة فعلاً. راجعها يدوياً.")
+    for pid, rid, name, tr, days, n, up, exp in partial:
+        print(f"     pending#{pid}  report#{rid}  {name}  (مترجم: {tr})  "
+              f"{n} مرفق  التقدّم {up}/{exp}  منذ {days} يوم")
 
     print(f"\n🅒 معلَّق بحق — لا مرفقات ولا حذف: {len(genuine)}   ⇒ لا يُمَسّ")
     for pid, rid, name, tr, days in genuine:
@@ -104,6 +134,7 @@ def main() -> int:
         print("\n" + "=" * 68)
         print("وضع الفحص — لم يُغيَّر شيء.")
         print(f"التنفيذ سيحذف {len(orphans)} سجل متابعة يتيم ويُغلق {len(uploaded)}.")
+        print(f"ولن يمسّ {len(partial)} جزئياً و{len(genuine)} معلَّقاً بحق.")
         print("أعد التشغيل مع --apply للتنفيذ.")
         print("=" * 68)
         return 0
@@ -117,14 +148,14 @@ def main() -> int:
             row = s.query(PendingReport).filter_by(id=pid).first()
             if row:
                 row.status = "completed"
-                row.completed_at = datetime.utcnow()
+                row.completed_at = datetime.now(timezone.utc).replace(tzinfo=None)
                 row.uploaded_count = max(int(row.uploaded_count or 0),
                                          int(row.expected_count or 1))
         s.commit()
 
     print("\n" + "=" * 68)
     print(f"✅ حُذِف {len(orphans)} سجل يتيم · أُغلق {len(uploaded)} سجل مرفوع.")
-    print(f"بقي {len(genuine)} سجلاً معلَّقاً بحق — لم يُمَسّ.")
+    print(f"لم يُمَسّ: {len(partial)} جزئياً · {len(genuine)} معلَّقاً بحق.")
     print("افتح شاشة «التقارير المعلقة» واضغط 🔄 تحديث.")
     print("=" * 68)
     return 0
