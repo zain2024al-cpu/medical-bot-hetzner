@@ -238,7 +238,14 @@ def create_profiles_from_arrival_batch(
                     source=                   "arrivals",
                     name=                     ap.name or "—",
                     status=                   "active",
-                    expiry_date=              _to_iso_date(ap.residence_expiry),
+                    # ✅ الرجوع إلى انتهاء التأشيرة حين لا تكون هناك إقامة بعد.
+                    # الواصل الجديد غالباً بلا إقامة (يتخطّى الحقل)، فكان
+                    # `expiry_date` يبقى فارغاً ويظهر الملف بـ«—» بلا أيام
+                    # متبقية — بينما التأشيرة هي ما يحكم مدة بقائه فعلياً.
+                    # وهذا يوحّد المسارين: الإضافة اليدوية تستخدم
+                    # visa_expiry أصلاً (انظر save_manual_batch).
+                    expiry_date=              (_to_iso_date(ap.residence_expiry)
+                                               or _to_iso_date(ap.visa_expiry)),
                     # ✅ ينساب من الوصول الآن — أساس تنبيه الجواز قبل 6 أشهر
                     passport_expiry=          _to_iso_date(ap.passport_expiry),
                     passport_file_id=         ap.passport_file_id  or "",
@@ -263,7 +270,9 @@ def create_profiles_from_arrival_batch(
                         arrival_companion_id=    ac.id,
                         name=                    ac.name or "—",
                         status=                  "active",
-                        expiry_date=             _to_iso_date(ac.residence_expiry),
+                        # ✅ نفس رجوع المريض إلى التأشيرة عند غياب الإقامة
+                        expiry_date=             (_to_iso_date(ac.residence_expiry)
+                                                  or _to_iso_date(ac.visa_expiry)),
                         passport_expiry=         _to_iso_date(ac.passport_expiry),
                         passport_file_id=        ac.passport_file_id   or "",
                         visa_file_id=            ac.visa_file_id        or "",

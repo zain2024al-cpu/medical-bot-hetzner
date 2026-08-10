@@ -19,6 +19,36 @@ def format_status_icon(status: str) -> str:
     return RESIDENCY_STATUS_ICONS.get(status, "•")
 
 
+# الحالات الثلاث الزمنية — تُشتقّ من التاريخ لا من العمود المخزَّن.
+_TIME_DERIVED_STATUSES = frozenset({"active", "expiring", "expired"})
+
+
+def effective_status(status: str, expiry_date: str) -> str:
+    """
+    الحالة المعروضة، مشتقّةً من تاريخ الانتهاء حين تكون الحالة زمنية.
+
+    ⚠️ لماذا لا نكتفي بالعمود المخزَّن: الحالة تُكتب مرة واحدة عند الإنشاء
+    ("active") ولا يعيد أحد حسابها بمرور الوقت — فملف أُنشئ اليوم يبقى
+    "✅ نشطة" إلى الأبد، حتى بعد انتهاء إقامته بشهور. وهذا ما رآه المستخدم:
+    إقامة منتهية منذ يوليو تُعرض «نشطة».
+
+    ⚠️ ولا تُمَسّ حالات **سير العمل** (`renewal_submitted` وأخواتها): هي
+    وقائع حدثت فعلاً — «تم رفع الأوراق» تبقى صحيحة سواء انتهت الإقامة أم
+    لا، فاستبدالها بـ«منتهية» يمحو معلومة حقيقية. تُصنَّف الزمنية وحدها.
+    """
+    if status not in _TIME_DERIVED_STATUSES:
+        return status
+    expiry = _parse_expiry_date(expiry_date)
+    if expiry is None:
+        return status
+    delta = (expiry - datetime.utcnow().date()).days
+    if delta < 0:
+        return "expired"
+    if delta <= 30:
+        return "expiring"
+    return "active"
+
+
 def _parse_expiry_date(expiry_date: str):
     """
     Try to parse a date string in either YYYY-MM-DD or DD/MM/YYYY format.

@@ -8,6 +8,7 @@ from modules.residency.constants import PROFILES_PAGE_SIZE, HISTORY_DISPLAY_LIMI
 from modules.residency.views import (
     format_status, format_status_icon, format_expiry_date,
     format_days_remaining, format_expiry_warning_inline, doc_icon,
+    effective_status,
     _DIVIDER, _THIN, _NONE,
 )
 
@@ -49,7 +50,7 @@ def build_archive_list(profiles, *, page: int, total: int) -> tuple[str, InlineK
         # 30 يوماً — فبدت الحالات الجديدة (كأنها) بلا أيام متبقية إطلاقاً،
         # وهي في الحقيقة سليمة وبعيدة عن الانتهاء.
         for p in profiles:
-            icon = format_status_icon(p.status)
+            icon = format_status_icon(effective_status(p.status, p.expiry_date))
             comp = f"  +{p.companion_count} مرافق" if p.companion_count else ""
             days = format_days_remaining(p.expiry_date)
             lines += [
@@ -65,7 +66,7 @@ def build_archive_list(profiles, *, page: int, total: int) -> tuple[str, InlineK
 
     # Patient buttons (one per row)
     for p in profiles:
-        icon = format_status_icon(p.status)
+        icon = format_status_icon(effective_status(p.status, p.expiry_date))
         rows.append([
             InlineKeyboardButton(
                 f"{icon} {p.name[:25]}",
@@ -102,8 +103,10 @@ def build_archive_list(profiles, *, page: int, total: int) -> tuple[str, InlineK
 
 def build_profile_detail(profile, companions, history) -> tuple[str, InlineKeyboardMarkup]:
     comp_count   = len(companions)
-    status_icon  = format_status_icon(profile.status)
-    status_label = format_status(profile.status)
+    # ✅ الحالة الزمنية تُشتقّ من التاريخ — العمود المخزَّن يبقى "active" أبداً
+    _status      = effective_status(profile.status, profile.expiry_date)
+    status_icon  = format_status_icon(_status)
+    status_label = format_status(_status)
 
     # ✅ «رقم الإقامة» أُزيل من هذه الشاشة بطلب المستخدم — الحقل ما زال في
     # قاعدة البيانات وفي مسار التجديد، لكنه لا يُعرض هنا لأنه غير مطلوب.
@@ -126,8 +129,9 @@ def build_profile_detail(profile, companions, history) -> tuple[str, InlineKeybo
         lines.append("  لا يوجد مرافقون")
     else:
         for i, c in enumerate(companions, 1):
-            c_icon  = format_status_icon(c.status)
-            c_label = format_status(c.status)
+            _c_status = effective_status(c.status, c.expiry_date)
+            c_icon  = format_status_icon(_c_status)
+            c_label = format_status(_c_status)
             c_exp   = format_expiry_date(c.expiry_date)
             c_days  = format_days_remaining(c.expiry_date)
             lines += [
@@ -219,7 +223,7 @@ def build_search_results(results, query: str) -> tuple[str, InlineKeyboardMarkup
     ]
     rows: list[list[InlineKeyboardButton]] = []
     for p in results:
-        icon    = format_status_icon(p.status)
+        icon    = format_status_icon(effective_status(p.status, p.expiry_date))
         warning = format_expiry_warning_inline(p.expiry_date)
         rows.append([
             InlineKeyboardButton(
