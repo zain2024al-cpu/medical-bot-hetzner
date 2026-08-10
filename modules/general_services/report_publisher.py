@@ -11,7 +11,7 @@ from typing import Optional
 
 from telegram import InputMediaPhoto
 
-from config.settings import ADMIN_IDS, GENERAL_SERVICES_GROUP_ID
+from config.settings import ADMIN_IDS, GENERAL_SERVICES_GROUP_ID, GS_NOTIFY_ADMINS
 
 logger = logging.getLogger(__name__)
 
@@ -33,11 +33,14 @@ async def publish(bot, data: GSPublishData) -> None:
     """Publish a GS record to admins + the GS group."""
     text = _build_text(data)
 
-    for admin_id in ADMIN_IDS:
-        try:
-            await bot.send_message(chat_id=admin_id, text=text, parse_mode="Markdown")
-        except Exception as exc:
-            logger.warning(f"[gs_publisher] admin notify failed admin={admin_id}: {exc}")
+    if GS_NOTIFY_ADMINS:
+        for admin_id in ADMIN_IDS:
+            try:
+                await bot.send_message(chat_id=admin_id, text=text, parse_mode="Markdown")
+            except Exception as exc:
+                logger.warning(f"[gs_publisher] admin notify failed admin={admin_id}: {exc}")
+    else:
+        logger.info("[gs_publisher] GS_NOTIFY_ADMINS=0 — تُخطّى إشعارات الأدمن الخاصة")
 
     group_id = _resolve_group_id()
     if not group_id:

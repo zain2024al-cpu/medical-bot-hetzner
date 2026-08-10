@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 
-from config.settings import ADMIN_IDS
+from config.settings import ADMIN_IDS, GS_NOTIFY_ADMINS
 
 logger = logging.getLogger(__name__)
 
@@ -29,11 +29,14 @@ async def publish_event(
     ] + body_lines
     text = "\n".join(lines)
 
-    for admin_id in (ADMIN_IDS or []):
-        try:
-            await bot.send_message(chat_id=admin_id, text=text, parse_mode="Markdown")
-        except Exception as exc:
-            logger.warning(f"[res_publisher] admin={admin_id}: {exc}")
+    if GS_NOTIFY_ADMINS:
+        for admin_id in (ADMIN_IDS or []):
+            try:
+                await bot.send_message(chat_id=admin_id, text=text, parse_mode="Markdown")
+            except Exception as exc:
+                logger.warning(f"[res_publisher] admin={admin_id}: {exc}")
+    else:
+        logger.info("[res_publisher] GS_NOTIFY_ADMINS=0 — تُخطّى إشعارات الأدمن الخاصة")
 
     group_id = _resolve_group_id()
     if not group_id:
