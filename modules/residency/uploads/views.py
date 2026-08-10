@@ -139,6 +139,7 @@ def build_service_patient_list(profiles, *, page: int, total: int, page_size: in
 
 def build_service_menu(profile, companions) -> tuple[str, InlineKeyboardMarkup]:
     has_form_c = bool(getattr(profile, "form_c_file_id", ""))
+    has_photo  = bool(getattr(profile, "photo_file_id", ""))
     lines = [
         _DIVIDER,
         "➕  **إضافة خدمة**",
@@ -149,6 +150,7 @@ def build_service_menu(profile, companions) -> tuple[str, InlineKeyboardMarkup]:
         f"👥 المرافقون: {len(companions)}",
         _THIN,
         f"📄 فورم C: {'✅ مرفوع' if has_form_c else '⬜ غير مرفوع'}",
+        f"🖼️ الصورة الشخصية: {'✅ مرفوعة' if has_photo else '⬜ غير مرفوعة'}",
     ]
     if companions:
         lines += [
@@ -158,8 +160,10 @@ def build_service_menu(profile, companions) -> tuple[str, InlineKeyboardMarkup]:
         ]
 
     form_c_label = "📄 استبدال فورم C" if has_form_c else "📄 رفع فورم C"
+    photo_label  = "🖼️ استبدال الصورة الشخصية" if has_photo else "🖼️ رفع صورة شخصية"
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton(form_c_label,             callback_data=f"{RNU}:formc_{profile.id}")],
+        [InlineKeyboardButton(photo_label,              callback_data=f"{RNU}:photo_{profile.id}")],
         [InlineKeyboardButton("🪪 رفع التمديد الجديد",  callback_data=f"rnr:start_{profile.id}")],
         [InlineKeyboardButton("👁 عرض الملف",           callback_data=f"rna:view_{profile.id}")],
         [InlineKeyboardButton("⬅️ رجوع",                callback_data=f"{RNU}:service")],
@@ -167,48 +171,15 @@ def build_service_menu(profile, companions) -> tuple[str, InlineKeyboardMarkup]:
     return "\n".join(lines), kb
 
 
-# ── إضافة مرفق (من ملف المريض مباشرةً) ───────────────────────────────────────
-
-def build_attach_menu(profile) -> tuple[str, InlineKeyboardMarkup]:
-    """
-    شاشة «📎 إضافة مرفق» المفتوحة من ملف المريض.
-
-    مقصورة على المرفقات التي لا يجمعها أي مسار آخر: الصورة الشخصية وفورم C.
-    الجواز والتأشيرة والإقامة تُرفع ضمن مساراتها (الإضافة والتجديد) فلا
-    تُكرَّر هنا حتى لا يصير للحقل الواحد مصدران متباينان.
-    """
-    has_form_c = bool(getattr(profile, "form_c_file_id", ""))
-    has_photo  = bool(getattr(profile, "photo_file_id", ""))
-    lines = [
-        _DIVIDER,
-        "📎  **إضافة مرفق**",
-        "",
-        f"👤 *{profile.name}*",
-        _THIN,
-        "",
-        f"🖼️ *الصورة الشخصية:*  {'✅ يوجد' if has_photo else '⬜ لا يوجد'}",
-        f"📄 *فورم C:*  {'✅ يوجد' if has_form_c else '⬜ لا يوجد'}",
-        "",
-        "اختر المرفق الذي تريد رفعه:",
-    ]
-    kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton(
-            "🖼️ استبدال الصورة الشخصية" if has_photo else "🖼️ رفع صورة شخصية",
-            callback_data=f"{RNU}:photo_{profile.id}")],
-        [InlineKeyboardButton(
-            "📄 استبدال فورم C" if has_form_c else "📄 رفع فورم C",
-            callback_data=f"{RNU}:formc_{profile.id}")],
-        [InlineKeyboardButton("⬅️ رجوع", callback_data=f"rna:view_{profile.id}")],
-    ])
-    return "\n".join(lines), kb
-
-
-def build_photo_saved(name: str) -> tuple[str, InlineKeyboardMarkup]:
+def build_photo_saved(name: str, *, resized: bool = True) -> tuple[str, InlineKeyboardMarkup]:
     lines = [
         _DIVIDER,
         "✅  **تم رفع الصورة الشخصية**",
         "",
         f"👤 {name}",
+        "",
+        ("📐 ضُبطت على مقاس 4×6." if resized else
+         "⚠️ حُفظت بمقاسها الأصلي — تعذّر ضبطها على 4×6، حاول رفعها مجدداً."),
         "",
         "الصورة محفوظة على ملف المريض، وتُرسَل مع «📎 إرسال الوثائق».",
     ]

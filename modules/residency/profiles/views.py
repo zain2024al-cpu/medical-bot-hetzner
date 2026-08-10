@@ -180,11 +180,9 @@ def build_profile_detail(profile, companions, history) -> tuple[str, InlineKeybo
             InlineKeyboardButton("📄 ملف PDF",         callback_data=f"{RNA}:pdf_{profile.id}"),
             InlineKeyboardButton("📎 إرسال الوثائق",  callback_data=f"{RNA}:send_docs_{profile.id}"),
         ],
-        # ✅ إضافة مرفق (صورة شخصية / فورم C) من الملف مباشرةً — كانت متاحة
-        # فقط عبر «الرفع والمتابعة ← إضافة خدمة»، وهو مسار غير بديهي من هنا.
-        [
-            InlineKeyboardButton("📎 إضافة مرفق", callback_data=f"rnu:attach_{profile.id}"),
-        ],
+        # ⚠️ لا زرّ رفع هنا: فورم C والصورة الشخصية يُضافان من
+        # «📤 الرفع والمتابعة ← ➕ إضافة خدمة» **حصراً** (قرار المستخدم)،
+        # فيبقى لكل مرفق مدخل واحد لا مدخلان.
         [
             InlineKeyboardButton("⬅️ رجوع",            callback_data=f"{RN}:archive"),
         ],

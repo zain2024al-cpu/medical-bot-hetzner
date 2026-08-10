@@ -10,6 +10,7 @@
 # معالج التجديد الموجود كما هو (تقويم الإقامة الجديدة + رقم الإقامة + رفع
 # الوثيقة + حلقة المرافقين). بناء نسخة ثانية منه كان سيعني تدفقين ينحرفان.
 
+import io
 import logging
 
 from telegram import Update
@@ -25,8 +26,7 @@ from modules.residency.constants import PROFILES_PAGE_SIZE
 from modules.residency.uploads.views import (
     RNU, build_uploads_hub, build_papers_list,
     build_service_patient_list, build_service_menu,
-    build_form_c_saved, build_not_found,
-    build_attach_menu, build_photo_saved,
+    build_form_c_saved, build_not_found, build_photo_saved,
 )
 
 logger = logging.getLogger(__name__)
@@ -168,21 +168,7 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
         await _show_papers(update, context)
         return
 
-    # ── شاشة «📎 إضافة مرفق» (تُفتح من ملف المريض) ─────────────────────────────
-    # ⚠️ قبل `formc_` عمداً: كلاهما يبدأ بحرف مختلف فلا التباس، لكن ترتيب
-    # الفحوص هنا هو ما يحدد الأسبقية، فيبقى الأخصّ أولاً.
-    if action.startswith("attach_"):
-        profile_id = int(action[7:])
-        from modules.residency.profiles.repository import get_profile_by_id
-        profile = get_profile_by_id(profile_id)
-        if profile is None:
-            text, kb = build_not_found()
-        else:
-            text, kb = build_attach_menu(profile)
-        await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
-        return
-
-    # ── رفع الصورة الشخصية ────────────────────────────────────────────────────
+    # ── رفع الصورة الشخصية (من «➕ إضافة خدمة» حصراً) ──────────────────────────
     if action.startswith("photo_"):
         profile_id = int(action[6:])
         context.user_data[_CTX_PHOTO_PROFILE] = profile_id
@@ -277,12 +263,37 @@ async def _on_photo(result, update: Update, context: ContextTypes.DEFAULT_TYPE) 
             "⚠️ لم تصل أي صورة. حاول مجدداً.", parse_mode="Markdown")
         return
 
+    # ✅ ضبط المقاس على 4×6 (طلب المستخدم صراحةً) — يُنزَّل الأصل، يُقصّ
+    # ويُصغَّر، ثم يُعاد رفعه ليحمل file_id جديداً يمثّل النسخة المضبوطة لا
+    # الأصل الخام. فشل المعالجة لا يُسقط العملية: يُحفَظ الأصل كما هو ويُخبَر
+    # المستخدم أن الضبط لم يتم — أفضل من ضياع الصورة كلياً.
+    resized_ok = False
+    final_file_id = file_id
+    try:
+        from modules.residency.uploads.photo_processing import resize_to_4x6
+
+        tg_file = await context.bot.get_file(file_id)
+        buf = io.BytesIO()
+        await tg_file.download_to_memory(buf)
+        buf.seek(0)
+        resized_bytes = resize_to_4x6(buf.read())
+
+        sent = await context.bot.send_photo(
+            chat_id=update.effective_chat.id,
+            photo=io.BytesIO(resized_bytes),
+            caption="🖼️ الصورة مضبوطة على مقاس 4×6",
+        )
+        final_file_id = sent.photo[-1].file_id
+        resized_ok = True
+    except Exception as exc:
+        logger.warning(f"[residency.uploads] photo resize failed, saving original: {exc}")
+
     from modules.residency.uploads.repository import save_patient_photo
     name = save_patient_photo(
-        profile_id=profile_id, file_id=file_id,
+        profile_id=profile_id, file_id=final_file_id,
         performed_by=update.effective_user.id if update.effective_user else None,
     )
-    text, kb = build_photo_saved(name)
+    text, kb = build_photo_saved(name, resized=resized_ok)
     await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
 
