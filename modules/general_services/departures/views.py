@@ -150,7 +150,7 @@ def build_notes_prompt(session: DepartureSession) -> tuple[str, InlineKeyboardMa
 # ── Step 6: المختص ────────────────────────────────────────────────────────────
 
 def build_specialist_prompt(session: DepartureSession) -> tuple[str, InlineKeyboardMarkup]:
-    lines = [_DIVIDER, "👨‍⚕️  **اختر المختص المسؤول**", "", "اختر المختص:"]
+    lines = [_DIVIDER, "👨‍⚕️  **اختر مختص الخدمات**", "", "اختر مختص الخدمات:"]
     rows = [
         [InlineKeyboardButton(label, callback_data=f"{GSD}:specialist_{sid}")]
         for sid, label in STAFF_MAP.items()
@@ -174,7 +174,7 @@ def build_review(session: DepartureSession) -> tuple[str, InlineKeyboardMarkup]:
         f"📅 *التاريخ:*  {date_str}",
         f"👥 *المغادرون:*  {session.patients_text or _NONE}",
         f"🏥 *الجهة الموصلة:*  {session.hospital_label or _NONE}",
-        f"👨‍⚕️ *المسؤول:*  {session.specialist_label or _NONE}",
+        f"👨‍⚕️ *مختص الخدمات:*  {session.specialist_label or _NONE}",
         f"📎 *الوثائق:*  {imgs}",
         _THIN,
         f"📝 *الملاحظات:*  {notes}",
@@ -195,7 +195,7 @@ def build_review(session: DepartureSession) -> tuple[str, InlineKeyboardMarkup]:
             InlineKeyboardButton("✏️ الملاحظات",  callback_data=f"{GSD}:edit_notes"),
         ],
         [
-            InlineKeyboardButton("✏️ المختص",     callback_data=f"{GSD}:edit_specialist"),
+            InlineKeyboardButton("✏️ مختص الخدمات",     callback_data=f"{GSD}:edit_specialist"),
         ],
     ])
     return "\n".join(lines), kb

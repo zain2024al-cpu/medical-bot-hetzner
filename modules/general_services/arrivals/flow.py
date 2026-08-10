@@ -1678,7 +1678,7 @@ async def _dispatch_callback_inner(
         body += [
             f"📝 *ملاحظات الدفعة:*  {_notes(session.batch_notes)}",
             "",
-            f"👨‍⚕️ *المسؤول:*  {_sp_line}",
+            f"👨‍⚕️ *مختص الخدمات:*  {_sp_line}",
         ]
 
         from modules.general_services.report_publisher import GSPublishData, publish as _publish

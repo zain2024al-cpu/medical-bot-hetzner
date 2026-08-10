@@ -69,7 +69,7 @@ def build_date_calendar_prompt(*, error: bool = False) -> tuple[str, InlineKeybo
 # الموصلة" أصبحت حقلاً خاصاً بكل فرد (انظر build_p_escort_entity_prompt أدناه).
 
 def build_specialist_prompt() -> tuple[str, InlineKeyboardMarkup]:
-    lines = [_DIVIDER, "👨‍⚕️  **اختر المختص المسؤول**", "", "اختر المختص:"]
+    lines = [_DIVIDER, "👨‍⚕️  **اختر مختص الخدمات**", "", "اختر مختص الخدمات:"]
     rows = [
         [InlineKeyboardButton(label, callback_data=f"{GSA}:specialist_{sid}")]
         for sid, label in STAFF_MAP.items()
@@ -456,12 +456,12 @@ def build_p_specialist_prompt(session: ArrivalSession) -> tuple[str, InlineKeybo
 
     lines = [
         _DIVIDER,
-        f"👨‍⚕️  **المريض {idx} — المختص المسؤول**",
+        f"👨‍⚕️  **المريض {idx} — مختص الخدمات**",
         "",
         f"المريض: {name}",
         _THIN,
         "",
-        "اختر المختص المسؤول عن هذا المريض:",
+        "اختر مختص الخدمات لهذا المريض:",
     ]
     ordered = list(STAFF_MAP.items())
     if prev:
@@ -809,7 +809,7 @@ def build_review(session: ArrivalSession) -> tuple[str, InlineKeyboardMarkup]:
             f"   🤝 مرافقون: {len(comps)}",
         ] + _individual_detail_lines(p, is_companion=False) + [
             f"   🚐 الجهة الموصلة: {p.get('escort_entity') or _NONE}",
-            f"   👨‍⚕️ المختص: {p.get('specialist_label') or _NONE}",
+            f"   👨‍⚕️ مختص الخدمات: {p.get('specialist_label') or _NONE}",
             f"   📝 ملاحظات: {p.get('notes') or 'لا توجد'}",
         ]
         for c in comps:

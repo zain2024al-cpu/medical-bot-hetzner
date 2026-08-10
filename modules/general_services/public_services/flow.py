@@ -399,7 +399,7 @@ async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             f"🧾 *نوع الخدمة:*  {svc}",
             f"🔢 *عدد البنود:*  {session.item_count}",
             f"📎 *الوثائق:*  {imgs}",
-            f"👨‍⚕️ *المختص:*  {session.specialist_label or '—'}",
+            f"👨‍⚕️ *مختص الخدمات:*  {session.specialist_label or '—'}",
             "─────────────────",
             f"📝 *الملاحظات:*  {notes}",
         ]

@@ -171,7 +171,7 @@ def build_notes_prompt(session: PublicServiceSession) -> tuple[str, InlineKeyboa
 # ── Step 7: المختص ────────────────────────────────────────────────────────────
 
 def build_specialist_prompt(session: PublicServiceSession) -> tuple[str, InlineKeyboardMarkup]:
-    lines = [_DIVIDER, "👨‍⚕️  **اختر المختص المسؤول**", "", "اختر المختص:"]
+    lines = [_DIVIDER, "👨‍⚕️  **اختر مختص الخدمات**", "", "اختر مختص الخدمات:"]
     rows = [
         [InlineKeyboardButton(label, callback_data=f"{GSP}:specialist_{sid}")]
         for sid, label in STAFF_MAP.items()
@@ -198,7 +198,7 @@ def build_review(session: PublicServiceSession) -> tuple[str, InlineKeyboardMark
         f"🧾 *نوع الخدمة:*  {svc}",
         f"🔢 *عدد البنود:*  {session.item_count or _NONE}",
         f"📎 *الوثائق:*  {imgs}",
-        f"👨‍⚕️ *المختص:*  {session.specialist_label or _NONE}",
+        f"👨‍⚕️ *مختص الخدمات:*  {session.specialist_label or _NONE}",
         _THIN,
         f"📝 *الملاحظات:*  {notes}",
         "",
@@ -219,7 +219,7 @@ def build_review(session: PublicServiceSession) -> tuple[str, InlineKeyboardMark
         ],
         [
             InlineKeyboardButton("✏️ الملاحظات", callback_data=f"{GSP}:edit_notes"),
-            InlineKeyboardButton("✏️ المختص",    callback_data=f"{GSP}:edit_specialist"),
+            InlineKeyboardButton("✏️ مختص الخدمات",    callback_data=f"{GSP}:edit_specialist"),
         ],
     ])
     return "\n".join(lines), kb

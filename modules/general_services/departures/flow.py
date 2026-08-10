@@ -427,7 +427,7 @@ async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         body  = [
             f"👥 *المغادرون:*  {session.patients_text or '—'}",
             f"🏥 *الجهة الموصلة:*  {session.hospital_label or '—'}",
-            f"👨‍⚕️ *المسؤول:*  {session.specialist_label or '—'}",
+            f"👨‍⚕️ *مختص الخدمات:*  {session.specialist_label or '—'}",
             f"📎 *الوثائق:*  {imgs}",
             "─────────────────",
             f"📝 *الملاحظات:*  {notes}",
