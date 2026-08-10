@@ -28,8 +28,26 @@
 `pending_reports` (سجلات المتابعة). التقارير والمرفقات لا تُمَسّ إطلاقاً.
 
 ── التشغيل ────────────────────────────────────────────────────────────────────
-    venv/bin/python scripts/fix_stuck_pending_reports.py           # فحص فقط
-    venv/bin/python scripts/fix_stuck_pending_reports.py --apply   # التنفيذ
+    fix_stuck_pending_reports.py                    # فحص
+    fix_stuck_pending_reports.py --apply            # حذف اليتيم + إغلاق المكتمل
+    fix_stuck_pending_reports.py --reconcile        # فحص تصحيح العدّاد
+    fix_stuck_pending_reports.py --reconcile --apply  # تنفيذ تصحيح العدّاد
+
+`--reconcile` يختار العملية و`--apply` ينفّذها؛ فالتشغيل بلا `--apply`
+معاينة آمنة دائماً مهما كانت العملية.
+
+⚠️ `--reconcile` عملية **منفصلة تماماً** عن `--apply`، وتمسّ الفئة 🅓 وحدها:
+تضبط `uploaded_count` على عدد المرفقات الفعلية (بحدّ أقصى `expected_count`)
+**بلا إغلاق أي سجل**. سببها أن العدّاد نفسه أفسده العطب: سجل له مرفق واحد
+قد يقرأ `0/2` لأن `increment_pending_upload` لم تُستدعَ أصلاً في مسار البحث
+المفتوح — فلو رفع المترجم الفحص الناقص لاحقاً لصار `1/2` وبقي معلَّقاً رغم
+اكتماله فعلياً. التصحيح يُعيد العدّاد للواقع فتُغلَق الحالة تلقائياً وبشكل
+صحيح عند رفع الباقي.
+
+⚠️ **وهو تقدير لا يقين**: عدد الملفات ≠ عدد الفحوصات بالضرورة (ملف PDF واحد
+قد يضمّ فحصين). لذلك لا يُغلق السكربت شيئاً هنا؛ إن بلغ العدّاد
+`expected_count` بعد التصحيح سيظهر السجل في الفئة 🅑 عند الفحص التالي
+**لقرارك أنت**، لا إغلاقاً صامتاً.
 """
 
 from __future__ import annotations
@@ -46,6 +64,10 @@ from db.models import PendingReport, Report, MedicalAttachmentFile    # noqa: E4
 
 def main() -> int:
     apply = "--apply" in sys.argv
+    reconcile = "--reconcile" in sys.argv
+
+    # `--reconcile` يختار العملية، و`--apply` ينفّذها — كما في بقية السكربت:
+    # التشغيل بلا `--apply` معاينة آمنة دائماً، مهما كانت العملية.
 
     orphans: list[tuple] = []      # 🅐 تقريره محذوف
     uploaded: list[tuple] = []     # 🅑 مرفوع ومكتمل العدد
@@ -118,17 +140,58 @@ def main() -> int:
         print(f"     pending#{pid}  report#{rid}  {name}  (مترجم: {tr})  "
               f"{n} مرفق  التقدّم {up}/{exp}  منذ {days} يوم")
 
-    print(f"\n🅓 مرفوع **جزئياً** — يحتاج حكمك: {len(partial)}   ⇒ ⚠️ لا يُمَسّ")
-    if partial:
+    _p_action = "⇒ يُصحَّح العدّاد فقط" if reconcile else "⇒ ⚠️ لا يُمَسّ"
+    print(f"\n🅓 مرفوع **جزئياً**: {len(partial)}   {_p_action}")
+    if partial and not reconcile:
         print("   له مرفقات لكن عدد الفحوصات المنتظَرة لم يكتمل بعد —")
         print("   إغلاقه قسراً يُخفي حالة ناقصة فعلاً. راجعها يدوياً.")
     for pid, rid, name, tr, days, n, up, exp in partial:
-        print(f"     pending#{pid}  report#{rid}  {name}  (مترجم: {tr})  "
-              f"{n} مرفق  التقدّم {up}/{exp}  منذ {days} يوم")
+        line = (f"     pending#{pid}  report#{rid}  {name}  (مترجم: {tr})  "
+                f"{n} مرفق  التقدّم {up}/{exp}  منذ {days} يوم")
+        if reconcile:
+            new_up = min(n, exp)
+            line += f"   ← سيصير {new_up}/{exp}" if new_up != up else "   (لا تغيير)"
+        print(line)
 
     print(f"\n🅒 معلَّق بحق — لا مرفقات ولا حذف: {len(genuine)}   ⇒ لا يُمَسّ")
     for pid, rid, name, tr, days in genuine:
         print(f"     pending#{pid}  report#{rid}  {name}  (مترجم: {tr})  منذ {days} يوم")
+
+    if reconcile:
+        # يمسّ الفئة 🅓 وحدها: العدّاد فقط، بلا إغلاق وبلا حذف.
+        changes = [(pid, up, min(n, exp), exp)
+                   for pid, _rid, _nm, _tr, _d, n, up, exp in partial
+                   if min(n, exp) != up]
+        print("\n" + "=" * 68)
+        if not changes:
+            print("لا عدّاد يحتاج تصحيحاً — كلها مطابقة لعدد المرفقات أصلاً.")
+            print("=" * 68)
+            return 0
+
+        if not apply:
+            print("وضع الفحص — لم يُغيَّر شيء.")
+            print(f"التنفيذ سيصحّح عدّاد {len(changes)} سجل، بلا إغلاق أي سجل.")
+            print("أعد التشغيل مع --reconcile --apply للتنفيذ.")
+            print("=" * 68)
+            return 0
+
+        with SessionLocal() as s:
+            for pid, _old, new_up, _exp in changes:
+                row = s.query(PendingReport).filter_by(id=pid).first()
+                if row:
+                    row.uploaded_count = new_up
+            s.commit()
+
+        print(f"✅ صُحِّح عدّاد {len(changes)} سجل — بلا إغلاق أي سجل.")
+        for pid, old, new_up, exp in changes:
+            print(f"     pending#{pid}:  {old}/{exp}  ←  {new_up}/{exp}")
+
+        reached = [c for c in changes if c[2] >= c[3]]
+        if reached:
+            print(f"\n⚠️ بلغ {len(reached)} منها العدد المتوقَّع، فسيظهر في الفئة 🅑")
+            print("   عند الفحص التالي — **لقرارك**، لم يُغلَق الآن.")
+        print("=" * 68)
+        return 0
 
     if not apply:
         print("\n" + "=" * 68)
