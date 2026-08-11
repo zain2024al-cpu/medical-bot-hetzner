@@ -340,18 +340,28 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
 
         is_dependent = any(c.get("skipped") for c in session.completed_companions)
 
-        # Publish notification
+        # Publish notification — مرفَقاً بملف الإقامة الذي صدر فعلاً (طلب
+        # المستخدم صراحةً)، للمريض ولكل مرافق أُنجزت إقامته في هذه الدورة.
         try:
             from modules.residency.report_publisher import publish_event
             from modules.residency.views import format_expiry_date
             details = [f"📅 الانتهاء الجديد: {format_expiry_date(session.new_expiry_date)}"]
             if is_dependent:
                 details.append("⏳ مرافقون معلقون")
+
+            attachments: list[tuple[str, str]] = []
+            if session.document_file_id:
+                attachments.append((session.document_file_id, f"🪪 إقامة — {session.profile_name}"))
+            for c in session.completed_companions:
+                if not c.get("skipped") and c.get("file_id"):
+                    attachments.append((c["file_id"], f"🪪 إقامة مرافق — {c.get('name', '')}"))
+
             await publish_event(
                 context.bot,
                 action_label="تم إصدار إقامة جديدة",
                 patient_name=session.profile_name,
                 body_lines=details,
+                attachments=attachments,
             )
         except Exception as exc:
             logger.warning(f"[residency.renewal] publish_event failed: {exc}")

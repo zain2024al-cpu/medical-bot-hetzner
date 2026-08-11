@@ -17,8 +17,15 @@ async def publish_event(
     action_label: str,
     patient_name: str,
     body_lines: list[str],
+    attachments: list[tuple[str, str]] | None = None,
 ) -> None:
-    """Send a residency event notification to all admins (and GS group if configured)."""
+    """
+    Send a residency event notification to all admins (and GS group if configured).
+
+    `attachments` — [(file_id, caption), …] لملفات الوثائق المرتبطة بالحدث
+    (مثل ملف الإقامة الذي صدر للتو). تُرسَل بعد نص الإشعار — فشل إرسال
+    مرفق واحد لا يوقف الباقي ولا يُسقط النصّ نفسه.
+    """
     from modules.general_services.views import format_arabic_date
     date_str = format_arabic_date(datetime.utcnow())
     lines = [
@@ -29,10 +36,20 @@ async def publish_event(
     ] + body_lines
     text = "\n".join(lines)
 
+    async def _send_attachments(chat_id) -> None:
+        for file_id, caption in (attachments or []):
+            if not file_id:
+                continue
+            try:
+                await bot.send_photo(chat_id=chat_id, photo=file_id, caption=caption)
+            except Exception as exc:
+                logger.warning(f"[res_publisher] attachment send failed  chat={chat_id}: {exc}")
+
     if GS_NOTIFY_ADMINS:
         for admin_id in (ADMIN_IDS or []):
             try:
                 await bot.send_message(chat_id=admin_id, text=text, parse_mode="Markdown")
+                await _send_attachments(admin_id)
             except Exception as exc:
                 logger.warning(f"[res_publisher] admin={admin_id}: {exc}")
     else:
@@ -43,6 +60,7 @@ async def publish_event(
         return
     try:
         await bot.send_message(chat_id=group_id, text=text, parse_mode="Markdown")
+        await _send_attachments(group_id)
     except Exception as exc:
         logger.warning(f"[res_publisher] group send failed: {exc}")
 
