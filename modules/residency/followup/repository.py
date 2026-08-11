@@ -41,6 +41,7 @@ def get_expiring_soon() -> list[ExpiringEntry]:
     and whose status is active, expiring, or renewal_submitted.
     Ordered by days_remaining ASC (most urgent first).
     """
+    from sqlalchemy import or_
     from db.session import get_db
     from db.models import ResidencyProfile, ResidencyCompanion
 
@@ -50,6 +51,9 @@ def get_expiring_soon() -> list[ExpiringEntry]:
     results: list[ExpiringEntry] = []
 
     trackable_statuses = TRACKABLE_STATUSES
+    # ✅ الملفات المضافة يدوياً (source="manual") مستبعَدة من كل شاشات
+    # المتابعة والتنبيهات — مصدر الأسماء الوحيد هو الواصلون (قرار المستخدم).
+    _arrivals_only = or_(ResidencyProfile.source != "manual", ResidencyProfile.source.is_(None))
 
     with get_db() as db:
         profiles = (
@@ -58,6 +62,7 @@ def get_expiring_soon() -> list[ExpiringEntry]:
                 ResidencyProfile.status.in_(trackable_statuses),
                 ResidencyProfile.expiry_date != "",
                 ResidencyProfile.expiry_date.isnot(None),
+                _arrivals_only,
             )
             .all()
         )
@@ -79,10 +84,13 @@ def get_expiring_soon() -> list[ExpiringEntry]:
 
         companions = (
             db.query(ResidencyCompanion)
+            .join(ResidencyProfile, ResidencyProfile.id == ResidencyCompanion.profile_id)
             .filter(
                 ResidencyCompanion.status.in_(trackable_statuses),
                 ResidencyCompanion.expiry_date != "",
                 ResidencyCompanion.expiry_date.isnot(None),
+                # ✅ مرافق مريض مُضاف يدوياً يُستبعَد معه — نفس النطاق أعلاه.
+                _arrivals_only,
             )
             .all()
         )
@@ -125,12 +133,14 @@ def get_passport_expiring_soon() -> list[ExpiringEntry]:
     إجراءً مختلفاً لا تنبيهاً مسبقاً، وإبقاؤها كان سيُغرق التنبيه اليومي
     بأسماء قديمة إلى الأبد. تنبيه الإقامة يُبقيها عمداً (سلوكه الأصلي).
     """
+    from sqlalchemy import or_
     from db.session import get_db
     from db.models import ResidencyProfile, ResidencyCompanion
 
     today = datetime.utcnow().date()
     results: list[ExpiringEntry] = []
     trackable_statuses = TRACKABLE_STATUSES
+    _arrivals_only = or_(ResidencyProfile.source != "manual", ResidencyProfile.source.is_(None))
 
     def _delta(raw: str) -> int | None:
         try:
@@ -145,6 +155,7 @@ def get_passport_expiring_soon() -> list[ExpiringEntry]:
                 ResidencyProfile.status.in_(trackable_statuses),
                 ResidencyProfile.passport_expiry != "",
                 ResidencyProfile.passport_expiry.isnot(None),
+                _arrivals_only,
             )
             .all()
         ):
@@ -161,10 +172,12 @@ def get_passport_expiring_soon() -> list[ExpiringEntry]:
 
         for c in (
             db.query(ResidencyCompanion)
+            .join(ResidencyProfile, ResidencyProfile.id == ResidencyCompanion.profile_id)
             .filter(
                 ResidencyCompanion.status.in_(trackable_statuses),
                 ResidencyCompanion.passport_expiry != "",
                 ResidencyCompanion.passport_expiry.isnot(None),
+                _arrivals_only,
             )
             .all()
         ):
@@ -191,6 +204,7 @@ def get_passport_expiring_soon() -> list[ExpiringEntry]:
 
 def get_dependent_pending() -> list[PendingEntry]:
     """Return profiles with status='dependent_pending' (issued but companions still pending)."""
+    from sqlalchemy import or_
     from db.session import get_db
     from db.models import ResidencyProfile, ResidencyCompanion
 
@@ -198,7 +212,10 @@ def get_dependent_pending() -> list[PendingEntry]:
     with get_db() as db:
         profiles = (
             db.query(ResidencyProfile)
-            .filter(ResidencyProfile.status == "dependent_pending")
+            .filter(
+                ResidencyProfile.status == "dependent_pending",
+                or_(ResidencyProfile.source != "manual", ResidencyProfile.source.is_(None)),
+            )
             .order_by(ResidencyProfile.updated_at.asc())
             .all()
         )

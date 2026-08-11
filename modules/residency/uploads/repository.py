@@ -58,12 +58,17 @@ def get_papers_entries(*, within_days: int = 60) -> list[PapersEntry]:
     النطاق 60 يوماً لا 30 عمداً: بدء الرفع يسبق الانتهاء بمدة، فلو ساوينا
     عتبة «المتابعة» (30) لظهر المريض في شاشة الرفع بعد فوات أوان البدء.
     """
+    from sqlalchemy import or_
     from db.session import get_db
     from db.models import ResidencyProfile, ResidencyCompanion, ResidencyUpdate
 
     out: list[PapersEntry] = []
     with get_db() as db:
-        profiles = db.query(ResidencyProfile).all()
+        # ✅ الإضافة اليدوية مستبعَدة — مصدر الأسماء الوحيد لهذه الشاشة
+        # هو الواصلون (قرار المستخدم).
+        profiles = db.query(ResidencyProfile).filter(
+            or_(ResidencyProfile.source != "manual", ResidencyProfile.source.is_(None))
+        ).all()
 
         # الملفات التي لها حدث مرحلة سابق ⇒ يمكن التراجع عنها
         undoable = {
@@ -282,17 +287,20 @@ def save_patient_photo(*, profile_id: int, file_id: str, performed_by: int | Non
 
 def get_hub_counts() -> dict[str, int]:
     """أعداد شاشة الوحدة الرئيسية — استعلام واحد لكل مجموعة."""
+    from sqlalchemy import or_
     from db.session import get_db
     from db.models import ResidencyProfile
     from modules.residency.followup.repository import (
         get_expiring_soon, get_passport_expiring_soon, get_dependent_pending,
     )
 
+    _arrivals_only = or_(ResidencyProfile.source != "manual", ResidencyProfile.source.is_(None))
+
     with get_db() as db:
         submitted = db.query(ResidencyProfile).filter(
-            ResidencyProfile.status == "renewal_submitted").count()
+            ResidencyProfile.status == "renewal_submitted", _arrivals_only).count()
         received = db.query(ResidencyProfile).filter(
-            ResidencyProfile.status == "extension_received").count()
+            ResidencyProfile.status == "extension_received", _arrivals_only).count()
 
     return {
         "expiring":  len(get_expiring_soon()),

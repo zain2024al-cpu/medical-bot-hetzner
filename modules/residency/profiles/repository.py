@@ -58,14 +58,22 @@ def get_profiles_page(page: int = 0) -> tuple[list[ProfileRow], int]:
     Return (profiles_for_page, total_count).
     Profiles are ordered by created_at DESC.
     """
+    from sqlalchemy import or_
     from db.session import get_db
     from db.models import ResidencyProfile, ResidencyCompanion
 
+    # ✅ مصدر الأسماء الوحيد لهذه القائمة هو الواصلون — الإضافة اليدوية
+    # (source="manual") مستبعَدة صراحةً (قرار المستخدم: لا تُجلب أسماء
+    # الإقامة من الأدمن). NULL يُعامَل كـ"arrivals" مطابقةً للقيمة الافتراضية
+    # في db/models.py، فلا تختفي صفوف قديمة سابقة على العمود بالخطأ.
+    _arrivals_only = or_(ResidencyProfile.source != "manual", ResidencyProfile.source.is_(None))
+
     offset = page * PROFILES_PAGE_SIZE
     with get_db() as db:
-        total = db.query(ResidencyProfile).count()
+        total = db.query(ResidencyProfile).filter(_arrivals_only).count()
         rows = (
             db.query(ResidencyProfile)
+            .filter(_arrivals_only)
             .order_by(ResidencyProfile.created_at.desc())
             .offset(offset)
             .limit(PROFILES_PAGE_SIZE)
@@ -172,6 +180,7 @@ def get_history_for_profile(profile_id: int, limit: int = 10) -> list[HistoryRow
 
 def search_profiles(query: str) -> list[ProfileRow]:
     """Simple name-contains search. Returns up to 20 matches."""
+    from sqlalchemy import or_
     from db.session import get_db
     from db.models import ResidencyProfile
 
@@ -179,7 +188,12 @@ def search_profiles(query: str) -> list[ProfileRow]:
     with get_db() as db:
         rows = (
             db.query(ResidencyProfile)
-            .filter(ResidencyProfile.name.ilike(q))
+            .filter(
+                ResidencyProfile.name.ilike(q),
+                # ✅ نفس استبعاد الإضافة اليدوية المطبَّق في get_profiles_page —
+                # البحث بوابة أخرى لنفس القائمة، فيجب أن يطابق نطاقها.
+                or_(ResidencyProfile.source != "manual", ResidencyProfile.source.is_(None)),
+            )
             .order_by(ResidencyProfile.created_at.desc())
             .limit(20)
             .all()

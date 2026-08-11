@@ -62,13 +62,21 @@ def collect_archive_rows() -> list[dict]:
     الترتيب: حسب أقرب تاريخ انتهاء إقامة للمجموعة (المريض ومرافقيه معاً)،
     فتظهر الحالات العاجلة أعلى الملف. من بلا تاريخ يُدفع للأسفل.
     """
+    from sqlalchemy import or_
     from db.session import SessionLocal
     from db.models import ResidencyProfile, ResidencyCompanion
     from modules.residency.views import format_status
 
     rows: list[dict] = []
     with SessionLocal() as db:
-        profiles = db.query(ResidencyProfile).order_by(ResidencyProfile.id).all()
+        # ✅ الإضافة اليدوية مستبعَدة من الأرشيف المُصدَّر (Excel/PDF كلاهما
+        # يستدعيان هذه الدالة) — نفس نطاق قائمة الإقامات داخل البوت.
+        profiles = (
+            db.query(ResidencyProfile)
+            .filter(or_(ResidencyProfile.source != "manual", ResidencyProfile.source.is_(None)))
+            .order_by(ResidencyProfile.id)
+            .all()
+        )
         groups = []
         for p in profiles:
             comps = (

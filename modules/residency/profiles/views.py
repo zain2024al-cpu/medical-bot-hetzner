@@ -20,12 +20,13 @@ RNA = "rna"
 
 def build_residency_main_menu() -> tuple[str, InlineKeyboardMarkup]:
     text = f"{_DIVIDER}\n🪪  **الإقامات**\n\nاختر القسم:"
-    # ✅ ثلاثة أزرار لا أربعة: «المتابعة» و«التحديثات المعلقة» انتقلتا داخل
-    # «الرفع والمتابعة» كتبويبين، فكلتاهما مرحلة من دورة الأوراق نفسها ولم
-    # يكن هناك سبب لتفرّقهما على مستوى القائمة الرئيسية.
+    # ✅ زرّان لا ثلاثة: «➕ إضافة مريض جديد» أُزيل عمداً — مصدر الأسماء
+    # الوحيد لقائمة الإقامات هو الواصلون (قرار المستخدم صراحةً: "لا يجلب
+    # الإقامات من الأدمن"). الإضافة اليدوية (save_manual_batch) لا تزال
+    # موجودة في الكود وتعمل لو استُدعيت مباشرةً، لكن لا مدخل إليها من
+    # الواجهة بعد الآن — فلا يمكن لأي اسم يدوي أن يدخل القائمة.
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("📁 أرشيف المرضى",    callback_data=f"{RN}:archive")],
-        [InlineKeyboardButton("➕ إضافة مريض جديد", callback_data=f"{RNA}:start")],
         [InlineKeyboardButton("📤 الرفع والمتابعة", callback_data=f"{RN}:uploads")],
     ])
     return text, kb
@@ -92,7 +93,8 @@ def build_archive_list(profiles, *, page: int, total: int) -> tuple[str, InlineK
     ])
 
     rows.append([
-        InlineKeyboardButton("➕ إضافة جديد", callback_data=f"{RNA}:start"),
+        # ⚠️ لا زرّ «➕ إضافة جديد» هنا — أُزيل عمداً مع زرّ القائمة الرئيسية
+        # (نفس السبب: مصدر الأسماء الوحيد هو الواصلون).
         InlineKeyboardButton("⬅️ رجوع",       callback_data=f"{RN}:main"),
     ])
 
