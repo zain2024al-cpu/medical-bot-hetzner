@@ -50,7 +50,7 @@ def build_followup_list(entries) -> tuple[str, InlineKeyboardMarkup]:
         lines += ["✅ لا توجد إقامات منتهية أو قريبة الانتهاء خلال الـ 30 يوم القادمة."]
         lines += passport_lines
         kb = InlineKeyboardMarkup([[
-            InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:uploads"),
+            InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:archive"),
         ]])
         return "\n".join(lines), kb
 
@@ -96,7 +96,7 @@ def build_followup_list(entries) -> tuple[str, InlineKeyboardMarkup]:
 
     lines += passport_lines
 
-    rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:uploads")])
+    rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:archive")])
     return "\n".join(lines), InlineKeyboardMarkup(rows)
 
 
@@ -112,7 +112,7 @@ def build_pending_list(entries) -> tuple[str, InlineKeyboardMarkup]:
     if not entries:
         lines += ["✅ لا توجد تحديثات معلقة."]
         kb = InlineKeyboardMarkup([[
-            InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:uploads"),
+            InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:archive"),
         ]])
         return "\n".join(lines), kb
 
@@ -129,5 +129,5 @@ def build_pending_list(entries) -> tuple[str, InlineKeyboardMarkup]:
             )
         ])
 
-    rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:uploads")])
+    rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:archive")])
     return "\n".join(lines), InlineKeyboardMarkup(rows)

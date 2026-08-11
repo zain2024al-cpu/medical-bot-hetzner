@@ -20,21 +20,24 @@ RNA = "rna"
 
 def build_residency_main_menu() -> tuple[str, InlineKeyboardMarkup]:
     text = f"{_DIVIDER}\n🪪  **الإقامات**\n\nاختر القسم:"
-    # ✅ زرّان لا ثلاثة: «➕ إضافة مريض جديد» أُزيل عمداً — مصدر الأسماء
-    # الوحيد لقائمة الإقامات هو الواصلون (قرار المستخدم صراحةً: "لا يجلب
-    # الإقامات من الأدمن"). الإضافة اليدوية (save_manual_batch) لا تزال
-    # موجودة في الكود وتعمل لو استُدعيت مباشرةً، لكن لا مدخل إليها من
-    # الواجهة بعد الآن — فلا يمكن لأي اسم يدوي أن يدخل القائمة.
+    # ✅ زرّ واحد لا أكثر: كل شيء صار عبر «📁 أرشيف المرضى» (قرار المستخدم
+    # صراحةً). أُزيل «➕ إضافة مريض جديد» سابقاً (مصدر الأسماء الوحيد هو
+    # الواصلون)، وأُزيل الآن «📤 الرفع والمتابعة» — متابعة تقديم الأوراق
+    # وإضافة المرافقين ورفع فورم C/الصورة صارت كلها أزراراً مباشرة على ملف
+    # كل مريض (يُفتح من الأرشيف)، وشاشتا «⏰ المتابعة» و«⏳ المرافقون
+    # المعلقون» انتقلتا لتكونا زرّين في شاشة الأرشيف نفسها.
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("📁 أرشيف المرضى",    callback_data=f"{RN}:archive")],
-        [InlineKeyboardButton("📤 الرفع والمتابعة", callback_data=f"{RN}:uploads")],
+        [InlineKeyboardButton("📁 أرشيف المرضى", callback_data=f"{RN}:archive")],
     ])
     return text, kb
 
 
 # ── Archive list ──────────────────────────────────────────────────────────────
 
-def build_archive_list(profiles, *, page: int, total: int) -> tuple[str, InlineKeyboardMarkup]:
+def build_archive_list(
+    profiles, *, page: int, total: int,
+    expiring_count: int = 0, pending_count: int = 0,
+) -> tuple[str, InlineKeyboardMarkup]:
     total_pages = max(1, -(-total // PROFILES_PAGE_SIZE))  # ceil division
     lines = [
         _DIVIDER,
@@ -90,6 +93,14 @@ def build_archive_list(profiles, *, page: int, total: int) -> tuple[str, InlineK
     rows.append([
         InlineKeyboardButton("📊 Excel", callback_data=f"{RNA}:export"),
         InlineKeyboardButton("📄 PDF",   callback_data=f"{RNA}:export_pdf"),
+    ])
+
+    # ✅ منقولان هنا من شاشة «📤 الرفع والمتابعة» المحذوفة — قرار المستخدم:
+    # كل شيء عبر الأرشيف. الهدفان (`rn:followup` / `rn:pending`) لم يتغيّرا،
+    # فقط موضع الزرّين.
+    rows.append([
+        InlineKeyboardButton(f"⏰ المتابعة ({expiring_count})",       callback_data=f"{RN}:followup"),
+        InlineKeyboardButton(f"⏳ المرافقون المعلقون ({pending_count})", callback_data=f"{RN}:pending"),
     ])
 
     rows.append([
@@ -173,22 +184,59 @@ def build_profile_detail(profile, companions, history) -> tuple[str, InlineKeybo
     else:
         lines.append("🕓 *السجل:*  لا توجد أحداث مسجلة")
 
-    rows: list[list[InlineKeyboardButton]] = [
-        [
-            InlineKeyboardButton("🪪 تجديد الإقامة",  callback_data=f"rnr:start_{profile.id}"),
-            InlineKeyboardButton("📋 تم التقديم",     callback_data=f"rnf:submitted_{profile.id}"),
-        ],
-        [
-            InlineKeyboardButton("📄 ملف PDF",         callback_data=f"{RNA}:pdf_{profile.id}"),
-            InlineKeyboardButton("📎 إرسال الوثائق",  callback_data=f"{RNA}:send_docs_{profile.id}"),
-        ],
-        # ⚠️ لا زرّ رفع هنا: فورم C والصورة الشخصية يُضافان من
-        # «📤 الرفع والمتابعة ← ➕ إضافة خدمة» **حصراً** (قرار المستخدم)،
-        # فيبقى لكل مرفق مدخل واحد لا مدخلان.
-        [
-            InlineKeyboardButton("⬅️ رجوع",            callback_data=f"{RN}:archive"),
-        ],
-    ]
+    # ✅ متابعة تقديم الأوراق مجمَّعة هنا بالكامل بدل شاشة «📤 الرفع
+    # والمتابعة» المحذوفة — مصدر الحقيقة الوحيد لا يزال PAPERS_ADVANCE في
+    # constants.py، فلا ينحرف نصّ الزر عمّا سينفّذه المستودع فعلياً.
+    from modules.residency.constants import PAPERS_ADVANCE
+    advance_label, _next_status = PAPERS_ADVANCE.get(_status, (None, None))
+
+    rows: list[list[InlineKeyboardButton]] = []
+
+    if advance_label:
+        rows.append([
+            InlineKeyboardButton(advance_label, callback_data=f"rnu:adv_{profile.id}"),
+        ])
+    # ✅ زر التراجع يظهر إلا في أول الدورة — لا شيء يمكن التراجع عنه هناك
+    # فعرضه كان سيُنتج «لا يوجد ما يمكن التراجع عنه» بلا فائدة دائماً.
+    if _status not in ("active", "expiring", "expired"):
+        rows.append([
+            InlineKeyboardButton("↩️ تراجع عن آخر مرحلة", callback_data=f"rnu:undo_{profile.id}"),
+        ])
+
+    # ✅ «هل ملفه معلق بسبب طلب إضافي» — يظهر فقط حين تكون هذه هي الحالة
+    # فعلاً (مرافق لم يُستكمَل رغم صدور إقامة المريض)، بدل شاشة منفصلة
+    # لعرض كل الحالات المعلَّقة دفعة واحدة.
+    if _status == "dependent_pending":
+        rows.append([
+            InlineKeyboardButton("📋 استكمال المرافقين المعلَّقين", callback_data=f"rnf:complete_{profile.id}"),
+        ])
+
+    rows.append([
+        InlineKeyboardButton("🪪 تجديد الإقامة", callback_data=f"rnr:start_{profile.id}"),
+        InlineKeyboardButton("➕ إضافة مرافق",   callback_data=f"{RNA}:add_comp_{profile.id}"),
+    ])
+
+    # ✅ فورم C والصورة الشخصية — منقولان من شاشة «➕ إضافة خدمة» المحذوفة
+    # مع الوحدة. لا يزالان المدخل الوحيد لهذين الحقلين (لا الجواز/التأشيرة/
+    # الإقامة — تلك تبقى في مساراتها فلا يصير للحقل الواحد مصدران).
+    has_form_c = bool(getattr(profile, "form_c_file_id", ""))
+    has_photo  = bool(getattr(profile, "photo_file_id", ""))
+    rows.append([
+        InlineKeyboardButton(
+            "📄 استبدال فورم C" if has_form_c else "📄 رفع فورم C",
+            callback_data=f"rnu:formc_{profile.id}"),
+        InlineKeyboardButton(
+            "🖼️ استبدال الصورة" if has_photo else "🖼️ رفع صورة شخصية",
+            callback_data=f"rnu:photo_{profile.id}"),
+    ])
+
+    rows.append([
+        InlineKeyboardButton("📄 ملف PDF",         callback_data=f"{RNA}:pdf_{profile.id}"),
+        InlineKeyboardButton("📎 إرسال الوثائق",  callback_data=f"{RNA}:send_docs_{profile.id}"),
+    ])
+    rows.append([
+        InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:archive"),
+    ])
     # Show quick-edit button only when expiry date is missing
     if not profile.expiry_date:
         rows.insert(1, [
@@ -201,6 +249,45 @@ def build_profile_detail(profile, companions, history) -> tuple[str, InlineKeybo
 
 
 # ── Search ────────────────────────────────────────────────────────────────────
+
+# ── إضافة مرافق لملف موجود ────────────────────────────────────────────────────
+
+def build_add_companion_name_prompt(profile_name: str, profile_id: int) -> tuple[str, InlineKeyboardMarkup]:
+    text = (
+        f"{_DIVIDER}\n➕  **إضافة مرافق**\n\n"
+        f"المريض: *{profile_name}*\n{_THIN}\n\n"
+        "✏️ اكتب اسم المرافق:"
+    )
+    kb = InlineKeyboardMarkup([[
+        InlineKeyboardButton("❌ إلغاء", callback_data=f"{RNA}:view_{profile_id}"),
+    ]])
+    return text, kb
+
+
+def build_add_companion_visa_expiry_prompt(name: str, profile_id: int) -> tuple[str, InlineKeyboardMarkup]:
+    text = (
+        f"{_DIVIDER}\n➕  **إضافة مرافق — {name}**\n\n"
+        "اختر تاريخ انتهاء التأشيرة، أو اضغط **⏭️ تخطي**."
+    )
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📆 اختيار من التقويم", callback_data=f"{RNA}:add_comp_cal_{profile_id}")],
+        [InlineKeyboardButton("⏭️ تخطي",              callback_data=f"{RNA}:add_comp_skipexp_{profile_id}")],
+        [InlineKeyboardButton("❌ إلغاء",              callback_data=f"{RNA}:view_{profile_id}")],
+    ])
+    return text, kb
+
+
+def build_add_companion_saved(name: str, profile_id: int) -> tuple[str, InlineKeyboardMarkup]:
+    text = (
+        f"{_DIVIDER}\n✅  **تمت إضافة المرافق**\n\n"
+        f"👤 {name}\n\n"
+        "أُضيف إلى ملف المريض."
+    )
+    kb = InlineKeyboardMarkup([[
+        InlineKeyboardButton("👁 عرض الملف", callback_data=f"{RNA}:view_{profile_id}"),
+    ]])
+    return text, kb
+
 
 def build_search_prompt(*, error: bool = False) -> tuple[str, InlineKeyboardMarkup]:
     lines = [_DIVIDER, "🔍  **البحث عن مريض**", ""]

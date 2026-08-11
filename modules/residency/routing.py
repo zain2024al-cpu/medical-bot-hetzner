@@ -45,7 +45,7 @@ def register_all(app) -> None:
     reg_renewal(app)
     reg_renewal_routes()
 
-    # ── Uploads: الرفع والمتابعة (rnu:) ────────────────────────────────────────
+    # ── Uploads: أفعال ملف مريض واحد — تقدّم مرحلة/فورم C/صورة (rnu:) ─────────
     from modules.residency.uploads.flow import (
         register_handlers as reg_uploads,
         register_result_routes as reg_uploads_routes,

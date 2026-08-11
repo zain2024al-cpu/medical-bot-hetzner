@@ -10,6 +10,57 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 
+def add_companion_to_profile(
+    *,
+    profile_id:        int,
+    name:              str,
+    visa_expiry:       str,
+    passport_file_id:  str,
+    visa_file_id:      str,
+    performed_by:      int | None,
+) -> str:
+    """
+    يضيف مرافقاً جديداً لملف مريض موجود بالفعل — عكس المسار المعتاد حيث
+    يُنشأ المرافق فقط مع مريضه عند الوصول. زر «➕ إضافة مرافق» في ملف
+    المريض (`build_profile_detail`) هو المدخل الوحيد لهذه الدالة.
+
+    ⚠️ `expiry_date` يُعبَّأ من `visa_expiry` مباشرةً — نفس رجوع الملف
+    الرئيسي إلى التأشيرة عند غياب الإقامة (المرافق الجديد نادراً ما يملك
+    رقم إقامة بعد)، فيظهر في شاشات المتابعة بدل أن يبقى بلا تاريخ.
+
+    يعيد اسم المرافق، أو "" إن لم يوجد الملف الأصل (المستدعي يتحقق).
+    """
+    from db.session import get_db
+    from db.models import ResidencyProfile, ResidencyCompanion, ResidencyUpdate
+
+    with get_db() as db:
+        profile = db.query(ResidencyProfile).filter(ResidencyProfile.id == profile_id).first()
+        if profile is None:
+            return ""
+
+        comp = ResidencyCompanion(
+            profile_id=              profile_id,
+            name=                    name or "—",
+            status=                  "active",
+            expiry_date=             visa_expiry or "",
+            passport_file_id=        passport_file_id or "",
+            visa_file_id=            visa_file_id or "",
+        )
+        db.add(comp)
+        db.add(ResidencyUpdate(
+            profile_id=      profile_id,
+            action_type=     "companion_added",
+            action_label=    "إضافة مرافق يدوياً",
+            new_status=      "active",
+            new_expiry_date= visa_expiry or "",
+            performed_by=    performed_by,
+        ))
+        saved_name = comp.name
+
+    logger.info(f"[residency.profiles] companion added  profile={profile_id}  name={saved_name!r}")
+    return saved_name
+
+
 def update_profile_expiry_date(
     profile_id:  int,
     expiry_date: str,

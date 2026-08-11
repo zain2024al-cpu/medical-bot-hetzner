@@ -1,118 +1,26 @@
 # modules/residency/uploads/repository.py
-# قراءات وكتابات وحدة «📤 الرفع والمتابعة».
+# منطق ملحق بملف مريض واحد: تقدّم/تراجع مرحلة الأوراق، حفظ فورم C،
+# حفظ الصورة الشخصية.
 #
 # ⚠️ لا حالات مكتوبة يدوياً هنا: كل الانتقالات تُقرأ من `PAPERS_ADVANCE` في
 # modules/residency/constants.py، والتراجع يُقرأ من سجل `ResidencyUpdate`
 # التدقيقي. فلا يوجد جدول انتقالات ثانٍ يمكن أن ينحرف عن الشاشة.
+#
+# ⚠️ `get_papers_entries` وَ`get_hub_counts` (شاشتا القائمة القديمتان)
+# حُذفتا مع شاشة «📤 الرفع والمتابعة» — كل فعل هنا يُستدعى مباشرةً بمعرّف
+# ملف من `build_profile_detail`، فلا حاجة لاستعلام قائمة يغذّيها.
 
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
-from datetime import datetime
 
-from modules.residency.constants import PAPERS_ADVANCE, PAPERS_IN_PROGRESS
+from modules.residency.constants import PAPERS_ADVANCE
 
 logger = logging.getLogger(__name__)
 
 # أنواع الأحداث التي تكتبها هذه الوحدة في السجل التدقيقي.
 # التراجع يبحث عن آخر حدث من هذه الأنواع ليعرف الحالة السابقة.
 _STAGE_ACTIONS = ("papers_submitted", "extension_received")
-
-
-@dataclass
-class PapersEntry:
-    """صف واحد في شاشة متابعة أوراق المستشفى."""
-    profile_id:       int
-    name:             str
-    status:           str
-    expiry_date:      str
-    days_remaining:   int | None
-    companion_count:  int
-    next_label:       str          # ما يُكتب على زر التقدّم
-    next_status:      str | None   # None ⇒ الزر يفتح مسار الإصدار rnr:
-    can_undo:         bool
-
-
-def _days(raw: str | None) -> int | None:
-    if not raw:
-        return None
-    for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
-        try:
-            d = datetime.strptime(str(raw)[:10], fmt).date()
-            return (d - datetime.utcnow().date()).days
-        except Exception:
-            continue
-    return None
-
-
-def get_papers_entries(*, within_days: int = 60) -> list[PapersEntry]:
-    """
-    المرضى الذين تحتاج أوراقهم متابعة، مرتَّبين بالأعجل أولاً.
-
-    يُدرَج المريض إذا:
-      • دورته جارية فعلاً (`PAPERS_IN_PROGRESS`) — بغضّ النظر عن تاريخ
-        الانتهاء، لأن ورقه عند المستشفى الآن ولا يصح أن يختفي من الشاشة، أو
-      • اقترب انتهاء إقامته (خلال `within_days`) فحان بدء الدورة.
-
-    النطاق 60 يوماً لا 30 عمداً: بدء الرفع يسبق الانتهاء بمدة، فلو ساوينا
-    عتبة «المتابعة» (30) لظهر المريض في شاشة الرفع بعد فوات أوان البدء.
-    """
-    from sqlalchemy import or_
-    from db.session import get_db
-    from db.models import ResidencyProfile, ResidencyCompanion, ResidencyUpdate
-
-    out: list[PapersEntry] = []
-    with get_db() as db:
-        # ✅ الإضافة اليدوية مستبعَدة — مصدر الأسماء الوحيد لهذه الشاشة
-        # هو الواصلون (قرار المستخدم).
-        profiles = db.query(ResidencyProfile).filter(
-            or_(ResidencyProfile.source != "manual", ResidencyProfile.source.is_(None))
-        ).all()
-
-        # الملفات التي لها حدث مرحلة سابق ⇒ يمكن التراجع عنها
-        undoable = {
-            r.profile_id
-            for r in db.query(ResidencyUpdate)
-            .filter(ResidencyUpdate.action_type.in_(_STAGE_ACTIONS))
-            .all()
-        }
-
-        for p in profiles:
-            status = p.status or "active"
-            if status == "inactive":
-                continue
-            d = _days(p.expiry_date)
-            in_progress = status in PAPERS_IN_PROGRESS
-            due_soon    = d is not None and d <= within_days
-            if not (in_progress or due_soon):
-                continue
-
-            label, nxt = PAPERS_ADVANCE.get(status, (None, None))
-            if label is None:
-                continue
-
-            comp_count = (
-                db.query(ResidencyCompanion)
-                .filter(ResidencyCompanion.profile_id == p.id)
-                .count()
-            )
-            out.append(PapersEntry(
-                profile_id=      p.id,
-                name=            p.name or "—",
-                status=          status,
-                expiry_date=     p.expiry_date or "",
-                days_remaining=  d,
-                companion_count= comp_count,
-                next_label=      label,
-                next_status=     nxt,
-                can_undo=        p.id in undoable,
-            ))
-
-    # من بلا تاريخ يُدفع للأسفل بدل أن يتصدّر بقيمة صفرية مضلِّلة
-    out.sort(key=lambda e: (e.days_remaining is None, e.days_remaining or 0))
-    logger.debug(f"[residency.uploads] get_papers_entries → {len(out)}")
-    return out
 
 
 def advance_papers_stage(*, profile_id: int, performed_by: int | None) -> tuple[bool, str, str]:
@@ -284,28 +192,3 @@ def save_patient_photo(*, profile_id: int, file_id: str, performed_by: int | Non
     logger.info(f"[residency.uploads] photo saved  profile={profile_id}")
     return name
 
-
-def get_hub_counts() -> dict[str, int]:
-    """أعداد شاشة الوحدة الرئيسية — استعلام واحد لكل مجموعة."""
-    from sqlalchemy import or_
-    from db.session import get_db
-    from db.models import ResidencyProfile
-    from modules.residency.followup.repository import (
-        get_expiring_soon, get_passport_expiring_soon, get_dependent_pending,
-    )
-
-    _arrivals_only = or_(ResidencyProfile.source != "manual", ResidencyProfile.source.is_(None))
-
-    with get_db() as db:
-        submitted = db.query(ResidencyProfile).filter(
-            ResidencyProfile.status == "renewal_submitted", _arrivals_only).count()
-        received = db.query(ResidencyProfile).filter(
-            ResidencyProfile.status == "extension_received", _arrivals_only).count()
-
-    return {
-        "expiring":  len(get_expiring_soon()),
-        "passports": len(get_passport_expiring_soon()),
-        "pending":   len(get_dependent_pending()),
-        "submitted": submitted,
-        "received":  received,
-    }

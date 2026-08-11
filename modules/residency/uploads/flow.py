@@ -1,5 +1,12 @@
 # modules/residency/uploads/flow.py
-# معالِج rnu: — وحدة «📤 الرفع والمتابعة».
+# معالِج rnu: — أفعال ملحقة بملف مريض واحد: تقدّم/تراجع مرحلة الأوراق،
+# رفع فورم C، رفع الصورة الشخصية.
+#
+# ⚠️ لا شاشة قائمة هنا بعد الآن — «📤 الرفع والمتابعة» بأزرارها ومنتقياتها
+# حُذفت (قرار المستخدم: كل شيء عبر «📁 أرشيف المرضى» ← ملف المريض). كل
+# فعل هنا يُستدعى مباشرةً من `rnu:{action}_{profile_id}` على زر في
+# `build_profile_detail` نفسه، وبعد التنفيذ يُعاد رسم **نفس شاشة الملف**
+# لا قائمة — فالمستخدم يبقى حيث كان.
 #
 # Handler group:
 #   group 20  CallbackQueryHandler(^rnu:)   — نفس مجموعة بقية callbacks الإقامة
@@ -22,15 +29,11 @@ from core.access.access_service import user_has_module
 from shared.uploads import collector as uploads
 from shared.result_router import register as _register_route
 
-from modules.residency.constants import PROFILES_PAGE_SIZE
-from modules.residency.uploads.views import (
-    RNU, build_uploads_hub, build_papers_list,
-    build_service_patient_list, build_service_menu,
-    build_form_c_saved, build_not_found, build_photo_saved,
-)
+from modules.residency.uploads.views import build_form_c_saved, build_photo_saved
 
 logger = logging.getLogger(__name__)
 
+RNU = "rnu"
 _RKEY_FORM_C = "res.uploads.form_c"
 _RKEY_PHOTO  = "res.uploads.photo"
 _MODULE_KEY  = "residency"
@@ -56,40 +59,28 @@ async def _safe_edit(update, text, kb):
     await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
 
-# ── الشاشات ───────────────────────────────────────────────────────────────────
+# ── الشاشة الوحيدة المتبقّية: إعادة رسم ملف المريض نفسه ───────────────────────
 
-async def show_hub(update, context) -> None:
-    from modules.residency.uploads.repository import get_hub_counts
-    text, kb = build_uploads_hub(get_hub_counts())
-    await _safe_edit(update, text, kb)
+async def _render_profile(update, context, profile_id: int) -> None:
+    """
+    تُستدعى بعد كل فعل هنا (تقدّم/تراجع مرحلة، أو نتيجة رفع فورم C/الصورة
+    الملغاة) لإعادة رسم شاشة ملف المريض بحالته المُحدَّثة — لا قائمة.
 
-
-async def _show_papers(update, context) -> None:
-    from modules.residency.uploads.repository import get_papers_entries
-    text, kb = build_papers_list(get_papers_entries())
-    await _safe_edit(update, text, kb)
-
-
-async def _show_service_list(update, context, page: int) -> None:
-    from modules.residency.profiles.repository import get_profiles_page
-    profiles, total = get_profiles_page(page=page)
-    context.user_data["_rnu_service_page"] = page
-    text, kb = build_service_patient_list(
-        profiles, page=page, total=total, page_size=PROFILES_PAGE_SIZE,
-    )
-    await _safe_edit(update, text, kb)
-
-
-async def _show_service_menu(update, context, profile_id: int) -> None:
+    `_safe_edit` تُحرّر الرسالة إن جاء الاستدعاء من ضغطة زر (adv_/undo_)،
+    وترسل رسالة جديدة إن جاء من نتيجة رفع (لا query نشِط حينها).
+    """
     from modules.residency.profiles.repository import (
-        get_profile_by_id, get_companions_for_profile,
+        get_profile_by_id, get_companions_for_profile, get_history_for_profile,
     )
+    from modules.residency.profiles.views import build_profile_detail
+
     profile = get_profile_by_id(profile_id)
     if profile is None:
-        text, kb = build_not_found()
-        await _safe_edit(update, text, kb)
+        await _safe_edit(update, "❌ لم يتم العثور على الملف.", None)
         return
-    text, kb = build_service_menu(profile, get_companions_for_profile(profile_id))
+    companions = get_companions_for_profile(profile_id)
+    history    = get_history_for_profile(profile_id)
+    text, kb   = build_profile_detail(profile, companions, history)
     await _safe_edit(update, text, kb)
 
 
@@ -120,21 +111,6 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
     query   = update.callback_query
     user_id = uid if isinstance(uid, int) else None
 
-    if action == "hub":
-        await show_hub(update, context); return
-
-    if action == "papers":
-        await _show_papers(update, context); return
-
-    if action == "service":
-        await _show_service_list(update, context, page=0); return
-
-    if action.startswith("spage_"):
-        await _show_service_list(update, context, page=int(action[6:])); return
-
-    if action.startswith("svc_"):
-        await _show_service_menu(update, context, int(action[4:])); return
-
     # ── تقدّم مرحلة (المريض + كل مرافقيه) ────────────────────────────────────
     if action.startswith("adv_"):
         profile_id = int(action[4:])
@@ -150,7 +126,7 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
         from modules.residency.views import format_status
         await query.answer(f"✅ {name} — {format_status(new_status)}", show_alert=True)
         await _notify(context, name, new_status)
-        await _show_papers(update, context)
+        await _render_profile(update, context, profile_id)
         return
 
     # ── تراجع خطوة ────────────────────────────────────────────────────────────
@@ -165,10 +141,10 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
             await query.answer(f"↩️ {name} — {format_status(restored)}", show_alert=True)
         else:
             await query.answer("لا يوجد ما يمكن التراجع عنه.", show_alert=True)
-        await _show_papers(update, context)
+        await _render_profile(update, context, profile_id)
         return
 
-    # ── رفع الصورة الشخصية (من «➕ إضافة خدمة» حصراً) ──────────────────────────
+    # ── رفع الصورة الشخصية (من ملف المريض) ────────────────────────────────────
     if action.startswith("photo_"):
         profile_id = int(action[6:])
         context.user_data[_CTX_PHOTO_PROFILE] = profile_id
@@ -222,8 +198,12 @@ async def _on_form_c(result, update: Update, context: ContextTypes.DEFAULT_TYPE)
     profile_id = context.user_data.pop(_CTX_FORM_C_PROFILE, None)
 
     if result.cancelled or not profile_id:
-        text, kb = build_uploads_hub(_counts())
-        await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+        # ✅ يعود لملف المريض إن عُرف (الإلغاء يحدث بعد فتح الرفع من ملفه
+        # فعلياً، فـ profile_id متاح غالباً)، وإلا رسالة عامة بلا كسر.
+        if profile_id:
+            await _render_profile(update, context, profile_id)
+        else:
+            await update.effective_message.reply_text("تم الإلغاء.", parse_mode="Markdown")
         return
 
     file_id = ""
@@ -241,7 +221,7 @@ async def _on_form_c(result, update: Update, context: ContextTypes.DEFAULT_TYPE)
         profile_id=profile_id, file_id=file_id,
         performed_by=update.effective_user.id if update.effective_user else None,
     )
-    text, kb = build_form_c_saved(name)
+    text, kb = build_form_c_saved(name, profile_id)
     await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
 
@@ -249,8 +229,10 @@ async def _on_photo(result, update: Update, context: ContextTypes.DEFAULT_TYPE) 
     profile_id = context.user_data.pop(_CTX_PHOTO_PROFILE, None)
 
     if result.cancelled or not profile_id:
-        text, kb = build_uploads_hub(_counts())
-        await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+        if profile_id:
+            await _render_profile(update, context, profile_id)
+        else:
+            await update.effective_message.reply_text("تم الإلغاء.", parse_mode="Markdown")
         return
 
     file_id = ""
@@ -293,13 +275,8 @@ async def _on_photo(result, update: Update, context: ContextTypes.DEFAULT_TYPE) 
         profile_id=profile_id, file_id=final_file_id,
         performed_by=update.effective_user.id if update.effective_user else None,
     )
-    text, kb = build_photo_saved(name, resized=resized_ok)
+    text, kb = build_photo_saved(name, profile_id, resized=resized_ok)
     await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
-
-
-def _counts() -> dict:
-    from modules.residency.uploads.repository import get_hub_counts
-    return get_hub_counts()
 
 
 # ── التسجيل ───────────────────────────────────────────────────────────────────

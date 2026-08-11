@@ -15,6 +15,7 @@ from bot.shared_auth import is_admin
 from core.access.access_service import user_has_module
 
 from shared.calendar_picker import build_calendar
+from shared.result_router import register as _register_route
 
 from modules.residency.profiles.session import (
     AddProfileSession,
@@ -38,6 +39,8 @@ from modules.residency.profiles.views import (
     build_c_passport_prompt, build_c_visa_prompt,
     build_batch_notes_prompt,
     build_review, build_success, build_cancelled, build_error,
+    build_add_companion_name_prompt, build_add_companion_visa_expiry_prompt,
+    build_add_companion_saved,
 )
 from modules.residency.profiles.repository import (
     get_profiles_page, get_profile_by_id,
@@ -52,6 +55,15 @@ _MODULE_KEY = "residency"
 
 def _is_authorized(user_id: int) -> bool:
     return is_admin(user_id) or user_has_module(user_id, _MODULE_KEY)
+
+
+# ── إضافة مرافق لملف موجود (زر «➕ إضافة مرافق» في ملف المريض) ─────────────────
+# جلسة خفيفة بلا dataclass — ثلاث خطوات فقط (اسم، تاريخ تأشيرة اختياري،
+# صورتان اختياريتان)، بخلاف AddProfileSession الضخمة المخصَّصة لدفعة كاملة
+# من مرضى جدد.
+_CTX_ADD_COMP = "_rna_add_comp"
+_RKEY_ADD_COMP_PASSPORT = "res.profiles.add_comp.passport"
+_RKEY_ADD_COMP_VISA     = "res.profiles.add_comp.visa"
 
 
 # ── Step sets ─────────────────────────────────────────────────────────────────
@@ -246,8 +258,13 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
     if action.startswith("page_"):
         page = int(action[5:])
         context.user_data["_res_archive_page"] = page
+        from modules.residency.followup.repository import get_expiring_soon, get_dependent_pending
         profiles, total = get_profiles_page(page=page)
-        text, kb = build_archive_list(profiles, page=page, total=total)
+        text, kb = build_archive_list(
+            profiles, page=page, total=total,
+            expiring_count=len(get_expiring_soon()),
+            pending_count=len(get_dependent_pending()),
+        )
         await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
         return
 
@@ -305,6 +322,73 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
         history    = get_history_for_profile(profile_id)
         text, kb   = build_profile_detail(profile, companions, history)
         await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
+        return
+
+    # ── إضافة مرافق لملف موجود ──────────────────────────────────────────────────
+    # ⚠️ الفروع الأخصّ (accal_/skipexp_) قبل الحالة العامة add_comp_{id} عمداً،
+    # وإلا لالتُقطت بها أولاً فحاولت تحويل نصّها الكامل إلى رقم فتفشل.
+    if action.startswith("add_comp_cal_"):
+        profile_id = int(action[len("add_comp_cal_"):])
+        from datetime import datetime as _dt
+        now = _dt.utcnow()
+        text, kb = build_calendar(
+            now.year, now.month, callback_prefix=f"{RNA}:accal",
+            back_callback=f"{RNA}:add_comp_skipexp_{profile_id}",
+        )
+        await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
+        return
+
+    if action.startswith("add_comp_skipexp_"):
+        profile_id = int(action[len("add_comp_skipexp_"):])
+        await _add_comp_start_passport(update, context, profile_id)
+        return
+
+    if action.startswith("add_comp_"):
+        profile_id = int(action[len("add_comp_"):])
+        profile = get_profile_by_id(profile_id)
+        if profile is None:
+            await query.edit_message_text("❌ لم يتم العثور على الملف.", parse_mode="Markdown")
+            return
+        context.user_data[_CTX_ADD_COMP] = {
+            "profile_id": profile_id, "name": "", "visa_expiry": "",
+            "passport_file_id": "", "visa_file_id": "",
+        }
+        text, kb = build_add_companion_name_prompt(profile.name, profile_id)
+        await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
+        return
+
+    # التقويم المخصَّص لهذه الخطوة وحدها — بادئة "accal:" منفصلة تماماً عن
+    # "cal_pick:"/"cal_prev:" العامة (الويزارد القديم المعطَّل يستخدمها
+    # بلا بادئة)، فلا التباس بين الجلستين رغم استخدام نفس build_calendar.
+    if action.startswith("accal:cal_pick:"):
+        parts = action[len("accal:cal_pick:"):].split(":")
+        ctx_data = context.user_data.get(_CTX_ADD_COMP)
+        if not ctx_data:
+            await query.edit_message_text("❌ انتهت الجلسة. ابدأ من جديد.", parse_mode="Markdown")
+            return
+        from datetime import date as _date
+        y, m, d = int(parts[0]), int(parts[1]), int(parts[2])
+        ctx_data["visa_expiry"] = _date(y, m, d).isoformat()
+        profile_id = ctx_data["profile_id"]
+        context.user_data[_CTX_ADD_COMP] = ctx_data
+        await _add_comp_start_passport(update, context, profile_id)
+        return
+
+    if action.startswith("accal:cal_prev:") or action.startswith("accal:cal_next:"):
+        ctx_data = context.user_data.get(_CTX_ADD_COMP)
+        if not ctx_data:
+            await query.edit_message_text("❌ انتهت الجلسة. ابدأ من جديد.", parse_mode="Markdown")
+            return
+        profile_id = ctx_data["profile_id"]
+        y, m = (int(p) for p in action.split(":")[2:4])
+        text, kb = build_calendar(
+            y, m, callback_prefix=f"{RNA}:accal",
+            back_callback=f"{RNA}:add_comp_skipexp_{profile_id}",
+        )
+        await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
+        return
+
+    if action == "accal:cal_noop":
         return
 
     # ── PDF document package ──────────────────────────────────────────────────
@@ -677,6 +761,70 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
     logger.warning(f"[res.profiles.cb] UNHANDLED action={action!r}  user={uid}")
 
 
+# ── إضافة مرافق — رفع الوثائق الاختيارية ───────────────────────────────────────
+
+async def _add_comp_start_passport(update, context, profile_id: int) -> None:
+    from shared.uploads import collector as _uploads
+    await _uploads.open(
+        update, context,
+        title="🛂 أرسل صورة جواز سفر المرافق، أو اضغط ⏭️ تخطي إن لم تتوفر بعد",
+        return_to=_RKEY_ADD_COMP_PASSPORT,
+        max_files=1,
+    )
+
+
+async def _on_add_comp_passport(result, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    ctx_data = context.user_data.get(_CTX_ADD_COMP)
+    if not ctx_data:
+        await update.effective_message.reply_text("⚠️ انتهت الجلسة. ابدأ من جديد.", parse_mode="Markdown")
+        return
+
+    if result.cancelled:
+        context.user_data.pop(_CTX_ADD_COMP, None)
+        await update.effective_message.reply_text("❌ أُلغيت إضافة المرافق.", parse_mode="Markdown")
+        return
+
+    if result.files:
+        f = result.files[0]
+        ctx_data["passport_file_id"] = f.to_dict().get("file_id", "") if hasattr(f, "to_dict") else ""
+        context.user_data[_CTX_ADD_COMP] = ctx_data
+
+    from shared.uploads import collector as _uploads
+    await _uploads.open(
+        update, context,
+        title="📋 أرسل صورة التأشيرة (وختم الدخول)، أو اضغط ⏭️ تخطي إن لم تتوفر بعد",
+        return_to=_RKEY_ADD_COMP_VISA,
+        max_files=1,
+    )
+
+
+async def _on_add_comp_visa(result, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    ctx_data = context.user_data.pop(_CTX_ADD_COMP, None)
+    if not ctx_data:
+        await update.effective_message.reply_text("⚠️ انتهت الجلسة. ابدأ من جديد.", parse_mode="Markdown")
+        return
+
+    if result.cancelled:
+        await update.effective_message.reply_text("❌ أُلغيت إضافة المرافق.", parse_mode="Markdown")
+        return
+
+    if result.files:
+        f = result.files[0]
+        ctx_data["visa_file_id"] = f.to_dict().get("file_id", "") if hasattr(f, "to_dict") else ""
+
+    from modules.residency.profiles.models import add_companion_to_profile
+    name = add_companion_to_profile(
+        profile_id=       ctx_data["profile_id"],
+        name=             ctx_data["name"],
+        visa_expiry=      ctx_data.get("visa_expiry", ""),
+        passport_file_id= ctx_data.get("passport_file_id", ""),
+        visa_file_id=     ctx_data.get("visa_file_id", ""),
+        performed_by=     update.effective_user.id if update.effective_user else None,
+    )
+    text, kb = build_add_companion_saved(name or ctx_data["name"], ctx_data["profile_id"])
+    await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+
+
 # ── Text handler (group 16) ───────────────────────────────────────────────────
 
 async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -708,6 +856,18 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
             context.user_data["_res_search_active"] = True
             return
         text, kb = build_search_results(results, query_text)
+        await msg.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+        return
+
+    # ── إضافة مرافق — خطوة الاسم ──────────────────────────────────────────────
+    _add_comp = context.user_data.get(_CTX_ADD_COMP)
+    if _add_comp is not None and not _add_comp.get("name"):
+        name = (msg.text or "").strip()
+        if not name:
+            return
+        _add_comp["name"] = name
+        context.user_data[_CTX_ADD_COMP] = _add_comp
+        text, kb = build_add_companion_visa_expiry_prompt(name, _add_comp["profile_id"])
         await msg.reply_text(text, reply_markup=kb, parse_mode="Markdown")
         return
 
@@ -898,5 +1058,6 @@ def register_handlers(app) -> None:
 
 
 def register_result_routes() -> None:
-    # No longer used — photos are handled directly (no uploads.open() in this flow).
-    pass
+    _register_route(_RKEY_ADD_COMP_PASSPORT, _on_add_comp_passport)
+    _register_route(_RKEY_ADD_COMP_VISA,     _on_add_comp_visa)
+    logger.info("[residency.profiles] result routes registered")
