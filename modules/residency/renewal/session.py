@@ -11,14 +11,14 @@ logger = logging.getLogger(__name__)
 _SESSION_KEY = "_res_ren"
 
 # ── Steps ─────────────────────────────────────────────────────────────────────
-STEP_EXPIRY_DATE          = "expiry_date"          # calendar: new expiry
-STEP_RESIDENCY_NUMBER     = "residency_number"      # text: new residency number (skippable)
-STEP_DOCUMENT             = "document"              # uploads: new residency doc
-STEP_COMPANIONS           = "companions"            # ask: any companions to update?
-STEP_C_EXPIRY_DATE        = "c_expiry_date"        # calendar: companion new expiry
-STEP_C_RESIDENCY_NUMBER   = "c_residency_number"   # text: companion residency number (skippable)
-STEP_C_DOCUMENT           = "c_document"           # uploads: companion residency doc
-STEP_NOTES                = "notes"                # text, skippable
+# ⚠️ مبسَّطة عمداً (قرار المستخدم): لا رقم إقامة ولا ملاحظات — فقط تاريخ
+# الانتهاء والوثيقة، للمريض ولكل مرافق. STEP_RESIDENCY_NUMBER/
+# STEP_C_RESIDENCY_NUMBER/STEP_COMPANIONS/STEP_NOTES أُزيلت من التدفق.
+STEP_EXPIRY_DATE          = "expiry_date"     # calendar: new expiry (patient)
+STEP_DOCUMENT             = "document"        # uploads: new residency doc (patient)
+STEP_C_READY              = "c_ready"         # ask: "هل تم تجديد إقامة {name}؟" لكل مرافق
+STEP_C_EXPIRY_DATE        = "c_expiry_date"   # calendar: companion new expiry
+STEP_C_DOCUMENT           = "c_document"      # uploads: companion residency doc
 STEP_REVIEW               = "review"
 
 
@@ -84,7 +84,7 @@ class RenewalSession:
         companions: list[dict],
         companions_only: bool = False,
     ) -> RenewalSession:
-        start_step = STEP_COMPANIONS if companions_only else STEP_EXPIRY_DATE
+        start_step = STEP_C_READY if companions_only else STEP_EXPIRY_DATE
         session = cls(
             step=                  start_step,
             profile_id=            profile_id,

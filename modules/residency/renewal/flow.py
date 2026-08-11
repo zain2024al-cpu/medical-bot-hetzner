@@ -1,6 +1,17 @@
 # modules/residency/renewal/flow.py
 # Handles rnr: callbacks — the issuance/renewal flow.
 #
+# ⚠️ مبسَّطة عمداً (قرار المستخدم): لا رقم إقامة ولا ملاحظات في هذا التدفق —
+# فقط تاريخ الانتهاء والوثيقة، للمريض ولكل مرافق على حِدة، بسؤال صريح لكل
+# مرافق: «هل تم تجديد إقامة {الاسم}؟» بدل بوابة جماعية واحدة.
+#
+# ⚠️ الاستئناف بعد "لم تجهز بعد": يُفعَّل تلقائياً عند الحالة
+# `dependent_pending` — بغضّ النظر عن الزر الذي فتح `rnr:start_` (سواء
+# «🪪 تجديد الإقامة» مباشرةً أو «📋 استكمال المرافقين المعلَّقين» في ملف
+# المريض)، فكلاهما يتصرّف بشكل صحيح: يتخطّى بيانات المريض المُنجَزة
+# فعلاً، ويستبعد أي مرافق سبق إصداره (`get_profile_with_companions(...,
+# pending_only=True)`) حتى لا يُعاد سؤاله عن مرافق اكتمل بالفعل.
+#
 # Handler groups:
 #   group 20  CallbackQueryHandler(^rnr:)
 #   (text input for notes handled by group 16 in profiles/flow.py via session step check)
@@ -19,18 +30,14 @@ from shared.result_router import register as _register_route
 
 from modules.residency.renewal.session import (
     RenewalSession,
-    STEP_EXPIRY_DATE, STEP_RESIDENCY_NUMBER, STEP_DOCUMENT,
-    STEP_COMPANIONS,
-    STEP_C_EXPIRY_DATE, STEP_C_RESIDENCY_NUMBER, STEP_C_DOCUMENT,
-    STEP_NOTES, STEP_REVIEW,
+    STEP_EXPIRY_DATE, STEP_DOCUMENT,
+    STEP_C_READY, STEP_C_EXPIRY_DATE, STEP_C_DOCUMENT,
+    STEP_REVIEW,
 )
 from modules.residency.renewal.views import (
     RNR, RN,
     build_renewal_expiry_prompt,
-    build_renewal_residency_number_prompt, build_renewal_c_residency_number_prompt,
-    build_renewal_document_prompt,
-    build_renewal_companions_prompt, build_renewal_c_expiry_prompt,
-    build_renewal_c_document_prompt, build_renewal_notes_prompt,
+    build_renewal_c_ready_prompt, build_renewal_c_expiry_prompt,
     build_renewal_review, build_renewal_success, build_renewal_cancelled,
 )
 
@@ -65,16 +72,6 @@ async def _cancel(update, context):
     await _safe_edit(update, text, kb)
 
 
-async def _go_to_review(update, context):
-    session = RenewalSession.load(context.user_data)
-    if session is None:
-        await _cancel(update, context); return
-    session.step = STEP_REVIEW
-    session.save(context.user_data)
-    text, kb = build_renewal_review(session)
-    await _safe_edit(update, text, kb)
-
-
 async def _open_expiry_calendar(update, context, session):
     from datetime import datetime
     now = datetime.utcnow()
@@ -94,7 +91,7 @@ async def _open_c_expiry_calendar(update, context, session):
     cal_text, cal_kb = build_calendar(
         year=now.year, month=now.month,
         callback_prefix=RNR,
-        back_callback=f"{RNR}:companions_yes",
+        back_callback=f"{RNR}:c_ready_show",
     )
     prompt, prompt_kb = build_renewal_c_expiry_prompt(session)
     await _safe_edit(update, prompt, prompt_kb)
@@ -121,25 +118,39 @@ async def _open_c_doc_upload(update, context):
     await uploads.open(update, context, title=title, return_to=_RKEY_C_DOC)
 
 
+async def _show_c_ready_prompt(update, context, session) -> None:
+    text, kb = build_renewal_c_ready_prompt(session)
+    await _safe_edit(update, text, kb)
+
+
+async def _go_to_companions_or_review(update, context, session) -> None:
+    """
+    يُستدعى بعد وثيقة المريض، وبعد كل مرافق يُنهى — يقرّر ما التالي:
+    مرافق آخر ينتظر السؤال عنه، أو لا أحد فتُعرض المراجعة مباشرةً
+    (بلا خطوة ملاحظات — أُزيلت عمداً).
+    """
+    if session.current_companion is not None:
+        session.step = STEP_C_READY
+        session.save(context.user_data)
+        await _show_c_ready_prompt(update, context, session)
+    else:
+        session.step = STEP_REVIEW
+        session.save(context.user_data)
+        text, kb = build_renewal_review(session)
+        await _safe_edit(update, text, kb)
+
+
 async def _advance_companion(
     update, context, session,
     new_expiry: str, file_id: str, skipped: bool,
     residency_number: str = "",
 ):
-    """Finish current companion and advance to next or to notes."""
+    """ينهي المرافق الحالي وينتقل للتالي (سؤال جاهزيته) أو للمراجعة."""
     session.finish_current_companion(
         new_expiry=new_expiry, file_id=file_id,
         skipped=skipped, residency_number=residency_number,
     )
-    if session.companions_done:
-        session.step = STEP_NOTES
-        session.save(context.user_data)
-        text, kb = build_renewal_notes_prompt(session)
-        await _safe_edit(update, text, kb)
-    else:
-        session.step = STEP_C_EXPIRY_DATE
-        session.save(context.user_data)
-        await _open_c_expiry_calendar(update, context, session)
+    await _go_to_companions_or_review(update, context, session)
 
 
 # ── Calendar handling ─────────────────────────────────────────────────────────
@@ -157,7 +168,7 @@ async def _handle_cal_action(update, context, action: str):
 
     if tag in ("cal_prev", "cal_next"):
         y, m = int(parts[1]), int(parts[2])
-        back = f"{RNR}:cancel" if session.step == STEP_EXPIRY_DATE else f"{RNR}:companions_yes"
+        back = f"{RNR}:cancel" if session.step == STEP_EXPIRY_DATE else f"{RNR}:c_ready_show"
         cal_text, cal_kb = build_calendar(year=y, month=m, callback_prefix=RNR, back_callback=back)
         await _safe_edit(update, cal_text, cal_kb)
         return
@@ -168,20 +179,16 @@ async def _handle_cal_action(update, context, action: str):
 
         if session.step == STEP_EXPIRY_DATE:
             session.new_expiry_date = date_str
-            session.step = STEP_RESIDENCY_NUMBER
             session.save(context.user_data)
-            text, kb = build_renewal_residency_number_prompt(session)
-            await _safe_edit(update, text, kb)
+            await _open_doc_upload(update, context)
 
         elif session.step == STEP_C_EXPIRY_DATE:
             # Store temporarily on the companion entry
             c = session.current_companion
             if c is not None:
                 c["_new_expiry"] = date_str
-            session.step = STEP_C_RESIDENCY_NUMBER
             session.save(context.user_data)
-            text, kb = build_renewal_c_residency_number_prompt(session)
-            await _safe_edit(update, text, kb)
+            await _open_c_doc_upload(update, context)
 
 
 # ── Callback dispatcher ───────────────────────────────────────────────────────
@@ -219,13 +226,26 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
     # ── Start renewal for a profile (entry point) ─────────────────────────────
     if action.startswith("start_"):
         profile_id = int(action[6:])
+
+        from modules.residency.profiles.repository import get_profile_by_id as _get_p
+        _p = _get_p(profile_id)
+        if _p is None:
+            await update.callback_query.edit_message_text("❌ لم يتم العثور على الملف.")
+            return
+
+        # ✅ يُفعَّل تلقائياً على ملف `dependent_pending` بغضّ النظر عن أي
+        # زر فتح هذا المسار — بيانات المريض نفسه منجَزة فعلاً فلا تُعاد.
+        companions_only = (
+            context.user_data.pop("_rnr_complete_companions", False)
+            or _p.status == "dependent_pending"
+        )
+
         from modules.residency.renewal.repository import get_profile_with_companions
-        profile, companions = get_profile_with_companions(profile_id)
+        profile, companions = get_profile_with_companions(profile_id, pending_only=companions_only)
         if profile is None:
             await update.callback_query.edit_message_text("❌ لم يتم العثور على الملف.")
             return
 
-        companions_only = context.user_data.pop("_rnr_complete_companions", False)
         session = RenewalSession.create(
             user_data=       context.user_data,
             profile_id=      profile_id,
@@ -239,47 +259,9 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
         )
 
         if companions_only:
-            # Skip directly to companions step
-            session.step = STEP_COMPANIONS
-            session.save(context.user_data)
-            text, kb = build_renewal_companions_prompt(session)
-            await _safe_edit(update, text, kb)
+            await _go_to_companions_or_review(update, context, session)
         else:
-            text, kb = build_renewal_expiry_prompt(session)
-            await _safe_edit(update, text, kb)
-            # Open calendar immediately
-            from datetime import datetime
-            now = datetime.utcnow()
-            cal_text, cal_kb = build_calendar(
-                year=now.year, month=now.month,
-                callback_prefix=RNR,
-                back_callback=f"{RNR}:cancel",
-            )
-            await update.effective_message.reply_text(cal_text, reply_markup=cal_kb, parse_mode="Markdown")
-        return
-
-    # ── Residency number skip (main patient) ─────────────────────────────────
-    if action == "skip_residency_number":
-        session = RenewalSession.load(context.user_data)
-        if session is None:
-            await _cancel(update, context); return
-        session.new_residency_number = ""
-        session.step = STEP_DOCUMENT
-        session.save(context.user_data)
-        await _open_doc_upload(update, context)
-        return
-
-    # ── Residency number skip (companion) ─────────────────────────────────────
-    if action == "skip_c_residency_number":
-        session = RenewalSession.load(context.user_data)
-        if session is None:
-            await _cancel(update, context); return
-        c = session.current_companion
-        if c is not None:
-            c["_residency_number"] = ""
-        session.step = STEP_C_DOCUMENT
-        session.save(context.user_data)
-        await _open_c_doc_upload(update, context)
+            await _open_expiry_calendar(update, context, session)
         return
 
     # ── Document done / skip ──────────────────────────────────────────────────
@@ -287,38 +269,34 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
         session = RenewalSession.load(context.user_data)
         if session is None:
             await _cancel(update, context); return
-        session.step = STEP_COMPANIONS
-        session.save(context.user_data)
-        text, kb = build_renewal_companions_prompt(session)
-        await _safe_edit(update, text, kb)
+        await _go_to_companions_or_review(update, context, session)
         return
 
-    # ── Companions: yes / skip / none ─────────────────────────────────────────
-    if action in ("companions_yes", "companions_skip", "no_companions"):
+    # ── هل تم تجديد إقامة هذا المرافق؟ ────────────────────────────────────────
+    if action == "c_ready_yes":
         session = RenewalSession.load(context.user_data)
         if session is None:
             await _cancel(update, context); return
-
-        if action == "companions_yes" and session.companions:
-            session.step = STEP_C_EXPIRY_DATE
-            session.save(context.user_data)
-            await _open_c_expiry_calendar(update, context, session)
-        else:
-            # Skip all companions → will result in dependent_pending if companions exist
-            for c in session.companions:
-                session.finish_current_companion(new_expiry="", file_id="", skipped=True, residency_number="")
-            session.step = STEP_NOTES
-            session.save(context.user_data)
-            text, kb = build_renewal_notes_prompt(session)
-            await _safe_edit(update, text, kb)
+        session.step = STEP_C_EXPIRY_DATE
+        session.save(context.user_data)
+        await _open_c_expiry_calendar(update, context, session)
         return
 
-    # ── Skip companion entirely ───────────────────────────────────────────────
-    if action == "skip_c":
+    if action == "c_ready_no":
         session = RenewalSession.load(context.user_data)
         if session is None:
             await _cancel(update, context); return
         await _advance_companion(update, context, session, new_expiry="", file_id="", skipped=True)
+        return
+
+    # يُعيد عرض سؤال الجاهزية بلا تغيير حالة — هدف زرّ الرجوع من تقويم المرافق
+    if action == "c_ready_show":
+        session = RenewalSession.load(context.user_data)
+        if session is None:
+            await _cancel(update, context); return
+        session.step = STEP_C_READY
+        session.save(context.user_data)
+        await _show_c_ready_prompt(update, context, session)
         return
 
     # ── Companion document done / skip ────────────────────────────────────────
@@ -328,26 +306,13 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
             await _cancel(update, context); return
         c               = session.current_companion
         new_expiry      = c.get("_new_expiry", "")      if c else ""
-        residency_number= c.get("_residency_number", "") if c else ""
         # File_id will have been set by the result route handler
         file_id         = context.user_data.pop("_rnr_pending_c_file_id", "")
         await _advance_companion(
             update, context, session,
             new_expiry=new_expiry, file_id=file_id,
-            skipped=False, residency_number=residency_number,
+            skipped=False,
         )
-        return
-
-    # ── Notes skip ────────────────────────────────────────────────────────────
-    if action == "skip_notes":
-        session = RenewalSession.load(context.user_data)
-        if session is None:
-            await _cancel(update, context); return
-        session.notes = ""
-        session.step  = STEP_REVIEW
-        session.save(context.user_data)
-        text, kb = build_renewal_review(session)
-        await _safe_edit(update, text, kb)
         return
 
     # ── Confirm ───────────────────────────────────────────────────────────────
@@ -360,9 +325,9 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
             saved = save_renewal(
                 profile_id=           session.profile_id,
                 new_expiry_date=      session.new_expiry_date,
-                new_residency_number= session.new_residency_number,
+                new_residency_number= "",
                 document_file_id=     session.document_file_id,
-                notes=                session.notes,
+                notes=                "",
                 completed_companions= session.completed_companions,
                 performed_by=         uid if isinstance(uid, int) else None,
             )
@@ -423,10 +388,8 @@ async def _on_renewal_doc(result, update: Update, context: ContextTypes.DEFAULT_
     if result.files:
         f = result.files[0]
         session.document_file_id = f.to_dict().get("file_id", "") if hasattr(f, "to_dict") else ""
-    session.step = STEP_COMPANIONS
     session.save(context.user_data)
-    text, kb = build_renewal_companions_prompt(session)
-    await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+    await _go_to_companions_or_review(update, context, session)
 
 
 async def _on_c_doc(result, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -446,11 +409,10 @@ async def _on_c_doc(result, update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
     c               = session.current_companion
     new_expiry      = c.get("_new_expiry", "")      if c else ""
-    residency_number= c.get("_residency_number", "") if c else ""
     await _advance_companion(
         update, context, session,
         new_expiry=new_expiry, file_id=file_id,
-        skipped=False, residency_number=residency_number,
+        skipped=False,
     )
 
 

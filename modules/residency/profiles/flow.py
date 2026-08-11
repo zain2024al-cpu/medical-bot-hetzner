@@ -871,46 +871,8 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await msg.reply_text(text, reply_markup=kb, parse_mode="Markdown")
         return
 
-    # ── Renewal text steps (residency number + notes) ────────────────────────
-    from modules.residency.renewal.session import (
-        RenewalSession,
-        STEP_RESIDENCY_NUMBER   as _REN_STEP_RES_NUM,
-        STEP_C_RESIDENCY_NUMBER as _REN_STEP_C_RES_NUM,
-        STEP_NOTES              as _REN_STEP_NOTES,
-        STEP_DOCUMENT           as _REN_STEP_DOC,
-        STEP_C_DOCUMENT         as _REN_STEP_C_DOC,
-        STEP_REVIEW             as _REN_STEP_REVIEW,
-    )
-    _ren = RenewalSession.load(context.user_data)
-    if _ren is not None and _ren.step in {_REN_STEP_RES_NUM, _REN_STEP_C_RES_NUM, _REN_STEP_NOTES}:
-        _input = (msg.text or "").strip()
-        if _ren.step == _REN_STEP_RES_NUM:
-            _ren.new_residency_number = _input
-            _ren.step = _REN_STEP_DOC
-            _ren.save(context.user_data)
-            logger.info(f"[res.text] STEP_RESIDENCY_NUMBER → STEP_DOCUMENT  num={_input!r}  user={uid}")
-            from shared.uploads import collector as _uploads
-            await _uploads.open(update, context, title="وثيقة الإقامة الجديدة", return_to="res.renewal.doc")
-        elif _ren.step == _REN_STEP_C_RES_NUM:
-            _c = _ren.current_companion
-            if _c is not None:
-                _c["_residency_number"] = _input
-            _ren.step = _REN_STEP_C_DOC
-            _ren.save(context.user_data)
-            logger.info(f"[res.text] STEP_C_RESIDENCY_NUMBER → STEP_C_DOCUMENT  num={_input!r}  user={uid}")
-            from shared.uploads import collector as _uploads
-            _c2   = _ren.current_companion
-            _title = f"وثيقة إقامة {_c2['name']}" if _c2 else "وثيقة إقامة المرافق"
-            await _uploads.open(update, context, title=_title, return_to="res.renewal.c_doc")
-        elif _ren.step == _REN_STEP_NOTES:
-            _ren.notes = _input
-            _ren.step  = _REN_STEP_REVIEW
-            _ren.save(context.user_data)
-            logger.info(f"[res.text] STEP_NOTES → STEP_REVIEW  notes={_input[:40]!r}  user={uid}")
-            from modules.residency.renewal.views import build_renewal_review as _build_ren_review
-            _txt, _kb = _build_ren_review(_ren)
-            await msg.reply_text(_txt, reply_markup=_kb, parse_mode="Markdown")
-        return
+    # ⚠️ لا خطوات نصّية متبقية في تجديد الإقامة (rnr:) — رقم الإقامة
+    # والملاحظات أُزيلا من التدفق (قرار المستخدم: فقط تاريخ + وثيقة).
 
     # ── Add-batch text steps ──────────────────────────────────────────────────
     session = AddProfileSession.load(context.user_data)
