@@ -818,11 +818,99 @@ def build_review(session: ArrivalSession) -> tuple[str, InlineKeyboardMarkup]:
             ]
 
     lines += ["", "هل تريد نشر هذا التقرير؟"]
-    kb = InlineKeyboardMarkup([[
+
+    rows: list[list[InlineKeyboardButton]] = []
+    # ✅ زر تعديل واحد لكل مريض — يفتح قائمة حقوله (طلب المستخدم: التعديل
+    # قبل النشر كان غائباً تماماً؛ الاسم مستثنى من التعديل عمداً لأنه
+    # اختيار إلزامي من السجل يجرّ معه قائمة المرافقين).
+    for i, p in enumerate(session.completed_patients):
+        rows.append([InlineKeyboardButton(
+            f"✏️ تعديل بيانات {p.get('name', '—')}", callback_data=f"{GSA}:edit_menu_{i}")])
+    rows.append([
         InlineKeyboardButton("📢 نشر التقرير", callback_data=f"{GSA}:confirm"),
         InlineKeyboardButton("❌ إلغاء",        callback_data=f"{GSA}:cancel"),
-    ]])
+    ])
+    kb = InlineKeyboardMarkup(rows)
     return "\n".join(lines), kb
+
+
+# ── التعديل قبل النشر ─────────────────────────────────────────────────────────
+# ⚠️ الاسم غير قابل للتعديل هنا عمداً — اختياره من السجل يجرّ معه قائمة
+# المرافقين تلقائياً (companion_queue)، وتغييره بعد اكتمال الدفعة يتطلب
+# إعادة بناء تلك القائمة، وهو خارج نطاق "تصحيح حقل واحد قبل النشر".
+
+# (label, field_code) — نفس field_code يُستخدَم في callback_data وفي جدول
+# التوجيه بـflow.py (_P_FIELD_ROUTES/_C_FIELD_ROUTES)، فالمصدر واحد للاثنين.
+_P_EDIT_FIELDS: list[tuple[str, str]] = [
+    ("📅 تاريخ الوصول",       "arrival"),
+    ("🛂 انتهاء الجواز",      "pexp"),
+    ("📋 انتهاء التأشيرة",    "vexp"),
+    ("🛂 صورة الجواز",        "pass"),
+    ("📋 صورة التأشيرة",      "visa"),
+    ("🎫 التذاكر",            "tickets"),
+    ("🪪 صورة الإقامة",       "residence"),
+    ("🪪 انتهاء الإقامة",     "rexp"),
+    ("🏠 عنوان السكن",        "addr"),
+    ("📝 الملاحظات",          "notes"),
+    ("🛎️ الخدمات المقدَّمة",  "services"),
+    ("🚐 الجهة الموصلة",      "escort"),
+    ("👨‍⚕️ المختص",           "specialist"),
+]
+
+_C_EDIT_FIELDS: list[tuple[str, str]] = [
+    ("📅 تاريخ الوصول",    "arrival"),
+    ("🛂 انتهاء الجواز",   "pexp"),
+    ("📋 انتهاء التأشيرة", "vexp"),
+    ("🛂 صورة الجواز",     "pass"),
+    ("📋 صورة التأشيرة",   "visa"),
+    ("🎫 التذاكر",         "tickets"),
+    ("🪪 صورة الإقامة",    "residence"),
+    ("🏠 عنوان السكن",     "addr"),
+]
+
+
+def _pairs(items: list[InlineKeyboardButton]) -> list[list[InlineKeyboardButton]]:
+    return [items[i:i + 2] for i in range(0, len(items), 2)]
+
+
+def build_edit_menu(patient: dict, i: int) -> tuple[str, InlineKeyboardMarkup]:
+    name  = patient.get("name", "—")
+    comps = patient.get("companions", [])
+    lines = [
+        _DIVIDER,
+        f"✏️  **تعديل بيانات — {name}**",
+        "",
+        "اختر الحقل المراد تصحيحه:",
+    ]
+    field_btns = [
+        InlineKeyboardButton(label, callback_data=f"{GSA}:edit_f_{code}_{i}")
+        for label, code in _P_EDIT_FIELDS
+    ]
+    rows = _pairs(field_btns)
+    if comps:
+        rows.append([InlineKeyboardButton(f"── مرافقو {name} ──", callback_data=f"{GSA}:edit_menu_{i}")])
+        for j, c in enumerate(comps):
+            rows.append([InlineKeyboardButton(
+                f"👥 تعديل مرافق: {c.get('name', '—')}", callback_data=f"{GSA}:edit_cmenu_{i}_{j}")])
+    rows.append([InlineKeyboardButton("⬅️ رجوع للمراجعة", callback_data=f"{GSA}:review_show")])
+    return "\n".join(lines), InlineKeyboardMarkup(rows)
+
+
+def build_edit_cmenu(companion: dict, i: int, j: int) -> tuple[str, InlineKeyboardMarkup]:
+    name = companion.get("name", "—")
+    lines = [
+        _DIVIDER,
+        f"✏️  **تعديل بيانات المرافق — {name}**",
+        "",
+        "اختر الحقل المراد تصحيحه:",
+    ]
+    field_btns = [
+        InlineKeyboardButton(label, callback_data=f"{GSA}:edit_cf_{code}_{i}_{j}")
+        for label, code in _C_EDIT_FIELDS
+    ]
+    rows = _pairs(field_btns)
+    rows.append([InlineKeyboardButton("⬅️ رجوع لقائمة الحقول", callback_data=f"{GSA}:edit_menu_{i}")])
+    return "\n".join(lines), InlineKeyboardMarkup(rows)
 
 
 # ── Terminal screens ──────────────────────────────────────────────────────────

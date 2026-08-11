@@ -67,6 +67,16 @@ class ArrivalSession:
     patient_index:      int          # 0-based index of current patient
     batch_notes:        str          # single notes field for the whole batch
 
+    # ✅ التعديل قبل النشر — يُفعَّل عند فتح حقل واحد من شاشة المراجعة بدل
+    # المسار الخطي المعتاد. current_patient/current_companion تُحمَّل مؤقتاً
+    # من completed_patients[edit_patient_index] (ومرافقه) بدل أن تُبنى من
+    # الصفر؛ وعند اكتمال الحقل الواحد تُكتَب القيم المعدَّلة مباشرة في مكانها
+    # ضمن completed_patients ويُعاد العرض لشاشة المراجعة — بغضّ النظر عمّا
+    # كانت ستؤول إليه الخطوة التالية في المسار الخطي العادي.
+    edit_from_review:     bool = False
+    edit_patient_index:   int | None = None
+    edit_companion_index: int | None = None
+
     # ── Persistence ───────────────────────────────────────────────────────────
 
     def save(self, user_data: dict) -> None:
@@ -81,6 +91,9 @@ class ArrivalSession:
             "current_companion":  self.current_companion,
             "patient_index":      self.patient_index,
             "batch_notes":        self.batch_notes,
+            "edit_from_review":     self.edit_from_review,
+            "edit_patient_index":   self.edit_patient_index,
+            "edit_companion_index": self.edit_companion_index,
         }
         logger.info(
             f"[ArrivalSession.save] step={self.step!r}"
@@ -111,6 +124,9 @@ class ArrivalSession:
             current_companion=  raw.get("current_companion",  {}),
             patient_index=      raw.get("patient_index",      0),
             batch_notes=        raw.get("batch_notes",        ""),
+            edit_from_review=     raw.get("edit_from_review",     False),
+            edit_patient_index=   raw.get("edit_patient_index",   None),
+            edit_companion_index= raw.get("edit_companion_index", None),
         )
 
     @classmethod

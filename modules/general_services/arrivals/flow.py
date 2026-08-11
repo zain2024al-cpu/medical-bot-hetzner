@@ -57,6 +57,7 @@ from modules.general_services.arrivals.views import (
     build_c_indiv_notes_prompt, build_c_services_prompt,
     build_c_escort_entity_prompt, build_c_residence_address_prompt,
     build_review, build_success, build_cancelled, build_error,
+    build_edit_menu, build_edit_cmenu,
 )
 
 logger = logging.getLogger(__name__)
@@ -382,6 +383,89 @@ async def _show_p_escort_entity_manual(update, context, session):
 async def _show_review(update, context, session):
     text, kb = build_review(session)
     await _safe_edit(update, text, kb)
+
+
+# ── التعديل قبل النشر — جداول التوجيه ──────────────────────────────────────────
+# ⚠️ نفس field_code المُستخدَم في callback_data ببناء القوائم بـviews.py
+# (_P_EDIT_FIELDS/_C_EDIT_FIELDS) — مصدر واحد كي لا ينحرف الاسم عن الخطوة.
+_P_FIELD_STEP: dict[str, str] = {
+    "arrival":    STEP_P_ARRIVAL_DATE,
+    "pexp":       STEP_P_PASSPORT_EXPIRY,
+    "vexp":       STEP_P_VISA_EXPIRY,
+    "pass":       STEP_P_PASSPORT,
+    "visa":       STEP_P_VISA,
+    "tickets":    STEP_P_TICKETS,
+    "residence":  STEP_P_RESIDENCE,
+    "rexp":       STEP_P_RESIDENCE_EXPIRY,
+    "addr":       STEP_P_RESIDENCE_ADDRESS,
+    "notes":      STEP_P_INDIV_NOTES,
+    "services":   STEP_P_SERVICES,
+    "escort":     STEP_P_ESCORT_ENTITY,
+    "specialist": STEP_P_SPECIALIST,
+}
+_C_FIELD_STEP: dict[str, str] = {
+    "arrival":   STEP_C_ARRIVAL_DATE,
+    "pexp":      STEP_C_PASSPORT_EXPIRY,
+    "vexp":      STEP_C_VISA_EXPIRY,
+    "pass":      STEP_C_PASSPORT,
+    "visa":      STEP_C_VISA,
+    "tickets":   STEP_C_TICKETS,
+    "residence": STEP_C_RESIDENCE,
+    "addr":      STEP_C_RESIDENCE_ADDRESS,
+}
+_STEP_SHOW_FUNC = {
+    STEP_P_ARRIVAL_DATE:      _show_p_arrival_date,
+    STEP_P_PASSPORT_EXPIRY:   _show_p_passport_expiry,
+    STEP_P_VISA_EXPIRY:       _show_p_visa_expiry,
+    STEP_P_PASSPORT:          _show_p_passport,
+    STEP_P_VISA:              _show_p_visa,
+    STEP_P_TICKETS:           _show_p_tickets,
+    STEP_P_RESIDENCE:         _show_p_residence,
+    STEP_P_RESIDENCE_EXPIRY:  _show_p_residence_expiry,
+    STEP_P_RESIDENCE_ADDRESS: _show_p_residence_address,
+    STEP_P_INDIV_NOTES:       _show_p_indiv_notes,
+    STEP_P_SERVICES:          _show_p_services,
+    STEP_P_ESCORT_ENTITY:     _show_p_escort_entity,
+    STEP_P_SPECIALIST:        _show_p_specialist,
+    STEP_C_ARRIVAL_DATE:      _show_c_arrival_date,
+    STEP_C_PASSPORT_EXPIRY:   _show_c_passport_expiry,
+    STEP_C_VISA_EXPIRY:       _show_c_visa_expiry,
+    STEP_C_PASSPORT:          _show_c_passport,
+    STEP_C_VISA:              _show_c_visa,
+    STEP_C_TICKETS:           _show_c_tickets,
+    STEP_C_RESIDENCE:         _show_c_residence,
+    STEP_C_RESIDENCE_ADDRESS: _show_c_residence_address,
+}
+
+
+async def _finish_field_edit(update, context, session: ArrivalSession) -> None:
+    """
+    ✅ يُستدعى فور حفظ أي حقل واحد أثناء التعديل من شاشة المراجعة — يكتب
+    القيمة المعدَّلة في مكانها ضمن completed_patients (والمرافق إن وُجد)
+    ويعيد العرض لشاشة المراجعة مباشرة، بغضّ النظر عمّا كانت ستؤول إليه
+    الخطوة التالية في المسار الخطي العادي (لا يُنادى `finish_current_patient`
+    أبداً هنا — ذاك يُلحق مريضاً **جديداً** بآخر القائمة، لا يُحدِّث موجوداً).
+    """
+    i = session.edit_patient_index
+    j = session.edit_companion_index
+    if j is not None:
+        comps = session.current_patient.setdefault("companions", [])
+        if 0 <= j < len(comps):
+            comps[j] = dict(session.current_companion)
+    if i is not None and 0 <= i < len(session.completed_patients):
+        session.completed_patients[i] = dict(session.current_patient)
+    session.current_patient   = {}
+    session.current_companion = {}
+    session.edit_from_review     = False
+    session.edit_patient_index   = None
+    session.edit_companion_index = None
+    session.step = STEP_REVIEW
+    session.save(context.user_data)
+    logger.info(
+        f"[arrivals.cb] field edit finished → STEP_REVIEW"
+        f"  patient_index={i}  companion_index={j}"
+    )
+    await _show_review(update, context, session)
 
 
 # ── Advance chains ─────────────────────────────────────────────────────────────
@@ -869,20 +953,29 @@ async def _dispatch_callback_inner(
             logger.warning(f"[arrivals.cb] cal_pick — no session  user={uid}")
             await _cancel(update, context); return
         # Dispatch by step.
+        # ⚠️ التعديل من المراجعة: كل فرع يكتب القيمة ثم — إن كنا في وضع
+        # التعديل — يُنهي فوراً ويعود للمراجعة بدل متابعة المسار الخطي
+        # (نفس الفحص في كل فروع cal_pick/الصور/النصوص/التخطي أدناه).
         if session.step == STEP_P_ARRIVAL_DATE:
             session.current_patient["arrival_date"] = dt.strftime("%d/%m/%Y")
+            if session.edit_from_review:
+                await _finish_field_edit(update, context, session); return
             session.step = STEP_P_PASSPORT_EXPIRY
             session.save(context.user_data)
             logger.info(f"[arrivals.cb] cal_pick p_arrival_date={dt.date()} → STEP_P_PASSPORT_EXPIRY  user={uid}")
             await _show_p_passport_expiry(update, context, session)
         elif session.step == STEP_P_PASSPORT_EXPIRY:
             session.current_patient["passport_expiry"] = dt.strftime("%d/%m/%Y")
+            if session.edit_from_review:
+                await _finish_field_edit(update, context, session); return
             session.step = STEP_P_VISA_EXPIRY
             session.save(context.user_data)
             logger.info(f"[arrivals.cb] cal_pick p_passport_expiry={dt.date()} → STEP_P_VISA_EXPIRY  user={uid}")
             await _show_p_visa_expiry(update, context, session)
         elif session.step == STEP_P_VISA_EXPIRY:
             session.current_patient["visa_expiry"] = dt.strftime("%d/%m/%Y")
+            if session.edit_from_review:
+                await _finish_field_edit(update, context, session); return
             # ✅ لا سؤال "هل يوجد مرافق؟" — معروف مسبقاً من السجل عند اختيار
             # الاسم (companion_queue). ننتقل مباشرة لرفع الوثائق.
             session.step = STEP_P_PASSPORT
@@ -893,6 +986,8 @@ async def _dispatch_callback_inner(
             await _show_p_passport(update, context, session)
         elif session.step == STEP_P_RESIDENCE_EXPIRY:
             session.current_patient["residence_expiry"] = dt.strftime("%Y-%m-%d")
+            if session.edit_from_review:
+                await _finish_field_edit(update, context, session); return
             session.save(context.user_data)
             logger.info(
                 f"[arrivals.cb] cal_pick p_residence_expiry={dt.date()} → _advance_after_p_residence_expiry  user={uid}"
@@ -900,12 +995,16 @@ async def _dispatch_callback_inner(
             await _advance_after_p_residence_expiry(update, context, session)
         elif session.step == STEP_C_ARRIVAL_DATE:
             session.current_companion["arrival_date"] = dt.strftime("%d/%m/%Y")
+            if session.edit_from_review:
+                await _finish_field_edit(update, context, session); return
             session.step = STEP_C_PASSPORT_EXPIRY
             session.save(context.user_data)
             logger.info(f"[arrivals.cb] cal_pick c_arrival_date={dt.date()} → STEP_C_PASSPORT_EXPIRY  user={uid}")
             await _show_c_passport_expiry(update, context, session)
         elif session.step == STEP_C_PASSPORT_EXPIRY:
             session.current_companion["passport_expiry"] = dt.strftime("%d/%m/%Y")
+            if session.edit_from_review:
+                await _finish_field_edit(update, context, session); return
             session.step = STEP_C_VISA_EXPIRY
             session.save(context.user_data)
             logger.info(f"[arrivals.cb] cal_pick c_passport_expiry={dt.date()} → STEP_C_VISA_EXPIRY  user={uid}")
@@ -916,6 +1015,8 @@ async def _dispatch_callback_inner(
             # تماماً (ويُفسد تاريخ الإقامة أيضاً). نفس نمط الحقل المُخزَّن
             # بمفتاح خاطئ الذي أُصلح مراراً هذه الجلسة.
             session.current_companion["visa_expiry"] = dt.strftime("%d/%m/%Y")
+            if session.edit_from_review:
+                await _finish_field_edit(update, context, session); return
             session.step = STEP_C_PASSPORT
             session.save(context.user_data)
             logger.info(
@@ -1005,6 +1106,8 @@ async def _dispatch_callback_inner(
         if session is None:
             await _cancel(update, context); return
         session.current_patient["arrival_date"] = ""
+        if session.edit_from_review:
+            await _finish_field_edit(update, context, session); return
         session.step = STEP_P_PASSPORT_EXPIRY
         session.save(context.user_data)
         await _show_p_passport_expiry(update, context, session)
@@ -1015,6 +1118,8 @@ async def _dispatch_callback_inner(
         if session is None:
             await _cancel(update, context); return
         session.current_patient["passport_expiry"] = ""
+        if session.edit_from_review:
+            await _finish_field_edit(update, context, session); return
         session.step = STEP_P_VISA_EXPIRY
         session.save(context.user_data)
         await _show_p_visa_expiry(update, context, session)
@@ -1035,6 +1140,8 @@ async def _dispatch_callback_inner(
         if session is None:
             await _cancel(update, context); return
         session.current_patient["tickets_file_id"] = ""
+        if session.edit_from_review:
+            await _finish_field_edit(update, context, session); return
         session.step = STEP_P_RESIDENCE
         session.save(context.user_data)
         await _show_p_residence(update, context, session)
@@ -1045,6 +1152,8 @@ async def _dispatch_callback_inner(
         if session is None:
             await _cancel(update, context); return
         session.current_patient["residence_file_id"] = ""
+        if session.edit_from_review:
+            await _finish_field_edit(update, context, session); return
         session.save(context.user_data)
         logger.info(f"[arrivals.cb] skip_p_residence → _advance_after_patient_uploads  user={uid}")
         await _advance_after_patient_uploads(update, context, session)
@@ -1055,6 +1164,8 @@ async def _dispatch_callback_inner(
         if session is None:
             await _cancel(update, context); return
         session.current_patient["residence_expiry"] = ""
+        if session.edit_from_review:
+            await _finish_field_edit(update, context, session); return
         session.save(context.user_data)
         logger.info(f"[arrivals.cb] skip_p_residence_expiry → _advance_after_p_residence_expiry  user={uid}")
         await _advance_after_p_residence_expiry(update, context, session)
@@ -1066,6 +1177,8 @@ async def _dispatch_callback_inner(
         if session is None:
             await _cancel(update, context); return
         session.current_patient["notes"] = ""
+        if session.edit_from_review:
+            await _finish_field_edit(update, context, session); return
         session.step = STEP_P_SERVICES
         session.save(context.user_data)
         await _show_p_services(update, context, session)
@@ -1078,6 +1191,8 @@ async def _dispatch_callback_inner(
         if session is None:
             await _cancel(update, context); return
         session.current_patient["services_provided"] = ""
+        if session.edit_from_review:
+            await _finish_field_edit(update, context, session); return
         session.step = STEP_P_ESCORT_ENTITY
         session.save(context.user_data)
         await _show_p_escort_entity(update, context, session)
@@ -1088,6 +1203,8 @@ async def _dispatch_callback_inner(
         if session is None:
             await _cancel(update, context); return
         session.current_patient["escort_entity"] = ""
+        if session.edit_from_review:
+            await _finish_field_edit(update, context, session); return
         session.step = STEP_P_SPECIALIST
         session.save(context.user_data)
         await _show_p_specialist(update, context, session)
@@ -1099,6 +1216,8 @@ async def _dispatch_callback_inner(
         if session is None:
             await _cancel(update, context); return
         session.current_patient["residence_address"] = ""
+        if session.edit_from_review:
+            await _finish_field_edit(update, context, session); return
         session.save(context.user_data)
         await _advance_after_p_core_done(update, context, session)
         return
@@ -1120,6 +1239,8 @@ async def _dispatch_callback_inner(
             logger.warning(f"[arrivals.cb] unknown escort id={eid!r}  user={uid}")
             return
         session.current_patient["escort_entity"] = label
+        if session.edit_from_review:
+            await _finish_field_edit(update, context, session); return
         session.step = STEP_P_SPECIALIST
         session.save(context.user_data)
         logger.info(f"[arrivals.cb] p_escort={label!r} → STEP_P_SPECIALIST  user={uid}")
@@ -1138,6 +1259,12 @@ async def _dispatch_callback_inner(
             return
         session.current_patient["specialist_id"]    = sid
         session.current_patient["specialist_label"] = label
+        # ⚠️ حاسم في وضع التعديل: `_finish_patient_and_advance` يستدعي
+        # `finish_current_patient()` الذي **يُلحق** current_patient كمريضٍ
+        # جديد بآخر completed_patients — لا يُحدِّث موجوداً بمكانه. أثناء
+        # التعديل من المراجعة نريد الكتابة في مكان المريض نفسه فقط.
+        if session.edit_from_review:
+            await _finish_field_edit(update, context, session); return
         session.save(context.user_data)
         logger.info(f"[arrivals.cb] p_specialist={label!r} → finish patient  user={uid}")
         await _finish_patient_and_advance(update, context, session)
@@ -1169,6 +1296,8 @@ async def _dispatch_callback_inner(
         if session is None:
             await _cancel(update, context); return
         session.current_companion["arrival_date"] = ""
+        if session.edit_from_review:
+            await _finish_field_edit(update, context, session); return
         session.step = STEP_C_PASSPORT_EXPIRY
         session.save(context.user_data)
         await _show_c_passport_expiry(update, context, session)
@@ -1179,6 +1308,8 @@ async def _dispatch_callback_inner(
         if session is None:
             await _cancel(update, context); return
         session.current_companion["passport_expiry"] = ""
+        if session.edit_from_review:
+            await _finish_field_edit(update, context, session); return
         session.step = STEP_C_VISA_EXPIRY
         session.save(context.user_data)
         await _show_c_visa_expiry(update, context, session)
@@ -1189,6 +1320,8 @@ async def _dispatch_callback_inner(
         if session is None:
             await _cancel(update, context); return
         session.current_companion["passport_file_id"] = ""
+        if session.edit_from_review:
+            await _finish_field_edit(update, context, session); return
         session.step = STEP_C_VISA
         session.save(context.user_data)
         logger.info(f"[arrivals.cb] skip_c_passport → STEP_C_VISA  user={uid}")
@@ -1210,6 +1343,8 @@ async def _dispatch_callback_inner(
         if session is None:
             await _cancel(update, context); return
         session.current_companion["tickets_file_id"] = ""
+        if session.edit_from_review:
+            await _finish_field_edit(update, context, session); return
         session.step = STEP_C_RESIDENCE
         session.save(context.user_data)
         await _show_c_residence(update, context, session)
@@ -1222,6 +1357,8 @@ async def _dispatch_callback_inner(
         if session is None:
             await _cancel(update, context); return
         session.current_companion["residence_file_id"] = ""
+        if session.edit_from_review:
+            await _finish_field_edit(update, context, session); return
         session.step = STEP_C_RESIDENCE_ADDRESS
         session.save(context.user_data)
         await _show_c_residence_address(update, context, session)
@@ -1232,6 +1369,8 @@ async def _dispatch_callback_inner(
         if session is None:
             await _cancel(update, context); return
         session.current_companion["residence_address"] = ""
+        if session.edit_from_review:
+            await _finish_field_edit(update, context, session); return
         session.save(context.user_data)
         await _advance_after_companion_done(update, context, session)
         return
@@ -1508,6 +1647,87 @@ async def _dispatch_callback_inner(
         session.step = STEP_C_ESCORT_ENTITY
         session.save(context.user_data)
         await _show_c_escort_entity(update, context, session)
+        return
+
+    # ── التعديل قبل النشر ──────────────────────────────────────────────────────
+    if action == "review_show":
+        session = ArrivalSession.load(context.user_data)
+        if session is None:
+            await _cancel(update, context); return
+        session.step = STEP_REVIEW
+        session.save(context.user_data)
+        await _show_review(update, context, session)
+        return
+
+    if action.startswith("edit_menu_"):
+        i = int(action[len("edit_menu_"):])
+        session = ArrivalSession.load(context.user_data)
+        if session is None or not (0 <= i < len(session.completed_patients)):
+            await _cancel(update, context); return
+        text, kb = build_edit_menu(session.completed_patients[i], i)
+        await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
+        return
+
+    if action.startswith("edit_cmenu_"):
+        i_str, j_str = action[len("edit_cmenu_"):].split("_")
+        i, j = int(i_str), int(j_str)
+        session = ArrivalSession.load(context.user_data)
+        if session is None or not (0 <= i < len(session.completed_patients)):
+            await _cancel(update, context); return
+        comps = session.completed_patients[i].get("companions", [])
+        if not (0 <= j < len(comps)):
+            await _cancel(update, context); return
+        text, kb = build_edit_cmenu(comps[j], i, j)
+        await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
+        return
+
+    if action.startswith("edit_cf_"):
+        field, i_str, j_str = action[len("edit_cf_"):].split("_")
+        i, j = int(i_str), int(j_str)
+        session = ArrivalSession.load(context.user_data)
+        if session is None or not (0 <= i < len(session.completed_patients)):
+            await _cancel(update, context); return
+        comps = session.completed_patients[i].get("companions", [])
+        if not (0 <= j < len(comps)):
+            await _cancel(update, context); return
+        step = _C_FIELD_STEP.get(field)
+        show = _STEP_SHOW_FUNC.get(step)
+        if step is None or show is None:
+            logger.warning(f"[arrivals.cb] unknown edit_cf field={field!r}  user={uid}")
+            return
+        session.current_patient      = dict(session.completed_patients[i])
+        session.current_companion    = dict(comps[j])
+        session.edit_from_review     = True
+        session.edit_patient_index   = i
+        session.edit_companion_index = j
+        session.step = step
+        session.save(context.user_data)
+        logger.info(
+            f"[arrivals.cb] edit_cf field={field!r}  patient={i}  companion={j} → {step!r}  user={uid}"
+        )
+        await show(update, context, session)
+        return
+
+    if action.startswith("edit_f_"):
+        field, i_str = action[len("edit_f_"):].rsplit("_", 1)
+        i = int(i_str)
+        session = ArrivalSession.load(context.user_data)
+        if session is None or not (0 <= i < len(session.completed_patients)):
+            await _cancel(update, context); return
+        step = _P_FIELD_STEP.get(field)
+        show = _STEP_SHOW_FUNC.get(step)
+        if step is None or show is None:
+            logger.warning(f"[arrivals.cb] unknown edit_f field={field!r}  user={uid}")
+            return
+        session.current_patient      = dict(session.completed_patients[i])
+        session.current_companion    = {}
+        session.edit_from_review     = True
+        session.edit_patient_index   = i
+        session.edit_companion_index = None
+        session.step = step
+        session.save(context.user_data)
+        logger.info(f"[arrivals.cb] edit_f field={field!r}  patient={i} → {step!r}  user={uid}")
+        await show(update, context, session)
         return
 
     # ── Confirm / Cancel ──────────────────────────────────────────────────────
@@ -1787,6 +2007,8 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if step == STEP_P_INDIV_NOTES:
         try:
             session.current_patient["notes"] = text
+            if session.edit_from_review:
+                await _finish_field_edit(update, context, session); return
             session.step = STEP_P_SERVICES
             session.save(context.user_data)
             await _show_p_services(update, context, session)
@@ -1797,6 +2019,8 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if step == STEP_P_SERVICES:
         try:
             session.current_patient["services_provided"] = text
+            if session.edit_from_review:
+                await _finish_field_edit(update, context, session); return
             session.step = STEP_P_ESCORT_ENTITY
             session.save(context.user_data)
             await _show_p_escort_entity(update, context, session)
@@ -1808,6 +2032,8 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if step == STEP_P_ESCORT_ENTITY:
         try:
             session.current_patient["escort_entity"] = text
+            if session.edit_from_review:
+                await _finish_field_edit(update, context, session); return
             session.step = STEP_P_SPECIALIST
             session.save(context.user_data)
             await _show_p_specialist(update, context, session)
@@ -1819,6 +2045,8 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if step == STEP_P_RESIDENCE_ADDRESS:
         try:
             session.current_patient["residence_address"] = text
+            if session.edit_from_review:
+                await _finish_field_edit(update, context, session); return
             session.save(context.user_data)
             await _advance_after_p_core_done(update, context, session)
         except Exception:
@@ -1831,6 +2059,8 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if step == STEP_C_RESIDENCE_ADDRESS:
         try:
             session.current_companion["residence_address"] = text
+            if session.edit_from_review:
+                await _finish_field_edit(update, context, session); return
             session.save(context.user_data)
             await _advance_after_companion_done(update, context, session)
         except Exception:
@@ -1868,6 +2098,8 @@ async def _handle_photo_input(update: Update, context: ContextTypes.DEFAULT_TYPE
     try:
         if step == STEP_P_PASSPORT:
             session.current_patient["passport_file_id"] = file_id
+            if session.edit_from_review:
+                await _finish_field_edit(update, context, session); return
             session.step = STEP_P_VISA
             session.save(context.user_data)
             logger.info(f"[arrivals.photo] STEP_P_PASSPORT → STEP_P_VISA  user={uid}")
@@ -1879,6 +2111,8 @@ async def _handle_photo_input(update: Update, context: ContextTypes.DEFAULT_TYPE
         # عمود entry_stamp_file_id يبقى في القاعدة للسجلات القديمة فقط.
         if step == STEP_P_VISA:
             session.current_patient["visa_file_id"] = file_id
+            if session.edit_from_review:
+                await _finish_field_edit(update, context, session); return
             session.step = STEP_P_TICKETS
             session.save(context.user_data)
             logger.info(f"[arrivals.photo] STEP_P_VISA (+stamp) → STEP_P_TICKETS  user={uid}")
@@ -1887,6 +2121,8 @@ async def _handle_photo_input(update: Update, context: ContextTypes.DEFAULT_TYPE
 
         if step == STEP_P_TICKETS:
             session.current_patient["tickets_file_id"] = file_id
+            if session.edit_from_review:
+                await _finish_field_edit(update, context, session); return
             session.step = STEP_P_RESIDENCE
             session.save(context.user_data)
             logger.info(f"[arrivals.photo] STEP_P_TICKETS → STEP_P_RESIDENCE  user={uid}")
@@ -1895,6 +2131,8 @@ async def _handle_photo_input(update: Update, context: ContextTypes.DEFAULT_TYPE
 
         if step == STEP_P_RESIDENCE:
             session.current_patient["residence_file_id"] = file_id
+            if session.edit_from_review:
+                await _finish_field_edit(update, context, session); return
             session.save(context.user_data)
             logger.info(f"[arrivals.photo] STEP_P_RESIDENCE → _advance_after_patient_uploads  user={uid}")
             await _advance_after_patient_uploads(update, context, session)
@@ -1902,6 +2140,8 @@ async def _handle_photo_input(update: Update, context: ContextTypes.DEFAULT_TYPE
 
         if step == STEP_C_PASSPORT:
             session.current_companion["passport_file_id"] = file_id
+            if session.edit_from_review:
+                await _finish_field_edit(update, context, session); return
             session.step = STEP_C_VISA
             session.save(context.user_data)
             logger.info(f"[arrivals.photo] STEP_C_PASSPORT → STEP_C_VISA  user={uid}")
@@ -1910,6 +2150,8 @@ async def _handle_photo_input(update: Update, context: ContextTypes.DEFAULT_TYPE
 
         if step == STEP_C_VISA:
             session.current_companion["visa_file_id"] = file_id
+            if session.edit_from_review:
+                await _finish_field_edit(update, context, session); return
             session.step = STEP_C_TICKETS
             session.save(context.user_data)
             logger.info(f"[arrivals.photo] STEP_C_VISA (+stamp) → STEP_C_TICKETS  user={uid}")
@@ -1918,6 +2160,8 @@ async def _handle_photo_input(update: Update, context: ContextTypes.DEFAULT_TYPE
 
         if step == STEP_C_TICKETS:
             session.current_companion["tickets_file_id"] = file_id
+            if session.edit_from_review:
+                await _finish_field_edit(update, context, session); return
             session.step = STEP_C_RESIDENCE
             session.save(context.user_data)
             logger.info(f"[arrivals.photo] STEP_C_TICKETS → STEP_C_RESIDENCE  user={uid}")
@@ -1926,6 +2170,8 @@ async def _handle_photo_input(update: Update, context: ContextTypes.DEFAULT_TYPE
 
         if step == STEP_C_RESIDENCE:
             session.current_companion["residence_file_id"] = file_id
+            if session.edit_from_review:
+                await _finish_field_edit(update, context, session); return
             session.step = STEP_C_RESIDENCE_ADDRESS
             session.save(context.user_data)
             logger.info(f"[arrivals.photo] STEP_C_RESIDENCE → STEP_C_RESIDENCE_ADDRESS  user={uid}")
