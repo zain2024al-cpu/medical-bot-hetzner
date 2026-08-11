@@ -10,6 +10,53 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 
+def add_missing_item(
+    *, profile_id: int, description: str, performed_by: int | None,
+) -> int:
+    """يسجّل طلباً/مستنداً ناقصاً جديداً لملف. يعيد معرّف السجل المُنشأ."""
+    from db.session import get_db
+    from db.models import ResidencyMissingItem
+
+    with get_db() as db:
+        row = ResidencyMissingItem(
+            profile_id=  profile_id,
+            description= description.strip() or "—",
+            status=      "pending",
+            created_by=  performed_by,
+        )
+        db.add(row)
+        db.flush()
+        item_id = row.id
+
+    logger.info(f"[residency.profiles] missing item added  profile={profile_id}  item={item_id}")
+    return item_id
+
+
+def resolve_missing_item(
+    *, item_id: int, file_id: str, performed_by: int | None,
+) -> tuple[int, str] | None:
+    """
+    يُغلق طلباً ناقصاً بعد رفع مستنده. يعيد (profile_id, description) أو
+    None إن لم يوجد السجل — المستدعي يحتاجهما لبناء رسالة النشر.
+    """
+    from datetime import datetime as _dt
+    from db.session import get_db
+    from db.models import ResidencyMissingItem
+
+    with get_db() as db:
+        row = db.query(ResidencyMissingItem).filter(ResidencyMissingItem.id == item_id).first()
+        if row is None:
+            return None
+        row.status      = "resolved"
+        row.file_id     = file_id
+        row.resolved_by = performed_by
+        row.resolved_at = _dt.utcnow()
+        result = (row.profile_id, row.description)
+
+    logger.info(f"[residency.profiles] missing item resolved  item={item_id}")
+    return result
+
+
 def add_companion_to_profile(
     *,
     profile_id:        int,

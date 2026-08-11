@@ -854,6 +854,25 @@ class ResidencyUpdate(Base):
     created_at       = Column(DateTime, default=datetime.utcnow, index=True, nullable=True)
 
 
+class ResidencyMissingItem(Base):
+    """
+    طلب/مستند ناقص لملف إقامة — يُنشأ إمّا عند تقديم الأوراق وإجابة «لا»
+    على «هل اكتملت؟»، أو يدوياً لاحقاً من ملف المريض. يُتابَع يومياً
+    (services/residency_missing_items_service.py) حتى يُرفَع ويُغلَق.
+    """
+    __tablename__ = "res_missing_items"
+
+    id           = Column(Integer, primary_key=True, autoincrement=True)
+    profile_id   = Column(Integer, nullable=False, index=True)   # FK → res_profiles.id
+    description  = Column(Text, nullable=False)                  # نصّ حرّ: نوع الطلب الناقص
+    status       = Column(String(20), default="pending", index=True)   # pending | resolved
+    file_id      = Column(String(255), default="")               # يُملأ عند الرفع
+    created_by   = Column(Integer, nullable=True)
+    created_at   = Column(DateTime, default=datetime.utcnow, index=True, nullable=True)
+    resolved_by  = Column(Integer, nullable=True)
+    resolved_at  = Column(DateTime, nullable=True)
+
+
 class DailyReportTracking(Base):
     """Daily report tracking"""
     __tablename__ = "daily_report_tracking"

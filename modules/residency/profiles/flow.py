@@ -41,11 +41,13 @@ from modules.residency.profiles.views import (
     build_review, build_success, build_cancelled, build_error,
     build_add_companion_name_prompt, build_add_companion_visa_expiry_prompt,
     build_add_companion_saved,
+    build_missing_item_prompt, build_missing_item_saved,
+    build_missing_items_pick, build_missing_item_resolved,
 )
 from modules.residency.profiles.repository import (
     get_profiles_page, get_profile_by_id,
     get_companions_for_profile, get_history_for_profile,
-    search_profiles,
+    search_profiles, get_pending_missing_items,
 )
 
 logger = logging.getLogger(__name__)
@@ -64,6 +66,14 @@ def _is_authorized(user_id: int) -> bool:
 _CTX_ADD_COMP = "_rna_add_comp"
 _RKEY_ADD_COMP_PASSPORT = "res.profiles.add_comp.passport"
 _RKEY_ADD_COMP_VISA     = "res.profiles.add_comp.visa"
+
+# ── طلب ناقص: تسجيل جديد أو رفع لإغلاق طلب قائم ────────────────────────────────
+# ⚠️ نفس الاسم الحرفي يُستخدَم في modules/residency/uploads/flow.py (زر
+# «❌ لا، يوجد نقص» عند تقديم الأوراق) — كلاهما يكتب نفس شكل القاموس، حتى
+# تُعالَج الخطوة النصّية من هنا بغضّ النظر عن أي شاشة فتحتها.
+_CTX_MISSING_ITEM = "_res_missing_item"
+_CTX_MISSING_RESOLVE = "_res_missing_resolve"
+_RKEY_MISSING_RESOLVE = "res.profiles.missing_resolve"
 
 
 # ── Step sets ─────────────────────────────────────────────────────────────────
@@ -318,9 +328,10 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
         if profile is None:
             await query.edit_message_text("❌ لم يتم العثور على الملف.", parse_mode="Markdown")
             return
-        companions = get_companions_for_profile(profile_id)
-        history    = get_history_for_profile(profile_id)
-        text, kb   = build_profile_detail(profile, companions, history)
+        companions    = get_companions_for_profile(profile_id)
+        history       = get_history_for_profile(profile_id)
+        missing_items = get_pending_missing_items(profile_id)
+        text, kb   = build_profile_detail(profile, companions, history, missing_items)
         await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
         return
 
@@ -355,6 +366,43 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
         }
         text, kb = build_add_companion_name_prompt(profile.name, profile_id)
         await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
+        return
+
+    # ── طلب ناقص: تسجيل جديد (مستقلّ — متاح في أي وقت، لا فقط عند التقديم) ──
+    if action.startswith("missing_new_"):
+        profile_id = int(action[len("missing_new_"):])
+        profile = get_profile_by_id(profile_id)
+        if profile is None:
+            await query.edit_message_text("❌ لم يتم العثور على الملف.", parse_mode="Markdown")
+            return
+        context.user_data[_CTX_MISSING_ITEM] = {"profile_id": profile_id, "advance_stage": False}
+        text, kb = build_missing_item_prompt(profile.name, profile_id)
+        await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
+        return
+
+    # ── طلب ناقص: اختيار أيّ الطلبات (عند وجود أكثر من واحد) ────────────────
+    if action.startswith("missing_pick_"):
+        profile_id = int(action[len("missing_pick_"):])
+        profile = get_profile_by_id(profile_id)
+        if profile is None:
+            await query.edit_message_text("❌ لم يتم العثور على الملف.", parse_mode="Markdown")
+            return
+        items = get_pending_missing_items(profile_id)
+        text, kb = build_missing_items_pick(profile.name, profile_id, items)
+        await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
+        return
+
+    # ── طلب ناقص: رفع المستند لإغلاق طلب محدَّد ──────────────────────────────
+    if action.startswith("missing_resolve_"):
+        item_id = int(action[len("missing_resolve_"):])
+        context.user_data[_CTX_MISSING_RESOLVE] = {"item_id": item_id}
+        from shared.uploads import collector as _uploads
+        await _uploads.open(
+            update, context,
+            title="📎 أرسل صورة أو ملف الوثيقة المرفوعة لإغلاق هذا الطلب",
+            return_to=_RKEY_MISSING_RESOLVE,
+            max_files=1,
+        )
         return
 
     # التقويم المخصَّص لهذه الخطوة وحدها — بادئة "accal:" منفصلة تماماً عن
@@ -558,10 +606,11 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
                 performed_by=update.effective_user.id if update.effective_user else None,
             )
             if ok:
-                profile    = get_profile_by_id(edit_id)
-                companions = get_companions_for_profile(edit_id)
-                history    = get_history_for_profile(edit_id)
-                text, kb   = build_profile_detail(profile, companions, history)
+                profile       = get_profile_by_id(edit_id)
+                companions    = get_companions_for_profile(edit_id)
+                history       = get_history_for_profile(edit_id)
+                missing_items = get_pending_missing_items(edit_id)
+                text, kb   = build_profile_detail(profile, companions, history, missing_items)
             else:
                 text, kb = build_error("فشل تحديث التاريخ. حاول مجدداً.")
             await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
@@ -825,6 +874,49 @@ async def _on_add_comp_visa(result, update: Update, context: ContextTypes.DEFAUL
     await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
 
+# ── طلب ناقص — رفع المستند لإغلاق طلب قائم ─────────────────────────────────────
+
+async def _on_missing_resolve(result, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    ctx_data = context.user_data.pop(_CTX_MISSING_RESOLVE, None)
+    if not ctx_data:
+        await update.effective_message.reply_text("⚠️ انتهت الجلسة. ابدأ من جديد.", parse_mode="Markdown")
+        return
+
+    if result.cancelled:
+        await update.effective_message.reply_text("❌ أُلغي رفع الوثيقة.", parse_mode="Markdown")
+        return
+
+    if not result.files:
+        await update.effective_message.reply_text("⚠️ لم يُرسَل أي ملف.", parse_mode="Markdown")
+        return
+
+    f = result.files[0]
+    file_id = f.to_dict().get("file_id", "") if hasattr(f, "to_dict") else ""
+
+    from modules.residency.profiles.models import resolve_missing_item
+    uid = update.effective_user.id if update.effective_user else None
+    resolved = resolve_missing_item(item_id=ctx_data["item_id"], file_id=file_id, performed_by=uid)
+    if resolved is None:
+        await update.effective_message.reply_text("❌ لم يتم العثور على الطلب.", parse_mode="Markdown")
+        return
+
+    profile_id, description = resolved
+    profile = get_profile_by_id(profile_id)
+    profile_name = profile.name if profile else "—"
+
+    from modules.residency.report_publisher import publish_event
+    try:
+        await publish_event(
+            context.bot, action_label="✅ تم رفع الطلب — جاري انتظار الإقامة",
+            patient_name=profile_name, body_lines=[f"الطلب: {description}"],
+        )
+    except Exception as exc:
+        logger.warning(f"[res.profiles.missing_resolve] publish_event failed: {exc}")
+
+    text, kb = build_missing_item_resolved(profile_name, description, profile_id)
+    await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+
+
 # ── Text handler (group 16) ───────────────────────────────────────────────────
 
 async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -868,6 +960,59 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
         _add_comp["name"] = name
         context.user_data[_CTX_ADD_COMP] = _add_comp
         text, kb = build_add_companion_visa_expiry_prompt(name, _add_comp["profile_id"])
+        await msg.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+        return
+
+    # ── طلب ناقص — إدخال الوصف يدوياً ─────────────────────────────────────────
+    _missing = context.user_data.pop(_CTX_MISSING_ITEM, None)
+    if _missing is not None:
+        description = (msg.text or "").strip()
+        if not description:
+            context.user_data[_CTX_MISSING_ITEM] = _missing
+            await msg.reply_text("⚠️ لا يمكن ترك الوصف فارغاً. أرسل نص الطلب الناقص.")
+            return
+
+        profile_id = _missing["profile_id"]
+        profile = get_profile_by_id(profile_id)
+        profile_name = profile.name if profile else "—"
+
+        from modules.residency.profiles.models import add_missing_item
+        add_missing_item(
+            profile_id=profile_id,
+            description=description,
+            performed_by=uid if isinstance(uid, int) else None,
+        )
+
+        from modules.residency.report_publisher import publish_event
+
+        if _missing.get("advance_stage"):
+            from modules.residency.uploads.repository import advance_papers_stage
+            ok, name, new_status = advance_papers_stage(profile_id=profile_id, performed_by=uid if isinstance(uid, int) else None)
+            if ok:
+                from modules.residency.views import format_status
+                comps = get_companions_for_profile(profile_id)
+                body_lines = (
+                    [f"👥 المرافقون: {'، '.join(c.name for c in comps)}"] if comps
+                    else ["👥 لا يوجد مرافقون"]
+                )
+                body_lines.append(f"⚠️ الطلب الناقص: {description}")
+                try:
+                    await publish_event(
+                        context.bot, action_label=format_status(new_status),
+                        patient_name=name, body_lines=body_lines,
+                    )
+                except Exception as exc:
+                    logger.warning(f"[res.profiles.text] publish_event failed: {exc}")
+        else:
+            try:
+                await publish_event(
+                    context.bot, action_label="📝 طلب جديد",
+                    patient_name=profile_name, body_lines=[f"الطلب: {description}"],
+                )
+            except Exception as exc:
+                logger.warning(f"[res.profiles.text] publish_event failed: {exc}")
+
+        text, kb = build_missing_item_saved(profile_name, description, profile_id)
         await msg.reply_text(text, reply_markup=kb, parse_mode="Markdown")
         return
 
@@ -1022,4 +1167,5 @@ def register_handlers(app) -> None:
 def register_result_routes() -> None:
     _register_route(_RKEY_ADD_COMP_PASSPORT, _on_add_comp_passport)
     _register_route(_RKEY_ADD_COMP_VISA,     _on_add_comp_visa)
+    _register_route(_RKEY_MISSING_RESOLVE,   _on_missing_resolve)
     logger.info("[residency.profiles] result routes registered")

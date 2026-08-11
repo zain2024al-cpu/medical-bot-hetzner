@@ -302,6 +302,16 @@ async def main():
         )
         logger.info(f"🔔 Scheduled daily residency/passport alerts at 09:00 ({TIMEZONE})")
 
+        # 📋 3ب. تذكير الطلبات الناقصة لملفات الإقامة (الساعة 5:00 مساءً)
+        # مساءً عمداً (بخلاف تنبيه الإقامات الصباحي) — طلب المستخدم صراحةً.
+        from services.residency_missing_items_service import send_daily_missing_items_reminder
+        app.job_queue.run_daily(
+            lambda context: send_daily_missing_items_reminder(context.application),
+            time=dt_time(hour=17, minute=0, tzinfo=tz),
+            name="daily_residency_missing_items"
+        )
+        logger.info(f"📋 Scheduled daily residency missing-items reminder at 17:00 ({TIMEZONE})")
+
         # 🧾 4. تقرير أخطاء اليوم (23:55) — آخر اليوم عمداً ليشمله كاملاً.
         # صامت تماماً لو لم يقع أي خطأ، فلا رسالة يومية بلا فائدة.
         from services.error_digest import send_daily_error_report, cleanup_old

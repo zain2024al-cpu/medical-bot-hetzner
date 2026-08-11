@@ -45,6 +45,41 @@ class CompanionRow:
 
 
 @dataclass
+class MissingItemRow:
+    id:          int
+    profile_id:  int
+    description: str
+    status:      str
+    file_id:     str
+    created_at:  str
+
+
+def get_pending_missing_items(profile_id: int) -> list[MissingItemRow]:
+    """الطلبات الناقصة غير المُغلَقة لملف واحد — تُعرض على ملف المريض."""
+    from db.session import get_db
+    from db.models import ResidencyMissingItem
+
+    with get_db() as db:
+        rows = (
+            db.query(ResidencyMissingItem)
+            .filter(
+                ResidencyMissingItem.profile_id == profile_id,
+                ResidencyMissingItem.status == "pending",
+            )
+            .order_by(ResidencyMissingItem.created_at.asc())
+            .all()
+        )
+        return [
+            MissingItemRow(
+                id=r.id, profile_id=r.profile_id, description=r.description or "",
+                status=r.status or "pending", file_id=r.file_id or "",
+                created_at=r.created_at.isoformat() if r.created_at else "",
+            )
+            for r in rows
+        ]
+
+
+@dataclass
 class HistoryRow:
     action_label:   str
     new_status:     str

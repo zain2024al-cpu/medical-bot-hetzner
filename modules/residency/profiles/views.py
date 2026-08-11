@@ -114,7 +114,7 @@ def build_archive_list(
 
 # ── Profile detail ────────────────────────────────────────────────────────────
 
-def build_profile_detail(profile, companions, history) -> tuple[str, InlineKeyboardMarkup]:
+def build_profile_detail(profile, companions, history, missing_items=()) -> tuple[str, InlineKeyboardMarkup]:
     comp_count   = len(companions)
     # ✅ الحالة الزمنية تُشتقّ من التاريخ — العمود المخزَّن يبقى "active" أبداً
     _status      = effective_status(profile.status, profile.expiry_date)
@@ -174,6 +174,13 @@ def build_profile_detail(profile, companions, history) -> tuple[str, InlineKeybo
 
     lines.append(_THIN)
 
+    # ── الطلبات الناقصة ────────────────────────────────────────────────────────
+    if missing_items:
+        lines.append(f"📋 *طلبات ناقصة بانتظار الرفع ({len(missing_items)}):*")
+        for m in missing_items:
+            lines.append(f"  • {m.description}")
+        lines.append(_THIN)
+
     # ── History ───────────────────────────────────────────────────────────────
     if history:
         lines.append(f"🕓 *آخر {min(len(history), HISTORY_DISPLAY_LIMIT)} أحداث:*")
@@ -210,6 +217,18 @@ def build_profile_detail(profile, companions, history) -> tuple[str, InlineKeybo
         rows.append([
             InlineKeyboardButton("📋 استكمال المرافقين المعلَّقين", callback_data=f"rnf:complete_{profile.id}"),
         ])
+
+    # ✅ تسجيل طلب ناقص متاح دائماً (طلب جديد يُكتشَف في أي وقت، لا فقط عند
+    # التقديم) — نفس الآلية التي تُفعَّل تلقائياً عند الإجابة بـ«لا» على
+    # «هل اكتملت الأوراق؟» عند الضغط على زر التقديم أعلاه.
+    missing_row = [InlineKeyboardButton("📝 تسجيل طلب ناقص", callback_data=f"{RNA}:missing_new_{profile.id}")]
+    if len(missing_items) == 1:
+        missing_row.append(InlineKeyboardButton(
+            "📎 رفع الطلب المعلَّق", callback_data=f"{RNA}:missing_resolve_{missing_items[0].id}"))
+    elif len(missing_items) > 1:
+        missing_row.append(InlineKeyboardButton(
+            f"📎 رفع طلب معلَّق ({len(missing_items)})", callback_data=f"{RNA}:missing_pick_{profile.id}"))
+    rows.append(missing_row)
 
     rows.append([
         InlineKeyboardButton("🪪 تجديد الإقامة", callback_data=f"rnr:start_{profile.id}"),
@@ -286,6 +305,78 @@ def build_add_companion_saved(name: str, profile_id: int) -> tuple[str, InlineKe
     kb = InlineKeyboardMarkup([[
         InlineKeyboardButton("👁 عرض الملف", callback_data=f"{RNA}:view_{profile_id}"),
     ]])
+    return text, kb
+
+
+# ── الطلبات الناقصة (تسجيل جديد / رفع لإغلاق طلب) ─────────────────────────────
+
+def build_missing_item_prompt(profile_name: str, profile_id: int) -> tuple[str, InlineKeyboardMarkup]:
+    text = (
+        f"{_DIVIDER}\n📝  **تسجيل طلب ناقص**\n\n"
+        f"المريض: *{profile_name}*\n{_THIN}\n\n"
+        "✏️ اكتب ما هو الطلب/المستند الناقص:"
+    )
+    kb = InlineKeyboardMarkup([[
+        InlineKeyboardButton("❌ إلغاء", callback_data=f"{RNA}:view_{profile_id}"),
+    ]])
+    return text, kb
+
+
+def build_missing_item_saved(profile_name: str, description: str, profile_id: int) -> tuple[str, InlineKeyboardMarkup]:
+    text = (
+        f"{_DIVIDER}\n✅  **تم تسجيل الطلب**\n\n"
+        f"👤 {profile_name}\n"
+        f"📝 {description}\n\n"
+        "نُشر للمجموعة للمتابعة، وسيُذكَّر به يومياً حتى يُرفَع."
+    )
+    kb = InlineKeyboardMarkup([[
+        InlineKeyboardButton("👁 عرض الملف", callback_data=f"{RNA}:view_{profile_id}"),
+    ]])
+    return text, kb
+
+
+def build_missing_items_pick(profile_name: str, profile_id: int, items) -> tuple[str, InlineKeyboardMarkup]:
+    lines = [
+        _DIVIDER, "📎  **اختر الطلب المُراد رفعه**", "",
+        f"المريض: *{profile_name}*", _THIN, "",
+    ]
+    rows: list[list[InlineKeyboardButton]] = []
+    for m in items:
+        lines.append(f"• {m.description}")
+        rows.append([InlineKeyboardButton(
+            f"📎 {m.description[:30]}", callback_data=f"{RNA}:missing_resolve_{m.id}")])
+    rows.append([InlineKeyboardButton("❌ إلغاء", callback_data=f"{RNA}:view_{profile_id}")])
+    return "\n".join(lines), InlineKeyboardMarkup(rows)
+
+
+def build_missing_item_resolved(profile_name: str, description: str, profile_id: int) -> tuple[str, InlineKeyboardMarkup]:
+    text = (
+        f"{_DIVIDER}\n✅  **تم رفع الطلب**\n\n"
+        f"👤 {profile_name}\n"
+        f"📝 {description}\n\n"
+        "جاري انتظار الإقامة."
+    )
+    kb = InlineKeyboardMarkup([[
+        InlineKeyboardButton("👁 عرض الملف", callback_data=f"{RNA}:view_{profile_id}"),
+    ]])
+    return text, kb
+
+
+# ── تأكيد اكتمال الأوراق قبل التقديم ──────────────────────────────────────────
+
+def build_submit_complete_prompt(profile_name: str, profile_id: int) -> tuple[str, InlineKeyboardMarkup]:
+    text = (
+        f"{_DIVIDER}\n📤  **تقديم الأوراق**\n\n"
+        f"المريض: *{profile_name}*\n{_THIN}\n\n"
+        "هل تم رفع كامل الأوراق (المريض والمرافقين)؟"
+    )
+    kb = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("✅ نعم، كاملة",     callback_data=f"rnu:submit_yes_{profile_id}"),
+            InlineKeyboardButton("❌ لا، يوجد نقص",   callback_data=f"rnu:submit_no_{profile_id}"),
+        ],
+        [InlineKeyboardButton("❌ إلغاء", callback_data=f"{RNA}:view_{profile_id}")],
+    ])
     return text, kb
 
 

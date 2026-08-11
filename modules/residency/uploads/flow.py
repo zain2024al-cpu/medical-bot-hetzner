@@ -71,6 +71,7 @@ async def _render_profile(update, context, profile_id: int) -> None:
     """
     from modules.residency.profiles.repository import (
         get_profile_by_id, get_companions_for_profile, get_history_for_profile,
+        get_pending_missing_items,
     )
     from modules.residency.profiles.views import build_profile_detail
 
@@ -78,9 +79,10 @@ async def _render_profile(update, context, profile_id: int) -> None:
     if profile is None:
         await _safe_edit(update, "❌ لم يتم العثور على الملف.", None)
         return
-    companions = get_companions_for_profile(profile_id)
-    history    = get_history_for_profile(profile_id)
-    text, kb   = build_profile_detail(profile, companions, history)
+    companions    = get_companions_for_profile(profile_id)
+    history       = get_history_for_profile(profile_id)
+    missing_items = get_pending_missing_items(profile_id)
+    text, kb   = build_profile_detail(profile, companions, history, missing_items)
     await _safe_edit(update, text, kb)
 
 
@@ -112,8 +114,24 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
     user_id = uid if isinstance(uid, int) else None
 
     # ── تقدّم مرحلة (المريض + كل مرافقيه) ────────────────────────────────────
+    # ⚠️ «تقديم الأوراق» تحديداً (النقلة إلى renewal_submitted) تمرّ أولاً
+    # عبر سؤال «هل اكتملت؟» — بقية النقلات (استلام التمديد/تسجيل الإقامة
+    # الجديدة) تبقى فورية كما كانت، فلا معنى لسؤال الاكتمال هناك.
     if action.startswith("adv_"):
         profile_id = int(action[4:])
+        from modules.residency.constants import PAPERS_ADVANCE
+        from modules.residency.profiles.repository import get_profile_by_id as _get_p
+        _p = _get_p(profile_id)
+        if _p is None:
+            await query.edit_message_text("❌ لم يتم العثور على الملف.", parse_mode="Markdown")
+            return
+        _next = PAPERS_ADVANCE.get(_p.status, (None, None))[1]
+        if _next == "renewal_submitted":
+            from modules.residency.profiles.views import build_submit_complete_prompt
+            text, kb = build_submit_complete_prompt(_p.name, profile_id)
+            await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
+            return
+
         from modules.residency.uploads.repository import advance_papers_stage
         ok, name, new_status = advance_papers_stage(
             profile_id=profile_id, performed_by=user_id,
@@ -127,6 +145,35 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
         await query.answer(f"✅ {name} — {format_status(new_status)}", show_alert=True)
         await _notify(context, name, new_status)
         await _render_profile(update, context, profile_id)
+        return
+
+    # ── تقديم الأوراق: كاملة ⇒ تقدّم فوري ونشر عادي ───────────────────────────
+    if action.startswith("submit_yes_"):
+        profile_id = int(action[len("submit_yes_"):])
+        from modules.residency.uploads.repository import advance_papers_stage
+        ok, name, new_status = advance_papers_stage(profile_id=profile_id, performed_by=user_id)
+        if ok:
+            from modules.residency.views import format_status
+            await query.answer(f"✅ {name} — {format_status(new_status)}", show_alert=True)
+            await _notify(context, name, new_status, profile_id=profile_id, complete=True)
+        await _render_profile(update, context, profile_id)
+        return
+
+    # ── تقديم الأوراق: ناقصة ⇒ تُطلَب التفاصيل عبر نصّ ثم تقدّم + نشر مختلف ───
+    if action.startswith("submit_no_"):
+        profile_id = int(action[len("submit_no_"):])
+        from modules.residency.profiles.repository import get_profile_by_id as _get_p2
+        from modules.residency.profiles.views import build_missing_item_prompt
+        _p2 = _get_p2(profile_id)
+        if _p2 is None:
+            await query.edit_message_text("❌ لم يتم العثور على الملف.", parse_mode="Markdown")
+            return
+        # ✅ نفس مفتاح السياق الذي يقرأه _handle_text_input في profiles/flow.py
+        # (`_CTX_MISSING_ITEM`) — `advance_stage=True` يُفرّق هذا المسار عن
+        # زر «📝 تسجيل طلب ناقص» المستقل الذي لا يُقدِّم الأوراق فور الحفظ.
+        context.user_data["_res_missing_item"] = {"profile_id": profile_id, "advance_stage": True}
+        text, kb = build_missing_item_prompt(_p2.name, profile_id)
+        await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
         return
 
     # ── تراجع خطوة ────────────────────────────────────────────────────────────
@@ -178,15 +225,36 @@ async def _open_renewal(update, context, profile_id: int) -> None:
     await rnr_cb(update, context)
 
 
-async def _notify(context, name: str, new_status: str) -> None:
+async def _notify(
+    context, name: str, new_status: str, *,
+    profile_id: int | None = None, complete: bool = True,
+) -> None:
+    """
+    ينشر حدث تقدّم المرحلة. عند تمرير `profile_id` (مسار «تم التقديم» فقط)
+    تُذكَر أسماء المرافقين فعلياً بدل سطر عام — طلب المستخدم صراحةً: «ينتشر
+    في المجموعة أنه تم التقديم للمريض مع المرافقين».
+    """
     from modules.residency.views import format_status
+    body_lines = ["👥 يشمل المرافقين"]
+    if profile_id is not None:
+        try:
+            from modules.residency.profiles.repository import get_companions_for_profile
+            comps = get_companions_for_profile(profile_id)
+            body_lines = (
+                [f"👥 المرافقون: {'، '.join(c.name for c in comps)}"] if comps
+                else ["👥 لا يوجد مرافقون"]
+            )
+            if not complete:
+                body_lines.append("⚠️ ناقص — راجع ملف المريض للتفاصيل")
+        except Exception:
+            logger.debug("تم تجاهل استثناء أثناء جلب أسماء المرافقين للنشر", exc_info=True)
     try:
         from modules.residency.report_publisher import publish_event
         await publish_event(
             context.bot,
             action_label=format_status(new_status),
             patient_name=name,
-            body_lines=["👥 يشمل المرافقين"],
+            body_lines=body_lines,
         )
     except Exception as exc:
         logger.warning(f"[residency.uploads] publish_event failed: {exc}")
