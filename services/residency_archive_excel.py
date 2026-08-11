@@ -116,7 +116,7 @@ def collect_archive_rows() -> list[dict]:
     return rows
 
 
-def build_archive_excel(rows: list[dict]) -> io.BytesIO:
+def build_archive_excel(rows: list[dict], include_passport: bool = True) -> io.BytesIO:
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
     from openpyxl.utils import get_column_letter
@@ -136,9 +136,14 @@ def build_archive_excel(rows: list[dict]) -> io.BytesIO:
     right       = Alignment(horizontal="right",  vertical="center", wrap_text=True)
     thin = Border(*[Side(style="thin", color="CCCCCC")] * 4)
 
+    # ✅ عمودا الجواز (انتهاء + المتبقّي) اختياريان — طلب المستخدم صراحةً
+    # خيار «الإقامات فقط بلا الجواز» قبل التصدير.
     headers = ["م", "الاسم", "الصفة", "الحالة", "رقم الإقامة",
-               "انتهاء الإقامة", "المتبقّي", "انتهاء الجواز", "المتبقّي"]
-    widths  = [5, 28, 9, 14, 16, 15, 16, 15, 16]
+               "انتهاء الإقامة", "المتبقّي"]
+    widths  = [5, 28, 9, 14, 16, 15, 16]
+    if include_passport:
+        headers += ["انتهاء الجواز", "المتبقّي"]
+        widths  += [15, 16]
     last    = get_column_letter(len(headers))
 
     ws.merge_cells(f"A1:{last}1")
@@ -164,14 +169,18 @@ def build_archive_excel(rows: list[dict]) -> io.BytesIO:
     r = hdr + 1
     for row in rows:
         res_txt, res_fill = _days_text(row["res_expiry"])
-        pas_txt, pas_fill = _days_text(row["pas_expiry"])
         # المرافق يُزاح باسمه ليظهر تابعاً لمريضه بصرياً
         display_name = f"    ↳ {row['name']}" if row["is_comp"] else row["name"]
 
         values = [
             row["seq"], display_name, row["role"], row["status"], row["res_number"],
-            _fmt(row["res_expiry"]), res_txt, _fmt(row["pas_expiry"]), pas_txt,
+            _fmt(row["res_expiry"]), res_txt,
         ]
+        if include_passport:
+            pas_txt, pas_fill = _days_text(row["pas_expiry"])
+            values += [_fmt(row["pas_expiry"]), pas_txt]
+        else:
+            pas_fill = None
         for i, v in enumerate(values, start=1):
             c = ws.cell(row=r, column=i, value=v)
             c.border = thin
@@ -181,7 +190,7 @@ def build_archive_excel(rows: list[dict]) -> io.BytesIO:
                 c.number_format = "@"      # رقم الإقامة نصّاً — لا يُحوَّل لرقم
         if res_fill:
             ws.cell(row=r, column=7).fill = PatternFill("solid", start_color=res_fill, end_color=res_fill)
-        if pas_fill:
+        if include_passport and pas_fill:
             ws.cell(row=r, column=9).fill = PatternFill("solid", start_color=pas_fill, end_color=pas_fill)
         r += 1
 
@@ -208,9 +217,9 @@ def build_archive_excel(rows: list[dict]) -> io.BytesIO:
     return buf
 
 
-def build_residency_archive_export() -> tuple[io.BytesIO | None, int]:
+def build_residency_archive_export(include_passport: bool = True) -> tuple[io.BytesIO | None, int]:
     """(الملف, عدد الأشخاص) — (None, 0) إن كان الأرشيف فارغاً."""
     rows = collect_archive_rows()
     if not rows:
         return None, 0
-    return build_archive_excel(rows), len(rows)
+    return build_archive_excel(rows, include_passport), len(rows)

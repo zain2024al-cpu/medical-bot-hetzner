@@ -43,6 +43,7 @@ from modules.residency.profiles.views import (
     build_add_companion_saved,
     build_missing_item_prompt, build_missing_item_saved,
     build_missing_items_pick, build_missing_item_resolved,
+    build_export_passport_prompt, build_export_destination_prompt,
 )
 from modules.residency.profiles.repository import (
     get_profiles_page, get_profile_by_id,
@@ -278,17 +279,36 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
         await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
         return
 
-    # ── Archive export (Excel / PDF) ──────────────────────────────────────────
-    # نفس المنطق للصيغتين — المُنتِج والامتداد فقط يختلفان.
-    if action in ("export", "export_pdf"):
-        is_pdf = action == "export_pdf"
+    # ── Archive export (Excel / PDF) — خياران قبل الإنشاء (طلب المستخدم) ──────
+    # ⚠️ الفروع الأخصّ (export_dst_/export_go_) قبل export_ask_ عمداً — نفس
+    # سبب ترتيب add_comp_cal_/add_comp_skipexp_ قبل add_comp_ أعلاه.
+
+    # 1) هل يتضمّن الملف تاريخ انتهاء الجواز؟
+    if action.startswith("export_ask_"):
+        fmt = action[len("export_ask_"):]
+        text, kb = build_export_passport_prompt(fmt)
+        await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
+        return
+
+    # 2) أين يُرسَل الملف — نشر في المجموعة أم للمستخدم فقط؟
+    if action.startswith("export_dst_"):
+        fmt, pas = action[len("export_dst_"):].rsplit("_", 1)
+        text, kb = build_export_destination_prompt(fmt, include_passport=(pas == "y"))
+        await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
+        return
+
+    # 3) الإنشاء والإرسال الفعلي — نفس المنطق للصيغتين، المُنتِج والامتداد فقط يختلفان.
+    if action.startswith("export_go_"):
+        fmt, pas, dest = action[len("export_go_"):].split("_")
+        is_pdf = fmt == "pdf"
+        include_passport = pas == "y"
         await query.answer("⏳ جارٍ تجهيز الملف…")
         try:
             if is_pdf:
                 from services.residency_archive_pdf import build_residency_archive_pdf as _build
             else:
                 from services.residency_archive_excel import build_residency_archive_export as _build
-            buf, count = _build()
+            buf, count = _build(include_passport)
         except Exception:
             logger.exception(f"[res.profiles.cb] archive export FAILED  pdf={is_pdf}  user={uid}")
             await query.answer("❌ تعذّر تجهيز الملف", show_alert=True)
@@ -301,20 +321,47 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
         from datetime import date as _date
         ext      = "pdf" if is_pdf else "xlsx"
         filename = f"residency_archive_{_date.today().strftime('%Y-%m-%d')}.{ext}"
+        scope_note = "الإقامات فقط (بلا الجواز)" if not include_passport else "مع تاريخ الجواز"
+        caption = (
+            f"📁 **أرشيف الإقامات** — {scope_note}\n"
+            f"👥 {count} شخص (مرضى ومرافقون)\n"
+            f"📅 {_date.today().strftime('%d/%m/%Y')}\n\n"
+            f"🔴 منتهية  🟠 خلال 30 يوم  🟡 خلال 90 يوم"
+        )
+
+        # نشر في المجموعة — لا للمستخدم الذي طلبه، تحديداً حسب اختياره.
+        if dest == "group":
+            # ⚠️ نفس منطق تحويل المعرّف المستخدَم في report_publisher._resolve_group_id
+            # — يُستورَد مباشرة بدل تكرار المنطق (نفس نمط _open_renewal في
+            # uploads/flow.py الذي يستورد _dispatch_callback عبر وحدة أخرى).
+            from modules.residency.report_publisher import _resolve_group_id
+            group_id = _resolve_group_id()
+            if not group_id:
+                await query.answer("⚠️ لم تُضبَط مجموعة الإقامات (RESIDENCY_GROUP_ID).", show_alert=True)
+                return
+            try:
+                await context.bot.send_document(
+                    chat_id=group_id, document=buf, filename=filename,
+                    caption=caption, parse_mode="Markdown",
+                )
+                await query.answer("✅ نُشر الملف في المجموعة", show_alert=True)
+                logger.info(
+                    f"[res.profiles.cb] archive exported→group  fmt={ext}  rows={count}"
+                    f"  passport={include_passport}  user={uid}"
+                )
+            except Exception:
+                logger.exception(f"[res.profiles.cb] failed to publish archive file  user={uid}")
+                await query.answer("❌ تعذّر نشر الملف في المجموعة", show_alert=True)
+            return
+
+        # للمستخدم فقط — بلا أي نشر.
         try:
             await query.message.reply_document(
-                document=buf,
-                filename=filename,
-                caption=(
-                    f"📁 **أرشيف الإقامات**\n"
-                    f"👥 {count} شخص (مرضى ومرافقون)\n"
-                    f"📅 {_date.today().strftime('%d/%m/%Y')}\n\n"
-                    f"🔴 منتهية  🟠 خلال 30 يوم  🟡 خلال 90 يوم"
-                ),
-                parse_mode="Markdown",
+                document=buf, filename=filename, caption=caption, parse_mode="Markdown",
             )
             logger.info(
-                f"[res.profiles.cb] archive exported  fmt={ext}  rows={count}  user={uid}"
+                f"[res.profiles.cb] archive exported→user  fmt={ext}  rows={count}"
+                f"  passport={include_passport}  user={uid}"
             )
         except Exception:
             logger.exception(f"[res.profiles.cb] failed to send archive file  user={uid}")

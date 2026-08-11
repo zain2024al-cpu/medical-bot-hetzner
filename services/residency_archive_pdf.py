@@ -73,7 +73,7 @@ def _ar(text) -> str:
         return s
 
 
-def build_archive_pdf(rows: list[dict]) -> io.BytesIO:
+def build_archive_pdf(rows: list[dict], include_passport: bool = True) -> io.BytesIO:
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.lib.units import cm
@@ -106,9 +106,13 @@ def build_archive_pdf(rows: list[dict]) -> io.BytesIO:
                                  leading=14)
 
     # ✅ الترتيب المنطقي ثم يُعكَس عند الرسم (انظر ملاحظة الرأس)
+    # عمودا الجواز اختياريان — طلب المستخدم صراحةً خيار «الإقامات فقط».
     headers_logical = ["م", "الاسم", "الصفة", "رقم الإقامة",
-                       "انتهاء الإقامة", "المتبقّي", "انتهاء الجواز", "المتبقّي"]
-    pct_logical     = [0.05, 0.26, 0.08, 0.13, 0.12, 0.12, 0.12, 0.12]
+                       "انتهاء الإقامة", "المتبقّي"]
+    pct_logical     = [0.06, 0.30, 0.10, 0.16, 0.19, 0.19]
+    if include_passport:
+        headers_logical += ["انتهاء الجواز", "المتبقّي"]
+        pct_logical      = [0.05, 0.26, 0.08, 0.13, 0.12, 0.12, 0.12, 0.12]
 
     headers = list(reversed(headers_logical))
     widths  = [p * content_w for p in reversed(pct_logical)]
@@ -141,23 +145,27 @@ def build_archive_pdf(rows: list[dict]) -> io.BytesIO:
 
         for ri, row in enumerate(chunk, start=1):
             res_txt, res_c = _days_text(row["res_expiry"])
-            pas_txt, pas_c = _days_text(row["pas_expiry"])
             name = ("↳ " + row["name"]) if row["is_comp"] else row["name"]
 
             logical = [
                 str(row["seq"]), name, row["role"], row["res_number"],
-                _fmt(row["res_expiry"]), res_txt, _fmt(row["pas_expiry"]), pas_txt,
+                _fmt(row["res_expiry"]), res_txt,
             ]
+            highlights = [(5, res_c)]
+            if include_passport:
+                pas_txt, pas_c = _days_text(row["pas_expiry"])
+                logical += [_fmt(row["pas_expiry"]), pas_txt]
+                highlights.append((7, pas_c))
+
             st = cell if row["is_comp"] else cell_b
             data.append([Paragraph(_ar(v), st) for v in reversed(logical)])
 
-            # مواضع أعمدة "المتبقّي" بعد العكس (الفهرس المنطقي 5 و7)
+            # مواضع أعمدة "المتبقّي" بعد العكس
             n = len(headers_logical)
-            col_res = n - 1 - 5
-            col_pas = n - 1 - 7
-            for col, c in ((col_res, res_c), (col_pas, pas_c)):
+            hexmap = {"FFCDD2": _C_EXPIRED, "FFE0B2": _C_URGENT, "FFF9C4": _C_SOON}
+            for logical_idx, c in highlights:
                 if c:
-                    hexmap = {"FFCDD2": _C_EXPIRED, "FFE0B2": _C_URGENT, "FFF9C4": _C_SOON}
+                    col = n - 1 - logical_idx
                     styles.append(("BACKGROUND", (col, ri), (col, ri),
                                    colors.HexColor(hexmap.get(c, "#FFFFFF"))))
             if row["is_comp"]:
@@ -198,10 +206,10 @@ def build_archive_pdf(rows: list[dict]) -> io.BytesIO:
     return buf
 
 
-def build_residency_archive_pdf() -> tuple[io.BytesIO | None, int]:
+def build_residency_archive_pdf(include_passport: bool = True) -> tuple[io.BytesIO | None, int]:
     """(الملف, عدد الأشخاص) — (None, 0) إن كان الأرشيف فارغاً."""
     from services.residency_archive_excel import collect_archive_rows
     rows = collect_archive_rows()
     if not rows:
         return None, 0
-    return build_archive_pdf(rows), len(rows)
+    return build_archive_pdf(rows, include_passport), len(rows)

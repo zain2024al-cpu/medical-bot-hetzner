@@ -91,8 +91,8 @@ def build_archive_list(
     # فيه المرضى ومرافقوهم وتواريخ انتهاء الإقامة والجواز، ملوَّن حسب القرب
     # من الانتهاء ومع فلتر تلقائي.
     rows.append([
-        InlineKeyboardButton("📊 Excel", callback_data=f"{RNA}:export"),
-        InlineKeyboardButton("📄 PDF",   callback_data=f"{RNA}:export_pdf"),
+        InlineKeyboardButton("📊 Excel", callback_data=f"{RNA}:export_ask_xlsx"),
+        InlineKeyboardButton("📄 PDF",   callback_data=f"{RNA}:export_ask_pdf"),
     ])
 
     # ✅ منقولان هنا من شاشة «📤 الرفع والمتابعة» المحذوفة — قرار المستخدم:
@@ -110,6 +110,40 @@ def build_archive_list(
     ])
 
     return "\n".join(lines), InlineKeyboardMarkup(rows)
+
+
+# ── تصدير الأرشيف — خياران قبل الإنشاء (طلب المستخدم صراحةً) ───────────────────
+
+_EXPORT_FMT_LABEL = {"pdf": "📄 PDF", "xlsx": "📊 Excel"}
+
+
+def build_export_passport_prompt(fmt: str) -> tuple[str, InlineKeyboardMarkup]:
+    """السؤال الأول: تضمين عمود انتهاء الجواز، أم الإقامات فقط."""
+    text = (
+        f"{_DIVIDER}\n{_EXPORT_FMT_LABEL.get(fmt, fmt)}  **تصدير الأرشيف**\n\n"
+        "هل يتضمّن الملف تاريخ انتهاء الجواز؟"
+    )
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📅 مع تاريخ الجواز",        callback_data=f"{RNA}:export_dst_{fmt}_y")],
+        [InlineKeyboardButton("🪪 الإقامات فقط (بلا جواز)", callback_data=f"{RNA}:export_dst_{fmt}_n")],
+        [InlineKeyboardButton("❌ إلغاء", callback_data=f"{RN}:archive")],
+    ])
+    return text, kb
+
+
+def build_export_destination_prompt(fmt: str, include_passport: bool) -> tuple[str, InlineKeyboardMarkup]:
+    """السؤال الثاني: نشر في المجموعة، أم للمستخدم فقط بلا نشر."""
+    pas = "y" if include_passport else "n"
+    text = (
+        f"{_DIVIDER}\n{_EXPORT_FMT_LABEL.get(fmt, fmt)}  **تصدير الأرشيف**\n\n"
+        "قبل الإنشاء — أين يُرسَل الملف؟"
+    )
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📢 نشر في المجموعة",       callback_data=f"{RNA}:export_go_{fmt}_{pas}_group")],
+        [InlineKeyboardButton("👤 لي فقط (بلا نشر)",       callback_data=f"{RNA}:export_go_{fmt}_{pas}_user")],
+        [InlineKeyboardButton("❌ إلغاء", callback_data=f"{RN}:archive")],
+    ])
+    return text, kb
 
 
 # ── Profile detail ────────────────────────────────────────────────────────────
