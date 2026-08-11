@@ -143,7 +143,7 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
 
         from modules.residency.views import format_status
         await query.answer(f"✅ {name} — {format_status(new_status)}", show_alert=True)
-        await _notify(context, name, new_status)
+        await _notify(context, name, new_status, submitted_by=user_id)
         await _render_profile(update, context, profile_id)
         return
 
@@ -155,7 +155,7 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
         if ok:
             from modules.residency.views import format_status
             await query.answer(f"✅ {name} — {format_status(new_status)}", show_alert=True)
-            await _notify(context, name, new_status, profile_id=profile_id, complete=True)
+            await _notify(context, name, new_status, profile_id=profile_id, complete=True, submitted_by=user_id)
         await _render_profile(update, context, profile_id)
         return
 
@@ -228,6 +228,7 @@ async def _open_renewal(update, context, profile_id: int) -> None:
 async def _notify(
     context, name: str, new_status: str, *,
     profile_id: int | None = None, complete: bool = True,
+    submitted_by: int | None = None,
 ) -> None:
     """
     ينشر حدث تقدّم المرحلة. عند تمرير `profile_id` (مسار «تم التقديم» فقط)
@@ -255,6 +256,7 @@ async def _notify(
             action_label=format_status(new_status),
             patient_name=name,
             body_lines=body_lines,
+            submitted_by=submitted_by,
         )
     except Exception as exc:
         logger.warning(f"[residency.uploads] publish_event failed: {exc}")

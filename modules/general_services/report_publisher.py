@@ -30,17 +30,30 @@ class GSPublishData:
 
 
 async def publish(bot, data: GSPublishData) -> None:
-    """Publish a GS record to admins + the GS group."""
+    """Publish a GS record to admins + the GS group + the submitting user."""
     text = _build_text(data)
+
+    notified_user_ids: set[int] = set()
 
     if GS_NOTIFY_ADMINS:
         for admin_id in ADMIN_IDS:
             try:
                 await bot.send_message(chat_id=admin_id, text=text, parse_mode="Markdown")
+                notified_user_ids.add(admin_id)
             except Exception as exc:
                 logger.warning(f"[gs_publisher] admin notify failed admin={admin_id}: {exc}")
     else:
         logger.info("[gs_publisher] GS_NOTIFY_ADMINS=0 — تُخطّى إشعارات الأدمن الخاصة")
+
+    # ✅ عرض التقرير الفعلي لمن نشره — لم يكن يرى إلا رسالة نجاح مختصرة
+    # («تم الحفظ والنشر») لا محتوى التقرير نفسه، بصرف النظر عن كونه أدمناً
+    # مُدرَجاً في ADMIN_IDS أو عضو صلاحية وحدة فقط. مستقل تماماً عن
+    # GS_NOTIFY_ADMINS/إعداد مجموعة الخدمات — طلب المستخدم صراحةً.
+    if data.created_by_id and data.created_by_id not in notified_user_ids:
+        try:
+            await bot.send_message(chat_id=data.created_by_id, text=text, parse_mode="Markdown")
+        except Exception as exc:
+            logger.warning(f"[gs_publisher] submitter copy failed user={data.created_by_id}: {exc}")
 
     group_id = _resolve_group_id()
     if not group_id:

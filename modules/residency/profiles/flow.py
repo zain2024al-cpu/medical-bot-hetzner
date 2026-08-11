@@ -956,6 +956,7 @@ async def _on_missing_resolve(result, update: Update, context: ContextTypes.DEFA
         await publish_event(
             context.bot, action_label="✅ تم رفع الطلب — جاري انتظار الإقامة",
             patient_name=profile_name, body_lines=[f"الطلب: {description}"],
+            submitted_by=uid,
         )
     except Exception as exc:
         logger.warning(f"[res.profiles.missing_resolve] publish_event failed: {exc}")
@@ -1047,6 +1048,7 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
                     await publish_event(
                         context.bot, action_label=format_status(new_status),
                         patient_name=name, body_lines=body_lines,
+                        submitted_by=uid if isinstance(uid, int) else None,
                     )
                 except Exception as exc:
                     logger.warning(f"[res.profiles.text] publish_event failed: {exc}")
@@ -1055,6 +1057,7 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 await publish_event(
                     context.bot, action_label="📝 طلب جديد",
                     patient_name=profile_name, body_lines=[f"الطلب: {description}"],
+                    submitted_by=uid if isinstance(uid, int) else None,
                 )
             except Exception as exc:
                 logger.warning(f"[res.profiles.text] publish_event failed: {exc}")

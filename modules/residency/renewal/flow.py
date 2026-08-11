@@ -362,6 +362,7 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
                 patient_name=session.profile_name,
                 body_lines=details,
                 attachments=attachments,
+                submitted_by=uid if isinstance(uid, int) else None,
             )
         except Exception as exc:
             logger.warning(f"[residency.renewal] publish_event failed: {exc}")
