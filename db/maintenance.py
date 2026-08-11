@@ -219,6 +219,9 @@ class DatabaseMaintenance:
                 _migrate_column(conn, "daily_patients", "translator_id", "INTEGER")
                 _migrate_column(conn, "daily_patients", "translator_name", "VARCHAR(255)")
                 _migrate_column(conn, "daily_patients", "patient_count", "INTEGER")
+                # ✅ رقم الجلسة ضمن الدورة الحالية — العلاج الكيماوي فقط،
+                # منفصل عن current_session (رقم الدورة نفسها).
+                _migrate_column(conn, "reports", "chemo_session_number", "INTEGER")
                 logger.info("🔎 Migration check finished.")
 
                 if check == "ok":

@@ -1294,6 +1294,14 @@ def _build_treatment_session_fields(data: dict) -> list:
         lines.append(str(summary).strip())
         lines.append("")
 
+    # ✅ الكيماوي فقط — رقم الجلسة ضمن الدورة الحالية (منفصل عن رقم الدورة
+    # نفسها المعروض ضمن treatment_plan_summary أعلاه). عمود Report مستقل
+    # بلا خطة تتبعه، فيُعرض فقط إن أُدخل فعلاً.
+    session_num = data.get('chemo_session_number')
+    if session_num is not None and str(session_num).strip():
+        lines.append(f"🔢 **رقم الجلسة ضمن الدورة:** {escape_markdown(str(session_num).strip())}")
+        lines.append("")
+
     complaint = data.get('complaint_text', '')
     if complaint and str(complaint).strip():
         lines.append("💬 **شكوى المريض:**")

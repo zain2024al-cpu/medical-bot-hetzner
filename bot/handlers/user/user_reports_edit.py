@@ -129,7 +129,7 @@ def test_editable_fields_mapping():
         ('تأجيل موعد', 4),
         ('أشعة وفحوصات', 4),
         ('جلسة إشعاعي', 6),
-        ('العلاج الكيماوي', 7),  # + session_number (أُضيف جلسة سابقة)
+        ('العلاج الكيماوي', 8),  # chemo_cycle_number + chemo_session_number (رقم دورة منفصل عن رقم جلسة ضمنها)
         ('العلاج الموجه', 7),
         ('العلاج المناعي', 7),
         ('جلسات غسيل الكلى', 3),
@@ -875,6 +875,11 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
                 # الفعلية (chemo/targeted/immuno) أو من نص treatment_plan_summary
                 # المخزَّن (dialysis، بلا خطة).
                 'session_number': _current_session_number_display(report),
+                # ✅ الكيماوي فقط — نفس current_session أعلاه لكن بمفتاح/تسمية
+                # صحيحة (رقم **الدورة** لا الجلسة)، + رقم الجلسة ضمن الدورة
+                # وهو عمود Report مستقل تماماً بلا أي تتبّع خطة.
+                'chemo_cycle_number': _current_session_number_display(report),
+                'chemo_session_number': getattr(report, 'chemo_session_number', None) or "لا يوجد",
             }
             
             # تحويل موعد العودة إلى صيغة 12 ساعة للعرض
@@ -1296,6 +1301,10 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 # (عدد الجلسات/الجلسة الحالية) من البطاقة رغم بقائها محفوظة
                 # في قاعدة البيانات.
                 'treatment_plan_summary': getattr(report, 'treatment_plan_summary', '') or '',
+                # ✅ رقم الجلسة ضمن الدورة — الكيماوي فقط، نفس سبب
+                # treatment_plan_summary أعلاه بالضبط (كان سيختفي من البطاقة
+                # عند إعادة النشر بعد التعديل رغم بقائه محفوظاً في القاعدة).
+                'chemo_session_number': getattr(report, 'chemo_session_number', None),
                 # ✅ حقول المناظير — نفس السبب أعلاه.
                 'endoscopy_type': getattr(report, 'endoscopy_type', '') or '',
                 'endoscopy_result': getattr(report, 'endoscopy_result', '') or '',
@@ -1429,6 +1438,9 @@ async def handle_field_selection(update: Update, context: ContextTypes.DEFAULT_T
             'transplant_parties': 'الجهة',
             'transplant_details': 'تفاصيل المعاملة',
             'session_number': 'رقم الجلسة الحالية',
+            # ✅ الكيماوي فقط — انظر التعليق في field_registry.py
+            'chemo_cycle_number': 'رقم الدورة الحالية',
+            'chemo_session_number': 'رقم الجلسة ضمن الدورة',
         }
         
         field_display = field_names.get(field_name, field_name)
@@ -2191,11 +2203,12 @@ async def handle_new_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return EDIT_DATE_TIME
     
-    # ✅ رقم الجلسة الحالية — رقم صحيح موجب فقط
-    if field_name == "session_number":
+    # ✅ رقم الجلسة/الدورة الحالية — رقم صحيح موجب فقط. الأخيران خاصان
+    # بالكيماوي (رقم الدورة، ورقم الجلسة ضمنها — انظر field_registry.py).
+    if field_name in ("session_number", "chemo_cycle_number", "chemo_session_number"):
         if not new_value.isdigit() or int(new_value) <= 0:
             await update.message.reply_text(
-                "⚠️ يرجى إدخال رقم صحيح أكبر من صفر (رقم الجلسة الحالية):",
+                "⚠️ يرجى إدخال رقم صحيح أكبر من صفر:",
             )
             return EDIT_VALUE
 
@@ -2449,12 +2462,21 @@ async def save_edit_to_database(query, context):
             report.endoscopy_procedures = new_json or _json.dumps({"list": [], "other": new_value}, ensure_ascii=False)
             logger.info(f"✅ تم تحديث endoscopy_procedures = {report.endoscopy_procedures[:80]}")
 
-        # ✅ رقم الجلسة الحالية لأنواع جلسات العلاج — يُحدِّث TreatmentPlan
+        # ✅ رقم الجلسة/الدورة الحالية لأنواع جلسات العلاج — يُحدِّث TreatmentPlan
         # الفعلية (chemo/targeted/immuno) أو نص treatment_plan_summary
         # مباشرة (dialysis، بلا خطة). انظر _apply_session_number_edit أعلاه.
-        elif field_name == 'session_number':
+        # chemo_cycle_number مرادف الكيماوي لـsession_number بتسمية صحيحة
+        # (current_session يمثّل الدورة لا الجلسة عنده) — نفس المنطق تماماً.
+        elif field_name in ('session_number', 'chemo_cycle_number'):
             _apply_session_number_edit(report, new_value)
-            logger.info(f"✅ تم تحديث رقم الجلسة الحالية للتقرير #{report_id} = {new_value}")
+            logger.info(f"✅ تم تحديث رقم الدورة/الجلسة الحالية للتقرير #{report_id} = {new_value}")
+
+        # ✅ رقم الجلسة ضمن الدورة — الكيماوي فقط، عمود Report مستقل بلا
+        # خطة تتبعه، فالفرع العام أدناه (setattr) يكفي؛ يُذكَر صراحةً هنا
+        # فقط لتوضيح أنه مقصود لا فرعاً غير مغطّى.
+        elif field_name == 'chemo_session_number':
+            setattr(report, field_name, int(new_value))
+            logger.info(f"✅ تم تحديث رقم الجلسة ضمن الدورة للتقرير #{report_id} = {new_value}")
 
         # ✅ تعديل «قرار الطبيب» للمسارات التي تخزّنه داخل doctor_decision
         # المركّب: نستبدل مقطعه فقط بدل الكتابة فوق النص كاملاً — الكتابة

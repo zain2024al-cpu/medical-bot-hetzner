@@ -2349,6 +2349,13 @@ async def save_report_to_database(query, context, flow_type):
             # flow_type لنفس السبب أعلاه (مفتاح خاص بهذه المسارات فقط).
             treatment_plan_summary=data.get("treatment_plan_summary", "") or None,
 
+            # ✅ رقم الجلسة ضمن الدورة الحالية — العلاج الكيماوي فقط، مفتاح
+            # لا يضبطه أي مسار آخر فيبقى None تلقائياً لبقية المسارات.
+            chemo_session_number=(
+                int(data["chemo_session_number"])
+                if str(data.get("chemo_session_number") or "").isdigit() else None
+            ),
+
             # ✅ حقول 🫁 معاملة الزراعة — بلا شرط flow_type لنفس السبب أعلاه
             # (مفاتيح خاصة بهذا المسار فقط، None تلقائياً لبقية المسارات).
             transplant_type=data.get("transplant_type", "") or None,
@@ -2709,6 +2716,15 @@ async def save_report_to_database(query, context, flow_type):
                     plan_summary = report_tmp.get('treatment_plan_summary', '')
                 if plan_summary:
                     broadcast_data['treatment_plan_summary'] = plan_summary
+
+                # ✅ رقم الجلسة ضمن الدورة — الكيماوي فقط. نفس سبب plan_summary
+                # أعلاه بالضبط: broadcast_data لا يرث من data تلقائياً.
+                chemo_session_num = data.get('chemo_session_number')
+                if chemo_session_num is None:
+                    report_tmp = context.user_data.get("report_tmp", {})
+                    chemo_session_num = report_tmp.get('chemo_session_number')
+                if chemo_session_num is not None:
+                    broadcast_data['chemo_session_number'] = chemo_session_num
 
                 if data.get('notes'):
                     broadcast_data['notes'] = data.get('notes')

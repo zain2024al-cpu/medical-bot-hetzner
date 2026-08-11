@@ -42,6 +42,11 @@ _FIELD_NAMES = {
     "followup_time":     "⏰ وقت العودة",
     "followup_reason":   "✍️ سبب العودة",
     "session_number":    "🔢 رقم الجلسة الحالية",
+    # ✅ الكيماوي فقط — current_session لديه يمثّل رقم الدورة لا الجلسة،
+    # فمفتاح منفصل بتسمية صحيحة بدل session_number المشترَك. انظر التعليق
+    # المقابل في field_registry.py.
+    "chemo_cycle_number":   "🔢 رقم الدورة الحالية",
+    "chemo_session_number": "🔢 رقم الجلسة ضمن الدورة",
 }
 
 # ✅ رقم الجلسة الحالية — نفس منطق التعديل بعد النشر تماماً (انظر
@@ -118,7 +123,7 @@ async def handle_treatment_endoscopy_edit_field_selection(update: Update, contex
         field_key = parts[2]
 
         data = context.user_data.get("report_tmp", {})
-        if field_key == "session_number":
+        if field_key in ("session_number", "chemo_cycle_number"):
             current_value = _current_session_number_display(data, flow_type)
         else:
             current_value = data.get(field_key, "غير محدد")
@@ -261,9 +266,11 @@ async def handle_treatment_endoscopy_edit_field_input(update: Update, context: C
             )
             return get_confirm_state(flow_type)
 
-        if field_key == "session_number" and (not text.isdigit() or int(text) <= 0):
+        if field_key in ("session_number", "chemo_cycle_number", "chemo_session_number") and (
+            not text.isdigit() or int(text) <= 0
+        ):
             await update.message.reply_text(
-                "⚠️ يرجى إدخال رقم صحيح أكبر من صفر (رقم الجلسة الحالية):",
+                "⚠️ يرجى إدخال رقم صحيح أكبر من صفر:",
             )
             return get_confirm_state(flow_type)
 
@@ -274,12 +281,15 @@ async def handle_treatment_endoscopy_edit_field_input(update: Update, context: C
         if field_key in ("complaint", "complaint_text"):
             data["complaint"] = text
             data["complaint_text"] = text
-        elif field_key == "session_number":
+        elif field_key in ("session_number", "chemo_cycle_number"):
             # ✅ يُحدِّث TreatmentPlan الفعلية (chemo/targeted/immuno) أو نص
             # treatment_plan_summary مباشرة (dialysis، بلا خطة) — وليس مجرد
             # مفتاح جديد في report_tmp لا يقرأه شيء.
             _apply_session_number_edit(data, flow_type, text)
         else:
+            # ✅ chemo_session_number يمرّ من هنا — عمود Report مستقل بلا
+            # خطة تتبعه، فمجرد كتابة القيمة في report_tmp تحت نفس المفتاح
+            # كافية (نفس اسم العمود، انظر flows/shared.py::save_report_to_database).
             data[field_key] = text
 
         context.user_data.pop("edit_field_key", None)

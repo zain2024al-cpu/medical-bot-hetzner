@@ -159,8 +159,16 @@ REPORT_FIELD_REGISTRY: dict[str, list[FieldDef]] = {
         # يُحسَبان من TreatmentPlan، تعديلهما هنا يفصلهما عن الخطة الفعلية.
         # التعديل الصحيح عبر "✏️ تعديل الخطة" أثناء إنشاء تقرير جديد.
     ),
+    # ✅ الكيماوي وحده له مفهومان منفصلان: current_session لديه يمثّل رقم
+    # **الدورة** لا الجلسة (كل دورة كيماوي تحوي عدة جلسات — انظر unit_labels
+    # في treatment_plan_service.py)، فمفتاحه هنا `chemo_cycle_number` بتسمية
+    # صحيحة بدل `session_number` المشترَك (المستخدَم بشكل صحيح فعلاً في
+    # targeted/immuno/dialysis أدناه، حيث current_session يمثّل جلسة حقاً).
+    # `chemo_session_number` حقل جديد كلياً — رقم الجلسة ضمن تلك الدورة،
+    # عمود Report مستقل بلا أي تتبّع خطة (بطلب المستخدم صراحةً).
     "treatment_chemo": _with_followup_and_gate(
-        _f("session_number", "🔢 رقم الجلسة الحالية"),
+        _f("chemo_cycle_number", "🔢 رقم الدورة الحالية"),
+        _f("chemo_session_number", "🔢 رقم الجلسة ضمن الدورة"),
         _f("complaint_text", "💬 شكوى المريض"),
         _f("notes", "📝 ملاحظات الطبيب"),
     ),

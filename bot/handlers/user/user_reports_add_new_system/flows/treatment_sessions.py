@@ -41,6 +41,7 @@ from ..states import (
     CHEMO_CYCLES_TOTAL, CHEMO_CYCLES_UNIFORM_CHOICE,
     CHEMO_CYCLES_UNIFORM_COUNT, CHEMO_CYCLES_CUSTOM_ENTRY,
     TREATMENT_DIALYSIS_SESSION, TREATMENT_DIALYSIS_NEXT_DATE,
+    TREATMENT_CHEMO_SESSION_NUMBER,
 )
 from ..utils import _nav_buttons, MONTH_NAMES_AR, WEEKDAYS_AR
 from ...user_reports_add_helpers import validate_text_input
@@ -353,6 +354,13 @@ async def handle_treatment_plan_display_choice(update: Update, context: ContextT
 
     if choice == "continue":
         await query.edit_message_text(f"{data.get('treatment_plan_summary', '')}", parse_mode="Markdown")
+        # ✅ الكيماوي فقط: رقم الجلسة ضمن الدورة الحالية — كل دورة تحتوي
+        # عدة جلسات، ورقم الدورة نفسها (current_session) لا يميّز بينها.
+        # targeted/immuno/dialysis ليس لها هذا المفهوم فتتخطّاه مباشرة.
+        if data.get("_treatment_key") == "chemo":
+            await _prompt_chemo_session_number(query.message, context)
+            context.user_data['_conversation_state'] = TREATMENT_CHEMO_SESSION_NUMBER
+            return TREATMENT_CHEMO_SESSION_NUMBER
         await _prompt_complaint(query.message, context)
         context.user_data['_conversation_state'] = TREATMENT_COMPLAINT
         return TREATMENT_COMPLAINT
@@ -463,6 +471,39 @@ async def handle_treatment_plan_edit_reason_skip(update: Update, context: Contex
     await query.answer()
     plan = await _apply_pending_edit(update, context, None)
     return await _show_plan_display(query.message, context, plan)
+
+
+# ═══════════════════════════════════════════════════════════════════
+# الكيماوي فقط: رقم الجلسة ضمن الدورة الحالية (يدوي، بلا تتبّع/عدّ كلي)
+# ═══════════════════════════════════════════════════════════════════
+async def _prompt_chemo_session_number(message, context):
+    await message.reply_text(
+        "🔢 **رقم الجلسة ضمن الدورة الحالية**\n\n"
+        "أدخل رقم هذه الجلسة (مثال: 2):",
+        reply_markup=_nav_buttons(show_back=True),
+        parse_mode="Markdown",
+    )
+
+
+async def handle_chemo_session_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """رقم الجلسة ضمن الدورة الحالية — إدخال يدوي بحت في كل تقرير، بلا خطة
+    محفوظة أو عدّ كلي لجلسات كل دورة (بطلب المستخدم صراحةً)."""
+    context.user_data['_conversation_state'] = TREATMENT_CHEMO_SESSION_NUMBER
+    text = update.message.text.strip()
+    if not text.isdigit() or int(text) <= 0:
+        await update.message.reply_text(
+            "⚠️ يرجى إدخال رقم صحيح أكبر من صفر (رقم الجلسة ضمن الدورة):",
+            reply_markup=_nav_buttons(show_back=True),
+        )
+        return TREATMENT_CHEMO_SESSION_NUMBER
+
+    data = context.user_data.setdefault("report_tmp", {})
+    data["chemo_session_number"] = int(text)
+
+    await update.message.reply_text("✅ تم الحفظ")
+    await _prompt_complaint(update.message, context)
+    context.user_data['_conversation_state'] = TREATMENT_COMPLAINT
+    return TREATMENT_COMPLAINT
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -715,6 +756,7 @@ __all__ = [
     'handle_treatment_plan_setup', 'handle_treatment_plan_display_choice',
     'handle_treatment_plan_edit_value', 'handle_treatment_plan_edit_reason',
     'handle_treatment_plan_edit_reason_skip', 'handle_treatment_plan_manual_session',
+    'handle_chemo_session_number',
     'handle_treatment_complaint',
     'handle_treatment_notes', 'handle_treatment_notes_skip', 'handle_treatment_followup_reason',
     'handle_treatment_dialysis_session_number',

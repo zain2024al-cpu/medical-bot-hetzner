@@ -73,6 +73,7 @@ from .states import (
     ONCOLOGY_QUEUE_TOTAL, ONCOLOGY_QUEUE_CURRENT,
     ONCOLOGY_DELIVERY_MODE, ONCOLOGY_DELIVERY_DAYS,
     TREATMENT_DIALYSIS_SESSION, TREATMENT_DIALYSIS_NEXT_DATE,
+    TREATMENT_CHEMO_SESSION_NUMBER,
     TRANSPLANT_TYPE, TRANSPLANT_PARTY, TRANSPLANT_DETAILS,
     TRANSPLANT_FOLLOWUP_DATE, TRANSPLANT_FOLLOWUP_REASON,
     TRANSPLANT_TRANSLATOR, TRANSPLANT_CONFIRM,
@@ -370,6 +371,7 @@ def _treatment_handlers():
             handle_treatment_plan_setup, handle_treatment_plan_display_choice,
             handle_treatment_plan_edit_value, handle_treatment_plan_edit_reason,
             handle_treatment_plan_edit_reason_skip, handle_treatment_plan_manual_session,
+            handle_chemo_session_number,
             handle_treatment_complaint,
             handle_treatment_notes, handle_treatment_notes_skip, handle_treatment_followup_reason,
             handle_treatment_dialysis_session_number,
@@ -386,6 +388,7 @@ def _treatment_handlers():
             'plan_edit_reason':         handle_treatment_plan_edit_reason,
             'plan_edit_reason_skip':    handle_treatment_plan_edit_reason_skip,
             'plan_manual_session':      handle_treatment_plan_manual_session,
+            'chemo_session_number':     handle_chemo_session_number,
             'complaint':                handle_treatment_complaint,
             'notes':                    handle_treatment_notes,
             'notes_skip':                handle_treatment_notes_skip,
@@ -1292,6 +1295,12 @@ def register(app):
             TREATMENT_PLAN_EDIT_REASON: [
                 CallbackQueryHandler(_tracked(tp.get('plan_edit_reason_skip'), TREATMENT_PLAN_EDIT_REASON), pattern="^tp_edit_reason_skip$"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, _tracked(tp.get('plan_edit_reason'), TREATMENT_PLAN_EDIT_REASON)),
+            ],
+            # ── الكيماوي فقط: رقم الجلسة ضمن الدورة الحالية (بعد "✅ متابعة") ──
+            TREATMENT_CHEMO_SESSION_NUMBER: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, _tracked(tp.get('chemo_session_number'), TREATMENT_CHEMO_SESSION_NUMBER)),
+                CallbackQueryHandler(sh['handle_smart_back_navigation'],   pattern="^nav:back$"),
+                CallbackQueryHandler(sh['handle_smart_cancel_navigation'], pattern="^nav:cancel$"),
             ],
             TREATMENT_COMPLAINT: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, _tracked(tp.get('complaint'), TREATMENT_COMPLAINT)),
