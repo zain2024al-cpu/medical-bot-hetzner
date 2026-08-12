@@ -537,7 +537,6 @@ def _build_draft_edit_calendar_markup(year: int, month: int, flow_type: str = "u
         InlineKeyboardButton("◀️ السابق", callback_data=f"draft_edit_cal_nav:{prev_y}-{prev_m}"),
         InlineKeyboardButton("▶️ التالي", callback_data=f"draft_edit_cal_nav:{next_y}-{next_m}")
     ])
-    keyboard.append([InlineKeyboardButton("⏭️ بدون تاريخ عودة", callback_data="draft_edit_cal_skip")])
     keyboard.append([InlineKeyboardButton("🔙 رجوع لقائمة الحقول", callback_data=f"back_to_edit_fields:{flow_type}")])
     return text, InlineKeyboardMarkup(keyboard)
 
@@ -654,24 +653,6 @@ async def handle_draft_edit_time_skip(update: Update, context: ContextTypes.DEFA
         return await _handle_back_to_edit_fields_direct(update, context, flow_type)
     except Exception as e:
         logger.error(f"خطأ في تخطي الوقت: {e}")
-        return "EDIT_DRAFT_FOLLOWUP_CALENDAR"
-
-
-async def handle_draft_edit_cal_skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    try:
-        context.user_data["report_tmp"]["followup_date"] = None
-        context.user_data["report_tmp"]["followup_time"] = None
-        context.user_data.pop("editing_draft_date", None)
-        context.user_data.pop("editing_field", None)
-        flow_type = (context.user_data.get('edit_flow_type') or
-                     context.user_data.get('draft_flow_type') or
-                     context.user_data.get('report_tmp', {}).get('current_flow') or 'new_consult')
-        await query.edit_message_text("✅ تم إزالة تاريخ العودة\n\nجاري العودة لقائمة الحقول...", parse_mode="Markdown")
-        return await _handle_back_to_edit_fields_direct(update, context, flow_type)
-    except Exception as e:
-        logger.error(f"خطأ في تخطي تاريخ العودة: {e}")
         return "EDIT_DRAFT_FOLLOWUP_CALENDAR"
 
 

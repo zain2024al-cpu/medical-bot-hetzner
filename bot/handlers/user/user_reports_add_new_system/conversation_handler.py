@@ -235,7 +235,6 @@ from .edit_handlers.draft.handlers import (
     handle_draft_edit_translator,
     handle_draft_edit_calendar_nav,
     handle_draft_edit_calendar_day,
-    handle_draft_edit_cal_skip,
     handle_draft_edit_time_hour,
     handle_draft_edit_time_minute,
     handle_draft_edit_time_skip,
@@ -474,7 +473,6 @@ def register(app):
         'handle_draft_edit_translator':              handle_draft_edit_translator,
         'handle_draft_edit_calendar_nav':            handle_draft_edit_calendar_nav,
         'handle_draft_edit_calendar_day':            handle_draft_edit_calendar_day,
-        'handle_draft_edit_cal_skip':                handle_draft_edit_cal_skip,
         'handle_draft_edit_time_hour':               handle_draft_edit_time_hour,
         'handle_draft_edit_time_minute':             handle_draft_edit_time_minute,
         'handle_draft_edit_time_skip':               handle_draft_edit_time_skip,
@@ -859,7 +857,6 @@ def register(app):
             "EDIT_DRAFT_FOLLOWUP_CALENDAR": [
                 CallbackQueryHandler(sh['handle_draft_edit_calendar_nav'],  pattern="^draft_edit_cal_nav:"),
                 CallbackQueryHandler(sh['handle_draft_edit_calendar_day'],  pattern="^draft_edit_cal_day:"),
-                CallbackQueryHandler(sh['handle_draft_edit_cal_skip'],      pattern="^draft_edit_cal_skip$"),
                 CallbackQueryHandler(sh['handle_draft_edit_time_hour'],     pattern="^draft_edit_time_hour:"),
                 CallbackQueryHandler(sh['handle_draft_edit_time_minute'],   pattern="^draft_edit_time_minute:"),
                 CallbackQueryHandler(sh['handle_draft_edit_time_skip'],     pattern="^draft_edit_time_skip$"),
