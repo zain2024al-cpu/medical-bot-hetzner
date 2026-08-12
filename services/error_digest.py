@@ -39,6 +39,31 @@ logger = logging.getLogger(__name__)
 LOGS_DIR = Path("logs")
 _LOCK = threading.Lock()
 
+
+def _today_local() -> date:
+    """
+    "اليوم" بتوقيت TIMEZONE المُعدّ (افتراضياً Asia/Kolkata) — لا `date.today()`
+    الساذجة التي تقرأ توقيت نظام السيرفر مباشرة.
+
+    ⚠️ سبب وجود هذه الدالة: خادم الاستضافة بتوقيت أوروبي (CEST، +2)، بينما
+    مهمة الإرسال اليومية مجدولة عبر `app.job_queue.run_daily` بتوقيت
+    Asia/Kolkata (+5:30) الساعة 23:55 — أي 20:25 بتوقيت السيرفر. لو استُخدمت
+    `date.today()` الساذجة هنا (كما كانت)، يبقى "اليوم" بتوقيت السيرفر ولا
+    يتبدّل إلى اليوم التالي إلا عند منتصف ليل CEST — أي بعد الإرسال بأكثر
+    من 3 ساعات ونصف. أي خطأ يقع في تلك الفجوة (20:25–23:59 بتوقيت السيرفر)
+    يُسجَّل في ملف "اليوم" **بعد** أن أُرسل تقريره فعلاً، فلا يظهر في تقرير
+    اليوم نفسه (أُرسل قبله) ولا تقرير الغد (يقرأ ملف الغد لا اليوم) — يضيع
+    نهائياً. هذا بالضبط ما أنتج "لا أخطاء، لا إرسال" في 2026-08-10 و
+    2026-08-11 رغم وجود أخطاء فعلية مسجَّلة في ملفَي ذلك اليوم بتوقيت لاحق.
+    """
+    try:
+        import pytz
+        from config.settings import TIMEZONE
+        return datetime.now(pytz.timezone(TIMEZONE)).date()
+    except Exception:
+        # احتياط: توقيت السيرفر الساذج أفضل من انهيار كامل للالتقاط/الإرسال.
+        return date.today()
+
 # سجلّات لا قيمة تشخيصية لها وتتكرر بكثافة — تُستبعَد حتى لا تُغرق التقرير
 _IGNORE_SUBSTRINGS = (
     "terminated by other getUpdates",
@@ -101,7 +126,7 @@ class _DigestHandler(logging.Handler):
             LOGS_DIR.mkdir(parents=True, exist_ok=True)
             line = json.dumps(entry, ensure_ascii=False)
             with _LOCK:
-                with open(_day_file(date.today()), "a", encoding="utf-8") as f:
+                with open(_day_file(_today_local()), "a", encoding="utf-8") as f:
                     f.write(line + "\n")
         except Exception:
             # معالِج تسجيل لا يجوز أن يُسقط التطبيق مهما حدث
@@ -203,7 +228,7 @@ async def send_daily_error_report(application, day: date | None = None) -> None:
     """يُرسل تقرير اليوم للأدمن. صامت تماماً لو لم يقع خطأ."""
     from config.settings import ADMIN_IDS
 
-    day = day or date.today()
+    day = day or _today_local()
     path, count = build_report_file(day)
     if path is None:
         logger.info(f"[error_digest] {day} — لا أخطاء، لا إرسال")
@@ -236,7 +261,7 @@ def cleanup_old(days: int = 30) -> int:
     """يحذف ملفات الأخطاء الأقدم من `days` حتى لا تتراكم بلا حد."""
     if not LOGS_DIR.exists():
         return 0
-    cutoff = date.today() - timedelta(days=days)
+    cutoff = _today_local() - timedelta(days=days)
     removed = 0
     for p in LOGS_DIR.glob("errors-*.jsonl"):
         try:
