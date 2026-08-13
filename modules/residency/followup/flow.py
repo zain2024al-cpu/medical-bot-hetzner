@@ -7,6 +7,7 @@
 import logging
 
 from telegram import Update
+from telegram.error import BadRequest
 from telegram.ext import ContextTypes, CallbackQueryHandler
 
 from bot.shared_auth import is_admin
@@ -21,6 +22,22 @@ _MODULE_KEY = "residency"
 
 def _is_authorized(user_id: int) -> bool:
     return is_admin(user_id) or user_has_module(user_id, _MODULE_KEY)
+
+
+async def _safe_edit(query, text: str, kb) -> None:
+    """Edit a callback message, silently ignoring 'not modified' rejections.
+
+    ⚠️ يحدث فعلياً عند الضغط على «📋 تقديم» مرة ثانية على ملف صار بالفعل
+    renewal_submitted — لا تغيّر فعلي فتصير النتيجة نصاً/أزراراً مطابقة
+    لما هو معروض بالضبط، فيرفض تيليجرام التعديل بـ BadRequest غير مُعالَج.
+    """
+    try:
+        await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
+    except BadRequest as e:
+        if "not modified" in str(e).lower():
+            logger.debug("[residency.followup] message unchanged — edit skipped")
+        else:
+            raise
 
 
 async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -67,7 +84,7 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
         from modules.residency.followup.views import build_followup_list
         entries  = get_expiring_soon()
         text, kb = build_followup_list(entries)
-        await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
+        await _safe_edit(query, text, kb)
         return
 
     if action.startswith("submitted_"):
@@ -84,7 +101,7 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
         from modules.residency.followup.views import build_followup_list
         entries  = get_expiring_soon()
         text, kb = build_followup_list(entries)
-        await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
+        await _safe_edit(query, text, kb)
         return
 
     # ── استكمال المرافقين — complete_{profile_id} ────────────────────────────
