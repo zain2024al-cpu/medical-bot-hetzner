@@ -473,7 +473,7 @@ async def handle_new_consult_followup_calendar_nav(update: Update, context: Cont
             current_state = APP_RESCHEDULE_RETURN_DATE
         elif current_flow == "endoscopy":
             current_state = ENDOSCOPY_FOLLOWUP_DATE
-        elif current_flow in ("treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis"):
+        elif current_flow in ("treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis", "treatment_combined"):
             current_state = TREATMENT_FOLLOWUP_DATE
         elif current_flow == "transplant":
             current_state = TRANSPLANT_FOLLOWUP_DATE
@@ -555,7 +555,7 @@ async def handle_new_consult_followup_calendar_day(update: Update, context: Cont
             next_state = APP_RESCHEDULE_RETURN_DATE
         elif current_flow == "endoscopy":
             next_state = ENDOSCOPY_FOLLOWUP_DATE
-        elif current_flow in ("treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis"):
+        elif current_flow in ("treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis", "treatment_combined"):
             next_state = TREATMENT_FOLLOWUP_DATE
         elif current_flow == "transplant":
             next_state = TRANSPLANT_FOLLOWUP_DATE
@@ -595,7 +595,7 @@ async def handle_new_consult_followup_calendar_day(update: Update, context: Cont
             current_state = APP_RESCHEDULE_RETURN_DATE
         elif current_flow == "endoscopy":
             current_state = ENDOSCOPY_FOLLOWUP_DATE
-        elif current_flow in ("treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis"):
+        elif current_flow in ("treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis", "treatment_combined"):
             current_state = TREATMENT_FOLLOWUP_DATE
         elif current_flow == "transplant":
             current_state = TRANSPLANT_FOLLOWUP_DATE
@@ -681,7 +681,7 @@ async def handle_new_consult_followup_time_hour(update: Update, context: Context
             next_state = APP_RESCHEDULE_RETURN_REASON
         elif current_flow == "endoscopy":
             next_state = ENDOSCOPY_FOLLOWUP_REASON
-        elif current_flow in ("treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis"):
+        elif current_flow in ("treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis", "treatment_combined"):
             next_state = TREATMENT_FOLLOWUP_REASON
         elif current_flow == "transplant":
             next_state = TRANSPLANT_FOLLOWUP_REASON
@@ -730,7 +730,7 @@ async def handle_new_consult_followup_time_hour(update: Update, context: Context
             return APP_RESCHEDULE_RETURN_DATE
         elif current_flow == "endoscopy":
             return ENDOSCOPY_FOLLOWUP_DATE
-        elif current_flow in ("treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis"):
+        elif current_flow in ("treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis", "treatment_combined"):
             return TREATMENT_FOLLOWUP_DATE
         elif current_flow == "transplant":
             return TRANSPLANT_FOLLOWUP_DATE
@@ -809,7 +809,7 @@ async def handle_new_consult_followup_time_minute(update: Update, context: Conte
             next_state = APP_RESCHEDULE_RETURN_REASON
         elif current_flow == "endoscopy":
             next_state = ENDOSCOPY_FOLLOWUP_REASON
-        elif current_flow in ("treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis"):
+        elif current_flow in ("treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis", "treatment_combined"):
             next_state = TREATMENT_FOLLOWUP_REASON
         elif current_flow == "transplant":
             next_state = TRANSPLANT_FOLLOWUP_REASON
@@ -846,7 +846,7 @@ async def handle_new_consult_followup_time_minute(update: Update, context: Conte
         current_state = DEVICE_FOLLOWUP_DATE
     elif current_flow == "endoscopy":
         current_state = ENDOSCOPY_FOLLOWUP_DATE
-    elif current_flow in ("treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis"):
+    elif current_flow in ("treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis", "treatment_combined"):
         current_state = TREATMENT_FOLLOWUP_DATE
     elif current_flow == "transplant":
         current_state = TRANSPLANT_FOLLOWUP_DATE
@@ -909,7 +909,7 @@ async def handle_new_consult_followup_time_skip(update: Update, context: Context
             next_state = APP_RESCHEDULE_RETURN_REASON
         elif current_flow == "endoscopy":
             next_state = ENDOSCOPY_FOLLOWUP_REASON
-        elif current_flow in ("treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis"):
+        elif current_flow in ("treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis", "treatment_combined"):
             next_state = TREATMENT_FOLLOWUP_REASON
         elif current_flow == "transplant":
             next_state = TRANSPLANT_FOLLOWUP_REASON
@@ -945,7 +945,7 @@ async def handle_new_consult_followup_time_skip(update: Update, context: Context
         current_state = DEVICE_FOLLOWUP_DATE
     elif current_flow == "endoscopy":
         current_state = ENDOSCOPY_FOLLOWUP_DATE
-    elif current_flow in ("treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis"):
+    elif current_flow in ("treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis", "treatment_combined"):
         current_state = TREATMENT_FOLLOWUP_DATE
     elif current_flow == "transplant":
         current_state = TRANSPLANT_FOLLOWUP_DATE
