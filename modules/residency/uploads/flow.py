@@ -30,13 +30,18 @@ from core.access.access_service import user_has_module
 from shared.uploads import collector as uploads
 from shared.result_router import register as _register_route
 
-from modules.residency.uploads.views import build_form_c_saved, build_photo_saved, build_photo_target_picker
+from modules.residency.uploads.views import (
+    build_form_c_saved, build_photo_saved, build_photo_target_picker,
+    build_document_type_menu, build_document_target_picker, build_document_saved,
+    DOCUMENT_TYPES,
+)
 
 logger = logging.getLogger(__name__)
 
 RNU = "rnu"
-_RKEY_FORM_C = "res.uploads.form_c"
-_RKEY_PHOTO  = "res.uploads.photo"
+_RKEY_FORM_C  = "res.uploads.form_c"
+_RKEY_PHOTO   = "res.uploads.photo"
+_RKEY_DOCUMENT = "res.uploads.document"
 _MODULE_KEY  = "residency"
 
 # المريض المستهدَف برفع فورم C — يُحفظ خارج جلسة الرفع لأن collector
@@ -45,6 +50,9 @@ _CTX_FORM_C_PROFILE = "_rnu_form_c_profile_id"
 # ✅ هدف الصورة الشخصية — قد يكون المريض نفسه أو أحد مرافقيه، فيُخزَّن
 # profile_id دائماً (للعودة لملف المريض) مع companion_id عند وجوده.
 _CTX_PHOTO_TARGET   = "_rnu_photo_target"
+# ✅ نفس فكرة _CTX_PHOTO_TARGET لكن لجواز/فيزا/تذكرة — يحمل doc_type أيضاً
+# لأن معالِج نتيجة الرفع واحد مشترك للأنواع الثلاثة.
+_CTX_DOC_TARGET     = "_rnu_doc_target"
 
 
 def _is_authorized(user_id: int) -> bool:
@@ -187,6 +195,82 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
         )
         return
 
+    # ── القائمة الموحَّدة «🗂️ رفع وثيقة» ──────────────────────────────────────
+    if action.startswith("docmenu_"):
+        profile_id = int(action[len("docmenu_"):])
+        text, kb = build_document_type_menu(profile_id)
+        await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
+        return
+
+    # ── جواز/فيزا/تذكرة — اختيار الهدف أولاً (مريض أو مرافق) ───────────────────
+    if action.startswith("docsel_"):
+        # format: docsel_{doc_type}_{profile_id}_{"p" | companion_id}
+        rest = action[len("docsel_"):]
+        doc_type, _, rest = rest.partition("_")
+        profile_id_str, _, who = rest.partition("_")
+        profile_id = int(profile_id_str)
+
+        from modules.residency.profiles.repository import get_profile_by_id, get_companions_for_profile
+        profile = get_profile_by_id(profile_id)
+        if profile is None:
+            await query.edit_message_text("❌ لم يتم العثور على الملف.", parse_mode="Markdown")
+            return
+
+        icon, label = DOCUMENT_TYPES[doc_type]
+        if who == "p":
+            context.user_data[_CTX_DOC_TARGET] = {"doc_type": doc_type, "profile_id": profile_id, "companion_id": None}
+            target_name = profile.name
+        else:
+            companion_id = int(who)
+            companions = get_companions_for_profile(profile_id)
+            match = next((c for c in companions if c.id == companion_id), None)
+            if match is None:
+                await query.edit_message_text("❌ لم يتم العثور على المرافق.", parse_mode="Markdown")
+                return
+            context.user_data[_CTX_DOC_TARGET] = {"doc_type": doc_type, "profile_id": profile_id, "companion_id": companion_id}
+            target_name = match.name
+
+        await uploads.open(
+            update, context,
+            title=f"{icon} أرسل {label} لـ «{target_name}»",
+            return_to=_RKEY_DOCUMENT,
+            max_files=1,
+        )
+        return
+
+    # ── جواز/فيزا/تذكرة (من ملف المريض) ─────────────────────────────────────────
+    if action.startswith("doc_"):
+        rest = action[len("doc_"):]
+        doc_type, _, profile_id_str = rest.partition("_")
+        profile_id = int(profile_id_str)
+        if doc_type not in DOCUMENT_TYPES:
+            logger.warning(f"[residency.uploads.cb] unknown doc_type={doc_type!r}")
+            return
+
+        from modules.residency.profiles.repository import get_profile_by_id, get_companions_for_profile
+        profile = get_profile_by_id(profile_id)
+        if profile is None:
+            await query.edit_message_text("❌ لم يتم العثور على الملف.", parse_mode="Markdown")
+            return
+        companions = get_companions_for_profile(profile_id)
+        icon, label = DOCUMENT_TYPES[doc_type]
+
+        # ✅ بلا مرافقين: رفع مباشر للمريض بلا شاشة اختيار (نفس منطق الصورة
+        # الشخصية) — بمرافقين: شاشة اختيار «لمن الوثيقة؟».
+        if not companions:
+            context.user_data[_CTX_DOC_TARGET] = {"doc_type": doc_type, "profile_id": profile_id, "companion_id": None}
+            await uploads.open(
+                update, context,
+                title=f"{icon} أرسل {label} لـ «{profile.name}»",
+                return_to=_RKEY_DOCUMENT,
+                max_files=1,
+            )
+            return
+
+        text, kb = build_document_target_picker(doc_type, profile.name, profile_id, companions)
+        await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
+        return
+
     logger.warning(f"[residency.uploads.cb] unhandled action={action!r}  user={uid}")
 
 
@@ -286,6 +370,39 @@ async def _on_photo(result, update: Update, context: ContextTypes.DEFAULT_TYPE) 
     await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
 
+async def _on_document(result, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """نتيجة رفع جواز/فيزا/تذكرة — نفس بنية _on_photo لكن بلا معالجة صورة."""
+    target = context.user_data.pop(_CTX_DOC_TARGET, None) or {}
+    doc_type     = target.get("doc_type")
+    profile_id   = target.get("profile_id")
+    companion_id = target.get("companion_id")
+
+    if result.cancelled or not profile_id:
+        if profile_id:
+            await _render_profile(update, context, profile_id)
+        else:
+            await update.effective_message.reply_text("تم الإلغاء.", parse_mode="Markdown")
+        return
+
+    file_id = ""
+    if result.files:
+        f = result.files[0]
+        file_id = f.to_dict().get("file_id", "") if hasattr(f, "to_dict") else ""
+
+    if not file_id:
+        await update.effective_message.reply_text(
+            "⚠️ لم يصل أي ملف. حاول مجدداً.", parse_mode="Markdown")
+        return
+
+    from modules.residency.uploads.repository import save_document
+    name = save_document(
+        doc_type=doc_type, profile_id=profile_id, companion_id=companion_id,
+        file_id=file_id, performed_by=update.effective_user.id if update.effective_user else None,
+    )
+    text, kb = build_document_saved(doc_type, name, profile_id)
+    await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+
+
 # ── التسجيل ───────────────────────────────────────────────────────────────────
 
 def register_handlers(app) -> None:
@@ -297,6 +414,7 @@ def register_handlers(app) -> None:
 
 
 def register_result_routes() -> None:
-    _register_route(_RKEY_FORM_C, _on_form_c)
-    _register_route(_RKEY_PHOTO,  _on_photo)
+    _register_route(_RKEY_FORM_C,   _on_form_c)
+    _register_route(_RKEY_PHOTO,    _on_photo)
+    _register_route(_RKEY_DOCUMENT, _on_document)
     logger.info("[residency.uploads] result routes registered")

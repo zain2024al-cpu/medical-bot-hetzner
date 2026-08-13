@@ -804,6 +804,9 @@ class ResidencyProfile(Base):
     form_c_file_id           = Column(String(255), default="")
     # ✅ الصورة الشخصية للمريض — تُرفع من «📎 إضافة مرفق» في ملف المريض.
     photo_file_id            = Column(String(255), default="")
+    # ✅ التذكرة — لم تكن موجودة إطلاقاً على الإقامات (فقط على الواصلين)،
+    # فلا يوجد أي طريق لرفعها/تصحيحها إن تم تخطّيها هناك بالخطأ.
+    tickets_file_id          = Column(String(255), default="")
     # Extra
     notes                    = Column(Text, default="")
     created_by               = Column(Integer, nullable=True, index=True)
@@ -834,6 +837,7 @@ class ResidencyCompanion(Base):
     # ✅ الصورة الشخصية للمرافق — نفس حقل المريض لكن لكل مرافق على حدة
     # (بخلاف فورم C الذي يبقى مستنداً واحداً للعائلة كلها).
     photo_file_id            = Column(String(255), default="")
+    tickets_file_id          = Column(String(255), default="")
     notes                    = Column(Text, default="")
     created_at               = Column(DateTime, default=datetime.utcnow, nullable=True)
     updated_at               = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)

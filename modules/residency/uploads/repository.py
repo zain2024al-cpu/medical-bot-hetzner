@@ -87,3 +87,40 @@ def save_companion_photo(*, profile_id: int, companion_id: int, file_id: str, pe
     logger.info(f"[residency.uploads] companion photo saved  profile={profile_id}  companion={companion_id}")
     return name
 
+
+def save_document(*, doc_type: str, profile_id: int, companion_id: int | None,
+                   file_id: str, performed_by: int | None) -> str:
+    """
+    يحفظ جواز/فيزا/تذكرة للمريض أو لمرافق — العمود مطابق لاسم النوع
+    (`{doc_type}_file_id`) على كلا الجدولين. يعيد اسم الشخص المستهدَف.
+    """
+    from db.session import get_db
+    from db.models import ResidencyProfile, ResidencyCompanion, ResidencyUpdate
+    from modules.residency.uploads.views import DOCUMENT_TYPES
+
+    _, label = DOCUMENT_TYPES[doc_type]
+    column = f"{doc_type}_file_id"
+
+    with get_db() as db:
+        if companion_id:
+            person = db.query(ResidencyCompanion).filter(ResidencyCompanion.id == companion_id).first()
+        else:
+            person = db.query(ResidencyProfile).filter(ResidencyProfile.id == profile_id).first()
+        if person is None:
+            return ""
+        setattr(person, column, file_id)
+        db.add(ResidencyUpdate(
+            profile_id=   profile_id,
+            companion_id= companion_id,
+            action_type=  f"{doc_type}_uploaded",
+            action_label= f"تم رفع {label}" + (f" — {person.name}" if companion_id else ""),
+            old_status=   person.status or "",
+            new_status=   person.status or "",
+            residency_file_id=file_id,
+            performed_by= performed_by,
+        ))
+        name = person.name or ""
+
+    logger.info(f"[residency.uploads] {doc_type} saved  profile={profile_id}  companion={companion_id}")
+    return name
+

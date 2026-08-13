@@ -225,6 +225,11 @@ class DatabaseMaintenance:
                 # ✅ الصورة الشخصية للمرافق — كانت مقصورة على المريض فقط،
                 # فلم يكن هناك أي طريقة لرفع صورة مرافق إطلاقاً.
                 _migrate_column(conn, "res_companions", "photo_file_id", "VARCHAR(255)")
+                # ✅ التذكرة — موجودة على الواصلين فقط (tickets_file_id) ولم
+                # تكن موجودة إطلاقاً على الإقامات، فتخطّيها أثناء الواصلين
+                # كان يعني لا طريق لرفعها لاحقاً أبداً.
+                _migrate_column(conn, "res_profiles", "tickets_file_id", "VARCHAR(255)")
+                _migrate_column(conn, "res_companions", "tickets_file_id", "VARCHAR(255)")
                 logger.info("🔎 Migration check finished.")
 
                 if check == "ok":

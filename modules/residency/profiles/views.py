@@ -242,18 +242,13 @@ def build_profile_detail(profile, companions, missing_items=()) -> tuple[str, In
         InlineKeyboardButton("➕ إضافة مرافق",   callback_data=f"{RNA}:add_comp_{profile.id}"),
     ])
 
-    # ✅ فورم C والصورة الشخصية — منقولان من شاشة «➕ إضافة خدمة» المحذوفة
-    # مع الوحدة. لا يزالان المدخل الوحيد لهذين الحقلين (لا الجواز/التأشيرة/
-    # الإقامة — تلك تبقى في مساراتها فلا يصير للحقل الواحد مصدران).
-    has_form_c = bool(getattr(profile, "form_c_file_id", ""))
-    has_photo  = bool(getattr(profile, "photo_file_id", ""))
+    # ✅ زر موحَّد واحد بدل زرَّي فورم C/الصورة المنفصلين سابقاً — يفتح قائمة
+    # تشمل الاثنين بالإضافة لجواز/فيزا/تذكرة (لم يكن لها أي مسار رفع من
+    # قبل — تُستخدَم لتصحيح ما تم تخطّيه بالخطأ أثناء الواصلين). الإقامة
+    # نفسها مستبعَدة عمداً وتبقى حصراً على مسار «🪪 تجديد الإقامة» الكامل
+    # فلا يصير للحقل الواحد مصدران.
     rows.append([
-        InlineKeyboardButton(
-            "📄 استبدال فورم C" if has_form_c else "📄 رفع فورم C",
-            callback_data=f"rnu:formc_{profile.id}"),
-        InlineKeyboardButton(
-            "🖼️ استبدال الصورة" if has_photo else "🖼️ رفع صورة شخصية",
-            callback_data=f"rnu:photo_{profile.id}"),
+        InlineKeyboardButton("🗂️ رفع وثيقة", callback_data=f"rnu:docmenu_{profile.id}"),
     ])
 
     rows.append([
