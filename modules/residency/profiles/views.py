@@ -4,7 +4,7 @@
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
-from modules.residency.constants import PROFILES_PAGE_SIZE, HISTORY_DISPLAY_LIMIT
+from modules.residency.constants import PROFILES_PAGE_SIZE
 from modules.residency.views import (
     format_status, format_status_icon, format_expiry_date,
     format_days_remaining, format_expiry_warning_inline, doc_icon,
@@ -148,7 +148,7 @@ def build_export_destination_prompt(fmt: str, include_passport: bool) -> tuple[s
 
 # ── Profile detail ────────────────────────────────────────────────────────────
 
-def build_profile_detail(profile, companions, history, missing_items=()) -> tuple[str, InlineKeyboardMarkup]:
+def build_profile_detail(profile, companions, missing_items=()) -> tuple[str, InlineKeyboardMarkup]:
     comp_count   = len(companions)
     # ✅ الحالة الزمنية تُشتقّ من التاريخ — العمود المخزَّن يبقى "active" أبداً
     _status      = effective_status(profile.status, profile.expiry_date)
@@ -214,16 +214,6 @@ def build_profile_detail(profile, companions, history, missing_items=()) -> tupl
         for m in missing_items:
             lines.append(f"  • {m.description}")
         lines.append(_THIN)
-
-    # ── History ───────────────────────────────────────────────────────────────
-    if history:
-        lines.append(f"🕓 *آخر {min(len(history), HISTORY_DISPLAY_LIMIT)} أحداث:*")
-        for h in history[:HISTORY_DISPLAY_LIMIT]:
-            date_part = h.created_at[:10] if h.created_at else ""
-            comp_tag  = " (مرافق)" if h.companion_id else ""
-            lines.append(f"  • {h.action_label}{comp_tag}  {date_part}")
-    else:
-        lines.append("🕓 *السجل:*  لا توجد أحداث مسجلة")
 
     # ✅ متابعة تقديم الأوراق مجمَّعة هنا بالكامل بدل شاشة «📤 الرفع
     # والمتابعة» المحذوفة — مصدر الحقيقة الوحيد لا يزال PAPERS_ADVANCE في

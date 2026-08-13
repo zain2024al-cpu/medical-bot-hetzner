@@ -70,7 +70,7 @@ async def _render_profile(update, context, profile_id: int) -> None:
     وترسل رسالة جديدة إن جاء من نتيجة رفع (لا query نشِط حينها).
     """
     from modules.residency.profiles.repository import (
-        get_profile_by_id, get_companions_for_profile, get_history_for_profile,
+        get_profile_by_id, get_companions_for_profile,
         get_pending_missing_items,
     )
     from modules.residency.profiles.views import build_profile_detail
@@ -80,9 +80,8 @@ async def _render_profile(update, context, profile_id: int) -> None:
         await _safe_edit(update, "❌ لم يتم العثور على الملف.", None)
         return
     companions    = get_companions_for_profile(profile_id)
-    history       = get_history_for_profile(profile_id)
     missing_items = get_pending_missing_items(profile_id)
-    text, kb   = build_profile_detail(profile, companions, history, missing_items)
+    text, kb   = build_profile_detail(profile, companions, missing_items)
     await _safe_edit(update, text, kb)
 
 

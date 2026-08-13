@@ -47,7 +47,7 @@ from modules.residency.profiles.views import (
 )
 from modules.residency.profiles.repository import (
     get_profiles_page, get_profile_by_id,
-    get_companions_for_profile, get_history_for_profile,
+    get_companions_for_profile,
     search_profiles, get_pending_missing_items,
 )
 
@@ -376,9 +376,8 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
             await query.edit_message_text("❌ لم يتم العثور على الملف.", parse_mode="Markdown")
             return
         companions    = get_companions_for_profile(profile_id)
-        history       = get_history_for_profile(profile_id)
         missing_items = get_pending_missing_items(profile_id)
-        text, kb   = build_profile_detail(profile, companions, history, missing_items)
+        text, kb   = build_profile_detail(profile, companions, missing_items)
         await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
         return
 
@@ -655,9 +654,8 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
             if ok:
                 profile       = get_profile_by_id(edit_id)
                 companions    = get_companions_for_profile(edit_id)
-                history       = get_history_for_profile(edit_id)
                 missing_items = get_pending_missing_items(edit_id)
-                text, kb   = build_profile_detail(profile, companions, history, missing_items)
+                text, kb   = build_profile_detail(profile, companions, missing_items)
             else:
                 text, kb = build_error("فشل تحديث التاريخ. حاول مجدداً.")
             await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")

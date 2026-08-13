@@ -79,15 +79,6 @@ def get_pending_missing_items(profile_id: int) -> list[MissingItemRow]:
         ]
 
 
-@dataclass
-class HistoryRow:
-    action_label:   str
-    new_status:     str
-    new_expiry_date:str
-    created_at:     str
-    companion_id:   int | None
-
-
 def get_profiles_page(page: int = 0) -> tuple[list[ProfileRow], int]:
     """
     Return (profiles_for_page, total_count).
@@ -184,30 +175,6 @@ def get_companions_for_profile(profile_id: int) -> list[CompanionRow]:
                 passport_file_id=r.passport_file_id or "",
                 visa_file_id=r.visa_file_id or "",
                 latest_residency_file_id=r.latest_residency_file_id or "",
-            )
-            for r in rows
-        ]
-
-
-def get_history_for_profile(profile_id: int, limit: int = 10) -> list[HistoryRow]:
-    from db.session import get_db
-    from db.models import ResidencyUpdate
-
-    with get_db() as db:
-        rows = (
-            db.query(ResidencyUpdate)
-            .filter(ResidencyUpdate.profile_id == profile_id)
-            .order_by(ResidencyUpdate.created_at.desc())
-            .limit(limit)
-            .all()
-        )
-        return [
-            HistoryRow(
-                action_label=    r.action_label or r.action_type,
-                new_status=      r.new_status or "",
-                new_expiry_date= r.new_expiry_date or "",
-                created_at=      r.created_at.isoformat() if r.created_at else "",
-                companion_id=    r.companion_id,
             )
             for r in rows
         ]
