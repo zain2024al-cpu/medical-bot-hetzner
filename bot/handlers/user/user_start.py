@@ -288,6 +288,8 @@ async def user_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if role == "healthcare":
             subtitle = "*في بوت الرعاية الصحية الذكية*"
+        elif role == "residency":
+            subtitle = "*في بوت الإقامات*"
         else:
             # Translators and public see the generic system name.
             subtitle = "*نظام إدارة التقارير الطبية*"
@@ -348,7 +350,10 @@ async def handle_start_main_menu(update: Update, context: ContextTypes.DEFAULT_T
         text, kb = build_healthcare_menu()
         await query.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
     else:
-        # Translator or public — restore the role-appropriate reply keyboard.
+        # Translator, residency, or public — restore the role-appropriate
+        # reply keyboard (dynamic_user_kb reads the user's actual modules,
+        # so this is correct for any non-healthcare role without needing
+        # a dedicated branch per role).
         first_name = update.effective_user.first_name or "المستخدم"
         await query.message.reply_text(
             f"👋 {first_name}، اختر من القائمة:",

@@ -7,11 +7,11 @@
 #
 # Priority order
 # ──────────────
-#   admin  > translator > healthcare > public
+#   admin  > translator > healthcare > residency > public
 #
-# "translator" takes priority over "healthcare" so that users who have BOTH
-# modules land on the translator interface (the primary role). They can still
-# reach healthcare through the "▶️ ابدأ الآن" button in their reply keyboard.
+# "translator" takes priority over "healthcare"/"residency" so that users who
+# have BOTH modules land on the translator interface (the primary role). They
+# can still reach healthcare/residency through their reply keyboard buttons.
 #
 # Architecture note
 # ─────────────────
@@ -25,7 +25,7 @@ from typing import Literal
 logger = logging.getLogger(__name__)
 
 # Canonical landing-role strings consumed by user_start.py and handle_start_main_menu.
-LandingRole = Literal["admin", "healthcare", "translator", "public"]
+LandingRole = Literal["admin", "healthcare", "residency", "translator", "public"]
 
 
 def resolve_user_landing_interface(tg_user_id: int) -> LandingRole:
@@ -37,8 +37,9 @@ def resolve_user_landing_interface(tg_user_id: int) -> LandingRole:
 
     Returns:
         "admin"       — user is in ADMIN_IDS
-        "translator"  — user has the user_reports module (with or without healthcare)
-        "healthcare"  — user has ONLY the healthcare module
+        "translator"  — user has the user_reports module (with or without healthcare/residency)
+        "healthcare"  — user has the healthcare module but not user_reports
+        "residency"   — user has the residency module but not user_reports/healthcare
         "public"      — user has no active modules (pending / no access granted)
 
     Never raises — returns "public" on any unexpected error.
@@ -62,6 +63,9 @@ def resolve_user_landing_interface(tg_user_id: int) -> LandingRole:
 
         if "healthcare" in modules:
             return "healthcare"
+
+        if "residency" in modules:
+            return "residency"
 
     except Exception as exc:
         logger.error(f"[landing] module check failed for {tg_user_id}: {exc}", exc_info=True)
