@@ -583,48 +583,22 @@ async def handle_calendar_cancel(update: Update, context: ContextTypes.DEFAULT_T
 
 
 async def handle_followup_date_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """معالجة إدخال تاريخ العودة يدوياً"""
-    from .states import (
-        NEW_CONSULT_FOLLOWUP_REASON, FOLLOWUP_REASON, EMERGENCY_REASON,
-        ADMISSION_FOLLOWUP_REASON, SURGERY_CONSULT_FOLLOWUP_REASON,
-        OPERATION_FOLLOWUP_REASON, DISCHARGE_FOLLOWUP_REASON,
-        PHYSICAL_THERAPY_FOLLOWUP_REASON, DEVICE_FOLLOWUP_REASON,
-    )
-    text = update.message.text.strip()
+    """رفض إدخال تاريخ العودة يدوياً — يُختار من التقويم فقط.
 
-    if not text or len(text) < 2:
-        await update.message.reply_text(
-            "⚠️ **يرجى إدخال نص صحيح**\n\n"
-            "أمثلة:\n• 15/1/2026\n• بعد أسبوع\n• الأحد القادم\n\n"
-            "أو اختر من التقويم أعلاه.",
-            parse_mode="Markdown"
-        )
-        return context.user_data.get('_conversation_state')
-
-    report_tmp = context.user_data.setdefault("report_tmp", {})
-    report_tmp["followup_date"] = text
-    report_tmp["followup_time"] = None
-
-    current_flow = report_tmp.get("current_flow", "new_consult")
-    reason_state_map = {
-        "followup":         FOLLOWUP_REASON,
-        "inpatient_followup": FOLLOWUP_REASON,
-        "periodic_followup":  FOLLOWUP_REASON,
-        "emergency":        EMERGENCY_REASON,
-        "admission":        ADMISSION_FOLLOWUP_REASON,
-        "surgery_consult":  SURGERY_CONSULT_FOLLOWUP_REASON,
-        "operation":        OPERATION_FOLLOWUP_REASON,
-        "discharge":        DISCHARGE_FOLLOWUP_REASON,
-        "rehab_physical":   PHYSICAL_THERAPY_FOLLOWUP_REASON,
-        "rehab_device":     DEVICE_FOLLOWUP_REASON,
-        "device":           DEVICE_FOLLOWUP_REASON,
-    }
-    next_state = reason_state_map.get(current_flow, NEW_CONSULT_FOLLOWUP_REASON)
+    ⚠️ كانت تقبل أي نص من حرفين فأكثر بلا أي تحقّق أو تحليل تاريخ فعلي —
+    تُخزَّن حرفياً كما كُتبت وينتقل مباشرة لسبب العودة، فيمكن حفظ نص عشوائي
+    ("xx", "22"...) كـ"تاريخ عودة" رسمي. أُزيلت هذه القدرة بطلب المستخدم
+    صراحةً: "المفترض الاختيار من التقويم" فقط — بنفس منطق الرفض المستخدَم
+    في تعديل التقرير بعد النشر (`handle_text_during_date_calendar` في
+    user_reports_edit.py)، فتتسق الشاشات الثلاث (الإنشاء، والتعديل قبل/بعد
+    النشر) على نفس القاعدة.
+    """
+    from .flows.new_consult import _render_followup_calendar
 
     await update.message.reply_text(
-        f"✅ **تم حفظ موعد العودة**\n\n📅 {text}\n\n✍️ يرجى إدخال سبب العودة:",
-        parse_mode="Markdown"
+        "⚠️ **لا يمكن إدخال تاريخ العودة يدوياً**\n\n"
+        "✅ **يرجى اختيار التاريخ من التقويم أدناه:**",
+        parse_mode="Markdown",
     )
-
-    context.user_data['_conversation_state'] = next_state
-    return next_state
+    await _render_followup_calendar(update.message, context)
+    return context.user_data.get('_conversation_state')
