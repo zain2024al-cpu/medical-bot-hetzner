@@ -1,5 +1,5 @@
 # modules/residency/uploads/flow.py
-# معالِج rnu: — أفعال ملحقة بملف مريض واحد: تقدّم/تراجع مرحلة الأوراق،
+# معالِج rnu: — أفعال ملحقة بملف مريض واحد: تقدّم مرحلة الأوراق،
 # رفع فورم C، رفع الصورة الشخصية.
 #
 # ⚠️ لا شاشة قائمة هنا بعد الآن — «📤 الرفع والمتابعة» بأزرارها ومنتقياتها
@@ -63,11 +63,11 @@ async def _safe_edit(update, text, kb):
 
 async def _render_profile(update, context, profile_id: int) -> None:
     """
-    تُستدعى بعد كل فعل هنا (تقدّم/تراجع مرحلة، أو نتيجة رفع فورم C/الصورة
-    الملغاة) لإعادة رسم شاشة ملف المريض بحالته المُحدَّثة — لا قائمة.
+    تُستدعى بعد كل فعل هنا (تقدّم مرحلة، أو نتيجة رفع فورم C/الصورة الملغاة)
+    لإعادة رسم شاشة ملف المريض بحالته المُحدَّثة — لا قائمة.
 
-    `_safe_edit` تُحرّر الرسالة إن جاء الاستدعاء من ضغطة زر (adv_/undo_)،
-    وترسل رسالة جديدة إن جاء من نتيجة رفع (لا query نشِط حينها).
+    `_safe_edit` تُحرّر الرسالة إن جاء الاستدعاء من ضغطة زر (adv_)، وترسل
+    رسالة جديدة إن جاء من نتيجة رفع (لا query نشِط حينها).
     """
     from modules.residency.profiles.repository import (
         get_profile_by_id, get_companions_for_profile,
@@ -173,21 +173,6 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
         context.user_data["_res_missing_item"] = {"profile_id": profile_id, "advance_stage": True}
         text, kb = build_missing_item_prompt(_p2.name, profile_id)
         await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
-        return
-
-    # ── تراجع خطوة ────────────────────────────────────────────────────────────
-    if action.startswith("undo_"):
-        profile_id = int(action[5:])
-        from modules.residency.uploads.repository import undo_papers_stage
-        ok, name, restored = undo_papers_stage(
-            profile_id=profile_id, performed_by=user_id,
-        )
-        if ok:
-            from modules.residency.views import format_status
-            await query.answer(f"↩️ {name} — {format_status(restored)}", show_alert=True)
-        else:
-            await query.answer("لا يوجد ما يمكن التراجع عنه.", show_alert=True)
-        await _render_profile(update, context, profile_id)
         return
 
     # ── رفع الصورة الشخصية (من ملف المريض) ────────────────────────────────────

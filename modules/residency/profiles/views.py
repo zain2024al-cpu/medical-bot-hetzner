@@ -227,13 +227,6 @@ def build_profile_detail(profile, companions, missing_items=()) -> tuple[str, In
         rows.append([
             InlineKeyboardButton(advance_label, callback_data=f"rnu:adv_{profile.id}"),
         ])
-    # ✅ زر التراجع يظهر إلا في أول الدورة — لا شيء يمكن التراجع عنه هناك
-    # فعرضه كان سيُنتج «لا يوجد ما يمكن التراجع عنه» بلا فائدة دائماً.
-    if _status not in ("active", "expiring", "expired"):
-        rows.append([
-            InlineKeyboardButton("↩️ تراجع عن آخر مرحلة", callback_data=f"rnu:undo_{profile.id}"),
-        ])
-
     # ✅ «هل ملفه معلق بسبب طلب إضافي» — يظهر فقط حين تكون هذه هي الحالة
     # فعلاً (مرافق لم يُستكمَل رغم صدور إقامة المريض)، بدل شاشة منفصلة
     # لعرض كل الحالات المعلَّقة دفعة واحدة.

@@ -1,10 +1,10 @@
 # modules/residency/uploads/repository.py
-# منطق ملحق بملف مريض واحد: تقدّم/تراجع مرحلة الأوراق، حفظ فورم C،
+# منطق ملحق بملف مريض واحد: تقدّم مرحلة الأوراق، حفظ فورم C،
 # حفظ الصورة الشخصية.
 #
 # ⚠️ لا حالات مكتوبة يدوياً هنا: كل الانتقالات تُقرأ من `PAPERS_ADVANCE` في
-# modules/residency/constants.py، والتراجع يُقرأ من سجل `ResidencyUpdate`
-# التدقيقي. فلا يوجد جدول انتقالات ثانٍ يمكن أن ينحرف عن الشاشة.
+# modules/residency/constants.py. فلا يوجد جدول انتقالات ثانٍ يمكن أن
+# ينحرف عن الشاشة.
 #
 # ⚠️ `get_papers_entries` وَ`get_hub_counts` (شاشتا القائمة القديمتان)
 # حُذفتا مع شاشة «📤 الرفع والمتابعة» — كل فعل هنا يُستدعى مباشرةً بمعرّف
@@ -17,11 +17,6 @@ import logging
 from modules.residency.constants import PAPERS_ADVANCE
 
 logger = logging.getLogger(__name__)
-
-# أنواع الأحداث التي تكتبها هذه الوحدة في السجل التدقيقي.
-# التراجع يبحث عن آخر حدث من هذه الأنواع ليعرف الحالة السابقة.
-_STAGE_ACTIONS = ("papers_submitted", "extension_received")
-
 
 def advance_papers_stage(*, profile_id: int, performed_by: int | None) -> tuple[bool, str, str]:
     """
@@ -82,65 +77,6 @@ def advance_papers_stage(*, profile_id: int, performed_by: int | None) -> tuple[
 
     logger.info(f"[residency.uploads] advance  profile={profile_id}  {old} → {new}")
     return True, name, new
-
-
-def undo_papers_stage(*, profile_id: int, performed_by: int | None) -> tuple[bool, str, str]:
-    """
-    يرجع المريض ومرافقيه مرحلةً واحدة للخلف.
-
-    الحالة السابقة تُقرأ من `old_status` في آخر حدث مرحلة بالسجل التدقيقي —
-    فلا حاجة لعمود «الحالة السابقة» يكرّر ما يخزّنه السجل أصلاً.
-
-    موجود لأن التقدّم بضغطة واحدة داخل قائمة يجعل الضغط على المريض المجاور
-    خطأً حتمياً، وبلا تراجع لا يمكن تصحيحه إلا يدوياً في قاعدة البيانات.
-
-    Returns: (نجح, اسم المريض, الحالة المُستعادة)
-    """
-    from db.session import get_db
-    from db.models import ResidencyProfile, ResidencyCompanion, ResidencyUpdate
-    from modules.residency.views import format_status
-
-    with get_db() as db:
-        p = db.query(ResidencyProfile).filter(ResidencyProfile.id == profile_id).first()
-        if p is None:
-            return False, "", ""
-
-        last = (
-            db.query(ResidencyUpdate)
-            .filter(
-                ResidencyUpdate.profile_id == profile_id,
-                ResidencyUpdate.companion_id.is_(None),
-                ResidencyUpdate.action_type.in_(_STAGE_ACTIONS),
-            )
-            .order_by(ResidencyUpdate.id.desc())
-            .first()
-        )
-        if last is None or not last.old_status:
-            return False, p.name or "", p.status or ""
-
-        cur, prev = p.status or "", last.old_status
-        p.status = prev
-        db.add(ResidencyUpdate(
-            profile_id=  profile_id,
-            action_type= "stage_undo",
-            action_label=f"تراجع عن: {format_status(cur)}",
-            old_status=  cur,
-            new_status=  prev,
-            performed_by=performed_by,
-        ))
-
-        for c in db.query(ResidencyCompanion).filter(
-            ResidencyCompanion.profile_id == profile_id
-        ).all():
-            if (c.status or "") == cur:
-                c.status = prev
-
-        # يُستهلَك الحدث حتى لا يتراجع الضغط التالي عن نفس الخطوة مرتين
-        db.delete(last)
-        name = p.name or ""
-
-    logger.info(f"[residency.uploads] undo  profile={profile_id}  {cur} → {prev}")
-    return True, name, prev
 
 
 def save_form_c(*, profile_id: int, file_id: str, performed_by: int | None) -> str:
