@@ -1,8 +1,7 @@
 # modules/residency/profiles/documents.py
 """
 High-level document actions for residency profiles:
-  send_patient_pdf()        — generate & send a PDF document package
-  send_patient_documents()  — send raw Telegram image files
+  send_patient_pdf()  — generate & send a PDF document package
 """
 
 from __future__ import annotations
@@ -111,58 +110,3 @@ async def send_patient_pdf(*, bot, message, profile_id: int) -> None:
             logger.debug("تم تجاهل استثناء في send_patient_pdf", exc_info=True)
 
 
-async def send_patient_documents(*, bot, message, profile_id: int) -> None:
-    """
-    Send all saved Telegram document images (passport / visa / residence)
-    for the patient and each of their companions.
-    """
-    from modules.residency.profiles.repository import (
-        get_profile_by_id,
-        get_companions_for_profile,
-    )
-
-    profile    = get_profile_by_id(profile_id)
-    companions = get_companions_for_profile(profile_id)
-
-    if profile is None:
-        await message.reply_text("❌ لم يتم العثور على الملف.", parse_mode="Markdown")
-        return
-
-    sent = 0
-
-    async def _try_send(file_id: str, caption: str) -> None:
-        nonlocal sent
-        if not file_id:
-            return
-        try:
-            await bot.send_photo(
-                chat_id=message.chat_id, photo=file_id, caption=caption
-            )
-            sent += 1
-        except Exception as exc:
-            logger.warning(f"[res.documents] send_photo failed: {exc}")
-
-    await _try_send(profile.passport_file_id,         f"📎 جواز — {profile.name}")
-    await _try_send(profile.visa_file_id,              f"📎 تأشيرة — {profile.name}")
-    await _try_send(profile.latest_residency_file_id,  f"🪪 إقامة — {profile.name}")
-    # فورم C استمارة واحدة للعائلة، فتُرسَل مرة واحدة مع المريض لا مع كل مرافق
-    await _try_send(getattr(profile, "form_c_file_id", ""), f"📄 فورم C — {profile.name}")
-    # ✅ الصورة الشخصية — بدونها تبقى محفوظة بلا أي طريق لإخراجها
-    await _try_send(getattr(profile, "photo_file_id", ""), f"🖼️ صورة شخصية — {profile.name}")
-
-    for c in companions:
-        await _try_send(c.passport_file_id,         f"📎 جواز مرافق — {c.name}")
-        await _try_send(c.visa_file_id,              f"📎 تأشيرة مرافق — {c.name}")
-        await _try_send(c.latest_residency_file_id,  f"🪪 إقامة مرافق — {c.name}")
-
-    if sent == 0:
-        await message.reply_text(
-            "⚠️ لا توجد وثائق محفوظة لهذا المريض.", parse_mode="Markdown"
-        )
-    else:
-        await message.reply_text(f"✅ تم إرسال {sent} وثيقة.", parse_mode="Markdown")
-
-    logger.info(
-        f"[res.documents] docs sent"
-        f"  profile_id={profile_id}  sent={sent}"
-    )

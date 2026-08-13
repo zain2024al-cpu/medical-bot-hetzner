@@ -26,7 +26,7 @@ def build_photo_saved(name: str, profile_id: int, *, resized: bool = True) -> tu
         ("📐 ضُبطت على مقاس 4×6." if resized else
          "⚠️ حُفظت بمقاسها الأصلي — تعذّر ضبطها على 4×6، حاول رفعها مجدداً."),
         "",
-        "الصورة محفوظة على ملف المريض، وتُرسَل مع «📎 إرسال الوثائق».",
+        "الصورة محفوظة على ملف المريض.",
     ]
     kb = InlineKeyboardMarkup([[
         InlineKeyboardButton("👁 عرض الملف", callback_data=f"{RNA}:view_{profile_id}"),
@@ -41,7 +41,7 @@ def build_form_c_saved(name: str, profile_id: int) -> tuple[str, InlineKeyboardM
         "",
         f"👤 {name}",
         "",
-        "الاستمارة محفوظة على ملف العائلة، وتُرسَل مع «📎 إرسال الوثائق».",
+        "الاستمارة محفوظة على ملف العائلة، وتُرسَل ضمن «📄 ملف PDF».",
     ]
     kb = InlineKeyboardMarkup([[
         InlineKeyboardButton("👁 عرض الملف", callback_data=f"{RNA}:view_{profile_id}"),

@@ -257,8 +257,7 @@ def build_profile_detail(profile, companions, missing_items=()) -> tuple[str, In
     ])
 
     rows.append([
-        InlineKeyboardButton("📄 ملف PDF",         callback_data=f"{RNA}:pdf_{profile.id}"),
-        InlineKeyboardButton("📎 إرسال الوثائق",  callback_data=f"{RNA}:send_docs_{profile.id}"),
+        InlineKeyboardButton("📄 ملف PDF", callback_data=f"{RNA}:pdf_{profile.id}"),
     ])
     rows.append([
         InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:archive"),

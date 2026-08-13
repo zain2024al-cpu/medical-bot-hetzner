@@ -495,17 +495,6 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
         )
         return
 
-    # ── Send raw document images ──────────────────────────────────────────────
-    if action.startswith("send_docs_"):
-        profile_id = int(action[10:])
-        from modules.residency.profiles.documents import send_patient_documents
-        await send_patient_documents(
-            bot=context.bot,
-            message=query.message,
-            profile_id=profile_id,
-        )
-        return
-
     # ── Quick expiry date edit ────────────────────────────────────────────────
     if action.startswith("edit_expiry_"):
         profile_id = int(action[12:])
