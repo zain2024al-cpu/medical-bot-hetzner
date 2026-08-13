@@ -70,6 +70,14 @@ def bootstrap_all() -> None:
     # when the user has been explicitly granted the "healthcare" module via
     # core.access.access_service.grant_module().  dynamic_user_kb() enforces
     # this — the button never appears for translators or public users.
+    #
+    # ✅ نفس النص "▶️ ابدأ الآن" مُستخدَم أيضاً في general_services وresidency
+    # أدناه — الزر الثلاثة يتصرّف بنفس السلوك تماماً (إعادة تشغيل كاملة عبر
+    # user_start، مثل "🚀 ابدأ" في بوت المترجمين)، ومُسجَّل مرة واحدة فقط
+    # في bot/handlers/user/user_start.py::register() — لا معالِج مخصَّص هنا
+    # بعد الآن (كان `modules/healthcare/menu.py::_show_menu` يفتح قائمة
+    # الرعاية الصحية مباشرة بدل التشغيل الكامل؛ حُذف بطلب المستخدم صراحةً
+    # ليتطابق السلوك).
     registry.register(
         name="healthcare",
         menu_buttons={"▶️ ابدأ الآن"},
@@ -143,11 +151,15 @@ def bootstrap_all() -> None:
     )
 
     # ── General Services: arrivals, departures, public services ──────────────
+    # ✅ "▶️ ابدأ الآن" — نفس زر إعادة التشغيل الكامل (رسالة ترحيب + إعادة بناء
+    # لوحة المفاتيح عبر user_start) المستخدَم أصلاً في الرعاية الصحية، بطلب
+    # المستخدم صراحةً ليتوفّر أيضاً هنا وفي الإقامات.
     registry.register(
         name="general_services",
-        menu_buttons={"🔧 الخدمات العامة"},
+        menu_buttons={"🔧 الخدمات العامة", "▶️ ابدأ الآن"},
         keyboard_rows=[
             ["🔧 الخدمات العامة"],
+            ["▶️ ابدأ الآن"],
         ],
         extra_wipe_keys={
             "_gsarr_add",   # arrivals session
@@ -159,8 +171,11 @@ def bootstrap_all() -> None:
     # ── Residency: lifecycle management ──────────────────────────────────────
     registry.register(
         name="residency",
-        menu_buttons={"🪪 الإقامة"},
-        keyboard_rows=[["🪪 الإقامة"]],
+        menu_buttons={"🪪 الإقامة", "▶️ ابدأ الآن"},
+        keyboard_rows=[
+            ["🪪 الإقامة"],
+            ["▶️ ابدأ الآن"],
+        ],
         extra_wipe_keys={
             "_res_add",    # add-new-patient session
             "_res_ren",    # renewal session

@@ -368,4 +368,8 @@ def register(app):
     app.add_handler(MessageHandler(filters.Regex("^/start$"), user_start))
     app.add_handler(MessageHandler(filters.Regex("^🚀 أبدا استخدام النظام$"), user_start))
     app.add_handler(MessageHandler(filters.Regex("^🚀 ابدأ$"), user_start))  # معالج لزر "ابدأ" في الكيبورد
+    # ✅ نفس السلوك (تحديث + بدء كامل) لزر "▶️ ابدأ الآن" — مشترك بين
+    # الرعاية الصحية والخدمات العامة والإقامات، بمعالِج واحد هنا بدل
+    # تكراره في كل وحدة (طلب المستخدم صراحةً أن يطابق سلوك "🚀 ابدأ").
+    app.add_handler(MessageHandler(filters.Regex("^▶️ ابدأ الآن$"), user_start))
     app.add_handler(CallbackQueryHandler(handle_start_main_menu, pattern="^start_main_menu$"))

@@ -243,7 +243,17 @@ def test_bootstrap_registers_healthcare():
     bootstrap_all()
     assert "healthcare" in registry.all_modules()
     assert "▶️ ابدأ الآن" in registry.all_menu_buttons()
-    assert registry.resolve_button("▶️ ابدأ الآن") == "healthcare"
+    # ✅ "▶️ ابدأ الآن" is now intentionally shared across healthcare,
+    # general_services, and residency — all three trigger the same
+    # full user_start() restart (registered once, globally, in
+    # bot/handlers/user/user_start.py::register()), so registry.resolve_button()
+    # ownership (whichever module registered last) has no functional effect:
+    # none of these modules define on_activate/on_deactivate hooks, and the
+    # button's handler clears user_data unconditionally regardless of which
+    # module "owns" it. What matters is that each module declares the button.
+    assert "▶️ ابدأ الآن" in registry.get("healthcare").menu_buttons
+    assert "▶️ ابدأ الآن" in registry.get("general_services").menu_buttons
+    assert "▶️ ابدأ الآن" in registry.get("residency").menu_buttons
     print("bootstrap registers healthcare OK")
 
 
