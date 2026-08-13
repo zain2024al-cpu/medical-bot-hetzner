@@ -332,8 +332,7 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
         # نشر في المجموعة — لا للمستخدم الذي طلبه، تحديداً حسب اختياره.
         if dest == "group":
             # ⚠️ نفس منطق تحويل المعرّف المستخدَم في report_publisher._resolve_group_id
-            # — يُستورَد مباشرة بدل تكرار المنطق (نفس نمط _open_renewal في
-            # uploads/flow.py الذي يستورد _dispatch_callback عبر وحدة أخرى).
+            # — يُستورَد مباشرة بدل تكرار المنطق.
             from modules.residency.report_publisher import _resolve_group_id
             group_id = _resolve_group_id()
             if not group_id:
@@ -421,7 +420,7 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
         if profile is None:
             await query.edit_message_text("❌ لم يتم العثور على الملف.", parse_mode="Markdown")
             return
-        context.user_data[_CTX_MISSING_ITEM] = {"profile_id": profile_id, "advance_stage": False}
+        context.user_data[_CTX_MISSING_ITEM] = {"profile_id": profile_id}
         text, kb = build_missing_item_prompt(profile.name, profile_id)
         await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
         return
@@ -1030,35 +1029,14 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
 
         from modules.residency.report_publisher import publish_event
-
-        if _missing.get("advance_stage"):
-            from modules.residency.uploads.repository import advance_papers_stage
-            ok, name, new_status = advance_papers_stage(profile_id=profile_id, performed_by=uid if isinstance(uid, int) else None)
-            if ok:
-                from modules.residency.views import format_status
-                comps = get_companions_for_profile(profile_id)
-                body_lines = (
-                    [f"👥 المرافقون: {'، '.join(c.name for c in comps)}"] if comps
-                    else ["👥 لا يوجد مرافقون"]
-                )
-                body_lines.append(f"⚠️ الطلب الناقص: {description}")
-                try:
-                    await publish_event(
-                        context.bot, action_label=format_status(new_status),
-                        patient_name=name, body_lines=body_lines,
-                        submitted_by=uid if isinstance(uid, int) else None,
-                    )
-                except Exception as exc:
-                    logger.warning(f"[res.profiles.text] publish_event failed: {exc}")
-        else:
-            try:
-                await publish_event(
-                    context.bot, action_label="📝 طلب جديد",
-                    patient_name=profile_name, body_lines=[f"الطلب: {description}"],
-                    submitted_by=uid if isinstance(uid, int) else None,
-                )
-            except Exception as exc:
-                logger.warning(f"[res.profiles.text] publish_event failed: {exc}")
+        try:
+            await publish_event(
+                context.bot, action_label="📝 طلب جديد",
+                patient_name=profile_name, body_lines=[f"الطلب: {description}"],
+                submitted_by=uid if isinstance(uid, int) else None,
+            )
+        except Exception as exc:
+            logger.warning(f"[res.profiles.text] publish_event failed: {exc}")
 
         text, kb = build_missing_item_saved(profile_name, description, profile_id)
         await msg.reply_text(text, reply_markup=kb, parse_mode="Markdown")

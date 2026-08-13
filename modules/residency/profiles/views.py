@@ -215,18 +215,8 @@ def build_profile_detail(profile, companions, missing_items=()) -> tuple[str, In
             lines.append(f"  • {m.description}")
         lines.append(_THIN)
 
-    # ✅ متابعة تقديم الأوراق مجمَّعة هنا بالكامل بدل شاشة «📤 الرفع
-    # والمتابعة» المحذوفة — مصدر الحقيقة الوحيد لا يزال PAPERS_ADVANCE في
-    # constants.py، فلا ينحرف نصّ الزر عمّا سينفّذه المستودع فعلياً.
-    from modules.residency.constants import PAPERS_ADVANCE
-    advance_label, _next_status = PAPERS_ADVANCE.get(_status, (None, None))
-
     rows: list[list[InlineKeyboardButton]] = []
 
-    if advance_label:
-        rows.append([
-            InlineKeyboardButton(advance_label, callback_data=f"rnu:adv_{profile.id}"),
-        ])
     # ✅ «هل ملفه معلق بسبب طلب إضافي» — يظهر فقط حين تكون هذه هي الحالة
     # فعلاً (مرافق لم يُستكمَل رغم صدور إقامة المريض)، بدل شاشة منفصلة
     # لعرض كل الحالات المعلَّقة دفعة واحدة.
@@ -376,24 +366,6 @@ def build_missing_item_resolved(profile_name: str, description: str, profile_id:
     kb = InlineKeyboardMarkup([[
         InlineKeyboardButton("👁 عرض الملف", callback_data=f"{RNA}:view_{profile_id}"),
     ]])
-    return text, kb
-
-
-# ── تأكيد اكتمال الأوراق قبل التقديم ──────────────────────────────────────────
-
-def build_submit_complete_prompt(profile_name: str, profile_id: int) -> tuple[str, InlineKeyboardMarkup]:
-    text = (
-        f"{_DIVIDER}\n📤  **تقديم الأوراق**\n\n"
-        f"المريض: *{profile_name}*\n{_THIN}\n\n"
-        "هل تم رفع كامل الأوراق (المريض والمرافقين)؟"
-    )
-    kb = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("✅ نعم، كاملة",     callback_data=f"rnu:submit_yes_{profile_id}"),
-            InlineKeyboardButton("❌ لا، يوجد نقص",   callback_data=f"rnu:submit_no_{profile_id}"),
-        ],
-        [InlineKeyboardButton("❌ إلغاء", callback_data=f"{RNA}:view_{profile_id}")],
-    ])
     return text, kb
 
 
