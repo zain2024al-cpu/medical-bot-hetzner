@@ -61,3 +61,29 @@ def save_patient_photo(*, profile_id: int, file_id: str, performed_by: int | Non
     logger.info(f"[residency.uploads] photo saved  profile={profile_id}")
     return name
 
+
+def save_companion_photo(*, profile_id: int, companion_id: int, file_id: str, performed_by: int | None) -> str:
+    """يحفظ الصورة الشخصية لمرافق ويسجّلها في السجل. يعيد اسم المرافق."""
+    from db.session import get_db
+    from db.models import ResidencyCompanion, ResidencyUpdate
+
+    with get_db() as db:
+        c = db.query(ResidencyCompanion).filter(ResidencyCompanion.id == companion_id).first()
+        if c is None:
+            return ""
+        c.photo_file_id = file_id
+        db.add(ResidencyUpdate(
+            profile_id=   profile_id,
+            companion_id= companion_id,
+            action_type=  "photo_uploaded",
+            action_label= f"تم رفع الصورة الشخصية — {c.name}",
+            old_status=   c.status or "",
+            new_status=   c.status or "",
+            residency_file_id=file_id,
+            performed_by= performed_by,
+        ))
+        name = c.name or ""
+
+    logger.info(f"[residency.uploads] companion photo saved  profile={profile_id}  companion={companion_id}")
+    return name
+

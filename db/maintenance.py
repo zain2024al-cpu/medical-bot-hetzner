@@ -222,6 +222,9 @@ class DatabaseMaintenance:
                 # ✅ رقم الجلسة ضمن الدورة الحالية — العلاج الكيماوي فقط،
                 # منفصل عن current_session (رقم الدورة نفسها).
                 _migrate_column(conn, "reports", "chemo_session_number", "INTEGER")
+                # ✅ الصورة الشخصية للمرافق — كانت مقصورة على المريض فقط،
+                # فلم يكن هناك أي طريقة لرفع صورة مرافق إطلاقاً.
+                _migrate_column(conn, "res_companions", "photo_file_id", "VARCHAR(255)")
                 logger.info("🔎 Migration check finished.")
 
                 if check == "ok":

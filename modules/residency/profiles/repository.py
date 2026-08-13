@@ -42,6 +42,7 @@ class CompanionRow:
     passport_file_id: str
     visa_file_id:     str
     latest_residency_file_id: str
+    photo_file_id:    str = ""
 
 
 @dataclass
@@ -175,6 +176,7 @@ def get_companions_for_profile(profile_id: int) -> list[CompanionRow]:
                 passport_file_id=r.passport_file_id or "",
                 visa_file_id=r.visa_file_id or "",
                 latest_residency_file_id=r.latest_residency_file_id or "",
+                photo_file_id=getattr(r, "photo_file_id", "") or "",
             )
             for r in rows
         ]

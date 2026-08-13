@@ -30,7 +30,7 @@ from core.access.access_service import user_has_module
 from shared.uploads import collector as uploads
 from shared.result_router import register as _register_route
 
-from modules.residency.uploads.views import build_form_c_saved, build_photo_saved
+from modules.residency.uploads.views import build_form_c_saved, build_photo_saved, build_photo_target_picker
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,9 @@ _MODULE_KEY  = "residency"
 # المريض المستهدَف برفع فورم C — يُحفظ خارج جلسة الرفع لأن collector
 # يعيد الملفات فقط ولا يحمل سياق المتصل.
 _CTX_FORM_C_PROFILE = "_rnu_form_c_profile_id"
-_CTX_PHOTO_PROFILE  = "_rnu_photo_profile_id"
+# ✅ هدف الصورة الشخصية — قد يكون المريض نفسه أو أحد مرافقيه، فيُخزَّن
+# profile_id دائماً (للعودة لملف المريض) مع companion_id عند وجوده.
+_CTX_PHOTO_TARGET   = "_rnu_photo_target"
 
 
 def _is_authorized(user_id: int) -> bool:
@@ -113,16 +115,64 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
     query   = update.callback_query
     user_id = uid if isinstance(uid, int) else None
 
-    # ── رفع الصورة الشخصية (من ملف المريض) ────────────────────────────────────
-    if action.startswith("photo_"):
-        profile_id = int(action[6:])
-        context.user_data[_CTX_PHOTO_PROFILE] = profile_id
+    # ── رفع الصورة الشخصية — اختيار الهدف أولاً (مريض أو مرافق) ────────────────
+    if action.startswith("photosel_"):
+        # format: photosel_{profile_id}_{"p" | companion_id}
+        rest = action[len("photosel_"):]
+        profile_id_str, _, who = rest.partition("_")
+        profile_id = int(profile_id_str)
+
+        from modules.residency.profiles.repository import get_profile_by_id, get_companions_for_profile
+        profile = get_profile_by_id(profile_id)
+        if profile is None:
+            await query.edit_message_text("❌ لم يتم العثور على الملف.", parse_mode="Markdown")
+            return
+
+        if who == "p":
+            context.user_data[_CTX_PHOTO_TARGET] = {"profile_id": profile_id, "companion_id": None}
+            target_name = profile.name
+        else:
+            companion_id = int(who)
+            companions = get_companions_for_profile(profile_id)
+            match = next((c for c in companions if c.id == companion_id), None)
+            if match is None:
+                await query.edit_message_text("❌ لم يتم العثور على المرافق.", parse_mode="Markdown")
+                return
+            context.user_data[_CTX_PHOTO_TARGET] = {"profile_id": profile_id, "companion_id": companion_id}
+            target_name = match.name
+
         await uploads.open(
             update, context,
-            title="🖼️ أرسل الصورة الشخصية للمريض",
+            title=f"🖼️ أرسل الصورة الشخصية لـ «{target_name}»",
             return_to=_RKEY_PHOTO,
             max_files=1,
         )
+        return
+
+    # ── رفع الصورة الشخصية (من ملف المريض) ────────────────────────────────────
+    if action.startswith("photo_"):
+        profile_id = int(action[6:])
+        from modules.residency.profiles.repository import get_profile_by_id, get_companions_for_profile
+        profile = get_profile_by_id(profile_id)
+        if profile is None:
+            await query.edit_message_text("❌ لم يتم العثور على الملف.", parse_mode="Markdown")
+            return
+        companions = get_companions_for_profile(profile_id)
+
+        # ✅ بلا مرافقين: لا داعي لتخيير المستخدم بين خيار واحد فقط — رفع
+        # مباشر للمريض كالسابق تماماً. بمرافقين: شاشة اختيار «لمن الصورة؟».
+        if not companions:
+            context.user_data[_CTX_PHOTO_TARGET] = {"profile_id": profile_id, "companion_id": None}
+            await uploads.open(
+                update, context,
+                title=f"🖼️ أرسل الصورة الشخصية لـ «{profile.name}»",
+                return_to=_RKEY_PHOTO,
+                max_files=1,
+            )
+            return
+
+        text, kb = build_photo_target_picker(profile.name, profile_id, companions)
+        await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
         return
 
     # ── رفع فورم C ────────────────────────────────────────────────────────────
@@ -174,7 +224,9 @@ async def _on_form_c(result, update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 async def _on_photo(result, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    profile_id = context.user_data.pop(_CTX_PHOTO_PROFILE, None)
+    target = context.user_data.pop(_CTX_PHOTO_TARGET, None) or {}
+    profile_id   = target.get("profile_id")
+    companion_id = target.get("companion_id")
 
     if result.cancelled or not profile_id:
         if profile_id:
@@ -218,11 +270,18 @@ async def _on_photo(result, update: Update, context: ContextTypes.DEFAULT_TYPE) 
     except Exception as exc:
         logger.warning(f"[residency.uploads] photo resize failed, saving original: {exc}")
 
-    from modules.residency.uploads.repository import save_patient_photo
-    name = save_patient_photo(
-        profile_id=profile_id, file_id=final_file_id,
-        performed_by=update.effective_user.id if update.effective_user else None,
-    )
+    performed_by = update.effective_user.id if update.effective_user else None
+    if companion_id:
+        from modules.residency.uploads.repository import save_companion_photo
+        name = save_companion_photo(
+            profile_id=profile_id, companion_id=companion_id,
+            file_id=final_file_id, performed_by=performed_by,
+        )
+    else:
+        from modules.residency.uploads.repository import save_patient_photo
+        name = save_patient_photo(
+            profile_id=profile_id, file_id=final_file_id, performed_by=performed_by,
+        )
     text, kb = build_photo_saved(name, profile_id, resized=resized_ok)
     await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 

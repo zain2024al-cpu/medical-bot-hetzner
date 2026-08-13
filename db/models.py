@@ -831,6 +831,9 @@ class ResidencyCompanion(Base):
     passport_file_id         = Column(String(255), default="")
     visa_file_id             = Column(String(255), default="")
     latest_residency_file_id = Column(String(255), default="")
+    # ✅ الصورة الشخصية للمرافق — نفس حقل المريض لكن لكل مرافق على حدة
+    # (بخلاف فورم C الذي يبقى مستنداً واحداً للعائلة كلها).
+    photo_file_id            = Column(String(255), default="")
     notes                    = Column(Text, default="")
     created_at               = Column(DateTime, default=datetime.utcnow, nullable=True)
     updated_at               = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
