@@ -1462,6 +1462,7 @@ async def show_final_summary(message, context, flow_type):
                 "treatment_targeted": "العلاج الموجه",
                 "treatment_immuno": "العلاج المناعي",
                 "treatment_dialysis": "جلسات غسيل الكلى",
+                "transplant": "معاملة الزراعة",
             }
             if flow_type in flow_to_action:
                 data["medical_action"] = flow_to_action[flow_type]

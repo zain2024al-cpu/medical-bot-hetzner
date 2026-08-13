@@ -390,7 +390,7 @@ async def handle_new_consult_followup_date_skip(update: Update, context: Context
         next_state = DISCHARGE_FOLLOWUP_REASON
     elif current_flow == "rehab_physical":
         next_state = PHYSICAL_THERAPY_FOLLOWUP_REASON
-    elif current_flow == "device":
+    elif current_flow in ("device", "rehab_device"):
         next_state = DEVICE_FOLLOWUP_REASON
     else:
         next_state = NEW_CONSULT_FOLLOWUP_REASON
@@ -467,7 +467,7 @@ async def handle_new_consult_followup_calendar_nav(update: Update, context: Cont
             current_state = DISCHARGE_FOLLOWUP_DATE
         elif current_flow == "rehab_physical":
             current_state = PHYSICAL_THERAPY_FOLLOWUP_DATE
-        elif current_flow == "device":
+        elif current_flow in ("device", "rehab_device"):
             current_state = DEVICE_FOLLOWUP_DATE
         elif current_flow == "appointment_reschedule":
             current_state = APP_RESCHEDULE_RETURN_DATE
@@ -549,7 +549,7 @@ async def handle_new_consult_followup_calendar_day(update: Update, context: Cont
             next_state = DISCHARGE_FOLLOWUP_DATE
         elif current_flow == "rehab_physical":
             next_state = PHYSICAL_THERAPY_FOLLOWUP_DATE
-        elif current_flow == "device":
+        elif current_flow in ("device", "rehab_device"):
             next_state = DEVICE_FOLLOWUP_DATE
         elif current_flow == "appointment_reschedule":
             next_state = APP_RESCHEDULE_RETURN_DATE
@@ -589,7 +589,7 @@ async def handle_new_consult_followup_calendar_day(update: Update, context: Cont
             current_state = DISCHARGE_FOLLOWUP_DATE
         elif current_flow == "rehab_physical":
             current_state = PHYSICAL_THERAPY_FOLLOWUP_DATE
-        elif current_flow == "device":
+        elif current_flow in ("device", "rehab_device"):
             current_state = DEVICE_FOLLOWUP_DATE
         elif current_flow == "appointment_reschedule":
             current_state = APP_RESCHEDULE_RETURN_DATE
@@ -675,7 +675,7 @@ async def handle_new_consult_followup_time_hour(update: Update, context: Context
             next_state = DISCHARGE_FOLLOWUP_REASON
         elif current_flow == "rehab_physical":
             next_state = PHYSICAL_THERAPY_FOLLOWUP_REASON
-        elif current_flow == "device":
+        elif current_flow in ("device", "rehab_device"):
             next_state = DEVICE_FOLLOWUP_REASON
         elif current_flow == "appointment_reschedule":
             next_state = APP_RESCHEDULE_RETURN_REASON
@@ -724,7 +724,7 @@ async def handle_new_consult_followup_time_hour(update: Update, context: Context
             return DISCHARGE_FOLLOWUP_DATE
         elif current_flow == "rehab_physical":
             return PHYSICAL_THERAPY_FOLLOWUP_DATE
-        elif current_flow == "device":
+        elif current_flow in ("device", "rehab_device"):
             return DEVICE_FOLLOWUP_DATE
         elif current_flow == "appointment_reschedule":
             return APP_RESCHEDULE_RETURN_DATE
@@ -803,7 +803,7 @@ async def handle_new_consult_followup_time_minute(update: Update, context: Conte
             next_state = DISCHARGE_FOLLOWUP_REASON
         elif current_flow == "rehab_physical":
             next_state = PHYSICAL_THERAPY_FOLLOWUP_REASON
-        elif current_flow == "device":
+        elif current_flow in ("device", "rehab_device"):
             next_state = DEVICE_FOLLOWUP_REASON
         elif current_flow == "appointment_reschedule":
             next_state = APP_RESCHEDULE_RETURN_REASON
@@ -842,7 +842,7 @@ async def handle_new_consult_followup_time_minute(update: Update, context: Conte
         current_state = DISCHARGE_FOLLOWUP_DATE
     elif current_flow == "rehab_physical":
         current_state = PHYSICAL_THERAPY_FOLLOWUP_DATE
-    elif current_flow == "device":
+    elif current_flow in ("device", "rehab_device"):
         current_state = DEVICE_FOLLOWUP_DATE
     elif current_flow == "endoscopy":
         current_state = ENDOSCOPY_FOLLOWUP_DATE
@@ -903,7 +903,7 @@ async def handle_new_consult_followup_time_skip(update: Update, context: Context
             next_state = DISCHARGE_FOLLOWUP_REASON
         elif current_flow == "rehab_physical":
             next_state = PHYSICAL_THERAPY_FOLLOWUP_REASON
-        elif current_flow == "device":
+        elif current_flow in ("device", "rehab_device"):
             next_state = DEVICE_FOLLOWUP_REASON
         elif current_flow == "appointment_reschedule":
             next_state = APP_RESCHEDULE_RETURN_REASON
@@ -941,7 +941,7 @@ async def handle_new_consult_followup_time_skip(update: Update, context: Context
         current_state = DISCHARGE_FOLLOWUP_DATE
     elif current_flow == "rehab_physical":
         current_state = PHYSICAL_THERAPY_FOLLOWUP_DATE
-    elif current_flow == "device":
+    elif current_flow in ("device", "rehab_device"):
         current_state = DEVICE_FOLLOWUP_DATE
     elif current_flow == "endoscopy":
         current_state = ENDOSCOPY_FOLLOWUP_DATE
