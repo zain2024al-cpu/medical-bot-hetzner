@@ -979,15 +979,8 @@ woundcare, medical_followup, other, pharmacy_finance): كلها لها معال�
 
 ## 🔓 مفتوح — لم يُصلح بعد
 
-- **"✏️ تعديل الحقول" قبل النشر لتقارير "معاملة الزراعة" (transplant)
-  غير مُنفَّذ**: `edit_handlers/before_publish/router.py` — كل من
-  `route_edit_field_selection` و`route_edit_field_input` تغطيان صراحةً
-  كل أنواع التدفّق الأخرى لكن ليس `"transplant"`؛ يسقطان لفرع `else`
-  الذي يعرض "⚠️ قيد التطوير" وينهي المحادثة. اكتُشف أثناء تدقيق
-  2026-08-13 (١٢) — عطل واضح (يفشل بصوت) لا فساد صامت، فلم يُصلَح فوراً
-  ضمن الإصلاح الميكانيكي لأنه يحتاج بناء مسار تعديل مخصَّص (حقول الزراعة:
-  `transplant_type`, `transplant_parties`, `transplant_details`) على غرار
-  `treatment_and_endoscopy_edit.py`، لا مجرد إضافة قيمة لسلسلة موجودة.
+_(لا بنود مفتوحة حالياً — أُغلق آخرها: تعديل حقول معاملة الزراعة قبل
+النشر، انظر قسم 2026-08-13 (١٣) أدناه.)_
 
 ---
 
@@ -2749,6 +2742,39 @@ before_publish/router.py` — سلسلتا `route_edit_field_selection`
 اختيار ساعة يوجّه لـ`DEVICE_FOLLOWUP_REASON` (كان يسقط لـ
 `NEW_CONSULT_FOLLOWUP_REASON`)؛ فحص انحدار صريح أن المرادف `"device"`
 (مسار التعديل القديم) وتقرير "استشارة جديدة" عادي كلاهما غير متأثرَين.
+
+### 2026-08-13 (١٣) — 🫁 تفعيل تعديل حقول "معاملة الزراعة" قبل النشر
+
+**الطلب**: إغلاق البند المفتوح الموثَّق في (١٢) — تعديل حقل محدَّد لتقرير
+"معاملة الزراعة" (transplant) قبل النشر كان يعرض "⚠️ قيد التطوير"
+وينهي المحادثة بدل فتح شاشة التعديل.
+
+**السبب**: `edit_handlers/before_publish/router.py` يوجّه حسب flow_type
+عبر سلسلة `if/elif` تغطي كل الأنواع الأخرى، وآخر فرع فيها
+`elif flow_type in TREATMENT_AND_ENDOSCOPY_FLOWS:` — وهي مجموعة معرَّفة
+في `treatment_and_endoscopy_edit.py` (نفس المعالِج العام المشترك المُشار
+إليه في (١١)/(١٢) لأن حقول الزراعة نصية بسيطة بلا استخلاص مركّب، تماماً
+كحقول جلسات العلاج/المناظير) — لكن `"transplant"` لم يكن عضواً فيها
+إطلاقاً، فيسقط لفرع `else` الافتراضي.
+
+**الإصلاح**: أُضيف `"transplant"` إلى `TREATMENT_AND_ENDOSCOPY_FLOWS`
+في `treatment_and_endoscopy_edit.py` (سطر واحد)، وأُضيفت تسميات عرض
+الحقول الثلاثة (`transplant_type`, `transplant_parties`,
+`transplant_details`) إلى قاموس `_FIELD_NAMES` في الملف نفسه. لم يُلمَس
+`router.py` إطلاقاً — العضوية في المجموعة كافية لأن كلا الفرعين هناك
+(`route_edit_field_selection`/`route_edit_field_input`) يتحقّقان من
+`TREATMENT_AND_ENDOSCOPY_FLOWS` مباشرة. لا حاجة لملف/معالِج مخصَّص جديد
+لأن حقول الزراعة الثلاثة نصوص حرة بلا أي منطق خاص (لا رقم جلسة، لا خطة
+علاج، لا قائمة اختيار) — تمرّ بالكامل عبر الفرع العام الموجود أصلاً في
+`handle_treatment_endoscopy_edit_field_input`.
+
+**التحقق**: `python -m py_compile` نظيف · بعد حذف `__pycache__` بالكامل:
+187 اختباراً + 170 معالجاً حقيقياً عبر `register_all_handlers` فعلي ·
+محاكاة حيّة فعلية عبر `route_edit_field_selection`/`route_edit_field_input`
+الحقيقيتين: اختيار حقل "📝 تفاصيل المعاملة" لتقرير زراعة يفتح الآن شاشة
+تعديل حقيقية (بدل "قيد التطوير")، وإدخال قيمة جديدة يحفظها في
+`report_tmp['transplant_details']` ويعيد الحالة إلى `TRANSPLANT_CONFIRM`
+بنجاح.
 
 ## 📋 كيفية استخدام هذا السجل
 

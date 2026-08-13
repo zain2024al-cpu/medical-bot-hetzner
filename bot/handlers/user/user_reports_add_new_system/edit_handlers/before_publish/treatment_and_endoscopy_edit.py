@@ -2,9 +2,9 @@
 # Treatment Sessions + Endoscopy - Edit Before Publish Handlers
 # =============================
 # handler مشترك لكل مسارات جلسات العلاج (كيماوي/موجّه/مناعي/غسيل الكلى/
-# المدمج) ومسار المناظير — كلها حقول نصية بسيطة بلا استخلاص مركّب
-# (بخلاف new_consult/emergency وغيرها)، فيكفي معالج واحد عام بدل تكرار
-# ملف منفصل لكل نوع.
+# المدمج) ومسار المناظير ومسار "معاملة الزراعة" (transplant) — كلها حقول
+# نصية بسيطة بلا استخلاص مركّب (بخلاف new_consult/emergency وغيرها)،
+# فيكفي معالج واحد عام بدل تكرار ملف منفصل لكل نوع.
 # =============================
 
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
@@ -29,7 +29,7 @@ except ImportError:
 
 TREATMENT_AND_ENDOSCOPY_FLOWS = {
     "treatment_chemo", "treatment_targeted", "treatment_immuno",
-    "treatment_dialysis", "treatment_combined", "endoscopy",
+    "treatment_dialysis", "treatment_combined", "endoscopy", "transplant",
 }
 
 _FIELD_NAMES = {
@@ -38,6 +38,9 @@ _FIELD_NAMES = {
     "notes":             "📝 ملاحظات",
     "endoscopy_type":    "🔬 نوع المنظار",
     "endoscopy_result":  "📋 نتيجة المنظار / خطة الطبيب",
+    "transplant_type":    "🫁 نوع الزراعة",
+    "transplant_parties": "🏢 الجهة",
+    "transplant_details": "📝 تفاصيل المعاملة",
     "followup_date":     "📅 موعد العودة",
     "followup_time":     "⏰ وقت العودة",
     "followup_reason":   "✍️ سبب العودة",
