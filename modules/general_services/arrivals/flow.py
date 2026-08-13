@@ -1850,10 +1850,11 @@ async def _dispatch_callback_inner(
                 f"   🛂 *انتهاء الجواز:*  {_val(p.get('passport_expiry'))}",
                 f"   🪪 *انتهاء الإقامة:*  {_val(p.get('residence_expiry'))}",
                 "",
-                f"   🚐 *الجهة الموصلة:*  {_val(p.get('escort_entity'))}",
                 f"   🏠 *عنوان السكن:*  {_val(p.get('residence_address'))}",
                 f"   🛎️ *الخدمات المقدَّمة:*  {_val(p.get('services_provided'))}",
                 f"   📝 *ملاحظات:*  {_notes(p.get('notes'))}",
+                # ✅ الجهة الموصلة بعد الملاحظات مباشرة — طلب المستخدم صراحةً.
+                f"   🚐 *الجهة الموصلة:*  {_val(p.get('escort_entity'))}",
                 "",
                 "   📎 *الوثائق:*",
                 f"      جواز السفر:  {_doc(p.get('passport_file_id'))}",

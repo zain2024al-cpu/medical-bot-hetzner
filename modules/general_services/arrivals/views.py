@@ -808,9 +808,13 @@ def build_review(session: ArrivalSession) -> tuple[str, InlineKeyboardMarkup]:
             f"*{i + 1}.* {pname}",
             f"   🤝 مرافقون: {len(comps)}",
         ] + _individual_detail_lines(p, is_companion=False) + [
+            f"   📝 ملاحظات: {p.get('notes') or 'لا توجد'}",
+            # ✅ ملاحظات → الجهة الموصلة → المختص — نفس ترتيب كتلة الختام
+            # في تدفّق الإدخال (انظر _advance_to_patient_closing)، ونفس
+            # ترتيب نص التقرير المنشور فعلياً (flow.py). طلب المستخدم
+            # صراحةً أن تسبق الجهة الموصلة الملاحظات مباشرة.
             f"   🚐 الجهة الموصلة: {p.get('escort_entity') or _NONE}",
             f"   👨‍⚕️ مختص الخدمات: {p.get('specialist_label') or _NONE}",
-            f"   📝 ملاحظات: {p.get('notes') or 'لا توجد'}",
         ]
         for c in comps:
             lines += [f"   ↳ *{c.get('name', '—')}*"] + [
@@ -851,6 +855,11 @@ _P_EDIT_FIELDS: list[tuple[str, str]] = [
     ("🪪 صورة الإقامة",       "residence"),
     ("🪪 انتهاء الإقامة",     "rexp"),
     ("🏠 عنوان السكن",        "addr"),
+    # ✅ ملاحظات → الخدمات المقدَّمة → الجهة الموصلة → المختص — نفس ترتيب
+    # كتلة الختام الحقيقي في تدفّق الإدخال (انظر التعليق فوق
+    # STEP_P_INDIV_NOTES في flow.py) — الجهة الموصلة تلي الملاحظات هنا
+    # فعلاً (بفارق حقل واحد)، فلا حاجة لإعادة ترتيب كانت ستُخالف التسلسل
+    # الفعلي المعتمَد في الإدخال.
     ("📝 الملاحظات",          "notes"),
     ("🛎️ الخدمات المقدَّمة",  "services"),
     ("🚐 الجهة الموصلة",      "escort"),
