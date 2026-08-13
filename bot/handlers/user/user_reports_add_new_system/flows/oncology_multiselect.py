@@ -23,6 +23,7 @@ from telegram.ext import ContextTypes
 from ..states import (
     ONCOLOGY_QUEUE_TOTAL, ONCOLOGY_QUEUE_CURRENT,
     ONCOLOGY_DELIVERY_MODE, ONCOLOGY_DELIVERY_DAYS,
+    ONCOLOGY_QUEUE_CHEMO_SESSION,
     CHEMO_CYCLES_TOTAL, TREATMENT_COMPLAINT,
 )
 from ..utils import _nav_buttons
@@ -178,6 +179,8 @@ async def _process_next_in_queue(message, context):
         summary = format_progress_text(advanced)
         data.setdefault("_onc_summaries", {})[key] = summary
         await message.reply_text(f"{_icon(key)} **{_short_label(key)}**\n{summary}", parse_mode="Markdown")
+        if key == "chemo":
+            return await _prompt_chemo_session_number_queue(message, context)
         return await _ask_delivery_mode(message, context)
 
     # ✅ الكيماوي لم يعد استثناءً: كان يتفرّع هنا لأسئلة الدورات، وصار يمرّ
@@ -199,7 +202,37 @@ async def chemo_committed_in_queue(message, context, plan: dict):
     data.setdefault("_onc_summaries", {})["chemo"] = summary
     data["_onc_current_type"] = "chemo"
     await message.reply_text(f"💉 **الكيماوي**\n{summary}", parse_mode="Markdown")
-    return await _ask_delivery_mode(message, context)
+    return await _prompt_chemo_session_number_queue(message, context)
+
+
+# ✅ الكيماوي فقط، وحتى ضمن الطابور — رقم الجلسة ضمن الدورة الحالية (منفصل
+# عن رقم الدورة نفسها). نفس الحقل/الفكرة المُضافة لمسار الكيماوي المفرد
+# (treatment_sessions.py::TREATMENT_CHEMO_SESSION_NUMBER)، لكن بحالة
+# محادثة مستقلة لأن معالِجات الطابور هنا منفصلة كلياً عن ذلك الملف — كانت
+# غائبة تماماً هنا فلا تظهر لأي مترجم يختار الكيماوي ضمن اختيار مُدمَج.
+async def _prompt_chemo_session_number_queue(message, context):
+    await message.reply_text(
+        "🔢 **رقم الجلسة ضمن الدورة الحالية**\n\n"
+        "أدخل رقم هذه الجلسة (مثال: 2):",
+        reply_markup=_nav_buttons(show_back=True),
+        parse_mode="Markdown",
+    )
+    return ONCOLOGY_QUEUE_CHEMO_SESSION
+
+
+async def handle_oncology_queue_chemo_session(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text.strip()
+    if not text.isdigit() or int(text) <= 0:
+        await update.message.reply_text(
+            "⚠️ يرجى إدخال رقم صحيح أكبر من صفر (رقم الجلسة ضمن الدورة):",
+            reply_markup=_nav_buttons(show_back=True),
+        )
+        return ONCOLOGY_QUEUE_CHEMO_SESSION
+
+    data = context.user_data.setdefault("report_tmp", {})
+    data["chemo_session_number"] = int(text)
+    await update.message.reply_text("✅ تم الحفظ")
+    return await _ask_delivery_mode(update.message, context)
 
 
 async def handle_oncology_queue_total(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -253,6 +286,8 @@ async def handle_oncology_queue_current(update: Update, context: ContextTypes.DE
     summary = format_progress_text(plan)
     data.setdefault("_onc_summaries", {})[key] = summary
     await update.message.reply_text(f"{_icon(key)} **{_short_label(key)}**\n{summary}", parse_mode="Markdown")
+    if key == "chemo":
+        return await _prompt_chemo_session_number_queue(update.message, context)
     return await _ask_delivery_mode(update.message, context)
 
 
@@ -347,5 +382,6 @@ __all__ = [
     'build_oncology_multiselect_screen', 'handle_onc_toggle', 'handle_onc_next',
     'chemo_committed_in_queue',
     'handle_oncology_queue_total', 'handle_oncology_queue_current',
+    'handle_oncology_queue_chemo_session',
     'handle_oncology_delivery_mode', 'handle_oncology_delivery_days',
 ]

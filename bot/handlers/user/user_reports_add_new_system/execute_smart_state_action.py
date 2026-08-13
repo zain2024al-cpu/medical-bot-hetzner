@@ -46,7 +46,8 @@ from .states import (
     TREATMENT_PLAN_EDIT_VALUE, TREATMENT_PLAN_EDIT_REASON, TREATMENT_PLAN_MANUAL_SESSION,
     TREATMENT_COMPLAINT, TREATMENT_NOTES, TREATMENT_FOLLOWUP_DATE,
     TREATMENT_FOLLOWUP_REASON, TREATMENT_TRANSLATOR, TREATMENT_CONFIRM,
-    ONCOLOGY_QUEUE_TOTAL, ONCOLOGY_QUEUE_CURRENT, ONCOLOGY_DELIVERY_DAYS,
+    ONCOLOGY_QUEUE_TOTAL, ONCOLOGY_QUEUE_CURRENT, ONCOLOGY_QUEUE_CHEMO_SESSION,
+    ONCOLOGY_DELIVERY_DAYS,
     TREATMENT_DIALYSIS_SESSION, TREATMENT_DIALYSIS_NEXT_DATE,
     TREATMENT_CHEMO_SESSION_NUMBER,
     TRANSPLANT_TYPE, TRANSPLANT_PARTY, TRANSPLANT_DETAILS,
@@ -811,6 +812,14 @@ async def execute_smart_state_action(target_step, flow_type, update, context):
         elif target_step == ONCOLOGY_QUEUE_CURRENT:
             await update.callback_query.edit_message_text(
                 "🔢 **رقم الجلسة الحالية؟**\n\n(إن كانت هذه أول جلسة أدخل 1)",
+                reply_markup=_nav_buttons(show_back=True),
+                parse_mode="Markdown"
+            )
+            return target_step
+
+        elif target_step == ONCOLOGY_QUEUE_CHEMO_SESSION:
+            await update.callback_query.edit_message_text(
+                "🔢 **رقم الجلسة ضمن الدورة الحالية**\n\nأدخل رقم هذه الجلسة (مثال: 2):",
                 reply_markup=_nav_buttons(show_back=True),
                 parse_mode="Markdown"
             )

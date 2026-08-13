@@ -71,6 +71,7 @@ from .states import (
     CHEMO_CYCLES_TOTAL, CHEMO_CYCLES_UNIFORM_CHOICE,
     CHEMO_CYCLES_UNIFORM_COUNT, CHEMO_CYCLES_CUSTOM_ENTRY,
     ONCOLOGY_QUEUE_TOTAL, ONCOLOGY_QUEUE_CURRENT,
+    ONCOLOGY_QUEUE_CHEMO_SESSION,
     ONCOLOGY_DELIVERY_MODE, ONCOLOGY_DELIVERY_DAYS,
     TREATMENT_DIALYSIS_SESSION, TREATMENT_DIALYSIS_NEXT_DATE,
     TREATMENT_CHEMO_SESSION_NUMBER,
@@ -427,6 +428,7 @@ def _oncology_handlers():
         from bot.handlers.user.user_reports_add_new_system.flows.oncology_multiselect import (
             handle_onc_toggle, handle_onc_next,
             handle_oncology_queue_total, handle_oncology_queue_current,
+            handle_oncology_queue_chemo_session,
             handle_oncology_delivery_mode, handle_oncology_delivery_days,
         )
         return {
@@ -434,6 +436,7 @@ def _oncology_handlers():
             'onc_next':            handle_onc_next,
             'queue_total':         handle_oncology_queue_total,
             'queue_current':       handle_oncology_queue_current,
+            'queue_chemo_session': handle_oncology_queue_chemo_session,
             'delivery_mode':       handle_oncology_delivery_mode,
             'delivery_days':       handle_oncology_delivery_days,
         }
@@ -1362,6 +1365,12 @@ def register(app):
             ],
             ONCOLOGY_QUEUE_CURRENT: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, _tracked(onc.get('queue_current'), ONCOLOGY_QUEUE_CURRENT)),
+                CallbackQueryHandler(sh['handle_smart_back_navigation'],   pattern="^nav:back$"),
+                CallbackQueryHandler(sh['handle_smart_cancel_navigation'], pattern="^nav:cancel$"),
+            ],
+            # ✅ الكيماوي فقط، حتى ضمن الطابور — رقم الجلسة ضمن الدورة الحالية.
+            ONCOLOGY_QUEUE_CHEMO_SESSION: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, _tracked(onc.get('queue_chemo_session'), ONCOLOGY_QUEUE_CHEMO_SESSION)),
                 CallbackQueryHandler(sh['handle_smart_back_navigation'],   pattern="^nav:back$"),
                 CallbackQueryHandler(sh['handle_smart_cancel_navigation'], pattern="^nav:cancel$"),
             ],
