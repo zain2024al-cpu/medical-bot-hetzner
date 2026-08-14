@@ -52,19 +52,22 @@ _FIELD_NAMES = {
     "chemo_session_number": "🔢 رقم الجلسة ضمن الدورة",
 }
 
-# ✅ رقم الجلسة الحالية — نفس منطق التعديل بعد النشر تماماً (انظر
+# ✅ رقم الجلسة/الدورة الحالية — نفس منطق التعديل بعد النشر تماماً (انظر
 # _current_session_number_display/_apply_session_number_edit في
 # user_reports_edit.py)، لكن على report_tmp الحي بدل صف Report منشور.
-# chemo/targeted/immuno لها TreatmentPlan فعلية فيُقرأ/يُحدَّث الرقم منها
-# مباشرة عبر get_active_plan/edit_plan، أما dialysis فالرقم مضمَّن فقط
-# داخل نص treatment_plan_summary فيُستبدَل بالنص مباشرة.
+# ✅ chemo/targeted/immuno لم يعد لها TreatmentPlan إطلاقاً (بطلب المستخدم
+# صراحةً — إدخال يدوي بحت) — الأولوية دائماً للنص المباشر في
+# treatment_plan_summary (نفس نمط dialysis منذ البداية)؛ يُحاوَل
+# get_active_plan/edit_plan فقط كـ fallback للتوافق مع خطط قديمة سابقة
+# لهذا التغيير.
 _TREATMENT_KEY_BY_FLOW = {
     "treatment_chemo": "chemo",
     "treatment_targeted": "targeted",
     "treatment_immuno": "immuno",
     "treatment_dialysis": "dialysis",
 }
-_DIALYSIS_SESSION_PATTERN = r'رقم الجلسة الحالية:\s*(\d+)'
+# يطابق "رقم الجلسة الحالية:" و"رقم الدورة الحالية:" معاً.
+_DIALYSIS_SESSION_PATTERN = r'رقم (?:الجلسة|الدورة) الحالية:\s*(\d+)'
 
 
 def _current_session_number_display(data: dict, flow_type: str) -> str:
@@ -72,9 +75,11 @@ def _current_session_number_display(data: dict, flow_type: str) -> str:
     treatment_key = _TREATMENT_KEY_BY_FLOW.get(flow_type)
     if not treatment_key:
         return "غير محدد"
+    m = re.search(_DIALYSIS_SESSION_PATTERN, data.get("treatment_plan_summary") or "")
+    if m:
+        return m.group(1)
     if treatment_key == "dialysis":
-        m = re.search(_DIALYSIS_SESSION_PATTERN, data.get("treatment_plan_summary") or "")
-        return m.group(1) if m else "غير محدد"
+        return "غير محدد"
     patient_id = data.get("patient_id")
     if not patient_id:
         return "غير محدد"
@@ -87,29 +92,33 @@ def _current_session_number_display(data: dict, flow_type: str) -> str:
 
 def _apply_session_number_edit(data: dict, flow_type: str, new_value: str) -> None:
     import re
+    from services.treatment_plan_service import unit_labels
     treatment_key = _TREATMENT_KEY_BY_FLOW.get(flow_type)
-    if treatment_key == "dialysis":
-        summary = data.get("treatment_plan_summary") or ""
-        if re.search(_DIALYSIS_SESSION_PATTERN, summary):
-            data["treatment_plan_summary"] = re.sub(
-                _DIALYSIS_SESSION_PATTERN, f"رقم الجلسة الحالية: {new_value}", summary,
-            )
-        else:
-            data["treatment_plan_summary"] = f"🩸 **جلسات غسيل الكلى**\n\nرقم الجلسة الحالية: {new_value}"
+    _one, the, _pl = unit_labels(treatment_key if treatment_key != "dialysis" else None)
+    summary = data.get("treatment_plan_summary") or ""
+    if re.search(_DIALYSIS_SESSION_PATTERN, summary):
+        data["treatment_plan_summary"] = re.sub(
+            _DIALYSIS_SESSION_PATTERN, f"رقم {the} الحالية: {new_value}", summary,
+        )
+    elif treatment_key == "dialysis":
+        data["treatment_plan_summary"] = f"🩸 **جلسات غسيل الكلى**\n\nرقم {the} الحالية: {new_value}"
+    elif treatment_key:
+        label = {"chemo": "العلاج الكيماوي", "targeted": "العلاج الموجه", "immuno": "العلاج المناعي"}.get(treatment_key, "")
+        data["treatment_plan_summary"] = f"📋 **{label}**\n\nرقم {the} الحالية: {new_value}"
+    if treatment_key == "dialysis" or not treatment_key:
         return
-    if treatment_key:
-        patient_id = data.get("patient_id")
-        if patient_id:
-            from services.treatment_plan_service import get_active_plan, edit_plan, format_progress_text
-            plan = get_active_plan(patient_id, treatment_key)
-            if plan:
-                updated_plan = edit_plan(
-                    plan["id"], {"current_session": int(new_value)},
-                    changed_by=None, changed_by_name="تعديل قبل النشر",
-                    reason="تصحيح رقم الجلسة قبل نشر التقرير",
-                )
-                data["treatment_plan_summary"] = format_progress_text(updated_plan)
-                data["_tp_plan_id"] = plan["id"]
+    patient_id = data.get("patient_id")
+    if patient_id:
+        from services.treatment_plan_service import get_active_plan, edit_plan, format_progress_text
+        plan = get_active_plan(patient_id, treatment_key)
+        if plan:
+            updated_plan = edit_plan(
+                plan["id"], {"current_session": int(new_value)},
+                changed_by=None, changed_by_name="تعديل قبل النشر",
+                reason="تصحيح رقم الجلسة قبل نشر التقرير",
+            )
+            data["treatment_plan_summary"] = format_progress_text(updated_plan)
+            data["_tp_plan_id"] = plan["id"]
 
 
 async def handle_treatment_endoscopy_edit_field_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):

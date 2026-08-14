@@ -8,23 +8,27 @@
 # الملف — لا يزال في flows/radiation_therapy.py، معدَّلاً ليستخدم نفس
 # المحرك لكن مع الحفاظ على أعمدة Report القديمة لعدم كسر بطاقة تقريره.
 #
-# التسلسل المشترك (targeted / immuno):
-#   [لا خطة نشطة] → "كم عدد الجلسات الكلي؟" → إنشاء الخطة (جلسة 1)
-#   [خطة نشطة]    → تقدُّم تلقائي (+1) → عرض "الجلسة الحالية: N من X"
-#                    + [✅ متابعة] [✏️ تعديل الخطة]
-#   ← ثم: الملاحظات → تاريخ العودة → سبب العودة → المترجم/البوابة/النشر
+# ✅ التسلسل المشترك (chemo / targeted / immuno) — بلا TreatmentPlan
+# وبلا "عدد كلي" إطلاقاً (بطلب المستخدم صراحةً — الغرض الأصلي من الخطة
+# كان التقدّم/العدّ التلقائي، وكلاهما أُلغيا في جلستين سابقتين، فلم يعد
+# للعدد الكلي أي فائدة فعلية):
+#   "رقم الجلسة/الدورة الحالية؟" (يدوي، كل تقرير من الصفر بلا تذكّر ولا
+#   خطة محفوظة) → [الكيماوي فقط: رقم الجلسة ضمن الدورة] → الشكوى →
+#   الملاحظات → تاريخ العودة → سبب العودة → المترجم/البوابة/النشر
+# لقطة نصية فقط تُحفَظ في Report.treatment_plan_summary (نفس صيغة نص
+# غسيل الكلى بالضبط)، بلا أي صف TreatmentPlan جديد.
 #
-# غسيل الكلى (dialysis) مختلف تماماً — لا TreatmentPlan ولا "عدد جلسات
-# كلي"، ولا شكوى مريض، ولا قرار طبيب، ولا رفع مرفقات (بناءً على طلب
-# المستخدم — تبسيط الفورمه لأقصى حد):
-#   رقم الجلسة الحالية (يدوي، كل تقرير من الصفر بلا تذكّر) → تاريخ الجلسة
-#   القادمة (تقويم فقط — بلا وقت وبلا سبب) → المترجم/البوابة/النشر
+# غسيل الكلى (dialysis) نفس الفلسفة تماماً، وسابق لها بهذا التبسيط —
+# ولا شكوى مريض ولا قرار طبيب ولا رفع مرفقات لها (بناءً على طلب المستخدم):
+#   رقم الجلسة الحالية (يدوي) → تاريخ الجلسة القادمة (تقويم فقط — بلا
+#   وقت وبلا سبب) → المترجم/البوابة/النشر
 #
-# العلاج الكيماوي إضافياً: يُتابَع دائماً "حسب الدورات" (لا يوجد خيار
-# "حسب الجلسات" — أُزيل بناءً على طلب المستخدم): عدد الدورات، ثم هل نفسه
-# لكل الدورات (نعم → عدد موحّد) أو (لا → إدخال تسلسلي لكل دورة).
-# (خطط قديمة أُنشئت سابقاً بنمط mode="sessions" تبقى تعمل ويمكن تعديلها
-# بشكل طبيعي — فقط شاشة الاختيار عند إنشاء خطة جديدة أُزيلت.)
+# ⚠️ شاشة "✏️ تعديل الخطة" (`_show_plan_display` وما بعدها) ومعالِجات
+# `CHEMO_CYCLES_*` (نمط الدورات القديم) أصبحت غير قابلة للوصول من إنشاء
+# تقرير جديد بعد إزالة TreatmentPlan لهذه الأنواع الثلاثة — بقيت الدوال/
+# الحالات مسجَّلة كرمز خامل (خطط قديمة محفوظة في قاعدة البيانات تبقى
+# كما هي، غير قابلة للتعديل عبر هذه الشاشة). حذفها الفعلي مهمة منفصلة
+# مستقبلية (نفس نمط تنظيف الكود الميت الموثَّق في MAINTENANCE_LOG.md).
 
 import calendar
 import json
@@ -48,7 +52,7 @@ from ...user_reports_add_helpers import validate_text_input
 from .shared import show_translator_selection
 from .new_consult import _render_followup_calendar
 from services.treatment_plan_service import (
-    get_active_plan, create_plan, advance_plan, edit_plan, format_progress_text,
+    get_active_plan, create_plan, edit_plan, format_progress_text,
     unit_labels,
 )
 
@@ -73,25 +77,33 @@ def _actor(update: Update):
 # ═══════════════════════════════════════════════════════════════════
 # نقاط الدخول (targeted / immuno / dialysis) — نمط "جلسات" بسيط
 # ═══════════════════════════════════════════════════════════════════
+def _build_manual_session_summary(treatment_key: str, current: int) -> str:
+    """لقطة نصية لرقم الجلسة/الدورة الحالية — بلا أي TreatmentPlan محفوظة،
+    إدخال يدوي بحت في كل تقرير (بطلب المستخدم صراحةً: إلغاء سؤال العدد
+    الكلي والتتبّع/التقدّم التلقائي للكيماوي/الموجّه/المناعي). نفس صيغة
+    النص المستخدمة أصلاً لغسيل الكلى بالضبط — التعديل بعد النشر
+    (`_apply_session_number_edit`/`_current_session_number_display` في
+    user_reports_edit.py) يطابق هذه الصيغة عبر تعبير نمطي مشترك."""
+    _, the, _pl = unit_labels(treatment_key)
+    return f"📋 **{TREATMENT_MEDICAL_ACTION[treatment_key]}**\n\nرقم {the} الحالية: {current}"
+
+
 async def _start_simple_session_flow(message, context, treatment_key: str):
+    """✅ لا خطة محفوظة (TreatmentPlan) ولا سؤال عن العدد الكلي — بطلب
+    المستخدم صراحةً لإلغاء الحفظ/التتبّع التلقائي. إدخال يدوي بحت لرقم
+    الجلسة/الدورة الحالية في كل تقرير، بنفس نمط غسيل الكلى تماماً."""
     data = context.user_data.setdefault("report_tmp", {})
     data["medical_action"] = TREATMENT_MEDICAL_ACTION[treatment_key]
     data["current_flow"] = f"treatment_{treatment_key}"
     data["_treatment_key"] = treatment_key
     data.pop("_tp_editing_plan_id", None)
 
-    patient_id = data.get("patient_id")
-    plan = get_active_plan(patient_id, treatment_key) if patient_id else None
-    if plan:
-        advanced = advance_plan(plan["id"])
-        return await _show_plan_display(message, context, advanced)
-
     # وحدة العدّ تُشتق من نوع العلاج: الكيماوي «دورة»، وغيره «جلسة».
-    _one, _the, plural = unit_labels(treatment_key)
+    _one, the, _pl = unit_labels(treatment_key)
     await message.reply_text(
         f"💉 **{TREATMENT_MEDICAL_ACTION[treatment_key]}**\n\n"
-        f"📊 **كم عدد ال{plural} الكلي؟**\n\n"
-        "أدخل رقماً (مثال: 12):",
+        f"🔢 **رقم {the} الحالية؟**\n\n"
+        "أدخل رقماً (مثال: 3):",
         reply_markup=_nav_buttons(show_back=True),
         parse_mode="Markdown",
     )
@@ -128,16 +140,18 @@ async def start_dialysis_flow(message, context):
 # ═══════════════════════════════════════════════════════════════════
 async def start_chemo_flow(message, context):
     """
-    سؤال واحد عن عدد الجلسات الكلي، ثم تقدّم تلقائي في كل تقرير لاحق —
-    تماماً كالمناعي والموجّه.
+    ✅ إدخال يدوي بحت لرقم الدورة الحالية، بلا خطة محفوظة وبلا سؤال عن
+    العدد الكلي (بطلب المستخدم صراحةً) — تماماً كالمناعي والموجّه.
 
-    ⚠️ كان يسأل عن الدورات: عدد الدورات ← هل عددها موحّد؟ ← وإن لا،
-    **إدخال يدوي لكل دورة على حدة** (6 دورات = 8 خطوات لتقرير واحد).
-    أُزيل بطلب المستخدم لأنه مُتعب بلا مقابل.
-
-    الخطط القديمة بنمط الدورات تبقى تعمل: التقدّم والعرض لا يعتمدان على
-    النمط، ومسار «✏️ تعديل الخطة» ما زال يتفرّع على `mode` فيعيد أسئلة
-    الدورات لتلك الخطط وحدها. لذلك تبقى معالِجات CHEMO_CYCLES_* مسجَّلة.
+    ⚠️ سابقاً: كان يسأل عن عدد الدورات الكلي ← هل عددها موحّد؟ ← وإن لا،
+    **إدخال يدوي لكل دورة على حدة** (6 دورات = 8 خطوات لتقرير واحد) —
+    أُزيل بطلب المستخدم لأنه مُتعب بلا مقابل. ثم لاحقاً حتى سؤال "العدد
+    الكلي" نفسه أُزيل تماماً (لا TreatmentPlan إطلاقاً لهذا النوع بعد
+    الآن)، فأصبحت شاشة "✏️ تعديل الخطة" (`_show_plan_display` وما بعدها،
+    ومعها معالِجات `CHEMO_CYCLES_*`) غير قابلة للوصول من إنشاء تقرير
+    جديد — بقيت مسجَّلة كرمز خامل بلا أثر عملي، لا حاجة لإزالتها ما لم
+    تُطلَب صراحةً (خطط قديمة محفوظة في قاعدة البيانات تبقى كما هي، غير
+    قابلة للتعديل عبر هذه الشاشة بعد الآن).
     """
     return await _start_simple_session_flow(message, context, "chemo")
 
@@ -289,40 +303,33 @@ async def _commit_chemo_plan(update, context, mode, total_cycles=None, sessions_
 # إعداد الخطة أول مرة (نمط "جلسات" بسيط) — مشترك لكل الأنماط البسيطة
 # ═══════════════════════════════════════════════════════════════════
 async def handle_treatment_plan_setup(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """يُستقبَل فيه رقم الجلسات الكلي — إما إنشاء أول مرة أو تعديل خطة قائمة."""
+    """✅ يستقبل رقم الجلسة/الدورة الحالية مباشرة (لا عدد كلي، بلا خطة
+    محفوظة) — بطلب المستخدم صراحةً. لقطة نصية فقط في treatment_plan_summary،
+    بنفس نمط غسيل الكلى (انظر _build_manual_session_summary أعلاه)."""
     text = update.message.text.strip()
-    _unit = unit_labels(context.user_data.get("report_tmp", {}).get("_treatment_key"))[2]
+    data = context.user_data.setdefault("report_tmp", {})
+    treatment_key = data.get("_treatment_key", "chemo")
+    _unit = unit_labels(treatment_key)[1]
     if not text.isdigit() or int(text) <= 0:
         await update.message.reply_text(
-            f"⚠️ يرجى إدخال رقم صحيح أكبر من صفر (عدد ال{_unit} الكلي):",
+            f"⚠️ يرجى إدخال رقم صحيح أكبر من صفر (رقم {_unit} الحالية):",
             reply_markup=_nav_buttons(show_back=True),
         )
         return TREATMENT_PLAN_SETUP
 
-    data = context.user_data.setdefault("report_tmp", {})
-    total_sessions = int(text)
-    treatment_key = data.get("_treatment_key", "chemo")
-    patient_id = data.get("patient_id")
-    actor_id, actor_name = _actor(update)
-    editing_id = data.get("_tp_editing_plan_id")
+    current = int(text)
+    data["treatment_plan_summary"] = _build_manual_session_summary(treatment_key, current)
 
     await update.message.reply_text("✅ تم الحفظ")
 
-    if editing_id:
-        plan = edit_plan(
-            editing_id, {"total_sessions": total_sessions},
-            changed_by=actor_id, changed_by_name=actor_name,
-            reason=data.pop("_tp_edit_reason", None),
-        )
-        data.pop("_tp_editing_plan_id", None)
-    else:
-        plan = create_plan(
-            patient_id=patient_id, treatment_key=treatment_key, mode="sessions",
-            total_sessions=total_sessions, created_by=actor_id, created_by_name=actor_name,
-        )
+    if treatment_key == "chemo":
+        await _prompt_chemo_session_number(update.message, context)
+        context.user_data['_conversation_state'] = TREATMENT_CHEMO_SESSION_NUMBER
+        return TREATMENT_CHEMO_SESSION_NUMBER
 
-    data.pop("_chemo_mode", None)
-    return await _show_plan_display(update.message, context, plan)
+    await _prompt_complaint(update.message, context)
+    context.user_data['_conversation_state'] = TREATMENT_COMPLAINT
+    return TREATMENT_COMPLAINT
 
 
 # ═══════════════════════════════════════════════════════════════════

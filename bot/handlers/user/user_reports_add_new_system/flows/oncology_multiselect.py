@@ -7,14 +7,17 @@
 # - اختيار نوع واحد فقط → يُفوَّض مباشرة لدالة البدء الأصلية لذلك النوع
 #   (start_chemo_flow/start_immuno_flow/start_targeted_flow/
 #   start_radiation_therapy_flow) بلا أي تغيير في سلوكها.
-# - اختيار نوعين أو أكثر → "طابور" يعالج كل نوع بدوره: إن كانت له خطة
-#   نشطة يتقدَّم تلقائياً (+1)، وإلا يُسأل عن الإعداد الأول (الكيماوي:
-#   دورات، البقية: عدد الجلسات الكلي ثم رقم الجلسة الحالية) — كل نوع
-#   بخطته المستقلة تماماً في TreatmentPlan (فلترة/إحصاء دقيقة لاحقاً بلا
-#   أي تغيير في قاعدة البيانات). بعد كل نوع: سؤال اختياري عن طريقة
-#   الإعطاء (عيادة يومية/رقود). بعد انتهاء الطابور: دمج كل الملخصات في
-#   تقرير واحد (current_flow="treatment_combined") ثم المتابعة بنفس
-#   خطوات "جلسات العلاج" المشتركة (شكوى → ملاحظات → موعد العودة → مترجم).
+# - اختيار نوعين أو أكثر → "طابور" يعالج كل نوع بدوره:
+#   ✅ كيماوي/مناعي/موجّه: لا خطة (TreatmentPlan) ولا سؤال عن عدد كلي
+#   إطلاقاً — إدخال يدوي بحت لرقم الجلسة/الدورة الحالية فقط (بطلب
+#   المستخدم صراحةً، نفس منطق treatment_sessions.py::_start_simple_session_flow
+#   تماماً).
+#   ⚠️ الإشعاعي وحده لم يُطلَب تغييره: عدد الجلسات الكلي ثم الحالي،
+#   بخطته المستقلة في TreatmentPlan كما كانت.
+#   بعد كل نوع: سؤال اختياري عن طريقة الإعطاء (عيادة يومية/رقود). بعد
+#   انتهاء الطابور: دمج كل الملخصات في تقرير واحد
+#   (current_flow="treatment_combined") ثم المتابعة بنفس خطوات "جلسات
+#   العلاج" المشتركة (شكوى → ملاحظات → موعد العودة → مترجم).
 
 import logging
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
@@ -30,7 +33,10 @@ from ..utils import _nav_buttons
 from services.treatment_plan_service import (
     get_active_plan, create_plan, edit_plan, format_progress_text, unit_labels,
 )
-from .treatment_sessions import start_chemo_flow, start_immuno_flow, start_targeted_flow, _prompt_complaint
+from .treatment_sessions import (
+    start_chemo_flow, start_immuno_flow, start_targeted_flow, _prompt_complaint,
+    _build_manual_session_summary,
+)
 from .radiation_therapy import start_radiation_therapy_flow
 
 logger = logging.getLogger(__name__)
@@ -51,11 +57,21 @@ _SINGLE_START_FUNCS = {
     "radiation": start_radiation_therapy_flow,
 }
 
+# ⚠️ الإشعاعي وحده لا يزال يُسأل عن العدد الكلي هنا (لم يُطلَب تغييره) —
+# يعتمد على TreatmentPlan فعلياً (radiation_therapy_remaining يُحسَب من
+# الفارق بين الكلي والحالي)، فبقي على حاله بلا مساس.
 _QUEUE_TOTAL_PROMPTS = {
-    "chemo":     "💉 **الكيماوي**\n\n📊 **كم عدد الدورات الكلي؟**\n\nأدخل رقماً (مثال: 6):",
-    "immuno":    "🧬 **المناعي**\n\n📊 **كم عدد الجلسات الكلي؟**\n\nأدخل رقماً (مثال: 12):",
-    "targeted":  "🎯 **الموجّه**\n\n📊 **كم عدد الجلسات الكلي؟**\n\nأدخل رقماً (مثال: 8):",
     "radiation": "☢️ **الإشعاعي**\n\n📊 **كم عدد الجلسات الكلي؟**\n\nأدخل رقماً (مثال: 30):",
+}
+
+# ✅ كيماوي/مناعي/موجّه — لا سؤال عن العدد الكلي إطلاقاً (بطلب المستخدم
+# صراحةً)، إدخال يدوي بحت لرقم الجلسة/الدورة الحالية فقط، بلا أي
+# TreatmentPlan (نفس منطق treatment_sessions.py::_start_simple_session_flow
+# تماماً — انظر _build_manual_session_summary هناك).
+_QUEUE_CURRENT_ONLY_PROMPTS = {
+    "chemo":     "💉 **الكيماوي**\n\n🔢 **رقم الدورة الحالية؟**\n\nأدخل رقماً (مثال: 2):",
+    "immuno":    "🧬 **المناعي**\n\n🔢 **رقم الجلسة الحالية؟**\n\nأدخل رقماً (مثال: 3):",
+    "targeted":  "🎯 **الموجّه**\n\n🔢 **رقم الجلسة الحالية؟**\n\nأدخل رقماً (مثال: 3):",
 }
 
 
@@ -166,11 +182,11 @@ async def handle_onc_next(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ═══════════════════════════════════════════════════════════════════
 async def _process_next_in_queue(message, context):
     """
-    ✅ لا تقدّم تلقائي بعد الآن — بطلب المستخدم صراحةً، كل نوع في القائمة
-    يُسأل عن عدد الجلسات/الدورات الكلي ورقم الجلسة/الدورة الحالية من
-    جديد في كل مرة، حتى لو كانت له خطة نشطة محفوظة مسبقاً (كانت تُقرأ
-    تلقائياً وتُقدَّم +1 بلا سؤال — انظر handle_oncology_queue_current
-    لكيفية معالجة الخطة الموجودة عند الحفظ بدل القراءة هنا).
+    ✅ لا تقدّم تلقائي — بطلب المستخدم صراحةً. الإشعاعي وحده يُسأل عن
+    العدد الكلي ثم الحالي (TreatmentPlan فعلية، لم تتغيّر). كيماوي/مناعي/
+    موجّه: لا سؤال عن العدد الكلي إطلاقاً — إدخال يدوي بحت لرقم الجلسة/
+    الدورة الحالية فقط، بلا أي خطة محفوظة (طلب لاحق من المستخدم ألغى
+    مفهوم "العدد الكلي" نفسه لهذه الأنواع الثلاثة).
     """
     data = context.user_data.setdefault("report_tmp", {})
     queue = data.get("_onc_queue") or []
@@ -180,6 +196,13 @@ async def _process_next_in_queue(message, context):
     key = queue[0]
     data["_onc_current_type"] = key
     data["_treatment_key"] = key
+
+    if key in _QUEUE_CURRENT_ONLY_PROMPTS:
+        await message.reply_text(
+            _QUEUE_CURRENT_ONLY_PROMPTS[key], reply_markup=_nav_buttons(show_back=True), parse_mode="Markdown",
+        )
+        return ONCOLOGY_QUEUE_CURRENT
+
     await message.reply_text(
         _QUEUE_TOTAL_PROMPTS[key], reply_markup=_nav_buttons(show_back=True), parse_mode="Markdown",
     )
@@ -248,25 +271,36 @@ async def handle_oncology_queue_total(update: Update, context: ContextTypes.DEFA
 
 
 async def handle_oncology_queue_current(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    data = context.user_data.setdefault("report_tmp", {})
+    key = data.get("_onc_current_type")
+    _the = unit_labels(key)[1]
     text = update.message.text.strip()
     if not text.isdigit() or int(text) <= 0:
         await update.message.reply_text(
-            "⚠️ يرجى إدخال رقم صحيح أكبر من صفر (رقم الجلسة الحالية):",
+            f"⚠️ يرجى إدخال رقم صحيح أكبر من صفر (رقم {_the} الحالية):",
             reply_markup=_nav_buttons(show_back=True),
         )
         return ONCOLOGY_QUEUE_CURRENT
 
-    data = context.user_data.setdefault("report_tmp", {})
-    key = data.get("_onc_current_type")
-    total = data.pop("_onc_pending_total", None)
     current = int(text)
+
+    # ✅ كيماوي/مناعي/موجّه — لا خطة إطلاقاً (بطلب المستخدم صراحةً)، لقطة
+    # نصية فقط بنفس صيغة _build_manual_session_summary (يطابقها تعبير
+    # نمطي مشترك عند التعديل بعد النشر — انظر treatment_sessions.py).
+    if key in _QUEUE_CURRENT_ONLY_PROMPTS:
+        summary = _build_manual_session_summary(key, current)
+        data.setdefault("_onc_summaries", {})[key] = summary
+        await update.message.reply_text("✅ تم الحفظ")
+        await update.message.reply_text(f"{_icon(key)} **{_short_label(key)}**\n{summary}", parse_mode="Markdown")
+        if key == "chemo":
+            return await _prompt_chemo_session_number_queue(update.message, context)
+        return await _ask_delivery_mode(update.message, context)
+
+    # الإشعاعي فقط من هنا وأسفل — TreatmentPlan فعلية لم تتغيّر.
+    total = data.pop("_onc_pending_total", None)
     actor_id, actor_name = _actor(update)
     patient_id = data.get("patient_id")
 
-    # ✅ لا تقدّم تلقائي (طلب المستخدم) — لكن إن كانت هناك خطة نشطة فعلاً
-    # لهذا المريض/النوع، تُحدَّث هي نفسها بالرقمين المُدخَلين يدوياً بدل
-    # إنشاء خطة "نشطة" ثانية موازية (سجل تدقيقي كامل عبر edit_plan).
-    # بلا خطة سابقة، تُنشَأ خطة جديدة كالمعتاد.
     existing = get_active_plan(patient_id, key) if patient_id else None
     if existing:
         plan = edit_plan(
@@ -281,18 +315,15 @@ async def handle_oncology_queue_current(update: Update, context: ContextTypes.DE
             created_by=actor_id, created_by_name=actor_name,
         )
 
-    if key == "radiation":
-        remaining = max(0, (total or 0) - current)
-        data["radiation_therapy_session_number"] = str(current)
-        data["radiation_therapy_remaining"] = str(remaining)
-        data.setdefault("radiation_therapy_type", "غير محدد")
+    remaining = max(0, (total or 0) - current)
+    data["radiation_therapy_session_number"] = str(current)
+    data["radiation_therapy_remaining"] = str(remaining)
+    data.setdefault("radiation_therapy_type", "غير محدد")
 
     await update.message.reply_text("✅ تم الحفظ")
     summary = format_progress_text(plan)
     data.setdefault("_onc_summaries", {})[key] = summary
     await update.message.reply_text(f"{_icon(key)} **{_short_label(key)}**\n{summary}", parse_mode="Markdown")
-    if key == "chemo":
-        return await _prompt_chemo_session_number_queue(update.message, context)
     return await _ask_delivery_mode(update.message, context)
 
 

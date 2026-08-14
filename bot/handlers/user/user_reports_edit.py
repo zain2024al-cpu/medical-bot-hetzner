@@ -197,21 +197,29 @@ _TREATMENT_KEY_BY_ACTION = {
     'العلاج المناعي': 'immuno',
     'جلسات غسيل الكلى': 'dialysis',
 }
-_DIALYSIS_SESSION_PATTERN = r'رقم الجلسة الحالية:\s*(\d+)'
+# ✅ يطابق كلا الصيغتين — "رقم الجلسة الحالية:" (dialysis/targeted/immuno)
+# و"رقم الدورة الحالية:" (chemo، عبر unit_labels) — نفس النص الذي تكتبه
+# _build_manual_session_summary في treatment_sessions.py.
+_DIALYSIS_SESSION_PATTERN = r'رقم (?:الجلسة|الدورة) الحالية:\s*(\d+)'
 
 
 def _current_session_number_display(report) -> str:
-    """القيمة المعروضة حالياً لحقل 'رقم الجلسة الحالية' — من TreatmentPlan
-    الفعلية (chemo/targeted/immuno) أو من نص treatment_plan_summary
-    (dialysis). يعيد 'لا يوجد' إن تعذّر إيجاد رقم (فيختفي الزر تلقائياً،
-    نفس سلوك بقية الحقول)."""
+    """القيمة المعروضة حالياً لحقل 'رقم الجلسة/الدورة الحالية'. الأولوية
+    دائماً للنص المباشر في treatment_plan_summary (الإدخال اليدوي بلا خطة
+    — dialysis منذ البداية، وأيضاً chemo/targeted/immuno بعد إلغاء
+    TreatmentPlan لهذه الأنواع الثلاثة بطلب المستخدم). إن لم يوجد نص
+    مطابق (تقرير قديم من قبل هذا التغيير له خطة فعلية فقط)، يُحاوَل
+    القراءة من TreatmentPlan كـ fallback للتوافق مع البيانات القديمة.
+    يعيد 'لا يوجد' إن تعذّر إيجاد رقم (فيختفي الزر تلقائياً)."""
     import re
     treatment_key = _TREATMENT_KEY_BY_ACTION.get((report.medical_action or '').strip())
     if not treatment_key:
         return "لا يوجد"
+    m = re.search(_DIALYSIS_SESSION_PATTERN, report.treatment_plan_summary or '')
+    if m:
+        return m.group(1)
     if treatment_key == 'dialysis':
-        m = re.search(_DIALYSIS_SESSION_PATTERN, report.treatment_plan_summary or '')
-        return m.group(1) if m else "لا يوجد"
+        return "لا يوجد"
     from services.treatment_plan_service import get_active_plan
     plan = get_active_plan(report.patient_id, treatment_key)
     if plan and plan.get('current_session') is not None:
@@ -220,19 +228,26 @@ def _current_session_number_display(report) -> str:
 
 
 def _apply_session_number_edit(report, new_value: str) -> None:
-    """يطبّق تعديل 'رقم الجلسة الحالية' على التقرير المنشور — يُحدِّث
-    TreatmentPlan الفعلية (chemo/targeted/immuno) أو نص treatment_plan_summary
-    مباشرة (dialysis، بلا خطة)."""
+    """يطبّق تعديل 'رقم الجلسة/الدورة الحالية' على التقرير المنشور. يكتب
+    دائماً في نص treatment_plan_summary مباشرة (المصدر الأساسي الآن لكل
+    الأنواع الأربعة). إن كان للتقرير خطة فعلية قديمة أيضاً (نُشر قبل
+    إلغاء TreatmentPlan لـ chemo/targeted/immuno)، تُحدَّث بالتوازي
+    للحفاظ على تناسق البيانات القديمة."""
     import re
+    from services.treatment_plan_service import unit_labels
     treatment_key = _TREATMENT_KEY_BY_ACTION.get((report.medical_action or '').strip())
+    _one, the, _pl = unit_labels(treatment_key if treatment_key != 'dialysis' else None)
+    summary = report.treatment_plan_summary or ""
+    if re.search(_DIALYSIS_SESSION_PATTERN, summary):
+        report.treatment_plan_summary = re.sub(
+            _DIALYSIS_SESSION_PATTERN, f'رقم {the} الحالية: {new_value}', summary,
+        )
+    elif treatment_key == 'dialysis':
+        report.treatment_plan_summary = f"🩸 **جلسات غسيل الكلى**\n\nرقم {the} الحالية: {new_value}"
+    elif treatment_key:
+        label = {'chemo': 'العلاج الكيماوي', 'targeted': 'العلاج الموجه', 'immuno': 'العلاج المناعي'}.get(treatment_key, '')
+        report.treatment_plan_summary = f"📋 **{label}**\n\nرقم {the} الحالية: {new_value}"
     if treatment_key == 'dialysis':
-        summary = report.treatment_plan_summary or ""
-        if re.search(_DIALYSIS_SESSION_PATTERN, summary):
-            report.treatment_plan_summary = re.sub(
-                _DIALYSIS_SESSION_PATTERN, f'رقم الجلسة الحالية: {new_value}', summary,
-            )
-        else:
-            report.treatment_plan_summary = f"🩸 **جلسات غسيل الكلى**\n\nرقم الجلسة الحالية: {new_value}"
         return
     if treatment_key:
         from services.treatment_plan_service import get_active_plan, edit_plan, format_progress_text
