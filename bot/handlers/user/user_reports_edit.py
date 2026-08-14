@@ -2415,6 +2415,69 @@ async def save_edit_to_database(query, context):
                 report.diagnosis = new_value
             logger.info(f"✅ تم تحديث doctor_decision لاستشارة مع قرار عملية: {field_name} = {new_value[:50]}...")
 
+        # ✅ tests (🧪 الفحوصات والأشعة) لاستشارة جديدة — عمود field_registry.py
+        # المخصَّص هو medications (نفس ما يُكتب عند إنشاء التقرير)، لكن لم يكن
+        # لهذا الحقل أي فرع هنا فيسقط في else العام أدناه (setattr على خاصية
+        # وهمية غير موجودة كعمود Report، لا تُحفَظ إطلاقاً) — التعديل يختفي
+        # صامتاً عند إعادة النشر (أحد الأخطاء الخمسة المكتشفة أثناء تدقيق
+        # الأنواع الـ17 مقابل field_registry.py).
+        elif field_name == 'tests' and report.medical_action == 'استشارة جديدة':
+            report.medications = new_value
+            current_data = context.user_data.get('current_report_data', {})
+            current_data['tests'] = new_value
+            context.user_data['current_report_data'] = current_data
+            # تحديث مقطع «الفحوصات المطلوبة:» داخل doctor_decision المركّب
+            # مع الحفاظ الكامل على بقية المقاطع (نفس نمط _replace_decision_segment
+            # لكن لمقطع مختلف).
+            existing = (report.doctor_decision or '').strip()
+            if existing:
+                segments = existing.split('\n\n')
+                rebuilt = []
+                replaced = False
+                for seg in segments:
+                    if seg.strip().startswith('الفحوصات المطلوبة:'):
+                        rebuilt.append(f"الفحوصات المطلوبة: {new_value}")
+                        replaced = True
+                    else:
+                        rebuilt.append(seg)
+                if not replaced:
+                    rebuilt.append(f"الفحوصات المطلوبة: {new_value}")
+                report.doctor_decision = '\n\n'.join(rebuilt)
+            else:
+                report.doctor_decision = f"الفحوصات المطلوبة: {new_value}"
+            logger.info(f"✅ تم تحديث tests (medications) + مقطع الفحوصات في doctor_decision للتقرير #{report_id} = {new_value[:50]}...")
+
+        # ✅ recommendations (💡 التوصيات الطبية) لاستشارة أخيرة — عمود
+        # field_registry.py المخصَّص هو treatment_plan (نفس ما يُكتب عند
+        # الإنشاء)، لكن Report لا يملك عمود recommendations إطلاقاً (الاسم
+        # موجود فقط في جدول monthly_evaluations منفصل تماماً) — فيسقط في
+        # else العام أدناه (setattr على خاصية وهمية غير موجودة كعمود، لا
+        # تُحفَظ إطلاقاً)، ويختفي التعديل صامتاً عند إعادة النشر (نفس شكل
+        # خلل tests أعلاه بالضبط — أحد الأخطاء الخمسة المكتشفة أثناء تدقيق
+        # الأنواع الـ17 مقابل field_registry.py).
+        elif field_name == 'recommendations':
+            report.treatment_plan = new_value
+            current_data = context.user_data.get('current_report_data', {})
+            current_data['recommendations'] = new_value
+            context.user_data['current_report_data'] = current_data
+            existing = (report.doctor_decision or '').strip()
+            if existing:
+                segments = existing.split('\n\n')
+                rebuilt = []
+                replaced = False
+                for seg in segments:
+                    if seg.strip().startswith('التوصيات الطبية:'):
+                        rebuilt.append(f"التوصيات الطبية: {new_value}")
+                        replaced = True
+                    else:
+                        rebuilt.append(seg)
+                if not replaced:
+                    rebuilt.append(f"التوصيات الطبية: {new_value}")
+                report.doctor_decision = '\n\n'.join(rebuilt)
+            else:
+                report.doctor_decision = f"التوصيات الطبية: {new_value}"
+            logger.info(f"✅ تم تحديث recommendations (treatment_plan) + مقطع التوصيات في doctor_decision للتقرير #{report_id} = {new_value[:50]}...")
+
         # ✅ معالجة حقول العلاج الإشعاعي
         # ⚠️ رقم الجلسة/الجلسات المتبقية لم يعودا مُعدَّلين هنا — يُحسبان من TreatmentPlan
         # (services/treatment_plan_service.py)، تعديلهما هنا كان سيفصلهما عن الخطة الفعلية
@@ -2482,8 +2545,21 @@ async def save_edit_to_database(query, context):
         # المركّب: نستبدل مقطعه فقط بدل الكتابة فوق النص كاملاً — الكتابة
         # الكاملة كانت تمحو التشخيص/الفحوصات/وضع الحالة/ملاحظات الرقود
         # المخزَّنة في نفس العمود، فتختفي من البطاقة عند إعادة النشر.
-        elif field_name == 'doctor_decision' and (report.medical_action or '').strip() in _COMPOSITE_DECISION_ACTIONS:
+        # ⚠️ field_name هنا قد يصل بأحد اسمين مختلفين لنفس الحقل فعلياً:
+        # 'doctor_decision' (مسارات قديمة) أو 'decision' (مفتاح field_registry.py
+        # الموحَّد — db_column="doctor_decision"، وهو الاسم الفعلي المُرسَل في
+        # callback_data للأزرار الجديدة المبنية عبر get_editable_fields_by_action_type
+        # لـ new_consult/periodic_followup/inpatient_followup/emergency/final_consult).
+        # 'decision' وحده لم يكن له أي فرع هنا فيسقط في else العام (setattr
+        # على خاصية وهمية غير موجودة كعمود Report، لا تُحفَظ إطلاقاً) — تعديل
+        # «قرار الطبيب» يختفي صامتاً عند إعادة النشر لكل هذه الأنواع الخمسة
+        # (خلل حقيقي عالي الأثر مكتشَف أثناء تدقيق الأنواع الـ17 مقابل
+        # field_registry.py، بنفس شكل خللي tests/recommendations أعلاه بالضبط).
+        elif field_name in ('doctor_decision', 'decision') and (report.medical_action or '').strip() in _COMPOSITE_DECISION_ACTIONS:
             report.doctor_decision = _replace_decision_segment(report.doctor_decision, new_value)
+            current_data = context.user_data.get('current_report_data', {})
+            current_data[field_name] = new_value
+            context.user_data['current_report_data'] = current_data
             logger.info(
                 f"✅ تم تحديث مقطع «قرار الطبيب» مع الحفاظ على بقية مقاطع "
                 f"doctor_decision للتقرير #{report_id} ({report.medical_action})"
