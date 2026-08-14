@@ -230,6 +230,10 @@ class DatabaseMaintenance:
                 # كان يعني لا طريق لرفعها لاحقاً أبداً.
                 _migrate_column(conn, "res_profiles", "tickets_file_id", "VARCHAR(255)")
                 _migrate_column(conn, "res_companions", "tickets_file_id", "VARCHAR(255)")
+                # ✅ اسم أضافه الإداري عبر "مريض جديد مع مرافقين" ولم يُستخدَم
+                # بعد في تقرير وصول فعلي — أساس شاشة "📋 الأسماء المعلّقة"
+                # الجديدة في الخدمات العامة.
+                _migrate_column(conn, "patients", "pending_arrival", "BOOLEAN")
                 logger.info("🔎 Migration check finished.")
 
                 if check == "ok":

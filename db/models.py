@@ -88,6 +88,11 @@ class Patient(Base):
     # تدفق الواصلين مضطراً لسؤال "هل يوجد مرافق؟" ثم اختيار كل مرافق يدوياً
     # من قائمة كل المرافقين في النظام.
     companion_of_id = Column(Integer, nullable=True, index=True)
+    # ✅ اسم أضافه الإداري عبر "مريض جديد مع مرافقين" ولم يُستخدَم بعد في
+    # تقرير "🛬 الوصول" فعلي — True عند الإنشاء، يُضبَط False تلقائياً عند
+    # تأكيد دفعة وصول تستخدم هذا الاسم. يُستخدَم لعرض "📋 الأسماء المعلّقة"
+    # في بوت الخدمات العامة. لا علاقة له بـ patient_type="general".
+    pending_arrival = Column(Boolean, default=False, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, index=True, nullable=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
 

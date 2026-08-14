@@ -3248,6 +3248,69 @@ TreatmentPlan؛ الزر المفرد (كيماوي) يسأل عن رقم الد
 الإجابة عن طريقة الإعطاء للكيماوي، ينتقل صحيحاً للنوع التالي في الطابور
 (الموجّه) بدل القفز للشكوى مباشرة.
 
+### 2026-08-14 (٢٤) — 📋 شاشة "الأسماء المعلّقة" في بوت الواصلين (جزء أ من دورة معلّق↔أرشيف↔معلّق)
+
+**الطلب**: ربط بوت الخدمات العامة (الواصلين) بالإقامات في دورة حياة
+كاملة: اسم إداري معلّق ← بيانات مكتملة (إقامة معلّقة بانتظار الصورة/فورم
+C) ← أرشفة بعد اكتمالهما ← معلّق من جديد عند اقتراب الانتهاء. بعد تدقيق
+شامل للآلية الحالية (خطة كاملة في
+`C:\Users\nalgu\.claude\plans\linked-tumbling-galaxy.md`) واتفاق على 4
+قرارات تصميم صريحة مع المستخدم، نُفِّذ الجزء الأول من 3.
+
+**التشخيص**: لا يوجد أي مفهوم "معلّق" ظاهر اليوم — اسم يُضاف عبر "🤝
+مريض جديد مع مرافقين" (`admin_schedule_management.py`) يُكتب في
+`Patient` بلا أي علم يميّزه عن أي اسم آخر؛ محدِّد شاشة اختيار الاسم في
+"🛬 الوصول" (`patient_selector` بعلم `only_companion_flow=True`) يعرض
+هذه الأسماء فقط ضمنياً (بلا استخدامها بعد) لكن بلا أي شاشة تُظهر ذلك
+صراحة للمستخدم.
+
+**الإصلاح**:
+- `db/models.py` + `db/maintenance.py`: عمود جديد
+  `Patient.pending_arrival` (Boolean, default False) + ترحيله
+  (`_migrate_column(conn, "patients", "pending_arrival", "BOOLEAN")`).
+- `services/patients_service.py::add_patient()`: بارامتر جديد
+  `pending_arrival: bool = False`.
+- `admin_schedule_management.py`: تمرير `pending_arrival=True` عند
+  إضافة المريض والمرافقين عبر "🤝 مريض جديد مع مرافقين" (نقطتان —
+  `handle_start_patient_with_companions`/`handle_companion_name_input`).
+  الإضافة العامة "➕ إضافة اسم جديد" لا تتأثر (تبقى `False` كالمعتاد).
+- `services/patients_service.py`: دالتان جديدتان —
+  `get_pending_arrival_names()` (تجمع كل عائلة `companion_parent`
+  مع مرافقيها `pending_arrival=True`) و
+  `clear_pending_arrival_by_names(names)` (مطابقة بالاسم الكامل — نفس
+  أسلوب فحص التكرار في `add_patient` نفسها، لأن `session.completed_patients`
+  في الواصلين لا يحمل معرّف السجل، فقط الاسم المُختار).
+- `modules/general_services/arrivals/flow.py`: عند تأكيد دفعة وصول
+  (`STEP_REVIEW`)، استدعاء جديد fire-and-forget لـ
+  `clear_pending_arrival_by_names()` بأسماء كل مريض ومرافقيه في الدفعة
+  — بجانب `create_profiles_from_arrival_batch`/`sync_arrivals_to_patient_registry`
+  الموجودين، بنفس نمط try/except اللاحرج.
+- `modules/general_services/arrivals/views.py`: زر جديد "📋 الأسماء
+  المعلّقة" في شاشة "🛬 الوصول" الفرعية + `build_pending_names_list()`
+  (عرض فقط، بلا أزرار إجراء — الاستخدام الفعلي يبقى عبر منتقي "➕ تسجيل
+  دفعة وصول جديدة" العادي).
+- `modules/general_services/arrivals/flow.py`: إضافة `action ==
+  "pending_names"` لموزِّع `gsa:` الموجود (`_dispatch_callback_inner`).
+
+**التحقق**: `python -m py_compile` نظيف على كل الملفات · بعد حذف
+`__pycache__` بالكامل: 187 اختباراً + 170 معالجاً حقيقياً (بلا تغيير —
+الزر الجديد يمر عبر موزِّع `gsa:` الموجود، لا معالِج جديد) · محاكاة حيّة
+عبر الدوال الفعلية: إضافة عائلة (مريض + مرافقان) عبر `add_patient`
+الحقيقية بـ`pending_arrival=True` ⇒ ظهورها في `get_pending_arrival_names()`
+بالضبط (مريض + المرافقان)؛ اسم عام مُضاف بلا `pending_arrival` لا يظهر
+إطلاقاً؛ استدعاء `clear_pending_arrival_by_names()` لاسمين من الثلاثة
+(محاكاة دفعة وصول استخدمتهما فقط) ⇒ التأكيد أن العائلة تختفي كاملة من
+القائمة (المريض نفسه لم يعد معلَّقاً) بينما المرافق الثالث المتخطَّى
+يبقى `pending_arrival=True` فعلياً في قاعدة البيانات (تحقّق مباشر) ·
+اختبار منفصل: بناء جدول `patients` بالبنية القديمة (بلا العمود) والتأكد
+أن `_migrate_column` الحقيقية تضيفه بنجاح — يحاكي ترقية قاعدة بيانات
+إنتاج فعلية.
+
+**متبقٍ (الجزءان ب/ج من نفس الخطة)**: حالتا `pending_documents`/
+`archived` الجديدتان في الإقامات + زر الأرشفة اليدوي + شاشة "الملفات
+المعلّقة (وثائق ناقصة)" + توسيع `TRACKABLE_STATUSES` — الخطة الكاملة
+موثَّقة في ملف الخطة أعلاه.
+
 ## 📋 كيفية استخدام هذا السجل
 
 - قبل إضافة أي نوع إجراء/مسار جديد للبوت: راجع الجدول أعلاه وسجِّله في

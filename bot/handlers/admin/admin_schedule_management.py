@@ -867,7 +867,7 @@ async def handle_pwc_patient_name_input(update: Update, context: ContextTypes.DE
         # ✅ "companion_parent" يبقى ظاهراً كـ"general" في كل الشاشات الأخرى
         # (نفس معاملة None سابقاً)، مع تمييزه إضافياً ليظهر حصراً أيضاً في
         # 🔧 الخدمات العامة و🪪 الإقامة (انظر shared/selectors/patient_selector).
-        patient_id = add_patient(name, patient_type="companion_parent")
+        patient_id = add_patient(name, patient_type="companion_parent", pending_arrival=True)
 
         if not patient_id:
             await update.message.reply_text("❌ **خطأ في الإضافة**", parse_mode=ParseMode.MARKDOWN)
@@ -980,6 +980,7 @@ async def handle_companion_name_input(update: Update, context: ContextTypes.DEFA
             name,
             patient_type="companion",
             companion_of_id=context.user_data.get("new_patient_id"),
+            pending_arrival=True,
         )
     except Exception as e:
         logger.error(f"Error adding companion: {e}")

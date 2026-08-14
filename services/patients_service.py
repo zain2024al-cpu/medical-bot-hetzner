@@ -146,6 +146,7 @@ def add_patient(
     name: str,
     patient_type: Optional[str] = None,
     companion_of_id: Optional[int] = None,
+    pending_arrival: bool = False,
 ) -> Optional[int]:
     """
     إضافة مريض جديد
@@ -153,6 +154,8 @@ def add_patient(
                   "pharmacy_only" = يظهر فقط في صرف الأدوية والمستلزمات الطبية.
     companion_of_id: معرّف المريض الذي يرافقه (للنوع "companion" فقط) —
                   يسمح لاحقاً بجلب "مرافقي هذا المريض" مباشرة بدل السؤال عنهم.
+    pending_arrival: True لأسماء "مريض جديد مع مرافقين" — لم تُستخدَم بعد
+                  في تقرير وصول فعلي، تظهر في شاشة "📋 الأسماء المعلّقة".
     إن كان الاسم موجوداً مسبقاً يُعاد id الموجود دون تغيير نوعه.
     Returns patient id or None
     """
@@ -171,6 +174,7 @@ def add_patient(
                 full_name=name,
                 patient_type=patient_type,
                 companion_of_id=companion_of_id,
+                pending_arrival=pending_arrival,
             )
             session.add(new_patient)
             session.commit()
@@ -184,6 +188,82 @@ def add_patient(
     except Exception as e:
         logger.error(f"Error adding patient: {e}")
         return None
+
+
+def clear_pending_arrival_by_names(names: List[str]) -> int:
+    """
+    يُلغي علم pending_arrival عن أسماء "مريض جديد مع مرافقين" فور استخدامها
+    فعلياً في تقرير وصول مؤكَّد — تختفي بذلك من شاشة "📋 الأسماء المعلّقة".
+    مطابقة بالاسم الكامل (نفس أسلوب فحص التكرار في add_patient نفسها) —
+    session.completed_patients لا يحمل معرّف السجل، فقط الاسم المُختار.
+    Returns عدد الصفوف التي تغيّرت فعلاً.
+    """
+    if not names:
+        return 0
+    try:
+        from db.session import SessionLocal
+        from db.models import Patient
+
+        with SessionLocal() as session:
+            rows = (
+                session.query(Patient)
+                .filter(
+                    Patient.full_name.in_(names),
+                    Patient.patient_type.in_(["companion_parent", "companion"]),
+                    Patient.pending_arrival.is_(True),
+                )
+                .all()
+            )
+            for row in rows:
+                row.pending_arrival = False
+            session.commit()
+            return len(rows)
+    except Exception as e:
+        logger.error(f"Error clearing pending_arrival: {e}")
+        return 0
+
+
+def get_pending_arrival_names() -> List[Dict]:
+    """
+    عائلات "مريض جديد مع مرافقين" لم يُسجَّل وصولها بعد (pending_arrival=True)
+    — تُستخدَم في شاشة "📋 الأسماء المعلّقة" ببوت الخدمات العامة.
+    Returns [{"id": int, "name": str, "companions": [str, ...]}, ...]
+    مرتَّبة الأحدث أولاً، بدون أي عنصر لا يملك patient_type="companion_parent".
+    """
+    try:
+        from db.session import SessionLocal
+        from db.models import Patient
+
+        with SessionLocal() as session:
+            parents = (
+                session.query(Patient)
+                .filter(
+                    Patient.patient_type == "companion_parent",
+                    Patient.pending_arrival.is_(True),
+                )
+                .order_by(Patient.created_at.desc())
+                .all()
+            )
+            result = []
+            for parent in parents:
+                companions = (
+                    session.query(Patient)
+                    .filter(
+                        Patient.patient_type == "companion",
+                        Patient.companion_of_id == parent.id,
+                        Patient.pending_arrival.is_(True),
+                    )
+                    .all()
+                )
+                result.append({
+                    "id": parent.id,
+                    "name": parent.full_name,
+                    "companions": [c.full_name for c in companions],
+                })
+            return result
+    except Exception as e:
+        logger.error(f"Error fetching pending arrival names: {e}")
+        return []
 
 
 def get_companions_for_patient(patient_id: int) -> List[Dict]:

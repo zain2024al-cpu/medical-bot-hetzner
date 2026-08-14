@@ -710,6 +710,13 @@ async def _dispatch_callback_inner(
         await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
         return
 
+    if action == "pending_names":
+        from modules.general_services.arrivals.views import build_pending_names_list
+        logger.info(f"[arrivals.cb] NAV → pending names list  user={uid}")
+        text, kb = build_pending_names_list()
+        await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
+        return
+
     # ── Date ──────────────────────────────────────────────────────────────────
     if action == "date_today":
         session = ArrivalSession.load(context.user_data)
@@ -1806,6 +1813,21 @@ async def _dispatch_callback_inner(
             logger.exception(
                 f"[arrivals.cb] patient registry sync FAILED (non-fatal)"
                 f"  batch_id={saved.batch_id}"
+            )
+
+        # ── Clear "📋 الأسماء المعلّقة" flag for names just used (fire-and-forget) ──
+        try:
+            from services.patients_service import clear_pending_arrival_by_names
+            _names = [p.get("name", "") for p in session.completed_patients if p.get("name")]
+            for p in session.completed_patients:
+                _names += [c.get("name", "") for c in p.get("companions", []) if c.get("name")]
+            cleared = clear_pending_arrival_by_names(_names)
+            logger.info(
+                f"[arrivals.cb] pending_arrival cleared for {cleared} name(s)  batch_id={saved.batch_id}"
+            )
+        except Exception:
+            logger.exception(
+                f"[arrivals.cb] clearing pending_arrival FAILED (non-fatal)  batch_id={saved.batch_id}"
             )
 
         user  = update.effective_user

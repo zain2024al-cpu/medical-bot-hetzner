@@ -21,9 +21,40 @@ def build_arrivals_menu() -> tuple[str, InlineKeyboardMarkup]:
     text = f"{_DIVIDER}\n🛬  **الوصول**\n\nاختر الإجراء:"
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("➕ تسجيل دفعة وصول جديدة", callback_data=f"{GSA}:start")],
+        [InlineKeyboardButton("📋 الأسماء المعلّقة",       callback_data=f"{GSA}:pending_names")],
         [InlineKeyboardButton("⬅️ رجوع",                  callback_data=f"{GS}:main")],
     ])
     return text, kb
+
+
+def build_pending_names_list() -> tuple[str, InlineKeyboardMarkup]:
+    """
+    ✅ الأسماء التي أضافها الأدمن عبر "مريض جديد مع مرافقين" ولم تُستخدَم
+    بعد في دفعة وصول مؤكَّدة (Patient.pending_arrival=True) — عرض فقط،
+    بلا أزرار إجراء؛ الاستخدام الفعلي يبقى عبر منتقي "➕ تسجيل دفعة وصول
+    جديدة" العادي كالمعتاد.
+    """
+    from services.patients_service import get_pending_arrival_names
+
+    families = get_pending_arrival_names()
+
+    lines = [_DIVIDER, "📋  **الأسماء المعلّقة**", ""]
+    if not families:
+        lines.append("لا توجد أسماء معلّقة حالياً.")
+    else:
+        lines.append("أسماء أضافها الإداري ولم يُسجَّل وصولها بعد:")
+        lines.append(_THIN)
+        for fam in families:
+            lines.append(f"👤 *{fam['name']}*")
+            for comp_name in fam["companions"]:
+                lines.append(f"   └ 👥 {comp_name}")
+        lines.append(_THIN)
+        lines.append(f"الإجمالي: {len(families)} مريضاً")
+
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("⬅️ رجوع", callback_data=f"{GSA}:arrivals")],
+    ])
+    return "\n".join(lines), kb
 
 
 # ── Step 1: التاريخ ───────────────────────────────────────────────────────────
