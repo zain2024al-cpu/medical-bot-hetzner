@@ -327,9 +327,14 @@ async def handle_treatment_plan_setup(update: Update, context: ContextTypes.DEFA
         context.user_data['_conversation_state'] = TREATMENT_CHEMO_SESSION_NUMBER
         return TREATMENT_CHEMO_SESSION_NUMBER
 
-    await _prompt_complaint(update.message, context)
-    context.user_data['_conversation_state'] = TREATMENT_COMPLAINT
-    return TREATMENT_COMPLAINT
+    # ✅ استيراد محلي عمداً (لا في أعلى الملف) لتفادي استيراد دائري —
+    # oncology_multiselect.py يستورد من هذا الملف على مستوى الوحدة.
+    # سؤال طريقة الإعطاء (عيادة يومية/رقود) كان مقصوراً على الزر المدمج
+    # "🎗️ جلسات الأورام" عند اختيار نوعين أو أكثر فقط — لا يظهر إطلاقاً
+    # عند اختيار نوع واحد فقط من نفس الشاشة أو عبر الأزرار المفردة (خلل
+    # حقيقي مُبلَّغ عنه). موحَّد الآن لجميع مسارات الدخول.
+    from .oncology_multiselect import _ask_delivery_mode
+    return await _ask_delivery_mode(update.message, context)
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -508,9 +513,10 @@ async def handle_chemo_session_number(update: Update, context: ContextTypes.DEFA
     data["chemo_session_number"] = int(text)
 
     await update.message.reply_text("✅ تم الحفظ")
-    await _prompt_complaint(update.message, context)
-    context.user_data['_conversation_state'] = TREATMENT_COMPLAINT
-    return TREATMENT_COMPLAINT
+    # ✅ استيراد محلي عمداً — انظر نفس الملاحظة في handle_treatment_plan_setup
+    # أعلاه (توحيد سؤال طريقة الإعطاء بين الأزرار المفردة والزر المدمج).
+    from .oncology_multiselect import _ask_delivery_mode
+    return await _ask_delivery_mode(update.message, context)
 
 
 # ═══════════════════════════════════════════════════════════════════

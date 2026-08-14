@@ -368,10 +368,17 @@ async def handle_oncology_delivery_days(update: Update, context: ContextTypes.DE
         return ONCOLOGY_DELIVERY_DAYS
 
     data = context.user_data.setdefault("report_tmp", {})
-    key = data.get("_onc_current_type")
-    summaries = data.setdefault("_onc_summaries", {})
-    if key in summaries:
-        summaries[key] = summaries[key] + f"\n🛏️ رقود ({text} أيام متوقعة)"
+    if data.get("_onc_queue") is None:
+        # ✅ وضع الاختيار المفرد (نوع واحد فقط من "🎗️ جلسات الأورام"، لا
+        # طابور ولا قاموس ملخصات) — يُلحَق مباشرة بلقطة الجلسة/الدورة.
+        data["treatment_plan_summary"] = (
+            data.get("treatment_plan_summary", "") + f"\n🛏️ رقود ({text} أيام متوقعة)"
+        )
+    else:
+        key = data.get("_onc_current_type")
+        summaries = data.setdefault("_onc_summaries", {})
+        if key in summaries:
+            summaries[key] = summaries[key] + f"\n🛏️ رقود ({text} أيام متوقعة)"
 
     await update.message.reply_text("✅ تم الحفظ")
     return await _advance_queue_after_delivery(update.message, context)
@@ -379,7 +386,13 @@ async def handle_oncology_delivery_days(update: Update, context: ContextTypes.DE
 
 async def _advance_queue_after_delivery(message, context):
     data = context.user_data.setdefault("report_tmp", {})
-    queue = data.get("_onc_queue") or []
+    queue = data.get("_onc_queue")
+    if queue is None:
+        # ✅ وضع الاختيار المفرد — لا طابور لمتابعته، ينتقل مباشرة لبقية
+        # المسار المشترك (نفس ما كانت تفعله الأزرار المفردة قبل هذا الإصلاح).
+        await _prompt_complaint(message, context)
+        context.user_data['_conversation_state'] = TREATMENT_COMPLAINT
+        return TREATMENT_COMPLAINT
     key = data.get("_onc_current_type")
     if queue and queue[0] == key:
         queue.pop(0)
