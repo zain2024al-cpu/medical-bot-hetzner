@@ -24,8 +24,12 @@ async def _dispatch_gs_nav(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         return
 
     if action == "arrivals":
-        from modules.general_services.arrivals.views import build_arrivals_menu
-        text, kb = build_arrivals_menu()
+        # ⚠️ "🛬 الوصول" يفتح شاشة "📋 الأسماء المعلّقة" مباشرة الآن — منيو
+        # "➕ تسجيل دفعة وصول جديدة" الفرعي حُذف (كان يعرض نفس مجموعة الأسماء
+        # عبر منتقٍ عام لا داعي له). كل أزرار "❌ إلغاء" عبر تدفق الوصول تشير
+        # لنفس gs:arrivals، فتعود جميعها هنا تلقائياً أيضاً.
+        from modules.general_services.arrivals.views import build_pending_names_list
+        text, kb = build_pending_names_list()
         await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
         return
 

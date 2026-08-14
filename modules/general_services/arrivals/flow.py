@@ -24,7 +24,6 @@ from modules.general_services.constants import (
 from modules.general_services.arrivals.session import (
     ArrivalSession,
     STEP_DATE, STEP_DATE_CUSTOM, STEP_SPECIALIST,
-    STEP_PATIENT_COUNT,
     STEP_P_NAME, STEP_P_ARRIVAL_DATE, STEP_P_PASSPORT_EXPIRY, STEP_P_VISA_EXPIRY,
     STEP_P_HAS_COMPANION, STEP_P_PASSPORT, STEP_P_VISA, STEP_P_ENTRY_STAMP, STEP_P_TICKETS,
     STEP_P_RESIDENCE, STEP_P_RESIDENCE_EXPIRY, STEP_P_INDIV_NOTES, STEP_P_SERVICES,
@@ -38,10 +37,8 @@ from modules.general_services.arrivals.session import (
 )
 from modules.general_services.arrivals.views import (
     GSA, GS,
-    build_arrivals_menu,
     build_date_prompt, build_date_calendar_prompt,
     build_specialist_prompt,
-    build_patient_count_prompt,
     build_p_arrival_date_prompt, build_p_passport_expiry_prompt, build_p_visa_expiry_prompt,
     build_p_has_companion_prompt,
     build_p_passport_prompt, build_p_visa_prompt,
@@ -99,9 +96,6 @@ _PHOTO_STEPS = {
 }
 
 # ── Text steps — active in group 10 ──────────────────────────────────────────
-# STEP_PATIENT_COUNT is intentionally excluded: it uses inline keyboard buttons
-# (count_1 … count_20 callbacks) so the bot receives input in group chats
-# without requiring bot admin / privacy-mode-off configuration.
 # STEP_P_NAME/STEP_C_NAME excluded: الاسم يُختار إلزامياً من patient_selector،
 # لا يوجد إدخال نص للاسم إطلاقاً.
 # كل حقول التقويم (arrival_date/passport_expiry/visa_expiry/residence_expiry)
@@ -202,11 +196,6 @@ async def _show_date(update, context):
 
 async def _show_specialist(update, context):
     text, kb = build_specialist_prompt()
-    await _safe_edit(update, text, kb)
-
-
-async def _show_patient_count(update, context, session):
-    text, kb = build_patient_count_prompt(session)
     await _safe_edit(update, text, kb)
 
 
@@ -567,6 +556,41 @@ def _finish_and_advance(session: ArrivalSession) -> None:
 
 # ── Mandatory registry-pick result routes ─────────────────────────────────────
 
+async def _apply_known_patient(
+    session: ArrivalSession, patient_id: int | None, patient_name: str,
+    update: Update, context: ContextTypes.DEFAULT_TYPE,
+) -> None:
+    """
+    يطبِّق مريضاً معروف الاسم/المعرِّف مسبقاً (سواء من منتقي patient_selector
+    أو من الضغط المباشر على اسم في "📋 الأسماء المعلّقة") — يجلب مرافقيه من
+    السجل، يضبط current_patient، وينتقل لـSTEP_P_ARRIVAL_DATE. مُستخلصة من
+    _on_p_name_selected لتُستخدَم أيضاً من مسار الاسم المُختار مسبقاً.
+    """
+    session.current_patient["name"] = patient_name
+
+    # ✅ مرافقو هذا المريض معروفون مسبقاً من إدخال الأدمن ("مريض جديد مع
+    # مرافقين") — نجلبهم هنا بدل سؤال المستخدم "هل يوجد مرافق؟" ثم اختيار
+    # كل مرافق يدوياً من قائمة كل المرافقين في النظام. أسماؤهم تُملأ تلقائياً
+    # وتُطلب بياناتهم واحداً تلو الآخر بعد إتمام المريض.
+    try:
+        from services.patients_service import get_companions_for_patient
+        queue = get_companions_for_patient(int(patient_id)) if patient_id else []
+    except Exception:
+        logger.exception("[arrivals] failed to load registry companions — continuing without")
+        queue = []
+
+    session.current_patient["companion_queue"] = queue
+    session.current_patient["has_companion"] = bool(queue)
+    session.step = STEP_P_ARRIVAL_DATE
+    session.save(context.user_data)
+    logger.info(
+        f"[arrivals] known patient applied={patient_name!r} companions={[c['name'] for c in queue]}"
+        f" → STEP_P_ARRIVAL_DATE"
+        f"  patient_index={session.patient_index}/{session.patient_count}"
+    )
+    await _show_p_arrival_date(update, context, session)
+
+
 async def _on_p_name_selected(result, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     session = ArrivalSession.load(context.user_data)
     if session is None:
@@ -585,30 +609,7 @@ async def _on_p_name_selected(result, update: Update, context: ContextTypes.DEFA
         await _show_p_name(update, context, session)
         return
 
-    session.current_patient["name"] = name
-
-    # ✅ مرافقو هذا المريض معروفون مسبقاً من إدخال الأدمن ("مريض جديد مع
-    # مرافقين") — نجلبهم هنا بدل سؤال المستخدم "هل يوجد مرافق؟" ثم اختيار
-    # كل مرافق يدوياً من قائمة كل المرافقين في النظام. أسماؤهم تُملأ تلقائياً
-    # وتُطلب بياناتهم واحداً تلو الآخر بعد إتمام المريض.
-    try:
-        from services.patients_service import get_companions_for_patient
-        _pid = getattr(patient, "id", None)
-        queue = get_companions_for_patient(int(_pid)) if _pid else []
-    except Exception:
-        logger.exception("[arrivals] failed to load registry companions — continuing without")
-        queue = []
-
-    session.current_patient["companion_queue"] = queue
-    session.current_patient["has_companion"] = bool(queue)
-    session.step = STEP_P_ARRIVAL_DATE
-    session.save(context.user_data)
-    logger.info(
-        f"[arrivals] p_name selected={name!r} companions={[c['name'] for c in queue]}"
-        f" → STEP_P_ARRIVAL_DATE"
-        f"  patient_index={session.patient_index}/{session.patient_count}"
-    )
-    await _show_p_arrival_date(update, context, session)
+    await _apply_known_patient(session, getattr(patient, "id", None), name, update, context)
 
 
 async def _on_c_name_selected(result, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -690,11 +691,9 @@ async def _dispatch_callback_inner(
     query = update.callback_query
 
     # ── GS navigation ─────────────────────────────────────────────────────────
-    if action == "arrivals":
-        logger.info(f"[arrivals.cb] NAV → arrivals menu  user={uid}")
-        text, kb = build_arrivals_menu()
-        await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
-        return
+    # ⚠️ "gsa:arrivals" لم يعد له أي مُصدِر (menu فرعي محذوف) — بقي
+    # "gs:arrivals" وحده، مُوجَّه عبر routing_nav.py::_dispatch_gs_nav
+    # مباشرة إلى build_pending_names_list().
 
     if action == "main":
         logger.info(f"[arrivals.cb] NAV → main GS menu  user={uid}")
@@ -702,18 +701,36 @@ async def _dispatch_callback_inner(
         await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
         return
 
-    # ── Start ─────────────────────────────────────────────────────────────────
-    if action == "start":
-        session = ArrivalSession.create(context.user_data)
-        logger.info(f"[arrivals.cb] start → session created → STEP_DATE  user={uid}")
-        text, kb = build_date_prompt()
-        await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
-        return
-
-    if action == "pending_names":
+    # ── Pending-name pick (replaces the old "➕ تسجيل دفعة وصول جديدة" +
+    # عدد المرضى + منتقي عام — الاسم معروف مسبقاً من "📋 الأسماء المعلّقة") ──
+    if action.startswith("pending_pick_"):
+        try:
+            parent_id = int(action[len("pending_pick_"):])
+        except ValueError:
+            logger.warning(f"[arrivals.cb] invalid pending_pick action={action!r}  user={uid}")
+            return
+        from services.patients_service import get_pending_arrival_names
         from modules.general_services.arrivals.views import build_pending_names_list
-        logger.info(f"[arrivals.cb] NAV → pending names list  user={uid}")
-        text, kb = build_pending_names_list()
+        families = get_pending_arrival_names()
+        match = next((f for f in families if f["id"] == parent_id), None)
+        if match is None:
+            logger.info(f"[arrivals.cb] pending_pick_{parent_id} — no longer pending  user={uid}")
+            text, kb = build_pending_names_list()
+            await query.edit_message_text(
+                "⚠️ هذا الاسم لم يعد متاحاً (رُبما سُجِّل وصوله للتو).\n\n" + text,
+                reply_markup=kb, parse_mode="Markdown",
+            )
+            return
+        session = ArrivalSession.create(context.user_data)
+        session.patient_count = 1
+        session.preselected_patient_id = parent_id
+        session.preselected_patient_name = match["name"]
+        session.save(context.user_data)
+        logger.info(
+            f"[arrivals.cb] pending_pick_{parent_id} ({match['name']!r}) "
+            f"→ session created → STEP_DATE  user={uid}"
+        )
+        text, kb = build_date_prompt()
         await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
         return
 
@@ -725,10 +742,14 @@ async def _dispatch_callback_inner(
             await _cancel(update, context); return
         from datetime import datetime
         session.created_at = datetime.utcnow().isoformat()
-        session.step = STEP_PATIENT_COUNT
-        session.save(context.user_data)
-        logger.info(f"[arrivals.cb] date_today → STEP_PATIENT_COUNT  user={uid}")
-        await _show_patient_count(update, context, session)
+        session.patient_index = 0
+        session.completed_patients = []
+        session.init_current_patient()
+        logger.info(f"[arrivals.cb] date_today → preselected patient  user={uid}")
+        await _apply_known_patient(
+            session, session.preselected_patient_id,
+            session.preselected_patient_name, update, context,
+        )
         return
 
     if action == "date_calendar":
@@ -1032,10 +1053,14 @@ async def _dispatch_callback_inner(
             await _show_c_passport(update, context, session)
         else:
             session.created_at = dt.isoformat()
-            session.step = STEP_PATIENT_COUNT
-            session.save(context.user_data)
-            logger.info(f"[arrivals.cb] cal_pick date={dt.date()} → STEP_PATIENT_COUNT  user={uid}")
-            await _show_patient_count(update, context, session)
+            session.patient_index = 0
+            session.completed_patients = []
+            session.init_current_patient()
+            logger.info(f"[arrivals.cb] cal_pick date={dt.date()} → preselected patient  user={uid}")
+            await _apply_known_patient(
+                session, session.preselected_patient_id,
+                session.preselected_patient_name, update, context,
+            )
         return
 
     # ── Specialist ────────────────────────────────────────────────────────────
@@ -1057,31 +1082,6 @@ async def _dispatch_callback_inner(
             f"[arrivals.cb] specialist={sid!r} ({label!r}) → STEP_REVIEW  user={uid}"
         )
         await _show_review(update, context, session)
-        return
-
-    # ── Patient count (inline button 1–20) ───────────────────────────────────
-    if action.startswith("count_"):
-        try:
-            n = int(action[len("count_"):])
-            assert 1 <= n <= 20
-        except (ValueError, AssertionError):
-            logger.warning(f"[arrivals.cb] invalid count action={action!r}  user={uid}")
-            return
-        session = ArrivalSession.load(context.user_data)
-        if session is None:
-            logger.warning(f"[arrivals.cb] count — no session  user={uid}")
-            await _cancel(update, context); return
-        session.patient_count      = n
-        session.patient_index      = 0
-        session.completed_patients = []
-        session.init_current_patient()
-        session.step = STEP_P_NAME
-        session.save(context.user_data)
-        logger.info(
-            f"[arrivals.cb] count={n} → STEP_P_NAME saved"
-            f"  session.step={session.step!r}  user={uid}"
-        )
-        await _show_p_name(update, context, session)
         return
 
     # ── Companion ─────────────────────────────────────────────────────────────
@@ -1391,16 +1391,6 @@ async def _dispatch_callback_inner(
         session.save(context.user_data)
         logger.info(f"[arrivals.cb] back_to_specialist → STEP_SPECIALIST  user={uid}")
         await _show_specialist(update, context)
-        return
-
-    if action == "back_to_count":
-        session = ArrivalSession.load(context.user_data)
-        if session is None:
-            await _cancel(update, context); return
-        session.step = STEP_PATIENT_COUNT
-        session.save(context.user_data)
-        logger.info(f"[arrivals.cb] back_to_count → STEP_PATIENT_COUNT  user={uid}")
-        await _show_patient_count(update, context, session)
         return
 
     if action == "back_to_batch_notes":
@@ -1995,13 +1985,17 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 await msg.reply_text(prompt, reply_markup=kb, parse_mode="Markdown")
                 return
             session.created_at = dt.isoformat()
-            session.step = STEP_PATIENT_COUNT
-            session.save(context.user_data)
+            session.patient_index = 0
+            session.completed_patients = []
+            session.init_current_patient()
             logger.info(
-                f"[arrivals.text] STEP_DATE_CUSTOM → STEP_PATIENT_COUNT"
+                f"[arrivals.text] STEP_DATE_CUSTOM → preselected patient"
                 f"  date={dt.date()}  user={uid}"
             )
-            await _show_patient_count(update, context, session)
+            await _apply_known_patient(
+                session, session.preselected_patient_id,
+                session.preselected_patient_name, update, context,
+            )
         except Exception:
             logger.exception(
                 f"[arrivals.text] EXCEPTION in STEP_DATE_CUSTOM"

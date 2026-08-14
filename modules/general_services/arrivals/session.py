@@ -13,7 +13,6 @@ _SESSION_KEY = "_gsarr_add"
 STEP_DATE               = "date"
 STEP_DATE_CUSTOM        = "date_custom"
 STEP_SPECIALIST         = "specialist"
-STEP_PATIENT_COUNT      = "patient_count"
 STEP_P_NAME             = "p_name"
 # ✅ حقول فردية جديدة (جولة توسيع تدفق الواصلين — اختيار إلزامي من السجل)
 STEP_P_ARRIVAL_DATE     = "p_arrival_date"
@@ -77,6 +76,12 @@ class ArrivalSession:
     edit_patient_index:   int | None = None
     edit_companion_index: int | None = None
 
+    # ✅ الاسم المختار مسبقاً من "📋 الأسماء المعلّقة" — يُتخطّى بذلك منتقي
+    # الاسم العام (patient_selector) ويُقفَز مباشرة لبقية بيانات المريض.
+    # مضمون الوجود دائماً (كل جلسة تُنشأ حصراً من pending_pick_<id> الآن).
+    preselected_patient_id:   int | None = None
+    preselected_patient_name: str = ""
+
     # ── Persistence ───────────────────────────────────────────────────────────
 
     def save(self, user_data: dict) -> None:
@@ -94,6 +99,8 @@ class ArrivalSession:
             "edit_from_review":     self.edit_from_review,
             "edit_patient_index":   self.edit_patient_index,
             "edit_companion_index": self.edit_companion_index,
+            "preselected_patient_id":   self.preselected_patient_id,
+            "preselected_patient_name": self.preselected_patient_name,
         }
         logger.info(
             f"[ArrivalSession.save] step={self.step!r}"
@@ -127,6 +134,8 @@ class ArrivalSession:
             edit_from_review=     raw.get("edit_from_review",     False),
             edit_patient_index=   raw.get("edit_patient_index",   None),
             edit_companion_index= raw.get("edit_companion_index", None),
+            preselected_patient_id=   raw.get("preselected_patient_id",   None),
+            preselected_patient_name= raw.get("preselected_patient_name", ""),
         )
 
     @classmethod

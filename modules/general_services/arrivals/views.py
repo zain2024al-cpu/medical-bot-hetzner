@@ -16,46 +16,47 @@ GSA = "gsa"
 
 
 # ── Menu ──────────────────────────────────────────────────────────────────────
-
-def build_arrivals_menu() -> tuple[str, InlineKeyboardMarkup]:
-    text = f"{_DIVIDER}\n🛬  **الوصول**\n\nاختر الإجراء:"
-    kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("➕ تسجيل دفعة وصول جديدة", callback_data=f"{GSA}:start")],
-        [InlineKeyboardButton("📋 الأسماء المعلّقة",       callback_data=f"{GSA}:pending_names")],
-        [InlineKeyboardButton("⬅️ رجوع",                  callback_data=f"{GS}:main")],
-    ])
-    return text, kb
+#
+# ⚠️ "➕ تسجيل دفعة وصول جديدة" وبقية منيو "🛬 الوصول" الفرعي حُذفا بطلب
+# المستخدم — منتقي الأسماء في ذلك التدفق كان مقيَّداً أصلاً على نفس
+# مجموعة الأسماء الظاهرة هنا (only_companion_flow=True)، فلم يكن يضيف
+# أي قدرة فعلية غير موجودة، فقط خطوة تنقّل زائدة. الضغط على "🛬 الوصول"
+# يفتح هذه الشاشة (`build_pending_names_list`) الآن مباشرة
+# (`routing_nav.py::_dispatch_gs_nav`)، وكل زر فيها يبدأ تسجيل بيانات
+# ذلك المريض تحديداً (`gsa:pending_pick_<id>`) بدل عرضٍ بلا إجراء.
 
 
 def build_pending_names_list() -> tuple[str, InlineKeyboardMarkup]:
     """
     ✅ الأسماء التي أضافها الأدمن عبر "مريض جديد مع مرافقين" ولم تُستخدَم
-    بعد في دفعة وصول مؤكَّدة (Patient.pending_arrival=True) — عرض فقط،
-    بلا أزرار إجراء؛ الاستخدام الفعلي يبقى عبر منتقي "➕ تسجيل دفعة وصول
-    جديدة" العادي كالمعتاد.
+    بعد في دفعة وصول مؤكَّدة (Patient.pending_arrival=True) — الضغط على
+    اسم يبدأ تسجيل بيانات وصوله مباشرة (`gsa:pending_pick_<id>`،
+    flow.py).
 
     ✅ اسم المريض فقط — بلا أسماء المرافقين (بطلب المستخدم صراحةً: لا داعي
     لظهورها للمستخدمين هنا، نفس فلسفة إخفاء المرافقين كأسطر مستقلة
-    الموثَّقة أصلاً في شاشات "أسماء المرضى" بالأدمن).
+    الموثَّقة أصلاً في شاشات "أسماء المرضى" بالأدمن). المرافقون يُجلَبون
+    تلقائياً من السجل بعد اختيار اسم الأب (نفس آلية `_on_p_name_selected`).
     """
     from services.patients_service import get_pending_arrival_names
 
     families = get_pending_arrival_names()
 
     lines = [_DIVIDER, "📋  **الأسماء المعلّقة**", ""]
+    kb_rows = []
     if not families:
         lines.append("لا توجد أسماء معلّقة حالياً.")
     else:
-        lines.append("أسماء أضافها الإداري ولم يُسجَّل وصولها بعد:")
-        lines.append(_THIN)
-        for fam in families:
-            lines.append(f"👤 {fam['name']}")
+        lines.append("اضغط على اسم لتسجيل بيانات وصوله:")
         lines.append(_THIN)
         lines.append(f"الإجمالي: {len(families)} مريضاً")
+        for fam in families:
+            kb_rows.append([InlineKeyboardButton(
+                f"👤 {fam['name']}", callback_data=f"{GSA}:pending_pick_{fam['id']}",
+            )])
 
-    kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("⬅️ رجوع", callback_data=f"{GSA}:arrivals")],
-    ])
+    kb_rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data=f"{GS}:main")])
+    kb = InlineKeyboardMarkup(kb_rows)
     return "\n".join(lines), kb
 
 
@@ -115,27 +116,6 @@ def build_specialist_prompt() -> tuple[str, InlineKeyboardMarkup]:
 
 
 # ── Step 3: عدد المرضى ────────────────────────────────────────────────────────
-
-def build_patient_count_prompt(session: ArrivalSession) -> tuple[str, InlineKeyboardMarkup]:
-    lines = [
-        _DIVIDER,
-        "👥  **عدد المرضى في الدفعة**",
-        "",
-        "اختر عدد المرضى في الدفعة:",
-    ]
-    # Numbers 1–20 in rows of 5
-    rows = [
-        [InlineKeyboardButton(str(n), callback_data=f"{GSA}:count_{n}") for n in range(1,  6)],
-        [InlineKeyboardButton(str(n), callback_data=f"{GSA}:count_{n}") for n in range(6,  11)],
-        [InlineKeyboardButton(str(n), callback_data=f"{GSA}:count_{n}") for n in range(11, 16)],
-        [InlineKeyboardButton(str(n), callback_data=f"{GSA}:count_{n}") for n in range(16, 21)],
-        [
-            InlineKeyboardButton("⬅️ رجوع", callback_data=f"{GSA}:start"),
-            InlineKeyboardButton("❌ إلغاء", callback_data=f"{GS}:arrivals"),
-        ],
-    ]
-    return "\n".join(lines), InlineKeyboardMarkup(rows)
-
 
 # ── Patient loop steps ─────────────────────────────────────────────────────────
 # ✅ لا يوجد بعد الآن أي شاشة "اكتب اسم المريض" — الاسم يُختار إلزامياً من
