@@ -150,6 +150,46 @@ def update_profile_expiry_date(
         return False
 
 
+def mark_archived(profile_id: int, performed_by: int | None = None) -> bool:
+    """
+    اعتماد يدوي صريح لنقل الملف إلى الأرشيف (status="archived") — يُستدعى
+    فقط من زر "✅ اعتماد ونقل إلى الأرشيف" الذي لا يظهر أصلاً إلا بعد
+    اكتمال الصورة الشخصية وفورم C معاً. فحص إضافي هنا (دفاع بعمق) يمنع أي
+    استدعاء مباشر خاطئ من تجاوز هذا الشرط.
+    Returns True on success, False إن لم يوجد الملف أو نقصت الوثائق.
+    """
+    from db.session import get_db
+    from db.models import ResidencyProfile, ResidencyUpdate
+    try:
+        with get_db() as db:
+            p = db.query(ResidencyProfile).filter(ResidencyProfile.id == profile_id).first()
+            if p is None:
+                return False
+            if not p.photo_file_id or not p.form_c_file_id:
+                logger.warning(
+                    f"[residency.profiles] mark_archived rejected — missing documents  id={profile_id}"
+                )
+                return False
+            old_status = p.status
+            p.status = "archived"
+            db.add(ResidencyUpdate(
+                profile_id=   profile_id,
+                action_type=  "archived",
+                action_label= "اعتماد ونقل إلى الأرشيف",
+                old_status=   old_status,
+                new_status=   "archived",
+                performed_by= performed_by,
+            ))
+        logger.info(f"[residency.profiles] mark_archived  id={profile_id}")
+        return True
+    except Exception as exc:
+        logger.error(
+            f"[residency.profiles] mark_archived FAILED  id={profile_id}: {exc}",
+            exc_info=True,
+        )
+        return False
+
+
 @dataclass
 class SavedProfile:
     profile_id: int
@@ -167,10 +207,15 @@ def save_profile(
     source:           str = "manual",
     arrival_patient_id: int | None = None,
     created_by:       int | None = None,
+    status:           str = "active",
 ) -> SavedProfile:
     """
     Persist a new residency profile with companions and an initial timeline entry.
     Returns a SavedProfile with the new profile ID.
+
+    status: الحالة الابتدائية للملف — الافتراضي "active" يحافظ على سلوك كل
+    مستدعٍ قديم؛ "pending_documents" لملفات جديدة بلا صورة/فورم C بعد
+    (بطلب المستخدم — انظر MAINTENANCE_LOG.md، دورة معلّق↔أرشيف↔معلّق).
     """
     from db.session import get_db
     from db.models import ResidencyProfile, ResidencyCompanion, ResidencyUpdate
@@ -185,7 +230,7 @@ def save_profile(
             arrival_patient_id=       arrival_patient_id,
             source=                   source,
             name=                     name,
-            status=                   "active",
+            status=                   status,
             residency_number=         residency_number,
             expiry_date=              expiry_date,
             latest_residency_file_id= latest_res_fid,
@@ -335,7 +380,10 @@ def create_profiles_from_arrival_batch(
                     arrival_patient_id=       ap.id,
                     source=                   "arrivals",
                     name=                     ap.name or "—",
-                    status=                   "active",
+                    # ✅ "pending_documents" لا "active" — بانتظار الصورة
+                    # الشخصية وفورم C، تُنقَل للأرشيف يدوياً بعد اكتمالهما
+                    # (زر "✅ اعتماد ونقل إلى الأرشيف" في ملف المريض).
+                    status=                   "pending_documents",
                     # ✅ الرجوع إلى انتهاء التأشيرة حين لا تكون هناك إقامة بعد.
                     # الواصل الجديد غالباً بلا إقامة (يتخطّى الحقل)، فكان
                     # `expiry_date` يبقى فارغاً ويظهر الملف بـ«—» بلا أيام
@@ -382,7 +430,7 @@ def create_profiles_from_arrival_batch(
                     profile_id=   profile_id,
                     action_type=  "profile_created",
                     action_label= "إنشاء تلقائي من الوصول",
-                    new_status=   "active",
+                    new_status=   "pending_documents",
                     new_expiry_date= _to_iso_date(ap.residence_expiry),
                     performed_by= created_by,
                 )

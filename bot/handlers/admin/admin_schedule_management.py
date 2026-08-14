@@ -798,6 +798,7 @@ def _create_residency_profile_for_companion_flow(
             notes="",
             source="companion_flow",
             created_by=created_by,
+            status="pending_documents",
         )
         logger.info(
             f"[admin_schedule] residency profile auto-created for companion-flow patient "

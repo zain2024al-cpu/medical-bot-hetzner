@@ -251,6 +251,17 @@ def build_profile_detail(profile, companions, missing_items=()) -> tuple[str, In
         InlineKeyboardButton("🗂️ رفع وثيقة", callback_data=f"rnu:docmenu_{profile.id}"),
     ])
 
+    # ✅ يظهر فقط بعد اكتمال الصورة الشخصية وفورم C معاً، وطالما لم يُؤرشَف
+    # الملف بعد — اعتماد يدوي صريح (بطلب المستخدم: لا نقل تلقائي بمجرد
+    # اكتمال الرفع). بعد أي تجديد لاحق (rnr:) يعود status إلى "issued"
+    # فيظهر الزر من جديد ليُعتمَد مجدداً.
+    if profile.photo_file_id and profile.form_c_file_id and profile.status != "archived":
+        rows.append([
+            InlineKeyboardButton(
+                "✅ اعتماد ونقل إلى الأرشيف", callback_data=f"{RNA}:archive_confirm_{profile.id}",
+            ),
+        ])
+
     rows.append([
         InlineKeyboardButton("📄 ملف PDF", callback_data=f"{RNA}:pdf_{profile.id}"),
     ])

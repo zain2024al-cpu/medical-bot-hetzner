@@ -380,6 +380,25 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
         await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
         return
 
+    # ── اعتماد ونقل إلى الأرشيف — يدوي صراحةً، الزر لا يظهر أصلاً إلا بعد
+    # اكتمال الصورة الشخصية وفورم C معاً (انظر build_profile_detail) ──────────
+    if action.startswith("archive_confirm_"):
+        profile_id = int(action[len("archive_confirm_"):])
+        from modules.residency.profiles.models import mark_archived
+        ok = mark_archived(profile_id, performed_by=uid)
+        if not ok:
+            await query.answer("⚠️ تعذّر الاعتماد — تأكد من اكتمال الصورة وفورم C.", show_alert=True)
+            return
+        profile = get_profile_by_id(profile_id)
+        if profile is None:
+            await query.edit_message_text("❌ لم يتم العثور على الملف.", parse_mode="Markdown")
+            return
+        companions    = get_companions_for_profile(profile_id)
+        missing_items = get_pending_missing_items(profile_id)
+        text, kb = build_profile_detail(profile, companions, missing_items)
+        await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
+        return
+
     # ── إضافة مرافق لملف موجود ──────────────────────────────────────────────────
     # ⚠️ الفروع الأخصّ (accal_/skipexp_) قبل الحالة العامة add_comp_{id} عمداً،
     # وإلا لالتُقطت بها أولاً فحاولت تحويل نصّها الكامل إلى رقم فتفشل.
