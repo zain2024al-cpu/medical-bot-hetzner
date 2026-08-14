@@ -43,7 +43,10 @@ def report_flow_patient_visible(patient_type, city=None) -> bool:
     """مصدر الحقيقة الوحيد لظهور المريض داخل تدفق تقارير المترجمين.
 
     city == "chennai" → قسم تشناي: مرضى تشناي حصراً.
-    غير ذلك          → التقارير الاعتيادية: الكل عدا pharmacy_only ومرضى تشناي.
+    غير ذلك          → التقارير الاعتيادية: الكل عدا pharmacy_only، مرضى
+                        تشناي، والمرافقون (companion — ليسوا مرضى يُكتَب
+                        لهم تقرير طبي؛ companion_parent يبقى ظاهراً
+                        بصفته مريضاً حقيقياً كالمعتاد).
 
     تُستدعى من كل مواضع سرد/بحث المرضى في التدفق (القائمة المرقَّمة والبحث
     inline) — موضع واحد للمنطق يمنع تباعد النسخ.
@@ -51,7 +54,7 @@ def report_flow_patient_visible(patient_type, city=None) -> bool:
     pt = patient_type or "general"
     if city == _CHENNAI:
         return pt == _CHENNAI
-    return pt not in (_PHARMACY_ONLY, _CHENNAI)
+    return pt not in (_PHARMACY_ONLY, _CHENNAI, _COMPANION)
 
 
 def _type_visible(
