@@ -28,7 +28,7 @@ from ..states import (
 )
 from ..utils import _nav_buttons
 from services.treatment_plan_service import (
-    get_active_plan, advance_plan, create_plan, format_progress_text, unit_labels,
+    get_active_plan, create_plan, edit_plan, format_progress_text, unit_labels,
 )
 from .treatment_sessions import start_chemo_flow, start_immuno_flow, start_targeted_flow, _prompt_complaint
 from .radiation_therapy import start_radiation_therapy_flow
@@ -165,6 +165,13 @@ async def handle_onc_next(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # الطابور: معالجة كل نوع مُختار بدوره
 # ═══════════════════════════════════════════════════════════════════
 async def _process_next_in_queue(message, context):
+    """
+    ✅ لا تقدّم تلقائي بعد الآن — بطلب المستخدم صراحةً، كل نوع في القائمة
+    يُسأل عن عدد الجلسات/الدورات الكلي ورقم الجلسة/الدورة الحالية من
+    جديد في كل مرة، حتى لو كانت له خطة نشطة محفوظة مسبقاً (كانت تُقرأ
+    تلقائياً وتُقدَّم +1 بلا سؤال — انظر handle_oncology_queue_current
+    لكيفية معالجة الخطة الموجودة عند الحفظ بدل القراءة هنا).
+    """
     data = context.user_data.setdefault("report_tmp", {})
     queue = data.get("_onc_queue") or []
     if not queue:
@@ -172,21 +179,6 @@ async def _process_next_in_queue(message, context):
 
     key = queue[0]
     data["_onc_current_type"] = key
-    patient_id = data.get("patient_id")
-    plan = get_active_plan(patient_id, key) if patient_id else None
-    if plan:
-        advanced = advance_plan(plan["id"])
-        summary = format_progress_text(advanced)
-        data.setdefault("_onc_summaries", {})[key] = summary
-        await message.reply_text(f"{_icon(key)} **{_short_label(key)}**\n{summary}", parse_mode="Markdown")
-        if key == "chemo":
-            return await _prompt_chemo_session_number_queue(message, context)
-        return await _ask_delivery_mode(message, context)
-
-    # ✅ الكيماوي لم يعد استثناءً: كان يتفرّع هنا لأسئلة الدورات، وصار يمرّ
-    # بنفس مسار بقية الأنواع (عدد الجلسات الكلي ← رقم الجلسة الحالية) —
-    # مطابقةً لتبسيط start_chemo_flow. لولا ذلك لاختلف النوع نفسه بين
-    # الاختيار المفرد والاختيار المُدمج.
     data["_treatment_key"] = key
     await message.reply_text(
         _QUEUE_TOTAL_PROMPTS[key], reply_markup=_nav_buttons(show_back=True), parse_mode="Markdown",
@@ -269,12 +261,25 @@ async def handle_oncology_queue_current(update: Update, context: ContextTypes.DE
     total = data.pop("_onc_pending_total", None)
     current = int(text)
     actor_id, actor_name = _actor(update)
+    patient_id = data.get("patient_id")
 
-    plan = create_plan(
-        patient_id=data.get("patient_id"), treatment_key=key, mode="sessions",
-        total_sessions=total, current_session=current,
-        created_by=actor_id, created_by_name=actor_name,
-    )
+    # ✅ لا تقدّم تلقائي (طلب المستخدم) — لكن إن كانت هناك خطة نشطة فعلاً
+    # لهذا المريض/النوع، تُحدَّث هي نفسها بالرقمين المُدخَلين يدوياً بدل
+    # إنشاء خطة "نشطة" ثانية موازية (سجل تدقيقي كامل عبر edit_plan).
+    # بلا خطة سابقة، تُنشَأ خطة جديدة كالمعتاد.
+    existing = get_active_plan(patient_id, key) if patient_id else None
+    if existing:
+        plan = edit_plan(
+            existing["id"], {"total_sessions": total, "current_session": current},
+            changed_by=actor_id, changed_by_name=actor_name,
+            reason="إعادة إدخال يدوية للخطة والدورة (أُلغي التقدّم التلقائي)",
+        )
+    else:
+        plan = create_plan(
+            patient_id=patient_id, treatment_key=key, mode="sessions",
+            total_sessions=total, current_session=current,
+            created_by=actor_id, created_by_name=actor_name,
+        )
 
     if key == "radiation":
         remaining = max(0, (total or 0) - current)
