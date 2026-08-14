@@ -66,22 +66,30 @@ def bootstrap_all() -> None:
     )
 
     # ── Healthcare: wound care and clinical tracking ──────────────────────────
-    # The "▶️ ابدأ الآن" button is ONLY included in a user's reply keyboard
-    # when the user has been explicitly granted the "healthcare" module via
+    # The buttons below are ONLY included in a user's reply keyboard when the
+    # user has been explicitly granted the "healthcare" module via
     # core.access.access_service.grant_module().  dynamic_user_kb() enforces
-    # this — the button never appears for translators or public users.
+    # this — they never appear for translators or public users.
     #
-    # ✅ نفس النص "▶️ ابدأ الآن" مُستخدَم أيضاً في general_services وresidency
-    # أدناه — الزر الثلاثة يتصرّف بنفس السلوك تماماً (إعادة تشغيل كاملة عبر
-    # user_start، مثل "🚀 ابدأ" في بوت المترجمين)، ومُسجَّل مرة واحدة فقط
-    # في bot/handlers/user/user_start.py::register() — لا معالِج مخصَّص هنا
-    # بعد الآن (كان `modules/healthcare/menu.py::_show_menu` يفتح قائمة
-    # الرعاية الصحية مباشرة بدل التشغيل الكامل؛ حُذف بطلب المستخدم صراحةً
-    # ليتطابق السلوك).
+    # ✅ نفس نص "▶️ ابدأ الآن" مُستخدَم أيضاً في general_services وresidency
+    # أدناه — الأزرار الثلاثة تتصرّف بنفس السلوك تماماً (إعادة تشغيل كاملة
+    # عبر user_start، مثل "🚀 ابدأ" في بوت المترجمين)، ومُسجَّل مرة واحدة
+    # فقط في bot/handlers/user/user_start.py::register().
+    #
+    # ⚠️ "🏥 الرعاية الصحية" — زرّ منفصل أُعيد بطلب المستخدم بعد اكتشاف خلل:
+    # كان `modules/healthcare/menu.py::_show_menu` القديم يجعل "▶️ ابدأ الآن"
+    # نفسها تفتح قائمة الرعاية الصحية مباشرة (بلا زر مستقل، خلافاً لـ
+    # general_services/residency اللذين يملكان زراً منفصلاً دائماً). حين
+    # وُحِّد سلوك "ابدأ الآن" ليصبح تشغيلاً كاملاً فقط (لا فتح قائمة)، بقي
+    # مستخدم الرعاية الصحية بلا أي زر يفتح قائمته الفعلية إطلاقاً — حلقة
+    # مفرغة (الضغط يعيد نفس اللوحة بزرّ واحد). الزرّ الجديد يفتح القائمة
+    # مباشرة (`modules/healthcare/menu.py::_show_menu`)، بنفس نمط "🔧 الخدمات
+    # العامة"/"🪪 الإقامة" تماماً.
     registry.register(
         name="healthcare",
-        menu_buttons={"▶️ ابدأ الآن"},
+        menu_buttons={"🏥 الرعاية الصحية", "▶️ ابدأ الآن"},
         keyboard_rows=[
+            ["🏥 الرعاية الصحية"],
             ["▶️ ابدأ الآن"],
         ],
         extra_wipe_keys={
