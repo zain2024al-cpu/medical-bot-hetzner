@@ -38,7 +38,7 @@ def _passport_section_lines() -> list[str]:
     return out
 
 
-def build_followup_list(entries) -> tuple[str, InlineKeyboardMarkup]:
+def build_followup_list(entries, *, pending_count: int = 0) -> tuple[str, InlineKeyboardMarkup]:
     lines = [
         _DIVIDER,
         "⏰  **المتابعة**",
@@ -47,12 +47,21 @@ def build_followup_list(entries) -> tuple[str, InlineKeyboardMarkup]:
 
     passport_lines = _passport_section_lines()
 
+    # ✅ "📁 أرشيف المرضى" (القائمة الكاملة + التصدير) و"⏳ المرافقون
+    # المعلقون" أصبحا زرَّين هنا (بطلب المستخدم صراحةً — القائمة الرئيسية
+    # صارت تفتح "المتابعة" مباشرة بدل الأرشيف، فنُقِلا إليها).
+    _hub_row = [
+        InlineKeyboardButton("📁 أرشيف المرضى", callback_data=f"{RN}:archive"),
+        InlineKeyboardButton(f"⏳ المرافقون المعلقون ({pending_count})", callback_data=f"{RN}:pending"),
+    ]
+
     if not entries:
         lines += ["✅ لا توجد إقامات منتهية أو قريبة الانتهاء خلال الـ 30 يوم القادمة."]
         lines += passport_lines
-        kb = InlineKeyboardMarkup([[
-            InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:archive"),
-        ]])
+        kb = InlineKeyboardMarkup([
+            _hub_row,
+            [InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:main")],
+        ])
         return "\n".join(lines), kb
 
     lines.append(f"يوجد {len(entries)} إقامة تتطلب المتابعة:")
@@ -97,7 +106,8 @@ def build_followup_list(entries) -> tuple[str, InlineKeyboardMarkup]:
 
     lines += passport_lines
 
-    rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:archive")])
+    rows.append(_hub_row)
+    rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:main")])
     return "\n".join(lines), InlineKeyboardMarkup(rows)
 
 
@@ -113,7 +123,7 @@ def build_pending_list(entries) -> tuple[str, InlineKeyboardMarkup]:
     if not entries:
         lines += ["✅ لا توجد تحديثات معلقة."]
         kb = InlineKeyboardMarkup([[
-            InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:archive"),
+            InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:followup"),
         ]])
         return "\n".join(lines), kb
 
@@ -130,7 +140,7 @@ def build_pending_list(entries) -> tuple[str, InlineKeyboardMarkup]:
             )
         ])
 
-    rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:archive")])
+    rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:followup")])
     return "\n".join(lines), InlineKeyboardMarkup(rows)
 
 
@@ -147,7 +157,7 @@ def build_pending_documents_list(entries) -> tuple[str, InlineKeyboardMarkup]:
     if not entries:
         lines += ["✅ لا توجد ملفات معلّقة حالياً."]
         kb = InlineKeyboardMarkup([[
-            InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:archive"),
+            InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:main"),
         ]])
         return "\n".join(lines), kb
 
@@ -163,5 +173,5 @@ def build_pending_documents_list(entries) -> tuple[str, InlineKeyboardMarkup]:
             InlineKeyboardButton(f"📂 فتح الملف — {e.name[:20]}", callback_data=f"{RNA}:view_{e.profile_id}"),
         ])
 
-    rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:archive")])
+    rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:main")])
     return "\n".join(lines), InlineKeyboardMarkup(rows)

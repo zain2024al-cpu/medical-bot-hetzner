@@ -18,16 +18,18 @@ RNA = "rna"
 
 # ── Main menu ─────────────────────────────────────────────────────────────────
 
-def build_residency_main_menu() -> tuple[str, InlineKeyboardMarkup]:
+def build_residency_main_menu(*, pending_docs_count: int = 0, expiring_count: int = 0) -> tuple[str, InlineKeyboardMarkup]:
     text = f"{_DIVIDER}\n🪪  **الإقامات**\n\nاختر القسم:"
-    # ✅ زرّ واحد لا أكثر: كل شيء صار عبر «📁 أرشيف المرضى» (قرار المستخدم
-    # صراحةً). أُزيل «➕ إضافة مريض جديد» سابقاً (مصدر الأسماء الوحيد هو
-    # الواصلون)، وأُزيل الآن «📤 الرفع والمتابعة» — متابعة تقديم الأوراق
-    # وإضافة المرافقين ورفع فورم C/الصورة صارت كلها أزراراً مباشرة على ملف
-    # كل مريض (يُفتح من الأرشيف)، وشاشتا «⏰ المتابعة» و«⏳ المرافقون
-    # المعلقون» انتقلتا لتكونا زرّين في شاشة الأرشيف نفسها.
+    # ✅ زرّان مباشرة على القائمة الرئيسية (قرار المستخدم صراحةً — بدل
+    # المرور عبر «📁 أرشيف المرضى» كنقطة دخول وحيدة كما كانت): "الملفات
+    # المعلّقة" تستلم ما يصل حديثاً من "🛬 الوصول" (بانتظار الصورة/فورم C)،
+    # و"المتابعة" هي وجهتها التالية بعد اكتمال الوثائق والأرشفة. "📁 أرشيف
+    # المرضى" (القائمة الكاملة + التصدير) و"⏳ المرافقون المعلقون" لم
+    # يُحذَفا — أصبحا زرّين داخل شاشة "⏰ المتابعة" نفسها (انظر
+    # followup/views.py::build_followup_list).
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("📁 أرشيف المرضى", callback_data=f"{RN}:archive")],
+        [InlineKeyboardButton(f"📋 الملفات المعلّقة ({pending_docs_count})", callback_data=f"{RN}:pending_docs")],
+        [InlineKeyboardButton(f"⏰ المتابعة ({expiring_count})", callback_data=f"{RN}:followup")],
     ])
     return text, kb
 
@@ -36,7 +38,6 @@ def build_residency_main_menu() -> tuple[str, InlineKeyboardMarkup]:
 
 def build_archive_list(
     profiles, *, page: int, total: int,
-    expiring_count: int = 0, pending_count: int = 0, pending_docs_count: int = 0,
 ) -> tuple[str, InlineKeyboardMarkup]:
     total_pages = max(1, -(-total // PROFILES_PAGE_SIZE))  # ceil division
     lines = [
@@ -95,24 +96,12 @@ def build_archive_list(
         InlineKeyboardButton("📄 PDF",   callback_data=f"{RNA}:export_ask_pdf"),
     ])
 
-    # ✅ منقولان هنا من شاشة «📤 الرفع والمتابعة» المحذوفة — قرار المستخدم:
-    # كل شيء عبر الأرشيف. الهدفان (`rn:followup` / `rn:pending`) لم يتغيّرا،
-    # فقط موضع الزرّين.
-    rows.append([
-        InlineKeyboardButton(f"⏰ المتابعة ({expiring_count})",       callback_data=f"{RN}:followup"),
-        InlineKeyboardButton(f"⏳ المرافقون المعلقون ({pending_count})", callback_data=f"{RN}:pending"),
-    ])
-
-    # ✅ ملفات قادمة من "🛬 الوصول"/"🤝 مريض جديد مع مرافقين" ما زالت
-    # بانتظار الصورة الشخصية وفورم C — دورة معلّق↔أرشيف↔معلّق (الجزء ج).
-    rows.append([
-        InlineKeyboardButton(f"📋 الملفات المعلّقة ({pending_docs_count})", callback_data=f"{RN}:pending_docs"),
-    ])
-
     rows.append([
         # ⚠️ لا زرّ «➕ إضافة جديد» هنا — أُزيل عمداً مع زرّ القائمة الرئيسية
         # (نفس السبب: مصدر الأسماء الوحيد هو الواصلون).
-        InlineKeyboardButton("⬅️ رجوع",       callback_data=f"{RN}:main"),
+        # ✅ الأرشيف لم يعد نقطة الدخول — يُفتح الآن من داخل شاشة "⏰ المتابعة"
+        # (زرّ "📁 أرشيف المرضى" هناك)، فـ"رجوع" يعود لها لا للقائمة الرئيسية.
+        InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:followup"),
     ])
 
     return "\n".join(lines), InlineKeyboardMarkup(rows)

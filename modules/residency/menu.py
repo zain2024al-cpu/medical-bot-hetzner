@@ -28,7 +28,11 @@ async def _handle_menu_button(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
     logger.info(f"[residency.menu] {_BUTTON!r} pressed  user={uid}")
     from modules.residency.profiles.views import build_residency_main_menu
-    text, kb = build_residency_main_menu()
+    from modules.residency.followup.repository import get_expiring_soon, get_pending_documents
+    text, kb = build_residency_main_menu(
+        pending_docs_count=len(get_pending_documents()),
+        expiring_count=len(get_expiring_soon()),
+    )
     await update.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
 

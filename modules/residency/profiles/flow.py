@@ -269,16 +269,8 @@ async def _dispatch_inner(update, context, action: str, uid) -> None:
     if action.startswith("page_"):
         page = int(action[5:])
         context.user_data["_res_archive_page"] = page
-        from modules.residency.followup.repository import (
-            get_expiring_soon, get_dependent_pending, get_pending_documents,
-        )
         profiles, total = get_profiles_page(page=page)
-        text, kb = build_archive_list(
-            profiles, page=page, total=total,
-            expiring_count=len(get_expiring_soon()),
-            pending_count=len(get_dependent_pending()),
-            pending_docs_count=len(get_pending_documents()),
-        )
+        text, kb = build_archive_list(profiles, page=page, total=total)
         await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
         return
 
