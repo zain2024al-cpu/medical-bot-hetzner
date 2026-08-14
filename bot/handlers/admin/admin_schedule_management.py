@@ -1058,6 +1058,12 @@ async def handle_delete_patient_name(update: Update, context: ContextTypes.DEFAU
         return
     
     # عرض الأسماء مع أزرار حذف
+    # ✅ المرافقون (patient_type="companion") مستبعَدون عمداً من
+    # get_patients_paginated نفسها (قرار سابق — لا يظهرون كصفوف مستقلة في
+    # هذه الشاشة). لكن هذا كان يترك مرافقي "companion_parent" بلا أي طريقة
+    # للوصول إليهم لحذفهم بمفردهم، وبلا حذف تلقائي معهم عند حذف المريض —
+    # يُعرَضون الآن كأزرار فرعية تحت كل "مريض جديد مع مرافقين" مباشرة.
+    from services.patients_service import get_companions_for_patient
     keyboard = []
     for patient in patients:
         # حفظ الأسماء في context للوصول إليها لاحقاً
@@ -1066,7 +1072,14 @@ async def handle_delete_patient_name(update: Update, context: ContextTypes.DEFAU
             f"🗑️ {patient['name']}",
             callback_data=f"del_patient:{patient['id']}"  # تقصير callback_data
         )])
-    
+        if patient.get('patient_type') == 'companion_parent':
+            for comp in get_companions_for_patient(patient['id']):
+                context.user_data.setdefault('patient_names_cache', {})[comp['id']] = comp['name']
+                keyboard.append([InlineKeyboardButton(
+                    f"   └ 🗑️ {comp['name']} (مرافق)",
+                    callback_data=f"del_patient:{comp['id']}"
+                )])
+
     # أزرار التنقل
     nav_buttons = []
     if page > 0:

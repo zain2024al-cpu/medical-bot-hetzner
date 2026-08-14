@@ -341,24 +341,32 @@ def update_patient(patient_id: int, new_name: str) -> bool:
 
 def delete_patient(patient_id: int) -> bool:
     """
-    حذف مريض
+    حذف مريض. ✅ إن كان هذا المريض "companion_parent" (له مرافقون مرتبطون
+    عبر companion_of_id)، يُحذَف مرافقوه معه تلقائياً — بدونها كانت صفوف
+    المرافقين تبقى يتيمة في قاعدة البيانات إلى الأبد بعد حذف المريض
+    (لا تظهر في أي شاشة إدارة، ولا طريقة للوصول إليها لحذفها لاحقاً).
+    حذف مرافق واحد بمفرده (لا يملك مرافقين هو نفسه) لا يُحدِث أي تسلسل.
     """
     try:
         from db.session import SessionLocal
         from db.models import Patient
-        
+
         with SessionLocal() as session:
             patient = session.query(Patient).filter_by(id=patient_id).first()
             if patient:
                 name = patient.full_name
+                companions = session.query(Patient).filter_by(companion_of_id=patient_id).all()
+                for comp in companions:
+                    logger.info(f"Deleting companion of patient #{patient_id}: {comp.full_name}")
+                    session.delete(comp)
                 session.delete(patient)
                 session.commit()
-                logger.info(f"Deleted patient: {name}")
+                logger.info(f"Deleted patient: {name}  (+{len(companions)} companion(s))")
                 return True
             else:
                 logger.warning(f"Patient with id {patient_id} not found")
                 return False
-                
+
     except Exception as e:
         logger.error(f"Error deleting patient: {e}")
         return False
