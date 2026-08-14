@@ -36,7 +36,7 @@ def build_residency_main_menu() -> tuple[str, InlineKeyboardMarkup]:
 
 def build_archive_list(
     profiles, *, page: int, total: int,
-    expiring_count: int = 0, pending_count: int = 0,
+    expiring_count: int = 0, pending_count: int = 0, pending_docs_count: int = 0,
 ) -> tuple[str, InlineKeyboardMarkup]:
     total_pages = max(1, -(-total // PROFILES_PAGE_SIZE))  # ceil division
     lines = [
@@ -101,6 +101,12 @@ def build_archive_list(
     rows.append([
         InlineKeyboardButton(f"⏰ المتابعة ({expiring_count})",       callback_data=f"{RN}:followup"),
         InlineKeyboardButton(f"⏳ المرافقون المعلقون ({pending_count})", callback_data=f"{RN}:pending"),
+    ])
+
+    # ✅ ملفات قادمة من "🛬 الوصول"/"🤝 مريض جديد مع مرافقين" ما زالت
+    # بانتظار الصورة الشخصية وفورم C — دورة معلّق↔أرشيف↔معلّق (الجزء ج).
+    rows.append([
+        InlineKeyboardButton(f"📋 الملفات المعلّقة ({pending_docs_count})", callback_data=f"{RN}:pending_docs"),
     ])
 
     rows.append([

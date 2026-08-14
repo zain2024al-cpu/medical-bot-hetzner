@@ -68,13 +68,16 @@ async def _dispatch(update, context, action: str, uid) -> None:
     if action == "archive":
         from modules.residency.profiles.repository import get_profiles_page
         from modules.residency.profiles.views import build_archive_list
-        from modules.residency.followup.repository import get_expiring_soon, get_dependent_pending
+        from modules.residency.followup.repository import (
+            get_expiring_soon, get_dependent_pending, get_pending_documents,
+        )
         page = context.user_data.get("_res_archive_page", 0)
         profiles, total = get_profiles_page(page=page)
         text, kb = build_archive_list(
             profiles, page=page, total=total,
             expiring_count=len(get_expiring_soon()),
             pending_count=len(get_dependent_pending()),
+            pending_docs_count=len(get_pending_documents()),
         )
         await _safe_edit(query, text, kb)
         return
@@ -92,6 +95,14 @@ async def _dispatch(update, context, action: str, uid) -> None:
         from modules.residency.followup.views import build_pending_list
         entries  = get_dependent_pending()
         text, kb = build_pending_list(entries)
+        await _safe_edit(query, text, kb)
+        return
+
+    if action == "pending_docs":
+        from modules.residency.followup.repository import get_pending_documents
+        from modules.residency.followup.views import build_pending_documents_list
+        entries  = get_pending_documents()
+        text, kb = build_pending_documents_list(entries)
         await _safe_edit(query, text, kb)
         return
 

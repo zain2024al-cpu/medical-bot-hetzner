@@ -60,8 +60,13 @@ PAPERS_IN_PROGRESS: tuple[str, ...] = ("renewal_submitted", "extension_received"
 # وهو أخطر أنواع الأعطال هنا لأنه صامت تماماً.
 
 # من يُتابَع في شاشة المتابعة وفي التنبيه اليومي (إقامةً وجوازاً).
+# ✅ "archived" مُضافة عمداً — ملف مؤرشَف اقترب انتهاؤه يجب أن يظهر هنا
+# تلقائياً (مشتقّ حيّاً من expiry_date مثل بقية الحالات الزمنية، بلا أي
+# كتابة على العمود المخزَّن) بدل آلية موازية منفصلة — نفس فلسفة
+# effective_status(). "pending_documents" عمداً غير مُضافة: تلك ليست
+# مسألة زمنية، لها شاشتها الخاصة "📋 الملفات المعلّقة (وثائق ناقصة)".
 TRACKABLE_STATUSES: tuple[str, ...] = (
-    "active", "expiring", "renewal_submitted", "extension_received", "issued",
+    "active", "expiring", "renewal_submitted", "extension_received", "issued", "archived",
 )
 
 # المرافق الذي ما زال ينتظر إقامته بينما صدرت إقامة مريضه.

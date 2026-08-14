@@ -9,6 +9,7 @@ from modules.residency.views import (
 
 RN  = "rn"
 RNF = "rnf"
+RNA = "rna"
 
 
 # ── المتابعة (expiring soon) ──────────────────────────────────────────────────
@@ -127,6 +128,39 @@ def build_pending_list(entries) -> tuple[str, InlineKeyboardMarkup]:
                 f"📋 استكمال — {e.name[:20]}",
                 callback_data=f"{RNF}:complete_{e.profile_id}",
             )
+        ])
+
+    rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:archive")])
+    return "\n".join(lines), InlineKeyboardMarkup(rows)
+
+
+# ── الملفات المعلّقة (وثائق ناقصة) ─────────────────────────────────────────────
+
+def build_pending_documents_list(entries) -> tuple[str, InlineKeyboardMarkup]:
+    """
+    ملفات قادمة من "🛬 الوصول"/"🤝 مريض جديد مع مرافقين" ما زالت بانتظار
+    الصورة الشخصية وفورم C — لا يظهر لها زر "اعتماد وأرشفة" في ملف
+    المريض حتى تكتمل الوثيقتان معاً.
+    """
+    lines = [_DIVIDER, "📋  **الملفات المعلّقة (وثائق ناقصة)**", ""]
+
+    if not entries:
+        lines += ["✅ لا توجد ملفات معلّقة حالياً."]
+        kb = InlineKeyboardMarkup([[
+            InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:archive"),
+        ]])
+        return "\n".join(lines), kb
+
+    lines.append(f"يوجد {len(entries)} ملفاً بانتظار استكمال الوثائق:")
+    lines.append(_THIN)
+
+    rows: list[list[InlineKeyboardButton]] = []
+    for e in entries:
+        photo_mark = "✅" if e.has_photo  else "⬜"
+        formc_mark = "✅" if e.has_form_c else "⬜"
+        lines.append(f"👤 {e.name}   صورة {photo_mark}  فورم C {formc_mark}")
+        rows.append([
+            InlineKeyboardButton(f"📂 فتح الملف — {e.name[:20]}", callback_data=f"{RNA}:view_{e.profile_id}"),
         ])
 
     rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:archive")])

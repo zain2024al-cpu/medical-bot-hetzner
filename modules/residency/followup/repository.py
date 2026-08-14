@@ -35,6 +35,14 @@ class PendingEntry:
     companions:             list[dict] = field(default_factory=list)
 
 
+@dataclass
+class PendingDocumentsEntry:
+    profile_id:  int
+    name:        str
+    has_photo:   bool
+    has_form_c:  bool
+
+
 def get_expiring_soon() -> list[ExpiringEntry]:
     """
     Return profiles AND companions whose expiry_date is within EXPIRING_SOON_DAYS
@@ -239,6 +247,35 @@ def get_dependent_pending() -> list[PendingEntry]:
             ))
 
     logger.debug(f"[residency.followup] get_dependent_pending → {len(results)} entries")
+    return results
+
+
+def get_pending_documents() -> list[PendingDocumentsEntry]:
+    """
+    ملفات status='pending_documents' — ما زالت بانتظار الصورة الشخصية
+    وفورم C (أو أحدهما) قبل أن يتاح اعتمادها ونقلها للأرشيف. تُستخدَم في
+    شاشة "📋 الملفات المعلّقة (وثائق ناقصة)" الجديدة. أحدث الملفات أولاً.
+    """
+    from db.session import get_db
+    from db.models import ResidencyProfile
+
+    results: list[PendingDocumentsEntry] = []
+    with get_db() as db:
+        profiles = (
+            db.query(ResidencyProfile)
+            .filter(ResidencyProfile.status == "pending_documents")
+            .order_by(ResidencyProfile.created_at.desc())
+            .all()
+        )
+        for p in profiles:
+            results.append(PendingDocumentsEntry(
+                profile_id= p.id,
+                name=       p.name or "—",
+                has_photo=  bool(p.photo_file_id),
+                has_form_c= bool(p.form_c_file_id),
+            ))
+
+    logger.debug(f"[residency.followup] get_pending_documents → {len(results)} entries")
     return results
 
 
