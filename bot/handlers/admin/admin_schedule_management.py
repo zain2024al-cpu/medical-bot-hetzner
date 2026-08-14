@@ -974,6 +974,12 @@ async def handle_companion_name_input(update: Update, context: ContextTypes.DEFA
         from services.patients_service import add_patient
         # ✅ أسماء المرافقين لا تُفحص للتكرار عمداً — قد يتكرر نفس الاسم
         # لمرافقين مختلفين لمرضى مختلفين، وهذا مقبول (راجع الخطة المعتمدة).
+        # ⚠️ skip_dedup=True ضروري فعلياً لتحقيق هذا — بدونه، إن تطابق اسم
+        # المرافق صدفة مع أي مريض موجود مسبقاً (مريض عادي من تقرير طبي
+        # مثلاً)، كانت add_patient تُعيد id ذلك المريض بلا تحديث
+        # patient_type/companion_of_id إطلاقاً (خلل حقيقي مُبلَّغ عنه: زر
+        # حذف المرافقين لا يظهر لذلك المرافق تحديداً، وحذف المريض لا
+        # يحذفه معه — لأنه لم يُربَط بمريضه أصلاً).
         # ✅ الربط بالمريض: بدونه كانت معلومة "مرافقو هذا المريض" غير موجودة
         # في القاعدة إطلاقاً رغم إدخالهما معاً هنا — فيضطر تدفق الواصلين
         # لسؤال "هل يوجد مرافق؟" ثم اختيار كل مرافق يدوياً من قائمة الجميع.
@@ -982,6 +988,7 @@ async def handle_companion_name_input(update: Update, context: ContextTypes.DEFA
             patient_type="companion",
             companion_of_id=context.user_data.get("new_patient_id"),
             pending_arrival=True,
+            skip_dedup=True,
         )
     except Exception as e:
         logger.error(f"Error adding companion: {e}")

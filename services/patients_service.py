@@ -147,6 +147,7 @@ def add_patient(
     patient_type: Optional[str] = None,
     companion_of_id: Optional[int] = None,
     pending_arrival: bool = False,
+    skip_dedup: bool = False,
 ) -> Optional[int]:
     """
     إضافة مريض جديد
@@ -156,7 +157,16 @@ def add_patient(
                   يسمح لاحقاً بجلب "مرافقي هذا المريض" مباشرة بدل السؤال عنهم.
     pending_arrival: True لأسماء "مريض جديد مع مرافقين" — لم تُستخدَم بعد
                   في تقرير وصول فعلي، تظهر في شاشة "📋 الأسماء المعلّقة".
-    إن كان الاسم موجوداً مسبقاً يُعاد id الموجود دون تغيير نوعه.
+    skip_dedup: True لتخطّي فحص "الاسم موجود مسبقاً" كلياً وإنشاء صف جديد
+                  دائماً — ضروري للمرافقين تحديداً (خلل حقيقي مكتشَف: اسم
+                  مرافق يتطابق صدفة مع مريض عادي موجود من تقرير طبي كان
+                  يجعل add_patient تُعيد id ذلك المريض بلا تحديث
+                  patient_type/companion_of_id إطلاقاً — فلا يظهر المرافق
+                  تحت مريضه في شاشة الحذف ولا يُحذَف معه). الافتراضي False
+                  يحافظ على سلوك كل مستدعٍ آخر (لا تكرار لأسماء المرضى
+                  العاديين).
+    إن كان الاسم موجوداً مسبقاً (وskip_dedup=False) يُعاد id الموجود دون
+    تغيير نوعه.
     Returns patient id or None
     """
     try:
@@ -165,10 +175,11 @@ def add_patient(
 
         with SessionLocal() as session:
             # Check if exists
-            existing = session.query(Patient).filter_by(full_name=name).first()
-            if existing:
-                logger.info(f"Patient already exists: {name}")
-                return existing.id
+            if not skip_dedup:
+                existing = session.query(Patient).filter_by(full_name=name).first()
+                if existing:
+                    logger.info(f"Patient already exists: {name}")
+                    return existing.id
 
             new_patient = Patient(
                 full_name=name,
