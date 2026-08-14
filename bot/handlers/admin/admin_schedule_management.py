@@ -778,35 +778,6 @@ async def handle_patient_name_input(update: Update, context: ContextTypes.DEFAUL
         return ConversationHandler.END
 
 
-def _create_residency_profile_for_companion_flow(
-    patient_name: str, companion_names: list, created_by: int | None,
-) -> None:
-    """
-    يولّد تلقائياً سجل إقامة (ResidencyProfile + ResidencyCompanion) لكل
-    مريض/مرافق يُضاف عبر زر "مريض جديد مع مرافقين" — بلا تواريخ انتهاء أو
-    مستندات (غير مُدخَلة في هذا التدفق أصلاً)، فيظهر جاهزاً في "🪪 الإقامة"
-    ليُكمَل لاحقاً. فشل هذه الخطوة لا يوقف تدفق إضافة المريض أبداً.
-    """
-    try:
-        from modules.residency.profiles.models import save_profile
-        save_profile(
-            name=patient_name,
-            expiry_date="",
-            residency_number="",
-            documents=[],
-            companions=[{"name": n, "expiry_date": ""} for n in companion_names],
-            notes="",
-            source="companion_flow",
-            created_by=created_by,
-            status="pending_documents",
-        )
-        logger.info(
-            f"[admin_schedule] residency profile auto-created for companion-flow patient "
-            f"[{patient_name}] with {len(companion_names)} companion(s)"
-        )
-    except Exception as e:
-        logger.error(f"[admin_schedule] failed to auto-create residency profile for [{patient_name}]: {e}")
-
 
 async def handle_start_patient_with_companions(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """بدء تدفق منفصل تماماً: مريض جديد مرتبط بمرافقين (خدمات عامة/إقامة).
@@ -868,6 +839,16 @@ async def handle_pwc_patient_name_input(update: Update, context: ContextTypes.DE
         # ✅ "companion_parent" يبقى ظاهراً كـ"general" في كل الشاشات الأخرى
         # (نفس معاملة None سابقاً)، مع تمييزه إضافياً ليظهر حصراً أيضاً في
         # 🔧 الخدمات العامة و🪪 الإقامة (انظر shared/selectors/patient_selector).
+        #
+        # ⚠️ لا يُنشَأ أي ResidencyProfile هنا — كان يُنشَأ سابقاً فوراً عبر
+        # _create_residency_profile_for_companion_flow() (محذوفة الآن)، فيظهر
+        # الاسم في "🪪 الإقامة" و"📋 الأسماء المعلّقة" (الوصول) معاً في آنٍ
+        # واحد، بما فيها اسم المرافق داخل تفاصيل الملف — قبل أن يُستخدَم الاسم
+        # فعلياً في "🛬 الوصول" حتى. بطلب المستخدم: مرحلتان منفصلتان لا تتداخلان
+        # — الملف السكني يُنشأ الآن فقط عند تأكيد "🛬 الوصول"
+        # (create_profiles_from_arrival_batch في modules/general_services/
+        # arrivals/flow.py)، فيختفي الاسم من "الأسماء المعلّقة" ويظهر في
+        # "الإقامة" في نفس اللحظة بالضبط — لا تداخل.
         patient_id = add_patient(name, patient_type="companion_parent", pending_arrival=True)
 
         if not patient_id:
@@ -910,10 +891,6 @@ async def handle_companion_ask_choice(update: Update, context: ContextTypes.DEFA
         context.user_data.pop('new_patient_id', None)
         context.user_data.pop('new_patient_name', None)
         context.user_data.pop('new_patient_type_label', None)
-
-        _create_residency_profile_for_companion_flow(
-            patient_name, [], created_by=update.effective_user.id if update.effective_user else None,
-        )
 
         keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")]])
         await query.edit_message_text(
@@ -1014,10 +991,6 @@ async def handle_companion_name_input(update: Update, context: ContextTypes.DEFA
     patient_name = context.user_data.get('new_patient_name', '')
     companion_names = context.user_data.get('companion_names', [])
     summary = "\n".join(f"👤 {n}" for n in companion_names)
-
-    _create_residency_profile_for_companion_flow(
-        patient_name, companion_names, created_by=update.effective_user.id if update.effective_user else None,
-    )
 
     for key in ('new_patient_id', 'new_patient_name', 'new_patient_type_label',
                 'companion_count', 'companion_index', 'companion_names'):
