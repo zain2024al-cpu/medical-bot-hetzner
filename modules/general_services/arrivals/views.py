@@ -33,6 +33,10 @@ def build_pending_names_list() -> tuple[str, InlineKeyboardMarkup]:
     بعد في دفعة وصول مؤكَّدة (Patient.pending_arrival=True) — عرض فقط،
     بلا أزرار إجراء؛ الاستخدام الفعلي يبقى عبر منتقي "➕ تسجيل دفعة وصول
     جديدة" العادي كالمعتاد.
+
+    ✅ اسم المريض فقط — بلا أسماء المرافقين (بطلب المستخدم صراحةً: لا داعي
+    لظهورها للمستخدمين هنا، نفس فلسفة إخفاء المرافقين كأسطر مستقلة
+    الموثَّقة أصلاً في شاشات "أسماء المرضى" بالأدمن).
     """
     from services.patients_service import get_pending_arrival_names
 
@@ -45,9 +49,7 @@ def build_pending_names_list() -> tuple[str, InlineKeyboardMarkup]:
         lines.append("أسماء أضافها الإداري ولم يُسجَّل وصولها بعد:")
         lines.append(_THIN)
         for fam in families:
-            lines.append(f"👤 *{fam['name']}*")
-            for comp_name in fam["companions"]:
-                lines.append(f"   └ 👥 {comp_name}")
+            lines.append(f"👤 {fam['name']}")
         lines.append(_THIN)
         lines.append(f"الإجمالي: {len(families)} مريضاً")
 
