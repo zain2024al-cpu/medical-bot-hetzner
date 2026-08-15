@@ -1,5 +1,5 @@
 # modules/residency/menu.py
-# زر لوحة المفاتيح "🪪 الإقامة" — يفتح "الملفات المعلّقة" مباشرة (شاشة واحدة).
+# زر لوحة المفاتيح "🪪 الإقامة" — يفتح القائمة الرئيسية (8 أزرار).
 
 import logging
 
@@ -24,11 +24,11 @@ async def _show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         await user_start(update, context)
         return
 
-    from modules.residency.repository import get_pending_profiles
-    from modules.residency.views import build_pending_list
+    from modules.residency.repository import get_status_counts
+    from modules.residency.views import build_main_menu
 
     logger.info(f"[residency] {RESIDENCY_BUTTON!r} pressed  user={tg_id}")
-    text, kb = build_pending_list(get_pending_profiles())
+    text, kb = build_main_menu(get_status_counts())
     await update.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
 

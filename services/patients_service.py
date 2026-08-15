@@ -358,11 +358,11 @@ def delete_patient(patient_id: int) -> bool:
     (لا تظهر في أي شاشة إدارة، ولا طريقة للوصول إليها لحذفها لاحقاً).
     حذف مرافق واحد بمفرده (لا يملك مرافقين هو نفسه) لا يُحدِث أي تسلسل.
 
-    ✅ إن كان لهذا المريض ملف إقامة مبتدئ بلا صورة مرفوعة بعد (لم
-    يُستكمَل)، يُحذَف معه أيضاً عبر
-    modules.residency.models.delete_stub_profile_by_name — بدونها كان
-    يبقى ملفاً يتيماً في "🪪 الإقامة" للأبد بلا أي مريض يشير إليه. ملفات
-    لها صورة مرفوعة بالفعل (تقدّم حقيقي) لا تُمَسّ إطلاقاً.
+    ✅ إن كان لهذا المريض شخص إقامة لم يُستكمَل بعد (WAITING_ARRIVAL بلا
+    صورة مرفوعة)، يُحذَف معه أيضاً عبر
+    modules.residency.models.delete_stub_person_by_name — بدونها كان
+    يبقى يتيماً في "🪪 الإقامة" للأبد بلا أي مريض يشير إليه. أشخاص لهم
+    تقدّم حقيقي (صورة مرفوعة، أو أي حالة أخرى) لا يُمَسّون إطلاقاً.
     """
     try:
         from db.session import SessionLocal
@@ -380,15 +380,15 @@ def delete_patient(patient_id: int) -> bool:
                 session.commit()
 
                 try:
-                    from modules.residency.models import delete_stub_profile_by_name
-                    deleted_profiles = delete_stub_profile_by_name(name)
+                    from modules.residency.models import delete_stub_person_by_name
+                    deleted_profiles = delete_stub_person_by_name(name)
                 except Exception:
                     logger.exception(f"Failed to clean up residency stub for: {name} (non-fatal)")
                     deleted_profiles = 0
 
                 logger.info(
                     f"Deleted patient: {name}  (+{len(companions)} companion(s), "
-                    f"+{deleted_profiles} orphaned pending residency profile(s))"
+                    f"+{deleted_profiles} orphaned pending residency person(s))"
                 )
                 return True
             else:

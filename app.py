@@ -291,18 +291,18 @@ async def main():
         )
         logger.info(f"🔧 Scheduled daily maintenance at 03:00 ({TIMEZONE})")
 
-        # 🔔 3. تذكير تقديم طلبات الإقامة (الساعة 9:00 صباحاً)
-        # ⚠️ إعادة بناء كاملة (2026-08-15) — يحلّ محلّ المهمّتين القديمتين
-        # (تنبيه انتهاء الإقامات + تذكير الطلبات الناقصة) معاً. الآن: تاريخ
-        # تنبيه يدوي لكل ملف (يختاره مستخدم الإقامة من التقويم)، رسالة يومية
-        # واحدة لمجموعة الإقامة حتى يضغط الأدمن "✅ تم تقديم طلب الإقامة".
-        from services.residency_reminders_service import send_daily_residency_reminders
+        # 🪪 3. الانتقال التلقائي للإقامة: نشط ← معلّق انتهاء (الساعة 9:00 صباحاً)
+        # ⚠️ نظام كامل (2026-08-15) — لكل شخص (مريض/مرافق) تاريخ تنبيه
+        # مستقل يدوي؛ هذه المهمّة تحوّل من وصل تاريخه تلقائياً إلى
+        # "🔴 معلّق انتهاء الإقامة" — كتابة فقط، بلا أي رسالة تلغرام
+        # (التنبيه يتحقق داخل البوت عبر العدّاد/القائمة عند فتحه).
+        from services.residency_status_service import run_daily_expiry_check
         app.job_queue.run_daily(
-            lambda context: send_daily_residency_reminders(context.application),
+            lambda context: asyncio.create_task(asyncio.to_thread(run_daily_expiry_check)),
             time=dt_time(hour=9, minute=0, tzinfo=tz),
-            name="daily_residency_reminders"
+            name="daily_residency_status_check"
         )
-        logger.info(f"🔔 Scheduled daily residency reminders at 09:00 ({TIMEZONE})")
+        logger.info(f"🪪 Scheduled daily residency status check at 09:00 ({TIMEZONE})")
 
         # 🧾 4. تقرير أخطاء اليوم (23:55) — آخر اليوم عمداً ليشمله كاملاً.
         # صامت تماماً لو لم يقع أي خطأ، فلا رسالة يومية بلا فائدة.

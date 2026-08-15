@@ -1,5 +1,5 @@
 # modules/residency/flow.py
-# معالِج كولباك "rn:" + استقبال الصورة الشخصية — المرحلة الأولى فقط.
+# معالِج كولباك "rn:" + استقبال الصور/الملفات — نظام دورة الحياة الكامل.
 
 import io
 import logging
@@ -12,24 +12,30 @@ from bot.shared_auth import is_admin
 from core.access.access_service import user_has_module
 from shared.calendar_picker import build_calendar
 
-from modules.residency.constants import RN
-from modules.residency.repository import get_pending_profiles, get_profile_by_id
-from modules.residency.models import set_reminder_date, mark_submitted, save_photo
-from modules.residency.views import build_pending_list, build_profile_detail, build_photo_prompt
+from modules.residency.constants import RN, STATUS_ORDER, STATUS_WAITING_ARRIVAL
+from modules.residency import models as rn_models
+from modules.residency import repository as rn_repo
+from modules.residency import views as rn_views
 
 logger = logging.getLogger(__name__)
 
 _MODULE_KEY = "residency"
-_CTX_WAITING_PHOTO = "_rn_waiting_photo"
-_CTX_ACTIVE_REMINDER = "_rn_active_reminder"
+_CTX_UPLOAD_TARGET = "_rn_upload_target"     # {"kind": "onboard_photo"|"issue_file", "person_id": int}
+_CTX_CAL_TARGET = "_rn_cal_target"           # {"kind": "onboard_remind"|"issue_expiry", "person_id": int, "root_id": int}
+_CTX_SEARCH_ACTIVE = "_rn_search_active"
 
 
 def _is_authorized(user_id: int) -> bool:
     return is_admin(user_id) or user_has_module(user_id, _MODULE_KEY)
 
 
-async def _show_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    text, kb = build_pending_list(get_pending_profiles())
+def _clear_transient_state(context: ContextTypes.DEFAULT_TYPE) -> None:
+    context.user_data.pop(_CTX_UPLOAD_TARGET, None)
+    context.user_data.pop(_CTX_CAL_TARGET, None)
+    context.user_data.pop(_CTX_SEARCH_ACTIVE, None)
+
+
+async def _edit(update: Update, text: str, kb) -> None:
     query = update.callback_query
     if query:
         await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
@@ -37,15 +43,82 @@ async def _show_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
 
-async def _show_detail(update: Update, context: ContextTypes.DEFAULT_TYPE, profile_id: int) -> None:
-    profile = get_profile_by_id(profile_id)
-    if profile is None:
-        await update.callback_query.edit_message_text("❌ لم يتم العثور على الملف.")
-        return
-    uid = update.effective_user.id if update.effective_user else 0
-    text, kb = build_profile_detail(profile, is_admin=is_admin(uid))
-    await update.callback_query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
+# ── Main menu / status lists / family detail ──────────────────────────────────
 
+async def _show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    counts = rn_repo.get_status_counts()
+    text, kb = rn_views.build_main_menu(counts)
+    await _edit(update, text, kb)
+
+
+async def _show_status_list(update: Update, context: ContextTypes.DEFAULT_TYPE, status: str) -> None:
+    families = rn_repo.get_requests_by_status(status)
+    text, kb = rn_views.build_status_list(status, families)
+    await _edit(update, text, kb)
+
+
+async def _show_family(update: Update, context: ContextTypes.DEFAULT_TYPE, root_id: int, uid: int) -> None:
+    family = rn_repo.get_family(root_id)
+    if family is None:
+        await _edit(update, "❌ لم يتم العثور على الطلب.", None)
+        return
+    if family.root.status == STATUS_WAITING_ARRIVAL:
+        await _show_onboard_step(update, context, root_id)
+        return
+    text, kb = rn_views.build_family_detail(family, is_admin=is_admin(uid))
+    await _edit(update, text, kb)
+
+
+# ── Onboarding (🟡) ──────────────────────────────────────────────────────────
+
+def _build_onboard_state(root_id: int) -> dict:
+    queue = rn_repo.get_onboarding_queue(root_id)
+    for i, p in enumerate(queue):
+        if not p.photo_file_id:
+            return {"root_id": root_id, "queue_ids": [q.id for q in queue], "index": i, "step": "photo"}
+        if not p.reminder_date:
+            return {"root_id": root_id, "queue_ids": [q.id for q in queue], "index": i, "step": "reminder"}
+    return {"root_id": root_id, "queue_ids": [q.id for q in queue], "index": len(queue), "step": "review"}
+
+
+async def _show_onboard_step(update: Update, context: ContextTypes.DEFAULT_TYPE, root_id: int) -> None:
+    state = _build_onboard_state(root_id)
+    _clear_transient_state(context)
+
+    if state["step"] == "review":
+        queue_rows = [rn_repo.get_person(pid) for pid in state["queue_ids"]]
+        text, kb = rn_views.build_onboard_review([p for p in queue_rows if p])
+        await _edit(update, text, kb)
+        return
+
+    person = rn_repo.get_person(state["queue_ids"][state["index"]])
+    if person is None:
+        await _show_menu(update, context)
+        return
+
+    if state["step"] == "photo":
+        context.user_data[_CTX_UPLOAD_TARGET] = {"kind": "onboard_photo", "person_id": person.id, "root_id": root_id}
+        text, kb = rn_views.build_onboard_photo_prompt(person, state["index"] + 1, len(state["queue_ids"]))
+        await _edit(update, text, kb)
+    else:  # reminder
+        context.user_data[_CTX_CAL_TARGET] = {"kind": "onboard_remind", "person_id": person.id, "root_id": root_id}
+        now = datetime.utcnow()
+        text, kb = build_calendar(now.year, now.month, RN, back_callback=f"{RN}:menu")
+        await _edit(update, text, kb)
+
+
+# ── Issuance (🟣) ────────────────────────────────────────────────────────────
+
+async def _show_issuance(update: Update, context: ContextTypes.DEFAULT_TYPE, person_id: int) -> None:
+    person = rn_repo.get_person(person_id)
+    if person is None:
+        await _edit(update, "❌ لم يتم العثور على الشخص.", None)
+        return
+    text, kb = rn_views.build_issuance_view(person)
+    await _edit(update, text, kb)
+
+
+# ── Callback dispatcher ────────────────────────────────────────────────────────
 
 async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
@@ -60,112 +133,230 @@ async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         logger.warning(f"[residency.cb] blocked unauthorized user={uid}  action={action!r}")
         return
 
-    if action == "list":
-        context.user_data.pop(_CTX_WAITING_PHOTO, None)
-        context.user_data.pop(_CTX_ACTIVE_REMINDER, None)
-        await _show_list(update, context)
+    if action == "menu":
+        _clear_transient_state(context)
+        await _show_menu(update, context)
         return
 
-    if action.startswith("view_"):
-        context.user_data.pop(_CTX_WAITING_PHOTO, None)
-        context.user_data.pop(_CTX_ACTIVE_REMINDER, None)
-        profile_id = int(action[len("view_"):])
-        await _show_detail(update, context, profile_id)
+    if action.startswith("status_"):
+        status = action[len("status_"):]
+        if status in STATUS_ORDER:
+            await _show_status_list(update, context, status)
         return
 
-    if action.startswith("photo_"):
-        profile_id = int(action[len("photo_"):])
-        profile = get_profile_by_id(profile_id)
-        if profile is None:
-            await query.edit_message_text("❌ لم يتم العثور على الملف.")
-            return
-        context.user_data[_CTX_WAITING_PHOTO] = profile_id
-        text, kb = build_photo_prompt(profile)
-        await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
+    if action.startswith("family_"):
+        root_id = int(action[len("family_"):])
+        await _show_family(update, context, root_id, uid)
         return
 
-    if action.startswith("remind_"):
-        profile_id = int(action[len("remind_"):])
-        context.user_data[_CTX_ACTIVE_REMINDER] = profile_id
-        now = datetime.utcnow()
-        text, kb = build_calendar(now.year, now.month, RN, back_callback=f"{RN}:view_{profile_id}")
-        await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
+    if action.startswith("person_"):
+        person_id = int(action[len("person_"):])
+        root_id = rn_repo.get_root_id_for_person(person_id)
+        if root_id:
+            await _show_family(update, context, root_id, uid)
         return
 
-    if action.startswith("cal_"):
-        profile_id = context.user_data.get(_CTX_ACTIVE_REMINDER)
-        if not profile_id:
-            await _show_list(update, context)
-            return
-        parts = action.split(":")
-        sub = parts[0]
-        if sub == "cal_noop":
-            return
-        if sub == "cal_pick":
-            y, m, d = int(parts[1]), int(parts[2]), int(parts[3])
-            date_iso = f"{y:04d}-{m:02d}-{d:02d}"
-            set_reminder_date(profile_id, date_iso)
-            context.user_data.pop(_CTX_ACTIVE_REMINDER, None)
-            await _show_detail(update, context, profile_id)
-            return
-        if sub in ("cal_prev", "cal_next"):
-            y, m = int(parts[1]), int(parts[2])
-            text, kb = build_calendar(y, m, RN, back_callback=f"{RN}:view_{profile_id}")
-            await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
-            return
+    if action.startswith("onboard_resume_"):
+        person_id = int(action[len("onboard_resume_"):])
+        root_id = rn_repo.get_root_id_for_person(person_id) or person_id
+        await _show_onboard_step(update, context, root_id)
+        return
+
+    if action.startswith("onboard_save_"):
+        root_id = int(action[len("onboard_save_"):])
+        rn_models.bulk_activate_request(root_id, performed_by=uid)
+        _clear_transient_state(context)
+        await _show_family(update, context, root_id, uid)
         return
 
     if action.startswith("submit_"):
-        profile_id = int(action[len("submit_"):])
+        person_id = int(action[len("submit_"):])
         if not is_admin(uid):
             await query.answer("🚫 هذا الزر للأدمن فقط.", show_alert=True)
             return
-        mark_submitted(profile_id, performed_by=uid)
-        await _show_list(update, context)
+        rn_models.mark_submitted(person_id, performed_by=uid)
+        root_id = rn_repo.get_root_id_for_person(person_id)
+        if root_id:
+            await _show_family(update, context, root_id, uid)
+        return
+
+    if action.startswith("issue_start_"):
+        person_id = int(action[len("issue_start_"):])
+        rn_models.start_issuance(person_id, performed_by=uid)
+        await _show_issuance(update, context, person_id)
+        return
+
+    if action.startswith("issue_view_"):
+        person_id = int(action[len("issue_view_"):])
+        await _show_issuance(update, context, person_id)
+        return
+
+    if action.startswith("issue_expiry_"):
+        person_id = int(action[len("issue_expiry_"):])
+        context.user_data[_CTX_CAL_TARGET] = {"kind": "issue_expiry", "person_id": person_id}
+        now = datetime.utcnow()
+        text, kb = build_calendar(now.year, now.month, RN, back_callback=f"{RN}:issue_view_{person_id}")
+        await _edit(update, text, kb)
+        return
+
+    if action.startswith("issue_file_"):
+        person_id = int(action[len("issue_file_"):])
+        context.user_data[_CTX_UPLOAD_TARGET] = {"kind": "issue_file", "person_id": person_id}
+        person = rn_repo.get_person(person_id)
+        if person:
+            text, kb = rn_views.build_issuance_file_prompt(person)
+            await _edit(update, text, kb)
+        return
+
+    if action.startswith("issue_confirm_"):
+        person_id = int(action[len("issue_confirm_"):])
+        ok = rn_models.confirm_issuance(person_id, performed_by=uid)
+        if not ok:
+            await query.answer("⚠️ أكمل تاريخ الانتهاء والملف أولاً.", show_alert=True)
+            return
+        root_id = rn_repo.get_root_id_for_person(person_id)
+        if root_id:
+            await _show_family(update, context, root_id, uid)
+        return
+
+    if action == "search":
+        _clear_transient_state(context)
+        context.user_data[_CTX_SEARCH_ACTIVE] = True
+        text, kb = rn_views.build_search_prompt()
+        await _edit(update, text, kb)
+        return
+
+    if action == "log":
+        entries = rn_repo.get_recent_log(30)
+        text, kb = rn_views.build_log_view(entries)
+        await _edit(update, text, kb)
+        return
+
+    if action == "reports":
+        counts = rn_repo.get_status_counts()
+        text, kb = rn_views.build_reports_view(counts)
+        await _edit(update, text, kb)
+        return
+
+    if action.startswith("cal_"):
+        await _handle_calendar_action(update, context, action, uid)
         return
 
 
-async def _on_photo_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    profile_id = context.user_data.get(_CTX_WAITING_PHOTO)
-    if not profile_id:
-        return
-    if not update.message or not update.message.photo:
+async def _handle_calendar_action(update: Update, context: ContextTypes.DEFAULT_TYPE, action: str, uid: int) -> None:
+    query = update.callback_query
+    target = context.user_data.get(_CTX_CAL_TARGET)
+    if not target:
+        await _show_menu(update, context)
         return
 
+    parts = action.split(":")
+    sub = parts[0]
+    if sub == "cal_noop":
+        return
+
+    if sub in ("cal_prev", "cal_next"):
+        y, m = int(parts[1]), int(parts[2])
+        back = f"{RN}:menu" if target["kind"] == "onboard_remind" else f"{RN}:issue_view_{target['person_id']}"
+        text, kb = build_calendar(y, m, RN, back_callback=back)
+        await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
+        return
+
+    if sub == "cal_pick":
+        y, mo, d = int(parts[1]), int(parts[2]), int(parts[3])
+        date_iso = f"{y:04d}-{mo:02d}-{d:02d}"
+        person_id = target["person_id"]
+
+        if target["kind"] == "onboard_remind":
+            rn_models.set_reminder_date(person_id, date_iso)
+            context.user_data.pop(_CTX_CAL_TARGET, None)
+            await _show_onboard_step(update, context, target["root_id"])
+        elif target["kind"] == "issue_expiry":
+            rn_models.set_issuance_expiry(person_id, date_iso)
+            context.user_data.pop(_CTX_CAL_TARGET, None)
+            await _show_issuance(update, context, person_id)
+        return
+
+
+# ── Text (search) ───────────────────────────────────────────────────────────
+
+async def _on_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not context.user_data.get(_CTX_SEARCH_ACTIVE):
+        return
+    if not update.message or not update.message.text:
+        return
     uid = update.effective_user.id if update.effective_user else 0
     if not _is_authorized(uid):
         return
 
-    context.user_data.pop(_CTX_WAITING_PHOTO, None)
-
-    file_id = update.message.photo[-1].file_id
-    final_file_id = file_id
-    try:
-        from modules.residency.photo_processing import resize_to_4x6
-
-        tg_file = await context.bot.get_file(file_id)
-        buf = io.BytesIO()
-        await tg_file.download_to_memory(buf)
-        buf.seek(0)
-        resized_bytes = resize_to_4x6(buf.read())
-
-        sent = await context.bot.send_photo(
-            chat_id=update.effective_chat.id,
-            photo=io.BytesIO(resized_bytes),
-            caption="🖼️ الصورة مضبوطة على مقاس 4×6",
-        )
-        final_file_id = sent.photo[-1].file_id
-    except Exception as exc:
-        logger.warning(f"[residency] photo resize failed, saving original: {exc}")
-
-    save_photo(profile_id, final_file_id)
-
-    profile = get_profile_by_id(profile_id)
-    text, kb = build_profile_detail(profile, is_admin=is_admin(uid))
+    context.user_data.pop(_CTX_SEARCH_ACTIVE, None)
+    query_text = update.message.text.strip()
+    results = rn_repo.search_persons(query_text)
+    text, kb = rn_views.build_search_results(query_text, results)
     await update.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+
+
+# ── Photo / document upload ───────────────────────────────────────────────────
+
+def _extract_file_id(message) -> str | None:
+    if message.photo:
+        return message.photo[-1].file_id
+    if message.document and message.document.mime_type and message.document.mime_type.startswith("image/"):
+        return message.document.file_id
+    return None
+
+
+async def _on_media_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    target = context.user_data.get(_CTX_UPLOAD_TARGET)
+    if not target:
+        return
+    if not update.message:
+        return
+    uid = update.effective_user.id if update.effective_user else 0
+    if not _is_authorized(uid):
+        return
+
+    file_id = _extract_file_id(update.message)
+    if not file_id:
+        return
+
+    context.user_data.pop(_CTX_UPLOAD_TARGET, None)
+    person_id = target["person_id"]
+
+    if target["kind"] == "onboard_photo":
+        final_file_id = file_id
+        try:
+            from modules.residency.photo_processing import resize_to_4x6
+
+            tg_file = await context.bot.get_file(file_id)
+            buf = io.BytesIO()
+            await tg_file.download_to_memory(buf)
+            buf.seek(0)
+            resized_bytes = resize_to_4x6(buf.read())
+
+            sent = await context.bot.send_photo(
+                chat_id=update.effective_chat.id,
+                photo=io.BytesIO(resized_bytes),
+                caption="🖼️ الصورة مضبوطة على مقاس 4×6",
+            )
+            final_file_id = sent.photo[-1].file_id
+        except Exception as exc:
+            logger.warning(f"[residency] photo resize failed, saving original: {exc}")
+
+        rn_models.save_photo(person_id, final_file_id)
+        await _show_onboard_step(update, context, target["root_id"])
+
+    elif target["kind"] == "issue_file":
+        # ✅ لا ضبط مقاس هنا — هذا مستند/بطاقة إقامة رسمية، لا صورة شخصية.
+        rn_models.save_issuance_file(person_id, file_id)
+        person = rn_repo.get_person(person_id)
+        if person:
+            text, kb = rn_views.build_issuance_view(person)
+            await update.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
 
 def register_handlers(app) -> None:
     app.add_handler(CallbackQueryHandler(_dispatch_callback, pattern=r"^rn:"), group=20)
-    app.add_handler(MessageHandler(filters.PHOTO, _on_photo_message), group=17)
-    logger.info("[residency] flow handlers registered (rn: callbacks group 20, photo group 17)")
+    app.add_handler(MessageHandler(filters.PHOTO | filters.Document.IMAGE, _on_media_message), group=17)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, _on_text_message), group=18)
+    logger.info("[residency] flow handlers registered (rn: callbacks group 20, media group 17, text group 18)")

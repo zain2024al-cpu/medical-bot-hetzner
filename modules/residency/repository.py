@@ -1,96 +1,183 @@
 # modules/residency/repository.py
-# استعلامات القراءة على res_profiles/res_companions — المرحلة الأولى فقط.
+# استعلامات القراءة على res_persons/res_status_log.
 
 from dataclasses import dataclass, field
 
+from modules.residency.constants import STATUS_ORDER
+
 
 @dataclass(frozen=True)
-class ProfileRow:
+class PersonRow:
     id: int
+    parent_id: int | None
     name: str
+    status: str
     photo_file_id: str
     reminder_date: str
-    reminder_active: bool
-    submitted: bool
-    companions: list[str] = field(default_factory=list)
+    expiry_date: str
+    residency_file_id: str
 
 
-def get_pending_profiles() -> list[ProfileRow]:
-    """كل الملفات التي لم يُقدَّم طلبها بعد (submitted=False) — أحدث أولاً."""
+@dataclass(frozen=True)
+class FamilyRow:
+    root: PersonRow
+    companions: list[PersonRow] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class LogEntry:
+    person_name: str
+    old_status: str
+    new_status: str
+    performed_by: int | None
+    created_at: str
+
+
+def _to_row(p) -> PersonRow:
+    return PersonRow(
+        id=p.id, parent_id=p.parent_id, name=p.name or "—", status=p.status,
+        photo_file_id=p.photo_file_id or "", reminder_date=p.reminder_date or "",
+        expiry_date=p.expiry_date or "", residency_file_id=p.residency_file_id or "",
+    )
+
+
+def get_status_counts() -> dict:
+    """عدد الطلبات (لا الأشخاص) التي لها شخص واحد على الأقل بكل حالة."""
     from db.session import get_db
-    from db.models import ResidencyProfile, ResidencyCompanion
+    from db.models import ResidencyPerson
 
-    rows: list[ProfileRow] = []
+    counts = {s: 0 for s in STATUS_ORDER}
     with get_db() as db:
-        profiles = (
-            db.query(ResidencyProfile)
-            .filter_by(submitted=False)
-            .order_by(ResidencyProfile.created_at.desc())
-            .all()
-        )
-        for p in profiles:
-            comps = db.query(ResidencyCompanion).filter_by(profile_id=p.id).all()
-            rows.append(ProfileRow(
-                id=p.id,
-                name=p.name or "—",
-                photo_file_id=p.photo_file_id or "",
-                reminder_date=p.reminder_date or "",
-                reminder_active=bool(p.reminder_active),
-                submitted=bool(p.submitted),
-                companions=[c.name for c in comps],
-            ))
-    return rows
+        people = db.query(ResidencyPerson).all()
+        by_status_roots: dict[str, set] = {s: set() for s in STATUS_ORDER}
+        for p in people:
+            root_id = p.parent_id if p.parent_id else p.id
+            if p.status in by_status_roots:
+                by_status_roots[p.status].add(root_id)
+        for s in STATUS_ORDER:
+            counts[s] = len(by_status_roots[s])
+    return counts
 
 
-def get_due_reminders() -> list[ProfileRow]:
-    """ملفات reminder_active=True وsubmitted=False وتاريخ التنبيه اليوم أو قبله."""
-    from datetime import date
+def get_requests_by_status(status: str) -> list[FamilyRow]:
+    """كل الطلبات (جذر + مرافقوه) التي لها شخص واحد على الأقل بهذه الحالة."""
     from db.session import get_db
-    from db.models import ResidencyProfile, ResidencyCompanion
+    from db.models import ResidencyPerson
 
-    today_iso = date.today().isoformat()
-    rows: list[ProfileRow] = []
+    rows: list[FamilyRow] = []
     with get_db() as db:
-        profiles = (
-            db.query(ResidencyProfile)
-            .filter(
-                ResidencyProfile.reminder_active == True,   # noqa: E712
-                ResidencyProfile.submitted == False,         # noqa: E712
-                ResidencyProfile.reminder_date != "",
-                ResidencyProfile.reminder_date <= today_iso,
+        matching = db.query(ResidencyPerson).filter_by(status=status).all()
+        root_ids: list[int] = []
+        seen = set()
+        for p in matching:
+            root_id = p.parent_id if p.parent_id else p.id
+            if root_id not in seen:
+                seen.add(root_id)
+                root_ids.append(root_id)
+
+        for root_id in root_ids:
+            root = db.query(ResidencyPerson).filter_by(id=root_id).first()
+            if not root:
+                continue
+            comps = (
+                db.query(ResidencyPerson)
+                .filter_by(parent_id=root_id)
+                .order_by(ResidencyPerson.id.asc())
+                .all()
             )
-            .order_by(ResidencyProfile.reminder_date.asc())
-            .all()
-        )
-        for p in profiles:
-            comps = db.query(ResidencyCompanion).filter_by(profile_id=p.id).all()
-            rows.append(ProfileRow(
-                id=p.id,
-                name=p.name or "—",
-                photo_file_id=p.photo_file_id or "",
-                reminder_date=p.reminder_date or "",
-                reminder_active=bool(p.reminder_active),
-                submitted=bool(p.submitted),
-                companions=[c.name for c in comps],
-            ))
+            rows.append(FamilyRow(root=_to_row(root), companions=[_to_row(c) for c in comps]))
     return rows
 
 
-def get_profile_by_id(profile_id: int) -> ProfileRow | None:
+def get_family(root_id: int) -> FamilyRow | None:
     from db.session import get_db
-    from db.models import ResidencyProfile, ResidencyCompanion
+    from db.models import ResidencyPerson
 
     with get_db() as db:
-        p = db.query(ResidencyProfile).filter_by(id=profile_id).first()
+        root = db.query(ResidencyPerson).filter_by(id=root_id).first()
+        if not root:
+            return None
+        comps = (
+            db.query(ResidencyPerson)
+            .filter_by(parent_id=root_id)
+            .order_by(ResidencyPerson.id.asc())
+            .all()
+        )
+        return FamilyRow(root=_to_row(root), companions=[_to_row(c) for c in comps])
+
+
+def get_person(person_id: int) -> PersonRow | None:
+    from db.session import get_db
+    from db.models import ResidencyPerson
+
+    with get_db() as db:
+        p = db.query(ResidencyPerson).filter_by(id=person_id).first()
+        return _to_row(p) if p else None
+
+
+def get_root_id_for_person(person_id: int) -> int | None:
+    from db.session import get_db
+    from db.models import ResidencyPerson
+
+    with get_db() as db:
+        p = db.query(ResidencyPerson).filter_by(id=person_id).first()
         if not p:
             return None
-        comps = db.query(ResidencyCompanion).filter_by(profile_id=p.id).all()
-        return ProfileRow(
-            id=p.id,
-            name=p.name or "—",
-            photo_file_id=p.photo_file_id or "",
-            reminder_date=p.reminder_date or "",
-            reminder_active=bool(p.reminder_active),
-            submitted=bool(p.submitted),
-            companions=[c.name for c in comps],
+        return p.parent_id if p.parent_id else p.id
+
+
+def search_persons(query: str, limit: int = 20) -> list[PersonRow]:
+    from db.session import get_db
+    from db.models import ResidencyPerson
+
+    with get_db() as db:
+        matches = (
+            db.query(ResidencyPerson)
+            .filter(ResidencyPerson.name.ilike(f"%{query}%"))
+            .order_by(ResidencyPerson.created_at.desc())
+            .limit(limit)
+            .all()
         )
+        return [_to_row(p) for p in matches]
+
+
+def get_recent_log(limit: int = 30) -> list[LogEntry]:
+    from db.session import get_db
+    from db.models import ResidencyStatusLog, ResidencyPerson
+
+    with get_db() as db:
+        entries = (
+            db.query(ResidencyStatusLog)
+            .order_by(ResidencyStatusLog.created_at.desc())
+            .limit(limit)
+            .all()
+        )
+        rows: list[LogEntry] = []
+        for e in entries:
+            person = db.query(ResidencyPerson).filter_by(id=e.person_id).first()
+            rows.append(LogEntry(
+                person_name=person.name if person else f"#{e.person_id}",
+                old_status=e.old_status or "",
+                new_status=e.new_status or "",
+                performed_by=e.performed_by,
+                created_at=e.created_at.strftime("%Y-%m-%d %H:%M") if e.created_at else "",
+            ))
+        return rows
+
+
+def get_onboarding_queue(root_id: int) -> list[PersonRow]:
+    """المريض (root_id) ثم كل مرافقيه بترتيب الإضافة — لتسلسل 🟡."""
+    from db.session import get_db
+    from db.models import ResidencyPerson
+
+    with get_db() as db:
+        root = db.query(ResidencyPerson).filter_by(id=root_id).first()
+        if not root:
+            return []
+        comps = (
+            db.query(ResidencyPerson)
+            .filter_by(parent_id=root_id)
+            .order_by(ResidencyPerson.id.asc())
+            .all()
+        )
+        return [_to_row(root)] + [_to_row(c) for c in comps]

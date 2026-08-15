@@ -12,4 +12,4 @@ def register_all(app) -> None:
 
     register_menu_handler(app)
     register_handlers(app)
-    logger.info("[residency] all handlers registered (المرحلة الأولى)")
+    logger.info("[residency] all handlers registered (نظام دورة الحياة الكامل)")
