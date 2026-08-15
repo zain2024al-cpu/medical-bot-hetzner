@@ -20,9 +20,10 @@ from modules.residency import views as rn_views
 logger = logging.getLogger(__name__)
 
 _MODULE_KEY = "residency"
-_CTX_UPLOAD_TARGET = "_rn_upload_target"     # {"kind": "onboard_photo"|"issue_file", "person_id": int}
+_CTX_UPLOAD_TARGET = "_rn_upload_target"     # {"kind": "onboard_photo"|"issue_file"|"doc_upload", "person_id": int, ...}
 _CTX_CAL_TARGET = "_rn_cal_target"           # {"kind": "onboard_remind"|"issue_expiry", "person_id": int, "root_id": int}
 _CTX_SEARCH_ACTIVE = "_rn_search_active"
+_CTX_DOC_NAME_ACTIVE = "_rn_doc_name_active"  # {"person_id": int} — بانتظار اسم وثيقة "أخرى" نصّياً
 
 
 def _is_authorized(user_id: int) -> bool:
@@ -33,6 +34,7 @@ def _clear_transient_state(context: ContextTypes.DEFAULT_TYPE) -> None:
     context.user_data.pop(_CTX_UPLOAD_TARGET, None)
     context.user_data.pop(_CTX_CAL_TARGET, None)
     context.user_data.pop(_CTX_SEARCH_ACTIVE, None)
+    context.user_data.pop(_CTX_DOC_NAME_ACTIVE, None)
 
 
 async def _edit(update: Update, text: str, kb) -> None:
@@ -65,7 +67,21 @@ async def _show_family(update: Update, context: ContextTypes.DEFAULT_TYPE, root_
     if family.root.status == STATUS_WAITING_ARRIVAL:
         await _show_onboard_step(update, context, root_id)
         return
-    text, kb = rn_views.build_family_detail(family, is_admin=is_admin(uid))
+    person_ids = [family.root.id] + [c.id for c in family.companions]
+    doc_counts = rn_repo.get_document_counts(person_ids)
+    text, kb = rn_views.build_family_detail(family, is_admin=is_admin(uid), doc_counts=doc_counts)
+    await _edit(update, text, kb)
+
+
+# ── Documents (📄) ───────────────────────────────────────────────────────────
+
+async def _show_documents(update: Update, context: ContextTypes.DEFAULT_TYPE, person_id: int) -> None:
+    person = rn_repo.get_person(person_id)
+    if person is None:
+        await _edit(update, "❌ لم يتم العثور على الشخص.", None)
+        return
+    documents = rn_repo.get_documents_for_person(person_id)
+    text, kb = rn_views.build_documents_list(person, documents)
     await _edit(update, text, kb)
 
 
@@ -219,6 +235,45 @@ async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await _show_family(update, context, root_id, uid)
         return
 
+    if action.startswith("docs_"):
+        person_id = int(action[len("docs_"):])
+        _clear_transient_state(context)
+        await _show_documents(update, context, person_id)
+        return
+
+    if action.startswith("doc_add_formc_"):
+        person_id = int(action[len("doc_add_formc_"):])
+        person = rn_repo.get_person(person_id)
+        if person:
+            context.user_data[_CTX_UPLOAD_TARGET] = {
+                "kind": "doc_upload", "person_id": person_id, "doc_type": "form_c", "doc_name": "Form C",
+            }
+            text, kb = rn_views.build_doc_file_prompt(person, "Form C")
+            await _edit(update, text, kb)
+        return
+
+    if action.startswith("doc_add_other_"):
+        person_id = int(action[len("doc_add_other_"):])
+        person = rn_repo.get_person(person_id)
+        if person:
+            context.user_data[_CTX_DOC_NAME_ACTIVE] = {"person_id": person_id}
+            text, kb = rn_views.build_doc_name_prompt(person)
+            await _edit(update, text, kb)
+        return
+
+    if action.startswith("doc_add_"):
+        person_id = int(action[len("doc_add_"):])
+        person = rn_repo.get_person(person_id)
+        if person:
+            text, kb = rn_views.build_doc_type_prompt(person)
+            await _edit(update, text, kb)
+        return
+
+    if action.startswith("print_"):
+        root_id = int(action[len("print_"):])
+        await _send_case_pdf(update, context, root_id)
+        return
+
     if action == "search":
         _clear_transient_state(context)
         context.user_data[_CTX_SEARCH_ACTIVE] = True
@@ -281,12 +336,28 @@ async def _handle_calendar_action(update: Update, context: ContextTypes.DEFAULT_
 # ── Text (search) ───────────────────────────────────────────────────────────
 
 async def _on_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not context.user_data.get(_CTX_SEARCH_ACTIVE):
-        return
     if not update.message or not update.message.text:
         return
     uid = update.effective_user.id if update.effective_user else 0
     if not _is_authorized(uid):
+        return
+
+    doc_target = context.user_data.get(_CTX_DOC_NAME_ACTIVE)
+    if doc_target:
+        context.user_data.pop(_CTX_DOC_NAME_ACTIVE, None)
+        person_id = doc_target["person_id"]
+        person = rn_repo.get_person(person_id)
+        if not person:
+            return
+        doc_name = update.message.text.strip()
+        context.user_data[_CTX_UPLOAD_TARGET] = {
+            "kind": "doc_upload", "person_id": person_id, "doc_type": "other", "doc_name": doc_name,
+        }
+        text, kb = rn_views.build_doc_file_prompt(person, doc_name)
+        await update.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+        return
+
+    if not context.user_data.get(_CTX_SEARCH_ACTIVE):
         return
 
     context.user_data.pop(_CTX_SEARCH_ACTIVE, None)
@@ -353,6 +424,93 @@ async def _on_media_message(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         if person:
             text, kb = rn_views.build_issuance_view(person)
             await update.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+
+    elif target["kind"] == "doc_upload":
+        # ✅ لا ضبط مقاس هنا كذلك — وثيقة مستقلة تُحفَظ كما رُفعت.
+        rn_models.add_document(
+            person_id, target.get("doc_type", "other"), target.get("doc_name", ""), file_id, created_by=uid,
+        )
+        person = rn_repo.get_person(person_id)
+        if person:
+            documents = rn_repo.get_documents_for_person(person_id)
+            text, kb = rn_views.build_documents_list(person, documents)
+            await update.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
+
+
+async def _download_file_bytes(context: ContextTypes.DEFAULT_TYPE, file_id: str | None) -> bytes | None:
+    if not file_id:
+        return None
+    try:
+        tg_file = await context.bot.get_file(file_id)
+        buf = io.BytesIO()
+        await tg_file.download_to_memory(buf)
+        return buf.getvalue()
+    except Exception as exc:
+        logger.warning(f"[residency] case pdf: failed to download file_id={file_id}: {exc}")
+        return None
+
+
+async def _build_person_pdf_dict(context: ContextTypes.DEFAULT_TYPE, person: rn_repo.PersonRow, *, role: str) -> dict:
+    from modules.residency.constants import status_line
+
+    latest = rn_repo.get_latest_issuance(person.id)
+    documents = rn_repo.get_documents_for_person(person.id)
+
+    photo_bytes = await _download_file_bytes(context, person.photo_file_id)
+    issuance_file_bytes = await _download_file_bytes(context, person.residency_file_id) if latest else None
+    doc_dicts = []
+    for d in documents:
+        label = "Form C" if d.doc_type == "form_c" else (d.doc_name or "وثيقة")
+        file_bytes = await _download_file_bytes(context, d.file_id)
+        doc_dicts.append({"label": label, "file_bytes": file_bytes})
+
+    return {
+        "name": person.name, "role": role, "status_text": status_line(person.status),
+        "photo_bytes": photo_bytes,
+        "expiry_date": person.expiry_date,
+        "last_issue_date": latest.issued_at if latest else "",
+        "issuance_file_bytes": issuance_file_bytes,
+        "documents": doc_dicts,
+    }
+
+
+async def _send_case_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE, root_id: int) -> None:
+    import asyncio
+    from datetime import datetime as dt
+    from services.residency_case_pdf import build_case_pdf
+
+    family = rn_repo.get_family(root_id)
+    if family is None:
+        await update.callback_query.answer("❌ لم يتم العثور على الطلب.", show_alert=True)
+        return
+
+    await update.callback_query.answer("⏳ جارٍ تجهيز الملف...")
+
+    people = [await _build_person_pdf_dict(context, family.root, role="المريض")]
+    for c in family.companions:
+        people.append(await _build_person_pdf_dict(context, c, role="مرافق"))
+
+    case = {
+        "root_id": root_id, "case_no": str(root_id),
+        "patient_name": family.root.name, "companion_count": len(family.companions),
+        "created_at": dt.utcnow().strftime("%Y-%m-%d"),
+        "people": people,
+    }
+
+    try:
+        pdf_buf = await asyncio.to_thread(build_case_pdf, case)
+    except Exception as exc:
+        logger.error(f"[residency] case pdf build failed  root_id={root_id}: {exc}")
+        await update.effective_chat.send_message("⚠️ تعذّر إنشاء الملف، حاول مرة أخرى.")
+        return
+
+    filename = f"ملف_الحالة_{family.root.name}_{root_id}.pdf".replace(" ", "_")
+    await context.bot.send_document(
+        chat_id=update.effective_chat.id,
+        document=pdf_buf,
+        filename=filename,
+        caption=f"🖨️ ملف الحالة — {family.root.name}",
+    )
 
 
 def register_handlers(app) -> None:

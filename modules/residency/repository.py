@@ -33,6 +33,16 @@ class LogEntry:
     created_at: str
 
 
+@dataclass(frozen=True)
+class DocumentRow:
+    id: int
+    person_id: int
+    doc_type: str
+    doc_name: str
+    file_id: str
+    created_at: str
+
+
 def _to_row(p) -> PersonRow:
     return PersonRow(
         id=p.id, parent_id=p.parent_id, name=p.name or "—", status=p.status,
@@ -163,6 +173,69 @@ def get_recent_log(limit: int = 30) -> list[LogEntry]:
                 created_at=e.created_at.strftime("%Y-%m-%d %H:%M") if e.created_at else "",
             ))
         return rows
+
+
+@dataclass(frozen=True)
+class IssuanceRow:
+    person_id: int
+    expiry_date: str
+    file_id: str
+    issued_at: str
+
+
+def get_latest_issuance(person_id: int) -> IssuanceRow | None:
+    """آخر سطر أرشفة لهذا الشخص في res_issuance_history — للحصول على
+    تاريخ الإصدار (issued_at) الذي لا يُخزَّن في الحقول الحيّة."""
+    from db.session import get_db
+    from db.models import ResidencyIssuance
+
+    with get_db() as db:
+        row = (
+            db.query(ResidencyIssuance)
+            .filter_by(person_id=person_id)
+            .order_by(ResidencyIssuance.issued_at.desc())
+            .first()
+        )
+        if not row:
+            return None
+        return IssuanceRow(
+            person_id=row.person_id, expiry_date=row.expiry_date or "",
+            file_id=row.file_id or "", issued_at=row.issued_at.strftime("%Y-%m-%d") if row.issued_at else "",
+        )
+
+
+def get_documents_for_person(person_id: int) -> list[DocumentRow]:
+    """Form C أولاً إن وُجدت، ثم بقية الوثائق بترتيب الإضافة."""
+    from db.session import get_db
+    from db.models import ResidencyDocument
+
+    with get_db() as db:
+        docs = (
+            db.query(ResidencyDocument)
+            .filter_by(person_id=person_id)
+            .order_by(ResidencyDocument.created_at.asc())
+            .all()
+        )
+        rows = [DocumentRow(
+            id=d.id, person_id=d.person_id, doc_type=d.doc_type, doc_name=d.doc_name or "",
+            file_id=d.file_id, created_at=d.created_at.strftime("%Y-%m-%d") if d.created_at else "",
+        ) for d in docs]
+        rows.sort(key=lambda r: 0 if r.doc_type == "form_c" else 1)
+        return rows
+
+
+def get_document_counts(person_ids: list[int]) -> dict[int, int]:
+    from db.session import get_db
+    from db.models import ResidencyDocument
+
+    counts = {pid: 0 for pid in person_ids}
+    if not person_ids:
+        return counts
+    with get_db() as db:
+        docs = db.query(ResidencyDocument).filter(ResidencyDocument.person_id.in_(person_ids)).all()
+        for d in docs:
+            counts[d.person_id] = counts.get(d.person_id, 0) + 1
+    return counts
 
 
 def get_onboarding_queue(root_id: int) -> list[PersonRow]:

@@ -1,0 +1,298 @@
+# services/residency_case_pdf.py
+# PDF لـ"🖨️ طباعة ملف الحالة" — ملف واحد منظّم يجمع المريض وكل مرافقيه:
+# بيانات أساسية + صورة شخصية + حالة الإقامة الحالية + آخر إصدار (تاريخه
+# وملفه) + وثائقه المستقلة، ثم جدول ملخّص في النهاية.
+#
+# ✅ دالة نقية متزامنة بلا أي استدعاء Telegram/DB داخلها — تستقبل قاموس
+# `case` جاهزاً (بايتات الصور/الملفات مُنزَّلة مسبقاً من المتصل غير
+# المتزامن في modules/residency/flow.py عبر bot.get_file+download_to_memory)
+# لتشغيلها بأمان داخل asyncio.to_thread دون تعارض حلقات الأحداث.
+#
+# نفس نمط النص العربي السليم المُثبَت في services/pharmacy_evacuation_pdf.py
+# (reshape+bidi صريح + خط عربي حقيقي مسجَّل)، مُعاد كتابته هنا محلياً
+# استقلالاً لكل ملف PDF كما جرت العادة في هذا المشروع.
+
+from __future__ import annotations
+
+import io
+import logging
+import os
+import re
+
+logger = logging.getLogger(__name__)
+
+_ARABIC_RE = re.compile("[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿]")
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_FONTS_DIR = os.path.normpath(os.path.join(_HERE, "..", "assets", "fonts"))
+
+_FONT_CANDIDATES = [
+    ("C:\\Windows\\Fonts\\arial.ttf", "Arial"),
+    ("C:\\Windows\\Fonts\\tahoma.ttf", "Tahoma"),
+    (os.path.join(_FONTS_DIR, "Arabic-Regular.ttf"), "ResCaseArFont"),
+]
+_FONT_BOLD_CANDIDATES = [
+    ("C:\\Windows\\Fonts\\arialbd.ttf", "ArialBd"),
+    ("C:\\Windows\\Fonts\\tahomabd.ttf", "TahomaBd"),
+    (os.path.join(_FONTS_DIR, "Arabic-Bold.ttf"), "ResCaseArFontBd"),
+]
+
+_MARGIN_CM = 2.0
+
+
+def _pick_font(candidates: list[tuple[str, str]], fallback: str = "Helvetica") -> str:
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+
+    for path, alias in candidates:
+        if os.path.isfile(path):
+            try:
+                pdfmetrics.registerFont(TTFont(alias, path))
+                return alias
+            except Exception:
+                continue
+    return fallback
+
+
+def _ar(text) -> str:
+    s = str(text or "")
+    if not _ARABIC_RE.search(s):
+        return s
+    try:
+        import arabic_reshaper
+        from bidi.algorithm import get_display
+        return get_display(arabic_reshaper.reshape(s), base_dir="R")
+    except Exception:
+        return s
+
+
+def _ar_wrap(text, font_name: str, font_size: float, max_width_pts: float) -> str:
+    from reportlab.pdfbase.pdfmetrics import stringWidth
+
+    s = str(text or "").strip()
+    if not s:
+        return ""
+
+    words = s.split()
+    lines: list[str] = []
+    current: list[str] = []
+    for word in words:
+        candidate = current + [word]
+        shaped_candidate = _ar(" ".join(candidate))
+        w = stringWidth(shaped_candidate, font_name, font_size)
+        if w <= max_width_pts or not current:
+            current = candidate
+        else:
+            lines.append(" ".join(current))
+            current = [word]
+    if current:
+        lines.append(" ".join(current))
+
+    return "<br/>".join(_ar(line) for line in lines)
+
+
+def _colors():
+    from reportlab.lib import colors
+    return {
+        "primary":   colors.HexColor("#424242"),
+        "light_bg":  colors.HexColor("#F0F0F0"),
+        "grid":      colors.HexColor("#CCCCCC"),
+        "text_dark": colors.HexColor("#212121"),
+        "text_gray": colors.HexColor("#777777"),
+        "white":     colors.white,
+        "frame":     colors.HexColor("#333333"),
+    }
+
+
+def _embed_image(img_bytes: bytes | None, max_w_pts: float, max_h_pts: float):
+    """يبني عنصر Image محافِظاً على نسبة الأبعاد ضمن الحد الأقصى
+    المُعطى، أو None إن تعذّرت قراءة البايتات (صورة تالفة/غير مدعومة)."""
+    if not img_bytes:
+        return None
+    try:
+        from reportlab.lib.utils import ImageReader
+        from reportlab.platypus import Image
+
+        reader = ImageReader(io.BytesIO(img_bytes))
+        iw, ih = reader.getSize()
+        if not iw or not ih:
+            return None
+        scale = min(max_w_pts / iw, max_h_pts / ih, 1.0)
+        return Image(io.BytesIO(img_bytes), width=iw * scale, height=ih * scale)
+    except Exception as exc:
+        logger.warning(f"[residency_case_pdf] embed image failed: {exc}")
+        return None
+
+
+def build_case_pdf(case: dict) -> io.BytesIO:
+    """
+    case = {
+        "root_id": int, "case_no": str, "patient_name": str,
+        "companion_count": int, "created_at": str,
+        "people": [
+            {
+                "name": str, "role": str,               # "المريض" | "مرافق"
+                "status_text": str,                       # نص الحالة الجاهز (أيقونة + تسمية)
+                "photo_bytes": bytes | None,
+                "expiry_date": str,                        # قد تكون فارغة
+                "last_issue_date": str,                    # قد تكون فارغة
+                "issuance_file_bytes": bytes | None,
+                "documents": [{"label": str, "file_bytes": bytes | None}],
+            }, ...
+        ],
+    }
+    """
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import cm
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.enums import TA_RIGHT, TA_CENTER
+    from reportlab.platypus import (
+        SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether,
+    )
+
+    C = _colors()
+    FN = _pick_font(_FONT_CANDIDATES)
+    FNB = _pick_font(_FONT_BOLD_CANDIDATES, FN)
+
+    margin = _MARGIN_CM * cm
+    content_width = A4[0] - (2 * margin)
+
+    def S(name, **kw):
+        kw.setdefault("fontName", FN)
+        return ParagraphStyle(name, **kw)
+
+    ST = {
+        "title":  S("title", fontSize=17, leading=22, alignment=TA_CENTER, textColor=C["primary"], fontName=FNB),
+        "h2":     S("h2",    fontSize=13, leading=17, alignment=TA_RIGHT,  textColor=C["primary"], fontName=FNB),
+        "body":   S("body",  fontSize=10, leading=15, alignment=TA_RIGHT,  textColor=C["text_dark"]),
+        "body_b": S("bodyb", fontSize=10, leading=15, alignment=TA_RIGHT,  textColor=C["text_dark"], fontName=FNB),
+        "th":     S("th",    fontSize=9,  leading=12, alignment=TA_CENTER, textColor=C["text_dark"], fontName=FNB),
+        "td_c":   S("tdc",   fontSize=9,  leading=12, alignment=TA_CENTER, textColor=C["text_dark"]),
+        "note":   S("note",  fontSize=9,  leading=12, alignment=TA_CENTER, textColor=C["text_gray"]),
+    }
+
+    def P(txt, style_key="body") -> Paragraph:
+        return Paragraph(_ar(txt), ST[style_key])
+
+    def P_wrap(txt, style_key, max_width_pts) -> Paragraph:
+        style = ST[style_key]
+        usable_width = max(max_width_pts - 10, 20)
+        wrapped = _ar_wrap(txt, style.fontName, style.fontSize, usable_width)
+        return Paragraph(wrapped, style)
+
+    def _on_page(canvas, doc):
+        canvas.saveState()
+        w, h = A4
+        frame_margin = 0.5 * cm
+        canvas.setStrokeColor(C["frame"])
+        canvas.setLineWidth(0.6)
+        canvas.rect(frame_margin, frame_margin, w - 2 * frame_margin, h - 2 * frame_margin, fill=0, stroke=1)
+        canvas.setFillColor(C["text_gray"])
+        canvas.setFont(FN, 8)
+        canvas.drawRightString(w - 1.8 * cm, 0.7 * cm, _ar(f"صفحة {doc.page}"))
+        canvas.restoreState()
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf, pagesize=A4,
+        leftMargin=margin, rightMargin=margin,
+        topMargin=margin, bottomMargin=margin,
+    )
+    story = []
+
+    # ── رأس ملف الحالة ────────────────────────────────────────────────────────
+    story.append(P("🏠 ملف الحالة", "title"))
+    story.append(Spacer(1, 0.3 * cm))
+    header_lines = [
+        f"رقم الحالة: {case.get('case_no', '')}",
+        f"اسم المريض: {case.get('patient_name', '')}",
+        f"عدد المرافقين: {case.get('companion_count', 0)}",
+        f"تاريخ الإصدار: {case.get('created_at', '')}",
+    ]
+    for line in header_lines:
+        story.append(P(line, "body_b"))
+    story.append(Spacer(1, 0.4 * cm))
+
+    people = case.get("people", [])
+    photo_max = (4.5 * cm, 4.5 * cm)
+    file_max = (content_width * 0.9, 9 * cm)
+
+    for person in people:
+        block = []
+        block.append(P(f"👤 {person['name']} — {person['role']}", "h2"))
+        block.append(Spacer(1, 0.15 * cm))
+
+        img = _embed_image(person.get("photo_bytes"), *photo_max)
+        if img is not None:
+            img.hAlign = "RIGHT"
+            block.append(img)
+            block.append(Spacer(1, 0.15 * cm))
+
+        block.append(P(f"الحالة الحالية: {person.get('status_text', '')}", "body"))
+        if person.get("expiry_date"):
+            block.append(P(f"تاريخ انتهاء الإقامة الحالية: {person['expiry_date']}", "body"))
+
+        block.append(Spacer(1, 0.1 * cm))
+        block.append(P("آخر إصدار للإقامة:", "body_b"))
+        if person.get("last_issue_date"):
+            block.append(P(f"تاريخ الإصدار: {person['last_issue_date']}", "body"))
+            issue_img = _embed_image(person.get("issuance_file_bytes"), *file_max)
+            if issue_img is not None:
+                issue_img.hAlign = "RIGHT"
+                block.append(issue_img)
+            else:
+                block.append(P("(تعذّر تضمين ملف الإصدار)", "note"))
+        else:
+            block.append(P("لا يوجد إصدار سابق بعد.", "note"))
+
+        block.append(Spacer(1, 0.15 * cm))
+        docs = person.get("documents", [])
+        block.append(P(f"📄 الوثائق ({len(docs)}):", "body_b"))
+        if not docs:
+            block.append(P("لا توجد وثائق مضافة.", "note"))
+        else:
+            for d in docs:
+                block.append(P(f"- {d['label']} ✅", "body"))
+                d_img = _embed_image(d.get("file_bytes"), *file_max)
+                if d_img is not None:
+                    d_img.hAlign = "RIGHT"
+                    block.append(d_img)
+
+        story.append(KeepTogether(block))
+        story.append(Spacer(1, 0.5 * cm))
+
+    # ── جدول ملخّص ────────────────────────────────────────────────────────────
+    story.append(P("📊 ملخّص الحالة", "h2"))
+    story.append(Spacer(1, 0.2 * cm))
+
+    REVERSED_LABELS = ["عدد الوثائق", "آخر إصدار", "حالة الإقامة", "الصفة", "الشخص"]
+    col_pct = {"عدد الوثائق": 0.15, "آخر إصدار": 0.2, "حالة الإقامة": 0.25, "الصفة": 0.15, "الشخص": 0.25}
+    header_row = [P(lbl, "th") for lbl in REVERSED_LABELS]
+    col_widths = [content_width * col_pct[lbl] for lbl in REVERSED_LABELS]
+
+    table_data = [header_row]
+    for person in people:
+        last_issue = person.get("last_issue_date") or "—"
+        table_data.append([
+            P(str(len(person.get("documents", []))), "td_c"),
+            P(last_issue, "td_c"),
+            P(person.get("status_text", ""), "td_c"),
+            P(person["role"], "td_c"),
+            P_wrap(person["name"], "td_c", col_widths[-1]),
+        ])
+
+    t = Table(table_data, colWidths=col_widths, hAlign="CENTER", repeatRows=1)
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), C["light_bg"]),
+        ("BACKGROUND", (0, 1), (-1, -1), C["white"]),
+        ("GRID", (0, 0), (-1, -1), 0.4, C["grid"]),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 5), ("LEFTPADDING", (0, 0), (-1, -1), 5),
+    ]))
+    story.append(t)
+
+    doc.build(story, onFirstPage=_on_page, onLaterPages=_on_page)
+    buf.seek(0)
+    logger.info(f"[residency_case_pdf] built  root_id={case.get('root_id')}  people={len(people)}  size={buf.getbuffer().nbytes:,}")
+    return buf

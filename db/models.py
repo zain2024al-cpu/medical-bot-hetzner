@@ -822,6 +822,41 @@ class ResidencyStatusLog(Base):
     created_at   = Column(DateTime, default=datetime.utcnow, index=True, nullable=True)
 
 
+class ResidencyDocument(Base):
+    """
+    وثيقة مستقلة تابعة لشخص واحد (مريض أو مرافق) — Form C أو وثيقة أخرى
+    مسمّاة. غير مرتبطة بحالة الإقامة إطلاقاً وتبقى محفوظة عبر كل تغييرات
+    الحالة (لا تُحذَف أو تُمَسّ عند أي انتقال حالة).
+    """
+    __tablename__ = "res_documents"
+
+    id         = Column(Integer, primary_key=True, autoincrement=True)
+    person_id  = Column(Integer, nullable=False, index=True)   # FK → res_persons.id
+    doc_type   = Column(String(30), default="other")            # "form_c" | "other"
+    doc_name   = Column(String(255), default="")                 # "Form C" ثابت، أو الاسم المُدخَل يدوياً لـ"أخرى"
+    file_id    = Column(String(255), nullable=False)
+    created_by = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True, nullable=True)
+
+
+class ResidencyIssuance(Base):
+    """
+    سجلّ كل إصدار سابق لشخص — يُضاف سطر جديد داخل
+    modules.residency.models.confirm_issuance() في كل مرة (بجانب تحديث
+    ResidencyPerson.expiry_date/residency_file_id الحيّين بالقيمة
+    الأحدث)، حفاظاً على الإصدارات القديمة بلا حذف. لا تُقرَأ من شاشة
+    "🖨️ طباعة ملف الحالة" (تلك تعرض آخر إصدار من الحقول الحيّة فقط) —
+    هذا الجدول للأرشفة الداخلية فقط.
+    """
+    __tablename__ = "res_issuance_history"
+
+    id          = Column(Integer, primary_key=True, autoincrement=True)
+    person_id   = Column(Integer, nullable=False, index=True)   # FK → res_persons.id
+    expiry_date = Column(String(50),  default="")
+    file_id     = Column(String(255), default="")
+    issued_at   = Column(DateTime, default=datetime.utcnow, index=True, nullable=True)
+
+
 class DailyReportTracking(Base):
     """Daily report tracking"""
     __tablename__ = "daily_report_tracking"

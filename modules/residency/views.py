@@ -8,7 +8,7 @@ from modules.residency.constants import (
     STATUS_WAITING_ARRIVAL, STATUS_ACTIVE, STATUS_EXPIRY_PENDING,
     STATUS_SUBMITTED, STATUS_ISSUED,
 )
-from modules.residency.repository import FamilyRow, PersonRow, LogEntry
+from modules.residency.repository import FamilyRow, PersonRow, LogEntry, DocumentRow
 
 _DIVIDER = "━━━━━━━━━━━━━━━━━━━━"
 _THIN = "─────────────────────"
@@ -74,7 +74,9 @@ def _person_action_button(person: PersonRow, *, is_root: bool) -> InlineKeyboard
     return None
 
 
-def build_family_detail(family: FamilyRow, *, is_admin: bool) -> tuple[str, InlineKeyboardMarkup]:
+def build_family_detail(
+    family: FamilyRow, *, is_admin: bool, doc_counts: dict[int, int] | None = None,
+) -> tuple[str, InlineKeyboardMarkup]:
     root = family.root
     lines = [_DIVIDER, "🪪  **تفاصيل الطلب**", "", f"👤 *المريض:* {root.name}", f"  {status_line(root.status)}"]
     if root.reminder_date:
@@ -93,17 +95,66 @@ def build_family_detail(family: FamilyRow, *, is_admin: bool) -> tuple[str, Inli
                 lines.append(f"     📅 {c.expiry_date}")
     lines.append(_THIN)
 
+    doc_counts = doc_counts or {}
     rows = []
     btn = _person_action_button(root, is_root=True)
     if btn:
         rows.append([btn])
+    n = doc_counts.get(root.id, 0)
+    rows.append([InlineKeyboardButton(
+        f"📄 الوثائق ({n}) — {root.name[:18]}", callback_data=f"{RN}:docs_{root.id}",
+    )])
     for c in family.companions:
         btn = _person_action_button(c, is_root=False)
         if btn:
             rows.append([btn])
+        n = doc_counts.get(c.id, 0)
+        rows.append([InlineKeyboardButton(
+            f"📄 الوثائق ({n}) — {c.name[:18]}", callback_data=f"{RN}:docs_{c.id}",
+        )])
 
+    rows.append([InlineKeyboardButton("🖨️ طباعة ملف الحالة", callback_data=f"{RN}:print_{root.id}")])
     rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:menu")])
     return "\n".join(lines), InlineKeyboardMarkup(rows)
+
+
+# ── Documents (📄) ───────────────────────────────────────────────────────────
+
+def build_documents_list(person: PersonRow, documents: list[DocumentRow]) -> tuple[str, InlineKeyboardMarkup]:
+    lines = [_DIVIDER, "📄  **الوثائق**", "", f"👤 {person.name}", _THIN]
+    if not documents:
+        lines.append("لا توجد وثائق بعد.")
+    else:
+        for d in documents:
+            label = "Form C" if d.doc_type == "form_c" else (d.doc_name or "وثيقة")
+            lines.append(f"- {label} ✅  ({d.created_at})")
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("➕ إضافة وثيقة", callback_data=f"{RN}:doc_add_{person.id}")],
+        [InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:family_{person.parent_id or person.id}")],
+    ])
+    return "\n".join(lines), kb
+
+
+def build_doc_type_prompt(person: PersonRow) -> tuple[str, InlineKeyboardMarkup]:
+    text = f"{_DIVIDER}\n📄  **إضافة وثيقة**\n\n👤 {person.name}\n\nاختر نوع الوثيقة:"
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📋 Form C", callback_data=f"{RN}:doc_add_formc_{person.id}")],
+        [InlineKeyboardButton("📋 أخرى", callback_data=f"{RN}:doc_add_other_{person.id}")],
+        [InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:docs_{person.id}")],
+    ])
+    return text, kb
+
+
+def build_doc_name_prompt(person: PersonRow) -> tuple[str, InlineKeyboardMarkup]:
+    text = f"{_DIVIDER}\n📄  **اسم الوثيقة**\n\n👤 {person.name}\n\nاكتب اسم الوثيقة الآن."
+    kb = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:docs_{person.id}")]])
+    return text, kb
+
+
+def build_doc_file_prompt(person: PersonRow, doc_name: str) -> tuple[str, InlineKeyboardMarkup]:
+    text = f"{_DIVIDER}\n📎  **رفع الوثيقة**\n\n👤 {person.name}\n📄 {doc_name}\n\nأرسل الصورة/الملف الآن."
+    kb = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:docs_{person.id}")]])
+    return text, kb
 
 
 # ── Onboarding (🟡) ──────────────────────────────────────────────────────────

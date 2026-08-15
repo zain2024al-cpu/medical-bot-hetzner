@@ -175,9 +175,13 @@ def confirm_issuance(person_id: int, performed_by: int | None = None) -> bool:
     "✅ تأكيد الإصدار" — يتطلَّب expiry_date وresidency_file_id مكتملَين
     مسبقاً (عبر set_issuance_expiry/save_issuance_file). ISSUED → ACTIVE،
     وreminder_date يُصفَّر لبدء دورة تنبيه جديدة يدوياً (لا حساب تلقائي).
+
+    ✅ يُضاف أيضاً سطر أرشفة في ResidencyIssuance (بجانب تحديث الحقول
+    الحيّة على الشخص كالمعتاد) — حفاظاً على الإصدار السابق قبل أن
+    تُستبدَل قيمه الحيّة، بلا أي تغيير على السلوك الظاهر لهذه الدالة.
     """
     from db.session import get_db
-    from db.models import ResidencyPerson
+    from db.models import ResidencyPerson, ResidencyIssuance
 
     with get_db() as db:
         person = db.query(ResidencyPerson).filter_by(id=person_id).first()
@@ -186,10 +190,32 @@ def confirm_issuance(person_id: int, performed_by: int | None = None) -> bool:
         if not person.expiry_date or not person.residency_file_id:
             return False
         old = person.status
+        db.add(ResidencyIssuance(
+            person_id=person.id, expiry_date=person.expiry_date,
+            file_id=person.residency_file_id,
+        ))
         person.status = STATUS_ACTIVE
         person.reminder_date = ""
         _log_transition(db, person.id, old, STATUS_ACTIVE, performed_by)
     logger.info(f"[residency] issuance confirmed  person_id={person_id} → ACTIVE")
+    return True
+
+
+def add_document(person_id: int, doc_type: str, doc_name: str, file_id: str, created_by: int | None = None) -> bool:
+    """يضيف وثيقة مستقلة لشخص واحد — لا ترتبط بحالة الإقامة، لا تُمَسّ
+    عند أي انتقال حالة."""
+    from db.session import get_db
+    from db.models import ResidencyPerson, ResidencyDocument
+
+    with get_db() as db:
+        person = db.query(ResidencyPerson).filter_by(id=person_id).first()
+        if not person:
+            return False
+        db.add(ResidencyDocument(
+            person_id=person_id, doc_type=doc_type, doc_name=doc_name,
+            file_id=file_id, created_by=created_by,
+        ))
+    logger.info(f"[residency] document added  person_id={person_id}  type={doc_type}  name={doc_name!r}")
     return True
 
 
