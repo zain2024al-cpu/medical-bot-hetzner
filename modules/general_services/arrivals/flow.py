@@ -23,23 +23,21 @@ from modules.general_services.constants import (
 )
 from modules.general_services.arrivals.session import (
     ArrivalSession,
-    STEP_DATE, STEP_DATE_CUSTOM, STEP_SPECIALIST,
+    STEP_DATE, STEP_DATE_CUSTOM,
     STEP_P_NAME, STEP_P_ARRIVAL_DATE, STEP_P_PASSPORT_EXPIRY, STEP_P_VISA_EXPIRY,
     STEP_P_HAS_COMPANION, STEP_P_PASSPORT, STEP_P_VISA, STEP_P_ENTRY_STAMP, STEP_P_TICKETS,
     STEP_P_RESIDENCE, STEP_P_RESIDENCE_EXPIRY, STEP_P_INDIV_NOTES, STEP_P_SERVICES,
     STEP_P_ESCORT_ENTITY, STEP_P_RESIDENCE_ADDRESS,
-    STEP_BATCH_NOTES,
     STEP_C_NAME, STEP_C_ARRIVAL_DATE, STEP_C_PASSPORT_EXPIRY, STEP_C_VISA_EXPIRY,
     STEP_C_RESIDENCE_EXPIRY,
     STEP_C_PASSPORT, STEP_C_VISA, STEP_C_ENTRY_STAMP, STEP_C_TICKETS, STEP_C_RESIDENCE,
-    STEP_C_INDIV_NOTES, STEP_C_SERVICES, STEP_C_ESCORT_ENTITY, STEP_C_RESIDENCE_ADDRESS,
+    STEP_C_INDIV_NOTES, STEP_C_SERVICES, STEP_C_ESCORT_ENTITY,
     STEP_C_MORE, STEP_P_SPECIALIST,
     STEP_REVIEW,
 )
 from modules.general_services.arrivals.views import (
     GSA, GS,
     build_date_prompt, build_date_calendar_prompt,
-    build_specialist_prompt,
     build_p_arrival_date_prompt, build_p_passport_expiry_prompt, build_p_visa_expiry_prompt,
     build_p_has_companion_prompt,
     build_p_passport_prompt, build_p_visa_prompt,
@@ -48,13 +46,12 @@ from modules.general_services.arrivals.views import (
     build_p_indiv_notes_prompt, build_p_services_prompt,
     build_p_escort_entity_prompt, build_p_residence_address_prompt,
     build_p_escort_entity_manual_prompt, build_c_more_prompt, build_p_specialist_prompt,
-    build_batch_notes_prompt,
     build_c_arrival_date_prompt, build_c_passport_expiry_prompt, build_c_visa_expiry_prompt,
     build_c_residence_expiry_prompt,
     build_c_passport_prompt, build_c_visa_prompt,
     build_c_entry_stamp_prompt, build_c_tickets_prompt, build_c_residence_prompt,
     build_c_indiv_notes_prompt, build_c_services_prompt,
-    build_c_escort_entity_prompt, build_c_residence_address_prompt,
+    build_c_escort_entity_prompt,
     build_review, build_success, build_cancelled, build_error,
     build_edit_menu, build_edit_cmenu,
 )
@@ -104,7 +101,6 @@ _PHOTO_STEPS = {
 # مستثناة: تُعالَج عبر أزرار التقويم (callbacks) فقط.
 _TEXT_STEPS = {
     STEP_DATE_CUSTOM,
-    STEP_BATCH_NOTES,
     STEP_P_INDIV_NOTES,
     STEP_P_SERVICES,
     STEP_P_ESCORT_ENTITY,
@@ -112,7 +108,6 @@ _TEXT_STEPS = {
     STEP_C_INDIV_NOTES,
     STEP_C_SERVICES,
     STEP_C_ESCORT_ENTITY,
-    STEP_C_RESIDENCE_ADDRESS,
 }
 
 
@@ -198,11 +193,6 @@ async def _show_date(update, context):
     await _safe_edit(update, text, kb)
 
 
-async def _show_specialist(update, context):
-    text, kb = build_specialist_prompt()
-    await _safe_edit(update, text, kb)
-
-
 # ── Patient loop — "show" functions ───────────────────────────────────────────
 
 async def _show_p_name(update, context, session):
@@ -285,11 +275,6 @@ async def _show_p_residence_address(update, context, session):
     await _safe_edit(update, text, kb)
 
 
-async def _show_batch_notes(update, context, session):
-    text, kb = build_batch_notes_prompt(session)
-    await update.effective_message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
-
-
 # ── Companion loop — "show" functions ─────────────────────────────────────────
 
 async def _show_c_name(update, context, session):
@@ -358,11 +343,6 @@ async def _show_c_escort_entity(update, context, session):
     await _safe_edit(update, text, kb)
 
 
-async def _show_c_residence_address(update, context, session):
-    text, kb = build_c_residence_address_prompt(session)
-    await _safe_edit(update, text, kb)
-
-
 async def _show_c_more(update, context, session):
     text, kb = build_c_more_prompt(session)
     await _safe_edit(update, text, kb)
@@ -409,7 +389,6 @@ _C_FIELD_STEP: dict[str, str] = {
     "visa":      STEP_C_VISA,
     "tickets":   STEP_C_TICKETS,
     "residence": STEP_C_RESIDENCE,
-    "addr":      STEP_C_RESIDENCE_ADDRESS,
 }
 _STEP_SHOW_FUNC = {
     STEP_P_ARRIVAL_DATE:      _show_p_arrival_date,
@@ -432,7 +411,6 @@ _STEP_SHOW_FUNC = {
     STEP_C_VISA:              _show_c_visa,
     STEP_C_TICKETS:           _show_c_tickets,
     STEP_C_RESIDENCE:         _show_c_residence,
-    STEP_C_RESIDENCE_ADDRESS: _show_c_residence_address,
 }
 
 
@@ -509,14 +487,19 @@ async def _start_next_companion(update, context, session):
         return
 
     nxt = queue[done]
-    session.current_companion = {"name": nxt.get("name", "")}
-    session.step = STEP_C_ARRIVAL_DATE
+    # ✅ لا خطوة "تاريخ الوصول" للمرافق — يصل مع المريض دائماً، يُنسَخ
+    # تلقائياً من تاريخ وصول المريض نفسه (نفس فرع _on_c_name_selected).
+    session.current_companion = {
+        "name": nxt.get("name", ""),
+        "arrival_date": session.current_patient.get("arrival_date", ""),
+    }
+    session.step = STEP_C_PASSPORT_EXPIRY
     session.save(context.user_data)
     logger.info(
         f"[arrivals] companion {done + 1}/{len(queue)} = {nxt.get('name')!r}"
-        f" → STEP_C_ARRIVAL_DATE (auto, from registry)"
+        f" → STEP_C_PASSPORT_EXPIRY (auto, from registry; arrival_date copied from patient)"
     )
-    await _show_c_arrival_date(update, context, session)
+    await _show_c_passport_expiry(update, context, session)
 
 
 async def _advance_to_patient_closing(update, context, session):
@@ -1415,8 +1398,9 @@ async def _dispatch_callback_inner(
         await _show_c_residence(update, context, session)
         return
 
-    # ✅ ذيل المرافق: عنوان السكن ثم المرافق التالي مباشرة
-    # (بلا ملاحظات/خدمات/جهة موصلة/مختص — تُسأل مرة واحدة للمريض ومرافقيه معاً)
+    # ✅ ذيل المرافق: صورة الإقامة آخر حقل ثم المرافق التالي مباشرة (بلا
+    # عنوان سكن مستقل — يغطّيه عنوان سكن المريض؛ بلا ملاحظات/خدمات/جهة
+    # موصلة/مختص — تُسأل مرة واحدة للمريض ومرافقيه معاً).
     if action == "skip_c_residence":
         session = ArrivalSession.load(context.user_data)
         if session is None:
@@ -1424,43 +1408,11 @@ async def _dispatch_callback_inner(
         session.current_companion["residence_file_id"] = ""
         if session.edit_from_review:
             await _finish_field_edit(update, context, session); return
-        session.step = STEP_C_RESIDENCE_ADDRESS
-        session.save(context.user_data)
-        await _show_c_residence_address(update, context, session)
-        return
-
-    if action == "skip_c_residence_address":
-        session = ArrivalSession.load(context.user_data)
-        if session is None:
-            await _cancel(update, context); return
-        session.current_companion["residence_address"] = ""
-        if session.edit_from_review:
-            await _finish_field_edit(update, context, session); return
         session.save(context.user_data)
         await _advance_after_companion_done(update, context, session)
         return
 
     # ── Back navigation ────────────────────────────────────────────────────────
-    if action == "back_to_specialist":
-        session = ArrivalSession.load(context.user_data)
-        if session is None:
-            await _cancel(update, context); return
-        session.step = STEP_SPECIALIST
-        session.save(context.user_data)
-        logger.info(f"[arrivals.cb] back_to_specialist → STEP_SPECIALIST  user={uid}")
-        await _show_specialist(update, context)
-        return
-
-    if action == "back_to_batch_notes":
-        session = ArrivalSession.load(context.user_data)
-        if session is None:
-            await _cancel(update, context); return
-        session.step = STEP_BATCH_NOTES
-        session.save(context.user_data)
-        logger.info(f"[arrivals.cb] back_to_batch_notes → STEP_BATCH_NOTES  user={uid}")
-        await _show_batch_notes(update, context, session)
-        return
-
     if action == "back_p_name":
         session = ArrivalSession.load(context.user_data)
         if session is None:
@@ -1932,8 +1884,6 @@ async def _dispatch_callback_inner(
                 f"   🏠 *عنوان السكن:*  {_val(p.get('residence_address'))}",
                 f"   🛎️ *الخدمات المقدَّمة:*  {_val(p.get('services_provided'))}",
                 f"   📝 *ملاحظات:*  {_notes(p.get('notes'))}",
-                # ✅ الجهة الموصلة بعد الملاحظات مباشرة — طلب المستخدم صراحةً.
-                f"   🚐 *الجهة الموصلة:*  {_val(p.get('escort_entity'))}",
                 "",
                 "   📎 *الوثائق:*",
                 f"      جواز السفر:  {_doc(p.get('passport_file_id'))}",
@@ -1946,12 +1896,13 @@ async def _dispatch_callback_inner(
                 "",
             ]
             for c in comps:
+                # ✅ لا سطر "عنوان السكن" للمرافق — عنوان سكن المريض أعلاه
+                # يغطّي العائلة كاملة.
                 body += [
                     f"      ↳ *{c.get('name', '—')}*",
                     "",
                     f"         📋 *انتهاء التأشيرة:*  {_val(c.get('visa_expiry'))}",
                     f"         🛂 *انتهاء الجواز:*  {_val(c.get('passport_expiry'))}",
-                    f"         🏠 *عنوان السكن:*  {_val(c.get('residence_address'))}",
                     "",
                     "         📎 *الوثائق:*",
                     f"            جواز السفر:  {_doc(c.get('passport_file_id'))}",
@@ -1959,6 +1910,10 @@ async def _dispatch_callback_inner(
                     f"            التذاكر:  {_doc(c.get('tickets_file_id'))}",
                     "",
                 ]
+            # ✅ الجهة الموصلة آخر سطر في كتلة هذا المريض — بعد المرافقين
+            # ووثائقهم، بطلب المستخدم صراحةً (تبقى ضمن كتلة كل مريض، لا
+            # مجمَّعة في نهاية التقرير كله).
+            body += [f"   🚐 *الجهة الموصلة:*  {_val(p.get('escort_entity'))}", ""]
             body += ["─────────────────", ""]
 
         # ── الملاحظات ثم المسؤول آخر التقرير ──────────────────────────────────
@@ -1976,8 +1931,6 @@ async def _dispatch_callback_inner(
             _sp_line = session.specialist_label or _NONE
 
         body += [
-            f"📝 *ملاحظات الدفعة:*  {_notes(session.batch_notes)}",
-            "",
             f"👨‍⚕️ *مختص الخدمات:*  {_sp_line}",
         ]
 
@@ -2070,22 +2023,6 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
             )
         return
 
-    if step == STEP_BATCH_NOTES:
-        try:
-            session.batch_notes = text
-            session.step = STEP_SPECIALIST
-            session.save(context.user_data)
-            logger.info(
-                f"[arrivals.text] STEP_BATCH_NOTES → STEP_SPECIALIST"
-                f"  notes={text[:40]!r}  user={uid}"
-            )
-            await _show_specialist(update, context)
-        except Exception:
-            logger.exception(
-                f"[arrivals.text] EXCEPTION in STEP_BATCH_NOTES  user={uid}"
-            )
-        return
-
     # ✅ كتلة الختام لكل مريض:
     #    ملاحظات → الخدمات المقدَّمة أثناء الوصول → الجهة الموصلة → المختص
     if step == STEP_P_INDIV_NOTES:
@@ -2135,20 +2072,6 @@ async def _handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await _advance_after_p_core_done(update, context, session)
         except Exception:
             logger.exception(f"[arrivals.text] EXCEPTION in STEP_P_RESIDENCE_ADDRESS  user={uid}")
-        return
-
-    # ── Companion tail: address → next companion / closing block ──────────────
-    # ✅ لا ملاحظات/خدمات/جهة موصلة/مختص للمرافق — كلها تُسأل مرة واحدة
-    # للمريض ومرافقيه معاً في كتلة الختام.
-    if step == STEP_C_RESIDENCE_ADDRESS:
-        try:
-            session.current_companion["residence_address"] = text
-            if session.edit_from_review:
-                await _finish_field_edit(update, context, session); return
-            session.save(context.user_data)
-            await _advance_after_companion_done(update, context, session)
-        except Exception:
-            logger.exception(f"[arrivals.text] EXCEPTION in STEP_C_RESIDENCE_ADDRESS  user={uid}")
         return
 
     logger.warning(
@@ -2256,10 +2179,9 @@ async def _handle_photo_input(update: Update, context: ContextTypes.DEFAULT_TYPE
             session.current_companion["residence_file_id"] = file_id
             if session.edit_from_review:
                 await _finish_field_edit(update, context, session); return
-            session.step = STEP_C_RESIDENCE_ADDRESS
             session.save(context.user_data)
-            logger.info(f"[arrivals.photo] STEP_C_RESIDENCE → STEP_C_RESIDENCE_ADDRESS  user={uid}")
-            await _show_c_residence_address(update, context, session)
+            logger.info(f"[arrivals.photo] STEP_C_RESIDENCE → _advance_after_companion_done  user={uid}")
+            await _advance_after_companion_done(update, context, session)
             return
 
     except Exception:

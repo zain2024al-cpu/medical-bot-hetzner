@@ -12,7 +12,6 @@ _SESSION_KEY = "_gsarr_add"
 # ── Steps ─────────────────────────────────────────────────────────────────────
 STEP_DATE               = "date"
 STEP_DATE_CUSTOM        = "date_custom"
-STEP_SPECIALIST         = "specialist"
 STEP_P_NAME             = "p_name"
 # ✅ حقول فردية جديدة (جولة توسيع تدفق الواصلين — اختيار إلزامي من السجل)
 STEP_P_ARRIVAL_DATE     = "p_arrival_date"
@@ -30,7 +29,6 @@ STEP_P_SERVICES         = "p_services"
 STEP_P_ESCORT_ENTITY    = "p_escort_entity"
 STEP_P_RESIDENCE_ADDRESS = "p_residence_address"
 STEP_P_NOTES            = "p_notes"          # kept for legacy session compat only
-STEP_BATCH_NOTES        = "batch_notes"
 STEP_C_NAME             = "c_name"
 STEP_C_ARRIVAL_DATE     = "c_arrival_date"
 STEP_C_PASSPORT_EXPIRY  = "c_passport_expiry"
@@ -42,7 +40,6 @@ STEP_C_TICKETS          = "c_tickets"
 STEP_C_INDIV_NOTES      = "c_indiv_notes"
 STEP_C_SERVICES         = "c_services"
 STEP_C_ESCORT_ENTITY    = "c_escort_entity"
-STEP_C_RESIDENCE_ADDRESS = "c_residence_address"
 STEP_C_RESIDENCE        = "c_residence"         # kept for legacy session compat only
 STEP_C_RESIDENCE_EXPIRY = "c_residence_expiry"
 # ✅ "هل يوجد مرافق آخر؟" — يسمح بأكثر من مرافق واحد للمريض (كان مرافقاً
@@ -64,7 +61,6 @@ class ArrivalSession:
     current_patient:    dict         # patient being filled
     current_companion:  dict         # companion being filled
     patient_index:      int          # 0-based index of current patient
-    batch_notes:        str          # single notes field for the whole batch
 
     # ✅ التعديل قبل النشر — يُفعَّل عند فتح حقل واحد من شاشة المراجعة بدل
     # المسار الخطي المعتاد. current_patient/current_companion تُحمَّل مؤقتاً
@@ -95,7 +91,6 @@ class ArrivalSession:
             "current_patient":    self.current_patient,
             "current_companion":  self.current_companion,
             "patient_index":      self.patient_index,
-            "batch_notes":        self.batch_notes,
             "edit_from_review":     self.edit_from_review,
             "edit_patient_index":   self.edit_patient_index,
             "edit_companion_index": self.edit_companion_index,
@@ -130,7 +125,6 @@ class ArrivalSession:
             current_patient=    raw.get("current_patient",    {}),
             current_companion=  raw.get("current_companion",  {}),
             patient_index=      raw.get("patient_index",      0),
-            batch_notes=        raw.get("batch_notes",        ""),
             edit_from_review=     raw.get("edit_from_review",     False),
             edit_patient_index=   raw.get("edit_patient_index",   None),
             edit_companion_index= raw.get("edit_companion_index", None),
@@ -150,7 +144,6 @@ class ArrivalSession:
             current_patient=    {},
             current_companion=  {},
             patient_index=      0,
-            batch_notes=        "",
         )
         session.save(user_data)
         return session

@@ -98,23 +98,6 @@ def build_date_calendar_prompt(*, error: bool = False) -> tuple[str, InlineKeybo
     return "\n".join(lines), kb
 
 
-# ── Step 2: المختص ────────────────────────────────────────────────────────────
-# ✅ خطوة "🏥 المستشفى/الجهة الموصلة" على مستوى الدفعة أُزيلت نهائياً — "الجهة
-# الموصلة" أصبحت حقلاً خاصاً بكل فرد (انظر build_p_escort_entity_prompt أدناه).
-
-def build_specialist_prompt() -> tuple[str, InlineKeyboardMarkup]:
-    lines = [_DIVIDER, "👨‍⚕️  **اختر مختص الخدمات**", "", "اختر مختص الخدمات:"]
-    rows = [
-        [InlineKeyboardButton(label, callback_data=f"{GSA}:specialist_{sid}")]
-        for sid, label in STAFF_MAP.items()
-    ]
-    rows.append([
-        InlineKeyboardButton("⬅️ رجوع", callback_data=f"{GSA}:back_to_batch_notes"),
-        InlineKeyboardButton("❌ إلغاء", callback_data=f"{GS}:arrivals"),
-    ])
-    return "\n".join(lines), InlineKeyboardMarkup(rows)
-
-
 # ── Step 3: عدد المرضى ────────────────────────────────────────────────────────
 
 # ── Patient loop steps ─────────────────────────────────────────────────────────
@@ -516,25 +499,6 @@ def build_p_residence_address_prompt(session: ArrivalSession) -> tuple[str, Inli
     return "\n".join(lines), kb
 
 
-def build_batch_notes_prompt(session: ArrivalSession) -> tuple[str, InlineKeyboardMarkup]:
-    lines = [
-        _DIVIDER,
-        "📝  **ملاحظات عامة للدفعة**",
-        "",
-        f"عدد المرضى: {session.patient_count}",
-        _THIN,
-        "",
-        "✏️ أضف ملاحظات عامة لهذه الدفعة، أو اضغط **⏭️ تخطي**.",
-    ]
-    if session.batch_notes:
-        lines.append(f"\nالملاحظات الحالية: _{session.batch_notes}_")
-    kb = InlineKeyboardMarkup([[
-        InlineKeyboardButton("⏭️ تخطي", callback_data=f"{GSA}:skip_batch_notes"),
-        InlineKeyboardButton("❌ إلغاء", callback_data=f"{GS}:arrivals"),
-    ]])
-    return "\n".join(lines), kb
-
-
 # ── Companion loop steps ──────────────────────────────────────────────────────
 # ✅ نفس القائمة الكاملة من الحقول التي يمر بها المريض تماماً (بلا خطوة
 # "هل يوجد مرافق؟" التي تخص المريض فقط). لا شاشة "اكتب اسم المرافق" — الاسم
@@ -783,27 +747,9 @@ def build_c_escort_entity_prompt(session: ArrivalSession) -> tuple[str, InlineKe
     return "\n".join(lines), kb
 
 
-def build_c_residence_address_prompt(session: ArrivalSession) -> tuple[str, InlineKeyboardMarkup]:
-    idx  = session.patient_index + 1
-    name = session.current_companion.get("name", "—")
-    lines = [
-        _DIVIDER,
-        f"🏠  **مرافق المريض {idx} — عنوان السكن**",
-        "",
-        f"المرافق: {name}",
-        _THIN,
-        "",
-        "✏️ اكتب عنوان السكن الكامل لهذا المرافق (اسم العمارة ورقم الشقة)،"
-        " أو اضغط **⏭️ تخطي**.",
-    ]
-    kb = InlineKeyboardMarkup([[
-        InlineKeyboardButton("⏭️ تخطي", callback_data=f"{GSA}:skip_c_residence_address"),
-        # ✅ عنوان السكن آخر حقل للمرافق الآن (لا خدمات/جهة موصلة له —
-        # تُسألان مرة واحدة للمريض ومرافقيه في كتلة الختام).
-        InlineKeyboardButton("⬅️ رجوع", callback_data=f"{GSA}:back_c_residence"),
-        InlineKeyboardButton("❌ إلغاء", callback_data=f"{GS}:arrivals"),
-    ]])
-    return "\n".join(lines), kb
+# ✅ لا شاشة "عنوان السكن" مستقلة للمرافق بعد الآن — عنوان سكن المريض
+# (build_p_residence_address_prompt) يغطّي العائلة كاملة، فآخر حقل
+# للمرافق الآن هو صورة الإقامة (build_c_residence_prompt) مباشرة.
 
 
 # ── Review ────────────────────────────────────────────────────────────────────
@@ -913,7 +859,6 @@ _C_EDIT_FIELDS: list[tuple[str, str]] = [
     ("📋 صورة التأشيرة",   "visa"),
     ("🎫 التذاكر",         "tickets"),
     ("🪪 صورة الإقامة",    "residence"),
-    ("🏠 عنوان السكن",     "addr"),
 ]
 
 
