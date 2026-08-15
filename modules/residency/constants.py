@@ -28,8 +28,8 @@ STATUS_LABELS = {
     STATUS_WAITING_ARRIVAL: "معلّق من الوصول",
     STATUS_ACTIVE:          "الحالات النشطة",
     STATUS_EXPIRY_PENDING:  "معلّق انتهاء الإقامة",
-    STATUS_SUBMITTED:       "تم التقديم",
-    STATUS_ISSUED:          "تم الإصدار",
+    STATUS_SUBMITTED:       "تم التقديم(قيد الانتظار)",
+    STATUS_ISSUED:          "توثيق التمديدات المصدره",
 }
 
 

@@ -61,11 +61,11 @@ def _person_action_button(person: PersonRow, *, is_root: bool) -> InlineKeyboard
         )
     if person.status == STATUS_EXPIRY_PENDING:
         return InlineKeyboardButton(
-            f"🔵 تم التقديم — {person.name[:20]}", callback_data=f"{RN}:submit_{person.id}",
+            f"🔵 تم التقديم(قيد الانتظار) — {person.name[:20]}", callback_data=f"{RN}:submit_{person.id}",
         )
     if person.status == STATUS_SUBMITTED:
         return InlineKeyboardButton(
-            f"🟣 تم الإصدار — {person.name[:20]}", callback_data=f"{RN}:issue_start_{person.id}",
+            f"🟣 توثيق التمديدات المصدره — {person.name[:20]}", callback_data=f"{RN}:issue_start_{person.id}",
         )
     if person.status == STATUS_ISSUED:
         return InlineKeyboardButton(
@@ -188,7 +188,7 @@ def build_issuance_view(person: PersonRow) -> tuple[str, InlineKeyboardMarkup]:
     expiry_mark = person.expiry_date if person.expiry_date else "➖ غير محدَّد"
     file_mark = "✅ مرفوع" if person.residency_file_id else "⬜ غير مرفوع"
     lines = [
-        _DIVIDER, "🟣  **تم الإصدار — استكمال البيانات**", "",
+        _DIVIDER, "🟣  **توثيق التمديدات المصدره — استكمال البيانات**", "",
         f"👤 {person.name}",
         f"📅 تاريخ الانتهاء الجديد: {expiry_mark}",
         f"📎 ملف الإقامة الجديدة: {file_mark}",
