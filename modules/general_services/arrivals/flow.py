@@ -1774,9 +1774,8 @@ async def _dispatch_callback_inner(
 
         # ── Auto-create residency profiles (fire-and-forget, never breaks arrivals) ──
         try:
-            from modules.residency.profiles.models import create_profiles_from_arrival_batch
-            created = create_profiles_from_arrival_batch(
-                batch_id=   saved.batch_id,
+            from modules.residency.models import create_profiles_from_arrival
+            created = create_profiles_from_arrival(
                 patients=   session.completed_patients,
                 created_by= update.effective_user.id if update.effective_user else None,
             )

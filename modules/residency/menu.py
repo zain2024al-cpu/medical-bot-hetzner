@@ -1,7 +1,8 @@
 # modules/residency/menu.py
-# Reply keyboard trigger: "🪪 الإقامة"
+# زر لوحة المفاتيح "🪪 الإقامة" — يفتح "الملفات المعلّقة" مباشرة (شاشة واحدة).
 
 import logging
+
 from telegram import Update
 from telegram.ext import ContextTypes, MessageHandler, filters
 
@@ -10,35 +11,30 @@ from core.access.access_service import user_has_module
 
 logger = logging.getLogger(__name__)
 
-_BUTTON = "🪪 الإقامة"
+RESIDENCY_BUTTON = "🪪 الإقامة"
 _MODULE_KEY = "residency"
 
 
-def _is_authorized(user_id: int) -> bool:
-    return is_admin(user_id) or user_has_module(user_id, _MODULE_KEY)
+async def _show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    tg_id = update.effective_user.id if update.effective_user else 0
 
-
-async def _handle_menu_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    uid = update.effective_user.id if update.effective_user else "?"
-    # ✅ الحماية داخل المعالِج نفسه — لا تعتمد على إظهار/إخفاء الزر في
-    # لوحة المفاتيح، لأن هذا المعالِج يستجيب لأي رسالة نصية تطابق النص
-    # حرفياً بغض النظر عمن أرسلها أو كيف كُتبت.
-    if not update.effective_user or not _is_authorized(update.effective_user.id):
-        logger.warning(f"[residency.menu] 🚫 blocked unauthorized user={uid}")
+    if not (is_admin(tg_id) or user_has_module(tg_id, _MODULE_KEY)):
+        logger.warning(f"[residency] {RESIDENCY_BUTTON!r} pressed by unauthorized user={tg_id}")
+        from bot.handlers.user.user_start import user_start
+        await user_start(update, context)
         return
-    logger.info(f"[residency.menu] {_BUTTON!r} pressed  user={uid}")
-    from modules.residency.profiles.views import build_residency_main_menu
-    from modules.residency.followup.repository import get_expiring_soon, get_pending_documents
-    text, kb = build_residency_main_menu(
-        pending_docs_count=len(get_pending_documents()),
-        expiring_count=len(get_expiring_soon()),
-    )
+
+    from modules.residency.repository import get_pending_profiles
+    from modules.residency.views import build_pending_list
+
+    logger.info(f"[residency] {RESIDENCY_BUTTON!r} pressed  user={tg_id}")
+    text, kb = build_pending_list(get_pending_profiles())
     await update.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
 
 def register_menu_handler(app) -> None:
     app.add_handler(
-        MessageHandler(filters.Text([_BUTTON]), _handle_menu_button),
-        group=16,  # group 16 = residency text group, runs independently of group 0 (healthcare)
+        MessageHandler(filters.Text([RESIDENCY_BUTTON]), _show_menu),
+        group=16,
     )
-    logger.info(f"[residency.menu] reply keyboard handler registered for {_BUTTON!r} (group 16)")
+    logger.info(f"[residency.menu] reply keyboard handler registered for {RESIDENCY_BUTTON!r} (group 16)")

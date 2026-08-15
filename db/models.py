@@ -778,118 +778,39 @@ class DailyPatient(Base):
 
 class ResidencyProfile(Base):
     """
-    Master residency record for one patient.
-    Created automatically from an ArrivalBatch (source='arrivals')
-    or manually by staff (source='manual').
+    ملف إقامة — يُنشأ تلقائياً عند تأكيد "🛬 الوصول" (لكل مريض في الدفعة).
+
+    ⚠️ إعادة بناء كاملة (2026-08-15) — المخطط القديم (source/status/
+    renewal/documents متعددة) استُبدِل بمخطط مبسَّط للمرحلة الأولى فقط:
+    ملف معلّق بانتظار الصورة الشخصية + تاريخ تنبيه يدوي يُشغِّل رسائل
+    تذكير يومية إلى مجموعة الإقامة حتى يضغط الأدمن "تم تقديم الطلب".
+    فورم سي/الأرشيف/التجديد ستُضاف في مراحل لاحقة منفصلة.
     """
     __tablename__ = "res_profiles"
 
-    id                       = Column(Integer, primary_key=True, autoincrement=True)
-    # Link back to arrivals (nullable — manual entries have no arrival record)
-    arrival_patient_id       = Column(Integer, nullable=True, index=True)
-    source                   = Column(String(20),  default="arrivals")   # "arrivals" | "manual"
-    name                     = Column(String(255), nullable=False, index=True)
-    # Status lifecycle:
-    # active → expiring → renewal_submitted → issued → (dependent_pending) → …
-    status                   = Column(String(30),  default="active", index=True)
-    # Document numbers / dates
-    residency_number         = Column(String(100), default="")
-    issue_date               = Column(String(50),  default="")   # ISO date string YYYY-MM-DD
-    expiry_date              = Column(String(50),  default="")   # ISO date string YYYY-MM-DD
-    # ✅ تاريخ انتهاء الجواز — يُنسخ من الوصول ويُنبَّه عنه قبل 6 أشهر.
-    # كان يُجمع في الواصلين لكنه يتوقف هناك (لا عمود له هنا إطلاقاً)، فلم
-    # يكن ممكناً التنبيه عن جواز قارب على الانتهاء. ISO YYYY-MM-DD مثل البقية.
-    passport_expiry          = Column(String(50),  default="")
-    # Latest known Telegram file_ids for each document
-    passport_file_id         = Column(String(255), default="")
-    visa_file_id             = Column(String(255), default="")
-    latest_residency_file_id = Column(String(255), default="")
-    # ✅ فورم C — استمارة واحدة للعائلة كلها (المريض ومرافقوه)، لذلك على
-    # الملف لا على كل شخص. تُرفع من وحدة «📤 الرفع والمتابعة».
-    form_c_file_id           = Column(String(255), default="")
-    # ✅ الصورة الشخصية للمريض — تُرفع من «📎 إضافة مرفق» في ملف المريض.
-    photo_file_id            = Column(String(255), default="")
-    # ✅ التذكرة — لم تكن موجودة إطلاقاً على الإقامات (فقط على الواصلين)،
-    # فلا يوجد أي طريق لرفعها/تصحيحها إن تم تخطّيها هناك بالخطأ.
-    tickets_file_id          = Column(String(255), default="")
-    # Extra
-    notes                    = Column(Text, default="")
-    created_by               = Column(Integer, nullable=True, index=True)
-    created_at               = Column(DateTime, default=datetime.utcnow, index=True, nullable=True)
-    updated_at               = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
+    id                  = Column(Integer, primary_key=True, autoincrement=True)
+    # الرابط إلى الوصول الذي أنشأ هذا الملف (مصدر الإنشاء الوحيد الآن)
+    arrival_patient_id  = Column(Integer, nullable=True, index=True)
+    name                = Column(String(255), nullable=False, index=True)
+    photo_file_id       = Column(String(255), default="")
+    # تاريخ التنبيه — يختاره مستخدم الإقامة يدوياً من التقويم (ISO YYYY-MM-DD)
+    reminder_date       = Column(String(50),  default="")
+    reminder_active      = Column(Boolean, default=False, nullable=True)
+    # "✅ تم تقديم طلب الإقامة" — أدمن فقط؛ يوقف التذكير ويُخفي الملف من المعلّقة
+    submitted           = Column(Boolean, default=False, nullable=True)
+    created_by          = Column(Integer, nullable=True, index=True)
+    created_at          = Column(DateTime, default=datetime.utcnow, index=True, nullable=True)
+    updated_at          = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
 
 
 class ResidencyCompanion(Base):
-    """
-    One companion attached to a ResidencyProfile.
-    Created from arrival companions automatically, or added manually.
-    """
+    """مرافق واحد تابع لملف إقامة — يُنشأ تلقائياً من مرافقي الوصول."""
     __tablename__ = "res_companions"
 
-    id                       = Column(Integer, primary_key=True, autoincrement=True)
-    profile_id               = Column(Integer, nullable=False, index=True)   # FK → res_profiles.id
-    arrival_companion_id     = Column(Integer, nullable=True)                # FK → gs_arrival_companions.id
-    name                     = Column(String(255), nullable=False, index=True)
-    status                   = Column(String(30),  default="active", index=True)
-    residency_number         = Column(String(100), default="")
-    issue_date               = Column(String(50),  default="")
-    expiry_date              = Column(String(50),  default="")
-    # ✅ نفس سبب العمود على ResidencyProfile — المرافق له جواز ينتهي أيضاً.
-    passport_expiry          = Column(String(50),  default="")
-    passport_file_id         = Column(String(255), default="")
-    visa_file_id             = Column(String(255), default="")
-    latest_residency_file_id = Column(String(255), default="")
-    # ✅ الصورة الشخصية للمرافق — نفس حقل المريض لكن لكل مرافق على حدة
-    # (بخلاف فورم C الذي يبقى مستنداً واحداً للعائلة كلها).
-    photo_file_id            = Column(String(255), default="")
-    tickets_file_id          = Column(String(255), default="")
-    notes                    = Column(Text, default="")
-    created_at               = Column(DateTime, default=datetime.utcnow, nullable=True)
-    updated_at               = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
-
-
-class ResidencyUpdate(Base):
-    """
-    Append-only audit / timeline log for every status change or document update
-    on a ResidencyProfile or its companions.
-    """
-    __tablename__ = "res_updates"
-
-    id               = Column(Integer, primary_key=True, autoincrement=True)
-    profile_id       = Column(Integer, nullable=False, index=True)   # FK → res_profiles.id
-    companion_id     = Column(Integer, nullable=True)                # FK → res_companions.id (companion event)
-    # action_type values:
-    #   profile_created | manual_add | renewal_submitted | issued
-    #   companion_issued | companion_skipped | status_changed | note_added
-    action_type      = Column(String(50),  nullable=False)
-    action_label     = Column(String(255), default="")
-    old_status       = Column(String(30),  default="")
-    new_status       = Column(String(30),  default="")
-    old_expiry_date  = Column(String(50),  default="")
-    new_expiry_date  = Column(String(50),  default="")
-    residency_file_id = Column(String(255), default="")
-    notes            = Column(Text, default="")
-    performed_by     = Column(Integer, nullable=True)
-    created_at       = Column(DateTime, default=datetime.utcnow, index=True, nullable=True)
-
-
-class ResidencyMissingItem(Base):
-    """
-    طلب/مستند ناقص لملف إقامة — يُنشأ إمّا عند تقديم الأوراق وإجابة «لا»
-    على «هل اكتملت؟»، أو يدوياً لاحقاً من ملف المريض. يُتابَع يومياً
-    (services/residency_missing_items_service.py) حتى يُرفَع ويُغلَق.
-    """
-    __tablename__ = "res_missing_items"
-
-    id           = Column(Integer, primary_key=True, autoincrement=True)
-    profile_id   = Column(Integer, nullable=False, index=True)   # FK → res_profiles.id
-    description  = Column(Text, nullable=False)                  # نصّ حرّ: نوع الطلب الناقص
-    status       = Column(String(20), default="pending", index=True)   # pending | resolved
-    file_id      = Column(String(255), default="")               # يُملأ عند الرفع
-    created_by   = Column(Integer, nullable=True)
-    created_at   = Column(DateTime, default=datetime.utcnow, index=True, nullable=True)
-    resolved_by  = Column(Integer, nullable=True)
-    resolved_at  = Column(DateTime, nullable=True)
+    id          = Column(Integer, primary_key=True, autoincrement=True)
+    profile_id  = Column(Integer, nullable=False, index=True)   # FK → res_profiles.id
+    name        = Column(String(255), nullable=False, index=True)
+    created_at  = Column(DateTime, default=datetime.utcnow, nullable=True)
 
 
 class DailyReportTracking(Base):

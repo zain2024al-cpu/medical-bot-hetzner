@@ -358,15 +358,15 @@ def delete_patient(patient_id: int) -> bool:
     (لا تظهر في أي شاشة إدارة، ولا طريقة للوصول إليها لحذفها لاحقاً).
     حذف مرافق واحد بمفرده (لا يملك مرافقين هو نفسه) لا يُحدِث أي تسلسل.
 
-    ✅ إن كان لهذا المريض ملف إقامة (ResidencyProfile.name مطابق) ما زال
-    "pending_documents" (لا صورة ولا فورم C — مجرد ملف فارغ لم يُستكمَل
-    بعد)، يُحذَف معه أيضاً — بدونها كان يبقى ملفاً يتيماً في "📋 الملفات
-    المعلّقة" للأبد بلا أي مريض يشير إليه. ملفات ذات تقدّم حقيقي (وثائق/
-    حالة أخرى) لا تُمَسّ إطلاقاً — الحذف يقتصر على الملفات الفارغة تماماً.
+    ✅ إن كان لهذا المريض ملف إقامة مبتدئ بلا صورة مرفوعة بعد (لم
+    يُستكمَل)، يُحذَف معه أيضاً عبر
+    modules.residency.models.delete_stub_profile_by_name — بدونها كان
+    يبقى ملفاً يتيماً في "🪪 الإقامة" للأبد بلا أي مريض يشير إليه. ملفات
+    لها صورة مرفوعة بالفعل (تقدّم حقيقي) لا تُمَسّ إطلاقاً.
     """
     try:
         from db.session import SessionLocal
-        from db.models import Patient, ResidencyProfile, ResidencyCompanion, ResidencyUpdate
+        from db.models import Patient
 
         with SessionLocal() as session:
             patient = session.query(Patient).filter_by(id=patient_id).first()
@@ -377,26 +377,18 @@ def delete_patient(patient_id: int) -> bool:
                     logger.info(f"Deleting companion of patient #{patient_id}: {comp.full_name}")
                     session.delete(comp)
                 session.delete(patient)
-
-                stale_profiles = (
-                    session.query(ResidencyProfile)
-                    .filter_by(name=name, status="pending_documents")
-                    .filter(
-                        (ResidencyProfile.photo_file_id == "") | (ResidencyProfile.photo_file_id.is_(None)),
-                        (ResidencyProfile.form_c_file_id == "") | (ResidencyProfile.form_c_file_id.is_(None)),
-                    )
-                    .all()
-                )
-                for pr in stale_profiles:
-                    session.query(ResidencyUpdate).filter_by(profile_id=pr.id).delete()
-                    session.query(ResidencyCompanion).filter_by(profile_id=pr.id).delete()
-                    session.delete(pr)
-                    logger.info(f"Deleted orphaned pending residency profile #{pr.id} for: {name}")
-
                 session.commit()
+
+                try:
+                    from modules.residency.models import delete_stub_profile_by_name
+                    deleted_profiles = delete_stub_profile_by_name(name)
+                except Exception:
+                    logger.exception(f"Failed to clean up residency stub for: {name} (non-fatal)")
+                    deleted_profiles = 0
+
                 logger.info(
                     f"Deleted patient: {name}  (+{len(companions)} companion(s), "
-                    f"+{len(stale_profiles)} orphaned pending residency profile(s))"
+                    f"+{deleted_profiles} orphaned pending residency profile(s))"
                 )
                 return True
             else:

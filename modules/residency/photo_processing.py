@@ -1,4 +1,4 @@
-# modules/residency/uploads/photo_processing.py
+# modules/residency/photo_processing.py
 # ضبط الصورة الشخصية على مقاس 4×6 (الصورة الشخصية القياسية للمستندات).
 #
 # 4 سم عرضاً × 6 سم ارتفاعاً (توجّه عمودي — الاصطلاح المعتاد لصور

@@ -1,127 +1,76 @@
 # modules/residency/views.py
-# Shared display helpers for the residency module.
+# بناء الشاشات — المرحلة الأولى فقط (ملفات معلّقة بانتظار الصورة + تاريخ تنبيه).
 
-from datetime import datetime
-from modules.residency.constants import RESIDENCY_STATUS_LABELS, RESIDENCY_STATUS_ICONS
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+from modules.residency.constants import RN
+from modules.residency.repository import ProfileRow
 
 _DIVIDER = "━━━━━━━━━━━━━━━━━━━━"
-_THIN    = "─────────────────────"
-_NONE    = "—"
+_THIN = "─────────────────────"
 
 
-def format_status(status: str) -> str:
-    """Return Arabic label for a residency status key."""
-    return RESIDENCY_STATUS_LABELS.get(status, status or _NONE)
+def build_pending_list(profiles: list[ProfileRow]) -> tuple[str, InlineKeyboardMarkup]:
+    lines = [_DIVIDER, "🪪  **الملفات المعلّقة**", ""]
+    rows: list[list[InlineKeyboardButton]] = []
+
+    if not profiles:
+        lines.append("✅ لا توجد ملفات معلّقة حالياً.")
+    else:
+        lines.append(f"يوجد {len(profiles)} ملفاً — اضغط على اسم لفتحه:")
+        lines.append(_THIN)
+        for p in profiles:
+            photo_mark = "✅" if p.photo_file_id else "⬜"
+            remind_mark = f"📅 {p.reminder_date}" if p.reminder_date else "📅 —"
+            lines.append(f"👤 {p.name}   صورة {photo_mark}   {remind_mark}")
+            rows.append([InlineKeyboardButton(
+                f"📂 {p.name[:25]}", callback_data=f"{RN}:view_{p.id}",
+            )])
+
+    return "\n".join(lines), InlineKeyboardMarkup(rows)
 
 
-def format_status_icon(status: str) -> str:
-    """Return emoji icon for a residency status key."""
-    return RESIDENCY_STATUS_ICONS.get(status, "•")
+def build_profile_detail(profile: ProfileRow, *, is_admin: bool) -> tuple[str, InlineKeyboardMarkup]:
+    photo_mark = "✅ مرفوعة" if profile.photo_file_id else "⬜ غير مرفوعة"
+    remind_text = profile.reminder_date if profile.reminder_date else "➖ غير محدَّد"
+
+    lines = [
+        _DIVIDER,
+        "🪪  **ملف المريض**",
+        "",
+        f"👤 *{profile.name}*",
+        _THIN,
+        f"📷 *الصورة الشخصية:*  {photo_mark}",
+        f"📅 *تاريخ التنبيه:*  {remind_text}",
+    ]
+    if profile.companions:
+        lines.append(_THIN)
+        lines.append(f"👥 *المرافقون ({len(profile.companions)}):*")
+        for name in profile.companions:
+            lines.append(f"  • {name}")
+    lines.append(_THIN)
+
+    rows = [
+        [InlineKeyboardButton("📷 رفع الصورة الشخصية", callback_data=f"{RN}:photo_{profile.id}")],
+        [InlineKeyboardButton("📅 تاريخ التنبيه", callback_data=f"{RN}:remind_{profile.id}")],
+    ]
+    if is_admin:
+        rows.append([InlineKeyboardButton(
+            "✅ تم تقديم طلب الإقامة لهذا المريض والمرافقين",
+            callback_data=f"{RN}:submit_{profile.id}",
+        )])
+    rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:list")])
+
+    return "\n".join(lines), InlineKeyboardMarkup(rows)
 
 
-# الحالات الثلاث الزمنية — تُشتقّ من التاريخ لا من العمود المخزَّن.
-_TIME_DERIVED_STATUSES = frozenset({"active", "expiring", "expired"})
-
-
-def effective_status(status: str, expiry_date: str) -> str:
-    """
-    الحالة المعروضة، مشتقّةً من تاريخ الانتهاء حين تكون الحالة زمنية.
-
-    ⚠️ لماذا لا نكتفي بالعمود المخزَّن: الحالة تُكتب مرة واحدة عند الإنشاء
-    ("active") ولا يعيد أحد حسابها بمرور الوقت — فملف أُنشئ اليوم يبقى
-    "✅ نشطة" إلى الأبد، حتى بعد انتهاء إقامته بشهور. وهذا ما رآه المستخدم:
-    إقامة منتهية منذ يوليو تُعرض «نشطة».
-
-    ⚠️ ولا تُمَسّ حالات **سير العمل** (`renewal_submitted` وأخواتها): هي
-    وقائع حدثت فعلاً — «تم رفع الأوراق» تبقى صحيحة سواء انتهت الإقامة أم
-    لا، فاستبدالها بـ«منتهية» يمحو معلومة حقيقية. تُصنَّف الزمنية وحدها.
-    """
-    if status not in _TIME_DERIVED_STATUSES:
-        return status
-    expiry = _parse_expiry_date(expiry_date)
-    if expiry is None:
-        return status
-    delta = (expiry - datetime.utcnow().date()).days
-    if delta < 0:
-        return "expired"
-    if delta <= 30:
-        return "expiring"
-    return "active"
-
-
-def _parse_expiry_date(expiry_date: str):
-    """
-    Try to parse a date string in either YYYY-MM-DD or DD/MM/YYYY format.
-    Returns a datetime.date object or None.
-    """
-    if not expiry_date:
-        return None
-    for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
-        try:
-            return datetime.strptime(expiry_date[:10], fmt).date()
-        except Exception:
-            continue
-    return None
-
-
-def format_expiry_date(expiry_date: str) -> str:
-    """
-    Return a human-readable date string: DD/MM/YYYY
-    Accepts ISO format YYYY-MM-DD or legacy DD/MM/YYYY.
-    """
-    if not expiry_date:
-        return _NONE
-    dt = _parse_expiry_date(expiry_date)
-    if dt is None:
-        return expiry_date          # fallback: show raw value
-    return f"{dt.day:02d}/{dt.month:02d}/{dt.year}"
-
-
-def format_days_remaining(expiry_date: str) -> str:
-    """
-    Return Arabic string for days remaining until expiry.
-    Accepts ISO format YYYY-MM-DD or legacy DD/MM/YYYY.
-    Negative = already expired.
-    """
-    if not expiry_date:
-        return _NONE
-    expiry = _parse_expiry_date(expiry_date)
-    if expiry is None:
-        return _NONE
-    today = datetime.utcnow().date()
-    delta = (expiry - today).days
-    if delta < 0:
-        return f"انتهت منذ {abs(delta)} يوم"
-    if delta == 0:
-        return "تنتهي اليوم ⚠️"
-    if delta == 1:
-        return "يوم واحد متبقٍ 🔴"
-    if delta <= 7:
-        return f"{delta} أيام متبقية 🔴"
-    if delta <= 30:
-        return f"{delta} يوم متبقٍ ⚠️"
-    return f"{delta} يوم متبقٍ"
-
-
-def format_expiry_warning_inline(expiry_date: str) -> str:
-    """Short inline warning label — empty if more than 30 days remaining."""
-    if not expiry_date:
-        return ""
-    try:
-        expiry = datetime.strptime(expiry_date[:10], "%Y-%m-%d").date()
-        today  = datetime.utcnow().date()
-        delta  = (expiry - today).days
-        if delta < 0:
-            return " ❌"
-        if delta <= 7:
-            return f" 🔴({delta}د)"
-        if delta <= 30:
-            return f" ⚠️({delta}د)"
-        return ""
-    except Exception:
-        return ""
-
-
-def doc_icon(file_id: str) -> str:
-    """Return ✅ if file_id is set, ⬜ otherwise."""
-    return "✅" if file_id else "⬜"
+def build_photo_prompt(profile: ProfileRow) -> tuple[str, InlineKeyboardMarkup]:
+    text = (
+        f"{_DIVIDER}\n📷  **رفع الصورة الشخصية**\n\n"
+        f"المريض: {profile.name}\n\n"
+        f"أرسل الصورة الآن."
+    )
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:view_{profile.id}")],
+    ])
+    return text, kb

@@ -291,26 +291,18 @@ async def main():
         )
         logger.info(f"🔧 Scheduled daily maintenance at 03:00 ({TIMEZONE})")
 
-        # 🔔 3. تنبيه انتهاء الإقامات/الجوازات (الساعة 9:00 صباحاً)
-        # صباحاً عمداً — تنبيه إجرائي يحتاج وقت عمل للتصرّف فيه، بخلاف
-        # تنبيه المواعيد المسائي الذي يخص اليوم التالي.
-        from services.residency_alerts_service import send_daily_residency_alerts
+        # 🔔 3. تذكير تقديم طلبات الإقامة (الساعة 9:00 صباحاً)
+        # ⚠️ إعادة بناء كاملة (2026-08-15) — يحلّ محلّ المهمّتين القديمتين
+        # (تنبيه انتهاء الإقامات + تذكير الطلبات الناقصة) معاً. الآن: تاريخ
+        # تنبيه يدوي لكل ملف (يختاره مستخدم الإقامة من التقويم)، رسالة يومية
+        # واحدة لمجموعة الإقامة حتى يضغط الأدمن "✅ تم تقديم طلب الإقامة".
+        from services.residency_reminders_service import send_daily_residency_reminders
         app.job_queue.run_daily(
-            lambda context: send_daily_residency_alerts(context.application),
+            lambda context: send_daily_residency_reminders(context.application),
             time=dt_time(hour=9, minute=0, tzinfo=tz),
-            name="daily_residency_alerts"
+            name="daily_residency_reminders"
         )
-        logger.info(f"🔔 Scheduled daily residency/passport alerts at 09:00 ({TIMEZONE})")
-
-        # 📋 3ب. تذكير الطلبات الناقصة لملفات الإقامة (الساعة 5:00 مساءً)
-        # مساءً عمداً (بخلاف تنبيه الإقامات الصباحي) — طلب المستخدم صراحةً.
-        from services.residency_missing_items_service import send_daily_missing_items_reminder
-        app.job_queue.run_daily(
-            lambda context: send_daily_missing_items_reminder(context.application),
-            time=dt_time(hour=17, minute=0, tzinfo=tz),
-            name="daily_residency_missing_items"
-        )
-        logger.info(f"📋 Scheduled daily residency missing-items reminder at 17:00 ({TIMEZONE})")
+        logger.info(f"🔔 Scheduled daily residency reminders at 09:00 ({TIMEZONE})")
 
         # 🧾 4. تقرير أخطاء اليوم (23:55) — آخر اليوم عمداً ليشمله كاملاً.
         # صامت تماماً لو لم يقع أي خطأ، فلا رسالة يومية بلا فائدة.
