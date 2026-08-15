@@ -11,6 +11,12 @@
 # نفس نمط النص العربي السليم المُثبَت في services/pharmacy_evacuation_pdf.py
 # (reshape+bidi صريح + خط عربي حقيقي مسجَّل)، مُعاد كتابته هنا محلياً
 # استقلالاً لكل ملف PDF كما جرت العادة في هذا المشروع.
+#
+# ✅ الصورة الشخصية/ملف الإصدار/كل وثيقة قد تصل صورة أو ملف PDF حقيقي
+# (Form C الرسمية غالباً PDF) — تُصنَّف بايتات كل مرفق فعلياً
+# (_classify_attachment)، فالصور تُضمَّن مباشرة داخل النص، وملفات PDF
+# الحقيقية تُدمَج كصفحات كاملة في نهاية الملف عبر pypdf (نفس نمط
+# bot/handlers/admin/admin_patient_attachments_bundle.py) بدل إسقاطها.
 
 from __future__ import annotations
 
@@ -104,11 +110,30 @@ def _colors():
     }
 
 
-def _embed_image(img_bytes: bytes | None, max_w_pts: float, max_h_pts: float):
+def _classify_attachment(data: bytes | None) -> str:
+    """يفرّق بين ملف PDF حقيقي (يُدمَج كصفحات كاملة لاحقاً — Form C
+    الرسمية غالباً PDF لا صورة) وصورة (تُضمَّن مباشرة داخل النص) وأي نوع
+    آخر غير مدعوم للمعاينة داخل هذا الملف. لا يعتمد على امتداد الملف
+    (غير متوفر أصلاً من Telegram file_id) بل على محتوى البايتات نفسها."""
+    if not data:
+        return "none"
+    if data[:5] == b"%PDF-":
+        return "pdf"
+    try:
+        from reportlab.lib.utils import ImageReader
+
+        reader = ImageReader(io.BytesIO(data))
+        iw, ih = reader.getSize()
+        if iw and ih:
+            return "image"
+    except Exception:
+        pass
+    return "unknown"
+
+
+def _embed_image(img_bytes: bytes, max_w_pts: float, max_h_pts: float):
     """يبني عنصر Image محافِظاً على نسبة الأبعاد ضمن الحد الأقصى
-    المُعطى، أو None إن تعذّرت قراءة البايتات (صورة تالفة/غير مدعومة)."""
-    if not img_bytes:
-        return None
+    المُعطى، أو None إن تعذّرت قراءة البايتات فعلياً رغم تصنيفها صورة."""
     try:
         from reportlab.lib.utils import ImageReader
         from reportlab.platypus import Image
@@ -217,12 +242,33 @@ def build_case_pdf(case: dict) -> io.BytesIO:
     photo_max = (4.5 * cm, 4.5 * cm)
     file_max = (content_width * 0.9, 9 * cm)
 
+    # ✅ كل ملف/وثيقة يتبيّن أنه PDF حقيقي (Form C الرسمية غالباً PDF لا
+    # صورة) لا يمكن تضمينه كـImage داخل النص المتدفّق — يُجمَع هنا ليُدمَج
+    # كصفحات كاملة في نهاية الملف (بعد صفحة فاصلة تُعرِّف صاحبه ونوعه)،
+    # بدل إسقاطه بصمت كما كان يحدث سابقاً.
+    pdf_attachments: list[tuple[str, bytes]] = []
+
+    def _attachment_flowables(label: str, data: bytes | None, person_name: str):
+        kind = _classify_attachment(data)
+        if kind == "none":
+            return [P(f"- {label}: لا يوجد ملف مرفوع بعد.", "note")]
+        if kind == "image":
+            img = _embed_image(data, *file_max)
+            if img is not None:
+                img.hAlign = "RIGHT"
+                return [P(f"- {label} ✅", "body"), img]
+            return [P(f"- {label} ✅ (تعذّر عرض الصورة)", "note")]
+        if kind == "pdf":
+            pdf_attachments.append((f"{person_name} — {label}", data))
+            return [P(f"- {label} ✅ (ملف PDF — الصفحات مرفقة في نهاية هذا الملف)", "body")]
+        return [P(f"- {label} ✅ (نوع ملف غير مدعوم للمعاينة هنا — راجعه داخل البوت)", "note")]
+
     for person in people:
         block = []
         block.append(P(f"👤 {person['name']} — {person['role']}", "h2"))
         block.append(Spacer(1, 0.15 * cm))
 
-        img = _embed_image(person.get("photo_bytes"), *photo_max)
+        img = _embed_image(person.get("photo_bytes"), *photo_max) if person.get("photo_bytes") else None
         if img is not None:
             img.hAlign = "RIGHT"
             block.append(img)
@@ -236,12 +282,7 @@ def build_case_pdf(case: dict) -> io.BytesIO:
         block.append(P("آخر إصدار للإقامة:", "body_b"))
         if person.get("last_issue_date"):
             block.append(P(f"تاريخ الإصدار: {person['last_issue_date']}", "body"))
-            issue_img = _embed_image(person.get("issuance_file_bytes"), *file_max)
-            if issue_img is not None:
-                issue_img.hAlign = "RIGHT"
-                block.append(issue_img)
-            else:
-                block.append(P("(تعذّر تضمين ملف الإصدار)", "note"))
+            block.extend(_attachment_flowables("ملف الإصدار", person.get("issuance_file_bytes"), person["name"]))
         else:
             block.append(P("لا يوجد إصدار سابق بعد.", "note"))
 
@@ -252,11 +293,7 @@ def build_case_pdf(case: dict) -> io.BytesIO:
             block.append(P("لا توجد وثائق مضافة.", "note"))
         else:
             for d in docs:
-                block.append(P(f"- {d['label']} ✅", "body"))
-                d_img = _embed_image(d.get("file_bytes"), *file_max)
-                if d_img is not None:
-                    d_img.hAlign = "RIGHT"
-                    block.append(d_img)
+                block.extend(_attachment_flowables(d["label"], d.get("file_bytes"), person["name"]))
 
         story.append(KeepTogether(block))
         story.append(Spacer(1, 0.5 * cm))
@@ -294,5 +331,47 @@ def build_case_pdf(case: dict) -> io.BytesIO:
 
     doc.build(story, onFirstPage=_on_page, onLaterPages=_on_page)
     buf.seek(0)
-    logger.info(f"[residency_case_pdf] built  root_id={case.get('root_id')}  people={len(people)}  size={buf.getbuffer().nbytes:,}")
-    return buf
+
+    if not pdf_attachments:
+        logger.info(f"[residency_case_pdf] built  root_id={case.get('root_id')}  people={len(people)}  size={buf.getbuffer().nbytes:,}  pdf_attachments=0")
+        return buf
+
+    # ── دمج صفحات مرفقات PDF الحقيقية في نهاية الملف ──────────────────────────
+    from pypdf import PdfReader, PdfWriter
+    from reportlab.pdfgen import canvas as canvas_mod
+
+    def _divider_page_bytes(label: str) -> bytes:
+        dbuf = io.BytesIO()
+        c = canvas_mod.Canvas(dbuf, pagesize=A4)
+        w, h = A4
+        c.setFont(FNB, 15)
+        c.setFillColor(C["primary"])
+        c.drawCentredString(w / 2, h / 2 + 0.4 * cm, _ar("📎 مرفق"))
+        c.setFont(FN, 12)
+        c.setFillColor(C["text_dark"])
+        c.drawCentredString(w / 2, h / 2 - 0.4 * cm, _ar(label))
+        c.showPage()
+        c.save()
+        dbuf.seek(0)
+        return dbuf.getvalue()
+
+    writer = PdfWriter()
+    for page in PdfReader(buf).pages:
+        writer.add_page(page)
+
+    for label, raw in pdf_attachments:
+        for page in PdfReader(io.BytesIO(_divider_page_bytes(label))).pages:
+            writer.add_page(page)
+        try:
+            for page in PdfReader(io.BytesIO(raw)).pages:
+                writer.add_page(page)
+        except Exception as exc:
+            logger.warning(f"[residency_case_pdf] failed to merge pdf attachment {label!r}: {exc}")
+            for page in PdfReader(io.BytesIO(_divider_page_bytes(f"{label} — تعذّر فتح الملف"))).pages:
+                writer.add_page(page)
+
+    out = io.BytesIO()
+    writer.write(out)
+    out.seek(0)
+    logger.info(f"[residency_case_pdf] built  root_id={case.get('root_id')}  people={len(people)}  size={out.getbuffer().nbytes:,}  pdf_attachments={len(pdf_attachments)}")
+    return out

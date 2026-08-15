@@ -370,9 +370,12 @@ async def _on_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 # ── Photo / document upload ───────────────────────────────────────────────────
 
 def _extract_file_id(message) -> str | None:
+    # ✅ لا يقتصر على الصور — الوثائق الرسمية (Form C وغيرها) كثيراً ما
+    # تُرفَع كملف PDF لا صورة، فيجب قبول أي مستند بصرف النظر عن نوعه
+    # (نفس نمط user_medical_attachments.py/admin_patient_attachments_bundle.py).
     if message.photo:
         return message.photo[-1].file_id
-    if message.document and message.document.mime_type and message.document.mime_type.startswith("image/"):
+    if message.document:
         return message.document.file_id
     return None
 
@@ -515,6 +518,6 @@ async def _send_case_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE, roo
 
 def register_handlers(app) -> None:
     app.add_handler(CallbackQueryHandler(_dispatch_callback, pattern=r"^rn:"), group=20)
-    app.add_handler(MessageHandler(filters.PHOTO | filters.Document.IMAGE, _on_media_message), group=17)
+    app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, _on_media_message), group=17)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, _on_text_message), group=18)
     logger.info("[residency] flow handlers registered (rn: callbacks group 20, media group 17, text group 18)")
