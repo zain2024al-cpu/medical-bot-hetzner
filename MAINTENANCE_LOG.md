@@ -4238,6 +4238,47 @@ PDF بصفحتين + وثيقتان PDF إحداهما بصفحة واحدة + �
 `residence_expiry` موجودة مسبقاً في `ArrivalCompanion`، التعديل في
 منطق التسلسل والتسميات فقط.
 
+### 2026-08-16 (٤١) — 🔧 حذف محاولات ترحيل أعمدة على جدولَي res_profiles/res_companions المحذوفَين (ضجيج أخطاء في السجلّ عند كل إقلاع)
+
+**البلاغ**: المستخدم لصق سجلّ pm2 بعد إعادة تشغيل السيرفر يُظهر 7 أخطاء
+`sqlite3.OperationalError: no such table: res_profiles` / `res_companions`
+مع traceback كامل لكل واحد، عند كل إقلاع للبوت.
+
+**التشخيص**: `db/maintenance.py::check_db_health_startup()` يستدعي
+`_migrate_column()` لسبعة أعمدة على `res_profiles`/`res_companions` —
+وهما اسما الجدولين **القديمَين** (مخطط الإقامة الأصلي، قبل حتى "المرحلة
+١" من إعادة البناء هذه الجلسة) اللذان حُذِفا نهائياً عبر
+`scripts/drop_old_residency_tables.py` عند بناء `res_persons` (البند
+٣٧). هذه الاستدعاءات كانت أُضيفت لترحيل أعمدة (`passport_expiry`،
+`form_c_file_id`، `photo_file_id`، `tickets_file_id`) على المخطط
+القديم **قبل** حذفه، ولم تُزَل بعد الحذف — فتُحاول `ALTER TABLE` على
+جدول غير موجود عند كل إقلاع، تفشل (يلتقطها `try/except` الداخلي في
+`_migrate_column` فلا تُسقِط البوت) لكنها تطبع 7 أخطاء كاملة بـ
+traceback في كل مرة، بلا أي فائدة فعلية (الأعمدة نفسها موجودة أصلاً في
+تعريف `ResidencyPerson` الحالي عبر `Base.metadata.create_all`، لا
+تحتاج أي ترحيل تدريجي).
+
+**الإصلاح**: حذف الاستدعاءات السبعة (`res_profiles.passport_expiry`،
+`res_companions.passport_expiry`، `res_profiles.form_c_file_id`،
+`res_profiles.photo_file_id`، `res_companions.photo_file_id`،
+`res_profiles.tickets_file_id`، `res_companions.tickets_file_id`)
+وتعليقاتها من `db/maintenance.py` — بلا أي مساس ببقية قائمة الترحيلات
+الطويلة (كل عمود آخر في هذه الدالة لا يزال يخصّ جدولاً حياً).
+
+**التحقق**: تأكَّدت أولاً عبر grep أن `res_profiles`/`res_companions`
+غير مذكورين في أي كود حيّ (`db/models.py`، أي `modules/`) — فقط في
+`scripts/migrate_to_res_persons.py`/`scripts/drop_old_residency_tables.py`
+(سكربتان لمرة واحدة، نُفِّذا بالفعل على الخادم) وسجلّ الصيانة التاريخي
+· بناء قاعدة اختبار فعلية بمخطط `res_persons` الحالي (بلا الجدولين
+القديمين إطلاقاً، تماماً كحال قاعدة الإنتاج بعد الحذف) وتشغيل
+`DatabaseMaintenance.check_db_health_startup()` الحقيقية عليها ⇒ لا
+ظهور لأي خطأ `res_profiles`/`res_companions` في المخرجات بعد الآن ·
+حذف `__pycache__` بالكامل ثم `pytest -q --ignore=Archive` (187 نجح، لا
+تغيير في أي معالِج فهذا تعديل داخل مسار فحص القاعدة عند الإقلاع فقط).
+
+لا حاجة لسكربت هجرة — حذف كود ميت فقط، بلا أي تغيير على المخطط أو
+البيانات.
+
 ## 📋 كيفية استخدام هذا السجل
 
 - قبل إضافة أي نوع إجراء/مسار جديد للبوت: راجع الجدول أعلاه وسجِّله في

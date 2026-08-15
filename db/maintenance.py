@@ -202,15 +202,6 @@ class DatabaseMaintenance:
                 # ✅ ربط المرافق بمريضه — لم يكن موجوداً إطلاقاً رغم أن الأدمن
                 # يُدخل المريض ومرافقيه في تدفق واحد.
                 _migrate_column(conn, "patients", "companion_of_id", "INTEGER")
-                # ✅ تاريخ انتهاء الجواز في الإقامات — لم يكن له عمود إطلاقاً
-                # رغم جمعه في الواصلين، فتعذّر التنبيه قبل انتهائه بـ6 أشهر.
-                _migrate_column(conn, "res_profiles", "passport_expiry", "VARCHAR(50)")
-                _migrate_column(conn, "res_companions", "passport_expiry", "VARCHAR(50)")
-                # ✅ فورم C — ملف واحد للعائلة (المريض ومرافقوه) على مستوى
-                # الملف لا لكل شخص، فهو استمارة إقامة واحدة تُقدَّم للعائلة.
-                _migrate_column(conn, "res_profiles", "form_c_file_id", "VARCHAR(255)")
-                # ✅ الصورة الشخصية للمريض — مرفق اختياري من ملف المريض.
-                _migrate_column(conn, "res_profiles", "photo_file_id", "VARCHAR(255)")
                 # ✅ daily_patients لم يكن له أي ترحيل إطلاقاً، وقاعدة السيرفر
                 # تسبق هذه الأعمدة. `s.query(DailyPatient)` يختار كل أعمدة
                 # الموديل، فكان يسقط بـ`no such column: daily_patients.
@@ -222,14 +213,6 @@ class DatabaseMaintenance:
                 # ✅ رقم الجلسة ضمن الدورة الحالية — العلاج الكيماوي فقط،
                 # منفصل عن current_session (رقم الدورة نفسها).
                 _migrate_column(conn, "reports", "chemo_session_number", "INTEGER")
-                # ✅ الصورة الشخصية للمرافق — كانت مقصورة على المريض فقط،
-                # فلم يكن هناك أي طريقة لرفع صورة مرافق إطلاقاً.
-                _migrate_column(conn, "res_companions", "photo_file_id", "VARCHAR(255)")
-                # ✅ التذكرة — موجودة على الواصلين فقط (tickets_file_id) ولم
-                # تكن موجودة إطلاقاً على الإقامات، فتخطّيها أثناء الواصلين
-                # كان يعني لا طريق لرفعها لاحقاً أبداً.
-                _migrate_column(conn, "res_profiles", "tickets_file_id", "VARCHAR(255)")
-                _migrate_column(conn, "res_companions", "tickets_file_id", "VARCHAR(255)")
                 # ✅ اسم أضافه الإداري عبر "مريض جديد مع مرافقين" ولم يُستخدَم
                 # بعد في تقرير وصول فعلي — أساس شاشة "📋 الأسماء المعلّقة"
                 # الجديدة في الخدمات العامة.
