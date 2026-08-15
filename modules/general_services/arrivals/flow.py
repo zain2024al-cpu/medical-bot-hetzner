@@ -30,6 +30,7 @@ from modules.general_services.arrivals.session import (
     STEP_P_ESCORT_ENTITY, STEP_P_RESIDENCE_ADDRESS,
     STEP_BATCH_NOTES,
     STEP_C_NAME, STEP_C_ARRIVAL_DATE, STEP_C_PASSPORT_EXPIRY, STEP_C_VISA_EXPIRY,
+    STEP_C_RESIDENCE_EXPIRY,
     STEP_C_PASSPORT, STEP_C_VISA, STEP_C_ENTRY_STAMP, STEP_C_TICKETS, STEP_C_RESIDENCE,
     STEP_C_INDIV_NOTES, STEP_C_SERVICES, STEP_C_ESCORT_ENTITY, STEP_C_RESIDENCE_ADDRESS,
     STEP_C_MORE, STEP_P_SPECIALIST,
@@ -49,6 +50,7 @@ from modules.general_services.arrivals.views import (
     build_p_escort_entity_manual_prompt, build_c_more_prompt, build_p_specialist_prompt,
     build_batch_notes_prompt,
     build_c_arrival_date_prompt, build_c_passport_expiry_prompt, build_c_visa_expiry_prompt,
+    build_c_residence_expiry_prompt,
     build_c_passport_prompt, build_c_visa_prompt,
     build_c_entry_stamp_prompt, build_c_tickets_prompt, build_c_residence_prompt,
     build_c_indiv_notes_prompt, build_c_services_prompt,
@@ -124,6 +126,7 @@ _STEP_TO_CAL_BACK_CB: dict[str, str] = {
     STEP_C_ARRIVAL_DATE:     f"{GSA}:c_arrival_date_prompt",
     STEP_C_PASSPORT_EXPIRY:  f"{GSA}:c_passport_expiry_prompt",
     STEP_C_VISA_EXPIRY:      f"{GSA}:c_visa_expiry_prompt",
+    STEP_C_RESIDENCE_EXPIRY: f"{GSA}:c_residence_expiry_prompt",
 }
 
 # ✅ خطوات "تاريخ انتهاء" — تواريخها بعيدة بسنوات (جواز ينتهي 2032 مثلاً)،
@@ -135,6 +138,7 @@ _QUICK_JUMP_STEPS: set[str] = {
     STEP_P_RESIDENCE_EXPIRY,
     STEP_C_PASSPORT_EXPIRY,
     STEP_C_VISA_EXPIRY,
+    STEP_C_RESIDENCE_EXPIRY,
 }
 
 
@@ -306,6 +310,11 @@ async def _show_c_passport_expiry(update, context, session):
 
 async def _show_c_visa_expiry(update, context, session):
     text, kb = build_c_visa_expiry_prompt(session)
+    await _safe_edit(update, text, kb)
+
+
+async def _show_c_residence_expiry(update, context, session):
+    text, kb = build_c_residence_expiry_prompt(session)
     await _safe_edit(update, text, kb)
 
 
@@ -629,10 +638,13 @@ async def _on_c_name_selected(result, update: Update, context: ContextTypes.DEFA
         return
 
     session.current_companion["name"] = name
-    session.step = STEP_C_ARRIVAL_DATE
+    # ✅ لا سؤال "تاريخ الوصول" للمرافق — يصل مع المريض دائماً، تاريخه
+    # مُدخَل بالفعل أثناء بيانات المريض نفسه، فيُنسَخ تلقائياً هنا.
+    session.current_companion["arrival_date"] = session.current_patient.get("arrival_date", "")
+    session.step = STEP_C_PASSPORT_EXPIRY
     session.save(context.user_data)
-    logger.info(f"[arrivals] c_name selected={name!r} → STEP_C_ARRIVAL_DATE")
-    await _show_c_arrival_date(update, context, session)
+    logger.info(f"[arrivals] c_name selected={name!r} → STEP_C_PASSPORT_EXPIRY (arrival_date copied from patient)")
+    await _show_c_passport_expiry(update, context, session)
 
 
 def register_result_routes() -> None:
@@ -879,6 +891,30 @@ async def _dispatch_callback_inner(
         await _show_c_visa_expiry(update, context, session)
         return
 
+    # ── Companion residence expiry calendar ────────────────────────────────────
+    if action == "c_residence_expiry_cal":
+        session = ArrivalSession.load(context.user_data)
+        if session is None:
+            logger.warning(f"[arrivals.cb] c_residence_expiry_cal — no session  user={uid}")
+            await _cancel(update, context); return
+        session.step = STEP_C_RESIDENCE_EXPIRY
+        session.save(context.user_data)
+        logger.info(f"[arrivals.cb] c_residence_expiry_cal → calendar shown  user={uid}")
+        from datetime import datetime
+        now = datetime.utcnow()
+        cal_text, cal_kb = _cal_for_step(session.step, now.year, now.month)
+        await query.edit_message_text(cal_text, reply_markup=cal_kb, parse_mode="Markdown")
+        return
+
+    if action == "c_residence_expiry_prompt":
+        session = ArrivalSession.load(context.user_data)
+        if session is None:
+            logger.warning(f"[arrivals.cb] c_residence_expiry_prompt — no session  user={uid}")
+            await _cancel(update, context); return
+        logger.info(f"[arrivals.cb] c_residence_expiry_prompt → re-show  user={uid}")
+        await _show_c_residence_expiry(update, context, session)
+        return
+
     # ── Patient residence expiry calendar ─────────────────────────────────────
     if action == "p_residence_expiry_cal":
         session = ArrivalSession.load(context.user_data)
@@ -1045,10 +1081,20 @@ async def _dispatch_callback_inner(
             session.current_companion["visa_expiry"] = dt.strftime("%d/%m/%Y")
             if session.edit_from_review:
                 await _finish_field_edit(update, context, session); return
+            session.step = STEP_C_RESIDENCE_EXPIRY
+            session.save(context.user_data)
+            logger.info(
+                f"[arrivals.cb] cal_pick c_visa_expiry={dt.date()} → STEP_C_RESIDENCE_EXPIRY  user={uid}"
+            )
+            await _show_c_residence_expiry(update, context, session)
+        elif session.step == STEP_C_RESIDENCE_EXPIRY:
+            session.current_companion["residence_expiry"] = dt.strftime("%d/%m/%Y")
+            if session.edit_from_review:
+                await _finish_field_edit(update, context, session); return
             session.step = STEP_C_PASSPORT
             session.save(context.user_data)
             logger.info(
-                f"[arrivals.cb] cal_pick c_visa_expiry={dt.date()} → STEP_C_PASSPORT  user={uid}"
+                f"[arrivals.cb] cal_pick c_residence_expiry={dt.date()} → STEP_C_PASSPORT  user={uid}"
             )
             await _show_c_passport(update, context, session)
         else:
@@ -1322,6 +1368,18 @@ async def _dispatch_callback_inner(
         await _show_c_visa_expiry(update, context, session)
         return
 
+    if action == "skip_c_residence_expiry":
+        session = ArrivalSession.load(context.user_data)
+        if session is None:
+            await _cancel(update, context); return
+        session.current_companion["residence_expiry"] = ""
+        if session.edit_from_review:
+            await _finish_field_edit(update, context, session); return
+        session.step = STEP_C_PASSPORT
+        session.save(context.user_data)
+        await _show_c_passport(update, context, session)
+        return
+
     if action == "skip_c_passport":
         session = ArrivalSession.load(context.user_data)
         if session is None:
@@ -1571,6 +1629,16 @@ async def _dispatch_callback_inner(
         session.save(context.user_data)
         logger.info(f"[arrivals.cb] back_c_visa_expiry → STEP_C_VISA_EXPIRY  user={uid}")
         await _show_c_visa_expiry(update, context, session)
+        return
+
+    if action == "back_c_residence_expiry":
+        session = ArrivalSession.load(context.user_data)
+        if session is None:
+            await _cancel(update, context); return
+        session.step = STEP_C_RESIDENCE_EXPIRY
+        session.save(context.user_data)
+        logger.info(f"[arrivals.cb] back_c_residence_expiry → STEP_C_RESIDENCE_EXPIRY  user={uid}")
+        await _show_c_residence_expiry(update, context, session)
         return
 
     if action == "back_c_passport":

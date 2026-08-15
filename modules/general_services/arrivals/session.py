@@ -44,7 +44,7 @@ STEP_C_SERVICES         = "c_services"
 STEP_C_ESCORT_ENTITY    = "c_escort_entity"
 STEP_C_RESIDENCE_ADDRESS = "c_residence_address"
 STEP_C_RESIDENCE        = "c_residence"         # kept for legacy session compat only
-STEP_C_RESIDENCE_EXPIRY = "c_residence_expiry"  # kept for legacy session compat only
+STEP_C_RESIDENCE_EXPIRY = "c_residence_expiry"
 # ✅ "هل يوجد مرافق آخر؟" — يسمح بأكثر من مرافق واحد للمريض (كان مرافقاً
 # واحداً فقط: التدفق كان يُنهي المريض فور إتمام أول مرافق).
 STEP_C_MORE             = "c_more"

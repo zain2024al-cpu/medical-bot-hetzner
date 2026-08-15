@@ -579,7 +579,9 @@ def build_c_passport_expiry_prompt(session: ArrivalSession) -> tuple[str, Inline
         [InlineKeyboardButton("📆 اختيار من التقويم", callback_data=f"{GSA}:c_passport_expiry_cal")],
         [
             InlineKeyboardButton("⏭️ تخطي", callback_data=f"{GSA}:skip_c_passport_expiry"),
-            InlineKeyboardButton("⬅️ رجوع", callback_data=f"{GSA}:back_c_arrival_date"),
+            # ✅ لا خطوة "تاريخ الوصول" للمرافق بعد الآن (يُنسَخ تلقائياً من
+            # تاريخ وصول المريض) — الرجوع من هنا يعود لاختيار الاسم مباشرة.
+            InlineKeyboardButton("⬅️ رجوع", callback_data=f"{GSA}:back_c_name"),
         ],
         [InlineKeyboardButton("❌ إلغاء", callback_data=f"{GS}:arrivals")],
     ])
@@ -591,12 +593,12 @@ def build_c_visa_expiry_prompt(session: ArrivalSession) -> tuple[str, InlineKeyb
     name = session.current_companion.get("name", "—")
     lines = [
         _DIVIDER,
-        f"📋  **مرافق المريض {idx} — تاريخ انتهاء الإقامة**",
+        f"📋  **مرافق المريض {idx} — تاريخ انتهاء التأشيرة**",
         "",
         f"المرافق: {name}",
         _THIN,
         "",
-        "اختر تاريخ انتهاء الإقامة:",
+        "اختر تاريخ انتهاء التأشيرة:",
     ]
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("📆 اختيار من التقويم", callback_data=f"{GSA}:c_visa_expiry_cal")],
@@ -604,6 +606,29 @@ def build_c_visa_expiry_prompt(session: ArrivalSession) -> tuple[str, InlineKeyb
             InlineKeyboardButton("⬅️ رجوع", callback_data=f"{GSA}:back_c_passport_expiry"),
             InlineKeyboardButton("❌ إلغاء", callback_data=f"{GS}:arrivals"),
         ],
+    ])
+    return "\n".join(lines), kb
+
+
+def build_c_residence_expiry_prompt(session: ArrivalSession) -> tuple[str, InlineKeyboardMarkup]:
+    idx  = session.patient_index + 1
+    name = session.current_companion.get("name", "—")
+    lines = [
+        _DIVIDER,
+        f"📋  **مرافق المريض {idx} — تاريخ انتهاء الإقامة**",
+        "",
+        f"المرافق: {name}",
+        _THIN,
+        "",
+        "اختر تاريخ انتهاء الإقامة، أو اضغط **⏭️ تخطي**.",
+    ]
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📆 اختيار من التقويم", callback_data=f"{GSA}:c_residence_expiry_cal")],
+        [
+            InlineKeyboardButton("⏭️ تخطي", callback_data=f"{GSA}:skip_c_residence_expiry"),
+            InlineKeyboardButton("⬅️ رجوع", callback_data=f"{GSA}:back_c_visa_expiry"),
+        ],
+        [InlineKeyboardButton("❌ إلغاء", callback_data=f"{GS}:arrivals")],
     ])
     return "\n".join(lines), kb
 
@@ -617,7 +642,7 @@ def build_c_passport_prompt(session: ArrivalSession) -> tuple[str, InlineKeyboar
         "أرسل صورة جواز سفر المرافق.",
     ]
     kb = InlineKeyboardMarkup([[
-        InlineKeyboardButton("⬅️ رجوع", callback_data=f"{GSA}:back_c_visa_expiry"),
+        InlineKeyboardButton("⬅️ رجوع", callback_data=f"{GSA}:back_c_residence_expiry"),
         InlineKeyboardButton("❌ إلغاء", callback_data=f"{GS}:arrivals"),
     ]])
     return "\n".join(lines), kb
@@ -768,7 +793,8 @@ def build_c_residence_address_prompt(session: ArrivalSession) -> tuple[str, Inli
         f"المرافق: {name}",
         _THIN,
         "",
-        "✏️ اكتب عنوان سكن المرافق، أو اضغط **⏭️ تخطي**.",
+        "✏️ اكتب عنوان السكن الكامل لهذا المرافق (اسم العمارة ورقم الشقة)،"
+        " أو اضغط **⏭️ تخطي**.",
     ]
     kb = InlineKeyboardMarkup([[
         InlineKeyboardButton("⏭️ تخطي", callback_data=f"{GSA}:skip_c_residence_address"),
