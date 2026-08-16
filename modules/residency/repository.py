@@ -256,9 +256,10 @@ def get_onboarding_queue(root_id: int) -> list[PersonRow]:
         return [_to_row(root)] + [_to_row(c) for c in comps]
 
 
-# ── ربط اختياري بوثائق "🛬 الوصول" (لغرض الطباعة فقط) ────────────────────────
+# ── ربط اختياري ببيانات "🛬 الوصول" (طباعة ملف الحالة + ملخّص "🟡 معلّق
+# من الوصول") ─────────────────────────────────────────────────────────────
 # ✅ لا رابط حقيقي (FK) بين res_persons وجداول الوصول — مطابقة بالاسم
-# الحرفي وقت الطباعة فقط، نفس دقّة services/patients_service.py::
+# الحرفي وقت الاستخدام فقط، نفس دقّة services/patients_service.py::
 # get_patient_by_name() (filter_by مطابقة تامة، بلا تطبيع). عدم وجود
 # تطابق ⇒ None، يُتجاهَل بصمت من قِبَل المستدعي.
 
@@ -269,6 +270,10 @@ class ArrivalDocsRow:
     residence_file_id: str
     tickets_file_id: str
     uploaded_at: str   # "%Y-%m-%d" من created_at صف الوصول
+    arrival_date: str
+    passport_expiry: str
+    visa_expiry: str
+    residence_expiry: str
 
 
 def get_arrival_patient_docs_by_name(name: str) -> ArrivalDocsRow | None:
@@ -290,6 +295,10 @@ def get_arrival_patient_docs_by_name(name: str) -> ArrivalDocsRow | None:
             residence_file_id=row.residence_file_id or "",
             tickets_file_id=row.tickets_file_id or "",
             uploaded_at=row.created_at.strftime("%Y-%m-%d") if row.created_at else "",
+            arrival_date=row.arrival_date or "",
+            passport_expiry=row.passport_expiry or "",
+            visa_expiry=row.visa_expiry or "",
+            residence_expiry=row.residence_expiry or "",
         )
 
 
@@ -312,4 +321,8 @@ def get_arrival_companion_docs_by_name(name: str) -> ArrivalDocsRow | None:
             residence_file_id=row.residence_file_id or "",
             tickets_file_id=row.tickets_file_id or "",
             uploaded_at=row.created_at.strftime("%Y-%m-%d") if row.created_at else "",
+            arrival_date=row.arrival_date or "",
+            passport_expiry=row.passport_expiry or "",
+            visa_expiry=row.visa_expiry or "",
+            residence_expiry=row.residence_expiry or "",
         )

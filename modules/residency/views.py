@@ -10,7 +10,7 @@ from modules.residency.constants import (
     STATUS_WAITING_ARRIVAL, STATUS_ACTIVE, STATUS_EXPIRY_PENDING,
     STATUS_SUBMITTED, STATUS_ISSUED,
 )
-from modules.residency.repository import FamilyRow, PersonRow, LogEntry, DocumentRow
+from modules.residency.repository import FamilyRow, PersonRow, LogEntry, DocumentRow, ArrivalDocsRow
 
 _DIVIDER = "━━━━━━━━━━━━━━━━━━━━"
 _THIN = "─────────────────────"
@@ -171,6 +171,51 @@ def build_doc_file_prompt(person: PersonRow, doc_name: str) -> tuple[str, Inline
 
 
 # ── Onboarding (🟡) ──────────────────────────────────────────────────────────
+
+def build_arrival_summary(
+    root: PersonRow, arrival: ArrivalDocsRow | None, companions: list[PersonRow],
+) -> tuple[str, InlineKeyboardMarkup]:
+    """شاشة ملخّص بيانات الوصول — تظهر عند فتح طلب ضمن "🟡 معلّق من
+    الوصول"، قبل بدء استكمال الصورة/تاريخ التنبيه، حتى يراجع الإداري
+    بيانات المريض كاملة أولاً بدل الانتقال المباشر لطلب الصورة."""
+    def _v(val: str) -> str:
+        return val if val else "—"
+
+    def _mark(file_id: str) -> str:
+        return "✅" if file_id else "⬜"
+
+    lines = [
+        _DIVIDER, "📋  **ملخّص بيانات الوصول**", "",
+        f"👤 {root.name}", _THIN, "",
+    ]
+
+    if arrival is None:
+        lines.append("⚠️ لا توجد بيانات وصول مطابقة لهذا الاسم.")
+    else:
+        lines += [
+            f"📅 تاريخ الوصول: {_v(arrival.arrival_date)}",
+            f"🛂 انتهاء الجواز: {_v(arrival.passport_expiry)}",
+            f"📋 انتهاء التأشيرة: {_v(arrival.visa_expiry)}",
+            f"🪪 انتهاء الإقامة: {_v(arrival.residence_expiry)}",
+            "",
+            "📎 *حالة الوثائق المرفوعة:*",
+            f"  جواز السفر: {_mark(arrival.passport_file_id)}",
+            f"  التأشيرة: {_mark(arrival.visa_file_id)}",
+            f"  التذاكر: {_mark(arrival.tickets_file_id)}",
+            f"  الإقامة: {_mark(arrival.residence_file_id)}",
+        ]
+
+    if companions:
+        lines += ["", f"🤝 *المرافقون ({len(companions)}):*"]
+        for c in companions:
+            lines.append(f"  • {c.name}")
+
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("▶️ ابدأ استكمال البيانات", callback_data=f"{RN}:onboard_resume_{root.id}")],
+        [InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:menu")],
+    ])
+    return "\n".join(lines), kb
+
 
 def build_onboard_photo_prompt(person: PersonRow, idx: int, total: int) -> tuple[str, InlineKeyboardMarkup]:
     text = (

@@ -69,11 +69,20 @@ async def _show_family(update: Update, context: ContextTypes.DEFAULT_TYPE, root_
         await _edit(update, "❌ لم يتم العثور على الطلب.", None)
         return
     if family.root.status == STATUS_WAITING_ARRIVAL:
-        await _show_onboard_step(update, context, root_id)
+        # ✅ ملخّص بيانات الوصول أولاً (بطلب المستخدم صراحةً — كان
+        # ينتقل مباشرة لطلب الصورة بلا عرض أي بيانات) — زرّ "ابدأ
+        # استكمال البيانات" هو من يدخل فعلياً في تسلسل الصورة/التنبيه.
+        await _show_arrival_summary(update, context, family)
         return
     person_ids = [family.root.id] + [c.id for c in family.companions]
     doc_counts = rn_repo.get_document_counts(person_ids)
     text, kb = rn_views.build_family_detail(family, is_admin=is_admin(uid), doc_counts=doc_counts)
+    await _edit(update, text, kb)
+
+
+async def _show_arrival_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, family: rn_repo.FamilyRow) -> None:
+    arrival = rn_repo.get_arrival_patient_docs_by_name(family.root.name)
+    text, kb = rn_views.build_arrival_summary(family.root, arrival, family.companions)
     await _edit(update, text, kb)
 
 
