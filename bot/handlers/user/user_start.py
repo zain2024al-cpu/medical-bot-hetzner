@@ -124,8 +124,6 @@ async def user_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await admin_start(update, context)
             return
     except Exception as e:
-        import logging
-        logger = logging.getLogger(__name__)
         logger.error(f"❌ Error in user_start (admin check): {e}", exc_info=True)
         if update and update.message:
             try:
@@ -156,9 +154,13 @@ async def user_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
                 # إرسال تنبيه للأدمن فوراً
                 from config.settings import ADMIN_IDS
-                import logging
-                logger = logging.getLogger(__name__)
-                
+                # ✅ يجب تعريفه هنا لا داخل else فقط — يُستخدَم لاحقاً (سطر
+                # notification_status) بصرف النظر عن حالة ADMIN_IDS، وكان
+                # هذا يُسقِط UnboundLocalError عند تسجيل مستخدم جديد
+                # فعلياً مع ADMIN_IDS فارغة (اكتُشِف عبر محاكاة حية بعد
+                # إصلاح خلل logger المشابه في نفس الدالة).
+                success_count = 0
+
                 if not ADMIN_IDS:
                     logger.warning("⚠️ لا يوجد أدمن محدد في ADMIN_IDS!")
                     print("⚠️ لا يوجد أدمن محدد في ADMIN_IDS!")
@@ -314,8 +316,6 @@ async def user_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=dynamic_user_kb(tg_id),
         )
     except Exception as e:
-        import logging
-        logger = logging.getLogger(__name__)
         logger.error(f"❌ Error in user_start: {e}", exc_info=True)
         if update and update.message:
             try:
