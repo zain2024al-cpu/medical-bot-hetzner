@@ -11,6 +11,8 @@ from telegram.ext import ContextTypes, CallbackQueryHandler, MessageHandler, fil
 from bot.shared_auth import is_admin
 from core.access.access_service import user_has_module
 from shared.calendar_picker import build_calendar
+from shared.multiselect import engine as multiselect
+from shared.result_router import register as _register_route
 
 from modules.residency.constants import RN, STATUS_ORDER, STATUS_WAITING_ARRIVAL
 from modules.residency import models as rn_models
@@ -24,6 +26,8 @@ _CTX_UPLOAD_TARGET = "_rn_upload_target"     # {"kind": "onboard_photo"|"issue_f
 _CTX_CAL_TARGET = "_rn_cal_target"           # {"kind": "onboard_remind"|"issue_expiry", "person_id": int, "root_id": int}
 _CTX_SEARCH_ACTIVE = "_rn_search_active"
 _CTX_DOC_NAME_ACTIVE = "_rn_doc_name_active"  # {"person_id": int} — بانتظار اسم وثيقة "أخرى" نصّياً
+_CTX_PRINT_ROOT_ID = "_rn_print_root_id"      # root_id بانتظار نتيجة شاشة اختيار وثائق الطباعة
+_RKEY_PRINT_CATS = "rn.print_categories"
 
 
 def _is_authorized(user_id: int) -> bool:
@@ -271,7 +275,16 @@ async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     if action.startswith("print_"):
         root_id = int(action[len("print_"):])
-        await _send_case_pdf(update, context, root_id)
+        context.user_data[_CTX_PRINT_ROOT_ID] = root_id
+        await multiselect.open(
+            update, context,
+            title="🖨️ اختر الوثائق المطلوب طباعتها",
+            options=rn_views.PRINT_DOC_OPTIONS,
+            return_to=_RKEY_PRINT_CATS,
+            icon="🖨️",
+            min_select=0,
+            preselected_ids=[o.id for o in rn_views.PRINT_DOC_OPTIONS],
+        )
         return
 
     if action == "search":
@@ -440,6 +453,28 @@ async def _on_media_message(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             await update.message.reply_text(text, reply_markup=kb, parse_mode="Markdown")
 
 
+async def _on_print_categories(result, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """نتيجة شاشة اختيار وثائق الطباعة (msel) — تُستدعى عبر result_router،
+    مسار مختلف عن `_dispatch_callback` فلا يمرّ عبر حارسه التلقائي."""
+    uid = update.effective_user.id if update.effective_user else 0
+    if not update.effective_user or not _is_authorized(uid):
+        logger.warning(f"[residency.print] blocked unauthorized user={uid}")
+        return
+
+    root_id = context.user_data.pop(_CTX_PRINT_ROOT_ID, None)
+    if root_id is None:
+        return
+
+    if result is None or result.cancelled:
+        try:
+            await update.callback_query.edit_message_text("✅ تم إلغاء الطباعة.")
+        except Exception:
+            logger.debug("تم تجاهل استثناء في _on_print_categories", exc_info=True)
+        return
+
+    await _send_case_pdf(update, context, root_id, selected=set(result.ids))
+
+
 async def _download_file_bytes(context: ContextTypes.DEFAULT_TYPE, file_id: str | None) -> bytes | None:
     if not file_id:
         return None
@@ -453,31 +488,79 @@ async def _download_file_bytes(context: ContextTypes.DEFAULT_TYPE, file_id: str 
         return None
 
 
-async def _build_person_pdf_dict(context: ContextTypes.DEFAULT_TYPE, person: rn_repo.PersonRow, *, role: str) -> dict:
+async def _build_person_pdf_dict(
+    context: ContextTypes.DEFAULT_TYPE, person: rn_repo.PersonRow, *, role: str, selected: set[str],
+) -> dict:
+    from datetime import datetime as _dt
     from modules.residency.constants import status_line
 
-    latest = rn_repo.get_latest_issuance(person.id)
     documents = rn_repo.get_documents_for_person(person.id)
-
-    photo_bytes = await _download_file_bytes(context, person.photo_file_id)
-    issuance_file_bytes = await _download_file_bytes(context, person.residency_file_id) if latest else None
     doc_dicts = []
     for d in documents:
+        if d.doc_type == "form_c" and "formc" not in selected:
+            continue
+        if d.doc_type != "form_c" and "otherdocs" not in selected:
+            continue
         label = "Form C" if d.doc_type == "form_c" else (d.doc_name or "وثيقة")
         file_bytes = await _download_file_bytes(context, d.file_id)
         doc_dicts.append({"label": label, "file_bytes": file_bytes})
+
+    photo_bytes = await _download_file_bytes(context, person.photo_file_id) if "photo" in selected else None
+
+    # ✅ لا رابط FK حقيقي بين res_persons وجداول الوصول — مطابقة بالاسم
+    # الحرفي فقط (نفس دقّة get_patient_by_name)، الجذر → ArrivalPatient،
+    # المرافق (parent_id مضبوط) → ArrivalCompanion.
+    arrival = (
+        rn_repo.get_arrival_patient_docs_by_name(person.name) if person.parent_id is None
+        else rn_repo.get_arrival_companion_docs_by_name(person.name)
+    )
+
+    arrival_docs: dict[str, bytes | None] = {}
+    if arrival:
+        if "passport" in selected and arrival.passport_file_id:
+            arrival_docs["passport"] = await _download_file_bytes(context, arrival.passport_file_id)
+        if "visa" in selected and arrival.visa_file_id:
+            arrival_docs["visa"] = await _download_file_bytes(context, arrival.visa_file_id)
+        if "tickets" in selected and arrival.tickets_file_id:
+            arrival_docs["tickets"] = await _download_file_bytes(context, arrival.tickets_file_id)
+
+    # ✅ "صورة الإقامة" — إقامة واحدة فقط تُطبَع، الأحدث زمنياً أياً كان
+    # مصدرها (وصول أو إصدار رسمي لاحق) — بطلب المستخدم صراحةً، لا تُعرَض
+    # الاثنتان معاً أبداً.
+    residence_doc = None
+    if "residence" in selected:
+        def _parse(d: str):
+            try:
+                return _dt.strptime(d, "%Y-%m-%d") if d else None
+            except ValueError:
+                return None
+
+        latest = rn_repo.get_latest_issuance(person.id)
+        issuance_date = _parse(latest.issued_at) if (latest and latest.file_id) else None
+        arrival_date = _parse(arrival.uploaded_at) if (arrival and arrival.residence_file_id) else None
+
+        if issuance_date and (not arrival_date or issuance_date >= arrival_date):
+            file_bytes = await _download_file_bytes(context, latest.file_id)
+            residence_doc = {"source": "إصدار رسمي", "date": latest.issued_at, "file_bytes": file_bytes}
+        elif arrival_date:
+            file_bytes = await _download_file_bytes(context, arrival.residence_file_id)
+            residence_doc = {"source": "من الوصول", "date": arrival.uploaded_at, "file_bytes": file_bytes}
+        else:
+            residence_doc = {"source": None, "date": "", "file_bytes": None}
 
     return {
         "name": person.name, "role": role, "status_text": status_line(person.status),
         "photo_bytes": photo_bytes,
         "expiry_date": person.expiry_date,
-        "last_issue_date": latest.issued_at if latest else "",
-        "issuance_file_bytes": issuance_file_bytes,
+        "arrival_docs": arrival_docs,
+        "residence_doc": residence_doc,
         "documents": doc_dicts,
     }
 
 
-async def _send_case_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE, root_id: int) -> None:
+async def _send_case_pdf(
+    update: Update, context: ContextTypes.DEFAULT_TYPE, root_id: int, *, selected: set[str],
+) -> None:
     import asyncio
     from datetime import datetime as dt
     from services.residency_case_pdf import build_case_pdf
@@ -489,9 +572,9 @@ async def _send_case_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE, roo
 
     await update.callback_query.answer("⏳ جارٍ تجهيز الملف...")
 
-    people = [await _build_person_pdf_dict(context, family.root, role="المريض")]
+    people = [await _build_person_pdf_dict(context, family.root, role="المريض", selected=selected)]
     for c in family.companions:
-        people.append(await _build_person_pdf_dict(context, c, role="مرافق"))
+        people.append(await _build_person_pdf_dict(context, c, role="مرافق", selected=selected))
 
     case = {
         "root_id": root_id, "case_no": str(root_id),
@@ -521,3 +604,11 @@ def register_handlers(app) -> None:
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, _on_media_message), group=17)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, _on_text_message), group=18)
     logger.info("[residency] flow handlers registered (rn: callbacks group 20, media group 17, text group 18)")
+
+
+def register_result_routes() -> None:
+    """نتيجة شاشة اختيار وثائق الطباعة (msel) — محرِّك الاختيار المتعدد
+    نفسه مسجَّل عالمياً مسبقاً في bot/handlers_registry.py، هذا فقط
+    يربط مفتاح النتيجة بدالّتنا."""
+    _register_route(_RKEY_PRINT_CATS, _on_print_categories)
+    logger.info(f"[residency] result routes registered: {_RKEY_PRINT_CATS}")

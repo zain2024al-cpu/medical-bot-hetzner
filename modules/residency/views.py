@@ -3,6 +3,8 @@
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
+from shared.multiselect import Option
+
 from modules.residency.constants import (
     RN, STATUS_ORDER, STATUS_ICONS, STATUS_LABELS, status_line,
     STATUS_WAITING_ARRIVAL, STATUS_ACTIVE, STATUS_EXPIRY_PENDING,
@@ -12,6 +14,17 @@ from modules.residency.repository import FamilyRow, PersonRow, LogEntry, Documen
 
 _DIVIDER = "━━━━━━━━━━━━━━━━━━━━"
 _THIN = "─────────────────────"
+
+# ── "🖨️ طباعة ملف الحالة" — فئات الوثائق القابلة للاختيار قبل الطباعة ──────
+PRINT_DOC_OPTIONS = [
+    Option(id="photo",     label="الصورة الشخصية", icon="📷"),
+    Option(id="passport",  label="جوازات السفر",   icon="🛂"),
+    Option(id="visa",      label="التأشيرات",       icon="📋"),
+    Option(id="residence", label="صورة الإقامة",    icon="🪪"),
+    Option(id="tickets",   label="التذاكر",         icon="🎫"),
+    Option(id="formc",     label="فورم سي",         icon="📋"),
+    Option(id="otherdocs", label="وثائق أخرى",      icon="📄"),
+]
 
 
 def build_main_menu(counts: dict) -> tuple[str, InlineKeyboardMarkup]:

@@ -254,3 +254,62 @@ def get_onboarding_queue(root_id: int) -> list[PersonRow]:
             .all()
         )
         return [_to_row(root)] + [_to_row(c) for c in comps]
+
+
+# ── ربط اختياري بوثائق "🛬 الوصول" (لغرض الطباعة فقط) ────────────────────────
+# ✅ لا رابط حقيقي (FK) بين res_persons وجداول الوصول — مطابقة بالاسم
+# الحرفي وقت الطباعة فقط، نفس دقّة services/patients_service.py::
+# get_patient_by_name() (filter_by مطابقة تامة، بلا تطبيع). عدم وجود
+# تطابق ⇒ None، يُتجاهَل بصمت من قِبَل المستدعي.
+
+@dataclass(frozen=True)
+class ArrivalDocsRow:
+    passport_file_id: str
+    visa_file_id: str
+    residence_file_id: str
+    tickets_file_id: str
+    uploaded_at: str   # "%Y-%m-%d" من created_at صف الوصول
+
+
+def get_arrival_patient_docs_by_name(name: str) -> ArrivalDocsRow | None:
+    from db.session import get_db
+    from db.models import ArrivalPatient
+
+    with get_db() as db:
+        row = (
+            db.query(ArrivalPatient)
+            .filter_by(name=name)
+            .order_by(ArrivalPatient.created_at.desc())
+            .first()
+        )
+        if not row:
+            return None
+        return ArrivalDocsRow(
+            passport_file_id=row.passport_file_id or "",
+            visa_file_id=row.visa_file_id or "",
+            residence_file_id=row.residence_file_id or "",
+            tickets_file_id=row.tickets_file_id or "",
+            uploaded_at=row.created_at.strftime("%Y-%m-%d") if row.created_at else "",
+        )
+
+
+def get_arrival_companion_docs_by_name(name: str) -> ArrivalDocsRow | None:
+    from db.session import get_db
+    from db.models import ArrivalCompanion
+
+    with get_db() as db:
+        row = (
+            db.query(ArrivalCompanion)
+            .filter_by(name=name)
+            .order_by(ArrivalCompanion.created_at.desc())
+            .first()
+        )
+        if not row:
+            return None
+        return ArrivalDocsRow(
+            passport_file_id=row.passport_file_id or "",
+            visa_file_id=row.visa_file_id or "",
+            residence_file_id=row.residence_file_id or "",
+            tickets_file_id=row.tickets_file_id or "",
+            uploaded_at=row.created_at.strftime("%Y-%m-%d") if row.created_at else "",
+        )

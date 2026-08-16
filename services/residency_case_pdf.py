@@ -158,10 +158,15 @@ def build_case_pdf(case: dict) -> io.BytesIO:
             {
                 "name": str, "role": str,               # "المريض" | "مرافق"
                 "status_text": str,                       # نص الحالة الجاهز (أيقونة + تسمية)
-                "photo_bytes": bytes | None,
-                "expiry_date": str,                        # قد تكون فارغة
-                "last_issue_date": str,                    # قد تكون فارغة
-                "issuance_file_bytes": bytes | None,
+                "photo_bytes": bytes | None,               # None = فئة "الصورة الشخصية" غير مطلوبة
+                "expiry_date": str,                        # قد تكون فارغة (معلومة نصّية دائماً)
+                "arrival_docs": {                            # مفاتيح المطلوب فقط منها — الغائب لا يُعرَض إطلاقاً
+                    "passport": bytes | None, "visa": bytes | None, "tickets": bytes | None,
+                },
+                "residence_doc": {                           # None = فئة "صورة الإقامة" غير مطلوبة
+                    "source": "من الوصول" | "إصدار رسمي" | None,  # None = مطلوبة لكن لا مصدر لدى الشخص
+                    "date": str, "file_bytes": bytes | None,
+                } | None,
                 "documents": [{"label": str, "file_bytes": bytes | None}],
             }, ...
         ],
@@ -278,13 +283,29 @@ def build_case_pdf(case: dict) -> io.BytesIO:
         if person.get("expiry_date"):
             block.append(P(f"تاريخ انتهاء الإقامة الحالية: {person['expiry_date']}", "body"))
 
-        block.append(Spacer(1, 0.1 * cm))
-        block.append(P("آخر إصدار للإقامة:", "body_b"))
-        if person.get("last_issue_date"):
-            block.append(P(f"تاريخ الإصدار: {person['last_issue_date']}", "body"))
-            block.extend(_attachment_flowables("ملف الإصدار", person.get("issuance_file_bytes"), person["name"]))
-        else:
-            block.append(P("لا يوجد إصدار سابق بعد.", "note"))
+        # ✅ إقامة واحدة فقط تُطبَع — الأحدث زمنياً أياً كان مصدرها (وصول
+        # أو إصدار رسمي لاحق)، بطلب المستخدم صراحةً؛ لا تُعرَض الاثنتان
+        # معاً أبداً. `residence_doc is None` = الفئة غير مطلوبة أصلاً.
+        residence_doc = person.get("residence_doc")
+        if residence_doc is not None:
+            block.append(Spacer(1, 0.1 * cm))
+            block.append(P("🪪 صورة الإقامة:", "body_b"))
+            if residence_doc.get("source"):
+                block.append(P(f"المصدر: {residence_doc['source']}  —  التاريخ: {residence_doc.get('date', '')}", "body"))
+                block.extend(_attachment_flowables("صورة الإقامة", residence_doc.get("file_bytes"), person["name"]))
+            else:
+                block.append(P("لا توجد إقامة مرفوعة.", "note"))
+
+        # ✅ وثائق "🛬 الوصول" (جواز/تأشيرة/تذاكر) — مصدر مستقل تماماً عن
+        # res_documents، مفاتيح غائبة = فئتها غير مطلوبة فلا يُعرَض سطرها.
+        arrival_docs = person.get("arrival_docs") or {}
+        if arrival_docs:
+            block.append(Spacer(1, 0.15 * cm))
+            block.append(P("📎 وثائق الوصول:", "body_b"))
+            _ARRIVAL_LABELS = [("passport", "جواز السفر"), ("visa", "التأشيرة"), ("tickets", "التذاكر")]
+            for key, label in _ARRIVAL_LABELS:
+                if key in arrival_docs:
+                    block.extend(_attachment_flowables(label, arrival_docs.get(key), person["name"]))
 
         block.append(Spacer(1, 0.15 * cm))
         docs = person.get("documents", [])
@@ -309,7 +330,8 @@ def build_case_pdf(case: dict) -> io.BytesIO:
 
     table_data = [header_row]
     for person in people:
-        last_issue = person.get("last_issue_date") or "—"
+        _rdoc = person.get("residence_doc")
+        last_issue = (_rdoc.get("date") if _rdoc and _rdoc.get("source") else None) or "—"
         table_data.append([
             P(str(len(person.get("documents", []))), "td_c"),
             P(last_issue, "td_c"),
