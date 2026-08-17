@@ -239,17 +239,21 @@ def _apply_session_number_edit(report, new_value: str) -> None:
     _one, the, _pl = unit_labels(treatment_key if treatment_key != 'dialysis' else None)
     summary = report.treatment_plan_summary or ""
     if re.search(_DIALYSIS_SESSION_PATTERN, summary):
+        # ✅ النص الحالي بالفعل بالصيغة اليدوية الجديدة — تعديل مباشر
+        # كافٍ، بلا استشارة TreatmentPlan إطلاقاً (نفس تصحيح
+        # treatment_and_endoscopy_edit.py::_apply_session_number_edit —
+        # راجع تعليقه لشرح الخلل الذي كان يقفز فجأة لصيغة "الخطة
+        # العلاجية" القديمة عند وجود خطة نشطة قديمة عالقة لنفس المريض).
         report.treatment_plan_summary = re.sub(
             _DIALYSIS_SESSION_PATTERN, f'رقم {the} الحالية: {new_value}', summary,
         )
-    elif treatment_key == 'dialysis':
-        report.treatment_plan_summary = f"🩸 **جلسات غسيل الكلى**\n\nرقم {the} الحالية: {new_value}"
-    elif treatment_key:
-        label = {'chemo': 'العلاج الكيماوي', 'targeted': 'العلاج الموجه', 'immuno': 'العلاج المناعي'}.get(treatment_key, '')
-        report.treatment_plan_summary = f"📋 **{label}**\n\nرقم {the} الحالية: {new_value}"
+        return
     if treatment_key == 'dialysis':
+        report.treatment_plan_summary = f"🩸 **جلسات غسيل الكلى**\n\nرقم {the} الحالية: {new_value}"
         return
     if treatment_key:
+        label = {'chemo': 'العلاج الكيماوي', 'targeted': 'العلاج الموجه', 'immuno': 'العلاج المناعي'}.get(treatment_key, '')
+        report.treatment_plan_summary = f"📋 **{label}**\n\nرقم {the} الحالية: {new_value}"
         from services.treatment_plan_service import get_active_plan, edit_plan, format_progress_text
         plan = get_active_plan(report.patient_id, treatment_key)
         if plan:

@@ -97,16 +97,27 @@ def _apply_session_number_edit(data: dict, flow_type: str, new_value: str) -> No
     _one, the, _pl = unit_labels(treatment_key if treatment_key != "dialysis" else None)
     summary = data.get("treatment_plan_summary") or ""
     if re.search(_DIALYSIS_SESSION_PATTERN, summary):
+        # ✅ النص الحالي بالفعل بالصيغة اليدوية الجديدة (نفس ما تكتبه
+        # _build_manual_session_summary عند إنشاء التقرير) — تعديل مباشر
+        # كافٍ. لا نستشير TreatmentPlan إطلاقاً هنا: لو استمر التنفيذ
+        # لأسفل، get_active_plan() قد يجد خطة نشطة قديمة تخص هذا المريض
+        # من نظام سابق (لا علاقة لها بهذا التقرير) وتقفز الصيغة فجأة إلى
+        # "📋 الخطة العلاجية: N دورة" رغم أن المترجم لم يُدخل أي عدد كلي —
+        # هذا هو الخلل الذي رصده المستخدم فعلياً في تقرير حقيقي.
         data["treatment_plan_summary"] = re.sub(
             _DIALYSIS_SESSION_PATTERN, f"رقم {the} الحالية: {new_value}", summary,
         )
-    elif treatment_key == "dialysis":
-        data["treatment_plan_summary"] = f"🩸 **جلسات غسيل الكلى**\n\nرقم {the} الحالية: {new_value}"
-    elif treatment_key:
-        label = {"chemo": "العلاج الكيماوي", "targeted": "العلاج الموجه", "immuno": "العلاج المناعي"}.get(treatment_key, "")
-        data["treatment_plan_summary"] = f"📋 **{label}**\n\nرقم {the} الحالية: {new_value}"
-    if treatment_key == "dialysis" or not treatment_key:
         return
+    if treatment_key == "dialysis":
+        data["treatment_plan_summary"] = f"🩸 **جلسات غسيل الكلى**\n\nرقم {the} الحالية: {new_value}"
+        return
+    if not treatment_key:
+        return
+    label = {"chemo": "العلاج الكيماوي", "targeted": "العلاج الموجه", "immuno": "العلاج المناعي"}.get(treatment_key, "")
+    data["treatment_plan_summary"] = f"📋 **{label}**\n\nرقم {the} الحالية: {new_value}"
+    # ✅ الوصول لهنا يعني النص الحالي لم يكن بالصيغة اليدوية إطلاقاً —
+    # على الأرجح تقرير قديم من قبل إلغاء TreatmentPlan لهذه الأنواع
+    # الثلاثة، فيُحاوَل تحديث خطته الفعلية كـ fallback توافق فقط.
     patient_id = data.get("patient_id")
     if patient_id:
         from services.treatment_plan_service import get_active_plan, edit_plan, format_progress_text
