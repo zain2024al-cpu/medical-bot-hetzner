@@ -160,7 +160,15 @@ def _unique(items: list[str], limit: int = 3) -> list[str]:
 
 
 def _trim(text: str, limit: int = 300) -> str:
-    return text if len(text) <= limit else text[:limit] + "…"
+    """يقصّ النص ثم يهرّب محارف Markdown — نقطة العبور الوحيدة لكل نص حر
+    (شكوى/تشخيص/قرار/توصية) قبل حشره في السرد. بلا هذا، محرف واحد غير
+    متزاوج من `_ * `` [` في نص طبي حر (شائع: "مستقر* بانتظار المتابعة")
+    يُسقط `parse_mode="Markdown"` عند الإرسال في user_case_summary.py
+    بـ`BadRequest: Can't parse entities` — نفس نمط الخلل المُصلَح سابقاً
+    عبر escape_md_v1() في شاشات تعديل التقرير."""
+    trimmed = text if len(text) <= limit else text[:limit] + "…"
+    from telegram.helpers import escape_markdown
+    return escape_markdown(trimmed, version=1)
 
 
 # ─── Structured field parser for doctor_decision ─────────

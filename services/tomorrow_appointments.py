@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from db.session import SessionLocal
 from db.models import Report
 from sqlalchemy import func
+from telegram.helpers import escape_markdown
 
 logger = logging.getLogger(__name__)
 
@@ -51,16 +52,20 @@ async def notify_admins_of_tomorrow_appointments(bot, admin_ids):
             message += "━━━━━━━━━━━━━━━━━━━━━━━\n\n"
             
             for i, appt in enumerate(appointments, 1):
-                p_name = appt.patient_name or "غير محدد"
-                dept = appt.department or "غير محدد"
+                # ✅ تهريب Markdown — هذه الحقول نص حر (اسم مريض/قسم/مترجم مُدخَل
+                # يدوياً)، ومحرف واحد غير متزاوج من `_ * `` [` يُسقط الإرسال
+                # بـBadRequest لكل الأدمن دفعة واحدة (نفس نمط escape_md_v1 الموثَّق
+                # في utils.py لشاشات تعديل التقرير).
+                p_name = escape_markdown(appt.patient_name or "غير محدد", version=1)
+                dept = escape_markdown(appt.department or "غير محدد", version=1)
                 # ✅ الوقت: نُفضّل followup_time (نص مُدخل يدوياً) وإلا نأخذه من ساعة followup_date
                 if appt.followup_time:
-                    time_str = appt.followup_time
+                    time_str = escape_markdown(appt.followup_time, version=1)
                 elif appt.followup_date and (appt.followup_date.hour or appt.followup_date.minute):
                     time_str = appt.followup_date.strftime("%H:%M")
                 else:
                     time_str = "غير محدد"
-                translator = appt.translator_name or "غير محدد"
+                translator = escape_markdown(appt.translator_name or "غير محدد", version=1)
                 
                 message += f"{i}. 👤 **المريض:** {p_name}\n"
                 message += f"   🏢 **القسم:** {dept}\n"

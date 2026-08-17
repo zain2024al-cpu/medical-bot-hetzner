@@ -13,6 +13,7 @@ import logging
 from datetime import datetime, date, timedelta
 from db.session import SessionLocal
 from db.models import PendingReport, Report
+from telegram.helpers import escape_markdown
 
 logger = logging.getLogger(__name__)
 
@@ -366,33 +367,38 @@ def get_pending_reports_summary_text() -> str:
     overdue_1 = [p for p in pending_list if p['days_waiting'] == 1]
     today = [p for p in pending_list if p['days_waiting'] == 0]
 
+    # ✅ اسم المريض/القسم/المترجم نص حر — تهريب Markdown قبل الحشر يمنع
+    # BadRequest عند وجود محرف `_ * `` [` غير متزاوج (نفس نمط escape_md_v1).
+    def _safe(v) -> str:
+        return escape_markdown(str(v) if v else "", version=1)
+
     # التقارير المتأخرة أكثر من 3 أيام
     if overdue_3plus:
         text += "🔴 **متأخرة أكثر من 3 أيام:**\n"
         for p in overdue_3plus:
             text += (
-                f"  • {p['patient_name']}\n"
-                f"    القسم: {p['department']} | {p['days_waiting']} أيام\n"
-                f"    المترجم: {p['translator_name']}\n\n"
+                f"  • {_safe(p['patient_name'])}\n"
+                f"    القسم: {_safe(p['department'])} | {p['days_waiting']} أيام\n"
+                f"    المترجم: {_safe(p['translator_name'])}\n\n"
             )
 
     # متأخرة يومين
     if overdue_2:
         text += "⚠️ **متأخرة يومين:**\n"
         for p in overdue_2:
-            text += f"  • {p['patient_name']} - {p['department']}\n"
+            text += f"  • {_safe(p['patient_name'])} - {_safe(p['department'])}\n"
 
     # متأخرة يوم واحد
     if overdue_1:
         text += "🟡 **منذ يوم واحد:**\n"
         for p in overdue_1:
-            text += f"  • {p['patient_name']} - {p['department']}\n"
+            text += f"  • {_safe(p['patient_name'])} - {_safe(p['department'])}\n"
 
     # اليوم
     if today:
         text += "🟢 **اليوم (للتو):**\n"
         for p in today:
-            text += f"  • {p['patient_name']} - {p['department']}\n"
+            text += f"  • {_safe(p['patient_name'])} - {_safe(p['department'])}\n"
 
     text += "\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
     text += "💡 تم إنشاء هذا التقرير تلقائياً كل يوم لمتابعة التقارير المعلقة."

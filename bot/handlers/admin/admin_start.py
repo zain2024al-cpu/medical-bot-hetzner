@@ -139,8 +139,10 @@ async def handle_user_approval(update: Update, context: ContextTypes.DEFAULT_TYP
                     parse_mode="Markdown"
                 )
             except Exception as e:
-                import logging
-                logger = logging.getLogger(__name__)
+                # ✅ استُخدِم logger مستوى الملف مباشرة (لا إعادة تعريف محلية) —
+                # نفس خلل UnboundLocalError المُصلَح سابقاً في user_start.py: أي
+                # تعريف محلي لـlogger داخل الدالة يجعله محلياً للدالة بأكملها،
+                # فيسقط فرع "reject" الأسفل عند استخدامه دون تعريف محلي سابق له.
                 logger.error(f"❌ خطأ في إرسال القائمة بعد الموافقة: {e}", exc_info=True)
                 # إرسال رسالة بسيطة كـ fallback
                 try:

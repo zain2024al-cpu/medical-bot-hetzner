@@ -37,8 +37,8 @@ from modules.healthcare.medical_followup.session import (
     STEP_IMAGES, STEP_NOTES, STEP_SPECIALIST, STEP_REVIEW,
 )
 from modules.healthcare.medical_followup.views import (
-    HC, HCFU,
-    build_date_prompt, build_date_calendar_prompt, build_followup_menu,
+    HCFU,
+    build_date_prompt, build_date_calendar_prompt,
     build_dept_other_prompt,
     build_complaint_other_prompt,
     build_vitals_temp_prompt, build_vitals_bp_prompt,
@@ -881,41 +881,6 @@ async def _cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await _safe_reply(update, text, kb)
 
 
-# ── HC callbacks (shared navigation) — late-binding to avoid circular imports ──
-
-async def _handle_hc_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    query = update.callback_query
-    if not query:
-        return
-    data = query.data or ""
-    try:
-        await query.answer()
-    except Exception:
-        logger.debug("تم تجاهل استثناء في _handle_hc_callback", exc_info=True)
-    # ✅ الحماية داخل المعالِج نفسه — مستقلة تماماً عن ظهور الزر في القائمة.
-    if not query.from_user or not _is_authorized(query.from_user.id):
-        logger.warning(f"[followup.hc] 🚫 blocked unauthorized user={getattr(query.from_user, 'id', '?')}")
-        return
-
-    action = data[len(HC) + 1:]   # strip "hc:"
-
-    if action == "main":
-        from modules.healthcare.views import build_healthcare_menu
-        text, kb = build_healthcare_menu()
-        try:
-            await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
-        except Exception:
-            await _safe_reply(update, text, kb)
-    elif action == "followup":
-        text, kb = build_followup_menu()
-        try:
-            await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
-        except Exception:
-            await _safe_reply(update, text, kb)
-    else:
-        logger.debug(f"[followup] hc: action not handled here: {action!r}")
-
-
 # ── HCFU callback dispatcher ──────────────────────────────────────────────────
 
 async def _handle_hcfu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -983,8 +948,10 @@ def register_handlers(app) -> None:
         CallbackQueryHandler(_handle_hcfu_callback, pattern=rf"^{HCFU}:"),
         group=1,
     )
-    app.add_handler(
-        CallbackQueryHandler(_handle_hc_callback, pattern=rf"^{HC}:"),
-        group=1,
-    )
+    # ✅ "hc:" (تنقّل مشترك بين وحدات الرعاية الصحية) لا يُسجَّل هنا — كانت
+    # نسخة مكرَّرة ميتة دائماً (woundcare/flow.py يسجّل نفس النمط في نفس
+    # المجموعة أولاً، فتوقفت PTB عندها ولم تُنفَّذ هذه النسخة قط)، وأيضاً
+    # قديمة (تعرض قائمة "المتابعة" الوسيطة بدل الانتقال المباشر لبدء
+    # التدفق كما في woundcare الحالي). حُذفت لتفادي مفاجأة صامتة لو تغيّر
+    # ترتيب التسجيل يوماً.
     logger.info("[followup] handlers registered")

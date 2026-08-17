@@ -2824,11 +2824,12 @@ async def show_field_selection(query, context):
         
         # ✅ الحصول على الحقول المحددة لهذا النوع من الإجراء
         all_fields = get_editable_fields_by_action_type(medical_action)
-        
+
         # ✅ بناء الأزرار - عرض فقط الحقول التي لها قيمة فعلية
-        import logging
-        logger = logging.getLogger(__name__)
-        
+        # (logger مستوى الملف يُستخدَم مباشرة — إعادة تعريفه محلياً هنا كانت
+        # تُسقِط الدالة بـUnboundLocalError عند أي except أعلاه في نفس الدالة،
+        # لأن التعريف المحلي يجعل الاسم محلياً للدالة بأكملها بصرف النظر عن
+        # ترتيب التنفيذ. نفس خلل user_start.py/admin_start.py بالضبط.)
         fields_with_values = []
         for field_name, field_display in all_fields:
             # ✅ التحقق من وجود قيمة فعلية للحقل

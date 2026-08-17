@@ -3,15 +3,19 @@
 # 🔹 نظام تتبع التقارير التلقائي للمترجمين
 # ================================================
 
+import logging
 from datetime import datetime, date, time
 from db.session import SessionLocal
 from db.models import (
-    DailyReportTracking, TranslatorNotification, 
+    DailyReportTracking, TranslatorNotification,
     Translator, Report
 )
 from telegram import Bot
+from telegram.helpers import escape_markdown
 from config.settings import BOT_TOKEN
 import asyncio
+
+logger = logging.getLogger(__name__)
 
 class ScheduleTracker:
     """نظام تتبع التقارير اليومية للمترجمين"""
@@ -80,10 +84,14 @@ class ScheduleTracker:
                 translator = s.query(Translator).filter_by(full_name=record.translator_name).first()
                 
                 if translator:
+                    # ✅ اسم المترجم نص حر (يُدخله الأدمن عند الإنشاء) — تهريب
+                    # Markdown قبل حشره في رسالة parse_mode='Markdown' يمنع
+                    # BadRequest عند وجود محرف `_ * `` [` غير متزاوج.
+                    safe_name = escape_markdown(record.translator_name or "", version=1)
                     # إرسال التذكير
                     message = (
                         f"🔔 **تذكير بعد الظهر**\n\n"
-                        f"مرحباً {record.translator_name}\n\n"
+                        f"مرحباً {safe_name}\n\n"
                         f"📅 التاريخ: {target_date.strftime('%Y-%m-%d')}\n"
                         f"📝 التقارير المطلوبة: {record.expected_reports}\n"
                         f"📊 التقارير المرفوعة: {record.actual_reports}\n\n"
@@ -111,7 +119,7 @@ class ScheduleTracker:
                         record.reminder_sent = True
                         
                     except Exception as e:
-                        print(f"❌ فشل إرسال تذكير لـ {record.translator_name}: {e}")
+                        logger.error(f"❌ فشل إرسال تذكير لـ {record.translator_name}: {e}")
             
             s.commit()
     
@@ -129,10 +137,11 @@ class ScheduleTracker:
                 translator = s.query(Translator).filter_by(full_name=record.translator_name).first()
                 
                 if translator:
+                    safe_name = escape_markdown(record.translator_name or "", version=1)
                     # إرسال التذكير النهائي
                     message = (
                         f"🚨 **تذكير نهائي**\n\n"
-                        f"مرحباً {record.translator_name}\n\n"
+                        f"مرحباً {safe_name}\n\n"
                         f"📅 التاريخ: {target_date.strftime('%Y-%m-%d')}\n"
                         f"📝 التقارير المطلوبة: {record.expected_reports}\n"
                         f"📊 التقارير المرفوعة: {record.actual_reports}\n\n"
@@ -157,7 +166,7 @@ class ScheduleTracker:
                         s.add(notification)
                         
                     except Exception as e:
-                        print(f"❌ فشل إرسال تذكير نهائي لـ {record.translator_name}: {e}")
+                        logger.error(f"❌ فشل إرسال تذكير نهائي لـ {record.translator_name}: {e}")
             
             s.commit()
     
@@ -197,8 +206,9 @@ class ScheduleTracker:
                 summary += "⚠️ **المترجمين المتأخرين:**\n"
                 for record in tracking_records:
                     if not record.is_completed:
-                        summary += f"• {record.translator_name}: {record.actual_reports}/{record.expected_reports}\n"
-            
+                        safe_name = escape_markdown(record.translator_name or "", version=1)
+                        summary += f"• {safe_name}: {record.actual_reports}/{record.expected_reports}\n"
+
             # إرسال للأدمن
             for admin_id in ADMIN_IDS.split(','):
                 try:
@@ -208,7 +218,7 @@ class ScheduleTracker:
                         parse_mode='Markdown'
                     )
                 except Exception as e:
-                    print(f"❌ فشل إرسال الملخص للأدمن {admin_id}: {e}")
+                    logger.error(f"❌ فشل إرسال الملخص للأدمن {admin_id}: {e}")
 
 # إنشاء مثيل عام للمتعقب
 schedule_tracker = ScheduleTracker()
@@ -230,7 +240,7 @@ async def run_daily_tracking():
             await asyncio.sleep(60)
             
         except Exception as e:
-            print(f"❌ خطأ في تتبع الجدول: {e}")
+            logger.error(f"❌ خطأ في تتبع الجدول: {e}", exc_info=True)
             await asyncio.sleep(60)
 
 
