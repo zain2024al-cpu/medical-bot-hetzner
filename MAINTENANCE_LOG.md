@@ -20,7 +20,7 @@
 | ~~`bot/handlers/user/user_reports_edit.py` → `handle_field_selection()`: قاموس `field_names`~~ **أُزيل 2026-08-18 (إدخال ٥٠)** — يقرأ الآن من `get_editable_fields_by_action_type()` مباشرة (نفس مصدر أزرار الحقول) | التسمية العربية في عنوان شاشة "✏️ تعديل: ..." | ~~لم يعد بنداً منفصلاً — لا يمكن أن يُنسى لأنه لم يعد قائمة يدوية إطلاقاً~~ |
 | `bot/handlers/user/user_reports_add_new_system/execute_smart_state_action.py` | إعادة عرض الشاشة عند ضغط "🔙 رجوع" | "⚠️ خطأ في التنقل" بدل الرجوع للسؤال السابق |
 | `services/broadcast_service.py` → `format_report_message()` | بناء بطاقة التقرير المنشورة | حقول مفقودة/فارغة في البطاقة رغم حفظها بالقاعدة |
-| `bot/handlers/user/user_reports_add_new_system/flows/shared.py` → قوائم `valid_flow_types` (3 مواضع) + `get_translator_state()`/`get_confirm_state()` | التحقق من صحة flow_type وربطه بحالة المحادثة الصحيحة | يرتدّ المسار لـ new_consult خطأً |
+| ~~`bot/handlers/user/user_reports_add_new_system/flows/shared.py` → قوائم `valid_flow_types` (3 مواضع)~~ **أُزيلت 2026-08-18 (إدخال ٥١)** — مُشتقّة الآن من `field_registry.VALID_FLOW_TYPES` عبر `resolve_flow_type_for_confirmation()` موحَّدة. `get_translator_state()`/`get_confirm_state()` أنفسهما (قاموسا حالة منفصلان) **لم يُلمسا بعد** — لا يزالان يحتاجان تسجيلاً يدوياً منفصلاً | التحقق من صحة flow_type وربطه بحالة المحادثة الصحيحة | ~~لم يعد بنداً منفصلاً لقوائم الصلاحية~~ — لكن نسيان `get_translator_state`/`get_confirm_state` لنوع جديد لا يزال يرتدّ المسار لـ new_consult/بلا حالة تأكيد صحيحة |
 
 **فحص سريع لأي نوع إجراء جديد**: ابحث عن اسم الـ flow_type الجديد في
 كل ملف من القائمة أعلاه؛ أي ملف لا يحتوي عليه = عطل مؤجل.
@@ -4734,6 +4734,59 @@ field_display = dict(get_editable_fields_by_action_type(medical_action)).get(fie
 `get_confirm_state()` في `flows/shared.py` — كل بند يحتاج فحصاً منفصلاً
 لتحديد إن كان قابلاً للتوحيد عبر `field_registry.py` بنفس الأمان، أو
 يحتاج تصميماً مختلفاً.
+
+لا حاجة لسكربت هجرة — إصلاح كود منطقي بحت، بلا أي تغيير على المخطط.
+
+### 2026-08-18 (٥١) — 🏗️ توحيد قوائم `valid_flow_types` الثلاث المكرَّرة في `flows/shared.py`
+
+**السياق**: تتمة مباشرة للإدخال ٥٠ — البند التالي من "النمط الجذري
+المتكرر". قائمة `valid_flow_types` (23 قيمة بالضبط) كانت مكرَّرة
+**حرفياً بشكل منفصل في 3 دوال مختلفة**: `handle_final_confirm`،
+`save_report_to_database`، `handle_translator_page_navigation` — كل
+واحدة مصحوبة بنسخة منفصلة من قاموس `more_specific_flows`
+(`{"followup": ["periodic_followup", "inpatient_followup"]}`). تحقّقت
+برمجياً: محتوى القوائم الثلاث **متطابق تماماً** (23/23)، لكن منطق
+الـfallback حولها **اختلف فعلياً**: نسختا `save_report_to_database`
+و`handle_translator_page_navigation` تتراجعان لـ`new_consult` صراحة
+إن كان كل من flow_type وcurrent_flow غير صالحين، بينما نسخة
+`handle_final_confirm` **كانت تفتقد هذا الـfallback الأخير** — دليل
+حي على أن التكرار اليدوي بدأ يتباعد فعلاً ولو بصمت (لا أثر عملي هنا
+لأن `get_confirm_state`/`get_translator_state` تفشلان بأمان لأي
+flow_type غير معروف عبر `.get(x, NEW_CONSULT_*)`، لكنه فرق سلوك حقيقي
+كان يمكن أن يصبح خطراً لو تغيّرت تلك الدوال مستقبلاً).
+
+**الإصلاح**: `field_registry.py` يحتوي الآن:
+- `VALID_FLOW_TYPES` — مُشتقّة آلياً من `REPORT_FIELD_REGISTRY.keys()`
+  (مطروحاً منها المفتاحان المرادفان `rehab_physical_short`/
+  `app_reschedule`، ومضافاً إليها `"followup"` كقيمة قديمة عامة موثَّقة
+  صراحة) — تحقّقتُ أنها تطابق الاتحاد الأصلي للقوائم الثلاث حرفاً بحرف.
+- `resolve_flow_type_for_confirmation(flow_type, current_flow)` — يحل
+  محل كل نسخ منطق "الأكثر تحديداً له الأولوية، وإلا تحقق الصلاحية، وإلا
+  new_consult" الثلاث، بالسلوك **الأكثر أماناً** من النسخ الثلاث (يشمل
+  fallback الـnew_consult الذي كان مفقوداً في `handle_final_confirm`).
+
+الدوال الثلاث في `flows/shared.py` تستدعي هذه الدالة الواحدة الآن بدل
+القوائم المحلية.
+
+**التحقق**: مقارنة برمجية صارمة أن `VALID_FLOW_TYPES` يطابق اتحاد
+القوائم الثلاث الأصلية (23/23) · اختبار `resolve_flow_type_for_
+confirmation` مباشرة لكل السيناريوهات (نوع صالح، نوع عام مع بديل أكثر
+تحديداً، نوع غير معروف مع/بلا current_flow صالح) · محاكاة حيّة كاملة
+عبر `handle_translator_page_navigation` الفعلية (3 سيناريوهات: بديل
+أكثر تحديداً، نوع صالح مباشرة، نوع غير معروف كلياً) — الثلاثة نجحت بلا
+استثناء · حذف `__pycache__` بالكامل ثم `pytest -q --ignore=Archive`
+(187 نجح) · فحص `register_all_handlers()` حقيقي (166 معالِجاً — بلا
+تغيير).
+
+**ما تبقّى** من "النمط الجذري المتكرر": `before_publish/router.py`،
+`handle_report_selection()`: قاموس `current_report_data` (⚠️ هذا البند
+تحديداً متشابك مع كود تحليل `doctor_decision` المركّب القديم — نفس
+الكود الذي تستهدفه المهمة المعلَّقة #124 "حذف كود التحليل المركّب
+الميت بعد التأكد من الترحيل"، فيحتاج فحصاً حذراً لمخاطر بيانات حقيقية
+لا مجرد إعادة هيكلة، وليس بنفس أمان هذا الإصلاح)، `execute_smart_
+state_action.py`، `broadcast_service.py::format_report_message()`،
+و`get_translator_state()`/`get_confirm_state()` (قاموسا حالة منفصلان
+لم يُلمسا).
 
 لا حاجة لسكربت هجرة — إصلاح كود منطقي بحت، بلا أي تغيير على المخطط.
 

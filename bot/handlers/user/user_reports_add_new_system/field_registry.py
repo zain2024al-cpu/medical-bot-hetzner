@@ -217,10 +217,59 @@ REPORT_FIELD_REGISTRY["rehab_physical_short"] = REPORT_FIELD_REGISTRY["rehab_phy
 # لنفس "appointment_reschedule" — يُبقى مرادفاً لتفادي كسر أي استدعاء قديم.
 REPORT_FIELD_REGISTRY["app_reschedule"] = REPORT_FIELD_REGISTRY["appointment_reschedule"]
 
+# ✅ مفاتيح مرادفة فقط (تشير لنفس قائمة حقول نوع آخر) — لا تُحسَب كـ
+# "flow_type حي" مستقل بذاته يمكن أن يظهر فعلياً في report_tmp["current_flow"]
+# أثناء محادثة نشطة (القيمة الحية تكون دائماً الاسم الأساسي).
+_ALIAS_FLOW_TYPES = frozenset({"rehab_physical_short", "app_reschedule"})
+
 
 def get_fields_for_flow_type(flow_type: str) -> list[FieldDef]:
     """القائمة الأولية — تُستخدم مباشرة قبل النشر (flow_type معروف من السياق)."""
     return list(REPORT_FIELD_REGISTRY.get(flow_type or "", []))
+
+
+# =============================================================================
+# VALID_FLOW_TYPES — قائمة أنواع الإجراء الحية المعروفة أثناء محادثة نشطة
+# =============================================================================
+# ⚠️ كانت هذه القائمة (بنفس الـ23 قيمة بالضبط) مكرَّرة يدوياً في **3 مواضع
+# مستقلة** داخل flows/shared.py (handle_final_confirmation،
+# save_report_to_database، handle_translator_page_navigation) — بند من
+# "النمط الجذري المتكرر" الموثَّق في MAINTENANCE_LOG.md. مُشتقّة الآن آلياً
+# من REPORT_FIELD_REGISTRY نفسه فيستحيل أن تتباعد عنه — أي نوع جديد يُضاف
+# للسجل يصبح "صالحاً" تلقائياً بلا أي تعديل هنا.
+#
+# "followup" حالة خاصة: قيمة عامة قديمة من صيغة callback_data سابقة (قبل
+# تقسيم periodic_followup/inpatient_followup) — لا قائمة حقول خاصة بها في
+# REPORT_FIELD_REGISTRY، لكنها تبقى قيمة "صالحة" قد تصل من أزرار/بيانات
+# قديمة ويُعاد توجيهها فوراً عبر resolve_flow_type_for_confirmation أدناه.
+VALID_FLOW_TYPES: frozenset[str] = (
+    frozenset(REPORT_FIELD_REGISTRY.keys()) - _ALIAS_FLOW_TYPES
+) | frozenset({"followup"})
+
+# ✅ عند وجود flow_type أعمّ (مثل "followup") وcurrent_flow أكثر تحديداً
+# (periodic_followup/inpatient_followup)، الأكثر تحديداً له الأولوية دائماً.
+# كان هذا القاموس أيضاً مكرَّراً بنفس الـ3 مواضع أعلاه.
+_MORE_SPECIFIC_FLOW_TYPES: dict[str, tuple[str, ...]] = {
+    "followup": ("periodic_followup", "inpatient_followup"),
+}
+
+
+def resolve_flow_type_for_confirmation(flow_type: str, current_flow: str) -> str:
+    """يحل flow_type الفعلي عند التأكيد/الحفظ/التنقل بين صفحات المترجمين —
+    نفس منطق "الأكثر تحديداً له الأولوية، وإلا: تحقق من الصلاحية، وإلا:
+    new_consult" المكرَّر سابقاً بشكل مستقل بثلاث نسخ في flows/shared.py
+    (بفروق طفيفة بينها — إحداها كانت تفتقد fallback الـnew_consult
+    النهائي، بلا أثر عملي لأن get_confirm_state/get_translator_state
+    تفشل بأمان لأي flow_type غير معروف أصلاً، لكن توحيدها هنا يزيل
+    الفرق الوحيد القائم بين النسخ الثلاث)."""
+    more_specific = _MORE_SPECIFIC_FLOW_TYPES.get(flow_type)
+    if more_specific and current_flow in more_specific:
+        return current_flow
+    if flow_type not in VALID_FLOW_TYPES:
+        if current_flow in VALID_FLOW_TYPES:
+            return current_flow
+        return "new_consult"
+    return flow_type
 
 
 # =============================================================================

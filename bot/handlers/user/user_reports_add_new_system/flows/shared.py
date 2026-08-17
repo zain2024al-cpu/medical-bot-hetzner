@@ -1651,25 +1651,21 @@ async def handle_final_confirm(update: Update, context: ContextTypes.DEFAULT_TYP
     
     data = context.user_data.get("report_tmp", {})
     current_flow = data.get("current_flow", "")
-    valid_flow_types = ["new_consult", "followup", "emergency", "admission", "surgery_consult",
-                         "operation", "final_consult", "discharge", "rehab_physical", "rehab_device", "radiology", "appointment_reschedule",
-                         "radiation_therapy", "periodic_followup", "inpatient_followup", "device", "endoscopy",
-                         "treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis", "treatment_combined", "transplant"]
 
     logger.info(f"🔍 [HANDLE_FINAL_CONFIRM] report_tmp current_flow: {current_flow}")
     logger.info(f"🔍 [HANDLE_FINAL_CONFIRM] report_tmp medical_action: {data.get('medical_action', '')}")
 
-    # ✅ إصلاح: إذا كان current_flow أكثر تحديداً (مثل periodic_followup بدلاً من followup)، استخدمه
-    more_specific_flows = {
-        "followup": ["periodic_followup", "inpatient_followup"],
-    }
-    if flow_type in more_specific_flows and current_flow in more_specific_flows.get(flow_type, []):
-        logger.info(f"💾 ✅ [CONFIRM] Overriding flow_type '{flow_type}' with more specific current_flow '{current_flow}'")
-        flow_type = current_flow
-    elif flow_type not in valid_flow_types:
-        if current_flow and current_flow in valid_flow_types:
-            flow_type = current_flow
-            logger.info(f"💾 Using current_flow from report_tmp: {flow_type}")
+    # ✅ منطق "الأكثر تحديداً له الأولوية، وإلا تحقق الصلاحية" موحَّد الآن
+    # في field_registry.py::resolve_flow_type_for_confirmation — كان مكرَّراً
+    # يدوياً هنا وفي save_report_to_database وhandle_translator_page_navigation
+    # (بند من "النمط الجذري المتكرر" في MAINTENANCE_LOG.md).
+    from bot.handlers.user.user_reports_add_new_system.field_registry import (
+        resolve_flow_type_for_confirmation,
+    )
+    _resolved = resolve_flow_type_for_confirmation(flow_type, current_flow)
+    if _resolved != flow_type:
+        logger.info(f"💾 ✅ [CONFIRM] Resolved flow_type '{flow_type}' → '{_resolved}' (current_flow='{current_flow}')")
+        flow_type = _resolved
 
     logger.info(f"💾 Action: {action}, Flow type: {flow_type}")
 
@@ -1756,28 +1752,20 @@ async def save_report_to_database(query, context, flow_type):
     logger.info(f"💾 Current flow in data: {data.get('current_flow', 'NOT FOUND')}")
     logger.info(f"💾 Flow type parameter: {flow_type}")
     
-    # التحقق من flow_type من report_tmp إذا كان flow_type غير صحيح
+    # ✅ التحقق من flow_type من report_tmp إذا كان flow_type غير صحيح — موحَّد
+    # الآن عبر field_registry.py::resolve_flow_type_for_confirmation (انظر
+    # تعليقها في handle_final_confirm أعلاه لسبب هذا التوحيد).
     current_flow = data.get("current_flow", "")
-    valid_flow_types = ["new_consult", "followup", "emergency", "admission", "surgery_consult",
-                         "operation", "final_consult", "discharge", "rehab_physical", "rehab_device", "radiology", "appointment_reschedule",
-                         "radiation_therapy", "periodic_followup", "inpatient_followup", "device", "endoscopy",
-                         "treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis", "treatment_combined", "transplant"]
-
-    # ✅ إصلاح: إذا كان current_flow أكثر تحديداً (مثل periodic_followup بدلاً من followup)، استخدمه
-    # المسارات الأكثر تحديداً لها الأولوية
-    more_specific_flows = {
-        "followup": ["periodic_followup", "inpatient_followup"],  # periodic_followup و inpatient_followup أكثر تحديداً من followup
-    }
-    if flow_type in more_specific_flows and current_flow in more_specific_flows.get(flow_type, []):
-        logger.info(f"💾 ✅ Overriding flow_type '{flow_type}' with more specific current_flow '{current_flow}'")
-        flow_type = current_flow
-    elif flow_type not in valid_flow_types:
-        if current_flow and current_flow in valid_flow_types:
-            flow_type = current_flow
-            logger.info(f"💾 Using current_flow from report_tmp: {flow_type}")
-        else:
+    from bot.handlers.user.user_reports_add_new_system.field_registry import (
+        resolve_flow_type_for_confirmation,
+    )
+    _resolved = resolve_flow_type_for_confirmation(flow_type, current_flow)
+    if _resolved != flow_type:
+        if _resolved == "new_consult" and current_flow != _resolved:
             logger.warning(f"💾 ⚠️ Invalid flow_type '{flow_type}' and current_flow '{current_flow}', defaulting to 'new_consult'")
-            flow_type = "new_consult"
+        else:
+            logger.info(f"💾 ✅ Resolved flow_type '{flow_type}' → '{_resolved}' (current_flow='{current_flow}')")
+        flow_type = _resolved
 
     # ✅ إضافة تحقق للتأكد من تطابق medical_action مع flow_type
     medical_action = data.get("medical_action", "")
@@ -3236,20 +3224,13 @@ async def handle_translator_page_navigation(update: Update, context: ContextType
         flow_type = parts[1]
         page = int(parts[2])
 
-        valid_flow_types = [
-            "new_consult", "followup", "periodic_followup", "inpatient_followup",
-            "emergency", "admission", "surgery_consult", "operation", "final_consult",
-            "discharge", "rehab_physical", "rehab_device", "device",
-            "radiology", "appointment_reschedule", "radiation_therapy", "endoscopy",
-            "treatment_chemo", "treatment_targeted", "treatment_immuno", "treatment_dialysis", "treatment_combined",
-            "transplant",
-        ]
+        # ✅ موحَّد عبر field_registry.py::resolve_flow_type_for_confirmation —
+        # انظر تعليقها في handle_final_confirm لسبب هذا التوحيد.
+        from bot.handlers.user.user_reports_add_new_system.field_registry import (
+            resolve_flow_type_for_confirmation,
+        )
         current_flow = context.user_data.get("report_tmp", {}).get("current_flow", "")
-        more_specific = {"followup": ["periodic_followup", "inpatient_followup"]}
-        if flow_type in more_specific and current_flow in more_specific[flow_type]:
-            flow_type = current_flow
-        elif flow_type not in valid_flow_types:
-            flow_type = current_flow if current_flow in valid_flow_types else "new_consult"
+        flow_type = resolve_flow_type_for_confirmation(flow_type, current_flow)
 
         text, keyboard = _build_translator_picker(flow_type, page, context)
         if not keyboard:
