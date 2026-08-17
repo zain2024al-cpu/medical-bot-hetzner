@@ -363,7 +363,14 @@ async def handle_any_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         except Exception:
             logger.debug("تم تجاهل استثناء في handle_any_callback", exc_info=True)
         
-        logger.warning(f"⚠️ Unhandled callback received: {callback_data}")
+        # ✅ ERROR لا warning — WARNING لا يصل لتقرير الأخطاء اليومي
+        # (services/error_digest.py يلتقط ERROR فأعلى فقط)، فكان هذا
+        # المسار — "زر ضُغِط ولا معالِج مختص له" بالضبط ما طلب المستخدم
+        # مراقبته — غير مرئي بصمت رغم وجود الكود الذي يكتشفه أصلاً. دُقِّق
+        # KNOWN_CALLBACKS مقابل كل نمط callback_data حرفي حقيقي مُستخدَم
+        # في المشروع قبل هذا التغيير (بلا أي فجوة موجودة) لتفادي إغراق
+        # التقرير اليومي بإيجابيات كاذبة فور التفعيل.
+        logger.error(f"⚠️ Unhandled callback received: {callback_data}")
         
         # للـ callbacks غير المعروفة، نرسل رسالة بسيطة فقط
         # بدون محاولة تخمين نوع الـ callback
