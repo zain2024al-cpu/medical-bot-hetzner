@@ -341,7 +341,18 @@ async def handle_action_category(update: Update, context: ContextTypes.DEFAULT_T
     try:
         await query.edit_message_text(text, reply_markup=keyboard, parse_mode="Markdown")
     except Exception as e:
-        logger.error(f"HANDLE_ACTION_CATEGORY: error rendering '{cat_key}': {e}", exc_info=True)
+        # ✅ "Message is not modified" — تيليجرام يرفض التعديل إن كان المحتوى
+        # مطابقاً تماماً لما هو معروض بالفعل (مثال: ضغط نفس زر التصنيف
+        # مرّتين متتاليتين). سلوك طبيعي متوقَّع لا خطأ حقيقي — نفس المبدأ
+        # المُتَّبع في admin_pending_reports.py::_handle_render_error. كان
+        # يُسجَّل بمستوى ERROR فيظهر ضجيجاً في تقرير الأخطاء اليومي رغم
+        # عدم وجود أي أثر فعلي على المستخدم (الشاشة المعروضة صحيحة أصلاً).
+        # لا يمكن استدعاء query.answer() مرة أخرى هنا لعرض تنبيه — سبق
+        # استدعاؤها أعلى الدالة، وتيليجرام يسمح برد واحد فقط لكل استعلام.
+        if "message is not modified" in str(e).lower():
+            logger.debug(f"HANDLE_ACTION_CATEGORY: '{cat_key}' — المحتوى مطابق للحالي، تجاهل صامت")
+        else:
+            logger.error(f"HANDLE_ACTION_CATEGORY: error rendering '{cat_key}': {e}", exc_info=True)
     return R_ACTION_TYPE
 
 
