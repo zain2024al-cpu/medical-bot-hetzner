@@ -57,11 +57,16 @@ def escape_markdown(text):
     المحلية. هنا يُحتفَظ بالاسم لأن له 68 موضع استدعاء، ويُستبدل
     **جسمها** بالتطبيق الرسمي (`telegram.helpers.escape_markdown`
     بـversion=1) — فيُصحَّح كل المواضع دفعة واحدة بلا لمسها.
-    """
+
+    ✅ المنطق الفعلي انتقل لاحقاً إلى shared/text_safety.py::
+    escape_markdown_v1 (مكان واحد بدل نسخة هنا ونسخة في utils.py) —
+    هذه الدالة غلاف رقيق فقط، بنفس سلوك الحالة الفارغة الأصلي (يعيد
+    القيمة كما هي بلا تحويلها لنص فارغ، حفاظاً على سلوك الـ68 موضع
+    القائمة بلا أي تغيير)."""
     if not text:
         return text
-    from telegram.helpers import escape_markdown as _tg_escape
-    return _tg_escape(str(text), version=1)
+    from shared.text_safety import escape_markdown_v1
+    return escape_markdown_v1(text)
 
 
 def _is_similar_text(text1: str, text2: str, threshold: float = 0.7) -> bool:

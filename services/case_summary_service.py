@@ -167,8 +167,8 @@ def _trim(text: str, limit: int = 300) -> str:
     بـ`BadRequest: Can't parse entities` — نفس نمط الخلل المُصلَح سابقاً
     عبر escape_md_v1() في شاشات تعديل التقرير."""
     trimmed = text if len(text) <= limit else text[:limit] + "…"
-    from telegram.helpers import escape_markdown
-    return escape_markdown(trimmed, version=1)
+    from shared.text_safety import escape_markdown_v1
+    return escape_markdown_v1(trimmed)
 
 
 # ─── Structured field parser for doctor_decision ─────────

@@ -6,7 +6,6 @@
 
 from telegram import Update, InlineQueryResultArticle, InputTextMessageContent
 from telegram.ext import ContextTypes, InlineQueryHandler
-from telegram.helpers import escape_markdown
 import logging
 
 # Imports قاعدة البيانات

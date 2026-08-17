@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from db.session import SessionLocal
 from db.models import Report
 from sqlalchemy import func
-from telegram.helpers import escape_markdown
+from shared.text_safety import escape_markdown_v1
 
 logger = logging.getLogger(__name__)
 
@@ -56,16 +56,16 @@ async def notify_admins_of_tomorrow_appointments(bot, admin_ids):
                 # يدوياً)، ومحرف واحد غير متزاوج من `_ * `` [` يُسقط الإرسال
                 # بـBadRequest لكل الأدمن دفعة واحدة (نفس نمط escape_md_v1 الموثَّق
                 # في utils.py لشاشات تعديل التقرير).
-                p_name = escape_markdown(appt.patient_name or "غير محدد", version=1)
-                dept = escape_markdown(appt.department or "غير محدد", version=1)
+                p_name = escape_markdown_v1(appt.patient_name or "غير محدد")
+                dept = escape_markdown_v1(appt.department or "غير محدد")
                 # ✅ الوقت: نُفضّل followup_time (نص مُدخل يدوياً) وإلا نأخذه من ساعة followup_date
                 if appt.followup_time:
-                    time_str = escape_markdown(appt.followup_time, version=1)
+                    time_str = escape_markdown_v1(appt.followup_time)
                 elif appt.followup_date and (appt.followup_date.hour or appt.followup_date.minute):
                     time_str = appt.followup_date.strftime("%H:%M")
                 else:
                     time_str = "غير محدد"
-                translator = escape_markdown(appt.translator_name or "غير محدد", version=1)
+                translator = escape_markdown_v1(appt.translator_name or "غير محدد")
                 
                 message += f"{i}. 👤 **المريض:** {p_name}\n"
                 message += f"   🏢 **القسم:** {dept}\n"

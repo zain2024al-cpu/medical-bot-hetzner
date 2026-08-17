@@ -6,7 +6,6 @@
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, InlineQueryResultArticle, InputTextMessageContent
 from telegram.ext import ContextTypes, ConversationHandler, MessageHandler, CallbackQueryHandler, CommandHandler, InlineQueryHandler, ChosenInlineResultHandler, filters
 from telegram.constants import ChatType
-from telegram.helpers import escape_markdown
 import logging
 from datetime import datetime, timedelta
 import calendar

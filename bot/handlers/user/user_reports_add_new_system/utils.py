@@ -32,10 +32,13 @@ def escape_md_v1(text) -> str:
     فيسقط المعالِج لخطأ عام بدل عرض شاشة التعديل — رُصِد هذا فعلياً في
     new_consult_edit.py عبر تقرير أخطاء البوت اليومي.
 
-    escape_markdown(version=1) من مكتبة telegram هي التطبيق الرسمي لقواعد
-    Telegram نفسها (وليست دالة مكتوبة يدوياً هنا قد تنحرف عنها)."""
-    from telegram.helpers import escape_markdown
-    return escape_markdown(str(text) if text is not None else "", version=1)
+    ✅ غلاف رقيق حول shared/text_safety.py::escape_markdown_v1 — المنطق
+    الفعلي موجود هناك الآن فقط (مكان واحد بدل نسخ مستقلة متعددة). الاسم
+    أُبقي هنا كما هو لأن له عشرات مواضع الاستدعاء عبر شاشات التعديل —
+    لا حاجة لتعديلها. أي كود جديد يجب أن يستورد escape_markdown_v1 من
+    shared.text_safety مباشرة بدل استيراد هذه الدالة من هذا الملف."""
+    from shared.text_safety import escape_markdown_v1
+    return escape_markdown_v1(text)
 
 # ثوابت
 MONTH_NAMES_AR = {

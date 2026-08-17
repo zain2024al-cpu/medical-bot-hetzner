@@ -5,7 +5,7 @@
 
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, InlineQueryResultArticle, InputTextMessageContent
 from telegram.ext import ContextTypes
-from telegram.helpers import escape_markdown
+from shared.text_safety import escape_markdown_v1
 import logging
 import sys
 
@@ -443,7 +443,7 @@ async def handle_patient_selection(
             except Exception as e:
                 logger.error(f"❌ خطأ في البحث عن المريض في قاعدة البيانات: {e}")
             
-            patient_name_escaped = escape_markdown(patient_name, version=1)
+            patient_name_escaped = escape_markdown_v1(patient_name)
             
             await query.edit_message_text(
                 f"✅ **تم اختيار المريض**\n\n"
@@ -492,7 +492,7 @@ async def handle_patient_selection(
             except Exception as e:
                 logger.error(f"❌ خطأ في البحث عن المريض في قاعدة البيانات: {e}")
             
-            patient_name_escaped = escape_markdown(patient_name, version=1)
+            patient_name_escaped = escape_markdown_v1(patient_name)
             
             await query.edit_message_text(
                 f"✅ **تم اختيار المريض**\n\n"

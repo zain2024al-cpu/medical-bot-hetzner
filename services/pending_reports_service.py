@@ -13,7 +13,7 @@ import logging
 from datetime import datetime, date, timedelta
 from db.session import SessionLocal
 from db.models import PendingReport, Report
-from telegram.helpers import escape_markdown
+from shared.text_safety import escape_markdown_v1
 
 logger = logging.getLogger(__name__)
 
@@ -370,7 +370,7 @@ def get_pending_reports_summary_text() -> str:
     # ✅ اسم المريض/القسم/المترجم نص حر — تهريب Markdown قبل الحشر يمنع
     # BadRequest عند وجود محرف `_ * `` [` غير متزاوج (نفس نمط escape_md_v1).
     def _safe(v) -> str:
-        return escape_markdown(str(v) if v else "", version=1)
+        return escape_markdown_v1(str(v) if v else "")
 
     # التقارير المتأخرة أكثر من 3 أيام
     if overdue_3plus:

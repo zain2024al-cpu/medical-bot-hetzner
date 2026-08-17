@@ -11,7 +11,7 @@ from db.models import (
     Translator, Report
 )
 from telegram import Bot
-from telegram.helpers import escape_markdown
+from shared.text_safety import escape_markdown_v1
 from config.settings import BOT_TOKEN
 import asyncio
 
@@ -87,7 +87,7 @@ class ScheduleTracker:
                     # ✅ اسم المترجم نص حر (يُدخله الأدمن عند الإنشاء) — تهريب
                     # Markdown قبل حشره في رسالة parse_mode='Markdown' يمنع
                     # BadRequest عند وجود محرف `_ * `` [` غير متزاوج.
-                    safe_name = escape_markdown(record.translator_name or "", version=1)
+                    safe_name = escape_markdown_v1(record.translator_name or "")
                     # إرسال التذكير
                     message = (
                         f"🔔 **تذكير بعد الظهر**\n\n"
@@ -137,7 +137,7 @@ class ScheduleTracker:
                 translator = s.query(Translator).filter_by(full_name=record.translator_name).first()
                 
                 if translator:
-                    safe_name = escape_markdown(record.translator_name or "", version=1)
+                    safe_name = escape_markdown_v1(record.translator_name or "")
                     # إرسال التذكير النهائي
                     message = (
                         f"🚨 **تذكير نهائي**\n\n"
@@ -206,7 +206,7 @@ class ScheduleTracker:
                 summary += "⚠️ **المترجمين المتأخرين:**\n"
                 for record in tracking_records:
                     if not record.is_completed:
-                        safe_name = escape_markdown(record.translator_name or "", version=1)
+                        safe_name = escape_markdown_v1(record.translator_name or "")
                         summary += f"• {safe_name}: {record.actual_reports}/{record.expected_reports}\n"
 
             # إرسال للأدمن
