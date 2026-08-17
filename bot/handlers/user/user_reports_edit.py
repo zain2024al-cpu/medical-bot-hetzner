@@ -1410,59 +1410,15 @@ async def handle_field_selection(update: Update, context: ContextTypes.DEFAULT_T
         # استخراج اسم الحقل
         field_name = query.data.split(':')[1]
         context.user_data['edit_field'] = field_name
-        
-        # أسماء الحقول بالعربي
-        field_names = {
-            'complaint_text': 'شكوى المريض',
-            'doctor_decision': 'قرار الطبيب',
-            'diagnosis': 'التشخيص الطبي',
-            'treatment_plan': 'التوصيات / خطة العلاج',
-            'medications': 'الأدوية / الفحوصات',
-            'notes': 'الملاحظات / الفحوصات',
-            'case_status': 'حالة الطوارئ',
-            'followup_date': 'موعد العودة',
-            'followup_reason': 'سبب العودة',
-            'translator_name': 'المترجم',
-            'room_number': 'رقم الغرفة والطابق',
-            'radiology_type': 'نوع الأشعة والفحوصات',
-            'radiology_delivery_date': 'تاريخ التسليم',
-            'app_reschedule_reason': 'سبب تأجيل الموعد',
-            'app_reschedule_return_date': 'موعد العودة الجديد',
-            'app_reschedule_return_reason': 'سبب العودة',
-            # ✅ حقول المسارات الخاصة
-            'operation_details': 'تفاصيل العملية',
-            'operation_name_en': 'اسم العملية بالإنجليزي',
-            'therapy_details': 'تفاصيل جلسة العلاج الطبيعي',
-            'device_details': 'تفاصيل الجهاز',
-            'admission_reason': 'سبب الرقود',
-            'admission_summary': 'ملخص الرقود',
-            # ✅ حقول استشارة مع قرار عملية
-            'decision': 'قرار الطبيب',
-            'success_rate': 'نسبة نجاح العملية',
-            'benefit_rate': 'نسبة الاستفادة',
-            'tests': 'الفحوصات والأشعة',
-            # ✅ حقول العلاج الإشعاعي
-            'radiation_therapy_type': 'نوع الإشعاعي',
-            'radiation_therapy_session_number': 'رقم الجلسة',
-            'radiation_therapy_remaining': 'الجلسات المتبقية',
-            'radiation_therapy_recommendations': 'ملاحظات / توصيات',
-            'no_paper_report_reason': 'سبب عدم وجود تقرير طبي',
-            # ✅ حقول المناظير — كانت مفقودة فيظهر اسم الحقل الداخلي الخام
-            # (endoscopy_type) بدل تسمية عربية في عنوان شاشة التعديل.
-            'endoscopy_type': 'نوع المنظار',
-            'endoscopy_result': 'نتيجة المنظار / خطة الطبيب',
-            'endoscopy_procedures': 'الإجراءات التي تمت أثناء المنظار',
-            # ✅ حقول معاملة الزراعة
-            'transplant_type': 'نوع الزراعة',
-            'transplant_parties': 'الجهة',
-            'transplant_details': 'تفاصيل المعاملة',
-            'session_number': 'رقم الجلسة الحالية',
-            # ✅ الكيماوي فقط — انظر التعليق في field_registry.py
-            'chemo_cycle_number': 'رقم الدورة الحالية',
-            'chemo_session_number': 'رقم الجلسة ضمن الدورة',
-        }
-        
-        field_display = field_names.get(field_name, field_name)
+
+        # ✅ التسمية تُقرأ من نفس get_editable_fields_by_action_type() التي
+        # بَنَت أزرار الحقول أصلاً (field_registry.py هو المصدر الفعلي) —
+        # بدل قاموس منفصل هنا كان يتباعد بصمت عن السجل الموحَّد (نفس النمط
+        # الجذري الموثَّق في MAINTENANCE_LOG.md: تسمية جديدة تُضاف في مكان
+        # وتُنسى في آخر). يضمن أيضاً تطابق تسمية شاشة التعديل مع تسمية
+        # الزر المضغوط بالضبط، حتى لو اختلفت التسمية حسب نوع التقرير.
+        medical_action = context.user_data.get('current_report_data', {}).get('medical_action', '')
+        field_display = dict(get_editable_fields_by_action_type(medical_action)).get(field_name, field_name)
         current_value = context.user_data['current_report_data'].get(field_name, "لا يوجد")
         
         # إذا كان الحقل هو المترجم، نعرض قائمة المترجمين

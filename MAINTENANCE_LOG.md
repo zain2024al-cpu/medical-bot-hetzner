@@ -17,7 +17,7 @@
 | `bot/handlers/user/user_reports_add_new_system/edit_handlers/before_publish/router.py` | تنفيذ التعديل الفعلي **قبل** النشر | زر التعديل يعرض "⚠️ قيد التطوير" |
 | `bot/handlers/user/user_reports_edit.py` → `get_editable_fields_by_action_type()` | حقول التعديل **بعد** النشر | لا تظهر أي حقول قابلة للتعديل بعد نشر التقرير |
 | `bot/handlers/user/user_reports_edit.py` → `handle_report_selection()`: قاموس `current_report_data` (حوالي السطر 907) | القيمة المعروضة فعلياً بجانب كل زر حقل، بعد النشر | الزر يعرض قيمة فارغة رغم وجود قيمة حقيقية بالقاعدة (القيمة تُقرأ من هذا القاموس أولاً، لا من `report` مباشرة) |
-| `bot/handlers/user/user_reports_edit.py` → `handle_field_selection()`: قاموس `field_names` (حوالي السطر 1462) | التسمية العربية في عنوان شاشة "✏️ تعديل: ..." | يظهر اسم الحقل الداخلي الخام (مثل `transplant_type`) بدل تسمية عربية |
+| ~~`bot/handlers/user/user_reports_edit.py` → `handle_field_selection()`: قاموس `field_names`~~ **أُزيل 2026-08-18 (إدخال ٥٠)** — يقرأ الآن من `get_editable_fields_by_action_type()` مباشرة (نفس مصدر أزرار الحقول) | التسمية العربية في عنوان شاشة "✏️ تعديل: ..." | ~~لم يعد بنداً منفصلاً — لا يمكن أن يُنسى لأنه لم يعد قائمة يدوية إطلاقاً~~ |
 | `bot/handlers/user/user_reports_add_new_system/execute_smart_state_action.py` | إعادة عرض الشاشة عند ضغط "🔙 رجوع" | "⚠️ خطأ في التنقل" بدل الرجوع للسؤال السابق |
 | `services/broadcast_service.py` → `format_report_message()` | بناء بطاقة التقرير المنشورة | حقول مفقودة/فارغة في البطاقة رغم حفظها بالقاعدة |
 | `bot/handlers/user/user_reports_add_new_system/flows/shared.py` → قوائم `valid_flow_types` (3 مواضع) + `get_translator_state()`/`get_confirm_state()` | التحقق من صحة flow_type وربطه بحالة المحادثة الصحيحة | يرتدّ المسار لـ new_consult خطأً |
@@ -4688,6 +4688,54 @@ markdown`) على نص فيه كل المحارف الخاصة `_ * `` [` — م
 
 لا حاجة لسكربت هجرة — إعادة تنظيم استيراد بحتة، الدالة الفعلية لم
 يتغيّر سلوكها إطلاقاً.
+
+### 2026-08-18 (٥٠) — 🏗️ حذف قاموس `field_names` اليدوي المكرَّر في `handle_field_selection()` — أحد بنود "النمط الجذري المتكرر" أُغلق
+
+**السياق**: تتمة سؤال المستخدم المعماري — بعد توحيد تهريب Markdown
+(الإدخال ٤٩)، العودة لبند "قائمة الـ6/7 ملفات" الموثَّق أعلى هذا
+السجل. أول بند مُختار: صف "قاموس `field_names`" — كان مرشَّحاً مثالياً
+لأن `field_registry.py` (بُني في مهام سابقة #117-125) **يحتوي بالفعل**
+كل تسمية عربية لكل حقل لكل نوع تقرير، وحتى الدالة التي تبني أزرار
+الحقول أصلاً (`get_editable_fields_by_action_type()`) كانت مسجَّلة
+تسحب منه — لكن `handle_field_selection()` (الدالة التي تُستدعى **عند
+الضغط على أحد تلك الأزرار بالذات**) كانت تحمل نسخة يدوية منفصلة
+بأكثر من 40 سطراً، بعضها **ميت فعلياً** (`doctor_decision`/
+`treatment_plan`/`medications` كمفاتيح — مفاتيح `field_registry.py`
+الحقيقية أصبحت `decision`/`recommendations`/`tests` منذ توحيد الأعمدة
+في المهام السابقة، فهذه الإدخالات لا تُطابَق أبداً)، وبعضها بتسميات
+عامة بلا سياق نوع التقرير (`'decision': 'قرار الطبيب'` دائماً، بينما
+`field_registry.py` يملك تسمية أدق لكل نوع: "قرار الطبيب وتفاصيل
+العملية" لاستشارة العملية، "قرار الطبيب وماذا تم" للطوارئ...).
+
+**الإصلاح**: حذف القاموس بالكامل. `field_display` الآن:
+```python
+medical_action = context.user_data.get('current_report_data', {}).get('medical_action', '')
+field_display = dict(get_editable_fields_by_action_type(medical_action)).get(field_name, field_name)
+```
+— نفس الدالة بالضبط التي بَنَت الزر المضغوط أصلاً، فتضمن تطابق تسمية
+شاشة التعديل مع تسمية الزر دائماً، ولا يمكن أن تتباعدا بصمت بعد الآن.
+
+**التحقق**: محاكاة حيّة عبر الدوال الحقيقية — عرض شاشة اختيار الحقول
+لتقرير كيماوي حقيقي (`show_field_selection`) ثم ضغط زر "رقم الدورة
+الحالية" (`handle_field_selection`) ⇒ التسمية المعروضة "🔢 رقم الدورة
+الحالية" مطابقة تماماً لمصدر الأزرار؛ حقل غير معروف كلياً ⇒ تراجع سليم
+للاسم الخام بلا أي استثناء (نفس سلوك `.get(x, x)` القديم)؛ نفس المفهوم
+(`case_status`) في نوع تقرير مختلف (طوارئ) ⇒ تسمية سياقية مختلفة "🏥
+وضع الحالة" — إثبات مباشر أن التوحيد صحّح غياب السياق لا فقط أزال
+التكرار · حذف `__pycache__` بالكامل ثم `pytest -q --ignore=Archive`
+(187 نجح) · فحص `register_all_handlers()` حقيقي (166 معالِجاً — بلا
+تغيير).
+
+**ما تبقّى من "النمط الجذري المتكرر"** (أعلى هذا السجل) لجولة لاحقة:
+`before_publish/router.py`، `handle_report_selection()`: قاموس
+`current_report_data`، `execute_smart_state_action.py`،
+`broadcast_service.py::format_report_message()`، وقوائم
+`valid_flow_types` (3 مواضع) + `get_translator_state()`/
+`get_confirm_state()` في `flows/shared.py` — كل بند يحتاج فحصاً منفصلاً
+لتحديد إن كان قابلاً للتوحيد عبر `field_registry.py` بنفس الأمان، أو
+يحتاج تصميماً مختلفاً.
+
+لا حاجة لسكربت هجرة — إصلاح كود منطقي بحت، بلا أي تغيير على المخطط.
 
 ## 📋 كيفية استخدام هذا السجل
 
