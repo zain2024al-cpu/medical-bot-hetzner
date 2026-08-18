@@ -327,8 +327,72 @@ def get_back_keyboard(callback_data="back_to_main"):
 # Universal Fallback Handler for Callbacks
 # ================================================
 
+# ✅ أنماط مُشتقّة آلياً من المعالِجات المسجَّلة فعلياً وقت الإقلاع — تُملأ
+# في register(app) أدناه. سبب وجودها: KNOWN_CALLBACKS أعلاه كانت **نسخة
+# يدوية مكرَّرة** من تسجيلات المعالِجات الحقيقية، وأي نمط جديد يُضاف للبوت
+# ويُنسى هنا يُنتج تحذير "زر غير متاح" كاذباً لكل ضغطة رغم نجاح الزر فعلاً
+# (نفس نمط "المنطق نفسه في مكانين يتباعدان" المتكرر في هذا المشروع).
+# وقع هذا فعلياً مع `medrep_count:` — زر عدد الفحوصات المنتظرة، مسجَّل
+# بمعالِج حقيقي في conversation_handler.py لكنه غائب عن القائمة اليدوية،
+# فظهر 28 مرة في تقرير أخطاء 2026-08-18 كـ"غير معالَج" رغم عمله السليم.
+# الاشتقاق الآلي يُنهي هذا الانحراف نهائياً: أي معالِج له pattern يُسكَت
+# تلقائياً بلا أي تعديل هنا.
+_REGISTERED_PATTERNS: list[str] = []
+
+
+def _snapshot_registered_patterns(app) -> None:
+    """يلتقط أنماط كل CallbackQueryHandler مسجَّل فعلاً (عدا معالِج الفلبَك
+    نفسه) — بما فيها المتداخلة داخل ConversationHandler.
+
+    ⚠️ يُستدعى من register() الذي يُسجَّل **آخر شيء** في handlers_registry.py،
+    فكل المعالِجات الأخرى موجودة على app وقت الالتقاط."""
+    from telegram.ext import CallbackQueryHandler as _CQH
+
+    collected: set[str] = set()
+
+    def _collect(h):
+        if isinstance(h, _CQH):
+            p = getattr(h, "pattern", None)
+            if p is None:
+                return  # بلا نمط = قنّاص شامل أو معالِج مقيَّد بحالة محادثة
+            pat = p.pattern if hasattr(p, "pattern") else str(p)
+            if pat and pat not in (".*", ".+", "^.*$", "^.+$"):
+                collected.add(pat)
+
+    for group, handlers in app.handlers.items():
+        if group == 999:      # لا نلتقط الفلبَك نفسه
+            continue
+        for h in handlers:
+            _collect(h)
+            if hasattr(h, "states"):
+                for hlist in h.states.values():
+                    for hh in hlist:
+                        _collect(hh)
+                for hh in getattr(h, "entry_points", []):
+                    _collect(hh)
+                for hh in getattr(h, "fallbacks", []):
+                    _collect(hh)
+
+    _REGISTERED_PATTERNS.clear()
+    _REGISTERED_PATTERNS.extend(sorted(collected))
+    logger.info(
+        f"🔎 التقاط {len(_REGISTERED_PATTERNS)} نمط callback مسجَّل فعلياً "
+        f"(إسكات تلقائي للفلبَك، بلا صيانة يدوية)"
+    )
+
+
 def is_known_callback(callback_data: str) -> bool:
-    """التحقق مما إذا كان الـ callback معروفاً ومعالجاً بواسطة handler آخر"""
+    """التحقق مما إذا كان الـ callback معروفاً ومعالجاً بواسطة handler آخر.
+
+    مصدران: الأنماط المُشتقّة آلياً من التسجيل الفعلي (الأساس)، ثم القائمة
+    اليدوية KNOWN_CALLBACKS (تكملة للمعالِجات المقيَّدة بحالة محادثة بلا
+    pattern، والتي لا يمكن اشتقاقها آلياً)."""
+    for pattern in _REGISTERED_PATTERNS:
+        try:
+            if re.match(pattern, callback_data):
+                return True
+        except re.error:
+            continue
     for pattern in KNOWN_CALLBACKS:
         if re.match(pattern, callback_data):
             return True
@@ -471,7 +535,15 @@ async def handle_any_message(update: Update, context: ContextTypes.DEFAULT_TYPE)
 def register(app):
     """تسجيل معالجات الـ fallback الشاملة"""
     logger.info("📋 تسجيل universal fallback handlers...")
-    
+
+    # ✅ يُلتقَط قبل إضافة معالِج الفلبَك نفسه — كل المعالِجات الأخرى مسجَّلة
+    # بالفعل في هذه اللحظة (هذا الملف آخر ما يُسجَّل، انظر handlers_registry.py).
+    try:
+        _snapshot_registered_patterns(app)
+    except Exception:
+        # فشل الالتقاط لا يجوز أن يمنع إقلاع البوت — تبقى القائمة اليدوية
+        logger.warning("⚠️ تعذّر التقاط الأنماط المسجَّلة تلقائياً", exc_info=True)
+
     # 1. معالج لجميع callback queries غير المعالجة (أولوية منخفضة جداً)
     app.add_handler(
         CallbackQueryHandler(handle_any_callback),

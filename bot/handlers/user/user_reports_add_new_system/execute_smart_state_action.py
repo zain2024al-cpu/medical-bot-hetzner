@@ -462,14 +462,20 @@ async def execute_smart_state_action(target_step, flow_type, update, context):
                     return FOLLOWUP_DECISION
             else:
                 current_value = context.user_data.get("report_tmp", {}).get("room_number", "")
-                from telegram import ReplyKeyboardMarkup
                 message_text = "🏥 **متابعة في الرقود: رقم الغرفة والطابق**\n\nأدخل رقم الغرفة والطابق (مثال: غرفة 205 - الطابق الثاني):"
                 if current_value:
                     message_text += f"\n\n📋 **القيمة الحالية:**\n```\n{current_value}\n```"
-                skip_keyboard = ReplyKeyboardMarkup([["تخطي"]], resize_keyboard=True)
+                # ⚠️ كان هنا ReplyKeyboardMarkup([["تخطي"]]) — و`edit_message_text`
+                # لا يقبل إلا لوحة **مضمَّنة** (InlineKeyboardMarkup)، فكان يسقط
+                # **دائماً** بـ`BadRequest: Inline keyboard expected` ويظهر
+                # للمستخدم "❌ حدث خطأ في إعادة العرض" بدل الشاشة (رُصِد في تقرير
+                # أخطاء 2026-08-18). لوحة "تخطي" تعمل فعلاً في المسار الأمامي
+                # (flows/followup.py) لأنها تُرسَل عبر `reply_text` لا `edit_...`.
+                # نص الرسالة أصلاً لا يذكر "تخطي"، فلا يفقد المستخدم شيئاً —
+                # وأزرار التنقل المضمَّنة هي نفسها المستخدَمة في كل الفروع الشقيقة.
                 await update.callback_query.edit_message_text(
                     message_text,
-                    reply_markup=skip_keyboard,
+                    reply_markup=_nav_buttons(show_back=True),
                     parse_mode="Markdown"
                 )
             return target_step
