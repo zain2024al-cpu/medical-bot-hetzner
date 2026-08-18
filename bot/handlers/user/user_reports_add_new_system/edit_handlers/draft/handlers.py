@@ -24,11 +24,34 @@ except ImportError:
     show_final_summary = None
     get_editable_fields_by_flow_type = lambda x: []
 
-try:
-    from bot.handlers.user.user_reports_edit import get_editable_fields_by_action_type
-except ImportError:
-    logger.warning("⚠️ Cannot import get_editable_fields_by_action_type from user_reports_edit")
-    get_editable_fields_by_action_type = lambda x: []
+def get_editable_fields_by_action_type(medical_action):
+    """حقول التعديل حسب نوع الإجراء — **باستيراد محلي إلزامي**.
+
+    ⚠️ كان هذا استيراداً على مستوى الملف داخل `try/except ImportError`
+    يسقط لبديل `lambda x: []`. وبترتيب الاستيراد الإنتاجي الفعلي (عبر
+    `register_all_handlers`) كان يفشل **دائماً** فيُربَط البديل الفارغ
+    نهائياً: `user_reports_edit` يستورد `...add_new_system.utils`، وهذا
+    يستلزم تنفيذ `__init__.py` للحزمة، وهي (عبر `conversation_handler.py`)
+    تستورد هذا الملف — دورة استيراد حقيقية. النتيجة المرئية للمستخدم:
+    بعد تعديل أي حقل في المسودة تظهر رسالة "📝 اختر حقلاً آخر للتعديل"
+    ثم قائمة **بلا أي زر حقل إطلاقاً** (انظر `handle_draft_field_input`).
+
+    الاستيراد داخل الدالة يكسر الدورة لأنه يقع وقت الاستدعاء لا وقت
+    التحميل — نفس الحل الموثَّق والمُطبَّق فعلاً في الطرف المقابل
+    (`user_reports_edit.py::get_editable_fields_by_action_type` تستورد
+    `field_registry` محلياً للسبب ذاته)."""
+    try:
+        from bot.handlers.user.user_reports_edit import (
+            get_editable_fields_by_action_type as _real,
+        )
+    except ImportError:
+        logger.error(
+            "❌ تعذّر استيراد get_editable_fields_by_action_type وقت الاستدعاء — "
+            "ستظهر قائمة حقول التعديل فارغة",
+            exc_info=True,
+        )
+        return []
+    return _real(medical_action)
 
 
 # =============================
