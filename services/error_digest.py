@@ -119,7 +119,24 @@ class _DigestHandler(logging.Handler):
             # لا نُسجّل أخطاء هذه الوحدة نفسها — تفادياً للارتداد اللانهائي
             if record.name == __name__:
                 return
-            text = f"{record.name} {record.msg}"
+            # ⚠️ يجب فحص الرسالة **بعد دمج المعاملات** ونوع الاستثناء معاً —
+            # لا `record.msg` الخام. سبب ذلك (رُصِد في تقريرَي 2026-08-18/19،
+            # 14 خطأ شبكة تسرّب رغم وجودها في قائمة التجاهل):
+            #   • PTB يسجّل `_LOGGER.exception("Error while getting Updates: %s", exc)`
+            #     فيبقى `record.msg` قالباً خاماً ("...: %s") والقيمة الحقيقية
+            #     ("httpx.ReadError") في `record.args` — فلا تراها المطابقة أبداً.
+            #   • بعض السجلات ("Exception happened while polling for updates.")
+            #     لا تحوي أي كلمة مفتاحية في نصها إطلاقاً، والدليل الوحيد على
+            #     كونها ضجيج شبكة هو **نوع الاستثناء** (NetworkError) في exc_info.
+            try:
+                formatted = record.getMessage()
+            except Exception:
+                formatted = str(record.msg)
+            exc_name = (
+                record.exc_info[0].__name__
+                if record.exc_info and record.exc_info[0] else ""
+            )
+            text = f"{record.name} {formatted} {exc_name}"
             if any(s.lower() in text.lower() for s in _IGNORE_SUBSTRINGS):
                 return
             entry = _redact(record)
