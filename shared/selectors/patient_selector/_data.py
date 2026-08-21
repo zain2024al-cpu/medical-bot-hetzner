@@ -71,6 +71,7 @@ def _type_visible(
     only_companion_flow: bool = False,
     city: str | None = None,
     archived_at=None,
+    gs_onboarded_at=None,
 ) -> bool:
     # ✅ المريض المسافر (مؤرشف) مخفي من **كل** قوائم الاختيار بلا استثناء —
     # أعلى أولوية، قبل فلتر المدينة نفسه. لا يؤثر هذا على أي قراءة تاريخية
@@ -92,7 +93,12 @@ def _type_visible(
     # "مريض جديد مع مرافقين" — يتجاوز include_pharmacy/include_companions
     # تماماً (يُستخدَم في "🔧 الخدمات العامة" و"🪪 الإقامة" حصراً).
     if only_companion_flow:
-        return pt in (_COMPANION_PARENT, _COMPANION)
+        # ✅ يشمل أيضاً المرضى **القدامى** الذين أُدخِلوا يدوياً لبوتَي
+        # الخدمات/الإقامة عبر "🏠 الحالات الموجودة" — هم مرضى حقيقيون في
+        # هاتين الوحدتين تماماً كمن جاء عبر "🛬 الوصول"، لكن نوعهم الأصلي
+        # (general/chennai/pharmacy_only) يبقى كما هو بلا مساس، فيُعرَف
+        # انتماؤهم من العلَم المستقل لا من تغيير التصنيف.
+        return bool(gs_onboarded_at) or pt in (_COMPANION_PARENT, _COMPANION)
 
     if pt == _PHARMACY_ONLY:
         return include_pharmacy
@@ -186,6 +192,7 @@ def fetch_all(
                 if not _type_visible(
                     p.patient_type, include_pharmacy, include_companions,
                     only_companion_flow, city, getattr(p, "archived_at", None),
+                    getattr(p, "gs_onboarded_at", None),
                 ):
                     continue
                 name = (p.full_name or "").strip()
@@ -249,6 +256,7 @@ def search(
                 and _type_visible(
                     p.patient_type, include_pharmacy, include_companions,
                     only_companion_flow, city, getattr(p, "archived_at", None),
+                    getattr(p, "gs_onboarded_at", None),
                 )
             ]
             logger.debug(

@@ -6,10 +6,17 @@ STATUS_ACTIVE          = "ACTIVE"
 STATUS_EXPIRY_PENDING  = "EXPIRY_PENDING"
 STATUS_SUBMITTED       = "SUBMITTED"
 STATUS_ISSUED          = "ISSUED"
+# ✅ مريض **قديم** كان موجوداً قبل تفعيل وحدة الإقامة، أُدخِل يدوياً عبر
+# "🏠 الحالات الموجودة" في الأدمن (لم يمرّ بتدفق "🛬 الوصول" إطلاقاً).
+# بياناته الأساسية (جواز/تأشيرة/سكن) مكتملة، لكن بيانات **الإقامة** نفسها
+# (تمديد/انتهاء) لم تُدخَل بعد — تُدخَل من هذا الزر ثم ينتقل لحالته
+# الطبيعية ضمن الحالات الخمس أعلاه.
+STATUS_LEGACY_PENDING  = "LEGACY_PENDING"
 
 # ترتيب العرض في القائمة الرئيسية
 STATUS_ORDER = [
     STATUS_WAITING_ARRIVAL,
+    STATUS_LEGACY_PENDING,
     STATUS_ACTIVE,
     STATUS_EXPIRY_PENDING,
     STATUS_SUBMITTED,
@@ -18,6 +25,7 @@ STATUS_ORDER = [
 
 STATUS_ICONS = {
     STATUS_WAITING_ARRIVAL: "🟡",
+    STATUS_LEGACY_PENDING:  "🏠",
     STATUS_ACTIVE:          "🟢",
     STATUS_EXPIRY_PENDING:  "🔴",
     STATUS_SUBMITTED:       "🔵",
@@ -26,6 +34,7 @@ STATUS_ICONS = {
 
 STATUS_LABELS = {
     STATUS_WAITING_ARRIVAL: "معلّق من الوصول",
+    STATUS_LEGACY_PENDING:  "معلّقات من الحالات السابقة",
     STATUS_ACTIVE:          "الحالات النشطة",
     STATUS_EXPIRY_PENDING:  "معلّق انتهاء الإقامة",
     STATUS_SUBMITTED:       "تم التقديم(قيد الانتظار)",

@@ -184,6 +184,11 @@ def register_all_handlers(app):
     multiselect.register_handler(app)
     # Note: uploads.register_handler() already called above (group -1 msg + group 1 cb)
 
+    # 🏠 الحالات الموجودة — إدخال المرضى القدامى لبوتَي الخدمات والإقامة
+    # (groups 21/22 خاصة به وحده — لا تصادم مع أي تدفق قائم)
+    from bot.handlers.admin.admin_legacy_onboarding import register as register_legacy_onboarding
+    register_legacy_onboarding(app)
+
     # 🛡️ Universal Fallback - يجب أن يكون آخر شيء يتم تسجيله
     # يتعامل مع جميع الأزرار والرسائل غير المعالجة لمنع تعليق البوت
     from bot.handlers.shared.universal_fallback import register as register_universal_fallback

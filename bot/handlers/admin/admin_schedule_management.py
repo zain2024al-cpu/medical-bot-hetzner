@@ -571,6 +571,9 @@ async def handle_manage_patients(update: Update, context: ContextTypes.DEFAULT_T
         [InlineKeyboardButton("🤝 مريض جديد مع مرافقين", callback_data="add_patient_with_companions")],
         [InlineKeyboardButton("📋 عرض جميع الأسماء", callback_data="view_patient_names")],
         [InlineKeyboardButton(f"🧳 أرشيف المسافرين ({archived_count})", callback_data="parch:menu")],
+        # ✅ إدخال المرضى القدامى لبوتَي الخدمات والإقامة (مهمة مؤقتة —
+        # انظر admin_legacy_onboarding.py)
+        [InlineKeyboardButton("🏠 الحالات الموجودة", callback_data="lego:menu")],
         [InlineKeyboardButton("✏️ تعديل اسم", callback_data="edit_patient_name")],
         [InlineKeyboardButton("🗑️ حذف اسم", callback_data="delete_patient_name")],
         [InlineKeyboardButton("🔙 رجوع", callback_data="sys_menu:back")]

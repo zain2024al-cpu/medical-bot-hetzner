@@ -105,6 +105,17 @@ class Patient(Base):
     # اختير عمود تاريخ لا Boolean عمداً: يحمل معلومة "متى سافر" (مفيدة
     # للإحصائيات لاحقاً) والصدق/الكذب مشتقّ منه مباشرة (NULL = غير مؤرشف).
     archived_at = Column(DateTime, nullable=True, index=True)
+    # ✅ مريض **قديم** أُدخِل يدوياً لبوتَي الخدمات والإقامة عبر شاشة
+    # "🏠 الحالات الموجودة" في الأدمن (لم يمرّ بتدفق "🛬 الوصول" لأنه كان
+    # هنا قبل تفعيل الوحدتين). NULL = لم يُدخَل بعد.
+    #
+    # ⚠️ لماذا علَم مستقل ولا يُغيَّر `patient_type` إلى "companion_parent":
+    # تغيير النوع كان سيكسر تصنيف المرضى الحاليين تصنيفاً حقيقياً — مريض
+    # `chennai` مثلاً يختفي من قسم "🏙️ تقارير تشناي" ويظهر خطأً في التقارير
+    # الاعتيادية، ومريض `pharmacy_only` يخرج من قصره على الصيدلية. العلَم
+    # المستقل يُبقي النوع الأصلي سليماً تماماً ويُضاف إليه الظهور في
+    # "🔧 الخدمات العامة" فقط (انظر `_type_visible` في patient_selector).
+    gs_onboarded_at = Column(DateTime, nullable=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow, index=True, nullable=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
 

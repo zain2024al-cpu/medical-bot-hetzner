@@ -221,6 +221,9 @@ class DatabaseMaintenance:
                 # وتاريخ = مسافر فيختفي من قوائم اختيار المرضى مع بقاء بياناته
                 # التاريخية كاملة للتقارير والإحصائيات.
                 _migrate_column(conn, "patients", "archived_at", "DATETIME")
+                # ✅ مريض قديم أُدخِل يدوياً لبوتَي الخدمات/الإقامة عبر شاشة
+                # "🏠 الحالات الموجودة" (لم يمرّ بتدفق الوصول).
+                _migrate_column(conn, "patients", "gs_onboarded_at", "DATETIME")
                 logger.info("🔎 Migration check finished.")
 
                 if check == "ok":
