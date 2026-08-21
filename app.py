@@ -35,19 +35,74 @@ class _RedactSecretsFilter(logging.Filter):
     Prevents accidental token leakage via pm2 logs, screenshots, copy/paste, etc.
     """
 
-    _tg_token_re = re.compile(r"(https?://api\\.telegram\\.org/bot)(\\d+:)[^/\\s]+", re.IGNORECASE)
+    # ⚠️ كان النمط مكتوباً بشرطات مائلة **مضاعفة** داخل سلسلة خام
+    # (r"...api\\.telegram\\.org...") فيعني للمحرِّك "شرطة مائلة حقيقية ثم
+    # أي محرف" — وهو ما لا يظهر إطلاقاً في رابط فعلي، فكان الفلتر **لا
+    # يطابق شيئاً أبداً** ويمرّ التوكن كما هو. نفس العطب في نص الاستبدال
+    # (r"\\1\\2") الذي كان سيكتب "\1\2" حرفياً بدل مجموعتَي المطابقة.
+    # أُثبِت باستخراج النمط الفعلي من هذا الملف عبر AST واختباره على رابط
+    # حقيقي: تطابق = False قبل الإصلاح، True بعده.
+    _tg_token_re = re.compile(r"(https?://api\.telegram\.org/bot)(\d+:)[^/\s]+", re.IGNORECASE)
 
     def filter(self, record: logging.LogRecord) -> bool:
         try:
             msg = record.getMessage()
             if msg:
-                redacted = self._tg_token_re.sub(r"\\1\\2***REDACTED***", msg)
+                redacted = self._tg_token_re.sub(r"\1\2***REDACTED***", msg)
                 if redacted != msg:
                     record.msg = redacted
                     record.args = ()
         except Exception:
             # Never break logging
             logger.debug("تم تجاهل استثناء في filter", exc_info=True)
+        return True
+
+
+class _CollapseTransientNetworkErrors(logging.Filter):
+    """يختصر أخطاء الشبكة العابرة أثناء long-polling إلى سطر واحد بلا أثر.
+
+    ⚠️ لا يُخفي الحدث إطلاقاً — يُبقي سطراً واضحاً، لكنه يحذف الـtraceback
+    (نحو 60 سطراً لكل حدث) الذي يُغرق سجل pm2 بلا أي فائدة تشخيصية: هذه
+    انقطاعات لحظية بين الخادم وتيليجرام، و PTB يعيد المحاولة تلقائياً
+    ويستأنف الاستقبال بلا تدخّل. أي خطأ شبكة غير مُدرَج هنا يبقى كاملاً
+    بأثره كما هو.
+
+    (تقرير الأخطاء اليومي يحجب هذه الفئة أصلاً — انظر `_IGNORE_SUBSTRINGS`
+    في services/error_digest.py؛ هذا الفلتر يخصّ سجل pm2 وحده.)
+    """
+
+    _TRANSIENT = (
+        "httpx.ReadError", "httpx.WriteError", "httpx.ConnectError",
+        "httpx.ReadTimeout", "httpx.WriteTimeout", "httpx.ConnectTimeout",
+        "httpx.PoolTimeout", "httpx.RemoteProtocolError",
+        "httpcore.ReadError", "Bad Gateway", "Gateway Timeout",
+        "Service Temporarily Unavailable",
+    )
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            if record.levelno < logging.ERROR or not record.name.startswith("telegram"):
+                return True
+            exc_name = ""
+            if record.exc_info and record.exc_info[1] is not None:
+                exc_name = f"{type(record.exc_info[1]).__name__}: {record.exc_info[1]}"
+            haystack = f"{record.getMessage()} {exc_name}"
+            hit = next((m for m in self._TRANSIENT if m.lower() in haystack.lower()), None)
+            if not hit:
+                return True
+            # سطر واحد موجز، بلا أثر، وبمستوى تحذير (ليس خطأً حقيقياً)
+            record.exc_info = None
+            record.exc_text = None
+            record.levelno = logging.WARNING
+            record.levelname = "WARNING"
+            record.msg = (
+                f"⚠️ انقطاع شبكة عابر مع تيليجرام ({hit}) — "
+                f"إعادة المحاولة تلقائياً، لا إجراء مطلوب."
+            )
+            record.args = ()
+        except Exception:
+            # فلتر تسجيل لا يجوز أن يُسقط التطبيق مهما حدث
+            return True
         return True
 
 
@@ -65,16 +120,21 @@ def _harden_logging():
         logging.getLogger(name).setLevel(logging.WARNING)
 
     root = logging.getLogger()
-    flt = _RedactSecretsFilter()
-    try:
-        root.addFilter(flt)
-    except Exception:
-        logger.debug("تم تجاهل استثناء في _harden_logging", exc_info=True)
-    for h in list(root.handlers):
+    # ⚠️ الفلاتر تُضاف على **معالِجات** الجذر لا على المُسجِّل وحده: فلتر
+    # المُسجِّل لا يرى إطلاقاً السجلات القادمة بالانتشار من مسجّل ابن
+    # (telegram.* / httpx) — وهي بالضبط المستهدَفة هنا. (أُثبِت تجريبياً.)
+    # يُضاف على المُسجِّل أيضاً لتغطية ما يُسجَّل على الجذر مباشرة.
+    filters = (_RedactSecretsFilter(), _CollapseTransientNetworkErrors())
+    for flt in filters:
         try:
-            h.addFilter(flt)
+            root.addFilter(flt)
         except Exception:
             logger.debug("تم تجاهل استثناء في _harden_logging", exc_info=True)
+        for h in list(root.handlers):
+            try:
+                h.addFilter(flt)
+            except Exception:
+                logger.debug("تم تجاهل استثناء في _harden_logging", exc_info=True)
 
 
 _harden_logging()
