@@ -50,6 +50,10 @@ logger = logging.getLogger(__name__)
 
 LEGO = "lego"                 # بادئة الكولباك
 _SESSION_KEY = "_lego"
+# ✅ حالة البحث السريع — منفصلة عن جلسة الفورمة لأن البحث يقع **قبل**
+# اختيار المريض (لا توجد جلسة بعد).
+_SEARCH_WAIT_KEY = "_lego_search_wait"   # بانتظار كتابة الأدمن للاسم
+_SEARCH_Q_KEY    = "_lego_search_q"      # الاستعلام النشط (للتصفّح)
 _PER_PAGE = 8
 
 # ── الخطوات ───────────────────────────────────────────────────────────────────
@@ -141,9 +145,15 @@ class LegoSession:
 
 # ── طبقة البيانات ─────────────────────────────────────────────────────────────
 
-def _fetch_candidates(page: int) -> tuple[list, int, int]:
+def _fetch_candidates(page: int, query: str = "") -> tuple[list, int, int]:
     """المرضى المؤهَّلون للإدخال: نشطون، غير مؤرشفين (لم يسافروا)، ولم
-    يُدخَلوا مسبقاً، وليسوا مرافقين."""
+    يُدخَلوا مسبقاً، وليسوا مرافقين.
+
+    query — بحث جزئي بالاسم (غير حسّاس لحالة الأحرف). فارغ = كل المؤهَّلين.
+    ⚠️ الفلاتر نفسها تُطبَّق على البحث حرفياً — فلا يعرض البحث اسماً
+    مؤرشفاً أو مُدخَلاً مسبقاً (وهذا سبب عدم استخدام بحث تيليجرام المدمج
+    المشترك هنا: معالِجه يطبّق قواعد تدفق التقارير لا قواعد هذه الشاشة).
+    """
     from db.session import SessionLocal
     from db.models import Patient
     from sqlalchemy import or_
@@ -155,6 +165,8 @@ def _fetch_candidates(page: int) -> tuple[list, int, int]:
             Patient.gs_onboarded_at.is_(None),    # لم يُدخَل مسبقاً
             or_(Patient.patient_type != "companion", Patient.patient_type.is_(None)),
         )
+        if query:
+            q = q.filter(Patient.full_name.ilike(f"%{query}%"))
         total = q.count()
         pages = (total + _PER_PAGE - 1) // _PER_PAGE
         rows = (
@@ -268,19 +280,27 @@ def _cancel_row() -> list:
     return [InlineKeyboardButton("❌ إلغاء", callback_data=f"{LEGO}:cancel")]
 
 
-async def _show_list(query, page: int) -> None:
-    rows, total, pages = _fetch_candidates(page)
+async def _show_list(query, page: int, search: str = "") -> None:
+    rows, total, pages = _fetch_candidates(page, search)
     done = _onboarded_count()
 
     kb = []
     if not rows:
-        text = (
-            "🏠 **الحالات الموجودة**\n\n"
-            "✅ لا توجد أسماء متبقية — تم إدخال جميع المرضى القدامى."
-        )
+        if search:
+            text = (
+                f"🔍 **نتائج البحث: «{search}»**\n\n"
+                "⚠️ لا يوجد اسم مطابق بين المرضى المتبقّين.\n"
+                "_(قد يكون أُدخِل مسبقاً، أو مؤرشفاً كمسافر.)_"
+            )
+        else:
+            text = (
+                "🏠 **الحالات الموجودة**\n\n"
+                "✅ لا توجد أسماء متبقية — تم إدخال جميع المرضى القدامى."
+            )
     else:
+        head = f"🔍 **نتائج البحث: «{search}»**" if search else "🏠 **الحالات الموجودة**"
         text = (
-            "🏠 **الحالات الموجودة**\n\n"
+            f"{head}\n\n"
             f"📊 **المتبقّون:** {total}   •   ✅ **أُدخِلوا:** {done}\n"
             f"📄 **صفحة:** {page + 1} من {pages}\n\n"
             "اختر المريض لإدخال بياناته في بوتَي الخدمات والإقامة:"
@@ -297,6 +317,11 @@ async def _show_list(query, page: int) -> None:
         nav.append(InlineKeyboardButton("التالي ▶️", callback_data=f"{LEGO}:page:{page+1}"))
     if nav:
         kb.append(nav)
+
+    # ✅ البحث السريع — يختصر تصفّح عشرات الصفحات للوصول لاسم واحد
+    kb.append([InlineKeyboardButton("🔍 بحث بالاسم", callback_data=f"{LEGO}:search")])
+    if search:
+        kb.append([InlineKeyboardButton("📋 عرض كل الأسماء", callback_data=f"{LEGO}:all")])
     kb.append([InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")])
 
     await query.edit_message_text(
@@ -468,12 +493,34 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     if action == "menu" or action.startswith("page:"):
         LegoSession.clear(ud)
         page = int(action.split(":")[1]) if action.startswith("page:") else 0
-        await _show_list(query, page)
+        if action == "menu":
+            ud.pop(_SEARCH_Q_KEY, None)     # دخول جديد = قائمة كاملة
+        ud.pop(_SEARCH_WAIT_KEY, None)
+        await _show_list(query, page, ud.get(_SEARCH_Q_KEY, ""))
+        return
+
+    if action == "search":
+        LegoSession.clear(ud)
+        ud[_SEARCH_WAIT_KEY] = True
+        await query.edit_message_text(
+            "🔍 **البحث عن مريض**\n\n"
+            "اكتب الاسم أو جزءاً منه (حرفان على الأقل):",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔙 رجوع للقائمة", callback_data=f"{LEGO}:all")]
+            ]),
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        return
+
+    if action == "all":
+        ud.pop(_SEARCH_Q_KEY, None)
+        ud.pop(_SEARCH_WAIT_KEY, None)
+        await _show_list(query, 0)
         return
 
     if action == "cancel":
         LegoSession.clear(ud)
-        await _show_list(query, 0)
+        await _show_list(query, 0, ud.get(_SEARCH_Q_KEY, ""))
         return
 
     if action.startswith("pick:"):
@@ -481,7 +528,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         pid, page = int(parts[1]), int(parts[2])
         if _already_onboarded(pid):
             await query.answer("⚠️ هذا المريض مُدخَل مسبقاً", show_alert=True)
-            await _show_list(query, page)
+            await _show_list(query, page, ud.get(_SEARCH_Q_KEY, ""))
             return
         from db.session import SessionLocal
         from db.models import Patient
@@ -631,11 +678,34 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """يستقبل السكن واسم المرافق — لا يعمل إلا داخل جلسة نشطة."""
-    session = LegoSession.load(context.user_data)
+    """يستقبل استعلام البحث، والسكن، واسم المرافق — لا يعمل إلا ضمن حالة
+    خاصة بهذه الشاشة."""
+    ud = context.user_data
+    msg = update.message
+
+    # ── البحث السريع (قبل وجود أي جلسة فورمة) ────────────────────────
+    if ud.get(_SEARCH_WAIT_KEY):
+        q_text = ((msg.text or "").strip() if msg else "")
+        if len(q_text) < 2:
+            await msg.reply_text("⚠️ اكتب حرفين على الأقل للبحث.")
+            return
+        ud.pop(_SEARCH_WAIT_KEY, None)
+        ud[_SEARCH_Q_KEY] = q_text
+
+        # ⚠️ رسالة جديدة لا تعديل: الرد على رسالة نصية لا يملك رسالة
+        # كولباك لتعديلها. نغلّف msg بواجهة edit_message_text المتوقَّعة
+        # في _show_list بلا تكرار منطق العرض.
+        class _AsNew:
+            @staticmethod
+            async def edit_message_text(text, reply_markup=None, parse_mode=None):
+                await msg.reply_text(text, reply_markup=reply_markup, parse_mode=parse_mode)
+
+        await _show_list(_AsNew, 0, q_text)
+        return
+
+    session = LegoSession.load(ud)
     if session is None or session.step not in (S_HOUSING, S_C_NAME):
         return                      # ⚠️ لا نبتلع رسائل التدفقات الأخرى
-    msg = update.message
     text = (msg.text or "").strip() if msg else ""
     if len(text) < 2:
         await msg.reply_text("⚠️ النص قصير جداً، أعد الإدخال.")
