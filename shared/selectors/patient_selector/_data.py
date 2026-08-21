@@ -72,6 +72,7 @@ def _type_visible(
     city: str | None = None,
     archived_at=None,
     gs_onboarded_at=None,
+    include_onboarded: bool = False,
 ) -> bool:
     # ✅ المريض المسافر (مؤرشف) مخفي من **كل** قوائم الاختيار بلا استثناء —
     # أعلى أولوية، قبل فلتر المدينة نفسه. لا يؤثر هذا على أي قراءة تاريخية
@@ -93,12 +94,19 @@ def _type_visible(
     # "مريض جديد مع مرافقين" — يتجاوز include_pharmacy/include_companions
     # تماماً (يُستخدَم في "🔧 الخدمات العامة" و"🪪 الإقامة" حصراً).
     if only_companion_flow:
-        # ✅ يشمل أيضاً المرضى **القدامى** الذين أُدخِلوا يدوياً لبوتَي
-        # الخدمات/الإقامة عبر "🏠 الحالات الموجودة" — هم مرضى حقيقيون في
-        # هاتين الوحدتين تماماً كمن جاء عبر "🛬 الوصول"، لكن نوعهم الأصلي
-        # (general/chennai/pharmacy_only) يبقى كما هو بلا مساس، فيُعرَف
-        # انتماؤهم من العلَم المستقل لا من تغيير التصنيف.
-        return bool(gs_onboarded_at) or pt in (_COMPANION_PARENT, _COMPANION)
+        # ✅ المرضى **القدامى** المُدخَلون يدوياً عبر "🏠 الحالات الموجودة"
+        # يظهرون هنا **فقط** عندما يطلبهم المستدعي صراحةً
+        # (include_onboarded=True — "🔧 الخدمات العامة" وحدها).
+        #
+        # ⚠️ لماذا علَم منفصل ولا يكفي gs_onboarded_at وحده: كلٌّ من
+        # "🛬 الوصول" و"🔧 الخدمات العامة" يستدعي المنتقي بـ
+        # only_companion_flow=True. فلو أظهرناهم بمجرد وجود العلَم، لظهر
+        # المريض القديم في منتقي اسم **الوصول** أيضاً — وهو ما يناقض
+        # القاعدة صراحةً: هؤلاء لم يصلوا عبر ذلك التدفق ولا يصحّ تسجيل
+        # وصول لهم. (رُصِد هذا التسريب فور شحن المرحلة ١ وأُصلح هنا.)
+        if include_onboarded and gs_onboarded_at:
+            return True
+        return pt in (_COMPANION_PARENT, _COMPANION)
 
     if pt == _PHARMACY_ONLY:
         return include_pharmacy
@@ -156,6 +164,7 @@ def fetch_all(
     include_companions: bool = False,
     only_companion_flow: bool = False,
     city: str | None = None,
+    include_onboarded: bool = False,
 ) -> list[PatientRecord]:
     """
     Fetch every patient from the database, sorted alphabetically.
@@ -192,7 +201,7 @@ def fetch_all(
                 if not _type_visible(
                     p.patient_type, include_pharmacy, include_companions,
                     only_companion_flow, city, getattr(p, "archived_at", None),
-                    getattr(p, "gs_onboarded_at", None),
+                    getattr(p, "gs_onboarded_at", None), include_onboarded,
                 ):
                     continue
                 name = (p.full_name or "").strip()
@@ -215,6 +224,7 @@ def search(
     include_companions: bool = False,
     only_companion_flow: bool = False,
     city: str | None = None,
+    include_onboarded: bool = False,
 ) -> list[PatientRecord]:
     """
     Search for patients whose full_name contains query (case-insensitive).
@@ -231,6 +241,7 @@ def search(
             include_companions=include_companions,
             only_companion_flow=only_companion_flow,
             city=city,
+            include_onboarded=include_onboarded,
         )
 
     try:
@@ -256,7 +267,7 @@ def search(
                 and _type_visible(
                     p.patient_type, include_pharmacy, include_companions,
                     only_companion_flow, city, getattr(p, "archived_at", None),
-                    getattr(p, "gs_onboarded_at", None),
+                    getattr(p, "gs_onboarded_at", None), include_onboarded,
                 )
             ]
             logger.debug(

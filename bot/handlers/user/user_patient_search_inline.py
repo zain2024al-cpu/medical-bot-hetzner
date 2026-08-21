@@ -74,6 +74,7 @@ async def patient_search_inline_handler(update: Update, context: ContextTypes.DE
         include_companions = False
         only_companion_flow = False
         _sel_city = None
+        _sel_onboarded = False
         _sel_state = None
         try:
             from shared.selectors.patient_selector._session import load as _sel_load
@@ -86,6 +87,10 @@ async def patient_search_inline_handler(update: Update, context: ContextTypes.DE
                 # inline لمرضى تشناي حصراً، بنفس صرامة القائمة المرقَّمة —
                 # وإلا يسرّب زر "🔍 بحث" مرضى غير تشناي رغم القيد في القائمة.
                 _sel_city = _sel_state.city
+                # ✅ نفس صرامة القائمة المرقَّمة تجاه المرضى القدامى
+                # المُدخَلين عبر "🏠 الحالات الموجودة": يظهرون في بحث
+                # "🔧 الخدمات العامة" فقط، لا في بحث "🛬 الوصول".
+                _sel_onboarded = _sel_state.include_onboarded
         except Exception:
             logger.debug("تم تجاهل استثناء في patient_search_inline_handler", exc_info=True)
 
@@ -132,6 +137,7 @@ async def patient_search_inline_handler(update: Update, context: ContextTypes.DE
                         if _type_visible(
                             p.patient_type, include_pharmacy, include_companions,
                             only_companion_flow, _sel_city, getattr(p, "archived_at", None),
+                            getattr(p, "gs_onboarded_at", None), _sel_onboarded,
                         )
                     ]
 

@@ -35,6 +35,11 @@ class PatientSelectorState:
     # الرعاية الصحية - تشناي"). يُحفظ في الجلسة لنفس سبب include_pharmacy —
     # تحترمه إعادة الجلب عند فقدان الـsnapshot وبحث inline النشط.
     city: str | None = None
+    # ✅ True فقط لـ"🔧 الخدمات العامة" — يُظهر أيضاً المرضى القدامى
+    # المُدخَلين عبر "🏠 الحالات الموجودة" (gs_onboarded_at). يبقى False
+    # لـ"🛬 الوصول" رغم أن كليهما يستخدم only_companion_flow، لأن هؤلاء
+    # لم يصلوا عبر تدفق الوصول ولا يصحّ تسجيل وصول لهم.
+    include_onboarded: bool = False
     # names-only snapshot for idx resolution (avoids re-querying on every tap)
     snapshot: list[str] = field(default_factory=list)
 
@@ -48,6 +53,7 @@ def save(user_data: dict, state: PatientSelectorState) -> None:
         "include_companions":  state.include_companions,
         "only_companion_flow": state.only_companion_flow,
         "city":                state.city,
+        "include_onboarded":   state.include_onboarded,
         "snapshot":            state.snapshot,
     }
 
@@ -64,6 +70,7 @@ def load(user_data: dict) -> PatientSelectorState | None:
         include_companions=raw.get("include_companions", False),
         only_companion_flow=raw.get("only_companion_flow", False),
         city=raw.get("city"),
+        include_onboarded=raw.get("include_onboarded", False),
         snapshot=raw.get("snapshot", []),
     )
 
