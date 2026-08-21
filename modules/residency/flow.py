@@ -16,6 +16,7 @@ from shared.result_router import register as _register_route
 
 from modules.residency.constants import (
     RN, STATUS_ORDER, STATUS_WAITING_ARRIVAL, STATUS_LEGACY_PENDING,
+    STATUS_ACTIVE,
 )
 from modules.residency import models as rn_models
 from modules.residency import repository as rn_repo
@@ -30,6 +31,9 @@ _CTX_SEARCH_ACTIVE = "_rn_search_active"
 _CTX_DOC_NAME_ACTIVE = "_rn_doc_name_active"  # {"person_id": int} — بانتظار اسم وثيقة "أخرى" نصّياً
 _CTX_PRINT_ROOT_ID = "_rn_print_root_id"      # root_id بانتظار نتيجة شاشة اختيار وثائق الطباعة
 _RKEY_PRINT_CATS = "rn.print_categories"
+# ✅ الحالة الهدف المُختارة، محفوظة أثناء جمع تواريخ التنبيه الناقصة قبل
+# تنفيذ النقل — {"root_id": int, "status": str}.
+_CTX_LEGACY_MOVE = "_rn_legacy_move"
 # ✅ 🏠 معالجة "معلّقات من الحالات السابقة": الوضع ("ext"/"noext") يُحدَّد بالزر
 # المضغوط ويُحمَل داخل _CTX_CAL_TARGET/_CTX_UPLOAD_TARGET نفسيهما — لا حاجة
 # لمفتاح سياق مستقل (الموضع داخل الطابور يُشتَقّ من القاعدة فيبقى المسار
@@ -45,6 +49,10 @@ def _clear_transient_state(context: ContextTypes.DEFAULT_TYPE) -> None:
     context.user_data.pop(_CTX_CAL_TARGET, None)
     context.user_data.pop(_CTX_SEARCH_ACTIVE, None)
     context.user_data.pop(_CTX_DOC_NAME_ACTIVE, None)
+    # ✅ يُنظَّف أيضاً حتى لا تبقى حالة نقل معلّقة لعائلة أخرى بعد مغادرة
+    # الشاشة. `_show_legacy_move_reminder` يستدعي هذه الدالة **ثم** يضبط
+    # المفتاح من جديد، فالترتيب سليم.
+    context.user_data.pop(_CTX_LEGACY_MOVE, None)
 
 
 async def _edit(update: Update, text: str, kb) -> None:
@@ -227,6 +235,64 @@ async def _show_legacy_step(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     await _edit(update, f"{header}\n\n{cal_text}", kb)
 
 
+def _missing_reminder_ids(root_id: int) -> list[int]:
+    """من لم يُدخَل له تاريخ تنبيه بعد ضمن العائلة (وما زال LEGACY_PENDING).
+
+    مسار "❌ لا يوجد تمديد" لا يجمع تاريخ تنبيه أصلاً، لكن الانتقال إلى
+    "🟢 الحالات النشطة" يستلزمه — وإلا لن يظهر أي تنبيه لهذا المريض لاحقاً
+    (بطلب المستخدم صراحةً). يُفحَص الحقل الفعلي لا الوضع، فيغطّي أي نقص
+    مهما كان مصدره.
+    """
+    queue = rn_repo.get_onboarding_queue(root_id)
+    return [
+        p.id for p in queue
+        if p.status == STATUS_LEGACY_PENDING and not p.reminder_date
+    ]
+
+
+async def _show_legacy_move_reminder(
+    update: Update, context: ContextTypes.DEFAULT_TYPE, root_id: int, target_status: str,
+) -> bool:
+    """يعرض تقويم تاريخ التنبيه لأول شخص ينقصه. يعيد False إن لم ينقص أحداً
+    (فينفّذ المستدعي النقل مباشرة)."""
+    pending = _missing_reminder_ids(root_id)
+    if not pending:
+        return False
+
+    person = rn_repo.get_person(pending[0])
+    if person is None:
+        return False
+
+    queue_ids = [p.id for p in rn_repo.get_onboarding_queue(root_id)]
+    idx = queue_ids.index(person.id) + 1 if person.id in queue_ids else 1
+
+    _clear_transient_state(context)
+    context.user_data[_CTX_LEGACY_MOVE] = {"root_id": root_id, "status": target_status}
+    context.user_data[_CTX_CAL_TARGET] = {
+        "kind": "legacy_move_remind", "person_id": person.id, "root_id": root_id,
+    }
+    now = datetime.utcnow()
+    cal_text, kb = build_calendar(
+        now.year, now.month, RN, back_callback=f"{RN}:family_{root_id}", quick_jump=True,
+    )
+    header = rn_views.legacy_step_header(person, "reminder", idx, len(queue_ids))
+    await _edit(update, f"{header}\n\n{cal_text}", kb)
+    return True
+
+
+async def _finish_legacy_move(
+    update: Update, context: ContextTypes.DEFAULT_TYPE, root_id: int,
+    target_status: str, uid: int,
+) -> None:
+    moved = rn_models.move_family_to_status(root_id, target_status, performed_by=uid)
+    context.user_data.pop(_CTX_LEGACY_MOVE, None)
+    _clear_transient_state(context)
+    if not moved:
+        await _edit(update, "⚠️ لم يُنقَل أحد — قد تكون الحالة عولجت مسبقاً.", None)
+        return
+    await _show_family(update, context, root_id, uid)
+
+
 # ── Issuance (🟣) ────────────────────────────────────────────────────────────
 
 async def _show_issuance(update: Update, context: ContextTypes.DEFAULT_TYPE, person_id: int) -> None:
@@ -313,12 +379,14 @@ async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         if target_status not in STATUS_ORDER or target_status == STATUS_LEGACY_PENDING:
             logger.warning(f"[residency.cb] lgc_to invalid status={target_status!r} user={uid}")
             return
-        moved = rn_models.move_family_to_status(root_id, target_status, performed_by=uid)
-        _clear_transient_state(context)
-        if not moved:
-            await _edit(update, "⚠️ لم يُنقَل أحد — قد تكون الحالة عولجت مسبقاً.", None)
-            return
-        await _show_family(update, context, root_id, uid)
+        # ✅ الانتقال إلى "🟢 الحالات النشطة" يستلزم تاريخ تنبيه لكل شخص —
+        # وإلا لن يظهر أي تنبيه لهذا المريض لاحقاً. مسار "لا يوجد تمديد" لا
+        # يجمعه، فيُطلَب هنا قبل تنفيذ النقل (بطلب المستخدم صراحةً). بقية
+        # الحالات تُنقَل مباشرة كما كانت.
+        if target_status == STATUS_ACTIVE:
+            if await _show_legacy_move_reminder(update, context, root_id, target_status):
+                return
+        await _finish_legacy_move(update, context, root_id, target_status, uid)
         return
 
     if action.startswith("submit_"):
@@ -496,6 +564,18 @@ async def _handle_calendar_action(update: Update, context: ContextTypes.DEFAULT_
             rn_models.set_issuance_expiry(person_id, date_iso)
             context.user_data.pop(_CTX_CAL_TARGET, None)
             await _show_issuance(update, context, person_id)
+        elif kind == "legacy_move_remind":
+            # ✅ تاريخ تنبيه مطلوب قبل النقل إلى "الحالات النشطة": يُحفَظ ثم
+            # يُنتقَل للشخص التالي الناقص، وعند اكتمال الجميع يُنفَّذ النقل.
+            rn_models.set_reminder_date(person_id, date_iso)
+            context.user_data.pop(_CTX_CAL_TARGET, None)
+            pending_move = context.user_data.get(_CTX_LEGACY_MOVE) or {}
+            root_id = pending_move.get("root_id", target["root_id"])
+            status = pending_move.get("status", STATUS_ACTIVE)
+            if not await _show_legacy_move_reminder(update, context, root_id, status):
+                await _finish_legacy_move(update, context, root_id, status, uid)
+            return
+
         elif is_legacy:
             # 🏠 تواريخ معالجة الحالات السابقة — كل خطوة تكتب حقلها ثم يُعاد
             # احتساب الخطوة التالية من القاعدة (قابل للاستئناف).
