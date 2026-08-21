@@ -19,7 +19,6 @@ from shared.uploads import collector as uploads
 from shared.result_router import register as _register_route
 from shared.selectors import result_router as _patient_router
 from modules.general_services.views import parse_date_input, build_gs_menu
-from modules.general_services.constants import STAFF_MAP
 from modules.general_services.public_services.session import (
     PublicServiceSession,
     STEP_DATE, STEP_DATE_CUSTOM, STEP_PATIENT, STEP_SERVICE_TYPE,
@@ -34,6 +33,7 @@ from modules.general_services.public_services.views import (
     build_specialist_prompt,
     build_review, build_success, build_cancelled, build_error,
 )
+from modules.general_services.staff import get_staff_map
 
 logger = logging.getLogger(__name__)
 
@@ -312,7 +312,7 @@ async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     # ── Specialist ────────────────────────────────────────────────────────────
     if action.startswith("specialist_"):
         sid = action[len("specialist_"):]
-        label = STAFF_MAP.get(sid, "")
+        label = get_staff_map().get(sid, "")
         if not label:
             return
         session = PublicServiceSession.load(context.user_data)

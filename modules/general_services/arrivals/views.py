@@ -8,8 +8,9 @@ from modules.general_services.views import (
     _DIVIDER, _THIN, _NONE,
 )
 from modules.general_services.constants import (
-    STAFF_MAP, ESCORT_ENTITY_MAP, ESCORT_ENTITY_OTHER_ID,
+    ESCORT_ENTITY_MAP, ESCORT_ENTITY_OTHER_ID,
 )
+from modules.general_services.staff import get_staff_map
 
 GS  = "gs"
 GSA = "gsa"
@@ -459,7 +460,7 @@ def build_p_specialist_prompt(session: ArrivalSession) -> tuple[str, InlineKeybo
         "",
         "اختر مختص الخدمات لهذا المريض:",
     ]
-    ordered = list(STAFF_MAP.items())
+    ordered = list(get_staff_map().items())
     if prev:
         ordered.sort(key=lambda kv: kv[0] != prev)   # previous choice first
 

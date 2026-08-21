@@ -19,7 +19,7 @@ from shared.selectors.patient_selector import selector as patient_selector
 from shared.result_router import register as _register_route
 from modules.general_services.views import parse_date_input, build_gs_menu
 from modules.general_services.constants import (
-    STAFF_MAP, ESCORT_ENTITY_MAP, ESCORT_ENTITY_OTHER_ID,
+    ESCORT_ENTITY_MAP, ESCORT_ENTITY_OTHER_ID,
 )
 from modules.general_services.arrivals.session import (
     ArrivalSession,
@@ -55,6 +55,7 @@ from modules.general_services.arrivals.views import (
     build_review, build_success, build_cancelled, build_error,
     build_edit_menu, build_edit_cmenu,
 )
+from modules.general_services.staff import get_staff_map
 
 logger = logging.getLogger(__name__)
 
@@ -1095,7 +1096,7 @@ async def _dispatch_callback_inner(
     # ── Specialist ────────────────────────────────────────────────────────────
     if action.startswith("specialist_"):
         sid = action[len("specialist_"):]
-        label = STAFF_MAP.get(sid, "")
+        label = get_staff_map().get(sid, "")
         if not label:
             logger.warning(f"[arrivals.cb] specialist unknown sid={sid!r}  user={uid}")
             return
@@ -1289,7 +1290,7 @@ async def _dispatch_callback_inner(
         if session is None:
             await _cancel(update, context); return
         sid   = action[len("p_specialist_"):]
-        label = STAFF_MAP.get(sid, "")
+        label = get_staff_map().get(sid, "")
         if not label:
             logger.warning(f"[arrivals.cb] unknown specialist id={sid!r}  user={uid}")
             return
@@ -1762,7 +1763,7 @@ async def _dispatch_callback_inner(
         _sp_ids = {p.get("specialist_id", "") for p in session.completed_patients if p.get("specialist_id")}
         if len(_sp_ids) == 1:
             _batch_sp_id    = next(iter(_sp_ids))
-            _batch_sp_label = STAFF_MAP.get(_batch_sp_id, session.specialist_label or "")
+            _batch_sp_label = get_staff_map().get(_batch_sp_id, session.specialist_label or "")
         elif len(_sp_ids) > 1:
             _batch_sp_id    = ""
             _batch_sp_label = "متعدد"

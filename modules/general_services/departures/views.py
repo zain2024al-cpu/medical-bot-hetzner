@@ -7,7 +7,8 @@ from modules.general_services.views import (
     format_arabic_datetime, format_arabic_date, format_image_count,
     _DIVIDER, _THIN, _NONE,
 )
-from modules.general_services.constants import ESCORT_ENTITY_MAP, STAFF_MAP
+from modules.general_services.constants import ESCORT_ENTITY_MAP
+from modules.general_services.staff import get_staff_map
 
 GS  = "gs"
 GSD = "gsd"
@@ -153,7 +154,7 @@ def build_specialist_prompt(session: DepartureSession) -> tuple[str, InlineKeybo
     lines = [_DIVIDER, "👨‍⚕️  **اختر مختص الخدمات**", "", "اختر مختص الخدمات:"]
     rows = [
         [InlineKeyboardButton(label, callback_data=f"{GSD}:specialist_{sid}")]
-        for sid, label in STAFF_MAP.items()
+        for sid, label in get_staff_map().items()
     ]
     rows.append([
         InlineKeyboardButton("⬅️ رجوع", callback_data=f"{GSD}:back_to_notes"),

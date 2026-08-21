@@ -19,7 +19,7 @@ from shared.multiselect import Option
 from shared.uploads import collector as uploads
 from shared.result_router import register as _register_route
 from modules.general_services.views import parse_date_input, build_gs_menu
-from modules.general_services.constants import ESCORT_ENTITY_MAP, STAFF_MAP
+from modules.general_services.constants import ESCORT_ENTITY_MAP
 from modules.general_services.arrivals.repository import (
     get_active_arrivals, expand_patient_ids_to_names, mark_patients_departed,
 )
@@ -36,6 +36,7 @@ from modules.general_services.departures.views import (
     build_hospital_prompt, build_notes_prompt, build_specialist_prompt,
     build_review, build_success, build_cancelled, build_error,
 )
+from modules.general_services.staff import get_staff_map
 
 logger = logging.getLogger(__name__)
 
@@ -325,7 +326,7 @@ async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     # ── Specialist ────────────────────────────────────────────────────────────
     if action.startswith("specialist_"):
         sid = action[len("specialist_"):]
-        label = STAFF_MAP.get(sid, "")
+        label = get_staff_map().get(sid, "")
         if not label:
             return
         session = DepartureSession.load(context.user_data)
