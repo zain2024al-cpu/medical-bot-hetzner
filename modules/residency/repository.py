@@ -16,6 +16,9 @@ class PersonRow:
     reminder_date: str
     expiry_date: str
     residency_file_id: str
+    # ✅ تاريخ آخر إصدار — يُملأ عند معالجة "🏠 معلّقات من الحالات السابقة"
+    # فقط؛ فارغ لكل من جاء عبر تدفق الوصول الاعتيادي.
+    last_issue_date: str = ""
 
 
 @dataclass(frozen=True)
@@ -48,6 +51,7 @@ def _to_row(p) -> PersonRow:
         id=p.id, parent_id=p.parent_id, name=p.name or "—", status=p.status,
         photo_file_id=p.photo_file_id or "", reminder_date=p.reminder_date or "",
         expiry_date=p.expiry_date or "", residency_file_id=p.residency_file_id or "",
+        last_issue_date=getattr(p, "last_issue_date", "") or "",
     )
 
 

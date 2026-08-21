@@ -5,7 +5,7 @@ import logging
 
 from modules.residency.constants import (
     STATUS_WAITING_ARRIVAL, STATUS_ACTIVE, STATUS_EXPIRY_PENDING,
-    STATUS_SUBMITTED, STATUS_ISSUED,
+    STATUS_SUBMITTED, STATUS_ISSUED, STATUS_LEGACY_PENDING,
 )
 
 logger = logging.getLogger(__name__)
@@ -217,6 +217,90 @@ def add_document(person_id: int, doc_type: str, doc_name: str, file_id: str, cre
         ))
     logger.info(f"[residency] document added  person_id={person_id}  type={doc_type}  name={doc_name!r}")
     return True
+
+
+# ── 🏠 معالجة "معلّقات من الحالات السابقة" (المرضى القدامى) ──────────────────
+# هؤلاء أُدخِلوا عبر شاشة الأدمن "🏠 الحالات الموجودة" بحالة LEGACY_PENDING.
+# بياناتهم الأساسية (جواز/تأشيرة/سكن) مكتملة، لكن بيانات **الإقامة** نفسها
+# لم تُدخَل بعد — تُدخَل هنا ثم يُنقَلون لحالتهم الطبيعية ضمن الحالات الخمس.
+
+def set_last_issue_date(person_id: int, date_iso: str) -> bool:
+    """تاريخ آخر إصدار للإقامة (إقامة أُصدرت قبل تفعيل الوحدة، فلا سجلّ لها)."""
+    from db.session import get_db
+    from db.models import ResidencyPerson
+
+    with get_db() as db:
+        person = db.query(ResidencyPerson).filter_by(id=person_id).first()
+        if not person:
+            return False
+        person.last_issue_date = date_iso
+    return True
+
+
+def set_expiry_date(person_id: int, date_iso: str) -> bool:
+    """تاريخ انتهاء الإقامة — يُستخدَم في مسارَي "يوجد تمديد" و"لا يوجد"."""
+    from db.session import get_db
+    from db.models import ResidencyPerson
+
+    with get_db() as db:
+        person = db.query(ResidencyPerson).filter_by(id=person_id).first()
+        if not person:
+            return False
+        person.expiry_date = date_iso
+    return True
+
+
+def save_residency_file(person_id: int, file_id: str) -> bool:
+    """صورة آخر إقامة (مستند رسمي — بلا ضبط مقاس)."""
+    from db.session import get_db
+    from db.models import ResidencyPerson
+
+    with get_db() as db:
+        person = db.query(ResidencyPerson).filter_by(id=person_id).first()
+        if not person:
+            return False
+        person.residency_file_id = file_id
+    return True
+
+
+def move_family_to_status(root_id: int, new_status: str, performed_by: int | None = None) -> int:
+    """ينقل المريض وكل مرافقيه من LEGACY_PENDING إلى الحالة التي يختارها
+    المستخدم، بسجلّ انتقال منفصل لكل شخص.
+
+    ⚠️ يقتصر على من هو في LEGACY_PENDING فعلاً — فلو كان أحد المرافقين قد
+    نُقِل سابقاً بشكل مستقل لا يُعاد تحريكه (نفس حارس `bulk_activate_request`).
+
+    ✅ يُؤرشَف الإصدار في ResidencyIssuance لمن يملك تاريخ انتهاء وملف إقامة
+    معاً — حتى يظهر ضمن "🖨️ طباعة ملف الحالة" وسجلّ الإصدارات كأي إصدار
+    رسمي، بلا حاجة لإعادة إدخاله لاحقاً.
+    """
+    from db.session import get_db
+    from db.models import ResidencyPerson, ResidencyIssuance
+
+    count = 0
+    with get_db() as db:
+        people = (
+            db.query(ResidencyPerson)
+            .filter((ResidencyPerson.id == root_id) | (ResidencyPerson.parent_id == root_id))
+            .all()
+        )
+        for person in people:
+            if person.status != STATUS_LEGACY_PENDING:
+                continue
+            if person.expiry_date and person.residency_file_id:
+                db.add(ResidencyIssuance(
+                    person_id=person.id, expiry_date=person.expiry_date,
+                    file_id=person.residency_file_id,
+                ))
+            old = person.status
+            person.status = new_status
+            _log_transition(db, person.id, old, new_status, performed_by)
+            count += 1
+
+    logger.info(
+        f"[residency] move_family_to_status root_id={root_id} → {new_status}: {count} person(s)"
+    )
+    return count
 
 
 def delete_stub_person_by_name(name: str) -> int:

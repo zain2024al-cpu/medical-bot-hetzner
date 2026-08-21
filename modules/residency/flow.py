@@ -14,7 +14,9 @@ from shared.calendar_picker import build_calendar
 from shared.multiselect import engine as multiselect
 from shared.result_router import register as _register_route
 
-from modules.residency.constants import RN, STATUS_ORDER, STATUS_WAITING_ARRIVAL
+from modules.residency.constants import (
+    RN, STATUS_ORDER, STATUS_WAITING_ARRIVAL, STATUS_LEGACY_PENDING,
+)
 from modules.residency import models as rn_models
 from modules.residency import repository as rn_repo
 from modules.residency import views as rn_views
@@ -28,6 +30,10 @@ _CTX_SEARCH_ACTIVE = "_rn_search_active"
 _CTX_DOC_NAME_ACTIVE = "_rn_doc_name_active"  # {"person_id": int} — بانتظار اسم وثيقة "أخرى" نصّياً
 _CTX_PRINT_ROOT_ID = "_rn_print_root_id"      # root_id بانتظار نتيجة شاشة اختيار وثائق الطباعة
 _RKEY_PRINT_CATS = "rn.print_categories"
+# ✅ 🏠 معالجة "معلّقات من الحالات السابقة": الوضع ("ext"/"noext") يُحدَّد بالزر
+# المضغوط ويُحمَل داخل _CTX_CAL_TARGET/_CTX_UPLOAD_TARGET نفسيهما — لا حاجة
+# لمفتاح سياق مستقل (الموضع داخل الطابور يُشتَقّ من القاعدة فيبقى المسار
+# قابلاً للاستئناف بعد أي انقطاع).
 
 
 def _is_authorized(user_id: int) -> bool:
@@ -136,6 +142,91 @@ async def _show_onboard_step(update: Update, context: ContextTypes.DEFAULT_TYPE,
         await _edit(update, text, kb)
 
 
+# ── 🏠 معالجة "معلّقات من الحالات السابقة" ────────────────────────────────────
+# المريض القديم (LEGACY_PENDING) بياناته الأساسية مكتملة من شاشة الأدمن، وما
+# ينقصه بيانات **الإقامة** نفسها. مساران:
+#   ext   — توجد إقامة/تمديد: آخر إصدار → الانتهاء → التنبيه → صورة الإقامة
+#           → الصورة الشخصية.
+#   noext — لا يوجد تمديد: تاريخ الانتهاء فقط.
+# يمرّ المسار على المريض ثم مرافقيه واحداً واحداً (نفس نمط الطابور المُستخدَم
+# في استكمال بيانات الوصول)، ثم شاشة اختيار القائمة التي ينتقلون إليها معاً.
+
+_LEGACY_STEPS_EXT = ["last_issue", "expiry", "reminder", "res_file", "photo"]
+_LEGACY_STEPS_NOEXT = ["expiry"]
+
+
+def _legacy_filled(person, step: str) -> bool:
+    """هل اكتملت هذه الخطوة لهذا الشخص؟ (تُشتَقّ من القاعدة فيكون المسار
+    قابلاً للاستئناف بعد أي انقطاع، تماماً كـ_build_onboard_state)."""
+    return bool({
+        "last_issue": person.last_issue_date,
+        "expiry":     person.expiry_date,
+        "reminder":   person.reminder_date,
+        "res_file":   person.residency_file_id,
+        "photo":      person.photo_file_id,
+    }.get(step, ""))
+
+
+def _build_legacy_state(root_id: int, mode: str) -> dict:
+    steps = _LEGACY_STEPS_EXT if mode == "ext" else _LEGACY_STEPS_NOEXT
+    queue = rn_repo.get_onboarding_queue(root_id)      # المريض ثم مرافقوه
+    for i, p in enumerate(queue):
+        for step in steps:
+            if not _legacy_filled(p, step):
+                return {
+                    "root_id": root_id, "mode": mode,
+                    "queue_ids": [q.id for q in queue],
+                    "index": i, "step": step,
+                }
+    return {"root_id": root_id, "mode": mode,
+            "queue_ids": [q.id for q in queue], "index": len(queue), "step": "choose"}
+
+
+async def _show_legacy_step(update: Update, context: ContextTypes.DEFAULT_TYPE, root_id: int, mode: str) -> None:
+    state = _build_legacy_state(root_id, mode)
+    _clear_transient_state(context)
+
+    # اكتمل الجميع ⇒ اختيار القائمة الهدف
+    if state["step"] == "choose":
+        family = rn_repo.get_family(root_id)
+        if family is None:
+            await _show_menu(update, context)
+            return
+        text, kb = rn_views.build_legacy_target_chooser(family)
+        await _edit(update, text, kb)
+        return
+
+    person = rn_repo.get_person(state["queue_ids"][state["index"]])
+    if person is None:
+        await _show_menu(update, context)
+        return
+
+    idx, total = state["index"] + 1, len(state["queue_ids"])
+    step = state["step"]
+
+    if step in ("res_file", "photo"):
+        context.user_data[_CTX_UPLOAD_TARGET] = {
+            "kind": "legacy_res_file" if step == "res_file" else "legacy_photo",
+            "person_id": person.id, "root_id": root_id, "mode": mode,
+        }
+        text, kb = rn_views.build_legacy_upload_prompt(person, step, idx, total)
+        await _edit(update, text, kb)
+        return
+
+    # خطوات التواريخ الثلاث — تقويم بقفز السنوات/الشهور (تواريخ قد تبعد
+    # سنة أو أكثر، فالتنقّل شهراً شهراً غير عملي)
+    context.user_data[_CTX_CAL_TARGET] = {
+        "kind": f"legacy_{step}", "person_id": person.id,
+        "root_id": root_id, "mode": mode,
+    }
+    now = datetime.utcnow()
+    cal_text, kb = build_calendar(
+        now.year, now.month, RN, back_callback=f"{RN}:family_{root_id}", quick_jump=True,
+    )
+    header = rn_views.legacy_step_header(person, step, idx, total)
+    await _edit(update, f"{header}\n\n{cal_text}", kb)
+
+
 # ── Issuance (🟣) ────────────────────────────────────────────────────────────
 
 async def _show_issuance(update: Update, context: ContextTypes.DEFAULT_TYPE, person_id: int) -> None:
@@ -195,6 +286,38 @@ async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         root_id = int(action[len("onboard_save_"):])
         rn_models.bulk_activate_request(root_id, performed_by=uid)
         _clear_transient_state(context)
+        await _show_family(update, context, root_id, uid)
+        return
+
+    # ── 🏠 معلّقات من الحالات السابقة ──────────────────────────────────
+    if action.startswith("lgc_ext_") or action.startswith("lgc_noext_"):
+        mode = "ext" if action.startswith("lgc_ext_") else "noext"
+        prefix = "lgc_ext_" if mode == "ext" else "lgc_noext_"
+        try:
+            root_id = int(action[len(prefix):])
+        except ValueError:
+            logger.warning(f"[residency.cb] lgc bad root_id action={action!r} user={uid}")
+            return
+        await _show_legacy_step(update, context, root_id, mode)
+        return
+
+    if action.startswith("lgc_to_"):
+        # صيغة: lgc_to_{STATUS}_{root_id} — الحالة نفسها قد تحوي "_"
+        rest = action[len("lgc_to_"):]
+        target_status, _, root_raw = rest.rpartition("_")
+        try:
+            root_id = int(root_raw)
+        except ValueError:
+            logger.warning(f"[residency.cb] lgc_to bad root_id action={action!r} user={uid}")
+            return
+        if target_status not in STATUS_ORDER or target_status == STATUS_LEGACY_PENDING:
+            logger.warning(f"[residency.cb] lgc_to invalid status={target_status!r} user={uid}")
+            return
+        moved = rn_models.move_family_to_status(root_id, target_status, performed_by=uid)
+        _clear_transient_state(context)
+        if not moved:
+            await _edit(update, "⚠️ لم يُنقَل أحد — قد تكون الحالة عولجت مسبقاً.", None)
+            return
         await _show_family(update, context, root_id, uid)
         return
 
@@ -332,10 +455,31 @@ async def _handle_calendar_action(update: Update, context: ContextTypes.DEFAULT_
     if sub == "cal_noop":
         return
 
-    if sub in ("cal_prev", "cal_next"):
+    kind = target["kind"]
+    is_legacy = kind.startswith("legacy_")
+
+    def _back_cb() -> str:
+        if is_legacy:
+            return f"{RN}:family_{target['root_id']}"
+        return f"{RN}:menu" if kind == "onboard_remind" else f"{RN}:issue_view_{target['person_id']}"
+
+    if sub in ("cal_prev", "cal_next", "cal_yprev", "cal_ynext", "cal_setmonth"):
         y, m = int(parts[1]), int(parts[2])
-        back = f"{RN}:menu" if target["kind"] == "onboard_remind" else f"{RN}:issue_view_{target['person_id']}"
-        text, kb = build_calendar(y, m, RN, back_callback=back)
+        text, kb = build_calendar(y, m, RN, back_callback=_back_cb(), quick_jump=is_legacy)
+        await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
+        return
+
+    # ✅ قفز السنة/الشهر — يُبنى فقط لتقويمات هذا المسار (quick_jump=True)،
+    # فلا تصل هذه الأفعال من المسارات القديمة إطلاقاً.
+    if sub in ("cal_years", "cal_yearpage"):
+        from shared.calendar_picker import build_year_picker
+        text, kb = build_year_picker(int(parts[1]), RN, _back_cb())
+        await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
+        return
+
+    if sub == "cal_setyear":
+        from shared.calendar_picker import build_month_picker
+        text, kb = build_month_picker(int(parts[1]), RN, _back_cb())
         await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
         return
 
@@ -352,6 +496,18 @@ async def _handle_calendar_action(update: Update, context: ContextTypes.DEFAULT_
             rn_models.set_issuance_expiry(person_id, date_iso)
             context.user_data.pop(_CTX_CAL_TARGET, None)
             await _show_issuance(update, context, person_id)
+        elif is_legacy:
+            # 🏠 تواريخ معالجة الحالات السابقة — كل خطوة تكتب حقلها ثم يُعاد
+            # احتساب الخطوة التالية من القاعدة (قابل للاستئناف).
+            step = kind[len("legacy_"):]
+            if step == "last_issue":
+                rn_models.set_last_issue_date(person_id, date_iso)
+            elif step == "expiry":
+                rn_models.set_expiry_date(person_id, date_iso)
+            elif step == "reminder":
+                rn_models.set_reminder_date(person_id, date_iso)
+            context.user_data.pop(_CTX_CAL_TARGET, None)
+            await _show_legacy_step(update, context, target["root_id"], target.get("mode", "ext"))
         return
 
 
@@ -441,6 +597,33 @@ async def _on_media_message(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
         rn_models.save_photo(person_id, final_file_id)
         await _show_onboard_step(update, context, target["root_id"])
+
+    elif target["kind"] == "legacy_res_file":
+        # 🪪 صورة آخر إقامة — مستند رسمي، بلا ضبط مقاس (نفس issue_file).
+        rn_models.save_residency_file(person_id, file_id)
+        await _show_legacy_step(update, context, target["root_id"], target.get("mode", "ext"))
+
+    elif target["kind"] == "legacy_photo":
+        # 📷 صورة شخصية — تُضبَط على 4×6 تماماً كصورة الوصول (نفس المعالجة
+        # حتى تصلح للطباعة في ملف الحالة).
+        final_file_id = file_id
+        try:
+            from modules.residency.photo_processing import resize_to_4x6
+
+            tg_file = await context.bot.get_file(file_id)
+            buf = io.BytesIO()
+            await tg_file.download_to_memory(buf)
+            buf.seek(0)
+            sent = await context.bot.send_photo(
+                chat_id=update.effective_chat.id,
+                photo=io.BytesIO(resize_to_4x6(buf.read())),
+                caption="🖼️ الصورة مضبوطة على مقاس 4×6",
+            )
+            final_file_id = sent.photo[-1].file_id
+        except Exception as exc:
+            logger.warning(f"[residency] legacy photo resize failed, saving original: {exc}")
+        rn_models.save_photo(person_id, final_file_id)
+        await _show_legacy_step(update, context, target["root_id"], target.get("mode", "ext"))
 
     elif target["kind"] == "issue_file":
         # ✅ لا ضبط مقاس هنا — هذا مستند/بطاقة إقامة رسمية، لا صورة شخصية.

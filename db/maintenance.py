@@ -224,6 +224,9 @@ class DatabaseMaintenance:
                 # ✅ مريض قديم أُدخِل يدوياً لبوتَي الخدمات/الإقامة عبر شاشة
                 # "🏠 الحالات الموجودة" (لم يمرّ بتدفق الوصول).
                 _migrate_column(conn, "patients", "gs_onboarded_at", "DATETIME")
+                # ✅ تاريخ آخر إصدار للإقامة — لمعالجة المرضى القدامى
+                # ("🏠 معلّقات من الحالات السابقة" في وحدة الإقامة).
+                _migrate_column(conn, "res_persons", "last_issue_date", "VARCHAR(50)")
                 logger.info("🔎 Migration check finished.")
 
                 if check == "ok":

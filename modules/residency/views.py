@@ -8,7 +8,7 @@ from shared.multiselect import Option
 from modules.residency.constants import (
     RN, STATUS_ORDER, STATUS_ICONS, STATUS_LABELS, status_line,
     STATUS_WAITING_ARRIVAL, STATUS_ACTIVE, STATUS_EXPIRY_PENDING,
-    STATUS_SUBMITTED, STATUS_ISSUED,
+    STATUS_SUBMITTED, STATUS_ISSUED, STATUS_LEGACY_PENDING,
 )
 from modules.residency.repository import FamilyRow, PersonRow, LogEntry, DocumentRow, ArrivalDocsRow
 
@@ -110,6 +110,18 @@ def build_family_detail(
 
     doc_counts = doc_counts or {}
     rows = []
+
+    # ✅ 🏠 معلّقات من الحالات السابقة — زرّان على مستوى **العائلة** لا الفرد:
+    # المسار يعالج المريض ومرافقيه دفعة واحدة ثم ينقلهم معاً للحالة المختارة
+    # (بطلب المستخدم: "ينقلهم إلى القائمة ويختار أي قائمة يدخل فيها").
+    if root.status == STATUS_LEGACY_PENDING:
+        rows.append([InlineKeyboardButton(
+            "✅ توجد إقامة / تمديد", callback_data=f"{RN}:lgc_ext_{root.id}",
+        )])
+        rows.append([InlineKeyboardButton(
+            "❌ لا يوجد تمديد", callback_data=f"{RN}:lgc_noext_{root.id}",
+        )])
+
     btn = _person_action_button(root, is_root=True)
     if btn:
         rows.append([btn])
@@ -314,3 +326,76 @@ def build_reports_view(counts: dict) -> tuple[str, InlineKeyboardMarkup]:
     lines.append(f"الإجمالي: {total} طلباً")
     kb = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:menu")]])
     return "\n".join(lines), kb
+
+
+# ── 🏠 معالجة "معلّقات من الحالات السابقة" ────────────────────────────────────
+# شاشات إدخال بيانات إقامة المريض القديم (ومرافقيه) ثم نقلهم للحالة المختارة.
+
+_LEGACY_STEP_TITLES = {
+    "last_issue": "📆 تاريخ **آخر إصدار** للإقامة",
+    "expiry":     "📅 تاريخ **انتهاء** الإقامة",
+    "reminder":   "🔔 تاريخ **التنبيه القادم**",
+    "res_file":   "🪪 صورة **آخر إقامة**",
+    "photo":      "📷 **الصورة الشخصية**",
+}
+
+
+def legacy_step_header(person: PersonRow, step: str, idx: int, total: int) -> str:
+    """ترويسة موحَّدة لكل خطوات هذا المسار — تُظهر لمن ندخل البيانات الآن
+    وأين نحن من الطابور (المريض ثم مرافقوه)."""
+    who = f"👤 {person.name}" if idx == 1 else f"🤝 {person.name}"
+    return (
+        f"🏠 **معالجة حالة سابقة** — ({idx}/{total})\n"
+        f"{who}\n\n"
+        f"{_LEGACY_STEP_TITLES.get(step, step)}"
+    )
+
+
+def build_legacy_upload_prompt(
+    person: PersonRow, step: str, idx: int, total: int,
+) -> tuple[str, InlineKeyboardMarkup]:
+    """شاشة رفع ملف (صورة آخر إقامة / الصورة الشخصية)."""
+    text = legacy_step_header(person, step, idx, total) + "\n\nأرسل الصورة أو الملف الآن 📎"
+    kb = InlineKeyboardMarkup([[
+        InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:menu"),
+    ]])
+    return text, kb
+
+
+def build_legacy_target_chooser(family: FamilyRow) -> tuple[str, InlineKeyboardMarkup]:
+    """الخطوة الأخيرة: اختيار القائمة التي ينتقل إليها المريض ومرافقوه.
+
+    تُعرض كل الحالات عدا LEGACY_PENDING نفسها (لا معنى للبقاء فيها بعد
+    اكتمال الإدخال) — مشتقّة من STATUS_ORDER فتتبع أي تغيير مستقبلي تلقائياً.
+    """
+    total = 1 + len(family.companions)
+    lines = [
+        _DIVIDER,
+        "✅ **اكتملت بيانات الإقامة**",
+        "",
+        f"👤 {family.root.name}",
+    ]
+    if family.root.expiry_date:
+        lines.append(f"  📅 الانتهاء: {family.root.expiry_date}")
+    if family.root.last_issue_date:
+        lines.append(f"  📆 آخر إصدار: {family.root.last_issue_date}")
+    for c in family.companions:
+        lines.append(f"🤝 {c.name}")
+        if c.expiry_date:
+            lines.append(f"  📅 الانتهاء: {c.expiry_date}")
+    lines += [
+        _THIN,
+        f"👥 سيُنقَل **{total}** شخص معاً.",
+        "",
+        "اختر القائمة التي ينتقلون إليها:",
+    ]
+
+    rows = [
+        [InlineKeyboardButton(
+            f"{STATUS_ICONS.get(s, '⚪')} {STATUS_LABELS.get(s, s)}",
+            callback_data=f"{RN}:lgc_to_{s}_{family.root.id}",
+        )]
+        for s in STATUS_ORDER if s != STATUS_LEGACY_PENDING
+    ]
+    rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:family_{family.root.id}")])
+    return "\n".join(lines), InlineKeyboardMarkup(rows)
