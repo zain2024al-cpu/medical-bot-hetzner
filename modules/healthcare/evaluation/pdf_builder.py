@@ -39,36 +39,15 @@ if not os.path.isfile(_FONT_BOLD):
 import re
 
 # نطاقات الحروف العربية (أساسي + مكمّل + أشكال العرض)
-_ARABIC_RE = re.compile(r"[؀-ۿݐ-ݿﭐ-﷿ﹰ-﻿]")
+# ✅ نمط محارف العربية انتقل إلى services/pdf_arabic.py::ARABIC_RE
+# (كان معرَّفاً هنا بنسخة مستقلة تباعدت عن البقية).
 
 
-def _ar(text: str) -> str:
-    """Reshape + apply bidi so ReportLab renders Arabic correctly (RTL).
-
-    ⚠️ نقطتان حرجتان تعلّمناهما من نصوص معكوسة في التقرير المطبوع:
-
-    1. **النص الخالي من العربية يُترك كما هو تماماً.** تمرير تاريخ أو رقم
-       مثل "2026/07/01 — 2026/08/05" عبر get_display بأساس RTL يقلب ترتيب
-       التاريخين فعلياً (تحقّقنا: يخرج "2026/08/05 — 2026/07/01"). فالأرقام
-       والتواريخ واللاتينية البحتة لا تمرّ بالخوارزمية إطلاقاً.
-
-    2. **base_dir="R" صراحةً للنص العربي.** get_display بلا وسيط يستنتج
-       اتجاه الأساس من أول حرف قوي في النص؛ فنص طبي مثل
-       "500mg باراسيتامول" أول حرف قوي فيه لاتيني ⇒ يُعامَل كفقرة LTR
-       فيُوضَع الجزء العربي في الطرف الخاطئ ويظهر "معكوساً" للمستخدم،
-       بينما جاره في نفس الجدول (اسم عربي صرف) يظهر سليماً — وهذا بالضبط
-       سبب "بعض النصوص معكوسة" دون بقيتها. تثبيت الأساس على R يجعل كل
-       خلية عربية تُرسم باتجاه واحد ثابت مهما بدأت.
-    """
-    s = str(text)
-    if not _ARABIC_RE.search(s):
-        return s
-    try:
-        import arabic_reshaper
-        from bidi.algorithm import get_display
-        return get_display(arabic_reshaper.reshape(s), base_dir="R")
-    except Exception:
-        return s
+def _ar(text) -> str:
+    """غلاف رقيق حول services/pdf_arabic.py::ar — المصدر الموحّد.
+    (كانت نسخة مستقلة؛ انظر شرح سبب التوحيد في ذلك الملف.)"""
+    from services.pdf_arabic import ar as _shared_ar
+    return _shared_ar(text)
 
 
 # ── Color palette ─────────────────────────────────────────────────────────────

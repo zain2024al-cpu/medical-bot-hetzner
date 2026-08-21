@@ -32,74 +32,28 @@ _FONT_BOLD_CANDIDATES = [
 
 
 def _pick_font(candidates: list[tuple[str, str]], fallback: str = "Helvetica") -> str:
-    from reportlab.pdfbase import pdfmetrics
-    from reportlab.pdfbase.ttfonts import TTFont
-
-    for path, alias in candidates:
-        if os.path.isfile(path):
-            try:
-                pdfmetrics.registerFont(TTFont(alias, path))
-                return alias
-            except Exception:
-                continue
-    return fallback
+    """غلاف رقيق حول services/pdf_arabic.py::pick_font — المصدر الموحّد.
+    قوائم الخطوط (_FONT_CANDIDATES) تبقى في كل ملف كما هي."""
+    from services.pdf_arabic import pick_font as _shared_pick_font
+    return _shared_pick_font(candidates, fallback)
 
 
 # نطاقات الحروف العربية (أساسي + مكمّل + أشكال العرض)
-_ARABIC_RE = re.compile(r"[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]")
+# ✅ نمط محارف العربية انتقل إلى services/pdf_arabic.py::ARABIC_RE
+# (كان معرَّفاً هنا بنسخة مستقلة تباعدت عن البقية).
 
 
-def _ar(text: str) -> str:
-    """يُطبِّق reshape+bidi على النص العربي فقط.
-
-    ⚠️ نقطتان لا تُفصلان (الإصلاح المرجعي في
-    modules/healthcare/evaluation/pdf_builder.py):
-    1. النص الخالي من العربية يُعاد كما هو — تمرير تاريخ مثل
-       "2026/07/01 — 2026/08/05" عبر get_display بأساس RTL يقلب ترتيب
-       التاريخين فعلياً.
-    2. base_dir="R" صراحةً — بدونه تستنتج المكتبة الاتجاه من أول حرف
-       قوي، فنص مثل "500mg باراسيتامول" (اسم دواء لاتيني أولاً) يُعامَل
-       كفقرة LTR فيظهر الجزء العربي في الطرف الخاطئ ويبدو معكوساً،
-       بينما جاره العربي الصرف يظهر سليماً."""
-    s = str(text or "")
-    if not _ARABIC_RE.search(s):
-        return s
-    try:
-        import arabic_reshaper
-        from bidi.algorithm import get_display
-        return get_display(arabic_reshaper.reshape(s), base_dir="R")
-    except Exception:
-        return s
+def _ar(text) -> str:
+    """غلاف رقيق حول services/pdf_arabic.py::ar — المصدر الموحّد.
+    (كانت نسخة مستقلة؛ انظر شرح سبب التوحيد في ذلك الملف.)"""
+    from services.pdf_arabic import ar as _shared_ar
+    return _shared_ar(text)
 
 
 def _ar_wrap(text, font_name: str, font_size: float, max_width_pts: float) -> str:
-    """يلفّ النص يدوياً كلمة-كلمة ضمن العرض المتاح، ثم يُطبِّق reshape+bidi على
-    كل سطر منجَز على حدة — يمنع تكسّر نص مختلط عربي/إنجليزي طويل (مثل اسم
-    عملية بالإنجليزي داخل قرار الطبيب) عند لف Paragraph التلقائي لسلسلة
-    أُعيد ترتيبها بصرياً بالفعل (نفس الإصلاح في services/patient_report_pdf.py
-    وservices/pharmacy_evacuation_pdf.py)."""
-    from reportlab.pdfbase.pdfmetrics import stringWidth
-
-    s = str(text or "").strip()
-    if not s:
-        return ""
-
-    words = s.split()
-    lines: list[str] = []
-    current: list[str] = []
-    for word in words:
-        candidate = current + [word]
-        shaped_candidate = _ar(" ".join(candidate))
-        w = stringWidth(shaped_candidate, font_name, font_size)
-        if w <= max_width_pts or not current:
-            current = candidate
-        else:
-            lines.append(" ".join(current))
-            current = [word]
-    if current:
-        lines.append(" ".join(current))
-
-    return "<br/>".join(_ar(line) for line in lines)
+    """غلاف رقيق حول services/pdf_arabic.py::ar_wrap — المصدر الموحّد."""
+    from services.pdf_arabic import ar_wrap as _shared_ar_wrap
+    return _shared_ar_wrap(text, font_name, font_size, max_width_pts)
 
 
 def _colors():

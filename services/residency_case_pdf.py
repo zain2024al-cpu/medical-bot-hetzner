@@ -27,7 +27,8 @@ import re
 
 logger = logging.getLogger(__name__)
 
-_ARABIC_RE = re.compile("[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿]")
+# ✅ نمط محارف العربية انتقل إلى services/pdf_arabic.py::ARABIC_RE
+# (كان معرَّفاً هنا بنسخة مستقلة تباعدت عن البقية).
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _FONTS_DIR = os.path.normpath(os.path.join(_HERE, "..", "assets", "fonts"))
@@ -47,54 +48,23 @@ _MARGIN_CM = 2.0
 
 
 def _pick_font(candidates: list[tuple[str, str]], fallback: str = "Helvetica") -> str:
-    from reportlab.pdfbase import pdfmetrics
-    from reportlab.pdfbase.ttfonts import TTFont
-
-    for path, alias in candidates:
-        if os.path.isfile(path):
-            try:
-                pdfmetrics.registerFont(TTFont(alias, path))
-                return alias
-            except Exception:
-                continue
-    return fallback
+    """غلاف رقيق حول services/pdf_arabic.py::pick_font — المصدر الموحّد.
+    قوائم الخطوط (_FONT_CANDIDATES) تبقى في كل ملف كما هي."""
+    from services.pdf_arabic import pick_font as _shared_pick_font
+    return _shared_pick_font(candidates, fallback)
 
 
 def _ar(text) -> str:
-    s = str(text or "")
-    if not _ARABIC_RE.search(s):
-        return s
-    try:
-        import arabic_reshaper
-        from bidi.algorithm import get_display
-        return get_display(arabic_reshaper.reshape(s), base_dir="R")
-    except Exception:
-        return s
+    """غلاف رقيق حول services/pdf_arabic.py::ar — المصدر الموحّد.
+    (كانت نسخة مستقلة؛ انظر شرح سبب التوحيد في ذلك الملف.)"""
+    from services.pdf_arabic import ar as _shared_ar
+    return _shared_ar(text)
 
 
 def _ar_wrap(text, font_name: str, font_size: float, max_width_pts: float) -> str:
-    from reportlab.pdfbase.pdfmetrics import stringWidth
-
-    s = str(text or "").strip()
-    if not s:
-        return ""
-
-    words = s.split()
-    lines: list[str] = []
-    current: list[str] = []
-    for word in words:
-        candidate = current + [word]
-        shaped_candidate = _ar(" ".join(candidate))
-        w = stringWidth(shaped_candidate, font_name, font_size)
-        if w <= max_width_pts or not current:
-            current = candidate
-        else:
-            lines.append(" ".join(current))
-            current = [word]
-    if current:
-        lines.append(" ".join(current))
-
-    return "<br/>".join(_ar(line) for line in lines)
+    """غلاف رقيق حول services/pdf_arabic.py::ar_wrap — المصدر الموحّد."""
+    from services.pdf_arabic import ar_wrap as _shared_ar_wrap
+    return _shared_ar_wrap(text, font_name, font_size, max_width_pts)
 
 
 def _colors():

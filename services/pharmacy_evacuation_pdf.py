@@ -31,9 +31,8 @@ logger = logging.getLogger(__name__)
 # نطاقات يونيكود العربية (الأساسية + الملحقة + أشكال العرض) — أي نص لا
 # يحتوي ولو حرفاً واحداً من هذه النطاقات لا علاقة له بإعادة التشكيل/bidi
 # إطلاقاً (تواريخ، أرقام فواتير، مبالغ، رموز، نص لاتيني).
-_ARABIC_RE = re.compile(
-    "[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿]"
-)
+# ✅ نمط محارف العربية انتقل إلى services/pdf_arabic.py::ARABIC_RE
+# (كان معرَّفاً هنا بنسخة مستقلة تباعدت عن البقية).
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _EVAL_FONTS_DIR = os.path.normpath(os.path.join(_HERE, "..", "assets", "fonts"))
@@ -81,68 +80,23 @@ _MARGIN_CM = 2.0  # هوامش متساوية يميناً ويساراً — م
 
 
 def _pick_font(candidates: list[tuple[str, str]], fallback: str = "Helvetica") -> str:
-    from reportlab.pdfbase import pdfmetrics
-    from reportlab.pdfbase.ttfonts import TTFont
-
-    for path, alias in candidates:
-        if os.path.isfile(path):
-            try:
-                pdfmetrics.registerFont(TTFont(alias, path))
-                return alias
-            except Exception:
-                continue
-    return fallback
+    """غلاف رقيق حول services/pdf_arabic.py::pick_font — المصدر الموحّد.
+    قوائم الخطوط (_FONT_CANDIDATES) تبقى في كل ملف كما هي."""
+    from services.pdf_arabic import pick_font as _shared_pick_font
+    return _shared_pick_font(candidates, fallback)
 
 
 def _ar(text) -> str:
-    """يُطبِّق reshape+bidi على النص العربي فقط. أي نص لا يحتوي ولو حرفاً
-    عربياً واحداً (تاريخ، رقم فاتورة، مبلغ، رمز، نص لاتيني) يُعاد كما هو
-    دون أي معالجة — فلا يخضع لإعادة ترتيب bidi إطلاقاً، مهما كان شكله."""
-    s = str(text or "")
-    if not _ARABIC_RE.search(s):
-        return s
-    try:
-        import arabic_reshaper
-        from bidi.algorithm import get_display
-        return get_display(arabic_reshaper.reshape(s), base_dir="R")
-    except Exception:
-        return s
+    """غلاف رقيق حول services/pdf_arabic.py::ar — المصدر الموحّد.
+    (كانت نسخة مستقلة؛ انظر شرح سبب التوحيد في ذلك الملف.)"""
+    from services.pdf_arabic import ar as _shared_ar
+    return _shared_ar(text)
 
 
 def _ar_wrap(text, font_name: str, font_size: float, max_width_pts: float) -> str:
-    """يلفّ النص يدوياً كلمة-كلمة ضمن العرض المتاح، ثم يُطبِّق reshape+bidi
-    على كل سطر مُنجَز على حدة (لا على النص الكامل قبل اللف).
-
-    ✅ سبب وجود هذه الدالة: لو مُرِّر نص عربي طويل عبر _ar() ثم دخل داخل
-    Paragraph من reportlab، فإن Paragraph يلفّه تلقائياً بعد إعادة الترتيب
-    البصري (bidi) — أي أنه يقطع سلسلة نصية أُعيد ترتيبها أصلاً لتُقرأ من
-    اليمين لليسار، فيقع القطع في نقطة خاطئة بصرياً، مما يُظهر النص وكأنه
-    "منعكس" أو "ناقص" (أعمدة الاسم/البيان تحديداً، لأنها الأطول محتوى).
-    الحل: اللف يتم هنا على النص الأصلي (بترتيب القراءة الطبيعي) *قبل* أي
-    reshape/bidi، ثم يُعاد تشكيل وترتيب كل سطر مكتمل بمفرده، فيبقى كل سطر
-    وحدة بصرية سليمة ومستقلة."""
-    from reportlab.pdfbase.pdfmetrics import stringWidth
-
-    s = str(text or "").strip()
-    if not s:
-        return ""
-
-    words = s.split()
-    lines: list[str] = []
-    current: list[str] = []
-    for word in words:
-        candidate = current + [word]
-        shaped_candidate = _ar(" ".join(candidate))
-        w = stringWidth(shaped_candidate, font_name, font_size)
-        if w <= max_width_pts or not current:
-            current = candidate
-        else:
-            lines.append(" ".join(current))
-            current = [word]
-    if current:
-        lines.append(" ".join(current))
-
-    return "<br/>".join(_ar(line) for line in lines)
+    """غلاف رقيق حول services/pdf_arabic.py::ar_wrap — المصدر الموحّد."""
+    from services.pdf_arabic import ar_wrap as _shared_ar_wrap
+    return _shared_ar_wrap(text, font_name, font_size, max_width_pts)
 
 
 def _colors():

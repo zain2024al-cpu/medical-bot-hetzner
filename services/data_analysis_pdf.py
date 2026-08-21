@@ -48,44 +48,22 @@ _FONT_BOLD_CANDIDATES = [
 
 
 def _pick_font(candidates: list[tuple[str, str]], fallback: str = "Helvetica") -> str:
-    from reportlab.pdfbase import pdfmetrics
-    from reportlab.pdfbase.ttfonts import TTFont
-
-    for path, alias in candidates:
-        if os.path.isfile(path):
-            try:
-                pdfmetrics.registerFont(TTFont(alias, path))
-                return alias
-            except Exception:
-                continue
-    return fallback
+    """غلاف رقيق حول services/pdf_arabic.py::pick_font — المصدر الموحّد.
+    قوائم الخطوط (_FONT_CANDIDATES) تبقى في كل ملف كما هي."""
+    from services.pdf_arabic import pick_font as _shared_pick_font
+    return _shared_pick_font(candidates, fallback)
 
 
 # نطاقات الحروف العربية (أساسي + مكمّل + أشكال العرض)
-_ARABIC_RE = re.compile(r"[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]")
+# ✅ نمط محارف العربية انتقل إلى services/pdf_arabic.py::ARABIC_RE
+# (كان معرَّفاً هنا بنسخة مستقلة تباعدت عن البقية).
 
 
 def _ar(text) -> str:
-    """يُطبِّق reshape+bidi على النص العربي فقط.
-
-    ⚠️ نقطتان لا تُفصلان (الإصلاح المرجعي في
-    modules/healthcare/evaluation/pdf_builder.py):
-    1. النص الخالي من العربية يُعاد كما هو — تمرير تاريخ مثل
-       "2026/07/01 — 2026/08/05" عبر get_display بأساس RTL يقلب ترتيب
-       التاريخين فعلياً.
-    2. base_dir="R" صراحةً — بدونه تستنتج المكتبة الاتجاه من أول حرف
-       قوي، فنص مثل "500mg باراسيتامول" (اسم دواء لاتيني أولاً) يُعامَل
-       كفقرة LTR فيظهر الجزء العربي في الطرف الخاطئ ويبدو معكوساً،
-       بينما جاره العربي الصرف يظهر سليماً."""
-    s = str(text or "")
-    if not _ARABIC_RE.search(s):
-        return s
-    try:
-        import arabic_reshaper
-        from bidi.algorithm import get_display
-        return get_display(arabic_reshaper.reshape(s), base_dir="R")
-    except Exception:
-        return s
+    """غلاف رقيق حول services/pdf_arabic.py::ar — المصدر الموحّد.
+    (كانت نسخة مستقلة؛ انظر شرح سبب التوحيد في ذلك الملف.)"""
+    from services.pdf_arabic import ar as _shared_ar
+    return _shared_ar(text)
 
 
 def _colors():
