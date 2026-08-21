@@ -72,7 +72,7 @@ async def enter(
     include_companions: bool = False,
     only_companion_flow: bool = False,
     city: str | None = None,
-    include_onboarded: bool = False,
+    services_scope: bool = False,
 ) -> None:
     """
     Open the patient selector.
@@ -101,7 +101,7 @@ async def enter(
             include_companions=include_companions,
             only_companion_flow=only_companion_flow,
             city=city,
-            include_onboarded=include_onboarded,
+            services_scope=services_scope,
         ),
     )
     names = [r.name for r in records]
@@ -114,7 +114,7 @@ async def enter(
         include_companions=include_companions,
         only_companion_flow=only_companion_flow,
         city=city,
-        include_onboarded=include_onboarded,
+        services_scope=services_scope,
         snapshot=names,
     )
     _save(context.user_data, state)
@@ -332,7 +332,7 @@ async def _handle_selection(
         _inc_comp = state.include_companions
         _only_cf = state.only_companion_flow
         _city = state.city
-        _inc_onb = state.include_onboarded
+        _svc_scope = state.services_scope
         records = await asyncio.get_event_loop().run_in_executor(
             None,
             lambda: fetch_all(
@@ -340,7 +340,7 @@ async def _handle_selection(
                 include_companions=_inc_comp,
                 only_companion_flow=_only_cf,
                 city=_city,
-                include_onboarded=_inc_onb,
+                services_scope=_svc_scope,
             ),
         )
         state = PatientSelectorState(
@@ -350,7 +350,7 @@ async def _handle_selection(
             include_companions=_inc_comp,
             only_companion_flow=_only_cf,
             city=_city,
-            include_onboarded=_inc_onb,
+            services_scope=_svc_scope,
             snapshot=[r.name for r in records],
         )
         _save(context.user_data, state)

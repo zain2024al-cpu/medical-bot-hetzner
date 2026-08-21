@@ -123,12 +123,12 @@ async def _open_patient_selector(update, context):
         await _cancel(update, context); return
     session.step = STEP_PATIENT
     session.save(context.user_data)
-    # ✅ include_onboarded=True — يشمل المرضى القدامى المُدخَلين يدوياً عبر
+    # ✅ services_scope=True — يشمل المرضى القدامى المُدخَلين يدوياً عبر
     # "🏠 الحالات الموجودة" في الأدمن. هذه الشاشة وحدها تطلبهم؛ "🛬 الوصول"
     # لا يطلبهم عمداً (لم يصلوا عبر ذلك التدفق فلا يصحّ تسجيل وصول لهم).
     await patient_selector.enter(
         update, context, return_to=_RKEY_PATIENT,
-        only_companion_flow=True, include_onboarded=True,
+        only_companion_flow=True, services_scope=True,
     )
 
 
