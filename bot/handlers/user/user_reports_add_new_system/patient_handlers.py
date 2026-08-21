@@ -73,7 +73,9 @@ async def patient_inline_query_handler(update: Update, context: ContextTypes.DEF
                 _city = context.user_data.get("report_city")
                 patients = [
                     p for p in patients
-                    if report_flow_patient_visible(p.patient_type, _city)
+                    if report_flow_patient_visible(
+                        p.patient_type, _city, getattr(p, "archived_at", None)
+                    )
                 ]
 
                 logger.info(f"✅ تم العثور على {len(patients)} مريض في قاعدة البيانات (city={_city})")
@@ -257,7 +259,9 @@ async def show_patient_list(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             patient_names = [
                 p.full_name.strip() for p in all_patients
                 if p.full_name and p.full_name.strip()
-                and report_flow_patient_visible(p.patient_type, _city)
+                and report_flow_patient_visible(
+                    p.patient_type, _city, getattr(p, "archived_at", None)
+                )
             ]
             logger.info(f"✅ تم تحميل {len(patient_names)} اسم من قاعدة البيانات مباشرة في show_patient_list (city={_city})")
         

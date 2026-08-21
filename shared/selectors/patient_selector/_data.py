@@ -39,7 +39,7 @@ _CHENNAI = "chennai"
 CITY_CHENNAI = _CHENNAI
 
 
-def report_flow_patient_visible(patient_type, city=None) -> bool:
+def report_flow_patient_visible(patient_type, city=None, archived_at=None) -> bool:
     """مصدر الحقيقة الوحيد لظهور المريض داخل تدفق تقارير المترجمين.
 
     city == "chennai" → قسم تشناي: مرضى تشناي حصراً.
@@ -48,9 +48,16 @@ def report_flow_patient_visible(patient_type, city=None) -> bool:
                         لهم تقرير طبي؛ companion_parent يبقى ظاهراً
                         بصفته مريضاً حقيقياً كالمعتاد).
 
+    archived_at — تاريخ تحديد المريض كـ"مسافر" عبر شاشة الأرشيف في الأدمن.
+                  أي قيمة غير NULL ⇒ **مخفي دائماً** بصرف النظر عن أي فلتر
+                  آخر (يُطبَّق أولاً). بياناته التاريخية لا تتأثر إطلاقاً —
+                  الإخفاء هنا يخصّ قوائم **الاختيار** وحدها.
+
     تُستدعى من كل مواضع سرد/بحث المرضى في التدفق (القائمة المرقَّمة والبحث
     inline) — موضع واحد للمنطق يمنع تباعد النسخ.
     """
+    if archived_at:
+        return False
     pt = patient_type or "general"
     if city == _CHENNAI:
         return pt == _CHENNAI
@@ -63,7 +70,14 @@ def _type_visible(
     include_companions: bool = False,
     only_companion_flow: bool = False,
     city: str | None = None,
+    archived_at=None,
 ) -> bool:
+    # ✅ المريض المسافر (مؤرشف) مخفي من **كل** قوائم الاختيار بلا استثناء —
+    # أعلى أولوية، قبل فلتر المدينة نفسه. لا يؤثر هذا على أي قراءة تاريخية
+    # (lookup_by_name/get_patient_by_id لا تمرّان من هنا إطلاقاً).
+    if archived_at:
+        return False
+
     pt = patient_type or "general"
 
     # ✅ فلتر المدينة: أعلى أولوية، يتجاوز كل الفلاتر الأخرى — نفس منطق
@@ -169,7 +183,10 @@ def fetch_all(
             seen: set[str] = set()
             records: list[PatientRecord] = []
             for p in rows:
-                if not _type_visible(p.patient_type, include_pharmacy, include_companions, only_companion_flow, city):
+                if not _type_visible(
+                    p.patient_type, include_pharmacy, include_companions,
+                    only_companion_flow, city, getattr(p, "archived_at", None),
+                ):
                     continue
                 name = (p.full_name or "").strip()
                 if name and name not in seen:
@@ -229,7 +246,10 @@ def search(
                 PatientRecord(id=p.id, name=(p.full_name or "").strip())
                 for p in rows
                 if (p.full_name or "").strip()
-                and _type_visible(p.patient_type, include_pharmacy, include_companions, only_companion_flow, city)
+                and _type_visible(
+                    p.patient_type, include_pharmacy, include_companions,
+                    only_companion_flow, city, getattr(p, "archived_at", None),
+                )
             ]
             logger.debug(
                 f"[patient_selector._data] search({query!r}) → {len(records)} records"

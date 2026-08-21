@@ -122,12 +122,17 @@ async def patient_search_inline_handler(update: Update, context: ContextTypes.DE
                     _city = context.user_data.get("report_city")
                     patients = [
                         p for p in patients
-                        if report_flow_patient_visible(p.patient_type, _city)
+                        if report_flow_patient_visible(
+                            p.patient_type, _city, getattr(p, "archived_at", None)
+                        )
                     ]
                 else:
                     patients = [
                         p for p in patients
-                        if _type_visible(p.patient_type, include_pharmacy, include_companions, only_companion_flow, _sel_city)
+                        if _type_visible(
+                            p.patient_type, include_pharmacy, include_companions,
+                            only_companion_flow, _sel_city, getattr(p, "archived_at", None),
+                        )
                     ]
 
                 # ✅ إنشاء النتائج

@@ -555,12 +555,14 @@ async def handle_manage_patients(update: Update, context: ContextTypes.DEFAULT_T
 
     # استخدام الخدمة الموحدة
     try:
-        from services.patients_service import get_patients_count
+        from services.patients_service import get_patients_count, get_archived_patients_count
         count = get_patients_count()
+        archived_count = get_archived_patients_count()
     except Exception as e:
         logger.error(f"❌ خطأ في تحميل عدد المرضى: {e}")
         count = 0
-    
+        archived_count = 0
+
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("➕ إضافة اسم جديد", callback_data="add_patient_name")],
         # ✅ زر منفصل تماماً عن "➕ إضافة اسم جديد" — مخصص للمرضى الجدد
@@ -568,6 +570,7 @@ async def handle_manage_patients(update: Update, context: ContextTypes.DEFAULT_T
         # في كل الشاشات كالمعتاد؛ المرافقون فقط مخفيون إلا في تلك الوحدتين.
         [InlineKeyboardButton("🤝 مريض جديد مع مرافقين", callback_data="add_patient_with_companions")],
         [InlineKeyboardButton("📋 عرض جميع الأسماء", callback_data="view_patient_names")],
+        [InlineKeyboardButton(f"🧳 أرشيف المسافرين ({archived_count})", callback_data="parch:menu")],
         [InlineKeyboardButton("✏️ تعديل اسم", callback_data="edit_patient_name")],
         [InlineKeyboardButton("🗑️ حذف اسم", callback_data="delete_patient_name")],
         [InlineKeyboardButton("🔙 رجوع", callback_data="sys_menu:back")]
@@ -575,12 +578,198 @@ async def handle_manage_patients(update: Update, context: ContextTypes.DEFAULT_T
 
     await query.edit_message_text(
         f"📝 **إدارة أسماء المرضى**\n\n"
-        f"📊 **عدد الأسماء:** {count}\n\n"
+        f"📊 **الأسماء النشطة:** {count}\n"
+        f"🧳 **المسافرون (مؤرشفون):** {archived_count}\n\n"
         f"اختر العملية:",
         reply_markup=keyboard,
         parse_mode=ParseMode.MARKDOWN
     )
     return ConversationHandler.END
+
+
+# =============================================================================
+# 🧳 أرشيف المسافرين — إخفاء أسماء من سافروا عن قوائم المستخدمين
+# =============================================================================
+# ⚠️ لا حذف إطلاقاً: يُضبَط `Patient.archived_at` فقط، فيختفي الاسم من كل
+# قوائم **اختيار** المرضى (عبر مصدرَي الحقيقة الوحيدين
+# `report_flow_patient_visible`/`_type_visible` في patient_selector/_data.py)
+# بينما تبقى كل بياناته التاريخية سليمة تماماً للتقارير والإحصائيات.
+# العملية عكوسة بالكامل: زر "↩️ عاد" يُعيد الاسم للقوائم فوراً.
+
+_ARCHIVE_PER_PAGE = 8
+
+
+def _archive_nav_row(prefix: str, page: int, total_pages: int) -> list:
+    """صف تنقّل الصفحات لشاشتَي الأرشيف (نفس نمط بقية شاشات هذا الملف)."""
+    nav = []
+    if page > 0:
+        nav.append(InlineKeyboardButton("◀️ السابق", callback_data=f"{prefix}:{page - 1}"))
+    if page < total_pages - 1:
+        nav.append(InlineKeyboardButton("التالي ▶️", callback_data=f"{prefix}:{page + 1}"))
+    return nav
+
+
+async def handle_patient_archive_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """الشاشة الرئيسية لأرشيف المسافرين."""
+    query = update.callback_query
+    await query.answer()
+
+    try:
+        from services.patients_service import get_patients_count, get_archived_patients_count
+        active_count = get_patients_count()
+        archived_count = get_archived_patients_count()
+    except Exception as e:
+        logger.error(f"❌ [parch] خطأ في تحميل الأعداد: {e}", exc_info=True)
+        active_count = archived_count = 0
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton(f"✈️ تحديد مريض مسافر ({active_count})", callback_data="parch:pick:0")],
+        [InlineKeyboardButton(f"📦 عرض المسافرين ({archived_count})", callback_data="parch:list:0")],
+        [InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")],
+    ])
+
+    await query.edit_message_text(
+        "🧳 **أرشيف المسافرين**\n\n"
+        "الاسم الذي تحدّده كمسافر **يختفي فوراً** من قوائم اختيار المرضى "
+        "لدى كل المستخدمين (التقارير، الرعاية الصحية، الصيدلية، الخدمات العامة).\n\n"
+        "✅ **لا يُحذف أي شيء** — كل تقاريره وبياناته السابقة تبقى كما هي "
+        "في الإحصائيات والتقارير.\n"
+        "↩️ يمكن إعادته للقوائم في أي وقت إن عاد.",
+        reply_markup=keyboard,
+        parse_mode=ParseMode.MARKDOWN,
+    )
+
+
+async def handle_patient_archive_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """قائمة المرضى النشطين — الضغط على اسم يحدّده كمسافر."""
+    query = update.callback_query
+    await query.answer()
+    try:
+        page = int(query.data.split(":")[2])
+    except Exception:
+        page = 0
+    await _render_archive_pick(query, page)
+
+
+async def _render_archive_pick(query, page: int):
+    """يرسم شاشة "تحديد مسافر" لصفحة محدَّدة.
+
+    ⚠️ منفصلة عن المعالِج عمداً ولا تستدعي `query.answer()`: تُستدعى أيضاً
+    من `handle_patient_archive_toggle` بعد تنفيذ الأرشفة، وتيليجرام يسمح
+    بالرد على الاستعلام **مرة واحدة فقط** (والرد الثاني يسقط باستثناء).
+    كما أن `CallbackQuery` كائن غير قابل للتعديل في PTB v20، فلا يصحّ
+    تمرير الصفحة بإعادة كتابة `query.data`."""
+    from services.patients_service import get_patients_paginated_by_archive
+    patients, total_count, total_pages = get_patients_paginated_by_archive(
+        page=page, per_page=_ARCHIVE_PER_PAGE, archived=False,
+    )
+
+    keyboard = []
+    if not patients:
+        text = "✈️ **تحديد مريض مسافر**\n\n⚠️ لا توجد أسماء نشطة."
+    else:
+        text = (
+            "✈️ **تحديد مريض مسافر**\n\n"
+            f"📊 **النشطون:** {total_count}   •   "
+            f"📄 **صفحة:** {page + 1} من {total_pages}\n\n"
+            "اضغط على اسم من سافر ليختفي من قوائم المستخدمين:"
+        )
+        for p in patients:
+            marker = " 💊" if p.get("patient_type") == "pharmacy_only" else ""
+            keyboard.append([InlineKeyboardButton(
+                f"✈️ {p['name']}{marker}", callback_data=f"parch:do:{p['id']}:{page}"
+            )])
+
+    nav = _archive_nav_row("parch:pick", page, total_pages)
+    if nav:
+        keyboard.append(nav)
+    keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="parch:menu")])
+
+    await query.edit_message_text(
+        text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode=ParseMode.MARKDOWN,
+    )
+
+
+async def handle_patient_archive_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """قائمة المسافرين المؤرشفين — الضغط على اسم يُعيده للقوائم."""
+    query = update.callback_query
+    await query.answer()
+    try:
+        page = int(query.data.split(":")[2])
+    except Exception:
+        page = 0
+    await _render_archive_list(query, page)
+
+
+async def _render_archive_list(query, page: int):
+    """يرسم شاشة "المسافرون المؤرشفون" — انظر شرح الفصل في _render_archive_pick."""
+    from services.patients_service import get_patients_paginated_by_archive
+    patients, total_count, total_pages = get_patients_paginated_by_archive(
+        page=page, per_page=_ARCHIVE_PER_PAGE, archived=True,
+    )
+
+    keyboard = []
+    if not patients:
+        text = (
+            "📦 **المسافرون المؤرشفون**\n\n"
+            "لا يوجد أي مريض مؤرشف حالياً — كل الأسماء تظهر للمستخدمين."
+        )
+    else:
+        text = (
+            "📦 **المسافرون المؤرشفون**\n\n"
+            f"📊 **العدد:** {total_count}   •   "
+            f"📄 **صفحة:** {page + 1} من {total_pages}\n\n"
+            "هؤلاء مخفيون عن قوائم المستخدمين. اضغط على اسم لإعادته:"
+        )
+        for p in patients:
+            when = p.get("archived_at")
+            when_txt = f" — {when.strftime('%Y-%m-%d')}" if when else ""
+            keyboard.append([InlineKeyboardButton(
+                f"↩️ {p['name']}{when_txt}", callback_data=f"parch:undo:{p['id']}:{page}"
+            )])
+
+    nav = _archive_nav_row("parch:list", page, total_pages)
+    if nav:
+        keyboard.append(nav)
+    keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="parch:menu")])
+
+    await query.edit_message_text(
+        text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode=ParseMode.MARKDOWN,
+    )
+
+
+async def handle_patient_archive_toggle(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """ينفّذ الأرشفة (parch:do) أو الإرجاع (parch:undo) ثم يعيد عرض نفس القائمة
+    والصفحة — حتى يستطيع الأدمن تحديد عدة مسافرين متتاليين بلا رجوع يدوي."""
+    query = update.callback_query
+
+    parts = query.data.split(":")
+    action = parts[1]                      # "do" | "undo"
+    try:
+        patient_id = int(parts[2])
+        page = int(parts[3]) if len(parts) > 3 else 0
+    except Exception:
+        await query.answer("⚠️ بيانات غير صالحة", show_alert=True)
+        return
+
+    archiving = (action == "do")
+
+    from services.patients_service import set_patient_archived
+    name = set_patient_archived(patient_id, archived=archiving)
+
+    if name is None:
+        await query.answer("⚠️ لم يتم العثور على المريض", show_alert=True)
+    elif archiving:
+        # ✅ escape_md_v1 غير لازم هنا: query.answer نص خام بلا parse_mode
+        await query.answer(f"✈️ {name} — أصبح مخفياً عن المستخدمين", show_alert=False)
+    else:
+        await query.answer(f"↩️ {name} — عاد للقوائم", show_alert=False)
+
+    # إعادة عرض نفس الشاشة والصفحة بعد التغيير (بلا رد ثانٍ على الاستعلام)
+    if archiving:
+        await _render_archive_pick(query, page)
+    else:
+        await _render_archive_list(query, page)
 
 async def handle_view_patient_names(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """عرض أسماء المرضى مع التصفح بالصفحات"""
@@ -1815,7 +2004,12 @@ def register(app):
     app.add_handler(CallbackQueryHandler(handle_edit_patient_name, pattern="^edit_patient_name$"))
     app.add_handler(CallbackQueryHandler(handle_edit_patient_name, pattern="^edit_patient_page:\\d+$"))
     app.add_handler(CallbackQueryHandler(handle_select_edit, pattern="^edit_patient:\\d+$"))
-    
+    # 🧳 أرشيف المسافرين — إخفاء/إعادة أسماء المرضى عن قوائم المستخدمين
+    app.add_handler(CallbackQueryHandler(handle_patient_archive_menu, pattern="^parch:menu$"))
+    app.add_handler(CallbackQueryHandler(handle_patient_archive_pick, pattern="^parch:pick:\\d+$"))
+    app.add_handler(CallbackQueryHandler(handle_patient_archive_list, pattern="^parch:list:\\d+$"))
+    app.add_handler(CallbackQueryHandler(handle_patient_archive_toggle, pattern="^parch:(do|undo):\\d+:\\d+$"))
+
     # إدارة المستشفيات مسجّلة في admin_hospitals_management.py فقط — لا تسجيل هنا.
 
     app.add_handler(conv)

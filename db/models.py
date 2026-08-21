@@ -93,6 +93,18 @@ class Patient(Base):
     # تأكيد دفعة وصول تستخدم هذا الاسم. يُستخدَم لعرض "📋 الأسماء المعلّقة"
     # في بوت الخدمات العامة. لا علاقة له بـ patient_type="general".
     pending_arrival = Column(Boolean, default=False, nullable=True)
+    # ✅ أرشفة "ناعمة" للمريض المسافر: تاريخ تحديده كمسافر عبر شاشة
+    # "🧳 أرشيف المسافرين" في الأدمن. NULL = مقيم/نشط (السلوك الافتراضي لكل
+    # المرضى الحاليين، فلا يتغيّر أي سلوك قائم).
+    #
+    # ⚠️ الغرض: إخفاء الاسم من **قوائم اختيار المرضى** فقط، مع الإبقاء على
+    # الصف وكل بياناته التاريخية سليمة تماماً (التقارير والإحصائيات تقرأ
+    # `Report` و`get_patient_by_id/by_name` ولا تمرّ بفلتر الأرشفة إطلاقاً)
+    # — لأن الحذف الفعلي كان سيُفقد بيانات التقارير المرتبطة به.
+    #
+    # اختير عمود تاريخ لا Boolean عمداً: يحمل معلومة "متى سافر" (مفيدة
+    # للإحصائيات لاحقاً) والصدق/الكذب مشتقّ منه مباشرة (NULL = غير مؤرشف).
+    archived_at = Column(DateTime, nullable=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow, index=True, nullable=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
 

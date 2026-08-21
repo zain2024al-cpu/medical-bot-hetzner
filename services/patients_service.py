@@ -251,6 +251,10 @@ def get_pending_arrival_names() -> List[Dict]:
                 .filter(
                     Patient.patient_type == "companion_parent",
                     Patient.pending_arrival.is_(True),
+                    # ✅ من أُرشِف كمسافر لا يُنتظَر وصوله — يختفي من "الأسماء
+                    # المعلّقة" أيضاً كبقية قوائم الاختيار (يعود تلقائياً
+                    # بمجرد إعادته عبر زر "↩️ عاد").
+                    Patient.archived_at.is_(None),
                 )
                 .order_by(Patient.created_at.desc())
                 .all()
@@ -420,7 +424,11 @@ def get_patients_paginated(page: int = 0, per_page: int = 10) -> tuple:
             # تستبعد صفوف NULL أيضاً (NULL != 'companion' ليست TRUE)، فلا بد
             # من or_(...is_(None)) صراحة وإلا اختفى كل المرضى العاديين من القائمة.
             base_query = session.query(Patient).filter(
-                or_(Patient.patient_type != "companion", Patient.patient_type.is_(None))
+                or_(Patient.patient_type != "companion", Patient.patient_type.is_(None)),
+                # ✅ المسافرون (المؤرشفون) لهم شاشتهم الخاصة "🧳 أرشيف
+                # المسافرين" — تبقى هذه الشاشة معروضةً للنشطين فقط حتى يرى
+                # الأدمن ما يراه المستخدمون بالضبط.
+                Patient.archived_at.is_(None),
             )
             total_count = base_query.count()
             total_pages = (total_count + per_page - 1) // per_page
@@ -512,7 +520,8 @@ def sync_file_to_database() -> int:
 
 def get_patients_count() -> int:
     """
-    عدد المرضى (مستبعِداً المرافقين — نفس فلتر get_patients_paginated)
+    عدد المرضى **النشطين** (مستبعِداً المرافقين والمسافرين المؤرشفين —
+    نفس فلتر get_patients_paginated بالضبط)
     """
     try:
         from db.session import SessionLocal
@@ -521,10 +530,120 @@ def get_patients_count() -> int:
 
         with SessionLocal() as session:
             return session.query(Patient).filter(
-                or_(Patient.patient_type != "companion", Patient.patient_type.is_(None))
+                or_(Patient.patient_type != "companion", Patient.patient_type.is_(None)),
+                Patient.archived_at.is_(None),
             ).count()
     except Exception:
         return len(get_patients_from_file())
+
+
+# =============================================================================
+# أرشفة المرضى المسافرين (soft archive)
+# =============================================================================
+# ⚠️ المبدأ: لا حذف إطلاقاً. الصف وكل بياناته التاريخية تبقى كما هي — يُضبَط
+# `archived_at` فقط، فيختفي الاسم من **قوائم اختيار المرضى** وحدها (عبر
+# `report_flow_patient_visible`/`_type_visible` في patient_selector/_data.py،
+# مصدرَي الحقيقة الوحيدين لظهور المريض). التقارير والإحصائيات تقرأ جدول
+# `Report` و`get_patient_by_id/by_name` ولا تمرّ بهذا الفلتر إطلاقاً.
+
+def set_patient_archived(patient_id: int, archived: bool) -> Optional[str]:
+    """يؤرشف مريضاً (سافر) أو يُعيده للقائمة النشطة (عاد).
+
+    Returns: اسم المريض عند النجاح، أو None إن لم يوجد/حدث خطأ.
+    """
+    try:
+        from datetime import datetime as _dt
+        from db.session import SessionLocal
+        from db.models import Patient
+
+        with SessionLocal() as session:
+            patient = session.query(Patient).filter_by(id=patient_id).first()
+            if not patient:
+                logger.warning(f"[archive] لا يوجد مريض بالمعرّف {patient_id}")
+                return None
+            name = patient.full_name
+            patient.archived_at = _dt.utcnow() if archived else None
+            session.commit()
+            logger.info(
+                f"[archive] {'أُرشِف' if archived else 'أُعيد'} المريض "
+                f"id={patient_id} name={name!r}"
+            )
+            return name
+    except Exception as exc:
+        logger.error(f"[archive] فشل تغيير حالة الأرشفة id={patient_id}: {exc}", exc_info=True)
+        return None
+
+
+def get_patients_paginated_by_archive(
+    page: int = 0, per_page: int = 10, archived: bool = False,
+) -> tuple:
+    """نفس فلتر `get_patients_paginated` (استبعاد المرافقين) لكن مقسوماً حسب
+    حالة الأرشفة — لشاشة "🧳 أرشيف المسافرين" في الأدمن.
+
+    archived=False ⇒ المرضى النشطون (`archived_at IS NULL`).
+    archived=True  ⇒ المسافرون المؤرشفون فقط.
+
+    Returns: (patients_list, total_count, total_pages)
+    """
+    try:
+        from db.session import SessionLocal
+        from db.models import Patient
+        from sqlalchemy import or_
+
+        with SessionLocal() as session:
+            base_query = session.query(Patient).filter(
+                # ⚠️ patient_type فارغ (NULL) للمرضى العاديين — انظر شرح
+                # or_(...is_(None)) في get_patients_paginated أعلاه.
+                or_(Patient.patient_type != "companion", Patient.patient_type.is_(None)),
+                Patient.full_name.isnot(None),
+                Patient.full_name != "",
+            )
+            if archived:
+                base_query = base_query.filter(Patient.archived_at.isnot(None))
+            else:
+                base_query = base_query.filter(Patient.archived_at.is_(None))
+
+            total_count = base_query.count()
+            total_pages = (total_count + per_page - 1) // per_page
+
+            # المؤرشفون: الأحدث سفراً أولاً. النشطون: أبجدياً (قائمة طويلة
+            # يبحث فيها الأدمن بالاسم، لا بترتيب الإضافة).
+            order = (
+                Patient.archived_at.desc() if archived else Patient.full_name.asc()
+            )
+            patients = (
+                base_query.order_by(order)
+                .offset(page * per_page).limit(per_page).all()
+            )
+
+            result = [{
+                'id': p.id,
+                'name': p.full_name,
+                'patient_type': p.patient_type,
+                'archived_at': p.archived_at,
+            } for p in patients]
+
+            return result, total_count, total_pages
+
+    except Exception as exc:
+        logger.error(f"[archive] فشل جلب قائمة (archived={archived}): {exc}", exc_info=True)
+        return [], 0, 0
+
+
+def get_archived_patients_count() -> int:
+    """عدد المرضى المؤرشفين (المسافرين) — لعرضه على زر الأرشيف."""
+    try:
+        from db.session import SessionLocal
+        from db.models import Patient
+        from sqlalchemy import or_
+
+        with SessionLocal() as session:
+            return session.query(Patient).filter(
+                or_(Patient.patient_type != "companion", Patient.patient_type.is_(None)),
+                Patient.archived_at.isnot(None),
+            ).count()
+    except Exception:
+        return 0
 
 
 # Compatibility alias

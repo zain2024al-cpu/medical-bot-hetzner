@@ -217,6 +217,10 @@ class DatabaseMaintenance:
                 # بعد في تقرير وصول فعلي — أساس شاشة "📋 الأسماء المعلّقة"
                 # الجديدة في الخدمات العامة.
                 _migrate_column(conn, "patients", "pending_arrival", "BOOLEAN")
+                # ✅ أرشفة المرضى المسافرين: NULL = نشط (كل الصفوف الحالية)،
+                # وتاريخ = مسافر فيختفي من قوائم اختيار المرضى مع بقاء بياناته
+                # التاريخية كاملة للتقارير والإحصائيات.
+                _migrate_column(conn, "patients", "archived_at", "DATETIME")
                 logger.info("🔎 Migration check finished.")
 
                 if check == "ok":
