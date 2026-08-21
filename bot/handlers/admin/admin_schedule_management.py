@@ -574,6 +574,10 @@ async def handle_manage_patients(update: Update, context: ContextTypes.DEFAULT_T
         # ✅ إدخال المرضى القدامى لبوتَي الخدمات والإقامة (مهمة مؤقتة —
         # انظر admin_legacy_onboarding.py)
         [InlineKeyboardButton("🏠 الحالات الموجودة", callback_data="lego:menu")],
+        # ✅ حذف كامل لاسم أُضيف عبر "🤝 مريض جديد مع مرافقين" — يزيله من
+        # سجلّ المرضى ووحدة الإقامة وجدول الوصول معاً (تنظيف الأسماء
+        # التجريبية التي بقيت ظاهرة في البوتين).
+        [InlineKeyboardButton("🗑️ حذف اسم (مريض + مرافقين)", callback_data="pcdel:menu")],
         [InlineKeyboardButton("✏️ تعديل اسم", callback_data="edit_patient_name")],
         [InlineKeyboardButton("🗑️ حذف اسم", callback_data="delete_patient_name")],
         [InlineKeyboardButton("🔙 رجوع", callback_data="sys_menu:back")]
@@ -588,6 +592,145 @@ async def handle_manage_patients(update: Update, context: ContextTypes.DEFAULT_T
         parse_mode=ParseMode.MARKDOWN
     )
     return ConversationHandler.END
+
+
+# =============================================================================
+# 🗑️ حذف كامل لاسم أُضيف عبر "🤝 مريض جديد مع مرافقين"
+# =============================================================================
+# ⚠️ الفرق عن "🗑️ حذف اسم" العادي: ذاك يحذف صفوف سجلّ المرضى فقط وينظّف
+# أشخاص الإقامة **غير المُستكمَلين** حصراً — فتبقى أشخاص الإقامة المكتملة
+# وصفوف الوصول ظاهرة في بوتَي الإقامة والمغادرين بلا أي مريض يشير إليها
+# (وهذا بالضبط ما شكا منه المستخدم: أسماء تجريبية بقيت في البوتين).
+# هذه الشاشة تحذف الاسم من **الأنظمة الثلاثة** دفعة واحدة.
+#
+# 🔒 حارس: يُمنَع الحذف نهائياً إن وُجد أي تقرير طبي مرتبط بالاسم — يُوجَّه
+# الأدمن حينها لأرشيف المسافرين (إخفاء بلا فقدان بيانات).
+
+_PCDEL_PER_PAGE = 8
+
+
+async def handle_pcdel_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """قائمة الأسماء المُضافة عبر زر المرافقين."""
+    query = update.callback_query
+    await query.answer()
+    try:
+        page = int(query.data.split(":")[2])
+    except Exception:
+        page = 0
+    await _render_pcdel_list(query, page)
+
+
+async def _render_pcdel_list(query, page: int):
+    from services.patients_service import get_companion_flow_families
+    rows, total, pages = get_companion_flow_families(page, _PCDEL_PER_PAGE)
+
+    kb = []
+    if not rows:
+        text = (
+            "🗑️ **حذف اسم (مريض + مرافقين)**\n\n"
+            "✅ لا توجد أسماء مُضافة عبر زر «🤝 مريض جديد مع مرافقين»."
+        )
+    else:
+        text = (
+            "🗑️ **حذف اسم (مريض + مرافقين)**\n\n"
+            f"📊 **العدد:** {total}   •   📄 **صفحة:** {page + 1} من {pages}\n\n"
+            "اختر الاسم لعرض ما سيُحذَف قبل التأكيد:"
+        )
+        for r in rows:
+            suffix = f" (+{r['companions']} مرافق)" if r["companions"] else ""
+            kb.append([InlineKeyboardButton(
+                f"👤 {r['name']}{suffix}", callback_data=f"pcdel:pick:{r['id']}:{page}",
+            )])
+
+    nav = []
+    if page > 0:
+        nav.append(InlineKeyboardButton("◀️ السابق", callback_data=f"pcdel:menu:{page-1}"))
+    if page < pages - 1:
+        nav.append(InlineKeyboardButton("التالي ▶️", callback_data=f"pcdel:menu:{page+1}"))
+    if nav:
+        kb.append(nav)
+    kb.append([InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")])
+
+    await query.edit_message_text(
+        text, reply_markup=InlineKeyboardMarkup(kb), parse_mode=ParseMode.MARKDOWN,
+    )
+
+
+async def handle_pcdel_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """يعرض بالضبط ما سيُحذَف (وما يمنع الحذف) قبل أي تأكيد."""
+    query = update.callback_query
+    await query.answer()
+    parts = query.data.split(":")
+    try:
+        pid, page = int(parts[2]), int(parts[3])
+    except Exception:
+        await query.answer("⚠️ بيانات غير صالحة", show_alert=True)
+        return
+
+    from services.patients_service import get_companion_flow_family_impact
+    impact = get_companion_flow_family_impact(pid)
+    if impact is None:
+        await query.answer("⚠️ لم يُعثر على الاسم", show_alert=True)
+        await _render_pcdel_list(query, page)
+        return
+
+    lines = [
+        "🗑️ **تأكيد الحذف**",
+        "",
+        f"👤 **{impact['name']}**",
+    ]
+    if impact["companions"]:
+        lines.append(f"🤝 المرافقون ({len(impact['companions'])}):")
+        for c in impact["companions"]:
+            lines.append(f"   • {c}")
+    lines += [
+        "",
+        "**سيُحذَف من:**",
+        f"   📋 سجلّ المرضى: {1 + len(impact['companions'])} اسم",
+        f"   🪪 وحدة الإقامة: {impact['residency']} شخص",
+        f"   🛬 جدول الوصول: {impact['arrivals']} صف "
+        f"(+{impact['arrival_companions']} مرافق)",
+    ]
+
+    if impact["reports"]:
+        lines += [
+            "",
+            f"🚫 **الحذف ممنوع** — لهذا الاسم **{impact['reports']}** تقرير طبي.",
+            "حذفه يفقد بيانات التقارير والإحصائيات.",
+            "",
+            "💡 استخدم **🧳 أرشيف المسافرين** لإخفائه من القوائم بلا حذف.",
+        ]
+        kb = [[InlineKeyboardButton("🔙 رجوع", callback_data=f"pcdel:menu:{page}")]]
+    else:
+        lines += ["", "⚠️ **لا يمكن التراجع عن الحذف.**"]
+        kb = [
+            [InlineKeyboardButton("🗑️ نعم، احذف نهائياً",
+                                  callback_data=f"pcdel:go:{pid}:{page}")],
+            [InlineKeyboardButton("🔙 إلغاء", callback_data=f"pcdel:menu:{page}")],
+        ]
+
+    await query.edit_message_text(
+        "\n".join(lines), reply_markup=InlineKeyboardMarkup(kb),
+        parse_mode=ParseMode.MARKDOWN,
+    )
+
+
+async def handle_pcdel_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    parts = query.data.split(":")
+    try:
+        pid, page = int(parts[2]), int(parts[3])
+    except Exception:
+        await query.answer("⚠️ بيانات غير صالحة", show_alert=True)
+        return
+
+    from services.patients_service import purge_companion_flow_family
+    ok, info = purge_companion_flow_family(pid)
+    if ok:
+        await query.answer(f"🗑️ حُذِف {info}", show_alert=False)
+    else:
+        await query.answer(f"⚠️ {info}", show_alert=True)
+    await _render_pcdel_list(query, page)
 
 
 # =============================================================================
@@ -2012,6 +2155,10 @@ def register(app):
     app.add_handler(CallbackQueryHandler(handle_patient_archive_pick, pattern="^parch:pick:\\d+$"))
     app.add_handler(CallbackQueryHandler(handle_patient_archive_list, pattern="^parch:list:\\d+$"))
     app.add_handler(CallbackQueryHandler(handle_patient_archive_toggle, pattern="^parch:(do|undo):\\d+:\\d+$"))
+    # 🗑️ حذف كامل لاسم أُضيف عبر "🤝 مريض جديد مع مرافقين"
+    app.add_handler(CallbackQueryHandler(handle_pcdel_list, pattern="^pcdel:menu(:\\d+)?$"))
+    app.add_handler(CallbackQueryHandler(handle_pcdel_pick, pattern="^pcdel:pick:\\d+:\\d+$"))
+    app.add_handler(CallbackQueryHandler(handle_pcdel_confirm, pattern="^pcdel:go:\\d+:\\d+$"))
 
     # إدارة المستشفيات مسجّلة في admin_hospitals_management.py فقط — لا تسجيل هنا.
 
