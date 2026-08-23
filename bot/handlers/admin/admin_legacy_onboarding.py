@@ -83,6 +83,43 @@ _STEP_TITLES = {
 }
 
 
+# ── الإدخال اليدوي للتواريخ ───────────────────────────────────────────────────
+# التقويم يخزّن دائماً بصيغة `%d/%m/%Y`. الكتابة اليدوية **تُطبَّع إلى نفس
+# الصيغة حرفياً** قبل الحفظ، فلا يرى بقية النظام أي فرق بين المصدرين — وهذا
+# شرط ألّا يتأثّر شيء آخر في البوت.
+_DATE_FMT = "%d/%m/%Y"
+
+# تلميح يُعرَض تحت التقويم — بدونه لا يعرف الأدمن أن الكتابة متاحة أصلاً
+_MANUAL_HINT = (
+    "\n\n✍️ _أو اكتب التاريخ يدوياً:_ `يوم/شهر/سنة`\n"
+    "_مثال:_ `25/12/2027`"
+)
+
+# الأرقام العربية والفارسية ⇐ لاتينية (لوحة المفاتيح العربية تُخرِجها كثيراً)
+_DIGIT_MAP = str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹", "01234567890123456789")
+
+
+def _parse_manual_date(text: str) -> str | None:
+    """نصّ المستخدم ⇒ تاريخ بصيغة التقويم نفسها، أو None إن كان غير صالح.
+
+    متسامح في المُدخَل (فواصل مختلفة، أرقام عربية، خانة واحدة) وصارم في
+    المُخرَج. يرفض المستحيل فعلاً (31/02) لأن `datetime` هو المُتحقِّق.
+    """
+    raw = (text or "").strip().translate(_DIGIT_MAP)
+    for sep in ("-", ".", "\\", " "):
+        raw = raw.replace(sep, "/")
+    parts = [p for p in raw.split("/") if p]
+    if len(parts) != 3:
+        return None
+    try:
+        d, m, y = (int(p) for p in parts)
+        if not (1900 <= y <= 2100):     # يمنع سنة من خانتين أو خطأ طباعي فادح
+            return None
+        return datetime(y, m, d).strftime(_DATE_FMT)
+    except (ValueError, TypeError):
+        return None                     # يشمل 31/02 و32/13 وأي حرف غير رقمي
+
+
 def _blank_person(name: str = "") -> dict:
     return {
         "name": name,
@@ -343,7 +380,7 @@ async def _render_step(query_or_msg, session: LegoSession, *, edit: bool) -> Non
         text, kb = build_calendar(
             today.year, today.month, LEGO, f"{LEGO}:cancel", quick_jump=True,
         )
-        text = header + f"**{_STEP_TITLES[step]}**\n\n" + text
+        text = header + f"**{_STEP_TITLES[step]}**\n\n" + text + _MANUAL_HINT
     elif step in (S_PASSPORT_FILE, S_VISA_FILE):
         rows = [_cancel_row()]
         text = header + (
@@ -554,7 +591,8 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         y, m = int(parts[1]), int(parts[2])
         text, kb = build_calendar(y, m, LEGO, f"{LEGO}:cancel", quick_jump=True)
         await query.edit_message_text(
-            f"{_who(session)}\n\n**{_STEP_TITLES[session.step]}**\n\n" + text,
+            f"{_who(session)}\n\n**{_STEP_TITLES[session.step]}**\n\n"
+            + text + _MANUAL_HINT,
             reply_markup=kb, parse_mode=ParseMode.MARKDOWN,
         )
         return
@@ -692,14 +730,29 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
 
     session = LegoSession.load(ud)
-    if session is None or session.step not in (S_HOUSING, S_C_NAME):
+    _TEXT_STEPS = (S_HOUSING, S_C_NAME, S_VISA_EXPIRY, S_PASSPORT_EXPIRY)
+    if session is None or session.step not in _TEXT_STEPS:
         return                      # ⚠️ لا نبتلع رسائل التدفقات الأخرى
     text = (msg.text or "").strip() if msg else ""
     if len(text) < 2:
         await msg.reply_text("⚠️ النص قصير جداً، أعد الإدخال.")
         return
 
-    if session.step == S_HOUSING:
+    if session.step in (S_VISA_EXPIRY, S_PASSPORT_EXPIRY):
+        picked = _parse_manual_date(text)
+        if picked is None:
+            # ⚠️ لا تُستهلَك الخطوة عند الخطأ: التقويم يبقى معروضاً كما هو
+            await msg.reply_text(
+                "⚠️ تاريخ غير صالح.\n"
+                "اكتبه بصيغة `يوم/شهر/سنة` — مثال: `25/12/2027`\n"
+                "أو اختر من التقويم أعلاه.",
+                parse_mode=ParseMode.MARKDOWN,
+            )
+            return
+        key = ("visa_expiry" if session.step == S_VISA_EXPIRY
+               else "passport_expiry")
+        session.active[key] = picked
+    elif session.step == S_HOUSING:
         session.housing = text
     else:
         session.current_companion["name"] = text
