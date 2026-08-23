@@ -61,7 +61,6 @@ S_VISA_EXPIRY      = "visa_expiry"
 S_PASSPORT_EXPIRY  = "passport_expiry"
 S_PASSPORT_FILE    = "passport_file"
 S_VISA_FILE        = "visa_file"
-S_RESIDENCE_FILE   = "residence_file"
 S_HOUSING          = "housing"
 S_HAS_COMPANION    = "has_companion"
 S_COMPANION_COUNT  = "companion_count"
@@ -69,9 +68,10 @@ S_C_NAME           = "c_name"
 S_REVIEW           = "review"
 
 # خطوات المرافق مطابقة لخطوات المريض (نفس الفورمة) — يميّزها علم `in_companion`
+# ⚠️ لا خطوة "صورة الإقامة" هنا (بطلب المستخدم): الإقامة تُوثَّق من بوت
+# الإقامات عبر "🏠 معلّقات من الحالات السابقة" — فرفعها مرتين تكرار.
 _PERSON_STEPS = [
-    S_VISA_EXPIRY, S_PASSPORT_EXPIRY, S_PASSPORT_FILE,
-    S_VISA_FILE, S_RESIDENCE_FILE,
+    S_VISA_EXPIRY, S_PASSPORT_EXPIRY, S_PASSPORT_FILE, S_VISA_FILE,
 ]
 
 _STEP_TITLES = {
@@ -79,7 +79,6 @@ _STEP_TITLES = {
     S_PASSPORT_EXPIRY: "🛂 تاريخ انتهاء الجواز",
     S_PASSPORT_FILE:   "🛂 صورة الجواز",
     S_VISA_FILE:       "📋 صورة التأشيرة مع ختم الدخول",
-    S_RESIDENCE_FILE:  "🪪 صورة الإقامة (إن وُجدت)",
     S_HOUSING:         "🏠 السكن ورقم الشقة",
 }
 
@@ -91,7 +90,6 @@ def _blank_person(name: str = "") -> dict:
         "passport_expiry": "",
         "passport_file_id": "",
         "visa_file_id": "",
-        "residence_file_id": "",
     }
 
 
@@ -215,7 +213,6 @@ def _persist(session: LegoSession, admin_id: int | None) -> tuple[bool, str]:
                 name=session.patient_name,
                 visa_expiry=p["visa_expiry"], passport_expiry=p["passport_expiry"],
                 passport_file_id=p["passport_file_id"], visa_file_id=p["visa_file_id"],
-                residence_file_id=p["residence_file_id"],
                 residence_address=session.housing,
                 has_companion=bool(session.companions),
                 arrival_status="active",
@@ -242,7 +239,6 @@ def _persist(session: LegoSession, admin_id: int | None) -> tuple[bool, str]:
                     patient_id=ap.id, name=c["name"],
                     visa_expiry=c["visa_expiry"], passport_expiry=c["passport_expiry"],
                     passport_file_id=c["passport_file_id"], visa_file_id=c["visa_file_id"],
-                    residence_file_id=c["residence_file_id"],
                 ))
                 # (2) صف مريض جديد للمرافق — ليظهر في الخدمات العامة
                 s.add(Patient(
@@ -348,13 +344,8 @@ async def _render_step(query_or_msg, session: LegoSession, *, edit: bool) -> Non
             today.year, today.month, LEGO, f"{LEGO}:cancel", quick_jump=True,
         )
         text = header + f"**{_STEP_TITLES[step]}**\n\n" + text
-    elif step in (S_PASSPORT_FILE, S_VISA_FILE, S_RESIDENCE_FILE):
-        rows = []
-        if step == S_RESIDENCE_FILE:
-            # الوحيدة الاختيارية (بطلب المستخدم صراحةً: "أو تخطي")
-            rows.append([InlineKeyboardButton("⏭️ تخطي (لا توجد إقامة)",
-                                              callback_data=f"{LEGO}:skip_res")])
-        rows.append(_cancel_row())
+    elif step in (S_PASSPORT_FILE, S_VISA_FILE):
+        rows = [_cancel_row()]
         text = header + (
             f"**{_STEP_TITLES[step]}**\n\n"
             "أرسل الصورة أو الملف الآن 📎"
@@ -400,11 +391,13 @@ async def _render_step(query_or_msg, session: LegoSession, *, edit: bool) -> Non
 def _person_summary(p: dict) -> str:
     def mark(v):
         return "✅" if v else "—"
+    # ⚠️ `.get` لا فهرسة مباشرة: أي مفتاح ناقص يجب أن يُعرَض "—" لا أن
+    # يُسقِط الشاشة كلها (هذا بالضبط ما سبّب عطل المرافق الثاني).
     return (
-        f"   📋 التأشيرة: {p['visa_expiry'] or '—'}\n"
-        f"   🛂 الجواز: {p['passport_expiry'] or '—'}\n"
-        f"   📎 المرفقات: جواز {mark(p['passport_file_id'])} · "
-        f"تأشيرة {mark(p['visa_file_id'])} · إقامة {mark(p['residence_file_id'])}\n"
+        f"   📋 التأشيرة: {p.get('visa_expiry') or '—'}\n"
+        f"   🛂 الجواز: {p.get('passport_expiry') or '—'}\n"
+        f"   📎 المرفقات: جواز {mark(p.get('passport_file_id'))} · "
+        f"تأشيرة {mark(p.get('visa_file_id'))}\n"
     )
 
 
@@ -449,7 +442,10 @@ def _advance(session: LegoSession) -> None:
         # انتهت فورمة هذا الشخص
         if session.in_companion:
             session.companions.append(dict(session.current_companion))
-            session.current_companion = {}
+            # 🔴 كان `{}` — فيفقد المرافق **الثاني فصاعداً** كل مفتاح لا
+            # يُكتَب صراحةً في خطواته، فينفجر `_person_summary` بـKeyError
+            # في شاشة المراجعة ويموت المعالِج بلا رد ⇒ الشاشة "تعلّق".
+            session.current_companion = _blank_person()
             if len(session.companions) < session.companion_total:
                 session.step = S_C_NAME
             else:
@@ -590,13 +586,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await _render_step(query, session, edit=True)
         return
 
-    # ── تخطي الإقامة (الحقل الاختياري الوحيد) ────────────────────────────
-    if action == "skip_res" and session.step == S_RESIDENCE_FILE:
-        _advance(session)
-        session.save(ud)
-        await _render_step(query, session, edit=True)
-        return
-
     # ── المرافقون ────────────────────────────────────────────────────────
     if action == "comp_no" and session.step == S_HAS_COMPANION:
         session.step = S_REVIEW
@@ -651,7 +640,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """يستقبل صور/ملفات خطوات المرفقات — لا يعمل إلا داخل جلسة نشطة."""
     session = LegoSession.load(context.user_data)
-    if session is None or session.step not in (S_PASSPORT_FILE, S_VISA_FILE, S_RESIDENCE_FILE):
+    if session is None or session.step not in (S_PASSPORT_FILE, S_VISA_FILE):
         return                      # ⚠️ لا نبتلع رسائل التدفقات الأخرى
     msg = update.message
     if not msg:
@@ -669,7 +658,6 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     key = {
         S_PASSPORT_FILE: "passport_file_id",
         S_VISA_FILE: "visa_file_id",
-        S_RESIDENCE_FILE: "residence_file_id",
     }[session.step]
     session.active[key] = file_id
     _advance(session)
