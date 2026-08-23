@@ -688,36 +688,126 @@ __all__ = [
 # مبدأ "لا نحذف من له بيانات" الذي بُني لأجله أرشيف المسافرين. الأسماء
 # التجريبية بلا تقارير فلا يعوقها الحارس.
 
-def get_companion_flow_families(page: int = 0, per_page: int = 8) -> tuple:
-    """الأسماء المُضافة عبر "🤝 مريض جديد مع مرافقين" (companion_parent)
-    مع عدد مرافقي كلٍّ منها. Returns: (list, total, pages)"""
+# ── حذف الأسماء التجريبية من الأنظمة الثلاثة ─────────────────────────────────
+# ⚠️ لماذا "مفتاح" نصّي بدل `patient_id`:
+# النسخة الأولى من هذه الشاشة كانت تُدرِج `patient_type == "companion_parent"`
+# وحدها وتُعرّف كل شيء بـ`patient_id`، فبقيت أسماء **لا تصلها الأداة إطلاقاً**:
+#   • مريض أُدخِل عبر "🏠 الحالات الموجودة" (نوعه `general` + علَم
+#     `gs_onboarded_at`) ⇒ يظهر في 🔧 الخدمات العامة بلا أي طريق لحذفه.
+#   • **شخص إقامة يتيم** — صف في `res_persons` بلا أي صف مريض مطابق بالاسم
+#     ⇒ يظهر في "🔴 معلّق انتهاء الإقامة" وأخواتها، ولا وجود لـ`patient_id`
+#     أصلاً ليُبنى عليه أي إجراء.
+#
+# لذلك صار المُعرِّف نصّاً يحمل مصدره: `p-<patient_id>` أو `r-<res_person_id>`.
+# (شرطة لا نقطتان — `callback_data` مُقسَّمة بـ":" في كل هذا الملف.)
+_SRC_COMPANION = "🤝 زر المرافقين"
+_SRC_LEGACY = "🏠 حالة موجودة"
+_SRC_RESIDENCY = "🪪 وحدة الإقامة"
+
+
+def _resolve_family(session, key: str):
+    """المفتاح ⇒ (اسم الجذر, أسماء المرافقين, patient_id أو None).
+
+    None إن لم يعد الصف موجوداً (حُذِف في جلسة أخرى).
+    """
+    from db.models import Patient, ResidencyPerson
+
+    kind, _, raw = str(key or "").partition("-")
     try:
+        row_id = int(raw)
+    except (TypeError, ValueError):
+        return None
+
+    if kind == "p":
+        p = session.query(Patient).filter_by(id=row_id).first()
+        if not p:
+            return None
+        comps = session.query(Patient).filter_by(companion_of_id=p.id).all()
+        return p.full_name, [c.full_name for c in comps if c.full_name], p.id
+
+    if kind == "r":
+        rp = session.query(ResidencyPerson).filter_by(id=row_id).first()
+        if not rp:
+            return None
+        # مرافقو الإقامة = الأبناء في العلاقة الذاتية (parent_id = الجذر)
+        kids = session.query(ResidencyPerson).filter_by(parent_id=rp.id).all()
+        comp_names = [k.name for k in kids if k.name]
+        # قد يوجد صف مريض بنفس الاسم (مريض عادي) — يُحذَف معه إن وُجد
+        p = session.query(Patient).filter_by(full_name=rp.name).first()
+        return rp.name, comp_names, (p.id if p else None)
+
+    return None
+
+
+def get_deletable_families(page: int = 0, per_page: int = 8) -> tuple:
+    """كل اسم يمكن حذفه من الأنظمة الثلاثة، أياً كان الزر الذي أنشأه.
+
+    ثلاثة مصادر مُوحَّدة بلا تكرار: مرضى زر المرافقين، مرضى "الحالات
+    الموجودة"، وجذور `res_persons` التي لا يغطّيها أيٌّ منهما — وهي بالذات
+    ما كان يتعذّر حذفه. Returns: (list, total, pages)
+    """
+    try:
+        from sqlalchemy import or_
         from db.session import SessionLocal
-        from db.models import Patient
+        from db.models import Patient, ResidencyPerson
 
         with SessionLocal() as session:
-            q = session.query(Patient).filter(
-                Patient.patient_type == "companion_parent",
-                Patient.full_name.isnot(None), Patient.full_name != "",
+            cands: list = []
+            seen_names: set = set()
+
+            patients = (
+                session.query(Patient)
+                .filter(
+                    Patient.full_name.isnot(None),
+                    Patient.full_name != "",
+                    or_(
+                        Patient.patient_type == "companion_parent",
+                        Patient.gs_onboarded_at.isnot(None),
+                    ),
+                )
+                .order_by(Patient.created_at.desc())
+                .all()
             )
-            total = q.count()
-            pages = (total + per_page - 1) // per_page
-            rows = (
-                q.order_by(Patient.created_at.desc())
-                .offset(page * per_page).limit(per_page).all()
-            )
-            result = []
-            for p in rows:
+            for p in patients:
                 n_comp = session.query(Patient).filter_by(companion_of_id=p.id).count()
-                result.append({"id": p.id, "name": p.full_name, "companions": n_comp})
-            return result, total, pages
+                cands.append({
+                    "key": f"p-{p.id}",
+                    "name": p.full_name,
+                    "companions": n_comp,
+                    "source": (_SRC_COMPANION if p.patient_type == "companion_parent"
+                               else _SRC_LEGACY),
+                })
+                seen_names.add(p.full_name)
+
+            # جذور الإقامة غير المُغطّاة أعلاه (تشمل الأيتام تماماً)
+            roots = (
+                session.query(ResidencyPerson)
+                .filter(ResidencyPerson.parent_id.is_(None))
+                .order_by(ResidencyPerson.id.desc())
+                .all()
+            )
+            for rp in roots:
+                if not rp.name or rp.name in seen_names:
+                    continue
+                n_comp = session.query(ResidencyPerson).filter_by(parent_id=rp.id).count()
+                cands.append({
+                    "key": f"r-{rp.id}",
+                    "name": rp.name,
+                    "companions": n_comp,
+                    "source": _SRC_RESIDENCY,
+                })
+                seen_names.add(rp.name)
+
+            total = len(cands)
+            pages = max(1, (total + per_page - 1) // per_page)
+            return cands[page * per_page: (page + 1) * per_page], total, pages
     except Exception as exc:
-        logger.error(f"[pcdel] فشل جلب عائلات زر المرافقين: {exc}", exc_info=True)
+        logger.error(f"[pcdel] فشل جلب الأسماء القابلة للحذف: {exc}", exc_info=True)
         return [], 0, 0
 
 
-def get_companion_flow_family_impact(patient_id: int) -> Optional[Dict]:
-    """ما الذي سيُحذَف فعلاً لهذا الاسم — يُعرَض للأدمن قبل التأكيد.
+def get_deletable_family_impact(key: str):
+    """ما الذي سيُحذَف فعلاً لهذا المفتاح — يُعرَض للأدمن قبل التأكيد.
 
     يشمل عدد التقارير الطبية (حارس الحذف): أي رقم > 0 يمنع الحذف.
     """
@@ -728,12 +818,10 @@ def get_companion_flow_family_impact(patient_id: int) -> Optional[Dict]:
         )
 
         with SessionLocal() as session:
-            patient = session.query(Patient).filter_by(id=patient_id).first()
-            if not patient:
+            resolved = _resolve_family(session, key)
+            if resolved is None:
                 return None
-            name = patient.full_name
-            companions = session.query(Patient).filter_by(companion_of_id=patient_id).all()
-            comp_names = [c.full_name for c in companions if c.full_name]
+            name, comp_names, patient_id = resolved
             all_names = [n for n in ([name] + comp_names) if n]
 
             # ⚠️ لا رابط FK بين سجلّ المرضى وجدولَي الإقامة/الوصول —
@@ -747,33 +835,41 @@ def get_companion_flow_family_impact(patient_id: int) -> Optional[Dict]:
             arr_comp = 0
             for a in arr:
                 arr_comp += session.query(ArrivalCompanion).filter_by(patient_id=a.id).count()
-            arr_comp += session.query(ArrivalCompanion).filter(
-                ArrivalCompanion.name.in_(comp_names)).count()
+            if comp_names:
+                arr_comp += session.query(ArrivalCompanion).filter(
+                    ArrivalCompanion.name.in_(comp_names)).count()
+
+            patients = session.query(Patient).filter(
+                Patient.full_name.in_(all_names)).count()
 
             reports = session.query(Report).filter(
                 Report.patient_name.in_(all_names)).count()
-            reports += session.query(Report).filter(
-                Report.patient_id == patient_id).count()
+            if patient_id is not None:
+                reports += session.query(Report).filter(
+                    Report.patient_id == patient_id).count()
 
             return {
-                "id": patient_id, "name": name,
+                "key": key,
+                "id": patient_id,
+                "name": name,
                 "companions": comp_names,
+                "patients": patients,
                 "residency": len(res_ids),
                 "arrivals": len(arr),
                 "arrival_companions": arr_comp,
                 "reports": reports,
             }
     except Exception as exc:
-        logger.error(f"[pcdel] فشل حساب أثر الحذف id={patient_id}: {exc}", exc_info=True)
+        logger.error(f"[pcdel] فشل حساب أثر الحذف key={key}: {exc}", exc_info=True)
         return None
 
 
-def purge_companion_flow_family(patient_id: int) -> tuple:
+def purge_deletable_family(key: str) -> tuple:
     """يحذف الاسم ومرافقيه من **كل** الأنظمة. Returns: (نجاح, رسالة/ملخص).
 
     🔒 يرفض الحذف إن وُجد أي تقرير طبي مرتبط (حماية بيانات التقارير).
     """
-    impact = get_companion_flow_family_impact(patient_id)
+    impact = get_deletable_family_impact(key)
     if impact is None:
         return False, "لم يُعثر على الاسم."
     if impact["reports"]:
@@ -789,8 +885,8 @@ def purge_companion_flow_family(patient_id: int) -> tuple:
             ResidencyIssuance, ArrivalPatient, ArrivalCompanion,
         )
 
-        all_names = [impact["name"]] + list(impact["companions"])
-        all_names = [n for n in all_names if n]
+        all_names = [n for n in ([impact["name"]] + list(impact["companions"])) if n]
+        patient_id = impact["id"]
 
         with SessionLocal() as session:
             # (1) أشخاص الإقامة + كل ما يتعلّق بهم
@@ -808,24 +904,28 @@ def purge_companion_flow_family(patient_id: int) -> tuple:
             for a in arrivals:
                 session.query(ArrivalCompanion).filter_by(patient_id=a.id).delete()
                 session.delete(a)
-            session.query(ArrivalCompanion).filter(
-                ArrivalCompanion.name.in_(impact["companions"])).delete(
-                synchronize_session=False)
+            if impact["companions"]:
+                session.query(ArrivalCompanion).filter(
+                    ArrivalCompanion.name.in_(impact["companions"])).delete(
+                    synchronize_session=False)
 
-            # (3) سجلّ المرضى (المرافقون ثم المريض)
-            session.query(Patient).filter_by(companion_of_id=patient_id).delete(
-                synchronize_session=False)
-            root = session.query(Patient).filter_by(id=patient_id).first()
-            if root:
-                session.delete(root)
+            # (3) سجلّ المرضى — بالرابط (يلتقط مرافقاً سُمّي باسم مختلف)
+            #     وبالاسم (يغطّي مفتاح `r-` الذي قد لا يملك patient_id أصلاً)
+            if patient_id is not None:
+                session.query(Patient).filter_by(companion_of_id=patient_id).delete(
+                    synchronize_session=False)
+            session.query(Patient).filter(
+                Patient.full_name.in_(all_names)).delete(synchronize_session=False)
 
             session.commit()
 
         logger.info(
-            f"[pcdel] purged {impact['name']!r}: {len(impact['companions'])} companion(s), "
-            f"{impact['residency']} residency person(s), {impact['arrivals']} arrival row(s)"
+            "[pcdel] purged %r (key=%s): %d companion(s), %d residency person(s), "
+            "%d arrival row(s)",
+            impact["name"], key, len(impact["companions"]),
+            impact["residency"], impact["arrivals"],
         )
         return True, impact["name"]
     except Exception as exc:
-        logger.error(f"[pcdel] فشل الحذف id={patient_id}: {exc}", exc_info=True)
+        logger.error(f"[pcdel] فشل الحذف key={key}: {exc}", exc_info=True)
         return False, str(exc)[:150]
