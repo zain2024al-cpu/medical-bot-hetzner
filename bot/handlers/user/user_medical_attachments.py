@@ -269,6 +269,39 @@ async def _show_reports_list(update: Update, context: ContextTypes.DEFAULT_TYPE,
 # Callback handler الرئيسي
 # ─────────────────────────────────────────────
 
+def _finish_pending_report(report_id: int) -> tuple[bool, int, int]:
+    """يُغلِق سجل المعلَّق **ويُخرِج** التقرير من القائمة معاً.
+
+    ⚠️ الاثنان معاً ضروريان: قائمة المترجم تُبنى من `Report.has_paper_report
+    == 2` لا من حالة السجل المعلَّق — فإغلاق السجل وحده لا يُخفي التقرير من
+    القائمة، وتحديث العَلَم وحده يترك سجلاً معلَّقاً للأبد في شاشة الأدمن.
+    """
+    try:
+        from services.pending_reports_service import complete_pending_upload
+
+        with SessionLocal() as s:
+            r = s.query(Report).filter_by(id=report_id).first()
+            if not r:
+                # ⚠️ لا تُعلن نجاحاً لتقرير غير موجود — الرسالة تصبح كاذبة
+                logger.warning(f"⚠️ MA: طُلِب إغلاق تقرير غير موجود #{report_id}")
+                return False, 0, 0
+
+        is_complete, uploaded_n, expected_n = complete_pending_upload(report_id)
+        with SessionLocal() as s:
+            r = s.query(Report).filter_by(id=report_id).first()
+            if r:
+                r.has_paper_report = 1
+                s.commit()
+        logger.info(
+            f"✅ MA: أُغلقت الحالة صراحةً للتقرير #{report_id} "
+            f"({uploaded_n}/{expected_n}) — بطلب المترجم"
+        )
+        return True, uploaded_n, expected_n
+    except Exception as exc:
+        logger.error(f"❌ MA: فشل إغلاق الحالة للتقرير #{report_id}: {exc}", exc_info=True)
+        return False, 0, 0
+
+
 async def handle_ma_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -285,6 +318,33 @@ async def handle_ma_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             reply_markup=reports_submenu(),
             parse_mode="Markdown"
         )
+        return
+
+    # ─── إغلاق حالة معلّقة صراحةً: "هذا كل شيء" ───
+    # لا يرفع شيئاً — يعلن فقط أن الفحوصات المنتظرة أقل مما قُدِّر وقت
+    # الإدخال، فيُغلِق السجل ويُخرِج التقرير من قائمة المعلّقات.
+    if parts[1] == "finish":
+        try:
+            report_id = int(parts[2])
+        except (IndexError, ValueError):
+            await query.answer("⚠️ بيانات غير صالحة", show_alert=True)
+            return
+        ok, uploaded_n, expected_n = _finish_pending_report(report_id)
+        if ok:
+            await query.edit_message_text(
+                f"✅ **أُغلقت الحالة**\n\n"
+                f"لم تعد في التقارير المعلّقة.\n"
+                f"📊 اعتُبرت مكتملة بـ {uploaded_n} من {expected_n} فحص مُقدَّر.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(
+                    "🔙 رجوع للقائمة", callback_data="ma:back_list")]]),
+                parse_mode="Markdown",
+            )
+        else:
+            await query.edit_message_text(
+                "⚠️ تعذّر إغلاق الحالة. حاول مجدداً أو راجع الأدمن.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(
+                    "🔙 رجوع للقائمة", callback_data="ma:back_list")]]),
+            )
         return
 
     # ─── تغيير الصفحة ───
@@ -418,7 +478,7 @@ async def _show_upload_prompt(query, context, report: dict):
         f"🏢 **القسم:** {dept}\n"
         f"👨‍💼 **المترجم:** {translator}\n\n"
         f"أرسل الصور أو الملفات أو الفيديوهات الآن"
-        + (" **(إذا جهّزت هذا الفحص فقط اضغط \"تم رفع هذا الفحص\"، وإذا كانت كل الفحوصات المنتظرة جاهزة الآن بنفس الملفات اضغط \"رفع الكل دفعة واحدة\")**" if show_done_all else "")
+        + (" **(إذا كان هذا فحصاً واحداً من عدة فحوصات اضغط \"تم رفع هذا الفحص\"، وإذا كانت هذه كل الفحوصات — أو تبيّن أنها أقل مما قُدِّر — اضغط \"هذه كل الفحوصات\" لإنهاء الحالة)**" if show_done_all else "")
         + ".\n"
         f"عند الانتهاء اضغط الزر المناسب."
     )
@@ -426,7 +486,7 @@ async def _show_upload_prompt(query, context, report: dict):
         "✅ تم رفع هذا الفحص" if show_done_all else "✅ تم الانتهاء", callback_data="ma:done",
     )]]
     if show_done_all:
-        keyboard_rows.append([InlineKeyboardButton("📦 رفع الكل دفعة واحدة", callback_data="ma:done_all")])
+        keyboard_rows.append([InlineKeyboardButton("✅ هذه كل الفحوصات — أنهِ الحالة", callback_data="ma:done_all")])
     keyboard_rows.append([InlineKeyboardButton("🔙 رجوع للقائمة", callback_data="ma:back_list")])
     keyboard = InlineKeyboardMarkup(keyboard_rows)
     try:
@@ -516,7 +576,7 @@ async def handle_ma_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
         callback_data="ma:done",
     )]]
     if show_done_all:
-        keyboard_rows.append([InlineKeyboardButton("📦 رفع الكل دفعة واحدة", callback_data="ma:done_all")])
+        keyboard_rows.append([InlineKeyboardButton("✅ هذه كل الفحوصات — أنهِ الحالة", callback_data="ma:done_all")])
     keyboard_rows.append([InlineKeyboardButton("🔙 رجوع للقائمة", callback_data="ma:back_list")])
     keyboard = InlineKeyboardMarkup(keyboard_rows)
     await msg.reply_text(
@@ -855,6 +915,7 @@ async def _publish_attachments(query, context, complete_all: bool = False):
         context.user_data.pop("ma_state", None)
 
         success_text = f"✅ **تم النشر بنجاح**\n\nتم إرسال {len(attachments)} مرفق(ات) للمجموعة."
+        success_kb = None
         if upload_progress is not None:
             is_complete, uploaded_n, expected_n = upload_progress
             if expected_n > 1:
@@ -864,10 +925,24 @@ async def _publish_attachments(query, context, complete_all: bool = False):
                     remaining_n = expected_n - uploaded_n
                     success_text += (
                         f"\n\n📊 تقدّم الفحوصات: {uploaded_n} من {expected_n} — متبقي {remaining_n}.\n"
-                        f"ستبقى هذه الحالة في التقارير المعلقة حتى رفع بقية الفحوصات."
+                        f"ستبقى هذه الحالة في التقارير المعلقة حتى رفع بقية الفحوصات.\n\n"
+                        f"📌 إن كان هذا **كل** ما لديك (تبيّن أن الفحوصات أقل مما قُدِّر، "
+                        f"أو وصلت كلها في ملف واحد) فأغلِق الحالة بالزر أدناه."
                     )
+                    # ⚠️ كانت هذه الرسالة **بلا أي أزرار** — طريق مسدود: المترجم
+                    # الذي يكتشف أن هذا كل ما لديه لا يجد وسيلة لقول ذلك، فعليه
+                    # الرجوع للقائمة ودخول التقرير من جديد وضغط زر اسمه "رفع الكل
+                    # دفعة واحدة" — وهو اسم يوحي برفع ملفات لا بإنهاء الحالة.
+                    # هذا بالضبط سبب شكوى "يرفع ويظل معلّق".
+                    if report_id:
+                        success_kb = InlineKeyboardMarkup([[InlineKeyboardButton(
+                            "✅ هذا كل شيء — أغلِق الحالة",
+                            callback_data=f"ma:finish:{report_id}",
+                        )]])
 
-        await query.edit_message_text(success_text, parse_mode="Markdown")
+        await query.edit_message_text(
+            success_text, reply_markup=success_kb, parse_mode="Markdown",
+        )
 
     except Exception as e:
         logger.error(f"❌ MA: فشل النشر: {e}", exc_info=True)
