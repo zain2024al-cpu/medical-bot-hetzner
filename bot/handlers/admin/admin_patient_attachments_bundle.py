@@ -176,24 +176,21 @@ async def _send_leftover(bot, chat_id: int, att: dict) -> None:
 # ── نتيجة اختيار المريض ──────────────────────────────────────────────────────
 
 async def _on_patient_selected(result, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # ⚠️ نفس ملاحظة admin_patient_report_v2: الاختيار من البحث inline يصل
+    # عبر رسالة نصّية، فـ`update.callback_query` تكون None هنا.
     query = update.callback_query
 
     if result.cancelled:
-        try:
-            await query.edit_message_text("✅ تم الإلغاء.")
-        except Exception:
-            logger.debug("تم تجاهل استثناء في _on_patient_selected", exc_info=True)
+        await patient_selector.respond(update, "✅ تم الإلغاء.")
         return
 
     patient_id = result.id
     patient_name = result.name
 
-    try:
-        await query.edit_message_text(
-            f"⏳ جارٍ تجميع مرفقات *{patient_name}*...", parse_mode=ParseMode.MARKDOWN
-        )
-    except Exception:
-        logger.debug("تم تجاهل استثناء في _on_patient_selected", exc_info=True)
+    await patient_selector.respond(
+        update, f"⏳ جارٍ تجميع مرفقات *{patient_name}*...",
+        parse_mode=ParseMode.MARKDOWN,
+    )
 
     try:
         from services.medical_attachment_files_service import (
@@ -235,7 +232,7 @@ async def _on_patient_selected(result, update: Update, context: ContextTypes.DEF
             if gap_note:
                 text += f"\n\n{gap_note.strip()}"
             try:
-                await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN)
+                await patient_selector.respond(update, text, parse_mode=ParseMode.MARKDOWN)
             except Exception:
                 logger.debug("تم تجاهل استثناء في _on_patient_selected", exc_info=True)
             return
@@ -279,7 +276,8 @@ async def _on_patient_selected(result, update: Update, context: ContextTypes.DEF
             )
 
         try:
-            await query.delete_message()
+            if query is not None:
+                await query.delete_message()
         except Exception:
             logger.debug("تم تجاهل استثناء في _on_patient_selected", exc_info=True)
 
@@ -292,7 +290,7 @@ async def _on_patient_selected(result, update: Update, context: ContextTypes.DEF
     except Exception:
         logger.exception("[patient_attachments_bundle] فشل تجميع المرفقات")
         try:
-            await query.edit_message_text("❌ حدث خطأ أثناء تجميع المرفقات.")
+            await patient_selector.respond(update, "❌ حدث خطأ أثناء تجميع المرفقات.")
         except Exception:
             logger.debug("تم تجاهل استثناء في _on_patient_selected", exc_info=True)
 

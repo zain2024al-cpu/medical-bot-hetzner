@@ -253,6 +253,39 @@ async def handle_inline_selection(
     )
 
 
+async def respond(update, text: str, **kwargs) -> None:
+    """يعرض `text` أياً كان مصدر التحديث — كولباك أو رسالة نصّية.
+
+    ⚠️ لماذا هذه الدالة موجودة:
+    مستقبِلات `result_router` كانت تكتب `update.callback_query.edit_message_text`
+    مباشرةً. هذا صحيح عند الاختيار من **القائمة المرقَّمة** (كولباك)، لكنه
+    ينهار عند الاختيار من **البحث inline**: ذاك المسار يصل عبر رسالة نصّية
+    (`__PATIENT_SELECTED__:…`) فيكون `callback_query = None`، فيُرفَع
+    AttributeError ويُبتلَع في `except` صامت ⇒ لا تظهر الشاشة التالية
+    إطلاقاً، ويبدو أن "البحث لا يعمل بينما القائمة تعمل" بالضبط.
+
+    الترتيب: تعديل رسالة الكولباك إن وُجدت، وإلا رسالة جديدة في المحادثة.
+    """
+    query = getattr(update, "callback_query", None)
+    if query is not None:
+        try:
+            await query.edit_message_text(text, **kwargs)
+            return
+        except Exception:
+            logger.debug("[patient_selector] تعذّر تعديل رسالة الكولباك", exc_info=True)
+
+    msg = getattr(update, "effective_message", None) or (
+        query.message if query is not None else None
+    )
+    if msg is None:
+        logger.error("[patient_selector] لا رسالة ولا كولباك — تعذّر الرد")
+        return
+    try:
+        await msg.reply_text(text, **kwargs)
+    except Exception:
+        logger.exception("[patient_selector] فشل إرسال الرد")
+
+
 def register_handler(app) -> None:
     """
     Register the sel_pat:* CallbackQueryHandler and the inline-search text

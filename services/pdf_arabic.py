@@ -84,20 +84,44 @@ def ar_wrap(text, font_name: str, font_size: float, max_width_pts: float) -> str
     return "<br/>".join(ar(line) for line in lines)
 
 
+def _is_path(x) -> bool:
+    """هل هذا العنصر مسار ملف لا اسم خط؟"""
+    return isinstance(x, str) and (
+        "/" in x or "\\" in x or x.lower().endswith((".ttf", ".otf"))
+    )
+
+
 def pick_font(candidates: list, fallback: str = "Helvetica") -> str:
     """يسجّل أول خط متاح من القائمة في ReportLab ويعيد اسمه.
 
-    candidates — [(اسم الخط, مسار الملف), ...] بترتيب الأفضلية.
-    يعيد `fallback` إن لم يتوفّر أي خط (فلا ينهار توليد المستند، وإن
-    ظهر النص العربي غير مُشكَّل).
+    candidates — [(مسار الملف, اسم الخط), ...] بترتيب الأفضلية.
+
+    ⚠️ الترتيب يُستنتَج لا يُفترَض: كل القوائم الفعلية في المشروع
+    `(مسار, اسم)`، لكن هذه الدالة كانت تفكّها `(اسم, مسار)` — فكانت
+    تستدعي TTFont(<مسار tahoma.ttf>, "Tahoma") معكوسةً، أي "افتح ملفاً
+    اسمه Tahoma"، فيفشل **كل** مرشَّح وتعود Helvetica التي لا تملك
+    محارف عربية ⇒ **مربعات في كل ملفات PDF بلا استثناء**. الفشل كان
+    صامتاً تماماً لأن الاستثناء يُبتلع في `continue`.
+
+    الآن: يُكتشَف أيّ العنصرين مسار، فيعمل الترتيبان معاً — ويُسجَّل
+    خطأ صريح عند السقوط لـ`fallback` بدل الصمت.
     """
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.ttfonts import TTFont
 
-    for name, path in candidates:
+    tried = []
+    for a, b in candidates:
+        path, name = (a, b) if _is_path(a) else (b, a)
         try:
             pdfmetrics.registerFont(TTFont(name, path))
             return name
-        except Exception:
+        except Exception as exc:
+            tried.append(f"{name}({path}): {type(exc).__name__}")
             continue
+
+    # لا يجوز أن يمرّ هذا بصمت — النتيجة مستند عربي غير مقروء
+    logger.error(
+        "[pdf_arabic] تعذّر تسجيل أي خط عربي — سيظهر النص مربعات! "
+        "المحاولات: %s", " | ".join(tried) or "(قائمة فارغة)"
+    )
     return fallback

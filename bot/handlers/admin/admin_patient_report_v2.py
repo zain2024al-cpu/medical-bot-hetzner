@@ -201,16 +201,13 @@ async def _on_patient_selected(
     The ConversationHandler remains inactive until a callback
     with pattern pr2:* is received.
     """
+    # ⚠️ لا تُستخدَم `update.callback_query` مباشرةً هنا: الاختيار من البحث
+    # inline يصل عبر **رسالة نصّية** لا كولباك، فتكون None. `respond` تتولّى
+    # المصدرين معاً (التوثيق الكامل في patient_selector/selector.py).
     if result.cancelled:
-        # User pressed back/cancel in patient_selector
-        try:
-            await update.callback_query.edit_message_text(
-                "✅ تم الإلغاء.",
-                parse_mode=ParseMode.MARKDOWN,
-            )
-        except Exception:
-            logger.debug("تم تجاهل استثناء في _on_patient_selected", exc_info=True)
-        # Clear context for clean state
+        await patient_selector.respond(
+            update, "✅ تم الإلغاء.", parse_mode=ParseMode.MARKDOWN,
+        )
         context.user_data.clear()
         return
 
@@ -222,24 +219,13 @@ async def _on_patient_selected(
     context.user_data["_patient_name"] = patient_name
 
     # Show departments selection
-    query = update.callback_query
-    try:
-        await query.edit_message_text(
-            f"👤 *{patient_name}*\n\n"
-            f"📋 اختر الأقسام:",
-            reply_markup=_depts_kb(patient_id, patient_name),
-            parse_mode=ParseMode.MARKDOWN,
-        )
-    except Exception:
-        try:
-            await query.message.reply_text(
-                f"👤 *{patient_name}*\n\n"
-                f"📋 اختر الأقسام:",
-                reply_markup=_depts_kb(patient_id, patient_name),
-                parse_mode=ParseMode.MARKDOWN,
-            )
-        except Exception:
-            logger.debug("تم تجاهل استثناء في _on_patient_selected", exc_info=True)
+    await patient_selector.respond(
+        update,
+        f"👤 *{patient_name}*\n\n"
+        f"📋 اختر الأقسام:",
+        reply_markup=_depts_kb(patient_id, patient_name),
+        parse_mode=ParseMode.MARKDOWN,
+    )
 
     # Set state for ConversationHandler to enter PR_DEPTS
     context._conversation_state = PR_DEPTS
