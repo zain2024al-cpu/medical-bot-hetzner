@@ -549,7 +549,12 @@ async def handle_ma_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not ma.get("report_id"):
         return  # لم يختر تقريراً بعد
 
-    msg = update.message
+    # ⚠️ `update.message` تكون None لتحديثات لا تحمل رسالة جديدة
+    # (رسالة مُعدَّلة، منشور قناة…) فينفجر `msg.photo` بـAttributeError.
+    msg = update.message or update.effective_message
+    if msg is None:
+        logger.debug("[MA] تحديث وسائط بلا رسالة — تجاهُل")
+        return
     attachments = ma.setdefault("attachments", [])
 
     original_name = None

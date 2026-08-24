@@ -182,7 +182,17 @@ async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_
             return ConversationHandler.END
         
         # استخراج رقم التقرير
-        report_id = int(query.data.split(':')[1])
+        # حارس: أي كولباك بلا الصيغة المتوقَّعة يعطي رسالة واضحة
+        # بدل IndexError صامت يقتل المعالِج.
+        parts = (query.data or "").split(':')
+        if len(parts) < 2 or not parts[1].isdigit():
+            logger.warning(f"⚠️ كولباك غير متوقَّع في handle_report_selection: {query.data!r}")
+            await query.edit_message_text(
+                "⚠️ **انتهت هذه الجلسة**\n\nابدأ من جديد من 🗑️ حذف التقارير.",
+                parse_mode=ParseMode.MARKDOWN,
+            )
+            return ConversationHandler.END
+        report_id = int(parts[1])
         context.user_data['delete_report_id'] = report_id
         logger.info(f"🗑️ تم اختيار التقرير رقم {report_id} للحذف")
         
@@ -481,7 +491,11 @@ def register(app):
             ],
             CONFIRM_DELETE: [
                 CallbackQueryHandler(handle_confirm_delete, pattern="^delete_confirm$"),
-                CallbackQueryHandler(handle_report_selection, pattern="^delete_back$"),
+                # ⚠️ كان يشير لـhandle_report_selection وهي لا تعرف
+                # "delete_back" إطلاقاً، فتصل لسطر split(':')[1] وتنفجر
+                # بـIndexError. handle_confirm_delete هي التي تحوي فرعه
+                # الفعلي (إعادة عرض قائمة التقارير).
+                CallbackQueryHandler(handle_confirm_delete, pattern="^delete_back$"),
                 CallbackQueryHandler(cancel_delete, pattern="^delete_cancel$")
             ]
         },

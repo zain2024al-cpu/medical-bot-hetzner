@@ -92,6 +92,16 @@ async def handle_periodic_followup_edit_field_selection(update: Update, context:
         from ...utils import escape_md_v1
         current_value_display = escape_md_v1(current_value_display)
         
+        # ⚠️ القيمة الحالية نصّ كتبه المستخدم ويُحقَن في رسالة Markdown —
+        # أي `*` أو `_` أو backtick غير متوازن يُفشِل الإرسال كاملاً
+        # (can't find end of the entity) فيرى المستخدم "حدث خطأ" بلا سبب
+        # ظاهر. الهروب يجعل النص يُعرَض كما كُتِب.
+        try:
+            from shared.text_safety import escape_markdown_v1
+            current_value_display = escape_markdown_v1(current_value_display)
+        except Exception:
+            logger.debug("تعذّر هروب Markdown للقيمة الحالية", exc_info=True)
+
         # عرض واجهة التعديل
         if field_key == "followup_date":
             # استخدام تقويم المسودة (draft_edit_cal_*) الذي يحتوي على state مناسب في ConversationHandler

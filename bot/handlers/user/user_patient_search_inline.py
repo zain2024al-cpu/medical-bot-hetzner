@@ -17,6 +17,8 @@ except ImportError as e:
     SessionLocal = None
     Patient = None
 
+from telegram.error import BadRequest
+
 logger = logging.getLogger(__name__)
 
 
@@ -211,7 +213,18 @@ async def patient_search_inline_handler(update: Update, context: ContextTypes.DE
             results.append(no_results)
         
         # ✅ إرسال النتائج مع cache_time=1 (لا تخزين مؤقت)
-        await update.inline_query.answer(results, cache_time=1)
+        # ⚠️ "Query is too old" ليس عطلاً: المستخدم يكتب حرفاً جديداً
+        # فيُبطِل تيليجرام الاستعلام السابق قبل أن نردّ عليه (كل ضغطة
+        # مفتاح تُنشئ استعلاماً جديداً). كان يُسجَّل ERROR فيتصدّر تقرير
+        # الأخطاء اليومي بـ٩ مرات وهو سلوك طبيعي تماماً — صار debug.
+        try:
+            await update.inline_query.answer(results, cache_time=1)
+        except BadRequest as br:
+            _m = str(br).lower()
+            if "too old" in _m or "query id is invalid" in _m:
+                logger.debug(f"[inline] استعلام قديم تجاوزه المستخدم بالكتابة: {br}")
+                return
+            raise
         logger.info(f"✅ تم إرسال {len(results)} نتيجة بنجاح")
         
     except Exception as e:
