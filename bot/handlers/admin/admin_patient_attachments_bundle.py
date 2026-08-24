@@ -16,10 +16,11 @@ import io
 import logging
 from datetime import date, datetime
 
-from telegram import Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
-from telegram.ext import ContextTypes
+from telegram.ext import CallbackQueryHandler, ContextTypes
 
+from bot.handlers.admin.decorators import require_admin
 from shared.selectors.patient_selector import selector as patient_selector
 from shared.selectors import result_router
 from shared.files.filename_builder import build_medical_pdf_filename
@@ -48,6 +49,14 @@ def _as_date(value) -> date | None:
     return None
 
 _RKEY_PATIENT = "admin.patient_attachments.patient"
+
+# بادئة كولباك شاشة الفترة (شاشة جديدة بين اختيار المريض والتجميع)
+_PFX = "pattach"
+
+# مفاتيح انتقالية في user_data — لا تعيش بعد انتهاء التجميع
+_CTX_PID   = "_pattach_pid"
+_CTX_NAME  = "_pattach_name"
+_CTX_START = "_pattach_start"   # تاريخ البداية بعد اختياره من التقويم
 
 # امتدادات الصور التي تُضَمّ كصفحات — سواء وصلت بنوع "photo" أو كـ"document".
 _MERGEABLE_IMAGE_EXT = (".jpg", ".jpeg", ".png", ".webp", ".bmp")
@@ -79,6 +88,162 @@ async def show_patient_selector(update: Update, context: ContextTypes.DEFAULT_TY
         # ✅ نفس منطق «👤 تقرير مريض»: شاشة إخراج لا إدخال.
         include_archived=True,
     )
+
+
+# ── شاشة الفترة (كل الفترة / من → إلى) ───────────────────────────────────────
+# ⚠️ قبل هذه الشاشة كان اختيار المريض يبدأ التجميع فوراً لكل تاريخه الطبي،
+# فمريض بعشرات الزيارات يُنتِج ملفاً ضخماً بلا وسيلة لحصره. الآن يختار
+# الأدمن: كل الفترة (السلوك القديم) أو مدى محدَّد بتاريخين.
+
+def _period_kb(patient_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("📋 كل الفترة",
+                              callback_data=f"{_PFX}:all:{patient_id}")],
+        [InlineKeyboardButton("📆 من → إلى (تحديد بالتاريخ)",
+                              callback_data=f"{_PFX}:custom:{patient_id}")],
+        [InlineKeyboardButton("❌ إلغاء", callback_data=f"{_PFX}:cancel")],
+    ])
+
+
+async def _show_period_menu(update, context, patient_id: int, patient_name: str) -> None:
+    await patient_selector.respond(
+        update,
+        f"📎 *كل مرفقات المريض*\n"
+        f"👤 {patient_name}\n\n"
+        f"📅 اختر الفترة:",
+        reply_markup=_period_kb(patient_id),
+        parse_mode=ParseMode.MARKDOWN,
+    )
+
+
+def _fmt(d) -> str:
+    return d.strftime("%d/%m/%Y") if d else "—"
+
+
+async def _show_calendar(query, context, step: str, year: int, month: int,
+                         patient_id: int) -> None:
+    """`step` = "start" أو "end" — يحدّد عنوان الشاشة ووجهة الاختيار."""
+    from shared.calendar_picker import build_calendar
+
+    title = "📆 *تاريخ البداية*" if step == "start" else "📆 *تاريخ النهاية*"
+    extra = ""
+    if step == "end":
+        extra = f"\n_البداية:_ {_fmt(context.user_data.get(_CTX_START))}"
+
+    text, kb = build_calendar(
+        year, month, _PFX, f"{_PFX}:custom:{patient_id}", quick_jump=True,
+    )
+    await query.edit_message_text(
+        f"{title}{extra}\n\n{text}", reply_markup=kb, parse_mode=ParseMode.MARKDOWN,
+    )
+
+
+@require_admin
+async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """كل كولباكات `pattach:` — الفترة والتقويم."""
+    query = update.callback_query
+    if not query:
+        return
+    await query.answer()
+    action = (query.data or "")[len(_PFX) + 1:]
+    ud = context.user_data
+
+    if action == "cancel":
+        ud.clear()
+        try:
+            await query.edit_message_text("✅ تم الإلغاء.")
+        except Exception:
+            logger.debug("تم تجاهل استثناء في handle_callback", exc_info=True)
+        return
+
+    if action == "cal_noop":
+        return
+
+    patient_id = ud.get(_CTX_PID)
+    patient_name = ud.get(_CTX_NAME) or ""
+
+    # 🔒 تحصين ضد فقدان user_data (إعادة تشغيل البوت، أو ضغط زر قديم):
+    # مُعرّف المريض مضمَّن في كولباك `all:`/`custom:` فيُستعاد منه، والاسم
+    # من قاعدة البيانات. بدون هذا كان الزر يصمت بلا أي تفسير — نفس صنف
+    # العطل الذي عولج في اختيار البحث inline.
+    if not patient_id and ":" in action:
+        try:
+            patient_id = int(action.split(":")[1])
+            ud[_CTX_PID] = patient_id
+        except (ValueError, IndexError):
+            patient_id = None
+    if patient_id and not patient_name:
+        from db.session import SessionLocal
+        from db.models import Patient
+        with SessionLocal() as _s:
+            row = _s.query(Patient).filter_by(id=patient_id).first()
+            patient_name = row.full_name if row else ""
+        ud[_CTX_NAME] = patient_name
+    if not patient_id:
+        await query.edit_message_text(
+            "⚠️ انتهت الجلسة. اختر المريض من جديد.",
+        )
+        return
+
+    # كل الفترة — السلوك السابق تماماً (بلا أي قيد تاريخي)
+    if action.startswith("all:"):
+        ud.pop(_CTX_START, None)
+        await _build_and_send(update, context, patient_id, patient_name,
+                              None, None, "كل الفترة")
+        return
+
+    # بدء التحديد بالتاريخ: تقويم البداية
+    if action.startswith("custom:"):
+        ud.pop(_CTX_START, None)
+        today = date.today()
+        await _show_calendar(query, context, "start", today.year, today.month, patient_id)
+        return
+
+    # تنقّل التقويم — الخطوة مُستنتَجة من وجود تاريخ البداية
+    if action.startswith(("cal_prev:", "cal_next:", "cal_yprev:", "cal_ynext:")):
+        parts = action.split(":")
+        step = "end" if ud.get(_CTX_START) else "start"
+        await _show_calendar(query, context, step, int(parts[1]), int(parts[2]), patient_id)
+        return
+
+    if action.startswith(("cal_years:", "cal_yearpage:")):
+        from shared.calendar_picker import build_year_picker
+        text, kb = build_year_picker(int(action.split(":")[1]), _PFX,
+                                     f"{_PFX}:custom:{patient_id}")
+        await query.edit_message_text(text, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+        return
+
+    if action.startswith("cal_setyear:"):
+        from shared.calendar_picker import build_month_picker
+        text, kb = build_month_picker(int(action.split(":")[1]), _PFX,
+                                      f"{_PFX}:custom:{patient_id}")
+        await query.edit_message_text(text, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+        return
+
+    if action.startswith("cal_setmonth:"):
+        parts = action.split(":")
+        step = "end" if ud.get(_CTX_START) else "start"
+        await _show_calendar(query, context, step, int(parts[1]), int(parts[2]), patient_id)
+        return
+
+    if action.startswith("cal_pick:"):
+        parts = action.split(":")
+        picked = date(int(parts[1]), int(parts[2]), int(parts[3]))
+
+        if not ud.get(_CTX_START):
+            ud[_CTX_START] = picked
+            await _show_calendar(query, context, "end", picked.year, picked.month, patient_id)
+            return
+
+        start = ud.pop(_CTX_START)
+        end = picked
+        # ✅ ترتيب متسامح: لو اختار الأدمن النهاية قبل البداية تُبدَّلان بدل
+        # أن يُنتِج المدى صفر نتائج بلا تفسير.
+        if end < start:
+            start, end = end, start
+        await _build_and_send(update, context, patient_id, patient_name,
+                              start, end, f"{_fmt(start)} → {_fmt(end)}")
+        return
 
 
 # ── تجميع المرفقات وبناء ملف PDF واحد ────────────────────────────────────────
@@ -187,8 +352,25 @@ async def _on_patient_selected(result, update: Update, context: ContextTypes.DEF
     patient_id = result.id
     patient_name = result.name
 
+    # ✅ لم يعد التجميع يبدأ هنا — يمرّ أولاً بشاشة اختيار الفترة.
+    context.user_data[_CTX_PID] = patient_id
+    context.user_data[_CTX_NAME] = patient_name
+    await _show_period_menu(update, context, patient_id, patient_name)
+
+
+async def _build_and_send(
+    update: Update, context: ContextTypes.DEFAULT_TYPE,
+    patient_id: int, patient_name: str,
+    start: date | None, end: date | None, period_label: str,
+) -> None:
+    """يجمّع مرفقات المريض ضمن المدى المطلوب ويرسلها.
+
+    start/end = None ⇒ كل الفترة (السلوك السابق حرفياً، بلا أي فلترة).
+    """
+    query = update.callback_query
+
     await patient_selector.respond(
-        update, f"⏳ جارٍ تجميع مرفقات *{patient_name}*...",
+        update, f"⏳ جارٍ تجميع مرفقات *{patient_name}*...\n📅 {period_label}",
         parse_mode=ParseMode.MARKDOWN,
     )
 
@@ -200,6 +382,20 @@ async def _on_patient_selected(result, update: Update, context: ContextTypes.DEF
 
         attachments = await asyncio.to_thread(get_medical_attachment_files_for_patient, patient_id)
         paper_reports = await asyncio.to_thread(get_reports_with_paper_report_for_patient, patient_id)
+
+        # ✅ الفلترة بالمدى تُطبَّق على **المصدرين معاً** — لو فُلترت
+        # المرفقات وحدها لأصبح تنبيه "تقارير بلا مرفق" يحصي تقارير خارج
+        # الفترة المطلوبة أصلاً، فيبدو التنبيه خاطئاً.
+        # المرفق بلا تاريخ يُستبعَد من المدى المحدَّد (لا يمكن التحقق منه)
+        # لكنه يبقى في "كل الفترة".
+        if start is not None and end is not None:
+            def _within(row) -> bool:
+                d = _as_date(row.get("report_date"))
+                return d is not None and start <= d <= end
+
+            attachments = [a for a in attachments if _within(a)]
+            paper_reports = [r for r in paper_reports if _within(r)]
+
         reports_covered = {a["report_id"] for a in attachments}
         missing_reports = [r for r in paper_reports if r["report_id"] not in reports_covered]
         missing_count = len(missing_reports)
@@ -228,7 +424,8 @@ async def _on_patient_selected(result, update: Update, context: ContextTypes.DEF
             gap_note = "\n" + "\n".join(lines)
 
         if not attachments:
-            text = f"⚠️ لا توجد مرفقات طبية مسجَّلة للمريض *{patient_name}*."
+            text = (f"⚠️ لا توجد مرفقات طبية للمريض *{patient_name}*\n"
+                    f"📅 ضمن: {period_label}")
             if gap_note:
                 text += f"\n\n{gap_note.strip()}"
             try:
@@ -241,10 +438,14 @@ async def _on_patient_selected(result, update: Update, context: ContextTypes.DEF
         chat_id = update.effective_chat.id
 
         if pdf_buf is not None:
-            filename = build_medical_pdf_filename(patient_name=patient_name, workflow_type="كل_المرفقات")
+            filename = build_medical_pdf_filename(
+                patient_name=patient_name,
+                workflow_type="المرفقات" if start else "كل_المرفقات",
+            )
             caption = (
-                f"📎 *كل المرفقات الطبية*\n"
+                f"📎 *المرفقات الطبية*\n"
                 f"👤 {patient_name}\n"
+                f"📅 {period_label}\n"
                 f"📄 {page_count} صفحة — من {len(attachments)} مرفق ({len(reports_covered)} تقرير)"
             )
             await context.bot.send_document(
@@ -282,7 +483,7 @@ async def _on_patient_selected(result, update: Update, context: ContextTypes.DEF
             logger.debug("تم تجاهل استثناء في _on_patient_selected", exc_info=True)
 
         logger.info(
-            f"[patient_attachments_bundle] patient_id={patient_id}  "
+            f"[patient_attachments_bundle] patient_id={patient_id}  period={period_label!r}  "
             f"total={len(attachments)}  merged_pages={page_count}  leftovers={len(leftovers)}  "
             f"paper_reports={len(paper_reports)}  reports_covered={len(reports_covered)}  missing={missing_count}"
         )
@@ -304,4 +505,8 @@ def register(app) -> None:
     """تسجيل مسار result_router فقط — لا توجد أزرار/CallbackQueryHandler
     إضافية لهذه الميزة بعد اختيار المريض (كل شيء يتم تلقائياً)."""
     result_router.register(_RKEY_PATIENT, _on_patient_selected)
-    logger.info("[patient_attachments_bundle] result_router route registered")
+    app.add_handler(CallbackQueryHandler(handle_callback, pattern=rf"^{_PFX}:"))
+    logger.info(
+        "[patient_attachments_bundle] result_router route + "
+        f"CallbackQueryHandler('^{_PFX}:') registered"
+    )
