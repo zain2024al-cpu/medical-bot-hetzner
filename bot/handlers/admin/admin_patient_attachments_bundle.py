@@ -74,7 +74,11 @@ async def show_patient_selector(update: Update, context: ContextTypes.DEFAULT_TY
         await query.answer()
     except Exception:
         logger.debug("تم تجاهل استثناء في show_patient_selector", exc_info=True)
-    await patient_selector.enter(update, context, return_to=_RKEY_PATIENT)
+    await patient_selector.enter(
+        update, context, return_to=_RKEY_PATIENT,
+        # ✅ نفس منطق «👤 تقرير مريض»: شاشة إخراج لا إدخال.
+        include_archived=True,
+    )
 
 
 # ── تجميع المرفقات وبناء ملف PDF واحد ────────────────────────────────────────

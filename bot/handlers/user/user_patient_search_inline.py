@@ -75,6 +75,7 @@ async def patient_search_inline_handler(update: Update, context: ContextTypes.DE
         only_companion_flow = False
         _sel_city = None
         _sel_services = False
+        _sel_archived = False
         _sel_state = None
         try:
             from shared.selectors.patient_selector._session import load as _sel_load
@@ -91,6 +92,10 @@ async def patient_search_inline_handler(update: Update, context: ContextTypes.DE
                 # المُدخَلين عبر "🏠 الحالات الموجودة": يظهرون في بحث
                 # "🔧 الخدمات العامة" فقط، لا في بحث "🛬 الوصول".
                 _sel_services = _sel_state.services_scope
+                # ✅ شاشات طباعة الأدمن تُظهر المسافرين المؤرشفين —
+                # والبحث inline مصدر بيانات **مستقل** عن القائمة
+                # المرقَّمة، فلولا هذا السطر لأخفاهم البحث وحده.
+                _sel_archived = _sel_state.include_archived
         except Exception:
             logger.debug("تم تجاهل استثناء في patient_search_inline_handler", exc_info=True)
 
@@ -138,6 +143,7 @@ async def patient_search_inline_handler(update: Update, context: ContextTypes.DE
                             p.patient_type, include_pharmacy, include_companions,
                             only_companion_flow, _sel_city, getattr(p, "archived_at", None),
                             getattr(p, "gs_onboarded_at", None), _sel_services,
+                            _sel_archived,
                         )
                     ]
 

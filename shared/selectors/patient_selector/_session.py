@@ -40,6 +40,7 @@ class PatientSelectorState:
     # لـ"🛬 الوصول" رغم أن كليهما يستخدم only_companion_flow، لأن هؤلاء
     # لم يصلوا عبر تدفق الوصول ولا يصحّ تسجيل وصول لهم.
     services_scope: bool = False
+    include_archived: bool = False
     # names-only snapshot for idx resolution (avoids re-querying on every tap)
     snapshot: list[str] = field(default_factory=list)
 
@@ -54,6 +55,7 @@ def save(user_data: dict, state: PatientSelectorState) -> None:
         "only_companion_flow": state.only_companion_flow,
         "city":                state.city,
         "services_scope":   state.services_scope,
+        "include_archived": state.include_archived,
         "snapshot":            state.snapshot,
     }
 
@@ -71,6 +73,7 @@ def load(user_data: dict) -> PatientSelectorState | None:
         only_companion_flow=raw.get("only_companion_flow", False),
         city=raw.get("city"),
         services_scope=raw.get("services_scope", False),
+        include_archived=raw.get("include_archived", False),
         snapshot=raw.get("snapshot", []),
     )
 

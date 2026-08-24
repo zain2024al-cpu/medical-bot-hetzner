@@ -175,7 +175,12 @@ async def show_patient_selector(
 
     # Open patient selector
     # Note: result_router will call _on_patient_selected when done
-    await patient_selector.enter(update, context, return_to=_RKEY_PATIENT)
+    await patient_selector.enter(
+        update, context, return_to=_RKEY_PATIENT,
+        # ✅ شاشة طباعة (لا إدخال): المسافرون المؤرشفون يجب أن يظهروا —
+        # بياناتهم للتقارير هي سبب الاحتفاظ بهم بدل حذفهم.
+        include_archived=True,
+    )
 
     # Tell ConversationHandler we're now in PR_SHOW_SELECTOR state
     # and waiting for patient_selector to complete
@@ -394,7 +399,12 @@ async def handle_departments(
         # Re-open patient selector
         context.user_data["_patient_id"] = None
         context.user_data["_patient_name"] = None
-        await patient_selector.enter(update, context, return_to=_RKEY_PATIENT)
+        await patient_selector.enter(
+        update, context, return_to=_RKEY_PATIENT,
+        # ✅ شاشة طباعة (لا إدخال): المسافرون المؤرشفون يجب أن يظهروا —
+        # بياناتهم للتقارير هي سبب الاحتفاظ بهم بدل حذفهم.
+        include_archived=True,
+    )
         return PR_SHOW_SELECTOR
 
     parts = data.split(":")

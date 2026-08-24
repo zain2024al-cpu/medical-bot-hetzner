@@ -73,6 +73,7 @@ async def enter(
     only_companion_flow: bool = False,
     city: str | None = None,
     services_scope: bool = False,
+    include_archived: bool = False,
 ) -> None:
     """
     Open the patient selector.
@@ -102,6 +103,7 @@ async def enter(
             only_companion_flow=only_companion_flow,
             city=city,
             services_scope=services_scope,
+            include_archived=include_archived,
         ),
     )
     names = [r.name for r in records]
@@ -115,6 +117,7 @@ async def enter(
         only_companion_flow=only_companion_flow,
         city=city,
         services_scope=services_scope,
+        include_archived=include_archived,
         snapshot=names,
     )
     _save(context.user_data, state)
@@ -333,6 +336,7 @@ async def _handle_selection(
         _only_cf = state.only_companion_flow
         _city = state.city
         _svc_scope = state.services_scope
+        _inc_arch = state.include_archived
         records = await asyncio.get_event_loop().run_in_executor(
             None,
             lambda: fetch_all(
@@ -341,6 +345,7 @@ async def _handle_selection(
                 only_companion_flow=_only_cf,
                 city=_city,
                 services_scope=_svc_scope,
+                include_archived=_inc_arch,
             ),
         )
         state = PatientSelectorState(
@@ -351,6 +356,7 @@ async def _handle_selection(
             only_companion_flow=_only_cf,
             city=_city,
             services_scope=_svc_scope,
+            include_archived=_inc_arch,
             snapshot=[r.name for r in records],
         )
         _save(context.user_data, state)

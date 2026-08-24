@@ -73,11 +73,17 @@ def _type_visible(
     archived_at=None,
     gs_onboarded_at=None,
     services_scope: bool = False,
+    include_archived: bool = False,
 ) -> bool:
-    # ✅ المريض المسافر (مؤرشف) مخفي من **كل** قوائم الاختيار بلا استثناء —
-    # أعلى أولوية، قبل فلتر المدينة نفسه. لا يؤثر هذا على أي قراءة تاريخية
+    # ✅ المريض المسافر (مؤرشف) مخفي من قوائم **الإدخال** — أعلى أولوية،
+    # قبل فلتر المدينة نفسه. لا يؤثر على أي قراءة تاريخية
     # (lookup_by_name/get_patient_by_id لا تمرّان من هنا إطلاقاً).
-    if archived_at:
+    #
+    # ⚠️ `include_archived=True` استثناء مقصود لشاشات **طباعة** الأدمن
+    # ("👤 تقرير مريض" و"📎 كل مرفقات مريض"): سبب الأرشفة أصلاً هو أن
+    # بيانات المسافر «تحتاجها التقارير والإحصائيات» — فإخفاؤه عن شاشة
+    # الطباعة يناقض الغرض ويجعل الطباعة تبدو معطَّلة (اسم المريض غائب).
+    if archived_at and not include_archived:
         return False
 
     pt = patient_type or "general"
@@ -176,6 +182,7 @@ def fetch_all(
     only_companion_flow: bool = False,
     city: str | None = None,
     services_scope: bool = False,
+    include_archived: bool = False,
 ) -> list[PatientRecord]:
     """
     Fetch every patient from the database, sorted alphabetically.
@@ -213,6 +220,7 @@ def fetch_all(
                     p.patient_type, include_pharmacy, include_companions,
                     only_companion_flow, city, getattr(p, "archived_at", None),
                     getattr(p, "gs_onboarded_at", None), services_scope,
+                    include_archived,
                 ):
                     continue
                 name = (p.full_name or "").strip()
@@ -236,6 +244,7 @@ def search(
     only_companion_flow: bool = False,
     city: str | None = None,
     services_scope: bool = False,
+    include_archived: bool = False,
 ) -> list[PatientRecord]:
     """
     Search for patients whose full_name contains query (case-insensitive).
@@ -279,6 +288,7 @@ def search(
                     p.patient_type, include_pharmacy, include_companions,
                     only_companion_flow, city, getattr(p, "archived_at", None),
                     getattr(p, "gs_onboarded_at", None), services_scope,
+                    include_archived,
                 )
             ]
             logger.debug(
