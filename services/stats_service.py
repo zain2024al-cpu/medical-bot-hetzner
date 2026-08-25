@@ -160,6 +160,62 @@ ALL_ACTION_TYPES = [
 ]
 
 
+
+# ── الملفات المعلّقة لكل مترجم ────────────────────────────────────────────────
+# ⚠️ الفرق عن `paper_pending` (لا تخلطهما):
+#   • `paper_pending` = تقارير علَمها `has_paper_report = 2` — **لقطة وقت
+#     النشر**: "المترجم قال إن التقرير لم يجهز بعد". تبقى ٢ حتى لو رفع
+#     الملف لاحقاً في بعض المسارات، فهي **تاريخية** لا حالية.
+#   • `pending_files` = سجلّات `pending_reports` المفتوحة **الآن**
+#     (`status='pending'`) — أي ما على المترجم فعلاً رفعه بعد. هذا ما
+#     يُقاس عليه في التقييم: عبء متراكم قائم، لا حدث ماضٍ.
+# لذلك قد يظهر "لم تجهز بعد = 0" بينما الملفات المعلّقة > 0 والعكس.
+
+def _open_pending_by_translator(session, start_date_str: str, end_date_str: str) -> dict:
+    """{اسم المترجم: عدد ملفاته المعلّقة المفتوحة} ضمن الفترة.
+
+    التجميع بالاسم — نفس مفتاح الاستعلام الرئيسي بالضبط (مترجم له أكثر من
+    translator_id يُدمَج في صف واحد)، وإلا لظهر العدّاد صفراً لمن اختلف
+    معرّفه بين الجدولين.
+
+    سجلّ معلَّق بلا `report_id` (لم يُربط بتقرير) يُنسَب بتاريخ إنشائه
+    واسم مترجمه المخزَّن — فلا يسقط من الحساب بصمت.
+    """
+    from sqlalchemy import text as _text
+    try:
+        sql = _text("""
+            SELECT COALESCE(td.name, r.translator_name, p.translator_name) AS tname,
+                   COUNT(*) AS n
+            FROM pending_reports p
+            LEFT JOIN reports r ON p.report_id = r.id
+            LEFT JOIN translators td ON r.translator_id = td.translator_id
+            WHERE p.status = 'pending'
+              AND (
+                    (r.id IS NOT NULL AND (
+                        (COALESCE(r.report_date, r.created_at) >= :start
+                         AND COALESCE(r.report_date, r.created_at) < :end)
+                     OR (DATE(datetime(r.created_at, '+5 hours', '+30 minutes')) >= :start
+                         AND DATE(datetime(r.created_at, '+5 hours', '+30 minutes')) < :end)
+                    ))
+                 OR (r.id IS NULL
+                     AND DATE(p.created_at) >= :start AND DATE(p.created_at) < :end)
+              )
+            GROUP BY tname
+        """)
+        rows = session.execute(
+            sql, {"start": start_date_str, "end": end_date_str}
+        ).fetchall()
+        out = {}
+        for tname, n in rows:
+            if tname:
+                out[str(tname)] = int(n or 0)
+        return out
+    except Exception as exc:
+        # عدّاد إضافي لا يجوز أن يُسقِط التقييم كله
+        logger.warning(f"⚠️ stats_service: تعذّر حساب الملفات المعلّقة: {exc}")
+        return {}
+
+
 def _run_translator_query(session, start_date_str: str, end_date_str: str):
     """
     الاستعلام المركزي الوحيد - يُستدعى داخلياً فقط.
@@ -210,6 +266,10 @@ def _run_translator_query(session, start_date_str: str, end_date_str: str):
         """)
 
         rows = session.execute(sql, {"start": start_date_str, "end": end_date_str}).fetchall()
+
+        # الملفات المعلّقة المفتوحة حالياً — استعلام مستقل بدل ضمّه للاستعلام
+        # الرئيسي: ضمّه عبر JOIN كان سيُضاعف صفوف التقارير ويُفسِد كل العدّادات.
+        pending_map = _open_pending_by_translator(session, start_date_str, end_date_str)
 
         # ═══ LOG: عدد المترجمين والتقارير ═══
         logger.info(f"📊 stats_service: range=[{start_date_str} → {end_date_str}], translators={len(rows)}")
@@ -310,6 +370,7 @@ def _run_translator_query(session, start_date_str: str, end_date_str: str):
                 "paper_yes": paper_yes,
                 "paper_no": paper_no,
                 "paper_pending": paper_pending,
+                "pending_files": int(pending_map.get(name, 0)),
                 "action_breakdown": action_breakdown,
                 "start_date": start_date_str,
                 "end_date": end_date_str,
@@ -452,6 +513,9 @@ def _run_translator_query_resilient(start_date_str: str, end_date_str: str):
             "paper_yes": item["paper_yes"],
             "paper_no": item["paper_no"],
             "paper_pending": item["paper_pending"],
+            # المسار الاحتياطي لا يحسب المعلّقات (يعمل بلا SQLAlchemy) —
+            # صفر صريح أفضل من مفتاح غائب يُسقِط الواجهة بـKeyError.
+            "pending_files": 0,
             "action_breakdown": item["action_breakdown"],
             "start_date": start_date_str,
             "end_date": end_date_str,

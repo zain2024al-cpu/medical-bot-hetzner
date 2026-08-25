@@ -510,6 +510,7 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
     tot_yes = sum(_i(it, "paper_yes") for it in results)
     tot_no = sum(_i(it, "paper_no") for it in results)
     tot_pending = sum(_i(it, "paper_pending") for it in results)
+    tot_pending_files = sum(_i(it, "pending_files") for it in results)
     gate_total = tot_yes + tot_no + tot_pending
     late_pct_g = _pct(total_late, total_reports)
     upload_pct_g = _pct(tot_yes, gate_total)
@@ -534,6 +535,7 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
 
     avg_no = (tot_no / n_tr) if n_tr else 0.0
     avg_pending = (tot_pending / n_tr) if n_tr else 0.0
+    avg_pending_files = (tot_pending_files / n_tr) if n_tr else 0.0
     LATE_THRESHOLD = 30.0
 
     def _needs_followup(it):
@@ -544,6 +546,9 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
             reasons.append(f"لا يوجد تقرير: {_i(it, 'paper_no')}")
         if _i(it, "paper_pending") > avg_pending and _i(it, "paper_pending") > 0:
             reasons.append(f"لم تجهز بعد: {_i(it, 'paper_pending')}")
+        # ✅ عبء قائم الآن — أهم إشارة متابعة عملياً: ملفات مطلوب رفعها بعد
+        if _i(it, "pending_files") > avg_pending_files and _i(it, "pending_files") > 0:
+            reasons.append(f"ملفات معلّقة: {_i(it, 'pending_files')}")
         return reasons
 
     is_multi = n_tr > 1
@@ -568,6 +573,7 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
             _kpi("نسبة رفع التقارير", f"{upload_pct_g:.0f}%", color=GREEN, value_color=GREEN),
             _kpi("تقارير لم تجهز بعد", str(tot_pending), color=AMBER, value_color=AMBER),
             _kpi("حالات لا يوجد تقرير", str(tot_no), color=RED, value_color=RED),
+            _kpi("ملفات معلّقة (لم تُرفَع)", str(tot_pending_files), color=AMBER, value_color=AMBER),
             _kpi("متوسط تقارير/مترجم", f"{(total_reports / n_tr):.1f}" if n_tr else "0", color=MAIN),
         ]
         story.append(_kpi_grid(kpis, per_row=3, cw=178))
@@ -857,7 +863,18 @@ def _generate_pdf(results, period_label, year, month, start_date_str=None, end_d
                         value_color=colors.HexColor("#B71C1C"),
                         label_color=colors.HexColor("#B71C1C"),
                     ),
-                    Drawing(250, 84),  # خانة فارغة (لا إطار) لموازنة الشبكة ثنائية الأعمدة
+                    # ✅ الملفات المعلّقة — عبء المترجم **القائم الآن**
+                    # (سجلّات pending_reports المفتوحة)، لا لقطة وقت النشر.
+                    # يختلف عمداً عن "لم تجهز بعد" أعلاه: تلك تاريخية وقد
+                    # تكون صفراً بينما هذه > 0 والعكس. انظر التوثيق في
+                    # services/stats_service.py::_open_pending_by_translator.
+                    _draw_card(
+                        "ملفات معلّقة (لم تُرفَع بعد)",
+                        str(item.get("pending_files", 0)),
+                        color=colors.HexColor("#FFB74D"),
+                        value_color=colors.HexColor("#E65100"),
+                        label_color=colors.HexColor("#E65100"),
+                    ),
                 ],
             ],
             colWidths=[260, 260],
@@ -1254,7 +1271,7 @@ def _generate_html_fallback(results, period_label, year, month, start_date_str, 
         paper_pending_i = item.get("paper_pending", 0)
         rank_prefix = "" if target_name else f"{_medal(i)} "
         translator_pages += f'''<div style="page-break-before:always;font-size:15px;"><h2 style="font-size:22px;">{rank_prefix}{item["translator_name"]}</h2>
-        <p style="font-size:16px;">إجمالي التقارير: <b>{item["total_reports"]}</b> | قبل 8 مساءً: <b>{before_8pm}</b> | بعد 8 مساءً: <b>{item["late_reports"]}</b> | أيام العمل: <b>{item["work_days"]}</b> | ✅ تم رفعها: <b>{paper_yes_i}</b> | 🟡 لم تجهز بعد: <b>{paper_pending_i}</b> | ❌ لا يوجد تقرير: <b>{paper_no_i}</b></p>
+        <p style="font-size:16px;">إجمالي التقارير: <b>{item["total_reports"]}</b> | قبل 8 مساءً: <b>{before_8pm}</b> | بعد 8 مساءً: <b>{item["late_reports"]}</b> | أيام العمل: <b>{item["work_days"]}</b> | ✅ تم رفعها: <b>{paper_yes_i}</b> | 🟡 لم تجهز بعد: <b>{paper_pending_i}</b> | ❌ لا يوجد تقرير: <b>{paper_no_i}</b> | 📌 ملفات معلّقة: <b>{item.get("pending_files", 0)}</b></p>
         <table border="1" cellpadding="5" style="font-size:14px;border-collapse:collapse;"><tr style="background:#1a237e;color:#fff;font-size:15px;"><th style="padding:8px 12px;">نوع الإجراء</th><th style="padding:8px 12px;">العدد</th></tr>{actions_rows}</table></div>'''
 
     header_title = "تقرير تقييم مترجم فردي" if target_name else "تقرير تقييم المترجمين"
@@ -1320,7 +1337,7 @@ def _generate_excel(results, period_label, year, month, target_name: str | None 
     ws['A2'].font = Font(name='Arial', size=10, color='777777')
     ws['A2'].alignment = center_align
 
-    headers = ['الترتيب', 'المترجم', 'إجمالي التقارير', 'قبل 8 مساءً', 'بعد 8 مساءً', 'أيام العمل', '✅ تم رفعها', '🟡 لم تجهز بعد', '❌ لا يوجد تقرير']
+    headers = ['الترتيب', 'المترجم', 'إجمالي التقارير', 'قبل 8 مساءً', 'بعد 8 مساءً', 'أيام العمل', '✅ تم رفعها', '🟡 لم تجهز بعد', '❌ لا يوجد تقرير', '📌 ملفات معلّقة']
 
     row = 4
     for col, header in enumerate(headers, 1):
@@ -1348,6 +1365,7 @@ def _generate_excel(results, period_label, year, month, target_name: str | None 
             item.get('paper_yes', 0),
             item.get('paper_pending', 0),
             item.get('paper_no', 0),
+            item.get('pending_files', 0),
         ]
 
         for col, val in enumerate(values, 1):
