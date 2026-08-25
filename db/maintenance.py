@@ -227,6 +227,7 @@ class DatabaseMaintenance:
                 # ✅ تاريخ آخر إصدار للإقامة — لمعالجة المرضى القدامى
                 # ("🏠 معلّقات من الحالات السابقة" في وحدة الإقامة).
                 _migrate_column(conn, "res_persons", "last_issue_date", "VARCHAR(50)")
+                _migrate_column(conn, "reports", "group_chat_id", "VARCHAR(64)")
                 logger.info("🔎 Migration check finished.")
 
                 if check == "ok":

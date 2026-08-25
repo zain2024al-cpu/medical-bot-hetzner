@@ -577,8 +577,14 @@ async def broadcast_new_report(bot: Bot, report_data: dict):
                         report = s.query(Report).filter_by(id=report_id).first()
                         if report:
                             report.group_message_id = group_message_id
+                            # ✅ المحادثة الفعلية المُستخدَمة في الإرسال — بلا
+                            # تخمين لاحق عند التعديل/الحذف.
+                            report.group_chat_id = str(REPORTS_GROUP_ID)
                             s.commit()
-                            logger.info(f"✅ تم حفظ معرف الرسالة {group_message_id} للتقرير {report_id}")
+                            logger.info(
+                                f"✅ تم حفظ معرف الرسالة {group_message_id} "
+                                f"في المحادثة {REPORTS_GROUP_ID} للتقرير {report_id}"
+                            )
                 except Exception as e:
                     logger.error(f"❌ فشل حفظ معرف الرسالة في قاعدة البيانات: {e}")
 
