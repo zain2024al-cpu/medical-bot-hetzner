@@ -410,13 +410,17 @@ async def handle_confirm_delete(update: Update, context: ContextTypes.DEFAULT_TY
 
 
                 # محاولة حذف الرسالة من المجموعة
-                if group_message_id and REPORTS_GROUP_ID:
+                # ⚠️ نفس ملاحظة report_groups.py — الحذف بمعرّف رسالة في
+                # المحادثة الخطأ قد يحذف بطاقة تقرير آخر بلا أي خطأ.
+                from services.report_groups import resolve_report_card_group_id
+                _card_group = resolve_report_card_group_id(report_id)
+                if group_message_id and _card_group:
                     try:
                         await context.bot.delete_message(
-                            chat_id=REPORTS_GROUP_ID,
+                            chat_id=_card_group,
                             message_id=group_message_id
                         )
-                        logger.info(f"✅ تم حذف الرسالة {group_message_id} من المجموعة {REPORTS_GROUP_ID}")
+                        logger.info(f"✅ تم حذف الرسالة {group_message_id} من المجموعة {_card_group}")
                     except Exception as e:
                         logger.warning(f"⚠️ فشل حذف الرسالة من المجموعة: {e}")
                         # لا نوقف العملية إذا فشل حذف الرسالة

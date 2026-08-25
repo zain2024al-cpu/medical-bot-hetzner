@@ -895,7 +895,12 @@ async def _publish_attachments(query, context, complete_all: bool = False):
         if report_id:
             try:
                 original_group_message_id = report.get("group_message_id")
-                if original_group_message_id and REPORTS_GROUP_ID:
+                # ⚠️ مجموعة البطاقة ≠ REPORTS_GROUP_ID دائماً: بطاقة تقرير
+                # تشناي تعيش في مجموعة تشناي، ومعرّفات الرسائل خاصة بكل
+                # محادثة. انظر services/report_groups.py.
+                from services.report_groups import resolve_report_card_group_id
+                _card_group = resolve_report_card_group_id(report_id)
+                if original_group_message_id and _card_group:
                     from services.medical_attachment_files_service import count_medical_attachment_files
 
                     if count_medical_attachment_files(report_id) > 0:
@@ -908,7 +913,7 @@ async def _publish_attachments(query, context, complete_all: bool = False):
                             "📂 فتح التقارير الطبية", callback_data=f"medfiles:{report_id}"
                         )])
                         await bot.edit_message_reply_markup(
-                            chat_id=REPORTS_GROUP_ID,
+                            chat_id=_card_group,
                             message_id=original_group_message_id,
                             reply_markup=InlineKeyboardMarkup(card_rows),
                         )

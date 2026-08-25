@@ -1344,7 +1344,10 @@ async def handle_republish(update: Update, context: ContextTypes.DEFAULT_TYPE):
             old_group_message_id = getattr(report, 'group_message_id', None)
             if old_group_message_id:
                 try:
-                    from config.settings import REPORTS_GROUP_ID as _GID
+                    # ⚠️ مجموعة البطاقة تُشتَقّ من التقرير — انظر
+                    # services/report_groups.py (تشناي في مجموعتها).
+                    from services.report_groups import resolve_report_card_group_id
+                    _GID = resolve_report_card_group_id(report_id)
                     if _GID:
                         await context.bot.delete_message(chat_id=_GID, message_id=old_group_message_id)
                         logger.info(f"✅ تم حذف رسالة المجموعة القديمة {old_group_message_id} للتقرير #{report_id}")
