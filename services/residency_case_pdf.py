@@ -223,10 +223,13 @@ def build_case_pdf(case: dict) -> io.BytesIO:
     # الارتفاع القصير فتظهر ضيقة جداً مقارنة بعرض الصفحة المتاح (شكوى
     # "المقاسات صغيرة وبقية الصفحة فاضية"). رُفِع لقرابة ارتفاع الصفحة
     # القابل للطباعة فعلياً حتى تستغل الصور الطولية عرض الصفحة كاملاً.
-    # ⚠️ كان 22سم = ارتفاع الصفحة كاملاً، فصورة جواز واحدة تحتلّ صفحة
-    # بمفردها وتدفع كل ما بعدها. 13سم تُبقي صورتين في الصفحة مع نصّها،
-    # ولا تزال أكبر بكثير من الـ9سم التي شُكِي منها سابقاً.
-    file_max = (content_width * 0.95, 13 * cm)
+    # ⚠️ السقف مُعايَر بالقياس لا بالتقدير: جُرِّبت 9/10/11/12/13سم على
+    # حالتين (بسيطة وغنيّة بالوثائق) وقِيس عدد الصفحات والفراغ المهدور.
+    #   9سم  ⇒ 2ص و5ص، متوسط فراغ 13% و19%، أسوأ صفحة 16%
+    #   12سم ⇒ 3ص و6ص، متوسط فراغ 32% و23%، أسوأ صفحة 81%  ← صفحة شبه فارغة
+    # الثمن: الوثيقة الأفقية تُعرَض بعرض 13.7سم بدل 16.9سم (81%) — مقابل
+    # اختفاء الصفحات شبه الفارغة التي شُكِي منها.
+    file_max = (content_width * 0.95, 9 * cm)
 
     # ✅ كل ملف/وثيقة يتبيّن أنه PDF حقيقي (Form C الرسمية غالباً PDF لا
     # صورة) لا يمكن تضمينه كـImage داخل النص المتدفّق — يُجمَع هنا ليُدمَج
@@ -242,9 +245,12 @@ def build_case_pdf(case: dict) -> io.BytesIO:
             img = _embed_image(data, *file_max)
             if img is not None:
                 img.hAlign = "RIGHT"
-                # التسمية وصورتها معاً — لا تنفصل تسمية في آخر صفحة عن
-                # صورتها في أول التالية.
-                return [KeepTogether([P(f"- {label}", "body"), img])]
+                # ⚠️ **لا** KeepTogether هنا: تعشيشها داخل `_section`
+                # يجعل (عنوان القسم + التسمية + صورة 13سم) كتلة واحدة لا
+                # تتّسع في بقية الصفحة أبداً، فتُدفَع كلها وتترك 53% فراغاً
+                # (قِيس فعلياً). التسمية تُضَمّ للعنوان في `_section`،
+                # والصورة تتدفّق خلفها فتملأ ما تبقّى.
+                return [P(f"- {label}", "body"), img]
             return [P(f"- {label} ✅ (تعذّر عرض الصورة)", "note")]
         if kind == "pdf":
             pdf_attachments.append((f"{person_name} — {label}", data))
@@ -272,6 +278,17 @@ def build_case_pdf(case: dict) -> io.BytesIO:
             return False
         return a == b
 
+    def _section(header, items: list) -> list:
+        """عنوان القسم مضموماً لأول عنصر فيه.
+
+        ⚠️ `CondPageBreak(5cm)` لم يكفِ: يحجز ٥سم بينما العنصر التالي قد
+        يكون صورة بارتفاع ١٣سم، فينكسر بعد العنوان ويترك فراغاً كبيراً.
+        ضمّ العنوان لأول عنصر يجعل ReportLab ينقلهما معاً أو يُبقيهما معاً.
+        """
+        if not items:
+            return [header]
+        return [KeepTogether([header, items[0]])] + items[1:]
+
     def _is_photo_label(label: str) -> bool:
         t = (label or "").replace("ة", "ه")
         return "شخصي" in t and "صور" in t
@@ -281,8 +298,17 @@ def build_case_pdf(case: dict) -> io.BytesIO:
         block.append(P(f"👤 {person['name']} — {person['role']}", "h2"))
         block.append(Spacer(1, 0.15 * cm))
 
-        # (1) الصورة الشخصية — مرة واحدة فقط
+        # (1) الصورة الشخصية — مرة واحدة فقط، وفي الأعلى دائماً
+        # ⚠️ قد تكون مرفوعة **كوثيقة** في res_documents بدل حقل الصورة
+        # (`photo_file_id` فارغ). حينها كانت تُعامَل كوثيقة عادية فتظهر
+        # **آخر الملف** — شكوى مباشرة من المستخدم. تُرقّى هنا لموضعها.
         photo_bytes = person.get("photo_bytes")
+        _docs_all = list(person.get("documents", []))
+        if photo_bytes is None:
+            for _d in _docs_all:
+                if _is_photo_label(_d.get("label", "")) and _d.get("file_bytes"):
+                    photo_bytes = _d["file_bytes"]
+                    break
         img = _embed_image(photo_bytes, *photo_max) if photo_bytes else None
         if img is not None:
             img.hAlign = "RIGHT"
@@ -297,29 +323,27 @@ def build_case_pdf(case: dict) -> io.BytesIO:
         arrival_docs = person.get("arrival_docs") or {}
         if arrival_docs:
             block.append(Spacer(1, 0.15 * cm))
-            block.append(CondPageBreak(5 * cm))
-            block.append(P("📎 وثائق الوصول:", "body_b"))
+            _items = []
             for key, label in _ARRIVAL_ORDER:
                 if key in arrival_docs:
-                    block.extend(_attachment_flowables(label, arrival_docs.get(key), person["name"]))
+                    _items.extend(_attachment_flowables(label, arrival_docs.get(key), person["name"]))
+            block.extend(_section(P("📎 وثائق الوصول:", "body_b"), _items))
 
         # (5) آخر إقامة مرفوعة — واحدة فقط، الأحدث مصدراً
         residence_doc = person.get("residence_doc")
         if residence_doc is not None:
             block.append(Spacer(1, 0.15 * cm))
-            block.append(CondPageBreak(5 * cm))
-            block.append(P("🪪 صورة الإقامة (الأحدث):", "body_b"))
             if residence_doc.get("source"):
-                block.append(P(
-                    f"المصدر: {residence_doc['source']}  —  التاريخ: {residence_doc.get('date', '')}",
-                    "body"))
-                block.extend(_attachment_flowables(
+                _date = residence_doc.get("date") or "—"
+                _items = [P(f"المصدر: {residence_doc['source']}  —  التاريخ: {_date}", "body")]
+                _items.extend(_attachment_flowables(
                     "صورة الإقامة", residence_doc.get("file_bytes"), person["name"]))
             else:
-                block.append(P("لا توجد إقامة مرفوعة.", "note"))
+                _items = [P("لا توجد إقامة مرفوعة.", "note")]
+            block.extend(_section(P("🪪 صورة الإقامة (الأحدث):", "body_b"), _items))
 
         # (6،7) Form C أولاً ثم بقية الوثائق — مع إسقاط تكرار الصورة الشخصية
-        docs = list(person.get("documents", []))
+        docs = _docs_all
         kept = []
         for d in docs:
             if photo_bytes is not None and (
@@ -334,14 +358,14 @@ def build_case_pdf(case: dict) -> io.BytesIO:
                   else 1)
 
         block.append(Spacer(1, 0.15 * cm))
-        block.append(CondPageBreak(5 * cm))
-        block.append(P(f"📄 الوثائق ({len(kept)}):", "body_b"))
         if not kept:
-            block.append(P("لا توجد وثائق مضافة.", "note"))
+            _items = [P("لا توجد وثائق مضافة.", "note")]
         else:
+            _items = []
             for d in kept:
-                block.extend(_attachment_flowables(
+                _items.extend(_attachment_flowables(
                     d["label"], d.get("file_bytes"), person["name"]))
+        block.extend(_section(P(f"📄 الوثائق ({len(kept)}):", "body_b"), _items))
 
         story.extend(block)
         story.append(Spacer(1, 0.5 * cm))

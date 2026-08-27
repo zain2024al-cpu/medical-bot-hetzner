@@ -810,16 +810,39 @@ async def _build_person_pdf_dict(
             except ValueError:
                 return None
 
+        # 🔴 **وجود الملف يقرّر، لا تاريخه**. كان الشرط `elif arrival_date:`
+        # أي: لا تُعرَض إقامة الوصول إلا إذا نجح تحليل تاريخها. فإن كان
+        # `created_at` لصف الوصول فارغاً (صفوف قديمة، أو أُنشئت بمسار لا
+        # يضبطه) يصير `uploaded_at` نصّاً فارغاً ⇒ `_parse` تُرجِع None ⇒
+        # **تُخفى الإقامة رغم أن ملفها مرفوع فعلاً**، وتُطبَع "لا توجد
+        # إقامة مرفوعة" — بلا أي خطأ يكشف السبب.
+        # التاريخ الآن يُستخدَم للترجيح بين مصدرين فقط، لا لإثبات الوجود.
         latest = rn_repo.get_latest_issuance(person.id)
-        issuance_date = _parse(latest.issued_at) if (latest and latest.file_id) else None
-        arrival_date = _parse(arrival.uploaded_at) if (arrival and arrival.residence_file_id) else None
+        has_issuance = bool(latest and latest.file_id)
+        has_arrival_res = bool(arrival and arrival.residence_file_id)
 
-        if issuance_date and (not arrival_date or issuance_date >= arrival_date):
+        issuance_date = _parse(latest.issued_at) if has_issuance else None
+        arrival_date = _parse(arrival.uploaded_at) if has_arrival_res else None
+
+        pick_issuance = False
+        if has_issuance and has_arrival_res:
+            # كلاهما موجود ⇒ الأحدث. وعند غياب أي تاريخ يُرجَّح الإصدار
+            # الرسمي لأنه بطبيعته لاحق لوثيقة الوصول.
+            if issuance_date and arrival_date:
+                pick_issuance = issuance_date >= arrival_date
+            else:
+                pick_issuance = True
+        elif has_issuance:
+            pick_issuance = True
+
+        if pick_issuance:
             file_bytes = await _download_file_bytes(context, latest.file_id)
-            residence_doc = {"source": "إصدار رسمي", "date": latest.issued_at, "file_bytes": file_bytes}
-        elif arrival_date:
+            residence_doc = {"source": "إصدار رسمي", "date": latest.issued_at or "",
+                             "file_bytes": file_bytes}
+        elif has_arrival_res:
             file_bytes = await _download_file_bytes(context, arrival.residence_file_id)
-            residence_doc = {"source": "من الوصول", "date": arrival.uploaded_at, "file_bytes": file_bytes}
+            residence_doc = {"source": "من الوصول", "date": arrival.uploaded_at or "",
+                             "file_bytes": file_bytes}
         else:
             residence_doc = {"source": None, "date": "", "file_bytes": None}
 
