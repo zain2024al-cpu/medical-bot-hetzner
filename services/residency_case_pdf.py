@@ -251,65 +251,98 @@ def build_case_pdf(case: dict) -> io.BytesIO:
             return [P(f"- {label} ✅ (ملف PDF — الصفحات مرفقة في نهاية هذا الملف)", "body")]
         return [P(f"- {label} ✅ (نوع ملف غير مدعوم للمعاينة هنا — راجعه داخل البوت)", "note")]
 
+    # ── ترتيب ثابت لكل شخص (بطلب المستخدم صراحةً) ────────────────────────────
+    #   الصورة الشخصية (مرة واحدة) ← الجواز ← التأشيرة ← التذاكر ←
+    #   آخر إقامة مرفوعة ← Form C ← بقية الوثائق بالتسلسل.
+    # ثم المرافقون بعد المريض كاملاً (ترتيب `people` نفسه: الجذر أولاً).
+    _ARRIVAL_ORDER = [("passport", "جواز السفر"), ("visa", "التأشيرة"),
+                      ("tickets", "التذاكر")]
+
+    def _same_bytes(a, b) -> bool:
+        """هل الملفان نفس المحتوى؟ — مقارنة بالمحتوى لا بالتسمية.
+
+        ⚠️ الصورة الشخصية كانت تُطبَع **مرتين**: مرة من `photo_file_id`
+        في رأس الكتلة، ومرة كوثيقة في `res_documents` باسم "صوره شخصية".
+        الاعتماد على التسمية وحده هشّ (تُكتَب يدوياً بصيغ مختلفة)، فتُقارَن
+        البايتات — يُمسَك التكرار مهما سُمّيت الوثيقة.
+        """
+        if not a or not b:
+            return False
+        if len(a) != len(b):
+            return False
+        return a == b
+
+    def _is_photo_label(label: str) -> bool:
+        t = (label or "").replace("ة", "ه")
+        return "شخصي" in t and "صور" in t
+
     for person in people:
         block = []
         block.append(P(f"👤 {person['name']} — {person['role']}", "h2"))
         block.append(Spacer(1, 0.15 * cm))
 
-        img = _embed_image(person.get("photo_bytes"), *photo_max) if person.get("photo_bytes") else None
+        # (1) الصورة الشخصية — مرة واحدة فقط
+        photo_bytes = person.get("photo_bytes")
+        img = _embed_image(photo_bytes, *photo_max) if photo_bytes else None
         if img is not None:
             img.hAlign = "RIGHT"
-            block.append(img)
+            block.append(KeepTogether([P("الصورة الشخصية:", "body_b"), img]))
             block.append(Spacer(1, 0.15 * cm))
 
         block.append(P(f"الحالة الحالية: {person.get('status_text', '')}", "body"))
         if person.get("expiry_date"):
             block.append(P(f"تاريخ انتهاء الإقامة الحالية: {person['expiry_date']}", "body"))
 
-        # ✅ إقامة واحدة فقط تُطبَع — الأحدث زمنياً أياً كان مصدرها (وصول
-        # أو إصدار رسمي لاحق)، بطلب المستخدم صراحةً؛ لا تُعرَض الاثنتان
-        # معاً أبداً. `residence_doc is None` = الفئة غير مطلوبة أصلاً.
-        residence_doc = person.get("residence_doc")
-        if residence_doc is not None:
-            block.append(Spacer(1, 0.1 * cm))
-            # ⚠️ لا يُترَك عنوان القسم وحيداً في ذيل الصفحة ومحتواه في
-            # التالية — إن بقي أقل من 5سم يُنقَل العنوان مع محتواه.
-            block.append(CondPageBreak(5 * cm))
-            block.append(P("🪪 صورة الإقامة:", "body_b"))
-            if residence_doc.get("source"):
-                block.append(P(f"المصدر: {residence_doc['source']}  —  التاريخ: {residence_doc.get('date', '')}", "body"))
-                block.extend(_attachment_flowables("صورة الإقامة", residence_doc.get("file_bytes"), person["name"]))
-            else:
-                block.append(P("لا توجد إقامة مرفوعة.", "note"))
-
-        # ✅ وثائق "🛬 الوصول" (جواز/تأشيرة/تذاكر) — مصدر مستقل تماماً عن
-        # res_documents، مفاتيح غائبة = فئتها غير مطلوبة فلا يُعرَض سطرها.
+        # (2،3،4) وثائق الوصول بالترتيب: جواز ← تأشيرة ← تذاكر
         arrival_docs = person.get("arrival_docs") or {}
         if arrival_docs:
             block.append(Spacer(1, 0.15 * cm))
             block.append(CondPageBreak(5 * cm))
             block.append(P("📎 وثائق الوصول:", "body_b"))
-            _ARRIVAL_LABELS = [("passport", "جواز السفر"), ("visa", "التأشيرة"), ("tickets", "التذاكر")]
-            for key, label in _ARRIVAL_LABELS:
+            for key, label in _ARRIVAL_ORDER:
                 if key in arrival_docs:
                     block.extend(_attachment_flowables(label, arrival_docs.get(key), person["name"]))
 
+        # (5) آخر إقامة مرفوعة — واحدة فقط، الأحدث مصدراً
+        residence_doc = person.get("residence_doc")
+        if residence_doc is not None:
+            block.append(Spacer(1, 0.15 * cm))
+            block.append(CondPageBreak(5 * cm))
+            block.append(P("🪪 صورة الإقامة (الأحدث):", "body_b"))
+            if residence_doc.get("source"):
+                block.append(P(
+                    f"المصدر: {residence_doc['source']}  —  التاريخ: {residence_doc.get('date', '')}",
+                    "body"))
+                block.extend(_attachment_flowables(
+                    "صورة الإقامة", residence_doc.get("file_bytes"), person["name"]))
+            else:
+                block.append(P("لا توجد إقامة مرفوعة.", "note"))
+
+        # (6،7) Form C أولاً ثم بقية الوثائق — مع إسقاط تكرار الصورة الشخصية
+        docs = list(person.get("documents", []))
+        kept = []
+        for d in docs:
+            if photo_bytes is not None and (
+                _same_bytes(d.get("file_bytes"), photo_bytes)
+                or _is_photo_label(d.get("label", ""))
+            ):
+                continue        # نفس الصورة الشخصية المعروضة أعلاه
+            kept.append(d)
+        # الترتيب: Form C ثم البقية بترتيب إضافتها (مستقرّ)
+        kept.sort(key=lambda d: 0 if (d.get("doc_type") == "form_c"
+                                      or "form c" in (d.get("label", "") or "").lower())
+                  else 1)
+
         block.append(Spacer(1, 0.15 * cm))
-        docs = person.get("documents", [])
         block.append(CondPageBreak(5 * cm))
-        block.append(P(f"📄 الوثائق ({len(docs)}):", "body_b"))
-        if not docs:
+        block.append(P(f"📄 الوثائق ({len(kept)}):", "body_b"))
+        if not kept:
             block.append(P("لا توجد وثائق مضافة.", "note"))
         else:
-            for d in docs:
-                block.extend(_attachment_flowables(d["label"], d.get("file_bytes"), person["name"]))
+            for d in kept:
+                block.extend(_attachment_flowables(
+                    d["label"], d.get("file_bytes"), person["name"]))
 
-        # ⚠️ كان `KeepTogether(block)` على الكتلة **كاملة** بما فيها الصور:
-        # إن لم تتّسع الكتلة في بقية الصفحة تُدفَع كلها لصفحة جديدة، فتبقى
-        # الصفحة السابقة فارغة ٨٥٪ — وهذا بالضبط سبب "الملف غير منظم".
-        # الآن يتدفّق المحتوى طبيعياً، ويبقى `KeepTogether` على الأزواج
-        # الصغيرة (تسمية + صورتها) داخل `_attachment_flowables` فلا تنفصل
-        # تسمية عن ملفها أبداً.
         story.extend(block)
         story.append(Spacer(1, 0.5 * cm))
 

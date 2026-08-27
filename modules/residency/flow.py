@@ -775,7 +775,10 @@ async def _build_person_pdf_dict(
             continue
         label = "Form C" if d.doc_type == "form_c" else (d.doc_name or "وثيقة")
         file_bytes = await _download_file_bytes(context, d.file_id)
-        doc_dicts.append({"label": label, "file_bytes": file_bytes})
+        # ✅ `doc_type` يُمرَّر ليُرتَّب Form C قبل بقية الوثائق في الملف
+        doc_dicts.append({
+            "label": label, "file_bytes": file_bytes, "doc_type": d.doc_type,
+        })
 
     photo_bytes = await _download_file_bytes(context, person.photo_file_id) if "photo" in selected else None
 
