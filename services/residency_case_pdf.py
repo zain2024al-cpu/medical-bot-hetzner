@@ -148,6 +148,7 @@ def build_case_pdf(case: dict) -> io.BytesIO:
     from reportlab.lib.enums import TA_RIGHT, TA_CENTER
     from reportlab.platypus import (
         SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether,
+        CondPageBreak,
     )
 
     C = _colors()
@@ -168,7 +169,9 @@ def build_case_pdf(case: dict) -> io.BytesIO:
         "body_b": S("bodyb", fontSize=10, leading=15, alignment=TA_RIGHT,  textColor=C["text_dark"], fontName=FNB),
         "th":     S("th",    fontSize=9,  leading=12, alignment=TA_CENTER, textColor=C["text_dark"], fontName=FNB),
         "td_c":   S("tdc",   fontSize=9,  leading=12, alignment=TA_CENTER, textColor=C["text_dark"]),
-        "note":   S("note",  fontSize=9,  leading=12, alignment=TA_CENTER, textColor=C["text_gray"]),
+        # ⚠️ كان TA_CENTER: أسطر مثل "لا توجد إقامة مرفوعة." تظهر في وسط
+        # الصفحة وسط نصّ كلّه يمينيّ — تبدو تائهة وغير مرتبطة بعنوانها.
+        "note":   S("note",  fontSize=9,  leading=12, alignment=TA_RIGHT, textColor=C["text_gray"]),
     }
 
     def P(txt, style_key="body") -> Paragraph:
@@ -220,7 +223,10 @@ def build_case_pdf(case: dict) -> io.BytesIO:
     # الارتفاع القصير فتظهر ضيقة جداً مقارنة بعرض الصفحة المتاح (شكوى
     # "المقاسات صغيرة وبقية الصفحة فاضية"). رُفِع لقرابة ارتفاع الصفحة
     # القابل للطباعة فعلياً حتى تستغل الصور الطولية عرض الصفحة كاملاً.
-    file_max = (content_width * 0.95, 22 * cm)
+    # ⚠️ كان 22سم = ارتفاع الصفحة كاملاً، فصورة جواز واحدة تحتلّ صفحة
+    # بمفردها وتدفع كل ما بعدها. 13سم تُبقي صورتين في الصفحة مع نصّها،
+    # ولا تزال أكبر بكثير من الـ9سم التي شُكِي منها سابقاً.
+    file_max = (content_width * 0.95, 13 * cm)
 
     # ✅ كل ملف/وثيقة يتبيّن أنه PDF حقيقي (Form C الرسمية غالباً PDF لا
     # صورة) لا يمكن تضمينه كـImage داخل النص المتدفّق — يُجمَع هنا ليُدمَج
@@ -236,7 +242,9 @@ def build_case_pdf(case: dict) -> io.BytesIO:
             img = _embed_image(data, *file_max)
             if img is not None:
                 img.hAlign = "RIGHT"
-                return [P(f"- {label} ✅", "body"), img]
+                # التسمية وصورتها معاً — لا تنفصل تسمية في آخر صفحة عن
+                # صورتها في أول التالية.
+                return [KeepTogether([P(f"- {label}", "body"), img])]
             return [P(f"- {label} ✅ (تعذّر عرض الصورة)", "note")]
         if kind == "pdf":
             pdf_attachments.append((f"{person_name} — {label}", data))
@@ -264,6 +272,9 @@ def build_case_pdf(case: dict) -> io.BytesIO:
         residence_doc = person.get("residence_doc")
         if residence_doc is not None:
             block.append(Spacer(1, 0.1 * cm))
+            # ⚠️ لا يُترَك عنوان القسم وحيداً في ذيل الصفحة ومحتواه في
+            # التالية — إن بقي أقل من 5سم يُنقَل العنوان مع محتواه.
+            block.append(CondPageBreak(5 * cm))
             block.append(P("🪪 صورة الإقامة:", "body_b"))
             if residence_doc.get("source"):
                 block.append(P(f"المصدر: {residence_doc['source']}  —  التاريخ: {residence_doc.get('date', '')}", "body"))
@@ -276,6 +287,7 @@ def build_case_pdf(case: dict) -> io.BytesIO:
         arrival_docs = person.get("arrival_docs") or {}
         if arrival_docs:
             block.append(Spacer(1, 0.15 * cm))
+            block.append(CondPageBreak(5 * cm))
             block.append(P("📎 وثائق الوصول:", "body_b"))
             _ARRIVAL_LABELS = [("passport", "جواز السفر"), ("visa", "التأشيرة"), ("tickets", "التذاكر")]
             for key, label in _ARRIVAL_LABELS:
@@ -284,6 +296,7 @@ def build_case_pdf(case: dict) -> io.BytesIO:
 
         block.append(Spacer(1, 0.15 * cm))
         docs = person.get("documents", [])
+        block.append(CondPageBreak(5 * cm))
         block.append(P(f"📄 الوثائق ({len(docs)}):", "body_b"))
         if not docs:
             block.append(P("لا توجد وثائق مضافة.", "note"))
@@ -291,7 +304,13 @@ def build_case_pdf(case: dict) -> io.BytesIO:
             for d in docs:
                 block.extend(_attachment_flowables(d["label"], d.get("file_bytes"), person["name"]))
 
-        story.append(KeepTogether(block))
+        # ⚠️ كان `KeepTogether(block)` على الكتلة **كاملة** بما فيها الصور:
+        # إن لم تتّسع الكتلة في بقية الصفحة تُدفَع كلها لصفحة جديدة، فتبقى
+        # الصفحة السابقة فارغة ٨٥٪ — وهذا بالضبط سبب "الملف غير منظم".
+        # الآن يتدفّق المحتوى طبيعياً، ويبقى `KeepTogether` على الأزواج
+        # الصغيرة (تسمية + صورتها) داخل `_attachment_flowables` فلا تنفصل
+        # تسمية عن ملفها أبداً.
+        story.extend(block)
         story.append(Spacer(1, 0.5 * cm))
 
     # ── جدول ملخّص ────────────────────────────────────────────────────────────
