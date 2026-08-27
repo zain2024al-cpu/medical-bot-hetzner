@@ -309,11 +309,27 @@ def build_case_pdf(case: dict) -> io.BytesIO:
                 if _is_photo_label(_d.get("label", "")) and _d.get("file_bytes"):
                     photo_bytes = _d["file_bytes"]
                     break
+        # 🔴 انحدار سابق: كان الشرط `if img is not None` وحده. فإن كانت
+        # الصورة ملف PDF أو نوعاً لا يُضمَّن، تُتخطّى الكتلة كلها —
+        # **وقد حُذفت الوثيقة أصلاً بفلتر التكرار أدناه** — فتختفي
+        # الصورة نهائياً من الملف بلا أي أثر. والمرافق الذي لا صورة له
+        # كان يُطبَع بصمت، فيبدو كأن الملف "أخفى" صورته.
         img = _embed_image(photo_bytes, *photo_max) if photo_bytes else None
         if img is not None:
             img.hAlign = "RIGHT"
             block.append(KeepTogether([P("الصورة الشخصية:", "body_b"), img]))
-            block.append(Spacer(1, 0.15 * cm))
+        elif photo_bytes:
+            # موجودة لكن غير قابلة للتضمين ⇒ تُعامَل كمرفق (PDF يُدمَج
+            # كصفحات في نهاية الملف، وغير المدعوم يُذكَر صراحةً).
+            block.extend(_section(
+                P("الصورة الشخصية:", "body_b"),
+                _attachment_flowables("الصورة الشخصية", photo_bytes, person["name"]),
+            ))
+        else:
+            # ✅ الغياب يُذكَر صراحةً بدل الصمت
+            block.append(P("الصورة الشخصية:", "body_b"))
+            block.append(P("لا توجد صورة شخصية مرفوعة.", "note"))
+        block.append(Spacer(1, 0.15 * cm))
 
         block.append(P(f"الحالة الحالية: {person.get('status_text', '')}", "body"))
         if person.get("expiry_date"):
