@@ -355,10 +355,94 @@ async def _show_list(query, page: int, search: str = "") -> None:
     kb.append([InlineKeyboardButton("🔍 بحث بالاسم", callback_data=f"{LEGO}:search")])
     if search:
         kb.append([InlineKeyboardButton("📋 عرض كل الأسماء", callback_data=f"{LEGO}:all")])
+    # ↩️ تصحيح إدخال خاطئ (عدد مرافقين غلط، تواريخ غلط…) بلا فقدان المريض
+    kb.append([InlineKeyboardButton(
+        "↩️ تصحيح إدخال سابق", callback_data=f"{LEGO}:undo:0")])
     kb.append([InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")])
 
     await query.edit_message_text(
         text, reply_markup=InlineKeyboardMarkup(kb), parse_mode=ParseMode.MARKDOWN
+    )
+
+
+async def _show_undo_list(query, page: int = 0) -> None:
+    """المُدخَلون سابقاً — لاختيار من يُراد تصحيح إدخاله."""
+    from services.patients_service import get_legacy_onboarded_patients
+
+    rows, total, pages = get_legacy_onboarded_patients(page, 8)
+    if not rows:
+        text = (
+            "↩️ **تصحيح إدخال سابق**\n\n"
+            "لا يوجد أي مريض مُدخَل عبر «🏠 الحالات الموجودة» بعد."
+        )
+        kb = [[InlineKeyboardButton("🔙 رجوع", callback_data=f"{LEGO}:all")]]
+    else:
+        text = (
+            "↩️ **تصحيح إدخال سابق**\n\n"
+            f"📊 **العدد:** {total}   •   📄 **صفحة:** {page + 1} من {pages}\n\n"
+            "اختر المريض الذي تريد **إلغاء إدخاله** لإعادة إدخاله صحيحاً:"
+        )
+        kb = []
+        for r in rows:
+            suffix = f" (+{r['companions']} مرافق)" if r["companions"] else ""
+            kb.append([InlineKeyboardButton(
+                f"👤 {r['name']}{suffix}",
+                callback_data=f"{LEGO}:undopick:{r['id']}:{page}",
+            )])
+        nav = []
+        if page > 0:
+            nav.append(InlineKeyboardButton(
+                "◀️ السابق", callback_data=f"{LEGO}:undo:{page - 1}"))
+        if page < pages - 1:
+            nav.append(InlineKeyboardButton(
+                "التالي ▶️", callback_data=f"{LEGO}:undo:{page + 1}"))
+        if nav:
+            kb.append(nav)
+        kb.append([InlineKeyboardButton("🔙 رجوع", callback_data=f"{LEGO}:all")])
+
+    await query.edit_message_text(
+        text, reply_markup=InlineKeyboardMarkup(kb), parse_mode=ParseMode.MARKDOWN
+    )
+
+
+async def _show_undo_confirm(query, pid: int, page: int) -> None:
+    """ما الذي سيُلغى بالضبط — قبل أي تنفيذ."""
+    from services.patients_service import get_deletable_family_impact
+
+    impact = get_deletable_family_impact(f"p-{pid}")
+    if impact is None:
+        await query.answer("⚠️ لم يُعثر على المريض", show_alert=True)
+        await _show_undo_list(query, page)
+        return
+
+    lines = [
+        "↩️ **تأكيد تصحيح الإدخال**",
+        "",
+        f"👤 **{impact['name']}**",
+        "",
+        "**سيُلغى:**",
+        f"   🤝 المرافقون: {len(impact['companions'])}",
+        f"   🪪 أشخاص الإقامة: {impact['residency']}",
+        f"   🛬 صفوف الوصول: {impact['arrivals']} (+{impact['arrival_companions']} مرافق)",
+    ]
+    if impact["companions"]:
+        lines.append("")
+        lines.append("**المرافقون الذين سيُحذَفون:**")
+        lines += [f"   • {c}" for c in impact["companions"]]
+    lines += [
+        "",
+        "✅ **المريض نفسه يبقى** في سجلّ المرضى مع كل تقاريره،",
+        "ويعود لقائمة «🏠 الحالات الموجودة» لإدخاله من جديد.",
+    ]
+
+    kb = [
+        [InlineKeyboardButton("↩️ نعم، ألغِ الإدخال",
+                              callback_data=f"{LEGO}:undogo:{pid}:{page}")],
+        [InlineKeyboardButton("🔙 إلغاء", callback_data=f"{LEGO}:undo:{page}")],
+    ]
+    await query.edit_message_text(
+        "\n".join(lines), reply_markup=InlineKeyboardMarkup(kb),
+        parse_mode=ParseMode.MARKDOWN,
     )
 
 
@@ -530,6 +614,28 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             ud.pop(_SEARCH_Q_KEY, None)     # دخول جديد = قائمة كاملة
         ud.pop(_SEARCH_WAIT_KEY, None)
         await _show_list(query, page, ud.get(_SEARCH_Q_KEY, ""))
+        return
+
+    # ── ↩️ تصحيح إدخال سابق ──────────────────────────────────────────────
+    if action.startswith("undo:"):
+        LegoSession.clear(ud)
+        await _show_undo_list(query, int(action.split(":")[1]))
+        return
+
+    if action.startswith("undopick:"):
+        _, pid, page = action.split(":")
+        await _show_undo_confirm(query, int(pid), int(page))
+        return
+
+    if action.startswith("undogo:"):
+        from services.patients_service import undo_legacy_onboarding
+        _, pid, page = action.split(":")
+        ok, info = undo_legacy_onboarding(int(pid))
+        if ok:
+            await query.answer(f"↩️ أُلغي إدخال {info}", show_alert=False)
+        else:
+            await query.answer(f"⚠️ {info}", show_alert=True)
+        await _show_undo_list(query, int(page))
         return
 
     if action == "search":

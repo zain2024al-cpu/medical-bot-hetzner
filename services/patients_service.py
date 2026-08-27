@@ -739,6 +739,115 @@ def _resolve_family(session, key: str):
     return None
 
 
+# ── التراجع عن إدخال "🏠 الحالات الموجودة" ───────────────────────────────────
+# ⚠️ لماذا لا يكفي الحذف:
+# `purge_deletable_family` تمسح **المريض نفسه** من سجلّ المرضى. لكن الخطأ
+# المعتاد هنا ليس في المريض بل في إدخاله: عدد مرافقين خاطئ، أو تواريخ
+# خاطئة. فحذف كل شيء يعني فقدان اسم المريض وإعادة إنشائه من الصفر.
+#
+# التراجع يعكس **الإدخال وحده**: يمسح المرافقين وصفوف الوصول وأشخاص
+# الإقامة، ويُصفّر `gs_onboarded_at` — فيعود المريض للقائمة المرشَّحة في
+# "🏠 الحالات الموجودة" جاهزاً لإدخال صحيح، وسجلّه وتقاريره كما هي.
+
+def get_legacy_onboarded_patients(page: int = 0, per_page: int = 8) -> tuple:
+    """المرضى المُدخَلون عبر "الحالات الموجودة" — الجذور فقط، للتراجع."""
+    try:
+        from db.session import SessionLocal
+        from db.models import Patient
+
+        with SessionLocal() as session:
+            q = (
+                session.query(Patient)
+                .filter(
+                    Patient.gs_onboarded_at.isnot(None),
+                    Patient.companion_of_id.is_(None),
+                    Patient.full_name.isnot(None), Patient.full_name != "",
+                )
+                .order_by(Patient.gs_onboarded_at.desc())
+            )
+            total = q.count()
+            pages = max(1, (total + per_page - 1) // per_page)
+            rows = q.offset(page * per_page).limit(per_page).all()
+            out = []
+            for p in rows:
+                n = session.query(Patient).filter_by(companion_of_id=p.id).count()
+                out.append({"id": p.id, "name": p.full_name, "companions": n})
+            return out, total, pages
+    except Exception as exc:
+        logger.error(f"[lego.undo] فشل جلب المُدخَلين: {exc}", exc_info=True)
+        return [], 0, 0
+
+
+def undo_legacy_onboarding(patient_id: int) -> tuple:
+    """يعكس إدخال مريض قديم ويُبقيه في سجلّ المرضى. Returns: (نجاح, رسالة).
+
+    🔒 يرفض إن كان لأحد **المرافقين** تقرير طبي (بيانات تُفقَد بحذفه).
+    تقارير المريض نفسه لا تتأثّر — صفّه باقٍ.
+    """
+    try:
+        from db.session import SessionLocal
+        from db.models import (
+            Patient, Report, ResidencyPerson, ResidencyStatusLog,
+            ResidencyDocument, ResidencyIssuance, ArrivalPatient, ArrivalCompanion,
+        )
+
+        with SessionLocal() as session:
+            root = session.query(Patient).filter_by(id=patient_id).first()
+            if not root:
+                return False, "لم يُعثر على المريض."
+            if not root.gs_onboarded_at:
+                return False, "هذا المريض غير مُدخَل عبر «الحالات الموجودة»."
+
+            comps = session.query(Patient).filter_by(companion_of_id=patient_id).all()
+            comp_names = [c.full_name for c in comps if c.full_name]
+
+            if comp_names:
+                n_rep = session.query(Report).filter(
+                    Report.patient_name.in_(comp_names)).count()
+                if n_rep:
+                    return False, (
+                        f"لأحد المرافقين {n_rep} تقرير طبي — التراجع ممنوع "
+                        f"حفاظاً على بيانات التقارير."
+                    )
+
+            all_names = [n for n in ([root.full_name] + comp_names) if n]
+
+            res = session.query(ResidencyPerson).filter(
+                ResidencyPerson.name.in_(all_names)).all()
+            for rp in res:
+                session.query(ResidencyStatusLog).filter_by(person_id=rp.id).delete()
+                session.query(ResidencyDocument).filter_by(person_id=rp.id).delete()
+                session.query(ResidencyIssuance).filter_by(person_id=rp.id).delete()
+                session.delete(rp)
+
+            arrivals = session.query(ArrivalPatient).filter(
+                ArrivalPatient.name.in_(all_names)).all()
+            for a in arrivals:
+                session.query(ArrivalCompanion).filter_by(patient_id=a.id).delete()
+                session.delete(a)
+            if comp_names:
+                session.query(ArrivalCompanion).filter(
+                    ArrivalCompanion.name.in_(comp_names)).delete(
+                    synchronize_session=False)
+
+            session.query(Patient).filter_by(companion_of_id=patient_id).delete(
+                synchronize_session=False)
+
+            # ✅ المريض يبقى — يُصفَّر العلَم فقط فيعود للقائمة المرشَّحة
+            root.gs_onboarded_at = None
+            session.commit()
+            name = root.full_name
+
+        logger.info(
+            f"[lego.undo] تراجع عن {name!r}: {len(comp_names)} مرافق، "
+            f"{len(res)} شخص إقامة، {len(arrivals)} صف وصول"
+        )
+        return True, name
+    except Exception as exc:
+        logger.error(f"[lego.undo] فشل التراجع id={patient_id}: {exc}", exc_info=True)
+        return False, str(exc)[:150]
+
+
 def get_deletable_families(page: int = 0, per_page: int = 8) -> tuple:
     """كل اسم يمكن حذفه من الأنظمة الثلاثة، أياً كان الزر الذي أنشأه.
 
@@ -760,6 +869,11 @@ def get_deletable_families(page: int = 0, per_page: int = 8) -> tuple:
                 .filter(
                     Patient.full_name.isnot(None),
                     Patient.full_name != "",
+                    # ⚠️ الجذور فقط: المرافق يحمل `gs_onboarded_at` أيضاً،
+                    # فبلا هذا الشرط تظهر عائلة من ٦ مرافقين كـ٧ صفوف
+                    # مستقلة — ضجيج، وخطر حذف مرافق وحده فتبقى عائلته
+                    # ناقصة في الأنظمة الثلاثة بلا أي أثر ظاهر.
+                    Patient.companion_of_id.is_(None),
                     or_(
                         Patient.patient_type == "companion_parent",
                         Patient.gs_onboarded_at.isnot(None),
@@ -832,12 +946,22 @@ def get_deletable_family_impact(key: str):
             ]
             arr = session.query(ArrivalPatient).filter(
                 ArrivalPatient.name.in_(all_names)).all()
-            arr_comp = 0
+            # ⚠️ مجموعة مُعرِّفات لا جمع عددين: الصف الواحد يطابق الشرطين
+            # معاً (مربوط بـpatient_id **و** اسمه ضمن المرافقين)، فجمعهما
+            # كان يُظهر ١٢ مرافقاً بينما الموجود ٦ — رقم خاطئ يُعرَض على
+            # الأدمن قبل إجراء لا رجعة فيه.
+            _arr_comp_ids = set()
             for a in arr:
-                arr_comp += session.query(ArrivalCompanion).filter_by(patient_id=a.id).count()
+                _arr_comp_ids.update(
+                    cid for (cid,) in session.query(ArrivalCompanion.id)
+                    .filter_by(patient_id=a.id).all()
+                )
             if comp_names:
-                arr_comp += session.query(ArrivalCompanion).filter(
-                    ArrivalCompanion.name.in_(comp_names)).count()
+                _arr_comp_ids.update(
+                    cid for (cid,) in session.query(ArrivalCompanion.id)
+                    .filter(ArrivalCompanion.name.in_(comp_names)).all()
+                )
+            arr_comp = len(_arr_comp_ids)
 
             patients = session.query(Patient).filter(
                 Patient.full_name.in_(all_names)).count()
