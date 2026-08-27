@@ -53,6 +53,8 @@ def _menu_kb() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("📆 المواعيد القادمة", callback_data="goto:appointments")],
         [InlineKeyboardButton("📋 التقارير المعلقة", callback_data="pndrep:page:0")],
         [InlineKeyboardButton("📎 تقارير ناقصة المرفقات", callback_data="msngatt:page:0")],
+        # 🪪 نافذة قراءة محضة على وحدة الإقامة — للاطّلاع لا للتنفيذ
+        [InlineKeyboardButton("🪪 متابعة الإقامات (اطّلاع)", callback_data="rnv:home")],
         # ✅ زر مسير الصيدلية — انتقل من الشاشة الرئيسية إلى هنا بطلب صريح.
         # الأدمن يرى كل السجلات بلا عزل (is_admin=True يُسقط الفلترة في
         # get_evacuation_ledger_rows تلقائياً — لا تغيير هناك).
