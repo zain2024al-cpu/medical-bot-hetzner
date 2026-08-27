@@ -37,14 +37,18 @@ def _fmt(value: str) -> str:
     return value if (value or "").strip() else "—"
 
 
-def _person_block(p, *, is_root: bool) -> list[str]:
+def _person_block(p, *, is_root: bool, since=None) -> list[str]:
     """أسطر شخص واحد — معلومات فقط."""
     from modules.residency.constants import status_line
+    from modules.residency.days import badge as _day_badge
 
     head = "👤" if is_root else "   👥"
     lines = [f"{head} **{p.name}**"]
     pad = "   " if is_root else "      "
     lines.append(f"{pad}الحالة: {status_line(p.status)}")
+    _b = _day_badge(p, since)
+    if _b:
+        lines.append(f"{pad}⏳ {_b}")
     lines.append(f"{pad}انتهاء الإقامة: {_fmt(p.expiry_date)}")
     lines.append(f"{pad}تاريخ التنبيه: {_fmt(p.reminder_date)}")
     if (getattr(p, "last_issue_date", "") or "").strip():
@@ -106,12 +110,20 @@ def _build_status(status: str, page: int) -> tuple[str, InlineKeyboardMarkup]:
     else:
         lines.append(f"📊 **العدد:** {total}   •   📄 **صفحة:** {page + 1} من {pages}")
 
+    # نفس شارة الأيام المستخدَمة في الشاشات التشغيلية — مصدر واحد
+    from modules.residency.days import family_badge
+    from modules.residency.repository import get_status_since
+    _ids = [p.id for f in chunk for p in ([f.root] + list(f.companions))]
+    _since = get_status_since(_ids)
+
     rows = []
     for fam in chunk:
         n = len(fam.companions)
         suffix = f" (+{n} مرافق)" if n else ""
+        bdg = family_badge(fam, _since)
+        note = f" — {bdg}" if bdg else ""
         rows.append([InlineKeyboardButton(
-            f"👤 {fam.root.name}{suffix}",
+            f"👤 {fam.root.name}{suffix}{note}",
             callback_data=f"{_PFX}:fam:{fam.root.id}:{status}:{page}",
         )])
 
@@ -136,6 +148,8 @@ def _build_family(root_id: int, status: str, page: int) -> tuple[str, InlineKeyb
         return "⚠️ لم تُعثَر على هذه الحالة.", _nav([], f"{_PFX}:st:{status}:{page}")
 
     people = [fam.root] + list(fam.companions)
+    from modules.residency.repository import get_status_since
+    since_map = get_status_since([p.id for p in people])
     try:
         doc_counts = get_document_counts([p.id for p in people]) or {}
     except Exception:
@@ -143,7 +157,7 @@ def _build_family(root_id: int, status: str, page: int) -> tuple[str, InlineKeyb
         doc_counts = {}
 
     lines = ["🪪 **تفاصيل الحالة**", ""]
-    lines += _person_block(fam.root, is_root=True)
+    lines += _person_block(fam.root, is_root=True, since=since_map.get(fam.root.id))
     nd = doc_counts.get(fam.root.id, 0)
     if nd:
         lines.append(f"   الوثائق المرفقة: {nd}")
@@ -153,7 +167,7 @@ def _build_family(root_id: int, status: str, page: int) -> tuple[str, InlineKeyb
         lines.append(f"👥 **المرافقون ({len(fam.companions)}):**")
         for c in fam.companions:
             lines.append("")
-            lines += _person_block(c, is_root=False)
+            lines += _person_block(c, is_root=False, since=since_map.get(c.id))
             nd = doc_counts.get(c.id, 0)
             if nd:
                 lines.append(f"      الوثائق المرفقة: {nd}")

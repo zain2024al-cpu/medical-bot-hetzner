@@ -228,6 +228,38 @@ def get_documents_for_person(person_id: int) -> list[DocumentRow]:
         return rows
 
 
+def get_status_since(person_ids: list[int]) -> dict[int, str]:
+    """{person_id: تاريخ آخر تحوّل حالة} — أي متى دخل حالته الحالية.
+
+    كل انتقال يُسجَّل في `res_status_log`، فآخر صفٍّ لكل شخص هو لحظة دخوله
+    حالته الراهنة. من لا سجلّ له (بيانات سابقة للتسجيل) يغيب من القاموس
+    فتظهر شاشته بلا شارة "منذ" بدل رقم مُختلَق.
+
+    استعلام واحد لكل الأشخاص — لا استعلام داخل حلقة العرض.
+    """
+    import logging
+    from sqlalchemy import func
+    from db.session import get_db
+    from db.models import ResidencyStatusLog
+
+    if not person_ids:
+        return {}
+    try:
+        with get_db() as db:
+            rows = (
+                db.query(ResidencyStatusLog.person_id,
+                         func.max(ResidencyStatusLog.created_at))
+                .filter(ResidencyStatusLog.person_id.in_(person_ids))
+                .group_by(ResidencyStatusLog.person_id)
+                .all()
+            )
+            return {pid: (str(ts)[:10] if ts else "") for pid, ts in rows if ts}
+    except Exception as exc:
+        logging.getLogger(__name__).warning(
+            f"[residency] get_status_since failed: {exc}")
+        return {}
+
+
 def get_document_counts(person_ids: list[int]) -> dict[int, int]:
     from db.session import get_db
     from db.models import ResidencyDocument

@@ -48,18 +48,28 @@ def _family_summary_line(family: FamilyRow) -> str:
 
 
 def build_status_list(status: str, families: list[FamilyRow]) -> tuple[str, InlineKeyboardMarkup]:
+    from modules.residency.days import family_badge
+    from modules.residency.repository import get_status_since
+
     lines = [_DIVIDER, f"{status_line(status)}", ""]
     rows = []
     if not families:
         lines.append("✅ لا توجد طلبات بهذه الحالة حالياً.")
     else:
+        # ✅ استعلام واحد لكل الأشخاص المعروضين — لا استعلام داخل الحلقة.
+        _ids = [p.id for f in families for p in ([f.root] + list(f.companions))]
+        _since = get_status_since(_ids)
+
         lines.append(f"يوجد {len(families)} طلباً — اضغط لفتح التفاصيل:")
         lines.append(_THIN)
         for fam in families:
             comp_note = f" (+{len(fam.companions)} مرافق)" if fam.companions else ""
-            lines.append(f"👤 {fam.root.name}{comp_note}")
+            # شارة العائلة = أشدّ أفرادها إلحاحاً (قد يكون مرافقاً لا المريض)
+            bdg = family_badge(fam, _since)
+            note = f" — {bdg}" if bdg else ""
+            lines.append(f"👤 {fam.root.name}{comp_note}{note}")
             rows.append([InlineKeyboardButton(
-                f"📂 {fam.root.name[:25]}", callback_data=f"{RN}:family_{fam.root.id}",
+                f"📂 {fam.root.name[:22]}{note}", callback_data=f"{RN}:family_{fam.root.id}",
             )])
     rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:menu")])
     return "\n".join(lines), InlineKeyboardMarkup(rows)
@@ -90,8 +100,20 @@ def _person_action_button(person: PersonRow, *, is_root: bool) -> InlineKeyboard
 def build_family_detail(
     family: FamilyRow, *, is_admin: bool, doc_counts: dict[int, int] | None = None,
 ) -> tuple[str, InlineKeyboardMarkup]:
+    from modules.residency.days import badge as _day_badge
+    from modules.residency.repository import get_status_since
+
     root = family.root
+    _ids = [p.id for p in ([root] + list(family.companions))]
+    _since = get_status_since(_ids)
+
+    def _b(person, pad: str) -> list[str]:
+        """سطر الأيام لشخص — يُحذَف كلياً إن لا رقم متاحاً."""
+        txt = _day_badge(person, _since.get(person.id))
+        return [f"{pad}⏳ {txt}"] if txt else []
+
     lines = [_DIVIDER, "🪪  **تفاصيل الطلب**", "", f"👤 *المريض:* {root.name}", f"  {status_line(root.status)}"]
+    lines += _b(root, "  ")
     if root.reminder_date:
         lines.append(f"  🔔 تاريخ التنبيه: {root.reminder_date}")
     if root.expiry_date:
@@ -102,6 +124,7 @@ def build_family_detail(
         lines.append(f"👥 *المرافقون ({len(family.companions)}):*")
         for c in family.companions:
             lines.append(f"  • {c.name} — {status_line(c.status)}")
+            lines += _b(c, "     ")
             if c.reminder_date:
                 lines.append(f"     🔔 {c.reminder_date}")
             if c.expiry_date:
