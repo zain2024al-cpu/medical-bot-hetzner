@@ -119,6 +119,24 @@ def build_family_detail(
     if root.expiry_date:
         lines.append(f"  📅 تاريخ الانتهاء: {root.expiry_date}")
 
+    # ⚠️ فجوة بين النظامين: مرافق مسجَّل في الوصول وغائب عن الإقامة
+    # (فشل النداء fire-and-forget، أو أُضيف للوصول بعد إنشاء الملف).
+    # تُعرَض صراحةً بدل أن يظهر "المرافقون: 0" بلا تفسير.
+    _missing = []
+    try:
+        from modules.residency.repository import get_arrival_companion_names
+        _known = {(c.name or "").strip() for c in family.companions}
+        _missing = [n for n in get_arrival_companion_names(root.name) if n not in _known]
+    except Exception:
+        _missing = []
+
+    if _missing:
+        lines.append(_THIN)
+        lines.append(f"⚠️ *{len(_missing)} مرافق مسجَّل في الوصول وغير مضاف هنا:*")
+        for n in _missing:
+            lines.append(f"   • {n}")
+        lines.append("_اضغط «🔄 إضافة مرافقي الوصول» لإضافتهم._")
+
     if family.companions:
         lines.append(_THIN)
         lines.append(f"👥 *المرافقون ({len(family.companions)}):*")
@@ -152,6 +170,12 @@ def build_family_detail(
         )])
         rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:menu")])
         return "\n".join(lines), InlineKeyboardMarkup(rows)
+
+    if _missing:
+        rows.append([InlineKeyboardButton(
+            f"🔄 إضافة مرافقي الوصول ({len(_missing)})",
+            callback_data=f"{RN}:syncomp_{root.id}",
+        )])
 
     btn = _person_action_button(root, is_root=True)
     if btn:

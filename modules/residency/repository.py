@@ -338,6 +338,41 @@ def get_arrival_patient_docs_by_name(name: str) -> ArrivalDocsRow | None:
         )
 
 
+def get_arrival_companion_names(patient_name: str) -> list[str]:
+    """أسماء مرافقي **الوصول** المسجَّلين لهذا المريض.
+
+    ⚠️ مصدر مستقل تماماً عن `res_persons`: أشخاص الإقامة يُنشَؤون مرة
+    واحدة عند تأكيد الوصول عبر `create_profiles_from_arrival`، وهو نداء
+    **fire-and-forget** داخل `try/except`. فإن فشل، أو أُضيف مرافق لصف
+    الوصول بعد ذلك، يبقى المرافق مسجَّلاً في الوصول و**غائباً عن الإقامة
+    للأبد** — بلا أي شاشة تكشف الفجوة.
+
+    المطابقة بالاسم الحرفي (لا FK بين الجدولين — نمط المشروع كلّه).
+    """
+    from db.session import get_db
+    from db.models import ArrivalPatient, ArrivalCompanion
+
+    name = (patient_name or "").strip()
+    if not name:
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    with get_db() as db:
+        rows = (
+            db.query(ArrivalPatient)
+            .filter(ArrivalPatient.name == name)
+            .order_by(ArrivalPatient.created_at.desc())
+            .all()
+        )
+        for ap in rows:
+            for c in db.query(ArrivalCompanion).filter_by(patient_id=ap.id).all():
+                cname = (c.name or "").strip()
+                if cname and cname not in seen:
+                    seen.add(cname)
+                    out.append(cname)
+    return out
+
+
 def get_arrival_companion_docs_by_name(name: str) -> ArrivalDocsRow | None:
     from db.session import get_db
     from db.models import ArrivalCompanion

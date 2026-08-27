@@ -330,6 +330,19 @@ async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await _show_status_list(update, context, status)
         return
 
+    # 🔄 إضافة مرافقي الوصول الغائبين عن الإقامة (إضافة فقط، بلا حذف)
+    if action.startswith("syncomp_"):
+        root_id = int(action[len("syncomp_"):])
+        n, names = rn_models.sync_companions_from_arrival(root_id, performed_by=uid)
+        if n:
+            await update.callback_query.answer(
+                f"✅ أُضيف {n} مرافق: {'، '.join(names)}", show_alert=True)
+        else:
+            await update.callback_query.answer(
+                "لا يوجد مرافق ناقص للإضافة.", show_alert=True)
+        await _show_family(update, context, root_id, uid)
+        return
+
     if action.startswith("family_"):
         root_id = int(action[len("family_"):])
         await _show_family(update, context, root_id, uid)

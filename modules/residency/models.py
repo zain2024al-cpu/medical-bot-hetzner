@@ -60,6 +60,51 @@ def create_profiles_from_arrival(patients: list[dict], created_by: int | None = 
     return count
 
 
+def sync_companions_from_arrival(root_id: int, performed_by: int | None = None) -> tuple:
+    """يُنشئ في الإقامة كل مرافق مسجَّل في الوصول وغائب هنا.
+
+    Returns: (عدد المُضاف, أسماء المُضافين).
+
+    🔒 **إضافة فقط** — لا يحذف ولا يعدّل أحداً. المرافق الموجود مسبقاً
+    (بأي حالة) يُترَك كما هو، فلا تُفقَد تواريخه ولا وثائقه.
+    الحالة الابتدائية = حالة الجذر نفسها، لا `WAITING_ARRIVAL` دائماً:
+    مريض وصل فعلاً ونُقِل لحالة نشطة، مرافقه المتأخّر يجب أن يبدأ معه لا
+    خلفه بمرحلة.
+    """
+    from db.session import get_db
+    from db.models import ResidencyPerson
+    from modules.residency.repository import get_arrival_companion_names
+
+    with get_db() as db:
+        root = db.query(ResidencyPerson).filter_by(id=root_id).first()
+        if not root or root.parent_id is not None:
+            return 0, []
+
+        existing = {
+            (c.name or "").strip()
+            for c in db.query(ResidencyPerson).filter_by(parent_id=root_id).all()
+        }
+        added = []
+        for cname in get_arrival_companion_names(root.name):
+            if cname in existing:
+                continue
+            comp = ResidencyPerson(
+                name=cname, parent_id=root_id,
+                status=root.status, created_by=performed_by,
+            )
+            db.add(comp)
+            db.flush()
+            _log_transition(db, comp.id, "", root.status, performed_by)
+            added.append(cname)
+
+    if added:
+        logger.info(
+            f"[residency] sync_companions_from_arrival root={root_id} "
+            f"added={len(added)} {added}"
+        )
+    return len(added), added
+
+
 def save_photo(person_id: int, file_id: str) -> bool:
     from db.session import get_db
     from db.models import ResidencyPerson
