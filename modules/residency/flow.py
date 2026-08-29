@@ -680,6 +680,29 @@ async def _handle_calendar_action(update: Update, context: ContextTypes.DEFAULT_
         date_iso = f"{y:04d}-{mo:02d}-{d:02d}"
         person_id = target["person_id"]
 
+        # ── 🔒 التحقّق من منطقية التاريخ قبل أي حفظ ──────────────────────
+        # الرفض يُظهر تنبيهاً ويُبقي المستخدم في **نفس التقويم** ليختار
+        # تاريخاً آخر — لا يُخرِجه من التسلسل ولا يحفظ شيئاً.
+        from modules.residency.days import validate_reminder, validate_expiry
+
+        _p = rn_repo.get_person(person_id)
+        _err = None
+        if _p is not None:
+            _is_remind = (
+                kind == "onboard_remind"
+                or kind == "legacy_move_remind"
+                or kind == "legacy_reminder"
+                or kind == "editf_remind"
+            )
+            _is_expiry = kind in ("legacy_expiry", "editf_expiry")
+            if _is_remind:
+                _err = validate_reminder(_p.expiry_date, date_iso)
+            elif _is_expiry:
+                _err = validate_expiry(_p.reminder_date, date_iso)
+        if _err:
+            await query.answer(_err, show_alert=True)
+            return
+
         if target["kind"] == "onboard_remind":
             rn_models.set_reminder_date(person_id, date_iso)
             context.user_data.pop(_CTX_CAL_TARGET, None)

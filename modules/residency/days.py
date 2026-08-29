@@ -126,3 +126,57 @@ def family_badge(family, since_map: dict | None = None,
     if worst_person is None:
         return ""
     return badge(worst_person, since_map.get(worst_person.id), today=today)
+
+
+# ── التحقّق من منطقية التواريخ ────────────────────────────────────────────────
+# ⚠️ لم يكن ثمة **أي** تحقّق: أي تاريخ يُقبَل كما هو، فيمكن ضبط تنبيه بعد
+# انتهاء الإقامة — وهو تنبيه لا يصل إلا بعد فوات الأوان، أي عديم الفائدة
+# تماماً وهو أخطر من غياب التنبيه لأنه يوهم بوجود متابعة.
+#
+# القاعدة (بنصّ المستخدم): "التنبيه يعني قبل انتهاء الإقامة بفترة، ما
+# يقبل بتاريخ بعد الانتهاء". المدّة نفسها يحدّدها المستخدم (شهر، عشرون
+# يوماً، حسب الحالة) — فلا حدّ أدنى مفروض، والشرط الوحيد: **قبل**.
+
+def validate_reminder(expiry_value, reminder_iso: str) -> str | None:
+    """رسالة الخطأ إن كان التنبيه غير منطقي، أو None إن كان سليماً.
+
+    `expiry_value` — تاريخ انتهاء الإقامة الحالي (قد يكون فارغاً فلا يُقارَن).
+    """
+    exp = parse_date(expiry_value)
+    rem = parse_date(reminder_iso)
+    if exp is None or rem is None:
+        return None                      # لا مقارنة ممكنة ⇒ لا رفض
+    if rem > exp:
+        n = (rem - exp).days
+        return (
+            f"⚠️ تاريخ التنبيه بعد انتهاء الإقامة بـ{n} {_plural(n)}.\n\n"
+            f"🔔 التنبيه: {rem.strftime('%d-%m-%Y')}\n"
+            f"📅 الانتهاء: {exp.strftime('%d-%m-%Y')}\n\n"
+            "التنبيه يجب أن يسبق الانتهاء ليصل في وقته. اختر تاريخاً أبكر."
+        )
+    if rem == exp:
+        return (
+            "⚠️ تاريخ التنبيه هو نفسه يوم انتهاء الإقامة.\n\n"
+            "لن يترك ذلك وقتاً للتجديد — اختر تاريخاً قبله."
+        )
+    return None
+
+
+def validate_expiry(reminder_value, expiry_iso: str) -> str | None:
+    """الوجه الآخر: تعديل الانتهاء ليصير **قبل** تنبيه مضبوط مسبقاً.
+
+    بلا هذا الفحص يمكن الوصول لنفس الحالة غير المنطقية من الباب الآخر.
+    """
+    rem = parse_date(reminder_value)
+    exp = parse_date(expiry_iso)
+    if exp is None or rem is None:
+        return None
+    if rem > exp:
+        n = (rem - exp).days
+        return (
+            f"⚠️ تاريخ الانتهاء يسبق تاريخ التنبيه المضبوط بـ{n} {_plural(n)}.\n\n"
+            f"📅 الانتهاء الجديد: {exp.strftime('%d-%m-%Y')}\n"
+            f"🔔 التنبيه الحالي: {rem.strftime('%d-%m-%Y')}\n\n"
+            "صحّح تاريخ التنبيه أولاً، أو اختر انتهاءً بعده."
+        )
+    return None
