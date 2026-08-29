@@ -22,14 +22,28 @@ GUARD_CALLS = {
 }
 GUARD_DECOS = {"require_admin", "admin_only", "admin_required"}
 
-SKIP_DIRS = ("Archive", "_archive", "scripts", "tests")
+# ⚠️ `venv` **داخل المستودع على الخادم** — بلا استثنائه يمشي الفحص في
+# عشرات آلاف ملفات المكتبات ويحلّلها بـ`ast`، فيبدو **معلّقاً بلا نهاية**.
+# لم يظهر العطل على جهاز التطوير لأن البيئة الافتراضية خارج المجلد هناك.
+# الفحص يخصّ شيفرة المشروع وحدها، فاستثناؤها صحيح لا مجرد تسريع.
+SKIP_DIRS = (
+    "Archive", "_archive", "scripts", "tests",
+    "venv", ".venv", "env", ".git", "node_modules",
+    "site-packages", "__pycache__", "backups", "uploads", "logs",
+)
+
+
+def _skipped(rel: str) -> bool:
+    """أي مسار يقع تحت أحد المجلدات المستثناة — لا بدايته فحسب."""
+    parts = rel.split("/")
+    return any(part in SKIP_DIRS for part in parts)
 
 
 def collect():
     handlers, funcs = [], {}
     for p in ROOT.rglob("*.py"):
         rel = p.relative_to(ROOT).as_posix()
-        if any(rel.startswith(d) for d in SKIP_DIRS):
+        if _skipped(rel):
             continue
         try:
             src = io.open(p, encoding="utf-8").read()
