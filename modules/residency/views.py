@@ -99,7 +99,15 @@ def _person_action_button(person: PersonRow, *, is_root: bool) -> InlineKeyboard
 
 def build_family_detail(
     family: FamilyRow, *, is_admin: bool, doc_counts: dict[int, int] | None = None,
+    back_to: str | None = None,
 ) -> tuple[str, InlineKeyboardMarkup]:
+    """`back_to` — وجهة زر الرجوع.
+
+    ⚠️ كانت كل الشاشات ترجع إلى `{RN}:menu` (القائمة الرئيسية) أياً كان
+    مصدر الدخول. فمن يفتح حالة من "🟢 الحالات النشطة" يُقذَف للقائمة
+    الرئيسية عند الرجوع بدل العودة لقائمته، ويضطر لإعادة التنقّل من الصفر
+    بعد كل حالة يفحصها — وهذا معنى "زر الرجوع لا يعمل بشكل صحيح".
+    الافتراضي `None` يُبقي السلوك القديم لأي مستدعٍ لم يُمرِّر شيئاً."""
     from modules.residency.days import badge as _day_badge
     from modules.residency.repository import get_status_since
 
@@ -168,7 +176,8 @@ def build_family_detail(
         rows.append([InlineKeyboardButton(
             "❌ لا يوجد تمديد", callback_data=f"{RN}:lgc_noext_{root.id}",
         )])
-        rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:menu")])
+        rows.append([InlineKeyboardButton(
+            "⬅️ رجوع", callback_data=back_to or f"{RN}:menu")])
         return "\n".join(lines), InlineKeyboardMarkup(rows)
 
     if _missing:
@@ -194,7 +203,7 @@ def build_family_detail(
         )])
 
     rows.append([InlineKeyboardButton("🖨️ طباعة ملف الحالة", callback_data=f"{RN}:print_{root.id}")])
-    rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:menu")])
+    rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data=back_to or f"{RN}:menu")])
     return "\n".join(lines), InlineKeyboardMarkup(rows)
 
 
@@ -309,7 +318,7 @@ def build_onboard_review(queue: list[PersonRow]) -> tuple[str, InlineKeyboardMar
 
 # ── Issuance (🟣) ────────────────────────────────────────────────────────────
 
-def build_issuance_view(person: PersonRow) -> tuple[str, InlineKeyboardMarkup]:
+def build_issuance_view(person: PersonRow, back_to: str | None = None) -> tuple[str, InlineKeyboardMarkup]:
     expiry_mark = person.expiry_date if person.expiry_date else "➖ غير محدَّد"
     file_mark = "✅ مرفوع" if person.residency_file_id else "⬜ غير مرفوع"
     lines = [
@@ -324,7 +333,7 @@ def build_issuance_view(person: PersonRow) -> tuple[str, InlineKeyboardMarkup]:
     ]
     if person.expiry_date and person.residency_file_id:
         rows.append([InlineKeyboardButton("✅ تأكيد الإصدار", callback_data=f"{RN}:issue_confirm_{person.id}")])
-    rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:menu")])
+    rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data=back_to or f"{RN}:menu")])
     return "\n".join(lines), InlineKeyboardMarkup(rows)
 
 
@@ -407,12 +416,12 @@ def legacy_step_header(person: PersonRow, step: str, idx: int, total: int) -> st
 
 
 def build_legacy_upload_prompt(
-    person: PersonRow, step: str, idx: int, total: int,
+    person: PersonRow, step: str, idx: int, total: int, back_to: str | None = None,
 ) -> tuple[str, InlineKeyboardMarkup]:
     """شاشة رفع ملف (صورة آخر إقامة / الصورة الشخصية)."""
     text = legacy_step_header(person, step, idx, total) + "\n\nأرسل الصورة أو الملف الآن 📎"
     kb = InlineKeyboardMarkup([[
-        InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:menu"),
+        InlineKeyboardButton("⬅️ رجوع", callback_data=back_to or f"{RN}:menu"),
     ]])
     return text, kb
 

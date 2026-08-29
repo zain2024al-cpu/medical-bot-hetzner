@@ -71,7 +71,19 @@ async def _show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     await _edit(update, text, kb)
 
 
+# مفتاح فتات التنقّل — آخر قائمة حالة دخل منها المستخدم. يُستعمَل ليعود
+# زر الرجوع في تفاصيل الطلب إلى قائمته لا إلى القائمة الرئيسية.
+_CTX_LAST_STATUS = "_rn_last_status"
+
+
+def _back_to_list(context) -> str:
+    """وجهة الرجوع من تفاصيل الطلب — قائمته إن عُرِفت، وإلا القائمة الرئيسية."""
+    st = (context.user_data or {}).get(_CTX_LAST_STATUS)
+    return f"{RN}:status_{st}" if st else f"{RN}:menu"
+
+
 async def _show_status_list(update: Update, context: ContextTypes.DEFAULT_TYPE, status: str) -> None:
+    context.user_data[_CTX_LAST_STATUS] = status
     families = rn_repo.get_requests_by_status(status)
     text, kb = rn_views.build_status_list(status, families)
     await _edit(update, text, kb)
@@ -90,7 +102,10 @@ async def _show_family(update: Update, context: ContextTypes.DEFAULT_TYPE, root_
         return
     person_ids = [family.root.id] + [c.id for c in family.companions]
     doc_counts = rn_repo.get_document_counts(person_ids)
-    text, kb = rn_views.build_family_detail(family, is_admin=is_admin(uid), doc_counts=doc_counts)
+    text, kb = rn_views.build_family_detail(
+        family, is_admin=is_admin(uid), doc_counts=doc_counts,
+        back_to=_back_to_list(context),
+    )
     await _edit(update, text, kb)
 
 
@@ -217,7 +232,10 @@ async def _show_legacy_step(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             "kind": "legacy_res_file" if step == "res_file" else "legacy_photo",
             "person_id": person.id, "root_id": root_id, "mode": mode,
         }
-        text, kb = rn_views.build_legacy_upload_prompt(person, step, idx, total)
+        text, kb = rn_views.build_legacy_upload_prompt(
+            person, step, idx, total,
+            back_to=f"{RN}:family_{person.parent_id or person.id}",
+        )
         await _edit(update, text, kb)
         return
 
@@ -300,7 +318,9 @@ async def _show_issuance(update: Update, context: ContextTypes.DEFAULT_TYPE, per
     if person is None:
         await _edit(update, "❌ لم يتم العثور على الشخص.", None)
         return
-    text, kb = rn_views.build_issuance_view(person)
+    # الرجوع لعائلة الشخص لا للقائمة الرئيسية — الأدمن يفحص حالة بعينها
+    _root = person.parent_id or person.id
+    text, kb = rn_views.build_issuance_view(person, back_to=f"{RN}:family_{_root}")
     await _edit(update, text, kb)
 
 
