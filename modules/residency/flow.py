@@ -146,7 +146,8 @@ async def _show_onboard_step(update: Update, context: ContextTypes.DEFAULT_TYPE,
 
     if state["step"] == "review":
         queue_rows = [rn_repo.get_person(pid) for pid in state["queue_ids"]]
-        text, kb = rn_views.build_onboard_review([p for p in queue_rows if p])
+        text, kb = rn_views.build_onboard_review(
+            [p for p in queue_rows if p], back_to=f"{RN}:family_{root_id}")
         await _edit(update, text, kb)
         return
 
@@ -164,7 +165,9 @@ async def _show_onboard_step(update: Update, context: ContextTypes.DEFAULT_TYPE,
     else:  # reminder
         context.user_data[_CTX_CAL_TARGET] = {"kind": "onboard_remind", "person_id": person.id, "root_id": root_id}
         now = datetime.utcnow()
-        text, kb = build_calendar(now.year, now.month, RN, back_callback=f"{RN}:menu")
+        # الرجوع للحالة لا للقائمة الرئيسية — الأدمن داخل تسلسل شخص بعينه
+        text, kb = build_calendar(
+            now.year, now.month, RN, back_callback=f"{RN}:family_{root_id}")
         await _edit(update, text, kb)
 
 
@@ -573,7 +576,10 @@ async def _handle_calendar_action(update: Update, context: ContextTypes.DEFAULT_
     def _back_cb() -> str:
         if is_legacy:
             return f"{RN}:family_{target['root_id']}"
-        return f"{RN}:menu" if kind == "onboard_remind" else f"{RN}:issue_view_{target['person_id']}"
+        if kind == "onboard_remind":
+            # كان `{RN}:menu` — يقفز للقائمة الرئيسية وسط تسلسل الاستكمال
+            return f"{RN}:family_{target.get('root_id') or target['person_id']}"
+        return f"{RN}:issue_view_{target['person_id']}"
 
     if sub in ("cal_prev", "cal_next", "cal_yprev", "cal_ynext", "cal_setmonth"):
         y, m = int(parts[1]), int(parts[2])

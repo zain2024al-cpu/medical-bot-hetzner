@@ -306,7 +306,7 @@ def build_onboard_photo_prompt(
     return text, kb
 
 
-def build_onboard_review(queue: list[PersonRow]) -> tuple[str, InlineKeyboardMarkup]:
+def build_onboard_review(queue: list[PersonRow], back_to: str | None = None) -> tuple[str, InlineKeyboardMarkup]:
     lines = [_DIVIDER, "✅  **مراجعة قبل الحفظ**", ""]
     for p in queue:
         photo_mark = "✅" if p.photo_file_id else "⬜"
@@ -315,7 +315,7 @@ def build_onboard_review(queue: list[PersonRow]) -> tuple[str, InlineKeyboardMar
     root_id = queue[0].id if queue else 0
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("✅ حفظ الإقامة", callback_data=f"{RN}:onboard_save_{root_id}")],
-        [InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:menu")],
+        [InlineKeyboardButton("⬅️ رجوع", callback_data=back_to or f"{RN}:menu")],
     ])
     return "\n".join(lines), kb
 
