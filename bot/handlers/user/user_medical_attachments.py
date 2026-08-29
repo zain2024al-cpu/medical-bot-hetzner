@@ -329,6 +329,13 @@ async def handle_ma_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         except (IndexError, ValueError):
             await query.answer("⚠️ بيانات غير صالحة", show_alert=True)
             return
+        if not _owns_report(report_id, query.from_user.id):
+            logger.warning(
+                f"🚫 MA: المستخدم {query.from_user.id} حاول إغلاق التقرير "
+                f"#{report_id} وهو ليس له"
+            )
+            await query.answer("🚫 هذا التقرير ليس لك.", show_alert=True)
+            return
         ok, uploaded_n, expected_n = _finish_pending_report(report_id)
         if ok:
             await query.edit_message_text(
@@ -393,6 +400,13 @@ async def handle_ma_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
     # ─── اختيار تقرير ───
     if parts[1] == "select":
         report_id = int(parts[2])
+        if not _owns_report(report_id, query.from_user.id):
+            logger.warning(
+                f"🚫 MA: المستخدم {query.from_user.id} حاول فتح التقرير "
+                f"#{report_id} وهو ليس له"
+            )
+            await query.answer("🚫 هذا التقرير ليس لك.", show_alert=True)
+            return
         ma = context.user_data.setdefault("ma_state", {})
         ma["report_id"]    = report_id
         ma["attachments"]  = []
@@ -970,6 +984,28 @@ async def _publish_attachments(query, context, complete_all: bool = False):
 # DB helper
 # ─────────────────────────────────────────────
 
+def _owns_report(report_id: int, tg_id: int) -> bool:
+    """هل يحقّ لهذا المستخدم لمس هذا التقرير؟ (صاحبه أو أدمن)
+
+    ⚠️ **ضروري لأن `callback_data` نصّ ظاهر**: القائمة تُبنى مُفلترة بـ
+    `submitted_by_user_id == tg_id`، لكن ذلك يحمي **ما يُعرَض** لا **ما
+    يُقبَل**. أي مستخدم يستطيع إرسال `ma:select:<رقم>` لتقرير ليس له،
+    فيقرأ اسم المريض والمستشفى والمترجم، ويرفع مرفقات تُنشَر في المجموعة
+    باسم ذلك التقرير، ويُغلقه بـ`ma:finish:<رقم>`. أُثبِت ذلك عملياً قبل
+    الإصلاح. الفلترة عند العرض لا تُغني أبداً عن الفحص عند التنفيذ.
+    """
+    try:
+        from bot.shared_auth import is_admin
+        if is_admin(tg_id):
+            return True
+        with SessionLocal() as s:
+            r = s.query(Report).filter_by(id=report_id).first()
+            return bool(r and r.submitted_by_user_id == tg_id)
+    except Exception as exc:
+        logger.error(f"❌ MA: تعذّر فحص ملكية التقرير #{report_id}: {exc}")
+        return False  # عند الشكّ: امنع
+
+
 def _get_report_by_id(report_id: int):
     try:
         with SessionLocal() as s:
@@ -996,6 +1032,11 @@ def _get_report_by_id(report_id: int):
 
 async def _entry_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """entry point من زر user_action:medical_attachments أو زر النص الثابت"""
+    # نقطة دخول ⇒ **تُبلَغ باردة**: أي مستخدم يرسل الكولباك يصلها بلا أي
+    # بوّابة سابقة، فالاعتماد يُفحَص هنا لا في مكان آخر.
+    from bot.shared_auth import ensure_approved
+    if not await ensure_approved(update, context):
+        return
     await start_medical_attachments(update, context)
 
 

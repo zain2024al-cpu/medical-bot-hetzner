@@ -15,6 +15,19 @@ async def _dispatch_gs_nav(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     data = query.data or ""
     if not data.startswith("gs:"):
         return
+
+    # ⚠️ **مُسجَّل مباشرةً ⇒ يُبلَغ بارداً**: بوّابة الوحدة موجودة في
+    # `arrivals/flow.py` و`departures/flow.py`، لكن **مُلاح الشاشات هذا كان
+    # بلا أي فحص** — فمن يرسل `gs:arrivals` يرى "الأسماء المعلّقة" ولو لم
+    # يملك الوحدة ولم يكن أدمن (أُثبِت عملياً). الشاشة التي تعرض بيانات
+    # تحتاج نفس بوّابة التدفّق الذي تنتمي إليه، لا بوّابة عند التنفيذ فقط.
+    from core.access.access_service import user_has_module
+    from bot.shared_auth import is_admin
+    _uid = query.from_user.id if query.from_user else 0
+    if not (is_admin(_uid) or user_has_module(_uid, "general_services")):
+        logger.warning(f"🚫 GS: محاولة وصول بلا صلاحية من {_uid} إلى «{data}»")
+        await query.answer("🚫 لا تملك صلاحية الخدمات العامة.", show_alert=True)
+        return
     action = data[len("gs:"):]
 
     if action == "main":

@@ -19,6 +19,10 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 GUARD_CALLS = {
     "is_admin", "_is_admin", "_is_authorized", "user_has_module",
     "require_admin", "admin_only", "_check_admin", "is_authorized",
+    # ⚠️ `ensure_approved` كان ناقصاً فظهرت معالِجات محميّة فعلاً ضمن
+    # "بلا حارس" (مثل `start_report`) — أُثبِت بالتجربة أنه يمنع غير
+    # المعتمَد. أي حارس جديد يجب أن يُضاف هنا وإلا صارت الأداة تُنذِر كذباً.
+    "ensure_approved", "is_user_approved", "_owns_report",
 }
 GUARD_DECOS = {"require_admin", "admin_only", "admin_required"}
 
@@ -37,6 +41,9 @@ def _skipped(rel: str) -> bool:
     """أي مسار يقع تحت أحد المجلدات المستثناة — لا بدايته فحسب."""
     parts = rel.split("/")
     return any(part in SKIP_DIRS for part in parts)
+
+
+cold = []
 
 
 def collect():
@@ -74,6 +81,30 @@ def collect():
                             pat = str(kw.value.value)
                     if cbname:
                         handlers.append((rel, n.lineno, cbname, pat))
+
+            # ⚠️ **الرقم الذي يهمّ**: ما يُبلَغ "بارداً" — أي بلا اجتياز أي
+            # بوّابة. معالِج داخل `states` لا يُبلَغ إلا بعد نقطة الدخول
+            # فحمايته منها؛ أما `entry_points` والتسجيل المباشر فيصلهما أي
+            # مستخدم بإرسال الكولباك. خلطهما يُنتِج رقماً مفزعاً بلا معنى.
+            if isinstance(n, ast.Call) and getattr(n.func, "id", "") == "ConversationHandler":
+                for kw in n.keywords:
+                    if kw.arg == "entry_points" and isinstance(kw.value, ast.List):
+                        for e in kw.value.elts:
+                            if (isinstance(e, ast.Call)
+                                    and getattr(e.func, "id", "") == "CallbackQueryHandler"
+                                    and e.args):
+                                nm = (getattr(e.args[0], "id", None)
+                                      or getattr(e.args[0], "attr", None))
+                                if nm:
+                                    cold.append((rel, e.lineno, nm, "entry_point"))
+            if (isinstance(n, ast.Call) and getattr(n.func, "attr", "") == "add_handler"
+                    and n.args and isinstance(n.args[0], ast.Call)
+                    and getattr(n.args[0].func, "id", "") == "CallbackQueryHandler"
+                    and n.args[0].args):
+                nm = (getattr(n.args[0].args[0], "id", None)
+                      or getattr(n.args[0].args[0], "attr", None))
+                if nm:
+                    cold.append((rel, n.lineno, nm, "direct"))
     return handlers, funcs
 
 
@@ -90,7 +121,24 @@ for rel, ln, cb, pat in handlers:
     elif not any(flags):
         unguarded.append((rel, ln, cb, pat))
 
-print(f"معالِجات الكولباك المسجَّلة: {len(handlers)}")
+cold_bad = [c for c in cold if not any(by_name.get(c[2], [False]))]
+cold_admin = [c for c in cold_bad if "admin" in c[0]]
+
+print("═" * 62)
+print("🎯 الأهمّ — ما يُبلَغ بارداً (بلا اجتياز أي بوّابة):")
+print(f"   المجموع: {len(cold)}   ·   بلا حارس: {len(cold_bad)}"
+      f"   ·   منها إداريّ: {len(cold_admin)}")
+if cold_admin:
+    print("   🔴 إداريّ مكشوف — يجب إصلاحه:")
+    for rel, ln, nm, kind in sorted(cold_admin):
+        print(f"      [{kind}] {nm}()  {rel}:{ln}")
+elif cold_bad:
+    print("   ✅ لا إداريّ مكشوف. الباقي واجهات مستخدم:")
+    for rel, ln, nm, kind in sorted(cold_bad):
+        print(f"      [{kind}] {nm}()")
+print("═" * 62 + "\n")
+
+print(f"التفصيل الكامل — معالِجات الكولباك المسجَّلة: {len(handlers)}")
 print(f"  ✅ محميّة:        {len(handlers) - len(unguarded) - len(unknown)}")
 print(f"  ❌ بلا حارس:      {len(unguarded)}")
 print(f"  ❔ تعذّر تحديدها: {len(unknown)}")
@@ -113,4 +161,5 @@ import sys as _sys
 if not ROOT.joinpath("bot").is_dir():
     print(f"\n🔴 لم يُعثَر على مجلد 'bot' داخل {ROOT} — شغّل السكربت من داخل المستودع.")
     _sys.exit(2)
-_sys.exit(1 if unguarded else 0)
+# الفشل يعني: إداريّ يُبلَغ بارداً بلا حارس — لا مجرد رقم كبير
+_sys.exit(1 if cold_admin else 0)
