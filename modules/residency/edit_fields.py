@@ -21,6 +21,7 @@ from modules.residency.constants import RN
 FIELDS = [
     ("expiry",  "📅 تاريخ انتهاء الإقامة", "date"),
     ("remind",  "🔔 تاريخ التنبيه",        "date"),
+    ("lastiss", "🗓️ تاريخ آخر إصدار",     "date"),
     ("resfile", "🪪 صورة الإقامة",         "file"),
     ("photo",   "📷 الصورة الشخصية",       "file"),
 ]
@@ -41,6 +42,8 @@ def current_value(person, key: str) -> str:
     """القيمة الحالية كما تُعرَض — "— (غير مُدخَل)" إن كانت فارغة."""
     if key == "expiry":
         v = (person.expiry_date or "").strip()
+    elif key == "lastiss":
+        v = (getattr(person, "last_issue_date", "") or "").strip()
     elif key == "remind":
         v = (person.reminder_date or "").strip()
     elif key == "resfile":
@@ -99,5 +102,26 @@ def build_file_prompt(person, key: str, back_to: str) -> tuple[str, InlineKeyboa
         "أرسل الملف الجديد الآن 📎\n"
         "_سيحلّ محلّ الملف السابق._"
     )
-    kb = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ رجوع", callback_data=back_to)]])
+    rows = []
+    # 🗑️ الحذف يظهر فقط إن كان ثمة ملف — فلا زر بلا معنى
+    if "✅" in current_value(person, key):
+        rows.append([InlineKeyboardButton(
+            f"🗑️ حذف {label}", callback_data=f"{RN}:edel_{key}_{person.id}")])
+    rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data=back_to)])
+    return text, InlineKeyboardMarkup(rows)
+
+
+def build_delete_confirm(person, key: str, back_to: str) -> tuple[str, InlineKeyboardMarkup]:
+    """تأكيد صريح قبل الحذف — لا حذف بضغطة واحدة."""
+    label = field_label(key)
+    text = (
+        f"🗑️ **حذف {label}**\n\n"
+        f"👤 {person.name}\n\n"
+        "سيُزال الملف من ملف الحالة ولن يُطبَع معه.\n"
+        "_يمكنك رفع بديل في أي وقت._"
+    )
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🗑️ نعم، احذفه", callback_data=f"{RN}:edelgo_{key}_{person.id}")],
+        [InlineKeyboardButton("⬅️ إلغاء", callback_data=back_to)],
+    ])
     return text, kb

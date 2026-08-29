@@ -348,6 +348,58 @@ def move_family_to_status(root_id: int, new_status: str, performed_by: int | Non
     return count
 
 
+# ── الحذف ────────────────────────────────────────────────────────────────────
+# ⚠️ لم تكن ثمة **أي** وسيلة لحذف ملف أو وثيقة: الوثائق تُضاف فقط
+# (`build_documents_list` بها زر إضافة وحده)، وصورة الإقامة/الشخصية
+# تُستبدَل ولا تُحذَف. فوثيقة رُفِعت لشخص خطأً — أو نوع خاطئ — تبقى في
+# ملف الحالة وتُطبَع معه إلى الأبد.
+#
+# 🔒 الحذف هنا يمسّ **مرجع الملف في قاعدة البيانات فقط**؛ الملف نفسه يبقى
+# في تيليجرام. ولا تُحذف أي بيانات أخرى للشخص.
+
+def delete_document(doc_id: int) -> tuple[bool, str]:
+    """يحذف وثيقة واحدة. Returns: (نجاح, اسمها للعرض)."""
+    from db.session import get_db
+    from db.models import ResidencyDocument
+
+    with get_db() as db:
+        d = db.query(ResidencyDocument).filter_by(id=doc_id).first()
+        if not d:
+            return False, ""
+        label = "Form C" if d.doc_type == "form_c" else (d.doc_name or "وثيقة")
+        db.delete(d)
+    logger.info(f"[residency] document deleted id={doc_id} label={label!r}")
+    return True, label
+
+
+def clear_residency_file(person_id: int) -> bool:
+    """يمسح مرجع صورة الإقامة (لا يمسّ تاريخ الانتهاء ولا غيره)."""
+    from db.session import get_db
+    from db.models import ResidencyPerson
+
+    with get_db() as db:
+        p = db.query(ResidencyPerson).filter_by(id=person_id).first()
+        if not p:
+            return False
+        p.residency_file_id = ""
+    logger.info(f"[residency] residency_file cleared person_id={person_id}")
+    return True
+
+
+def clear_photo(person_id: int) -> bool:
+    """يمسح مرجع الصورة الشخصية."""
+    from db.session import get_db
+    from db.models import ResidencyPerson
+
+    with get_db() as db:
+        p = db.query(ResidencyPerson).filter_by(id=person_id).first()
+        if not p:
+            return False
+        p.photo_file_id = ""
+    logger.info(f"[residency] photo cleared person_id={person_id}")
+    return True
+
+
 def delete_stub_person_by_name(name: str) -> int:
     """
     ✅ تُستدعى من services/patients_service.py::delete_patient() — تحذف

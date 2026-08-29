@@ -441,6 +441,45 @@ async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await _show_edit_menu(update, context, int(action[len("edit_"):]))
         return
 
+    # 🗑️ حذف ملف من شاشة التعديل — بتأكيد
+    if action.startswith("edelgo_"):
+        rest = action[len("edelgo_"):]
+        key, _, pid = rest.rpartition("_")
+        pid = int(pid)
+        if key == "resfile":
+            rn_models.clear_residency_file(pid)
+        elif key == "photo":
+            rn_models.clear_photo(pid)
+        await query.answer("🗑️ حُذِف الملف", show_alert=False)
+        await _show_edit_menu(update, context, pid)
+        return
+
+    if action.startswith("edel_"):
+        from modules.residency import edit_fields as ef
+        rest = action[len("edel_"):]
+        key, _, pid = rest.rpartition("_")
+        pid = int(pid)
+        person = rn_repo.get_person(pid)
+        if person is None:
+            await _edit(update, "❌ لم يتم العثور على الشخص.", None)
+            return
+        text, kb = ef.build_delete_confirm(person, key, back_to=f"{RN}:edf_{key}_{pid}")
+        await _edit(update, text, kb)
+        return
+
+    # 🗑️ حذف وثيقة من شاشة الوثائق
+    if action.startswith("docdel_"):
+        doc_id = int(action[len("docdel_"):])
+        person_id = rn_repo.get_document_owner(doc_id)
+        ok, label = rn_models.delete_document(doc_id)
+        await query.answer(f"🗑️ حُذِفت: {label}" if ok else "⚠️ لم تُعثَر الوثيقة",
+                           show_alert=not ok)
+        if person_id:
+            await _show_documents(update, context, person_id)
+        else:
+            await _show_menu(update, context)
+        return
+
     if action.startswith("edf_"):
         rest = action[len("edf_"):]
         key, _, pid = rest.rpartition("_")
@@ -718,6 +757,8 @@ async def _handle_calendar_action(update: Update, context: ContextTypes.DEFAULT_
                 rn_models.set_expiry_date(person_id, date_iso)
             elif fkey == "remind":
                 rn_models.set_reminder_date(person_id, date_iso)
+            elif fkey == "lastiss":
+                rn_models.set_last_issue_date(person_id, date_iso)
             context.user_data.pop(_CTX_CAL_TARGET, None)
             await _show_edit_menu(update, context, person_id)
             return

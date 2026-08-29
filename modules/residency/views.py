@@ -216,16 +216,20 @@ def build_family_detail(
 
 def build_documents_list(person: PersonRow, documents: list[DocumentRow]) -> tuple[str, InlineKeyboardMarkup]:
     lines = [_DIVIDER, "📄  **الوثائق**", "", f"👤 {person.name}", _THIN]
+    rows = []
     if not documents:
         lines.append("لا توجد وثائق بعد.")
     else:
+        # ✅ زر حذف لكل وثيقة — كانت تُضاف ولا تُحذَف أبداً، فوثيقة رُفِعت
+        # خطأً تبقى في ملف الحالة وتُطبَع معه إلى الأبد.
         for d in documents:
             label = "Form C" if d.doc_type == "form_c" else (d.doc_name or "وثيقة")
             lines.append(f"- {label} ✅  ({d.created_at})")
-    kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("➕ إضافة وثيقة", callback_data=f"{RN}:doc_add_{person.id}")],
-        [InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:family_{person.parent_id or person.id}")],
-    ])
+            rows.append([InlineKeyboardButton(
+                f"🗑️ حذف: {label[:24]}", callback_data=f"{RN}:docdel_{d.id}")])
+    rows.append([InlineKeyboardButton("➕ إضافة وثيقة", callback_data=f"{RN}:doc_add_{person.id}")])
+    rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:family_{person.parent_id or person.id}")])
+    kb = InlineKeyboardMarkup(rows)
     return "\n".join(lines), kb
 
 

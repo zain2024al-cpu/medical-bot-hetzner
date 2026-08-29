@@ -260,6 +260,16 @@ def get_status_since(person_ids: list[int]) -> dict[int, str]:
         return {}
 
 
+def get_document_owner(doc_id: int) -> int | None:
+    """صاحب الوثيقة — لإعادة عرض شاشته بعد الحذف."""
+    from db.session import get_db
+    from db.models import ResidencyDocument
+
+    with get_db() as db:
+        d = db.query(ResidencyDocument).filter_by(id=doc_id).first()
+        return d.person_id if d else None
+
+
 def get_document_counts(person_ids: list[int]) -> dict[int, int]:
     from db.session import get_db
     from db.models import ResidencyDocument
