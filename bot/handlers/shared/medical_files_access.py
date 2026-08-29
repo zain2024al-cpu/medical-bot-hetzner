@@ -51,6 +51,23 @@ async def handle_medical_files_callback(update: Update, context: ContextTypes.DE
     if not query or not query.data:
         return
 
+    # 🔒 حارس هوية: `medfiles:<id>` نصّ ظاهر في بطاقة المجموعة، فأي شخص
+    # يستطيع إرساله للبوت خاصةً بأي رقم تقرير ويستلم **ملفات مريض** لا
+    # تخصّه. الزر مُعَدّ للطاقم، فيُشترَط أن يكون الضاغط أدمناً أو مستخدماً
+    # وافق عليه الأدمن.
+    _uid = update.effective_user.id if update.effective_user else 0
+    try:
+        from bot.shared_auth import is_admin, is_user_approved
+        _ok = bool(_uid) and (is_admin(_uid) or is_user_approved(_uid))
+    except Exception:
+        logger.warning("[medfiles] تعذّر التحقّق من الصلاحية — رُفِض احتياطاً",
+                       exc_info=True)
+        _ok = False
+    if not _ok:
+        logger.warning(f"[medfiles] blocked unauthorized user={_uid} data={query.data!r}")
+        await query.answer("🚫 هذه الميزة مخصصة للطاقم المعتمد.", show_alert=True)
+        return
+
     try:
         parts = query.data.split(':', 1)
         if len(parts) < 2:

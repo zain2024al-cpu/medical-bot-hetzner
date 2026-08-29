@@ -3,6 +3,7 @@
 # 🔹 إدارة جدول المترجمين الجديد
 # ================================================
 
+from bot.handlers.admin.decorators import require_admin
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler, MessageHandler, CallbackQueryHandler, filters, CommandHandler
 from telegram.constants import ParseMode
@@ -72,6 +73,7 @@ async def start_schedule_management(update: Update, context: ContextTypes.DEFAUL
     elif update.message:
         await update.message.reply_text(text, reply_markup=keyboard, parse_mode=ParseMode.MARKDOWN)
 
+@require_admin
 async def handle_schedule_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة اختيار العملية"""
     query = update.callback_query
@@ -176,6 +178,7 @@ async def upload_schedule_image(update: Update, context: ContextTypes.DEFAULT_TY
     
     return CONFIRM_SCHEDULE
 
+@require_admin
 async def confirm_schedule_save(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """تأكيد حفظ الجدول"""
     query = update.callback_query
@@ -380,6 +383,7 @@ async def view_current_schedule(update: Update, context: ContextTypes.DEFAULT_TY
     
     return ConversationHandler.END
 
+@require_admin
 async def track_daily_reports(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """تتبع التقارير اليومية"""
     query = update.callback_query
@@ -425,6 +429,7 @@ async def track_daily_reports(update: Update, context: ContextTypes.DEFAULT_TYPE
             parse_mode=ParseMode.MARKDOWN
         )
 
+@require_admin
 async def send_notifications_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """قائمة إرسال التنبيهات"""
     query = update.callback_query
@@ -444,6 +449,7 @@ async def send_notifications_menu(update: Update, context: ContextTypes.DEFAULT_
         parse_mode=ParseMode.MARKDOWN
     )
 
+@require_admin
 async def send_reminders_to_late_translators(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """إرسال تذكيرات للمترجمين المتأخرين"""
     query = update.callback_query
@@ -491,12 +497,14 @@ async def send_reminders_to_late_translators(update: Update, context: ContextTyp
             parse_mode=ParseMode.MARKDOWN
         )
 
+@require_admin
 async def cancel_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """إلغاء رفع الجدول"""
     context.user_data.clear()
     await update.callback_query.edit_message_text("❌ تم إلغاء رفع الجدول.")
     return ConversationHandler.END
 
+@require_admin
 async def back_to_schedule_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """العودة لقائمة إدارة الجدول"""
     query = update.callback_query
@@ -509,6 +517,7 @@ async def back_to_schedule_menu(update: Update, context: ContextTypes.DEFAULT_TY
         parse_mode=ParseMode.MARKDOWN
     )
 
+@require_admin
 async def start_daily_patients_from_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """فتح إدارة أسماء المرضى اليومية من داخل إدارة الجدول"""
     query = update.callback_query
@@ -544,6 +553,7 @@ async def start_daily_patients_from_schedule(update: Update, context: ContextTyp
 # إدارة أسماء المرضى (نظام الملف)
 # ================================================
 
+@require_admin
 async def handle_manage_patients(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """إدارة أسماء المرضى من قاعدة البيانات الموحدة"""
     query = update.callback_query
@@ -615,6 +625,7 @@ async def handle_manage_patients(update: Update, context: ContextTypes.DEFAULT_T
 _PCDEL_PER_PAGE = 8
 
 
+@require_admin
 async def handle_pcdel_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """قائمة كل الأسماء القابلة للحذف من الأنظمة الثلاثة."""
     query = update.callback_query
@@ -664,6 +675,7 @@ async def _render_pcdel_list(query, page: int):
     )
 
 
+@require_admin
 async def handle_pcdel_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """يعرض بالضبط ما سيُحذَف (وما يمنع الحذف) قبل أي تأكيد."""
     query = update.callback_query
@@ -723,6 +735,7 @@ async def handle_pcdel_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+@require_admin
 async def handle_pcdel_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     parts = query.data.split(":")
@@ -763,6 +776,7 @@ def _archive_nav_row(prefix: str, page: int, total_pages: int) -> list:
     return nav
 
 
+@require_admin
 async def handle_patient_archive_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """الشاشة الرئيسية لأرشيف المسافرين."""
     query = update.callback_query
@@ -794,6 +808,7 @@ async def handle_patient_archive_menu(update: Update, context: ContextTypes.DEFA
     )
 
 
+@require_admin
 async def handle_patient_archive_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """قائمة المرضى النشطين — الضغط على اسم يحدّده كمسافر."""
     query = update.callback_query
@@ -844,6 +859,7 @@ async def _render_archive_pick(query, page: int):
     )
 
 
+@require_admin
 async def handle_patient_archive_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """قائمة المسافرين المؤرشفين — الضغط على اسم يُعيده للقوائم."""
     query = update.callback_query
@@ -892,6 +908,7 @@ async def _render_archive_list(query, page: int):
     )
 
 
+@require_admin
 async def handle_patient_archive_toggle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """ينفّذ الأرشفة (parch:do) أو الإرجاع (parch:undo) ثم يعيد عرض نفس القائمة
     والصفحة — حتى يستطيع الأدمن تحديد عدة مسافرين متتاليين بلا رجوع يدوي."""
@@ -925,6 +942,7 @@ async def handle_patient_archive_toggle(update: Update, context: ContextTypes.DE
     else:
         await _render_archive_list(query, page)
 
+@require_admin
 async def handle_view_patient_names(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """عرض أسماء المرضى مع التصفح بالصفحات"""
     query = update.callback_query
@@ -1008,6 +1026,7 @@ async def handle_add_patient_name(update: Update, context: ContextTypes.DEFAULT_
     return "ADD_PATIENT_TYPE"
 
 
+@require_admin
 async def handle_patient_type_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة اختيار نوع ظهور المريض ثم طلب الاسم"""
     query = update.callback_query
@@ -1122,6 +1141,7 @@ async def handle_patient_name_input(update: Update, context: ContextTypes.DEFAUL
 
 
 
+@require_admin
 async def handle_start_patient_with_companions(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """بدء تدفق منفصل تماماً: مريض جديد مرتبط بمرافقين (خدمات عامة/إقامة).
 
@@ -1349,6 +1369,7 @@ async def handle_companion_name_input(update: Update, context: ContextTypes.DEFA
     )
     return ConversationHandler.END
 
+@require_admin
 async def handle_delete_patient_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """واجهة حذف اسم مريض مع التصفح بالصفحات"""
     query = update.callback_query
@@ -1422,6 +1443,7 @@ async def handle_delete_patient_name(update: Update, context: ContextTypes.DEFAU
         parse_mode=ParseMode.MARKDOWN
     )
 
+@require_admin
 async def handle_confirm_delete(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """تأكيد حذف اسم مريض - يستخدم الخدمة الموحدة"""
     query = update.callback_query
@@ -1474,6 +1496,7 @@ async def handle_confirm_delete(update: Update, context: ContextTypes.DEFAULT_TY
             parse_mode=ParseMode.MARKDOWN
         )
 
+@require_admin
 async def handle_edit_patient_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """واجهة تعديل اسم مريض مع التصفح بالصفحات"""
     query = update.callback_query
@@ -1534,6 +1557,7 @@ async def handle_edit_patient_name(update: Update, context: ContextTypes.DEFAULT
         parse_mode=ParseMode.MARKDOWN
     )
 
+@require_admin
 async def handle_select_edit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة اختيار اسم للتعديل - يستخدم ID بدل الindex"""
     query = update.callback_query
@@ -2092,6 +2116,7 @@ def register(app):
     )
     
     # دالة wrapper لإضافة اسم (لحل مشكلة async)
+    @require_admin
     async def start_add_patient_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await handle_add_patient_name(update, context)
     

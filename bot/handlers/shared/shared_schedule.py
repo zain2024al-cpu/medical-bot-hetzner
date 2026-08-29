@@ -5,6 +5,7 @@
 # - للمستخدمين: يعرض الجدول المرفوع
 # ================================================
 
+from bot.handlers.admin.decorators import require_admin
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes, MessageHandler, CallbackQueryHandler, filters
 from bot.shared_auth import is_admin
@@ -104,6 +105,7 @@ async def show_schedule_to_user(update: Update, context: ContextTypes.DEFAULT_TY
     )
 
 
+@require_admin
 async def handle_schedule_admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة خيارات الأدمن لجدول اليوم"""
     query = update.callback_query

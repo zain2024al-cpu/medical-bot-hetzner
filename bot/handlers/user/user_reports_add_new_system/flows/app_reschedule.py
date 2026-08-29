@@ -234,6 +234,23 @@ async def handle_view_reschedule_callback(update: Update, context: ContextTypes.
         query = update.callback_query
         if not query or not query.data:
             return
+
+        # 🔒 حارس هوية: `view_reschedule:<id>` نصّ ظاهر في بطاقة المجموعة،
+        # فأي شخص يستطيع إرساله للبوت بأي رقم تقرير ويقرأ سبب تأجيل موعد
+        # مريض لا يخصّه. الزر للطاقم المعتمد وحده.
+        _uid = update.effective_user.id if update.effective_user else 0
+        try:
+            from bot.shared_auth import is_admin, is_user_approved
+            _ok = bool(_uid) and (is_admin(_uid) or is_user_approved(_uid))
+        except Exception:
+            _logger.warning("[view_reschedule] تعذّر التحقّق — رُفِض احتياطاً",
+                            exc_info=True)
+            _ok = False
+        if not _ok:
+            _logger.warning(f"[view_reschedule] blocked user={_uid} data={query.data!r}")
+            await query.answer("🚫 هذه الميزة مخصصة للطاقم المعتمد.", show_alert=True)
+            return
+
         await query.answer()
         parts = query.data.split(':', 1)
         if len(parts) < 2:
