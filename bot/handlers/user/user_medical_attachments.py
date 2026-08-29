@@ -95,31 +95,38 @@ MONTH_NAMES_AR = {
 WEEKDAYS_AR = ["سبت", "أحد", "اثن", "ثلا", "أرب", "خمي", "جمع"]
 
 
-def _build_ma_calendar(year: int, month: int) -> InlineKeyboardMarkup:
+def _build_ma_calendar(year: int, month: int, prefix: str = "ma_cal",
+                      back_cb: str = "ma:back_list") -> InlineKeyboardMarkup:
+    """تقويم عربي قابل لإعادة الاستخدام.
+
+    ⚠️ `prefix`/`back_cb` أُضيفا ليستعمله **تعديل التقارير** أيضاً بدل نسخ
+    التقويم مرة ثانية. القيم الافتراضية هي سلوك المرفقات الطبية حرفياً،
+    فلا يتغيّر شيء عند من يستدعيه بلا وسائط.
+    """
     cal = calendar.Calendar(firstweekday=calendar.SATURDAY)
     weeks = cal.monthdayscalendar(year, month)
     today = datetime.now(TZ).date()
 
     keyboard = []
     keyboard.append([
-        InlineKeyboardButton("⬅️", callback_data=f"ma_cal:prev:{year}-{month:02d}"),
-        InlineKeyboardButton(f"{MONTH_NAMES_AR[month]} {year}", callback_data="ma_cal:noop"),
-        InlineKeyboardButton("➡️", callback_data=f"ma_cal:next:{year}-{month:02d}"),
+        InlineKeyboardButton("⬅️", callback_data=f"{prefix}:prev:{year}-{month:02d}"),
+        InlineKeyboardButton(f"{MONTH_NAMES_AR[month]} {year}", callback_data=f"{prefix}:noop"),
+        InlineKeyboardButton("➡️", callback_data=f"{prefix}:next:{year}-{month:02d}"),
     ])
-    keyboard.append([InlineKeyboardButton(d, callback_data="ma_cal:noop") for d in WEEKDAYS_AR])
+    keyboard.append([InlineKeyboardButton(d, callback_data=f"{prefix}:noop") for d in WEEKDAYS_AR])
 
     for week in weeks:
         row = []
         for day in week:
             if day == 0:
-                row.append(InlineKeyboardButton(" ", callback_data="ma_cal:noop"))
+                row.append(InlineKeyboardButton(" ", callback_data=f"{prefix}:noop"))
             else:
                 d = date(year, month, day)
                 label = f"({day})" if d == today else str(day)
-                row.append(InlineKeyboardButton(label, callback_data=f"ma_cal:day:{year}-{month:02d}-{day:02d}"))
+                row.append(InlineKeyboardButton(label, callback_data=f"{prefix}:day:{year}-{month:02d}-{day:02d}"))
         keyboard.append(row)
 
-    keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="ma:back_list")])
+    keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data=back_cb)])
     return InlineKeyboardMarkup(keyboard)
 
 

@@ -182,7 +182,7 @@ def reports_submenu():
     """قائمة فرعية لإدارة التقارير"""
     keyboard = [
         [InlineKeyboardButton("➕ إضافة تقرير جديد", callback_data="user_action:add_report")],
-        [InlineKeyboardButton("✏️ تعديل تقارير اليوم", callback_data="user_action:edit")],
+        [InlineKeyboardButton("✏️ تعديل التقارير", callback_data="user_action:edit")],
         [InlineKeyboardButton("📎 المرفقات الطبية", callback_data="user_action:medical_attachments")],
         [InlineKeyboardButton("📜 سجل تقاريري", callback_data="user_action:history")],
         [InlineKeyboardButton("🔙 رجوع للقائمة الرئيسية", callback_data="user_action:back_main")]

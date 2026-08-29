@@ -449,145 +449,202 @@ def get_editable_fields_by_action_type(medical_action):
     return [(f.key, f.label) for f in fields]
 
 
+# ═══════════════════════════════════════════════════════════
+# قائمة التقارير القابلة للتعديل — **مصدر واحد**
+# ═══════════════════════════════════════════════════════════
+# ⚠️ كان الاستعلام مكرّراً حرفياً في `start_edit_reports` وفي
+# `start_edit_reports_from_callback` (زر الرجوع)، ولكلٍّ نسخة احتياطية
+# ثالثة داخل `except`. أي تعديل في واحدة كان يترك الأخرى بسلوك مختلف —
+# فيعرض «الرجوع» غير ما تعرضه القائمة. وُحِّد الآن في `_fetch_reports`.
+#
+# ⚠️ **أُلغيت نافذة الـ٣٦ ساعة** (كانت `now-24h .. now+12h`): كانت تُطبَّق
+# عند **العرض فقط** بلا أي فحص عند الاختيار، فالتقرير الأقدم يُعدَّل فعلاً
+# متى وصل رقمه للمعالِج (أُثبِت بتقرير عمره ٩٠ يوماً). فبدل قيدٍ وهمي
+# يُخفي ولا يمنع، صار التعديل مسموحاً صراحةً لكل تقارير المستخدم مع
+# **اختيار التاريخ وتصفّح الصفحات**. الملكية تبقى مفروضة في
+# `can_modify_report` عند كل اختيار.
+
+_ER_MONTHS = {
+    1: "يناير", 2: "فبراير", 3: "مارس", 4: "أبريل", 5: "مايو", 6: "يونيو",
+    7: "يوليو", 8: "أغسطس", 9: "سبتمبر", 10: "أكتوبر", 11: "نوفمبر", 12: "ديسمبر",
+}
+
+# التقويم مشترك مع «المرفقات الطبية» — بادئة مختلفة لا نسخة ثانية
+from bot.handlers.user.user_medical_attachments import _build_ma_calendar
+
+_ER_PER_PAGE = 8
+
+
+def _er_state(context):
+    return context.user_data.setdefault("er_state", {"date": None, "page": 0})
+
+
+def _fetch_reports(s, user_id, target_date=None, offset=0, limit=_ER_PER_PAGE):
+    """تقارير هذا المستخدم — كلها أو ليوم بعينه. يُرجِع (صفوف، الإجمالي)."""
+    translator = s.query(Translator).filter_by(tg_user_id=user_id).first()
+    translator_id = translator.id if translator else None
+
+    if translator_id:
+        owner_clause = or_(
+            Report.submitted_by_user_id == user_id,
+            and_(
+                Report.submitted_by_user_id.is_(None),
+                Report.translator_id == translator_id,
+            ),
+        )
+    else:
+        owner_clause = (Report.submitted_by_user_id == user_id)
+
+    q = s.query(Report).filter(owner_clause)
+    if target_date is not None:
+        day_start = datetime(target_date.year, target_date.month, target_date.day)
+        q = q.filter(Report.report_date >= day_start,
+                     Report.report_date < day_start + timedelta(days=1))
+
+    total = q.count()
+    rows = (q.order_by(Report.report_date.desc())
+             .offset(offset).limit(limit).all())
+    return rows, total
+
+
+def _build_reports_screen(s, user_id, context):
+    """نصّ القائمة ولوحتها — تُستعمل من نقطة الدخول ومن زر الرجوع معاً."""
+    st = _er_state(context)
+    target_date = st.get("date")
+    page = max(0, int(st.get("page", 0)))
+
+    rows, total = _fetch_reports(s, user_id, target_date,
+                                 offset=page * _ER_PER_PAGE)
+    # صفحة صارت خارج النطاق ⇒ ارجع لآخر صفحة صالحة بدل شاشة فارغة
+    if not rows and total:
+        page = max(0, (total - 1) // _ER_PER_PAGE)
+        st["page"] = page
+        rows, total = _fetch_reports(s, user_id, target_date,
+                                     offset=page * _ER_PER_PAGE)
+
+    scope = (f"📅 **{target_date.strftime('%Y-%m-%d')}**"
+             if target_date else "🗓 **كل التواريخ**")
+    pages = max(1, (total + _ER_PER_PAGE - 1) // _ER_PER_PAGE)
+
+    if total == 0:
+        text = "✏️ **تعديل التقارير**\n\n" + scope + "\n\nلا توجد تقارير مطابقة."
+    else:
+        text = ("✏️ **تعديل التقارير**\n\n"
+                f"{scope} — {total} تقرير  ·  صفحة {page + 1} من {pages}\n\n"
+                "اختر التقرير الذي تريد تعديله:")
+
+    keyboard = []
+    for r in rows:
+        patient = s.query(Patient).filter_by(id=r.patient_id).first()
+        pname = patient.full_name if patient else (r.patient_name or "غير معروف")
+        dstr = r.report_date.strftime("%Y-%m-%d %H:%M") if r.report_date else "بلا تاريخ"
+        keyboard.append([InlineKeyboardButton(
+            f"#{r.id} | {pname} | {dstr}", callback_data=f"edit_report:{r.id}")])
+
+    nav = []
+    if page > 0:
+        nav.append(InlineKeyboardButton("⬅️ السابق", callback_data=f"er:page:{page - 1}"))
+    if (page + 1) * _ER_PER_PAGE < total:
+        nav.append(InlineKeyboardButton("التالي ➡️", callback_data=f"er:page:{page + 1}"))
+    if nav:
+        keyboard.append(nav)
+
+    keyboard.append([InlineKeyboardButton("📅 اختر تاريخاً", callback_data="er:pick_date")])
+    if target_date is not None:
+        keyboard.append([InlineKeyboardButton("🗓 كل التواريخ", callback_data="er:all_dates")])
+    keyboard.append([InlineKeyboardButton("❌ إلغاء", callback_data="edit_cancel")])
+    return text, InlineKeyboardMarkup(keyboard)
+
+
 async def start_edit_reports(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """بداية عملية تعديل التقارير"""
-    import logging
-    logger = logging.getLogger(__name__)
-    
+    """نقطة الدخول: قائمة تقارير المستخدم (كل التواريخ، مصفَّحة)."""
     try:
         user = update.effective_user
-        logger.info(f"🔧 start_edit_reports: بدء عملية تعديل التقارير للمستخدم {user.id}")
-        
-        # التحقق من أن المستخدم أدمن أولاً
-        if is_admin(user.id):
-            logger.info("ℹ️ المستخدم أدمن - توجيه إلى لوحة الأدمن")
-            from bot.handlers.admin.admin_start import admin_start
-            await admin_start(update, context)
+        if not user:
             return ConversationHandler.END
-        
+
+        # جلسة جديدة: ابدأ من كل التواريخ والصفحة الأولى
+        context.user_data["er_state"] = {"date": None, "page": 0}
+        context.user_data["submitted_by_user_id"] = user.id
+
         with SessionLocal() as s:
-            # ✅ البحث عن تقارير اليوم المقدمة من هذا المستخدم (بغض النظر عن اسم المترجم)
-            today = date.today()
-            
-            # نطاق اليوم بتوقيت IST (نفس توقيت report_date المحفوظ في DB)
-            now_ist = _ist_now()
-            today_start = now_ist - timedelta(hours=24)
-            today_end = now_ist + timedelta(hours=12)
+            text, markup = _build_reports_screen(s, user.id, context)
 
-            logger.info(f"🔍 نطاق البحث (IST): من {today_start} إلى {today_end}")
+        await update.message.reply_text(
+            text, reply_markup=markup, parse_mode=ParseMode.MARKDOWN)
+        return SELECT_REPORT
 
-            # ✅ البحث بمعرف المستخدم الذي أنشأ التقرير (submitted_by_user_id)
-            # هذا الحقل يتم حفظه عند إنشاء التقرير بغض النظر عن اسم المترجم المختار
-            # للتقارير القديمة: البحث عن translator_id الذي يطابق tg_user_id للمستخدم الحالي
-            translator = s.query(Translator).filter_by(tg_user_id=user.id).first()
-            translator_id = translator.id if translator else None
-            
-            logger.info(f"🔍 البحث عن تقارير للمستخدم (اليوم):")
-            logger.info(f"   - Telegram user.id: {user.id}")
-            logger.info(f"   - translator found: {translator.full_name if translator else 'None'}")
-            logger.info(f"   - translator_id: {translator_id}")
-            logger.info(f"   - today_start: {today_start}")
-            logger.info(f"   - today_end: {today_end}")
-            
-            # ✅ البحث عن التقارير:
-            # 1. submitted_by_user_id == user.id (للتقارير الجديدة - الأفضل)
-            # 2. translator_id == translator_id AND submitted_by_user_id IS NULL (للتقارير القديمة فقط)
-            try:
-                if translator_id:
-                    reports = s.query(Report).filter(
-                        or_(
-                            Report.submitted_by_user_id == user.id,  # التقارير الجديدة
-                            and_(
-                                Report.submitted_by_user_id.is_(None),  # التقارير القديمة فقط
-                                Report.translator_id == translator_id  # المترجم يطابق المستخدم الحالي
-                            )
-                        ),
-                        Report.report_date >= today_start,
-                        Report.report_date <= today_end
-                    ).order_by(Report.report_date.desc()).all()
-                else:
-                    # إذا لم يكن المستخدم مسجلاً كـ translator، نبحث فقط عن submitted_by_user_id
-                    reports = s.query(Report).filter(
-                        Report.submitted_by_user_id == user.id,
-                        Report.report_date >= today_start,
-                        Report.report_date <= today_end
-                    ).order_by(Report.report_date.desc()).all()
-                    
-                logger.info(f"✅ تم العثور على {len(reports)} تقرير للمستخدم {user.id} (translator_id: {translator_id})")
-                
-                # طباعة تفاصيل التقارير المكتشفة
-                for r in reports:
-                    logger.info(f"   📄 Report #{r.id}: submitted_by={r.submitted_by_user_id}, translator_id={r.translator_id}")
-            except Exception as e:
-                # إذا فشل (مثلاً العمود غير موجود)، نستخدم translator_id فقط
-                logger.warning(f"⚠️ Error using submitted_by_user_id, falling back to translator_id: {e}")
-                if translator_id:
-                    reports = s.query(Report).filter(
-                        Report.translator_id == translator_id,
-                        Report.report_date >= today_start,
-                        Report.report_date <= today_end
-                    ).order_by(Report.report_date.desc()).all()
-                else:
-                    reports = []
-
-            if not reports:
-                await update.message.reply_text(
-                    "📋 **لا توجد تقارير لليوم**\n\n"
-                    f"📅 **التاريخ:** {today.strftime('%Y-%m-%d')}\n\n"
-                    "لم تقم بإضافة أي تقارير اليوم.\n"
-                    "استخدم زر '📝 إضافة تقرير جديد' لإضافة تقرير.",
-                    parse_mode=ParseMode.MARKDOWN
-                )
-                return ConversationHandler.END
-
-            # حفظ معرف المستخدم للتحقق لاحقاً
-            context.user_data['submitted_by_user_id'] = user.id
-
-            # إنشاء قائمة بالتقارير
-            text = "✏️ **تعديل التقارير - اليوم**\n\n"
-            text += f"📅 **{today.strftime('%Y-%m-%d')}** ({len(reports)} تقرير)\n\n"
-            text += "اختر التقرير الذي تريد تعديله:\n\n"
-            
-            keyboard = []
-            for report in reports:
-                # جلب بيانات المريض
-                patient = s.query(Patient).filter_by(id=report.patient_id).first()
-                patient_name = patient.full_name if patient else "غير معروف"
-                
-                # تنسيق التاريخ
-                date_str = report.report_date.strftime('%Y-%m-%d %H:%M')
-                
-                # نص الزر
-                button_text = f"#{report.id} | {patient_name} | {date_str}"
-                keyboard.append([
-                    InlineKeyboardButton(
-                        button_text, 
-                        callback_data=f"edit_report:{report.id}"
-                    )
-                ])
-            
-            keyboard.append([InlineKeyboardButton("❌ إلغاء", callback_data="edit_cancel")])
-            
-            await update.message.reply_text(
-                text,
-                reply_markup=InlineKeyboardMarkup(keyboard),
-                parse_mode=ParseMode.MARKDOWN
-            )
-            
-            logger.info(f"✅ تم عرض قائمة التقارير ({len(reports)} تقرير)")
-            return SELECT_REPORT
-            
     except Exception as e:
         logger.error(f"❌ خطأ في start_edit_reports: {e}", exc_info=True)
         try:
             await update.message.reply_text(
                 "❌ **حدث خطأ أثناء تحميل التقارير**\n\n"
                 "يرجى المحاولة مرة أخرى أو التواصل مع الإدارة.",
-                parse_mode=ParseMode.MARKDOWN
-            )
+                parse_mode=ParseMode.MARKDOWN)
         except Exception:
             logger.debug("تم تجاهل استثناء في start_edit_reports", exc_info=True)
         return ConversationHandler.END
+
+
+async def handle_reports_nav(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تصفّح الصفحات واختيار التاريخ داخل قائمة التعديل (`er:` و`er_cal:`)."""
+    query = update.callback_query
+    await query.answer()
+    data = query.data or ""
+    user_id = query.from_user.id
+    st = _er_state(context)
+
+    # ── التقويم ──
+    if data.startswith("er_cal:"):
+        parts = data.split(":")
+        action = parts[1]
+        if action == "noop":
+            return SELECT_REPORT
+        if action in ("prev", "next"):
+            year, month = int(parts[2][:4]), int(parts[2][5:7])
+            month += 1 if action == "next" else -1
+            if month == 0:
+                month, year = 12, year - 1
+            elif month == 13:
+                month, year = 1, year + 1
+            st["cal_year"], st["cal_month"] = year, month
+            await query.edit_message_text(
+                f"📅 **اختر التاريخ**\n\n{_ER_MONTHS[month]} {year}",
+                reply_markup=_build_ma_calendar(year, month, prefix="er_cal",
+                                                back_cb="er:back_list"),
+                parse_mode=ParseMode.MARKDOWN)
+            return SELECT_REPORT
+        if action == "day":
+            st["date"] = datetime.strptime(parts[2], "%Y-%m-%d").date()
+            st["page"] = 0
+        # يسقط للعرض أدناه
+
+    elif data == "er:pick_date":
+        today = date.today()
+        year = st.get("cal_year", today.year)
+        month = st.get("cal_month", today.month)
+        await query.edit_message_text(
+            f"📅 **اختر التاريخ**\n\n{_ER_MONTHS[month]} {year}",
+            reply_markup=_build_ma_calendar(year, month, prefix="er_cal",
+                                            back_cb="er:back_list"),
+            parse_mode=ParseMode.MARKDOWN)
+        return SELECT_REPORT
+
+    elif data == "er:all_dates":
+        st["date"] = None
+        st["page"] = 0
+
+    elif data.startswith("er:page:"):
+        st["page"] = max(0, int(data.split(":")[2]))
+
+    # er:back_list ⇒ يعرض القائمة بالحالة الحالية بلا تغيير
+
+    with SessionLocal() as s:
+        text, markup = _build_reports_screen(s, user_id, context)
+    await query.edit_message_text(text, reply_markup=markup,
+                                  parse_mode=ParseMode.MARKDOWN)
+    return SELECT_REPORT
+
 
 async def handle_report_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة اختيار التقرير"""
@@ -2869,95 +2926,23 @@ async def show_field_selection(query, context):
         return SELECT_FIELD
 
 async def start_edit_reports_from_callback(query, context):
-    """إعادة عرض قائمة التقارير من callback"""
-    import logging
-    logger = logging.getLogger(__name__)
-    
-    with SessionLocal() as s:
-        # ✅ استخدام معرف المستخدم الفعلي بدلاً من translator_id
-        user_id = context.user_data.get('submitted_by_user_id')
-        if not user_id and query.from_user:
-            user_id = query.from_user.id
-        
-        # البحث عن تقارير اليوم فقط
-        today = date.today()
-        
-        # نطاق اليوم بتوقيت IST (نفس توقيت report_date المحفوظ في DB)
-        now_ist = _ist_now()
-        today_start = now_ist - timedelta(hours=24)
-        today_end = now_ist + timedelta(hours=12)
+    """إعادة عرض قائمة التقارير من callback (زر الرجوع).
 
-        logger.info(f"🔍 نطاق البحث (IST): من {today_start} إلى {today_end}")
-        
-        # ✅ البحث بمعرف المستخدم الذي أنشأ التقرير (نفس منطق start_edit_reports)
-        translator = s.query(Translator).filter_by(tg_user_id=user_id).first()
-        translator_id = translator.id if translator else None
-        
-        try:
-            if translator_id:
-                reports = s.query(Report).filter(
-                    or_(
-                        Report.submitted_by_user_id == user_id,  # التقارير الجديدة
-                        and_(
-                            Report.submitted_by_user_id.is_(None),  # التقارير القديمة فقط
-                            Report.translator_id == translator_id  # المترجم يطابق المستخدم الحالي
-                        )
-                    ),
-                    Report.report_date >= today_start,
-                    Report.report_date <= today_end
-                ).order_by(Report.report_date.desc()).all()
-            else:
-                reports = s.query(Report).filter(
-                    Report.submitted_by_user_id == user_id,
-                    Report.report_date >= today_start,
-                    Report.report_date <= today_end
-                ).order_by(Report.report_date.desc()).all()
-                
-            logger.info(f"✅ تم العثور على {len(reports)} تقرير للمستخدم {user_id} (translator_id: {translator_id})")
-        except Exception as e:
-            logger.warning(f"⚠️ Error using submitted_by_user_id, falling back to translator_id: {e}")
-            if translator_id:
-                reports = s.query(Report).filter(
-                    Report.translator_id == translator_id,
-                    Report.report_date >= today_start,
-                    Report.report_date <= today_end
-                ).order_by(Report.report_date.desc()).all()
-            else:
-                reports = []
-        
-        if not reports:
-            await query.edit_message_text(
-                f"📋 **لا توجد تقارير لليوم**\n\n"
-                f"📅 **التاريخ:** {today.strftime('%Y-%m-%d')}"
-            )
-            return ConversationHandler.END
-        
-        text = "✏️ **تعديل التقارير - اليوم**\n\n"
-        text += f"📅 **{today.strftime('%Y-%m-%d')}** ({len(reports)} تقرير)\n\n"
-        text += "اختر التقرير الذي تريد تعديله:\n\n"
-        
-        keyboard = []
-        for report in reports:
-            patient = s.query(Patient).filter_by(id=report.patient_id).first()
-            patient_name = patient.full_name if patient else "غير معروف"
-            date_str = report.report_date.strftime('%Y-%m-%d %H:%M')
-            button_text = f"#{report.id} | {patient_name} | {date_str}"
-            keyboard.append([
-                InlineKeyboardButton(
-                    button_text, 
-                    callback_data=f"edit_report:{report.id}"
-                )
-            ])
-        
-        keyboard.append([InlineKeyboardButton("❌ إلغاء", callback_data="edit_cancel")])
-        
-        await query.edit_message_text(
-            text,
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode=ParseMode.MARKDOWN
-        )
-        
-        return SELECT_REPORT
+    ⚠️ كانت تحمل **نسخة ثانية كاملة** من الاستعلام ومن بناء اللوحة، بنافذة
+    الـ٣٦ ساعة الخاصة بها. فأي تغيير في القائمة كان يتركها بسلوك مختلف.
+    صارت تستدعي `_build_reports_screen` نفسها — فالرجوع يعرض ما تعرضه
+    القائمة حرفياً، بنفس التاريخ المختار ونفس الصفحة.
+    """
+    user_id = context.user_data.get("submitted_by_user_id")
+    if not user_id and query.from_user:
+        user_id = query.from_user.id
+
+    with SessionLocal() as s:
+        text, markup = _build_reports_screen(s, user_id, context)
+
+    await query.edit_message_text(text, reply_markup=markup,
+                                  parse_mode=ParseMode.MARKDOWN)
+    return SELECT_REPORT
 
 async def cancel_edit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """إلغاء عملية التعديل"""
@@ -2976,7 +2961,10 @@ def register(app):
             SELECT_REPORT: [
                 CallbackQueryHandler(handle_report_selection, pattern="^edit_report:"),
                 CallbackQueryHandler(handle_report_selection, pattern="^edit_back$"),
-                CallbackQueryHandler(handle_report_selection, pattern="^edit_cancel$")
+                CallbackQueryHandler(handle_report_selection, pattern="^edit_cancel$"),
+                # تصفّح الصفحات واختيار التاريخ — بديل نافذة الـ٣٦ ساعة
+                CallbackQueryHandler(handle_reports_nav, pattern="^er:"),
+                CallbackQueryHandler(handle_reports_nav, pattern="^er_cal:"),
             ],
             SELECT_FIELD: [
                 CallbackQueryHandler(handle_field_selection, pattern="^edit_field:"),
