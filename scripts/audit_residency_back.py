@@ -5,8 +5,11 @@
   ٢) هل وجهته **يعالجها** المُوزِّع فعلاً (لا زر ميت)؟
   ٣) هل تُنظَّف الحالة الانتقالية بعد الضغط عليه؟
 """
-import os, sys, asyncio, logging, tempfile
-sys.path.insert(0, r"C:\Users\nalgu\medical-bot-clean")
+import os, sys, asyncio, logging, pathlib, tempfile
+# ⚠️ جذر المشروع من موقع السكربت لا مسار ثابت: المسار المكتوب يدوياً
+# يجعل السكربت **يفشل بصمت على الخادم** (لا وحدات تُستورَد أو صفر
+# نتائج) بلا أي رسالة تكشف السبب.
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 os.environ.setdefault("BOT_TOKEN", "x")
 DB = os.path.join(tempfile.gettempdir(), "audit_back.db")
 if os.path.exists(DB):

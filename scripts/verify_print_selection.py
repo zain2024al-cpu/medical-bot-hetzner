@@ -1,6 +1,9 @@
 """ملف الحالة يحترم ما أُلغي تحديده — كل تركيبة."""
-import os, sys, fitz
-sys.path.insert(0, r"C:\Users\nalgu\medical-bot-clean")
+import os, sys, pathlib, fitz
+# ⚠️ جذر المشروع من موقع السكربت لا مسار ثابت: المسار المكتوب يدوياً
+# يجعل السكربت **يفشل بصمت على الخادم** (لا وحدات تُستورَد أو صفر
+# نتائج) بلا أي رسالة تكشف السبب.
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 os.environ.setdefault("BOT_TOKEN", "x")
 from reportlab.platypus import Paragraph
 CAP = []; _o = Paragraph.__init__
@@ -10,9 +13,21 @@ Paragraph.__init__ = spy
 from arabic_reshaper import reshape
 from bidi.algorithm import get_display
 def r(t): return get_display(reshape(t))
-src = fitz.open(r"C:\Users\nalgu\Downloads\ملف_الحالة_طلال_محمد_الصوفي_محمد_الصوفي_3 (1).pdf")
-imgs = [src.extract_image(i[0])["image"] for pg in src for i in pg.get_images(full=True)]
-passport, photo = imgs[0], imgs[-1]
+# ⚠️ كان يقرأ ملف PDF من مجلد تنزيلات جهاز التطوير — فيفشل على أي جهاز
+# آخر. الصور تُولَّد هنا داخلياً فيعمل السكربت في أي مكان بلا مرفقات.
+def _png(w, h, color):
+    import struct, zlib
+    raw = b"".join(b"\x00" + bytes(color) * w for _ in range(h))
+    def chunk(tag, data):
+        c = tag + data
+        return struct.pack(">I", len(data)) + c + struct.pack(">I", zlib.crc32(c))
+    return (b"\x89PNG\r\n\x1a\n"
+            + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0))
+            + chunk(b"IDAT", zlib.compress(raw))
+            + chunk(b"IEND", b""))
+
+passport, photo = _png(600, 400, (200, 200, 220)), _png(300, 400, (220, 200, 200))
+
 from services.residency_case_pdf import build_case_pdf
 
 SECTIONS = {"الصورة الشخصية:": "صورة", "وثائق الوصول:": "وصول",
