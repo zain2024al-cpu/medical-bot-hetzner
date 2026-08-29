@@ -413,8 +413,13 @@ def build_case_pdf(case: dict) -> io.BytesIO:
     for person in people:
         _rdoc = person.get("residence_doc")
         last_issue = (_rdoc.get("date") if _rdoc and _rdoc.get("source") else None) or "—"
+        # ⚠️ "0" تعني "لا وثائق لهذا الشخص" — وهي **كذب** إن كان المستخدم
+        # لم يختر فئة الوثائق للطباعة أصلاً. تُعرَض "—" حينها: لم تُطلَب،
+        # لا أنها غير موجودة.
+        _docs_n = (str(len(person.get("documents", [])))
+                   if person.get("docs_selected", True) else "—")
         table_data.append([
-            P(str(len(person.get("documents", []))), "td_c"),
+            P(_docs_n, "td_c"),
             P(last_issue, "td_c"),
             P(person.get("status_text", ""), "td_c"),
             P(person["role"], "td_c"),
