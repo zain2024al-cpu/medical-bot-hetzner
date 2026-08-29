@@ -1072,6 +1072,11 @@ async def _build_person_pdf_dict(
 
     return {
         "name": person.name, "role": role, "status_text": status_line(person.status),
+        # ✅ **الاختيار يُمرَّر صراحةً** لا يُستنتَج من فراغ البيانات:
+        # قسم فارغ لأن المستخدم ألغاه ≠ قسم فارغ لأنه لا بيانات فيه.
+        # الأول يُحذَف كلياً، والثاني يُعرَض بـ"لا يوجد".
+        "photo_selected": "photo" in selected,
+        "docs_selected": ("formc" in selected) or ("otherdocs" in selected),
         "photo_bytes": photo_bytes,
         "expiry_date": person.expiry_date,
         "arrival_docs": arrival_docs,

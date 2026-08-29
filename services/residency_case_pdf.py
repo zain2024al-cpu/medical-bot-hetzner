@@ -302,9 +302,16 @@ def build_case_pdf(case: dict) -> io.BytesIO:
         # ⚠️ قد تكون مرفوعة **كوثيقة** في res_documents بدل حقل الصورة
         # (`photo_file_id` فارغ). حينها كانت تُعامَل كوثيقة عادية فتظهر
         # **آخر الملف** — شكوى مباشرة من المستخدم. تُرقّى هنا لموضعها.
+        # ⚠️ الافتراضي True ليبقى أي مستدعٍ لا يمرّر الأعلام كما كان.
+        _photo_on = person.get("photo_selected", True)
+        _docs_on = person.get("docs_selected", True)
+
         photo_bytes = person.get("photo_bytes")
         _docs_all = list(person.get("documents", []))
-        if photo_bytes is None:
+        # 🔴 الترقية كانت تسحب الصورة من الوثائق **متجاوزةً الاختيار**:
+        # من ألغى "الصورة الشخصية" وأبقى "وثائق أخرى" تظهر له الصورة رغم
+        # إلغائها. الترقية الآن مشروطة باختيارها.
+        if _photo_on and photo_bytes is None:
             for _d in _docs_all:
                 if _is_photo_label(_d.get("label", "")) and _d.get("file_bytes"):
                     photo_bytes = _d["file_bytes"]
@@ -314,8 +321,10 @@ def build_case_pdf(case: dict) -> io.BytesIO:
         # **وقد حُذفت الوثيقة أصلاً بفلتر التكرار أدناه** — فتختفي
         # الصورة نهائياً من الملف بلا أي أثر. والمرافق الذي لا صورة له
         # كان يُطبَع بصمت، فيبدو كأن الملف "أخفى" صورته.
-        img = _embed_image(photo_bytes, *photo_max) if photo_bytes else None
-        if img is not None:
+        img = _embed_image(photo_bytes, *photo_max) if (_photo_on and photo_bytes) else None
+        if not _photo_on:
+            pass                      # لم تُختَر ⇒ لا قسم إطلاقاً
+        elif img is not None:
             img.hAlign = "RIGHT"
             block.append(KeepTogether([P("الصورة الشخصية:", "body_b"), img]))
         elif photo_bytes:
@@ -372,6 +381,11 @@ def build_case_pdf(case: dict) -> io.BytesIO:
         kept.sort(key=lambda d: 0 if (d.get("doc_type") == "form_c"
                                       or "form c" in (d.get("label", "") or "").lower())
                   else 1)
+
+        if not _docs_on:
+            story.extend(block)
+            story.append(Spacer(1, 0.5 * cm))
+            continue                  # لم تُختَر أي فئة وثائق ⇒ لا قسم
 
         block.append(Spacer(1, 0.15 * cm))
         if not kept:
