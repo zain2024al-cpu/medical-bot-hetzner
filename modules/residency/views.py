@@ -186,6 +186,11 @@ def build_family_detail(
             callback_data=f"{RN}:syncomp_{root.id}",
         )])
 
+    # ✏️ تصحيح أي بيانات أُدخِلت خطأً — متاح دائماً بعد مغادرة "معلّق الوصول"
+    if root.status != STATUS_WAITING_ARRIVAL:
+        rows.append([InlineKeyboardButton(
+            "✏️ تعديل البيانات", callback_data=f"{RN}:editp_{root.id}")])
+
     btn = _person_action_button(root, is_root=True)
     if btn:
         rows.append([btn])

@@ -128,6 +128,62 @@ async def _show_documents(update: Update, context: ContextTypes.DEFAULT_TYPE, pe
     await _edit(update, text, kb)
 
 
+# ── ✏️ تعديل البيانات ────────────────────────────────────────────────────────
+# مسار تصحيح مستقلّ عن تسلسل الإدخال. سببه: منطق الاستئناف يتخطّى كل حقل
+# مملوء، فقيمة أُدخِلت خطأً لا يُعاد سؤالها أبداً — لا بالرجوع ولا بإعادة
+# الدخول. انظر modules/residency/edit_fields.py.
+
+async def _show_edit_picker(update: Update, context: ContextTypes.DEFAULT_TYPE, root_id: int) -> None:
+    from modules.residency import edit_fields as ef
+    family = rn_repo.get_family(root_id)
+    if family is None:
+        await _edit(update, "❌ لم يتم العثور على الطلب.", None)
+        return
+    text, kb = ef.build_person_picker(family)
+    await _edit(update, text, kb)
+
+
+async def _show_edit_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, person_id: int) -> None:
+    from modules.residency import edit_fields as ef
+    _clear_transient_state(context)
+    person = rn_repo.get_person(person_id)
+    if person is None:
+        await _edit(update, "❌ لم يتم العثور على الشخص.", None)
+        return
+    root_id = person.parent_id or person.id
+    text, kb = ef.build_edit_menu(person, back_to=f"{RN}:editp_{root_id}")
+    await _edit(update, text, kb)
+
+
+async def _start_edit_field(update: Update, context: ContextTypes.DEFAULT_TYPE,
+                            key: str, person_id: int) -> None:
+    from modules.residency import edit_fields as ef
+    person = rn_repo.get_person(person_id)
+    if person is None:
+        await _edit(update, "❌ لم يتم العثور على الشخص.", None)
+        return
+    _clear_transient_state(context)
+    back = f"{RN}:edit_{person_id}"
+
+    if ef.field_kind(key) == "date":
+        context.user_data[_CTX_CAL_TARGET] = {
+            "kind": f"editf_{key}", "person_id": person_id,
+            "root_id": person.parent_id or person.id,
+        }
+        now = datetime.utcnow()
+        cal_text, kb = build_calendar(
+            now.year, now.month, RN, back_callback=back, quick_jump=True)
+        header = f"✏️ **تصحيح {ef.field_label(key)}**\n👤 {person.name}\nالحالي: {ef.current_value(person, key)}"
+        await _edit(update, f"{header}\n\n{cal_text}", kb)
+    else:
+        context.user_data[_CTX_UPLOAD_TARGET] = {
+            "kind": f"editf_{key}", "person_id": person_id,
+            "root_id": person.parent_id or person.id,
+        }
+        text, kb = ef.build_file_prompt(person, key, back_to=back)
+        await _edit(update, text, kb)
+
+
 # ── Onboarding (🟡) ──────────────────────────────────────────────────────────
 
 def _build_onboard_state(root_id: int) -> dict:
@@ -376,6 +432,21 @@ async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await _show_family(update, context, root_id, uid)
         return
 
+    # ✏️ التعديل — قبل `family_` لأن `editp_` لا يتقاطع لكن الترتيب أوضح
+    if action.startswith("editp_"):
+        await _show_edit_picker(update, context, int(action[len("editp_"):]))
+        return
+
+    if action.startswith("edit_"):
+        await _show_edit_menu(update, context, int(action[len("edit_"):]))
+        return
+
+    if action.startswith("edf_"):
+        rest = action[len("edf_"):]
+        key, _, pid = rest.rpartition("_")
+        await _start_edit_field(update, context, key, int(pid))
+        return
+
     if action.startswith("family_"):
         _clear_transient_state(context)
         root_id = int(action[len("family_"):])
@@ -571,11 +642,14 @@ async def _handle_calendar_action(update: Update, context: ContextTypes.DEFAULT_
         return
 
     kind = target["kind"]
+    is_edit = kind.startswith("editf_")
     is_legacy = kind.startswith("legacy_")
 
     def _back_cb() -> str:
         if is_legacy:
             return f"{RN}:family_{target['root_id']}"
+        if is_edit:
+            return f"{RN}:edit_{target['person_id']}"
         if kind == "onboard_remind":
             # كان `{RN}:menu` — يقفز للقائمة الرئيسية وسط تسلسل الاستكمال
             return f"{RN}:family_{target.get('root_id') or target['person_id']}"
@@ -614,6 +688,17 @@ async def _handle_calendar_action(update: Update, context: ContextTypes.DEFAULT_
             rn_models.set_issuance_expiry(person_id, date_iso)
             context.user_data.pop(_CTX_CAL_TARGET, None)
             await _show_issuance(update, context, person_id)
+        elif is_edit:
+            # ✏️ تصحيح تاريخ — يكتب فوق القديم ويعود لشاشة التعديل
+            fkey = kind[len("editf_"):]
+            if fkey == "expiry":
+                rn_models.set_expiry_date(person_id, date_iso)
+            elif fkey == "remind":
+                rn_models.set_reminder_date(person_id, date_iso)
+            context.user_data.pop(_CTX_CAL_TARGET, None)
+            await _show_edit_menu(update, context, person_id)
+            return
+
         elif kind == "legacy_move_remind":
             # ✅ تاريخ تنبيه مطلوب قبل النقل إلى "الحالات النشطة": يُحفَظ ثم
             # يُنتقَل للشخص التالي الناقص، وعند اكتمال الجميع يُنفَّذ النقل.
@@ -727,6 +812,31 @@ async def _on_media_message(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
         rn_models.save_photo(person_id, final_file_id)
         await _show_onboard_step(update, context, target["root_id"])
+
+    elif target["kind"].startswith("editf_"):
+        # ✏️ تصحيح ملف — يحلّ محلّ السابق ثم يعود لشاشة التعديل
+        fkey = target["kind"][len("editf_"):]
+        if fkey == "resfile":
+            rn_models.save_residency_file(person_id, file_id)
+        elif fkey == "photo":
+            final_file_id = file_id
+            try:
+                from modules.residency.photo_processing import resize_to_4x6
+
+                tg_file = await context.bot.get_file(file_id)
+                buf = io.BytesIO()
+                await tg_file.download_to_memory(buf)
+                buf.seek(0)
+                sent = await context.bot.send_photo(
+                    chat_id=update.effective_chat.id,
+                    photo=io.BytesIO(resize_to_4x6(buf.read())),
+                    caption="🖼️ الصورة مضبوطة على مقاس 4×6",
+                )
+                final_file_id = sent.photo[-1].file_id
+            except Exception as exc:
+                logger.warning(f"[residency] edit photo resize failed: {exc}")
+            rn_models.save_photo(person_id, final_file_id)
+        await _show_edit_menu(update, context, person_id)
 
     elif target["kind"] == "legacy_res_file":
         # 🪪 صورة آخر إقامة — مستند رسمي، بلا ضبط مقاس (نفس issue_file).
