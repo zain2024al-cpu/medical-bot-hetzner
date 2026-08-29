@@ -250,6 +250,7 @@ def build_doc_file_prompt(person: PersonRow, doc_name: str) -> tuple[str, Inline
 
 def build_arrival_summary(
     root: PersonRow, arrival: ArrivalDocsRow | None, companions: list[PersonRow],
+    back_to: str | None = None,
 ) -> tuple[str, InlineKeyboardMarkup]:
     """شاشة ملخّص بيانات الوصول — تظهر عند فتح طلب ضمن "🟡 معلّق من
     الوصول"، قبل بدء استكمال الصورة/تاريخ التنبيه، حتى يراجع الإداري
@@ -288,17 +289,20 @@ def build_arrival_summary(
 
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("▶️ ابدأ استكمال البيانات", callback_data=f"{RN}:onboard_resume_{root.id}")],
-        [InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:menu")],
+        [InlineKeyboardButton("⬅️ رجوع", callback_data=back_to or f"{RN}:menu")],
     ])
     return "\n".join(lines), kb
 
 
-def build_onboard_photo_prompt(person: PersonRow, idx: int, total: int) -> tuple[str, InlineKeyboardMarkup]:
+def build_onboard_photo_prompt(
+    person: PersonRow, idx: int, total: int, back_to: str | None = None,
+) -> tuple[str, InlineKeyboardMarkup]:
     text = (
         f"{_DIVIDER}\n📷  **الصورة الشخصية ({idx}/{total})**\n\n"
         f"الشخص: {person.name}\n\nأرسل الصورة الآن."
     )
-    kb = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:menu")]])
+    kb = InlineKeyboardMarkup([[InlineKeyboardButton(
+        "⬅️ رجوع", callback_data=back_to or f"{RN}:menu")]])
     return text, kb
 
 

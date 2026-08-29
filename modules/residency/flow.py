@@ -111,7 +111,8 @@ async def _show_family(update: Update, context: ContextTypes.DEFAULT_TYPE, root_
 
 async def _show_arrival_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, family: rn_repo.FamilyRow) -> None:
     arrival = rn_repo.get_arrival_patient_docs_by_name(family.root.name)
-    text, kb = rn_views.build_arrival_summary(family.root, arrival, family.companions)
+    text, kb = rn_views.build_arrival_summary(
+        family.root, arrival, family.companions, back_to=_back_to_list(context))
     await _edit(update, text, kb)
 
 
@@ -156,7 +157,9 @@ async def _show_onboard_step(update: Update, context: ContextTypes.DEFAULT_TYPE,
 
     if state["step"] == "photo":
         context.user_data[_CTX_UPLOAD_TARGET] = {"kind": "onboard_photo", "person_id": person.id, "root_id": root_id}
-        text, kb = rn_views.build_onboard_photo_prompt(person, state["index"] + 1, len(state["queue_ids"]))
+        text, kb = rn_views.build_onboard_photo_prompt(
+            person, state["index"] + 1, len(state["queue_ids"]),
+            back_to=f"{RN}:family_{root_id}")
         await _edit(update, text, kb)
     else:  # reminder
         context.user_data[_CTX_CAL_TARGET] = {"kind": "onboard_remind", "person_id": person.id, "root_id": root_id}
@@ -345,6 +348,13 @@ async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
     if action.startswith("status_"):
+        # 🔴 التنظيف ضروري هنا وفي `family_`: هاتان الشاشتان هما وجهة زر
+        # الرجوع من **داخل تسلسلات الإدخال** (رفع وثيقة، اختيار تاريخ).
+        # بلا تنظيف يبقى `_rn_cal_target`/`_rn_upload_target` معلّقاً بعد
+        # مغادرة التسلسل، فأول تاريخ يُختار أو ملف يُرفَع لاحقاً — ولو
+        # لشخص آخر — قد يُكتَب في الخطوة المهجورة. `menu` كان ينظّف وحده،
+        # وتوجيه الرجوع لهاتين الشاشتين كشف الفجوة.
+        _clear_transient_state(context)
         status = action[len("status_"):]
         if status in STATUS_ORDER:
             await _show_status_list(update, context, status)
@@ -364,6 +374,7 @@ async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
     if action.startswith("family_"):
+        _clear_transient_state(context)
         root_id = int(action[len("family_"):])
         await _show_family(update, context, root_id, uid)
         return
