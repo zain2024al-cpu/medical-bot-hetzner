@@ -5,6 +5,7 @@
 # - يسمح بالإلغاء أثناء المحادثة
 # =============================
 
+import logging
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import (
     ContextTypes,
@@ -19,6 +20,8 @@ from db.session import SessionLocal
 from db.models import ScheduleImage, DailySchedule, Translator
 from bot.shared_auth import is_admin
 from bot.handlers.admin.decorators import require_admin
+
+logger = logging.getLogger(__name__)
 
 UPLOAD_IMAGE, CONFIRM_SAVE = range(2)
 
@@ -79,10 +82,17 @@ async def handle_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await q.edit_message_text("⚠️ لا يوجد ملف محفوظ. أعد العملية.")
         return ConversationHandler.END
 
-    # مجلد الحفظ المحلي
-    out_dir = os.path.join("uploads", "schedules")
-    os.makedirs(out_dir, exist_ok=True)
-    local_path = os.path.join(out_dir, filename)
+    # 🔒 اسم الملف يأتي من `msg.document.file_name` — يتحكّم فيه المُرسِل.
+    # بناء المسار به مباشرةً كان يسمح بـ"../../app.py" فيُكتَب فوق شيفرة
+    # البوت. `safe_join` يعقّمه ويتحقّق أن الناتج داخل المجلد.
+    from shared.files.safe_paths import safe_join
+    try:
+        local_path = safe_join("uploads/schedules", filename,
+                               default_ext=".jpg", fallback="schedule")
+    except ValueError:
+        logger.warning(f"[schedule] اسم ملف مرفوض: {filename!r}")
+        await q.edit_message_text("⚠️ اسم الملف غير صالح. أعد التسمية وحاول مجدداً.")
+        return ConversationHandler.END
 
     try:
         the_file = await q.get_bot().get_file(file_id)
