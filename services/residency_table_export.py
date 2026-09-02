@@ -53,6 +53,25 @@ def _remaining_text(expiry) -> str:
     return f"متأخّر {abs(left)} {_plural(abs(left))}"
 
 
+# حدّ «قرب الانتهاء» — دون هذا العدد من الأيام يُعتبَر مستعجلاً.
+_SOON_DAYS = 30
+
+
+def _urgency(expiry) -> str:
+    """`over` منتهية · `soon` قاربت · `ok` بعيدة · `none` بلا تاريخ.
+
+    ⚠️ تُحسب **مرة واحدة** هنا لا في كل مولِّد: لو حسبها PDF وExcel كلٌّ
+    بمعياره لاختلف لون الصفّ نفسه بين الملفين.
+    """
+    from modules.residency.days import days_until
+    left = days_until(expiry)
+    if left is None:
+        return "none"
+    if left < 0:
+        return "over"
+    return "soon" if left <= _SOON_DAYS else "ok"
+
+
 def collect_rows(families, status_label_of) -> list[dict]:
     """يفرد العائلات صفوفاً: المريض ثم مرافقوه.
 
@@ -79,6 +98,7 @@ def collect_rows(families, status_label_of) -> list[dict]:
                 "left": _remaining_text(person.expiry_date),
                 "files": str(counts.get(person.id, 0)),
                 "is_root": is_root,
+                "urgency": _urgency(person.expiry_date),
             })
     return rows
 
@@ -108,6 +128,17 @@ def build_pdf(rows: list[dict], title: str) -> io.BytesIO:
                           textColor=colors.HexColor("#1F3864"), leading=12)
     cell = ParagraphStyle("c", fontName=FN, fontSize=8.5, alignment=TA_CENTER, leading=11)
     cell_r = ParagraphStyle("cr", fontName=FN, fontSize=8.5, alignment=TA_RIGHT, leading=11)
+    # ⚠️ اللون على **الفقرة** لا على TableStyle: الخلايا هنا Paragraph،
+    # و`TEXTCOLOR` في TableStyle لا يؤثّر على نصّ داخل فقرة لها نمطها.
+    red_hot = ParagraphStyle("rh", parent=cell, fontName=FB,
+                             textColor=colors.HexColor("#B00020"))
+    red_soft = ParagraphStyle("rs", parent=cell,
+                              textColor=colors.HexColor("#C0392B"))
+    gray_none = ParagraphStyle("gn", parent=cell,
+                               textColor=colors.HexColor("#9E9E9E"))
+
+    def urgent_style(u):
+        return {"over": red_hot, "soon": red_soft, "none": gray_none}.get(u, cell)
     ttl = ParagraphStyle("t", fontName=FB, fontSize=15, alignment=TA_CENTER,
                          textColor=colors.HexColor("#1F3864"), leading=20)
     sub = ParagraphStyle("s", fontName=FN, fontSize=9, alignment=TA_CENTER,
@@ -125,8 +156,11 @@ def build_pdf(rows: list[dict], title: str) -> io.BytesIO:
     for r in rows:
         if r["is_root"]:
             root_lines.append(len(data))
+        us = urgent_style(r["urgency"])
+        # العمودان معاً: التاريخ يقول متى، والمتبقّي يقول كم بقي — تلوين
+        # أحدهما دون الآخر يجعل نصف السطر يصرخ ونصفه صامت.
         data.append([
-            P(r["files"]), P(r["left"]), P(r["expiry"]), P(r["remind"]),
+            P(r["files"]), P(r["left"], us), P(r["expiry"], us), P(r["remind"]),
             P(r["status"]), P(r["role"]), P(r["name"], cell_r), P(r["num"]),
         ])
 
@@ -158,6 +192,11 @@ def build_pdf(rows: list[dict], title: str) -> io.BytesIO:
         # تابعاً له بلا عمود إضافي.
         for ln in root_lines:
             style.append(("BACKGROUND", (0, ln), (-1, ln), colors.HexColor("#F2F6FC")))
+        # المنتهية: خلفية وردية على خانتَي الانتهاء والمتبقّي (الفهرسان ١ و٢
+        # بعد عكس الأعمدة) — تُلمَح من بعيد بلا قراءة الأرقام.
+        for i, r in enumerate(rows, start=1):
+            if r["urgency"] == "over":
+                style.append(("BACKGROUND", (1, i), (2, i), colors.HexColor("#FCE8E6")))
 
         t = Table(data, colWidths=col_w, hAlign="CENTER", repeatRows=1)
         t.setStyle(TableStyle(style))
@@ -217,14 +256,30 @@ def build_excel(rows: list[dict], title: str) -> io.BytesIO:
         c.border = border
 
     root_fill = PatternFill("solid", fgColor="F2F6FC")
+    over_fill = PatternFill("solid", fgColor="FCE8E6")
+    # نفس درجات ألوان الـPDF حرفياً — الملفان يعرضان البيانات نفسها،
+    # فاختلاف اللون بينهما يجعل القارئ يشكّ في أيّهما الصحيح.
+    URGENT_FONT = {
+        "over": Font(bold=True, color="B00020"),
+        "soon": Font(color="C0392B"),
+        "none": Font(color="9E9E9E"),
+    }
+    EXPIRY_COL, LEFT_COL = 5, 6          # فهارس صفرية: الانتهاء، المتبقّي
+
     for r in rows:
         ws.append([r["num"], r["name"], r["role"], r["status"],
                    r["remind"], r["expiry"], r["left"], r["files"]])
+        uf = URGENT_FONT.get(r["urgency"])
         for idx, c in enumerate(ws[ws.max_row]):
             c.border = border
             c.alignment = right if idx == 1 else center
             if r["is_root"]:
                 c.fill = root_fill
+            if idx in (EXPIRY_COL, LEFT_COL):
+                if uf is not None:
+                    c.font = uf
+                if r["urgency"] == "over":
+                    c.fill = over_fill    # يتقدّم على تظليل صفّ المريض
 
     for i, share in enumerate(_WIDTH_SHARES, start=1):
         ws.column_dimensions[get_column_letter(i)].width = max(8, round(share * 105))
