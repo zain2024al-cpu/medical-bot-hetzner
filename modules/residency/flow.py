@@ -138,8 +138,7 @@ async def _send_file(update: Update, context: ContextTypes.DEFAULT_TYPE,
         await context.bot.send_photo(chat_id, file_id, caption=caption)
     except Exception as exc:
         logger.error(f"[residency] تعذّر إرسال الملف {file_id[:20]}: {exc}")
-        await update.callback_query.answer(
-            "⚠️ تعذّر فتح الملف — قد يكون محذوفاً من تليجرام.", show_alert=True)
+        await _alert(update, context, "⚠️ تعذّر فتح الملف — قد يكون محذوفاً من تليجرام.")
 
 
 async def _show_documents(update: Update, context: ContextTypes.DEFAULT_TYPE, person_id: int) -> None:
@@ -412,9 +411,58 @@ async def _show_issuance(update: Update, context: ContextTypes.DEFAULT_TYPE, per
 
 # ── Callback dispatcher ────────────────────────────────────────────────────────
 
-async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+# ── إيصال التنبيهات ──────────────────────────────────────────────────────────
+# ⚠️ **تليجرام يقبل `answerCallbackQuery` مرة واحدة لكل ضغطة.** كان المُرسِل
+# يستهلكها في سطره الثاني (`await _alert(update, context, )`)، فكل تنبيه بعدها يُرفَض
+# ويُفجِّر المعالِج — فيُبتلَع النصّ ولا يتغيّر شيء على الشاشة. النتيجة
+# الحرفية: موظف يضغط «🔵 تم التقديم» فلا يرى شيئاً ولا تنتقل الحالة، بلا
+# أي تفسير. أُثبِت بمحاكاة تحترم قاعدة المرة الواحدة (المحاكاة السابقة
+# كانت تسمح بإجابتين فأعطت ثقة كاذبة).
+#
+# القاعدة الآن: لا يُجاب في البداية إطلاقاً. من يريد تنبيهاً ينادي `_alert`،
+# ومن لا يريد تُجاب ضغطته **في النهاية** — وهذا أيضاً أصحّ سلوكاً: تبقى
+# دائرة الانتظار على الزر حتى يكتمل العمل فعلاً.
+_ANSWERED = "_rn_answered"
+
+
+async def _alert(update: Update, context: ContextTypes.DEFAULT_TYPE,
+                 text: str, *, show_alert: bool = True) -> None:
+    """تنبيه يصل فعلاً — وإن تعذّر، يُرسَل رسالةً مستقلة بدل أن يضيع."""
     query = update.callback_query
-    await query.answer()
+    if query is None:
+        return
+    try:
+        await query.answer(text, show_alert=show_alert)
+        if context.user_data is not None:
+            context.user_data[_ANSWERED] = True
+        return
+    except Exception as exc:
+        logger.warning(f"[residency] تعذّر تنبيه المستخدم عبر answer: {exc}")
+    try:
+        await context.bot.send_message(update.effective_chat.id, text)
+    except Exception as exc:
+        logger.error(f"[residency] وضاع التنبيه «{text[:40]}»: {exc}")
+
+
+async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """غلاف يضمن إجابة الضغطة **مرة واحدة** — بعد انتهاء العمل لا قبله."""
+    query = update.callback_query
+    if query is None:
+        return
+    if context.user_data is not None:
+        context.user_data.pop(_ANSWERED, None)
+    try:
+        await _dispatch_action(update, context)
+    finally:
+        if not (context.user_data or {}).pop(_ANSWERED, False):
+            try:
+                await query.answer()
+            except Exception:
+                pass
+
+
+async def _dispatch_action(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
     data = query.data or ""
     if not data.startswith(f"{RN}:"):
         return
@@ -448,11 +496,10 @@ async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         root_id = int(action[len("syncomp_"):])
         n, names = rn_models.sync_companions_from_arrival(root_id, performed_by=uid)
         if n:
-            await update.callback_query.answer(
-                f"✅ أُضيف {n} مرافق: {'، '.join(names)}", show_alert=True)
+            await _alert(update, context,
+                         f"✅ أُضيف {n} مرافق: {'، '.join(names)}")
         else:
-            await update.callback_query.answer(
-                "لا يوجد مرافق ناقص للإضافة.", show_alert=True)
+            await _alert(update, context, "لا يوجد مرافق ناقص للإضافة.")
         await _show_family(update, context, root_id, uid)
         return
 
@@ -474,7 +521,7 @@ async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             rn_models.clear_residency_file(pid)
         elif key == "photo":
             rn_models.clear_photo(pid)
-        await query.answer("🗑️ حُذِف الملف", show_alert=False)
+        await _alert(update, context, "🗑️ حُذِف الملف", show_alert=False)
         await _show_edit_menu(update, context, pid)
         return
 
@@ -496,8 +543,9 @@ async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         doc_id = int(action[len("docdel_"):])
         person_id = rn_repo.get_document_owner(doc_id)
         ok, label = rn_models.delete_document(doc_id)
-        await query.answer(f"🗑️ حُذِفت: {label}" if ok else "⚠️ لم تُعثَر الوثيقة",
-                           show_alert=not ok)
+        await _alert(update, context,
+                     f"🗑️ حُذِفت: {label}" if ok else "⚠️ لم تُعثَر الوثيقة",
+                     show_alert=not ok)
         if person_id:
             await _show_documents(update, context, person_id)
         else:
@@ -572,10 +620,16 @@ async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     if action.startswith("submit_"):
         person_id = int(action[len("submit_"):])
-        if not is_admin(uid):
-            await query.answer("🚫 هذا الزر للأدمن فقط.", show_alert=True)
-            return
-        rn_models.mark_submitted(person_id, performed_by=uid)
+        # ⚠️ كان هذا **الزر الوحيد** في الوحدة كلها المقيَّد بالأدمن، بينما
+        # رفع الملفات والتواريخ ونقل الحالات السابقة وتوثيق الإصدار وحذف
+        # الوثائق كلها مفتوحة لمن يملك وحدة الإقامات. فكان الموظف يُكمل
+        # دورة العمل كاملة ويتعثّر في خطوة واحدة وسطها. رُفِع القيد بقرار
+        # المستخدم؛ `_is_authorized` في المُرسِل تبقى هي البوّابة.
+        if not rn_models.mark_submitted(person_id, performed_by=uid):
+            # ⚠️ القيمة المُعادة كانت **مُهمَلة**: إن رفضت الدالة (الحالة
+            # ليست EXPIRY_PENDING) تُعاد رسم الشاشة كأن شيئاً لم يكن.
+            await _alert(update, context,
+                         "⚠️ تعذّر النقل — قد تكون الحالة عولجت مسبقاً.")
         root_id = rn_repo.get_root_id_for_person(person_id)
         if root_id:
             await _show_family(update, context, root_id, uid)
@@ -613,7 +667,7 @@ async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         person_id = int(action[len("issue_confirm_"):])
         ok = rn_models.confirm_issuance(person_id, performed_by=uid)
         if not ok:
-            await query.answer("⚠️ أكمل تاريخ الانتهاء والملف أولاً.", show_alert=True)
+            await _alert(update, context, "⚠️ أكمل تاريخ الانتهاء والملف أولاً.")
             return
         root_id = rn_repo.get_root_id_for_person(person_id)
         if root_id:
@@ -626,7 +680,7 @@ async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await _send_file(update, context, person.residency_file_id,
                              f"🪪 ملف الإقامة — {person.name}")
         else:
-            await query.answer("لا يوجد ملف إقامة مرفوع.", show_alert=True)
+            await _alert(update, context, "لا يوجد ملف إقامة مرفوع.")
         return
 
     if action.startswith("photoview_"):
@@ -635,7 +689,7 @@ async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await _send_file(update, context, person.photo_file_id,
                              f"🖼️ الصورة الشخصية — {person.name}")
         else:
-            await query.answer("لا توجد صورة مرفوعة.", show_alert=True)
+            await _alert(update, context, "لا توجد صورة مرفوعة.")
         return
 
     if action.startswith("docview_"):
@@ -645,7 +699,7 @@ async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             label = "Form C" if doc.doc_type == "form_c" else (doc.doc_name or "وثيقة")
             await _send_file(update, context, doc.file_id, f"📄 {label}")
         else:
-            await query.answer("الوثيقة غير موجودة.", show_alert=True)
+            await _alert(update, context, "الوثيقة غير موجودة.")
         return
 
     if action.startswith("docs_"):
@@ -791,7 +845,7 @@ async def _handle_calendar_action(update: Update, context: ContextTypes.DEFAULT_
             elif _is_expiry:
                 _err = validate_expiry(_p.reminder_date, date_iso)
         if _err:
-            await query.answer(_err, show_alert=True)
+            await _alert(update, context, _err)
             return
 
         if target["kind"] == "onboard_remind":
@@ -1146,10 +1200,10 @@ async def _send_case_pdf(
 
     family = rn_repo.get_family(root_id)
     if family is None:
-        await update.callback_query.answer("❌ لم يتم العثور على الطلب.", show_alert=True)
+        await _alert(update, context, "❌ لم يتم العثور على الطلب.")
         return
 
-    await update.callback_query.answer("⏳ جارٍ تجهيز الملف...")
+    await _alert(update, context, "⏳ جارٍ تجهيز الملف...", show_alert=False)
 
     people = [await _build_person_pdf_dict(context, family.root, role="المريض", selected=selected)]
     for c in family.companions:
