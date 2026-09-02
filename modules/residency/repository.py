@@ -284,6 +284,49 @@ def get_document_counts(person_ids: list[int]) -> dict[int, int]:
     return counts
 
 
+def get_document(doc_id: int) -> DocumentRow | None:
+    """وثيقة واحدة بمعرّفها — لعرض الملف من شاشة الملفات."""
+    from db.session import get_db
+    from db.models import ResidencyDocument
+
+    with get_db() as db:
+        d = db.query(ResidencyDocument).filter_by(id=doc_id).first()
+        if not d:
+            return None
+        return DocumentRow(
+            id=d.id, person_id=d.person_id, doc_type=d.doc_type,
+            doc_name=d.doc_name or "", file_id=d.file_id,
+            created_at=d.created_at.strftime("%Y-%m-%d") if d.created_at else "",
+        )
+
+
+def get_file_counts(person_ids: list[int]) -> dict[int, int]:
+    """عدد **كل** ملفات الشخص: وثائق `res_documents` + ملف الإقامة + الصورة.
+
+    ⚠️ `get_document_counts` تعدّ الجدول وحده، فشخص رفع ملف إقامة وصورة
+    ولم يُضِف وثيقة كان يظهر «📄 الوثائق (0)» ثم «لا توجد وثائق بعد» —
+    والملفان محفوظان فعلاً في حقلَي `residency_file_id`/`photo_file_id`
+    على الشخص نفسه. العدّ والعرض يجب أن يشملا المصدرين معاً.
+    """
+    from db.session import get_db
+    from db.models import ResidencyDocument, ResidencyPerson
+
+    counts = {pid: 0 for pid in person_ids}
+    if not person_ids:
+        return counts
+    with get_db() as db:
+        for d in db.query(ResidencyDocument).filter(
+                ResidencyDocument.person_id.in_(person_ids)).all():
+            counts[d.person_id] = counts.get(d.person_id, 0) + 1
+        for p in db.query(ResidencyPerson).filter(
+                ResidencyPerson.id.in_(person_ids)).all():
+            if (p.residency_file_id or "").strip():
+                counts[p.id] = counts.get(p.id, 0) + 1
+            if (p.photo_file_id or "").strip():
+                counts[p.id] = counts.get(p.id, 0) + 1
+    return counts
+
+
 def get_onboarding_queue(root_id: int) -> list[PersonRow]:
     """المريض (root_id) ثم كل مرافقيه بترتيب الإضافة — لتسلسل 🟡."""
     from db.session import get_db

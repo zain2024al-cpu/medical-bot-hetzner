@@ -101,7 +101,9 @@ async def _show_family(update: Update, context: ContextTypes.DEFAULT_TYPE, root_
         await _show_arrival_summary(update, context, family)
         return
     person_ids = [family.root.id] + [c.id for c in family.companions]
-    doc_counts = rn_repo.get_document_counts(person_ids)
+    # يشمل ملف الإقامة والصورة لا وثائق الجدول وحدها — وإلا ظهر
+    # «الوثائق (0)» لشخص ملفاته مرفوعة فعلاً.
+    doc_counts = rn_repo.get_file_counts(person_ids)
     text, kb = rn_views.build_family_detail(
         family, is_admin=is_admin(uid), doc_counts=doc_counts,
         back_to=_back_to_list(context),
@@ -117,6 +119,28 @@ async def _show_arrival_summary(update: Update, context: ContextTypes.DEFAULT_TY
 
 
 # ── Documents (📄) ───────────────────────────────────────────────────────────
+
+async def _send_file(update: Update, context: ContextTypes.DEFAULT_TYPE,
+                     file_id: str, caption: str) -> None:
+    """يرسل ملفاً بـfile_id مهما كان نوعه عند الرفع.
+
+    ⚠️ `file_id` في تليجرام **مرتبط بنوعه**: مُعرِّف صورة يُرفَض من
+    `sendDocument` والعكس. والوثيقة قد تُرفَع صورةً أو ملفاً، ولا نخزّن
+    النوع — فتُجرَّب الطريقتان بدل افتراض واحدة.
+    """
+    chat_id = update.effective_chat.id
+    try:
+        await context.bot.send_document(chat_id, file_id, caption=caption)
+        return
+    except Exception:
+        pass
+    try:
+        await context.bot.send_photo(chat_id, file_id, caption=caption)
+    except Exception as exc:
+        logger.error(f"[residency] تعذّر إرسال الملف {file_id[:20]}: {exc}")
+        await update.callback_query.answer(
+            "⚠️ تعذّر فتح الملف — قد يكون محذوفاً من تليجرام.", show_alert=True)
+
 
 async def _show_documents(update: Update, context: ContextTypes.DEFAULT_TYPE, person_id: int) -> None:
     person = rn_repo.get_person(person_id)
@@ -594,6 +618,34 @@ async def _dispatch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         root_id = rn_repo.get_root_id_for_person(person_id)
         if root_id:
             await _show_family(update, context, root_id, uid)
+        return
+
+    if action.startswith("resview_"):
+        person = rn_repo.get_person(int(action[len("resview_"):]))
+        if person and (person.residency_file_id or "").strip():
+            await _send_file(update, context, person.residency_file_id,
+                             f"🪪 ملف الإقامة — {person.name}")
+        else:
+            await query.answer("لا يوجد ملف إقامة مرفوع.", show_alert=True)
+        return
+
+    if action.startswith("photoview_"):
+        person = rn_repo.get_person(int(action[len("photoview_"):]))
+        if person and (person.photo_file_id or "").strip():
+            await _send_file(update, context, person.photo_file_id,
+                             f"🖼️ الصورة الشخصية — {person.name}")
+        else:
+            await query.answer("لا توجد صورة مرفوعة.", show_alert=True)
+        return
+
+    if action.startswith("docview_"):
+        doc_id = int(action[len("docview_"):])
+        doc = rn_repo.get_document(doc_id)
+        if doc:
+            label = "Form C" if doc.doc_type == "form_c" else (doc.doc_name or "وثيقة")
+            await _send_file(update, context, doc.file_id, f"📄 {label}")
+        else:
+            await query.answer("الوثيقة غير موجودة.", show_alert=True)
         return
 
     if action.startswith("docs_"):

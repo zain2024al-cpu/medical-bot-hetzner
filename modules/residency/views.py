@@ -213,20 +213,47 @@ def build_family_detail(
 
 
 # ── Documents (📄) ───────────────────────────────────────────────────────────
-
 def build_documents_list(person: PersonRow, documents: list[DocumentRow]) -> tuple[str, InlineKeyboardMarkup]:
-    lines = [_DIVIDER, "📄  **الوثائق**", "", f"👤 {person.name}", _THIN]
+    """كل ملفات الشخص — الوثائق **وملف الإقامة والصورة**، مع زرّ عرض لكلٍّ.
+
+    ⚠️ كانت تعرض جدول `res_documents` وحده وبلا أي زرّ عرض إطلاقاً: شخص
+    رفع إقامته وصورته يرى «لا توجد وثائق بعد»، ومن رفع وثيقة لا يستطيع
+    فتحها — الطريقة الوحيدة لرؤية أي ملف كانت طباعة ملف الحالة كاملاً.
+    """
+    lines = [_DIVIDER, "📄  **الملفات**", "", f"👤 {person.name}", _THIN]
     rows = []
-    if not documents:
-        lines.append("لا توجد وثائق بعد.")
-    else:
+
+    has_res   = bool((person.residency_file_id or "").strip())
+    has_photo = bool((person.photo_file_id or "").strip())
+
+    if has_res:
+        lines.append("- 🪪 ملف الإقامة ✅")
+        rows.append([InlineKeyboardButton(
+            "🪪 عرض ملف الإقامة", callback_data=f"{RN}:resview_{person.id}")])
+    if has_photo:
+        lines.append("- 🖼️ الصورة الشخصية ✅")
+        rows.append([InlineKeyboardButton(
+            "🖼️ عرض الصورة الشخصية", callback_data=f"{RN}:photoview_{person.id}")])
+
+    if documents:
         # ✅ زر حذف لكل وثيقة — كانت تُضاف ولا تُحذَف أبداً، فوثيقة رُفِعت
         # خطأً تبقى في ملف الحالة وتُطبَع معه إلى الأبد.
         for d in documents:
             label = "Form C" if d.doc_type == "form_c" else (d.doc_name or "وثيقة")
-            lines.append(f"- {label} ✅  ({d.created_at})")
-            rows.append([InlineKeyboardButton(
-                f"🗑️ حذف: {label[:24]}", callback_data=f"{RN}:docdel_{d.id}")])
+            lines.append(f"- 📄 {label} ✅  ({d.created_at})")
+            rows.append([
+                InlineKeyboardButton(f"👁️ {label[:18]}", callback_data=f"{RN}:docview_{d.id}"),
+                InlineKeyboardButton("🗑️ حذف", callback_data=f"{RN}:docdel_{d.id}"),
+            ])
+
+    if not (has_res or has_photo or documents):
+        lines.append("لا توجد ملفات بعد.")
+    elif has_res or has_photo:
+        # حذف هذين الملفين له مسار واحد قائم (✏️ تعديل البيانات) — لا يُكرَّر
+        # هنا حتى لا يوجد طريقان للحذف يتباعدان مع الوقت.
+        lines.append(_THIN)
+        lines.append("لتبديل ملف الإقامة أو الصورة أو حذفهما: «✏️ تعديل البيانات».")
+
     rows.append([InlineKeyboardButton("➕ إضافة وثيقة", callback_data=f"{RN}:doc_add_{person.id}")])
     rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:family_{person.parent_id or person.id}")])
     kb = InlineKeyboardMarkup(rows)
