@@ -46,10 +46,24 @@ def _family_summary_line(family: FamilyRow) -> str:
         return f"👤 {family.root.name}\n👥 المرافقون: {len(family.companions)}"
     return f"👤 {family.root.name}"
 
+_RN_PER_PAGE = 8
 
-def build_status_list(status: str, families: list[FamilyRow]) -> tuple[str, InlineKeyboardMarkup]:
+
+def build_status_list(status: str, families: list[FamilyRow],
+                      page: int = 0, per_page: int = _RN_PER_PAGE) -> tuple[str, InlineKeyboardMarkup]:
+    """قائمة الحالة **مصفَّحة**.
+
+    ⚠️ كانت تُخرِج زراً لكل طلب دفعةً واحدة — و«الحالات النشطة» وحدها ٥٣
+    طلباً. عدا صعوبة التصفّح، تليجرام يرفض الرسالة إن تجاوزت حدّها، فكانت
+    القائمة قنبلةً موقوتة تنفجر مع نموّ البيانات لا عطلاً ظاهراً اليوم.
+    """
     from modules.residency.days import family_badge
     from modules.residency.repository import get_status_since
+
+    total = len(families)
+    pages = max(1, (total + per_page - 1) // per_page)
+    page = max(0, min(int(page), pages - 1))     # صفحة خارج النطاق تُصحَّح
+    chunk = families[page * per_page:(page + 1) * per_page]
 
     lines = [_DIVIDER, f"{status_line(status)}", ""]
     rows = []
@@ -57,12 +71,12 @@ def build_status_list(status: str, families: list[FamilyRow]) -> tuple[str, Inli
         lines.append("✅ لا توجد طلبات بهذه الحالة حالياً.")
     else:
         # ✅ استعلام واحد لكل الأشخاص المعروضين — لا استعلام داخل الحلقة.
-        _ids = [p.id for f in families for p in ([f.root] + list(f.companions))]
+        _ids = [p.id for f in chunk for p in ([f.root] + list(f.companions))]
         _since = get_status_since(_ids)
 
-        lines.append(f"يوجد {len(families)} طلباً — اضغط لفتح التفاصيل:")
+        lines.append(f"يوجد {total} طلباً — صفحة {page + 1} من {pages}")
         lines.append(_THIN)
-        for fam in families:
+        for fam in chunk:
             comp_note = f" (+{len(fam.companions)} مرافق)" if fam.companions else ""
             # شارة العائلة = أشدّ أفرادها إلحاحاً (قد يكون مرافقاً لا المريض)
             bdg = family_badge(fam, _since)
@@ -71,6 +85,17 @@ def build_status_list(status: str, families: list[FamilyRow]) -> tuple[str, Inli
             rows.append([InlineKeyboardButton(
                 f"📂 {fam.root.name[:22]}{note}", callback_data=f"{RN}:family_{fam.root.id}",
             )])
+
+        nav = []
+        if page > 0:
+            nav.append(InlineKeyboardButton(
+                "⬅️ السابق", callback_data=f"{RN}:lpage:{status}:{page - 1}"))
+        if page + 1 < pages:
+            nav.append(InlineKeyboardButton(
+                "التالي ➡️", callback_data=f"{RN}:lpage:{status}:{page + 1}"))
+        if nav:
+            rows.append(nav)
+
     rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:menu")])
     return "\n".join(lines), InlineKeyboardMarkup(rows)
 

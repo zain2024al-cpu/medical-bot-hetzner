@@ -76,16 +76,26 @@ async def _show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 _CTX_LAST_STATUS = "_rn_last_status"
 
 
+# رقم الصفحة المعروضة من قائمة الحالة — حتى يعود زر الرجوع إليها هي لا
+# إلى أولها. من فتح طلباً من الصفحة الرابعة يُفترض أن يجدها كما تركها.
+_CTX_LAST_PAGE = "_rn_last_page"
+
+
 def _back_to_list(context) -> str:
-    """وجهة الرجوع من تفاصيل الطلب — قائمته إن عُرِفت، وإلا القائمة الرئيسية."""
-    st = (context.user_data or {}).get(_CTX_LAST_STATUS)
-    return f"{RN}:status_{st}" if st else f"{RN}:menu"
+    """وجهة الرجوع من تفاصيل الطلب — قائمته **وصفحتها**، وإلا القائمة الرئيسية."""
+    ud = context.user_data or {}
+    st = ud.get(_CTX_LAST_STATUS)
+    if not st:
+        return f"{RN}:menu"
+    return f"{RN}:lpage:{st}:{int(ud.get(_CTX_LAST_PAGE, 0))}"
 
 
-async def _show_status_list(update: Update, context: ContextTypes.DEFAULT_TYPE, status: str) -> None:
+async def _show_status_list(update: Update, context: ContextTypes.DEFAULT_TYPE,
+                            status: str, page: int = 0) -> None:
     context.user_data[_CTX_LAST_STATUS] = status
+    context.user_data[_CTX_LAST_PAGE] = page
     families = rn_repo.get_requests_by_status(status)
-    text, kb = rn_views.build_status_list(status, families)
+    text, kb = rn_views.build_status_list(status, families, page=page)
     await _edit(update, text, kb)
 
 
@@ -478,6 +488,19 @@ async def _dispatch_action(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await _show_menu(update, context)
         return
 
+    if action.startswith("lpage:"):
+        # `rn:lpage:{status}:{page}` — الحالة داخل الكولباك لا في الجلسة
+        # وحدها، فتبقى الصفحة صحيحة حتى بعد إعادة تشغيل البوت.
+        _, _st, _pg = action.split(":", 2)
+        _clear_transient_state(context)
+        if _st in STATUS_ORDER:
+            try:
+                _page = int(_pg)
+            except ValueError:
+                _page = 0
+            await _show_status_list(update, context, _st, page=_page)
+        return
+
     if action.startswith("status_"):
         # 🔴 التنظيف ضروري هنا وفي `family_`: هاتان الشاشتان هما وجهة زر
         # الرجوع من **داخل تسلسلات الإدخال** (رفع وثيقة، اختيار تاريخ).
@@ -488,7 +511,7 @@ async def _dispatch_action(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         _clear_transient_state(context)
         status = action[len("status_"):]
         if status in STATUS_ORDER:
-            await _show_status_list(update, context, status)
+            await _show_status_list(update, context, status, page=0)
         return
 
     # 🔄 إضافة مرافقي الوصول الغائبين عن الإقامة (إضافة فقط، بلا حذف)
