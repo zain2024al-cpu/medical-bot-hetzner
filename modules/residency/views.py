@@ -38,6 +38,37 @@ def build_main_menu(counts: dict) -> tuple[str, InlineKeyboardMarkup]:
     rows.append([InlineKeyboardButton("🔍 البحث", callback_data=f"{RN}:search")])
     rows.append([InlineKeyboardButton("📋 سجل الإقامات", callback_data=f"{RN}:log")])
     rows.append([InlineKeyboardButton("📊 التقارير", callback_data=f"{RN}:reports")])
+    rows.append([InlineKeyboardButton("📤 تصدير جدول (PDF / Excel)", callback_data=f"{RN}:export")])
+    return "\n".join(lines), InlineKeyboardMarkup(rows)
+
+
+def build_export_status_picker(counts: dict) -> tuple[str, InlineKeyboardMarkup]:
+    """اختيار الحالة المُصدَّرة — العدد بجانب كلٍّ ليعرف المستخدم حجم الجدول."""
+    lines = [_DIVIDER, "📤  **تصدير جدول**", "", "اختر الحالة المطلوب تصديرها:"]
+    rows = []
+    total = 0
+    for s in STATUS_ORDER:
+        n = counts.get(s, 0)
+        total += n
+        rows.append([InlineKeyboardButton(
+            f"{STATUS_ICONS[s]} {STATUS_LABELS[s]} ({n})",
+            callback_data=f"{RN}:exp:{s}")])
+    rows.append([InlineKeyboardButton(f"🗂 كل الحالات ({total})",
+                                      callback_data=f"{RN}:exp:ALL")])
+    rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:menu")])
+    return "\n".join(lines), InlineKeyboardMarkup(rows)
+
+
+def build_export_format_picker(status: str, label: str, n: int) -> tuple[str, InlineKeyboardMarkup]:
+    lines = [_DIVIDER, "📤  **صيغة الملف**", "", f"الحالة: *{label}*",
+             f"عدد الطلبات: {n}", _THIN, "اختر الصيغة:"]
+    rows = [
+        [InlineKeyboardButton("📄 PDF — جاهز للطباعة",
+                              callback_data=f"{RN}:expdo:{status}:pdf")],
+        [InlineKeyboardButton("📊 Excel — قابل للفرز والتعديل",
+                              callback_data=f"{RN}:expdo:{status}:xlsx")],
+        [InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:export")],
+    ]
     return "\n".join(lines), InlineKeyboardMarkup(rows)
 
 

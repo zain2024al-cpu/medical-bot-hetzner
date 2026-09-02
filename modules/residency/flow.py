@@ -15,7 +15,7 @@ from shared.multiselect import engine as multiselect
 from shared.result_router import register as _register_route
 
 from modules.residency.constants import (
-    RN, STATUS_ORDER, STATUS_WAITING_ARRIVAL, STATUS_LEGACY_PENDING,
+    RN, STATUS_ORDER, STATUS_LABELS, STATUS_WAITING_ARRIVAL, STATUS_LEGACY_PENDING,
     STATUS_ACTIVE,
 )
 from modules.residency import models as rn_models
@@ -149,6 +149,57 @@ async def _send_file(update: Update, context: ContextTypes.DEFAULT_TYPE,
     except Exception as exc:
         logger.error(f"[residency] تعذّر إرسال الملف {file_id[:20]}: {exc}")
         await _alert(update, context, "⚠️ تعذّر فتح الملف — قد يكون محذوفاً من تليجرام.")
+
+
+async def _send_export(update: Update, context: ContextTypes.DEFAULT_TYPE,
+                       status: str, fmt: str) -> None:
+    """يبني جدول الحالات ويرسله ملفاً.
+
+    ⚠️ يُبنى الملف **قبل** أي إعلان نجاح: لو فشل التوليد بعد الإعلان بقي
+    المستخدم ينتظر ملفاً لن يصل. والتنبيهات عبر `_alert` لأن المُرسِل
+    يُجيب الضغطة مرة واحدة فقط (إدخال ٩٩).
+    """
+    from services import residency_table_export as rx
+
+    if status == "ALL":
+        families = []
+        for s_ in STATUS_ORDER:
+            families.extend(rn_repo.get_requests_by_status(s_))
+        # ⚠️ عائلة لها أشخاص في حالتين تظهر في القائمتين فتتكرّر هنا —
+        # تُزال بمعرّف الجذر لا بالكائن (FamilyRow لقطات مستقلة).
+        seen, uniq = set(), []
+        for f in families:
+            if f.root.id not in seen:
+                seen.add(f.root.id)
+                uniq.append(f)
+        families = uniq
+        label = "كل الحالات"
+    else:
+        families = rn_repo.get_requests_by_status(status)
+        label = STATUS_LABELS.get(status, status)
+
+    rows = rx.collect_rows(families, lambda st: STATUS_LABELS.get(st, st))
+    title = f"جدول الإقامات — {label}"
+
+    try:
+        buf = rx.build_excel(rows, title) if fmt == "xlsx" else rx.build_pdf(rows, title)
+    except Exception as exc:
+        logger.error(f"[residency.export] فشل توليد {fmt} لحالة {status}: {exc}",
+                     exc_info=True)
+        await _alert(update, context, "⚠️ تعذّر إنشاء الملف. راجع الإدارة.")
+        return
+
+    fname = rx.build_filename(label, "xlsx" if fmt == "xlsx" else "pdf")
+    try:
+        await context.bot.send_document(
+            update.effective_chat.id, document=buf, filename=fname,
+        caption=f"📤 {title}\n👥 {len(rows)} شخصاً في {len(families)} طلباً",
+        )
+    except Exception as exc:
+        logger.error(f"[residency.export] تعذّر إرسال الملف: {exc}", exc_info=True)
+        await _alert(update, context, "⚠️ أُنشئ الملف لكن تعذّر إرساله.")
+        return
+    await _alert(update, context, "✅ أُرسل الجدول.", show_alert=False)
 
 
 async def _show_documents(update: Update, context: ContextTypes.DEFAULT_TYPE, person_id: int) -> None:
@@ -778,6 +829,30 @@ async def _dispatch_action(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         context.user_data[_CTX_SEARCH_ACTIVE] = True
         text, kb = rn_views.build_search_prompt()
         await _edit(update, text, kb)
+        return
+
+    # ── 📤 تصدير جدول الحالات (PDF / Excel) ──────────────────────────────
+    if action == "export":
+        counts = rn_repo.get_status_counts()
+        text, kb = rn_views.build_export_status_picker(counts)
+        await _edit(update, text, kb)
+        return
+
+    if action.startswith("exp:"):
+        st = action[len("exp:"):]
+        if st != "ALL" and st not in STATUS_ORDER:
+            await _alert(update, context, "حالة غير معروفة.")
+            return
+        n = (sum(rn_repo.get_status_counts().values()) if st == "ALL"
+             else len(rn_repo.get_requests_by_status(st)))
+        label = "كل الحالات" if st == "ALL" else STATUS_LABELS.get(st, st)
+        text, kb = rn_views.build_export_format_picker(st, label, n)
+        await _edit(update, text, kb)
+        return
+
+    if action.startswith("expdo:"):
+        _, st, fmt = action.split(":", 2)
+        await _send_export(update, context, st, fmt)
         return
 
     if action == "log" or action.startswith("logp:"):
