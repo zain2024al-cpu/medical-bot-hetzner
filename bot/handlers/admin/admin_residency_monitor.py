@@ -176,27 +176,61 @@ def _build_family(root_id: int, status: str, page: int) -> tuple[str, InlineKeyb
     lines.append("_للتنفيذ استخدم زر «🪪 الإقامة» في القائمة الرئيسية._")
     return "\n".join(lines), _nav([], f"{_PFX}:st:{status}:{page}")
 
+def _build_log(page: int = 0) -> tuple[str, InlineKeyboardMarkup]:
+    """آخر الحركات — مجمَّعة بالأيام ومصفَّحة، بنفس شكل سجل بوت الإقامات.
 
-def _build_log() -> tuple[str, InlineKeyboardMarkup]:
-    from modules.residency.constants import STATUS_LABELS
-    from modules.residency.repository import get_recent_log
+    ⚠️ كانت ٢٠ حركة بتسميات كاملة بلا تجميع ولا تصفّح — جدار نصّ. وُحِّد
+    شكلها مع `build_log_view` عمداً: نفس المعلومة بشكلين مختلفين تُربِك.
+    """
+    from modules.residency.constants import status_chip
+    from modules.residency.repository import get_log_page
+    from modules.residency.views import _day_label
 
+    per = _PER_PAGE
     try:
-        entries = get_recent_log(20) or []
+        entries, total = get_log_page(offset=page * per, limit=per)
     except Exception:
         logger.warning("[rnv] تعذّر جلب السجل", exc_info=True)
-        entries = []
+        entries, total = [], 0
+
+    pages = max(1, (total + per - 1) // per)
+    if not entries and total:                 # صفحة خارج النطاق ⇒ آخر صفحة
+        page = pages - 1
+        entries, total = get_log_page(offset=page * per, limit=per)
 
     lines = ["📋 **آخر الحركات**", ""]
+    rows: list[list[InlineKeyboardButton]] = []
+
     if not entries:
         lines.append("لا توجد حركات مسجَّلة بعد.")
-    for e in entries:
-        old = STATUS_LABELS.get(e.old_status, e.old_status or "—")
-        new = STATUS_LABELS.get(e.new_status, e.new_status)
-        when = (e.created_at or "")[:16]
-        lines.append(f"• **{e.person_name}**\n   {old} ← {new}   _{when}_")
+    else:
+        lines.append(f"{total} حركة — صفحة {page + 1} من {pages}")
+        current_day = None
+        for e in entries:
+            day, _, clock = (e.created_at or "").partition(" ")
+            if day != current_day:
+                current_day = day
+                lines.append("")
+                lines.append(f"📅 *{_day_label(day)}*")
+            old = status_chip(e.old_status) if e.old_status else "—"
+            new = status_chip(e.new_status)
+            who = "" if e.performed_by else "  ⚙️"
+            lines.append(f"🕐 {clock} · {e.person_name[:22]}")
+            lines.append(f"      {old} ⟵ {new}{who}")
 
-    return "\n".join(lines), _nav([], f"{_PFX}:home")
+        if any(not e.performed_by for e in entries):
+            lines.append("")
+            lines.append("⚙️ = نقلٌ تلقائي بالمهمة اليومية")
+
+        nav = []
+        if page > 0:
+            nav.append(InlineKeyboardButton("⬅️ السابق", callback_data=f"{_PFX}:log:{page - 1}"))
+        if page + 1 < pages:
+            nav.append(InlineKeyboardButton("التالي ➡️", callback_data=f"{_PFX}:log:{page + 1}"))
+        if nav:
+            rows.append(nav)
+
+    return "\n".join(lines), _nav(rows, f"{_PFX}:home")
 
 
 # ── المعالِج ──────────────────────────────────────────────────────────────────
@@ -218,8 +252,9 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         elif action.startswith("fam:"):
             _, root_id, status, page = action.split(":", 3)
             text, kb = _build_family(int(root_id), status, int(page))
-        elif action == "log":
-            text, kb = _build_log()
+        elif action == "log" or action.startswith("log:"):
+            _pg = action.split(":", 1)[1] if ":" in action else "0"
+            text, kb = _build_log(int(_pg) if _pg.isdigit() else 0)
         else:
             return
     except Exception:

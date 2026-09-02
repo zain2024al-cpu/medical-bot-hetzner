@@ -42,5 +42,23 @@ STATUS_LABELS = {
 }
 
 
+# تسميات مختصرة — للسجل حيث يتكرّر اسمان في كل سطر. التسمية الكاملة
+# («معلّقات من الحالات السابقة») تجعل السطر ~١٠٠ حرف فيلتفّ ثلاث مرات
+# على الجوال، والشاشة كلها تقترب من حدّ تليجرام (٤٠٩٦).
+STATUS_SHORT = {
+    STATUS_WAITING_ARRIVAL: "معلّق الوصول",
+    STATUS_LEGACY_PENDING:  "حالات سابقة",
+    STATUS_ACTIVE:          "نشطة",
+    STATUS_EXPIRY_PENDING:  "معلّق انتهاء",
+    STATUS_SUBMITTED:       "تم التقديم",
+    STATUS_ISSUED:          "تمديد مُصدَر",
+}
+
+
+def status_chip(status: str) -> str:
+    """أيقونة + تسمية مختصرة."""
+    return f"{STATUS_ICONS.get(status, '⚪')} {STATUS_SHORT.get(status, status)}"
+
+
 def status_line(status: str) -> str:
     return f"{STATUS_ICONS.get(status, '⚪')} {STATUS_LABELS.get(status, status)}"

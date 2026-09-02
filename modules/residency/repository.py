@@ -55,6 +55,34 @@ def _to_row(p) -> PersonRow:
     )
 
 
+def get_log_page(offset: int = 0, limit: int = 10) -> tuple[list[LogEntry], int]:
+    """صفحة من السجل + الإجمالي.
+
+    ⚠️ حلّت محلّ `get_recent_log` (حُذِفت): كانت تُخرِج ٣٠ حدثاً في رسالة واحدة (~٣٠٩٠
+    حرفاً = ٧٥٪ من حدّ تليجرام) بلا تصفّح — تُعرَض وتقف. الصفحات تجعل
+    السجل كاملاً قابلاً للتصفّح ولا تقترب من الحدّ.
+    """
+    from db.session import get_db
+    from db.models import ResidencyStatusLog, ResidencyPerson
+
+    with get_db() as db:
+        q = db.query(ResidencyStatusLog)
+        total = q.count()
+        entries = (q.order_by(ResidencyStatusLog.created_at.desc())
+                    .offset(offset).limit(limit).all())
+        rows: list[LogEntry] = []
+        for e in entries:
+            person = db.query(ResidencyPerson).filter_by(id=e.person_id).first()
+            rows.append(LogEntry(
+                person_name=person.name if person else f"#{e.person_id}",
+                old_status=e.old_status or "",
+                new_status=e.new_status or "",
+                performed_by=e.performed_by,
+                created_at=e.created_at.strftime("%Y-%m-%d %H:%M") if e.created_at else "",
+            ))
+        return rows, total
+
+
 def get_status_counts() -> dict:
     """عدد الطلبات (لا الأشخاص) التي لها شخص واحد على الأقل بكل حالة."""
     from db.session import get_db
@@ -153,31 +181,6 @@ def search_persons(query: str, limit: int = 20) -> list[PersonRow]:
             .all()
         )
         return [_to_row(p) for p in matches]
-
-
-def get_recent_log(limit: int = 30) -> list[LogEntry]:
-    from db.session import get_db
-    from db.models import ResidencyStatusLog, ResidencyPerson
-
-    with get_db() as db:
-        entries = (
-            db.query(ResidencyStatusLog)
-            .order_by(ResidencyStatusLog.created_at.desc())
-            .limit(limit)
-            .all()
-        )
-        rows: list[LogEntry] = []
-        for e in entries:
-            person = db.query(ResidencyPerson).filter_by(id=e.person_id).first()
-            rows.append(LogEntry(
-                person_name=person.name if person else f"#{e.person_id}",
-                old_status=e.old_status or "",
-                new_status=e.new_status or "",
-                performed_by=e.performed_by,
-                created_at=e.created_at.strftime("%Y-%m-%d %H:%M") if e.created_at else "",
-            ))
-        return rows
-
 
 @dataclass(frozen=True)
 class IssuanceRow:

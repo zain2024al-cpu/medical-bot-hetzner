@@ -780,9 +780,20 @@ async def _dispatch_action(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await _edit(update, text, kb)
         return
 
-    if action == "log":
-        entries = rn_repo.get_recent_log(30)
-        text, kb = rn_views.build_log_view(entries)
+    if action == "log" or action.startswith("logp:"):
+        page = 0
+        if action.startswith("logp:"):
+            try:
+                page = max(0, int(action.split(":", 1)[1]))
+            except ValueError:
+                page = 0
+        per = rn_views._LOG_PER_PAGE
+        entries, total = rn_repo.get_log_page(offset=page * per, limit=per)
+        pages = max(1, (total + per - 1) // per)
+        if not entries and total:          # صفحة خارج النطاق ⇒ آخر صفحة
+            page = pages - 1
+            entries, total = rn_repo.get_log_page(offset=page * per, limit=per)
+        text, kb = rn_views.build_log_view(entries, page=page, pages=pages, total=total)
         await _edit(update, text, kb)
         return
 

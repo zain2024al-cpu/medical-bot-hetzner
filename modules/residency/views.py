@@ -430,18 +430,76 @@ def build_search_results(query: str, results: list[PersonRow]) -> tuple[str, Inl
     rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:menu")])
     return "\n".join(lines), InlineKeyboardMarkup(rows)
 
+_LOG_PER_PAGE = 8          # نفس حجم صفحة شاشة المراقبة الإدارية
 
-def build_log_view(entries: list[LogEntry]) -> tuple[str, InlineKeyboardMarkup]:
+
+def _day_label(iso_date: str) -> str:
+    """«اليوم» / «أمس» / التاريخ — أوضح من تكرار السنة في كل سطر."""
+    from datetime import date, timedelta
+    try:
+        y, m, d = (int(x) for x in iso_date.split("-"))
+        day = date(y, m, d)
+    except Exception:
+        return iso_date
+    today = date.today()
+    if day == today:
+        return f"اليوم · {iso_date}"
+    if day == today - timedelta(days=1):
+        return f"أمس · {iso_date}"
+    return iso_date
+
+
+def build_log_view(entries: list[LogEntry], page: int = 0,
+                   pages: int = 1, total: int = 0) -> tuple[str, InlineKeyboardMarkup]:
+    """سجل الأحداث — مجمَّعاً بالأيام ومصفَّحاً.
+
+    ⚠️ كان ٣٠ حدثاً في رسالة واحدة (~٣٠٩٠ حرفاً، ٧٥٪ من حدّ تليجرام)،
+    كل سطر ~١٠٠ حرف لأنه يحمل الاسم كاملاً والتسميتين كاملتين والتاريخ
+    بالسنة — فيلتفّ ثلاث مرات على الجوال ويصير جداراً من النصّ.
+    الآن: عنوان يوم لكل مجموعة، ووقت فقط في السطر، وتسميات مختصرة،
+    واسم مقصوص، وصفحات.
+    """
+    from modules.residency.constants import status_chip
+
     lines = [_DIVIDER, "📋  **سجل الإقامات**", ""]
+    rows = []
+
     if not entries:
         lines.append("لا توجد أحداث بعد.")
     else:
+        lines.append(f"{total} حدثاً — صفحة {page + 1} من {pages}")
+        current_day = None
         for e in entries:
-            old = status_line(e.old_status) if e.old_status else "—"
-            new = status_line(e.new_status)
-            lines.append(f"• {e.person_name}: {old} ← {new}  ({e.created_at})")
-    kb = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:menu")]])
-    return "\n".join(lines), kb
+            stamp = e.created_at or ""
+            day, _, clock = stamp.partition(" ")
+            if day != current_day:
+                current_day = day
+                lines.append("")
+                lines.append(f"📅 *{_day_label(day)}*")
+                lines.append(_THIN)
+            old = status_chip(e.old_status) if e.old_status else "—"
+            new = status_chip(e.new_status)
+            # ⚙️ = نقلته المهمة اليومية لا مستخدم. تمييزٌ مفيد عند مراجعة
+            # سبب تحرّك حالة لم يلمسها أحد.
+            who = "" if e.performed_by else "  ⚙️"
+            lines.append(f"🕐 {clock} · {e.person_name[:22]}")
+            lines.append(f"      {old} ⟵ {new}{who}")
+
+        # رمز بلا مفتاح لغز — يُشرح عند ظهوره فقط لا في كل صفحة
+        if any(not e.performed_by for e in entries):
+            lines.append("")
+            lines.append("⚙️ = نقلٌ تلقائي بالمهمة اليومية (بلا تدخّل مستخدم)")
+
+        nav = []
+        if page > 0:
+            nav.append(InlineKeyboardButton("⬅️ السابق", callback_data=f"{RN}:logp:{page - 1}"))
+        if page + 1 < pages:
+            nav.append(InlineKeyboardButton("التالي ➡️", callback_data=f"{RN}:logp:{page + 1}"))
+        if nav:
+            rows.append(nav)
+
+    rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:menu")])
+    return "\n".join(lines), InlineKeyboardMarkup(rows)
 
 
 def build_reports_view(counts: dict) -> tuple[str, InlineKeyboardMarkup]:
