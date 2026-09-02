@@ -362,7 +362,17 @@ async def main():
             time=dt_time(hour=9, minute=0, tzinfo=tz),
             name="daily_residency_status_check"
         )
-        logger.info(f"🪪 Scheduled daily residency status check at 09:00 ({TIMEZONE})")
+        # ⚠️ **تعويض عند الإقلاع**: `run_daily` يُطلِق في ٠٩:٠٠ فقط وهو حيّ.
+        # كل يوم يكون البوت فيه متوقّفاً عند تلك اللحظة (إعادة تشغيل، نشر،
+        # انقطاع) يضيع بلا تعويض، فتبقى حالات منتهية في "النشطة" إلى الأبد.
+        # الفحص فكرته «من استحقّ حتى اليوم» لا «من استحقّ اليوم»، فتكراره
+        # آمن ولا يُنتِج أثراً مضاعفاً: من انتقل خرج من شرط ACTIVE.
+        app.job_queue.run_once(
+            lambda context: asyncio.create_task(asyncio.to_thread(run_daily_expiry_check)),
+            when=15,
+            name="residency_status_catchup_on_start",
+        )
+        logger.info(f"🪪 Scheduled daily residency status check at 09:00 ({TIMEZONE}) + تعويض عند الإقلاع")
 
         # 🧾 4. تقرير أخطاء اليوم (23:55) — آخر اليوم عمداً ليشمله كاملاً.
         # صامت تماماً لو لم يقع أي خطأ، فلا رسالة يومية بلا فائدة.

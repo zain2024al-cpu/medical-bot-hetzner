@@ -103,7 +103,27 @@ def _views():
               f"قائمة={len(fams):<3} {names}")
 
 
+def _overdue():
+    """نشطة رغم استحقاق التنبيه أو انتهاء الإقامة — يجب أن تكون فارغة."""
+    from datetime import date
+    today = date.today().isoformat()
+    rows = q("SELECT id, name, COALESCE(reminder_date,''), COALESCE(expiry_date,'') "
+             "FROM res_persons WHERE status='ACTIVE'")
+    bad = [r for r in rows
+           if (r[2] and r[2] <= today) or (r[3] and r[3] <= today)]
+    if not bad:
+        print("   ✅ لا توجد حالة نشطة مستحقّة — المهمة اليومية مواكِبة.")
+        return
+    print(f"   🔴 {len(bad)} حالة نشطة كان يجب أن تنتقل إلى «معلّق انتهاء»:")
+    for pid, nm, rem, exp in bad:
+        why = []
+        if rem and rem <= today: why.append(f"تنبيه {rem}")
+        if exp and exp <= today: why.append(f"انتهاء {exp}")
+        print(f"      #{pid:<4} {str(nm)[:26]:<28} {' · '.join(why)}")
+
+
 section("📊 الحالات كما هي مخزَّنة حرفياً:", _statuses)
+section("⏰ نشطة رغم الاستحقاق (يجب أن تكون فارغة):", _overdue)
 section("📋 كل الأشخاص:", _people)
 section("🕘 آخر ٢٥ انتقال حالة (الأحدث أولاً):", _logs)
 section("🔵 تاريخ الانتقال إلى «تم التقديم»:", _submitted_history)
