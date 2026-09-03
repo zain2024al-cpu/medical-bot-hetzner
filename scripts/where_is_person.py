@@ -40,8 +40,31 @@ def _q(con, sql, args=()):
         return []
 
 
+def _tokens(term: str) -> list[str]:
+    """كلمات البحث — كلٌّ منها يجب أن يرد في الاسم.
+
+    ⚠️ كانت المطابقة **متّصلة** (`%طلال الصوفي%`)، والأسماء هنا رباعية
+    وخماسية: «طلال محمد الصوفي محمد الصوفي». فالبحث بالاسم الأول والأخير
+    — وهو ما يفعله كل مستخدم — كان يُرجِع **صفر نتيجة عن اسم موجود**.
+    وأداة تشخيص تنفي وجود موجودٍ أسوأ من غيابها: بنيتُ على جوابها أن
+    الشخص بلا تواريخ، وكان له تاريخ مستحقّ.
+    """
+    return [t for t in term.strip().split() if t] or [term.strip()]
+
+
+def _match(col: str, term: str) -> tuple[str, tuple]:
+    """(شرط SQL، الوسائط) — كل كلمة LIKE مستقلّة مربوطة بـAND."""
+    toks = _tokens(term)
+    clause = " AND ".join(f"{col} LIKE ?" for _ in toks)
+    return f"({clause})", tuple(f"%{t}%" for t in toks)
+
+
 def report(con, term: str) -> None:
-    like = f"%{term.strip()}%"
+    _m0 = _match("full_name", term)
+    _m1 = _match("name", term)
+    _m2 = _match("c.name", term)
+    _m3 = _match("r.name", term)
+    _m4 = _match("name", term)
     print("=" * 66)
     print(f"🔍 البحث عن: {term!r}")
     print("=" * 66)
@@ -50,9 +73,9 @@ def report(con, term: str) -> None:
     rows = _q(con, """
         SELECT id, full_name, patient_type, companion_of_id,
                archived_at, gs_onboarded_at
-        FROM patients WHERE full_name LIKE ?
+        FROM patients WHERE %s
         ORDER BY id
-    """, (like,))
+    """ % _m0[0], _m0[1])
     print(f"\n📋 سجلّ المرضى — {len(rows)} نتيجة")
     for i, name, ptype, comp_of, arch, onb in rows:
         bits = [f"id={i}", f"نوع={ptype or 'general'}"]
@@ -67,8 +90,8 @@ def report(con, term: str) -> None:
     # ── الوصول ──
     rows = _q(con, """
         SELECT id, name, arrival_status, created_at
-        FROM gs_arrival_patients WHERE name LIKE ? ORDER BY id
-    """, (like,))
+        FROM gs_arrival_patients WHERE %s ORDER BY id
+    """ % _m1[0], _m1[1])
     print(f"\n🛬 جدول الوصول (كمريض) — {len(rows)} نتيجة")
     for i, name, st, created in rows:
         print(f"   • {name}   [id={i} · حالة={st} · أُنشئ={created}]")
@@ -80,8 +103,8 @@ def report(con, term: str) -> None:
         SELECT c.id, c.name, c.patient_id, p.name
         FROM gs_arrival_companions c
         LEFT JOIN gs_arrival_patients p ON p.id = c.patient_id
-        WHERE c.name LIKE ? ORDER BY c.id
-    """, (like,))
+        WHERE %s ORDER BY c.id
+    """ % _m2[0], _m2[1])
     print(f"\n👥 مرافقو الوصول — {len(rows)} نتيجة")
     for i, name, pid, pname in rows:
         print(f"   • {name}   [id={i} · مرافق لـ: {pname or f'(مريض محذوف id={pid})'}]")
@@ -92,8 +115,8 @@ def report(con, term: str) -> None:
                r.expiry_date, r.reminder_date
         FROM res_persons r
         LEFT JOIN res_persons p ON p.id = r.parent_id
-        WHERE r.name LIKE ? ORDER BY r.id
-    """, (like,))
+        WHERE %s ORDER BY r.id
+    """ % _m3[0], _m3[1])
     print(f"\n🪪 وحدة الإقامة — {len(rows)} نتيجة")
     for i, name, st, par, pname, exp, rem in rows:
         role = f"مرافق لـ {pname}" if par else "مريض (جذر)"
@@ -104,8 +127,8 @@ def report(con, term: str) -> None:
     print("\n🔎 فحص الفجوة بين الوصول والإقامة:")
     roots = _q(con, """
         SELECT id, name FROM res_persons
-        WHERE parent_id IS NULL AND name LIKE ?
-    """, (like,))
+        WHERE parent_id IS NULL AND %s
+    """ % _m4[0], _m4[1])
     if not roots:
         print("   (لا جذر إقامة بهذا الاسم — لا فجوة تُقاس)")
     for rid, rname in roots:
