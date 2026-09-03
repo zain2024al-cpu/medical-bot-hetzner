@@ -350,10 +350,10 @@ async def main():
         from services.chennai_daily_returns import send_chennai_daily_returns
         app.job_queue.run_daily(
             lambda context: send_chennai_daily_returns(context.application),
-            time=dt_time(hour=21, minute=0, tzinfo=tz),
+            time=dt_time(hour=22, minute=30, tzinfo=tz),
             name="chennai_daily_returns",
         )
-        logger.info(f"🏥 Scheduled Chennai daily returns to group at 21:00 ({TIMEZONE})")
+        logger.info(f"🏥 Scheduled Chennai daily returns to group at 22:30 ({TIMEZONE})")
         
         # 🔧 2. الصيانة اليومية (الساعة 3:00 صباحاً)
         app.job_queue.run_daily(
