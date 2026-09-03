@@ -424,3 +424,87 @@ async def send_pending_reports_daily_report(bot, admin_ids: list):
 
     except Exception as e:
         logger.error(f"❌ Error in send_pending_reports_daily_report: {e}", exc_info=True)
+
+
+def close_pending_report(report_id: int, performed_by: int | None = None
+                         ) -> tuple[bool, int, int]:
+    """يُغلِق التقرير المعلَّق **ويُخرِجه من قائمة المترجم معاً**.
+
+    ⚠️ **الاثنان ضروريان ولا يُغني أحدهما**: قائمة المترجم تُبنى من
+    `Report.has_paper_report == 2` لا من حالة السجل المعلَّق. فإغلاق
+    السجل وحده يُخفي الصفّ من شاشة الأدمن ويتركه في قائمة المترجم؛
+    وتحديث العَلَم وحده يترك سجلاً معلَّقاً للأبد في شاشة الأدمن.
+
+    ⚠️ **مصدر واحد للمترجم وللأدمن**: كان المنطق داخل
+    `user_medical_attachments._finish_pending_report` وحده. وإضافة زرّ
+    إغلاق للأدمن بنسخة ثانية منه كانت ستُنتِج مسارين يتباعدان — أحد
+    نمطَي الخطأ المُسجَّلَين في MAINTENANCE_LOG. فنُقِل هنا ويستدعيه
+    الطرفان.
+
+    Returns: (نجح، المرفوع، المتوقَّع)
+    """
+    try:
+        from db.models import Report
+
+        with SessionLocal() as session:
+            exists = session.query(Report).filter_by(id=report_id).first()
+            if not exists:
+                # ⚠️ لا تُعلن نجاحاً لتقرير غير موجود — الرسالة تصير كاذبة.
+                # لكن السجل المعلَّق اليتيم يجب أن يُنظَّف رغم ذلك، وإلا بقي
+                # في الشاشة بلا سبيل لإغلاقه (انظر drop_pending_for_report).
+                dropped = drop_pending_for_report(report_id)
+                logger.warning(
+                    f"⚠️ إغلاق معلَّق لتقرير غير موجود #{report_id} — "
+                    f"حُذِف {dropped} سجل يتيم"
+                )
+                return bool(dropped), 0, 0
+
+        ok, uploaded, expected = complete_pending_upload(report_id)
+
+        with SessionLocal() as session:
+            r = session.query(Report).filter_by(id=report_id).first()
+            if r:
+                r.has_paper_report = 1
+                session.commit()
+
+        logger.info(
+            f"✅ أُغلِق التقرير المعلَّق #{report_id} ({uploaded}/{expected})"
+            f"{f' — بواسطة {performed_by}' if performed_by else ''}"
+        )
+        return True, uploaded, expected
+
+    except Exception as exc:
+        logger.error(f"❌ فشل إغلاق التقرير المعلَّق #{report_id}: {exc}", exc_info=True)
+        return False, 0, 0
+
+
+def close_pending_older_than(days: int, performed_by: int | None = None,
+                             reason_filter: str | None = None) -> tuple[int, int]:
+    """إغلاق جماعي لكل معلَّق تجاوز عمره `days` يوماً.
+
+    ⚠️ يُعالَج كلٌّ عبر `close_pending_report` نفسها لا بتحديث جماعي على
+    الجدول: التحديث الجماعي كان سيُغفِل عَلَم `has_paper_report` فتختفي
+    الصفوف من شاشة الأدمن وتبقى في قوائم المترجمين — وهو أسوأ من تركها.
+
+    Returns: (عدد ما أُغلِق، عدد ما فشل)
+    """
+    items = [p for p in get_pending_reports() if int(p.get("days_waiting") or 0) >= days]
+    if reason_filter is not None:
+        items = [p for p in items
+                 if (p.get("no_report_reason") or "").strip() == reason_filter]
+
+    done = failed = 0
+    for p in items:
+        rid = p.get("report_id")
+        if not rid:
+            # سجل بلا report_id — لا سبيل لإغلاقه بالمسار العادي
+            failed += 1
+            continue
+        ok, _u, _e = close_pending_report(rid, performed_by=performed_by)
+        if ok:
+            done += 1
+        else:
+            failed += 1
+
+    logger.info(f"🧹 إغلاق جماعي (>{days} يوماً): نجح {done} · فشل {failed}")
+    return done, failed

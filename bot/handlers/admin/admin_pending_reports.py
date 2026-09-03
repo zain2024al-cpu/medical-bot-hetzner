@@ -34,7 +34,12 @@ _PFX = "pndrep"
 _PER_PAGE = 8
 
 
-def _list_kb(page: int, total_pages: int) -> InlineKeyboardMarkup:
+# عتبة الإغلاق الجماعي — «قديم» يعني تجاوز هذه المدة.
+_BULK_DAYS = 30
+
+
+def _list_kb(page: int, total_pages: int, items=None, total_old: int = 0
+             ) -> InlineKeyboardMarkup:
     nav: list[InlineKeyboardButton] = []
     if total_pages > 1 and page > 0:
         nav.append(InlineKeyboardButton("⬅️", callback_data=f"{_PFX}:page:{page - 1}"))
@@ -46,6 +51,23 @@ def _list_kb(page: int, total_pages: int) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
     if nav:
         rows.append(nav)
+    # ✅ زرّ إغلاق لكل تقرير معروض — الشاشة كانت للقراءة فقط، فالتقرير
+    # الذي تعذّر على المترجم إغلاقه (استقال، أو أُدخِل خطأً) يبقى فيها
+    # إلى الأبد بلا أي سبيل للتخلّص منه.
+    for p in (items or []):
+        rid = p.get("report_id")
+        if not rid:
+            continue
+        nm = str(p.get("patient_name") or "—")[:20]
+        rows.append([InlineKeyboardButton(
+            f"✅ إغلاق: {nm} ({p.get('days_waiting', 0)}ي)",
+            callback_data=f"{_PFX}:close:{rid}:{page}")])
+
+    if total_old:
+        rows.append([InlineKeyboardButton(
+            f"🧹 إغلاق كل ما تجاوز {_BULK_DAYS} يوماً ({total_old})",
+            callback_data=f"{_PFX}:bulkask:{page}")])
+
     rows.append([InlineKeyboardButton("🔄 تحديث", callback_data=f"{_PFX}:page:{page}")])
     rows.append([InlineKeyboardButton("🔙 رجوع", callback_data="sys_menu:back")])
     return InlineKeyboardMarkup(rows)
@@ -85,7 +107,7 @@ def _render_item_text(p: dict) -> str:
 _NOT_READY_REASON = "🟡 لم يجهز بعد"
 
 
-async def _render_list(query, page: int) -> None:
+async def _render_list(query, page: int, answered: bool = False) -> None:
     from services.pending_reports_service import get_pending_reports
 
     # ✅ هذه الشاشة مخصَّصة حصراً لحالة "🟡 لم يجهز بعد" — العلامة الثابتة
@@ -117,10 +139,15 @@ async def _render_list(query, page: int) -> None:
                 f"🔄 آخر تحديث: {stamp}",
                 reply_markup=_list_kb(0, 1),
             )
-            await _answer_once(query, "✅ تم التحديث.")
+            if not answered:
+                await _answer_once(query, "✅ تم التحديث.")
         except Exception as exc:
             await _handle_render_error(query, exc, page=0)
         return
+
+    # عدد المتجاوز للعتبة — يُحسب من **كل** القائمة لا من الصفحة الحالية،
+    # وإلا اختلف رقم زرّ الإغلاق الجماعي بين الصفحات وهو عملية واحدة.
+    total_old = sum(1 for p in items if int(p.get("days_waiting") or 0) >= _BULK_DAYS)
 
     per_page = _PER_PAGE
     total_pages = max(1, (total + per_page - 1) // per_page)
@@ -138,9 +165,10 @@ async def _render_list(query, page: int) -> None:
     try:
         await query.edit_message_text(
             "\n".join(lines),
-            reply_markup=_list_kb(page, total_pages),
+            reply_markup=_list_kb(page, total_pages, page_items, total_old),
         )
-        await _answer_once(query, "✅ تم التحديث.")
+        if not answered:
+            await _answer_once(query, "✅ تم التحديث.")
     except Exception as exc:
         await _handle_render_error(query, exc, page=page)
 
@@ -194,6 +222,66 @@ async def handle_pending_reports_callback(update: Update, context: ContextTypes.
         except (IndexError, ValueError):
             page = 0
         await _render_list(query, page)
+        return
+
+    # ── إغلاق تقرير واحد ───────────────────────────────────────────────
+    if action == "close":
+        from services.pending_reports_service import close_pending_report
+        try:
+            report_id = int(parts[2])
+            page = int(parts[3]) if len(parts) > 3 else 0
+        except (IndexError, ValueError):
+            await _answer_once(query, "⚠️ بيانات غير صالحة.")
+            return
+        ok, uploaded, expected = close_pending_report(report_id, performed_by=user.id)
+        # ⚠️ الردّ **قبل** إعادة الرسم: `_render_list` يستهلك فرصة الردّ
+        # الوحيدة، فلو أُخِّر لضاعت نتيجة العملية بلا أن يراها الأدمن.
+        await _answer_once(
+            query,
+            f"✅ أُغلِق ({uploaded}/{expected})" if ok else "⚠️ تعذّر الإغلاق.")
+        await _render_list(query, page, answered=True)
+        return
+
+    # ── إغلاق جماعي: تأكيد ثم تنفيذ ───────────────────────────────────
+    if action == "bulkask":
+        from services.pending_reports_service import get_pending_reports
+        try:
+            page = int(parts[2])
+        except (IndexError, ValueError):
+            page = 0
+        n = sum(1 for p in get_pending_reports()
+                if (p.get("no_report_reason") or "").strip() == _NOT_READY_REASON
+                and int(p.get("days_waiting") or 0) >= _BULK_DAYS)
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton(f"✅ نعم، أغلِق الـ{n}",
+                                  callback_data=f"{_PFX}:bulkdo:{page}")],
+            [InlineKeyboardButton("❌ إلغاء", callback_data=f"{_PFX}:page:{page}")],
+        ])
+        _txt = "\n".join([
+            "🧹 تأكيد الإغلاق الجماعي",
+            "",
+            f"سيُغلَق {n} تقريراً معلَّقاً تجاوز عمره {_BULK_DAYS} يوماً.",
+            "",
+            "يختفي كلٌّ منها من هذه الشاشة ومن قائمة المترجم معاً،",
+            "ويبقى سجلّها محفوظاً للمراجعة.",
+            "",
+            "⚠️ لا تُلغى العملية بضغطة — تابع فقط إن كنت متأكداً.",
+        ])
+        await query.edit_message_text(_txt, reply_markup=kb)
+        await _answer_once(query)
+        return
+
+    if action == "bulkdo":
+        from services.pending_reports_service import close_pending_older_than
+        try:
+            page = int(parts[2])
+        except (IndexError, ValueError):
+            page = 0
+        done, failed = close_pending_older_than(
+            _BULK_DAYS, performed_by=user.id, reason_filter=_NOT_READY_REASON)
+        msg = f"✅ أُغلِق {done}" + (f" · تعذّر {failed}" if failed else "")
+        await _answer_once(query, msg)
+        await _render_list(query, page, answered=True)
         return
 
     try:

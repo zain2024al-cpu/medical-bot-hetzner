@@ -275,38 +275,16 @@ async def _show_reports_list(update: Update, context: ContextTypes.DEFAULT_TYPE,
 # ─────────────────────────────────────────────
 # Callback handler الرئيسي
 # ─────────────────────────────────────────────
-
 def _finish_pending_report(report_id: int) -> tuple[bool, int, int]:
-    """يُغلِق سجل المعلَّق **ويُخرِج** التقرير من القائمة معاً.
+    """يُغلِق السجل المعلَّق ويُخرِج التقرير من قائمة المترجم معاً.
 
-    ⚠️ الاثنان معاً ضروريان: قائمة المترجم تُبنى من `Report.has_paper_report
-    == 2` لا من حالة السجل المعلَّق — فإغلاق السجل وحده لا يُخفي التقرير من
-    القائمة، وتحديث العَلَم وحده يترك سجلاً معلَّقاً للأبد في شاشة الأدمن.
+    ⚠️ المنطق انتقل إلى `services.pending_reports_service.close_pending_report`
+    ليستدعيه **الأدمن والمترجم معاً**: زرّ الإغلاق الجديد في شاشة الأدمن
+    بنسخة ثانية من المنطق كان سيُنتِج مسارين يتباعدان (أحدهما ينسى عَلَم
+    `has_paper_report` مثلاً فتختفي الصفوف من شاشة ويبقى في أخرى).
     """
-    try:
-        from services.pending_reports_service import complete_pending_upload
-
-        with SessionLocal() as s:
-            r = s.query(Report).filter_by(id=report_id).first()
-            if not r:
-                # ⚠️ لا تُعلن نجاحاً لتقرير غير موجود — الرسالة تصبح كاذبة
-                logger.warning(f"⚠️ MA: طُلِب إغلاق تقرير غير موجود #{report_id}")
-                return False, 0, 0
-
-        is_complete, uploaded_n, expected_n = complete_pending_upload(report_id)
-        with SessionLocal() as s:
-            r = s.query(Report).filter_by(id=report_id).first()
-            if r:
-                r.has_paper_report = 1
-                s.commit()
-        logger.info(
-            f"✅ MA: أُغلقت الحالة صراحةً للتقرير #{report_id} "
-            f"({uploaded_n}/{expected_n}) — بطلب المترجم"
-        )
-        return True, uploaded_n, expected_n
-    except Exception as exc:
-        logger.error(f"❌ MA: فشل إغلاق الحالة للتقرير #{report_id}: {exc}", exc_info=True)
-        return False, 0, 0
+    from services.pending_reports_service import close_pending_report
+    return close_pending_report(report_id)
 
 
 async def handle_ma_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
