@@ -118,6 +118,35 @@ def save_photo(person_id: int, file_id: str) -> bool:
     return True
 
 
+def _reevaluate_after_date_change(person_id: int) -> None:
+    """يُعيد تقييم الاستحقاق فور حفظ تاريخ — فيسري التاريخ الماضي حالاً.
+
+    ⚠️ **لماذا**: النظام كان يفحص في لحظتين فقط — ٠٩:٠٠ يومياً، وعند
+    الإقلاع. فمن يُدخِل تاريخاً **مستحقّاً أصلاً** في الرابعة مساءً يبقى
+    شخصه «نشطاً» حتى صباح الغد، ويبدو للمستخدم أن الإدخال لم يُفِد شيئاً.
+    حدث هذا فعلاً مع طلال الصوفي ومرافقه (أُدخِل تنبيههما ١٦:٤٨ ولم
+    ينتقلا إلا بإعادة تشغيل ١٧:١٨).
+
+    ⚠️ **يُعاد استخدام قاعدة المهمة اليومية نفسها** لا نسخة منها هنا:
+    قاعدتان لنفس القرار تتباعدان مع الوقت فيختلف سلوك الإدخال اليدوي عن
+    الفحص التلقائي — وهو أحد نمطَي الخطأ المُسجَّلَين في MAINTENANCE_LOG.
+
+    الاستدعاء من داخل واضعَي التاريخ لا من مواضع الاستدعاء الستّة: نقطة
+    اختناق واحدة لا تُنسى عند إضافة مسار إدخال جديد.
+    """
+    try:
+        from services.residency_status_service import run_daily_expiry_check
+        moved = run_daily_expiry_check()
+        if moved:
+            logger.info(f"[residency] إعادة تقييم بعد تغيير تاريخ "
+                        f"person_id={person_id}: انتقل {moved}")
+    except Exception as exc:
+        # الحفظ نجح — فشل إعادة التقييم لا يجوز أن يُبطِله. ستلتقطه
+        # المهمة اليومية أو التعويض عند الإقلاع لاحقاً.
+        logger.error(f"[residency] تعذّرت إعادة التقييم بعد تغيير تاريخ "
+                     f"person_id={person_id}: {exc}")
+
+
 def set_reminder_date(person_id: int, date_iso: str) -> bool:
     """يضبط تاريخ التنبيه اليدوي لهذا الشخص وحده."""
     from db.session import get_db
@@ -129,6 +158,7 @@ def set_reminder_date(person_id: int, date_iso: str) -> bool:
             return False
         person.reminder_date = date_iso
     logger.info(f"[residency] reminder_date set  person_id={person_id}  date={date_iso}")
+    _reevaluate_after_date_change(person_id)
     return True
 
 
@@ -200,6 +230,8 @@ def set_issuance_expiry(person_id: int, date_iso: str) -> bool:
         if not person:
             return False
         person.expiry_date = date_iso
+    logger.info(f"[residency] expiry_date set  person_id={person_id}  date={date_iso}")
+    _reevaluate_after_date_change(person_id)
     return True
 
 
@@ -281,7 +313,6 @@ def set_last_issue_date(person_id: int, date_iso: str) -> bool:
         person.last_issue_date = date_iso
     return True
 
-
 def set_expiry_date(person_id: int, date_iso: str) -> bool:
     """تاريخ انتهاء الإقامة — يُستخدَم في مسارَي "يوجد تمديد" و"لا يوجد"."""
     from db.session import get_db
@@ -292,8 +323,9 @@ def set_expiry_date(person_id: int, date_iso: str) -> bool:
         if not person:
             return False
         person.expiry_date = date_iso
+    logger.info(f"[residency] expiry_date set  person_id={person_id}  date={date_iso}")
+    _reevaluate_after_date_change(person_id)
     return True
-
 
 def save_residency_file(person_id: int, file_id: str) -> bool:
     """صورة آخر إقامة (مستند رسمي — بلا ضبط مقاس)."""
