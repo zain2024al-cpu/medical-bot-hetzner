@@ -342,6 +342,18 @@ async def main():
             name="daily_appointments_reminder"
         )
         logger.info(f"📅 Scheduled daily appointments reminder at 20:00 ({TIMEZONE})")
+
+        # 🏥 عودات مرضى تشناي — تُنشر في **مجموعة تشناي** الساعة ٢١:٠٠.
+        # ⚠️ مهمّة مستقلّة عن تنبيه ٢٠:٠٠ أعلاه لا امتداد له: ذاك خاصّ
+        # لكل أدمن ويشمل كل المرضى، وهذا عامّ في المجموعة ولمرضى تشناي
+        # وحدهم. دمجهما كان سيُسرِّب مرضى غير تشناي إلى مجموعتها.
+        from services.chennai_daily_returns import send_chennai_daily_returns
+        app.job_queue.run_daily(
+            lambda context: send_chennai_daily_returns(context.application),
+            time=dt_time(hour=21, minute=0, tzinfo=tz),
+            name="chennai_daily_returns",
+        )
+        logger.info(f"🏥 Scheduled Chennai daily returns to group at 21:00 ({TIMEZONE})")
         
         # 🔧 2. الصيانة اليومية (الساعة 3:00 صباحاً)
         app.job_queue.run_daily(
