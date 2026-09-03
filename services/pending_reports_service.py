@@ -459,7 +459,25 @@ def close_pending_report(report_id: int, performed_by: int | None = None
                 )
                 return bool(dropped), 0, 0
 
+        # ⚠️ يُلتقَط التقدّم **قبل** الإغلاق: `complete_pending_upload`
+        # تضبط uploaded=expected، فبعدها تضيع القيمة الحقيقية للأبد
+        # ولا يمكن إعادة الفتح على حالتها الصحيحة.
+        with SessionLocal() as session:
+            row = session.query(PendingReport).filter(
+                PendingReport.report_id == report_id,
+                PendingReport.status == "pending",
+            ).first()
+            prev_uploaded = int(row.uploaded_count or 0) if row else 0
+
         ok, uploaded, expected = complete_pending_upload(report_id)
+
+        with SessionLocal() as session:
+            row = session.query(PendingReport).filter(
+                PendingReport.report_id == report_id).order_by(
+                PendingReport.id.desc()).first()
+            if row is not None:
+                row.uploaded_before_close = prev_uploaded
+                session.commit()
 
         with SessionLocal() as session:
             r = session.query(Report).filter_by(id=report_id).first()
@@ -508,3 +526,82 @@ def close_pending_older_than(days: int, performed_by: int | None = None,
 
     logger.info(f"🧹 إغلاق جماعي (>{days} يوماً): نجح {done} · فشل {failed}")
     return done, failed
+
+
+def reopen_pending_report(report_id: int, performed_by: int | None = None) -> bool:
+    """يُعيد فتح تقرير أُغلِق — تراجعٌ كامل عن `close_pending_report`.
+
+    ⚠️ **يعكس الفِعلين معاً**: حالة السجل المعلَّق **و**عَلَم
+    `has_paper_report`. عكس أحدهما فقط يُنتِج نصف تراجع: يعود للأدمن
+    ولا يعود للمترجم، أو العكس.
+
+    ويستعيد `uploaded_count` من `uploaded_before_close` لا من صفر —
+    فالتقدّم الذي أنجزه المترجم قبل الإغلاق لا يُهدَر بالتراجع.
+    """
+    try:
+        from db.models import Report
+
+        with SessionLocal() as session:
+            row = (session.query(PendingReport)
+                   .filter(PendingReport.report_id == report_id)
+                   .order_by(PendingReport.id.desc()).first())
+            if row is None:
+                logger.warning(f"⚠️ لا سجل معلَّق لإعادة فتحه report_id={report_id}")
+                return False
+            if row.status == "pending":
+                return True                      # مفتوح أصلاً — تراجع بلا أثر
+
+            row.status = "pending"
+            row.completed_at = None
+            if row.uploaded_before_close is not None:
+                row.uploaded_count = int(row.uploaded_before_close)
+            row.uploaded_before_close = None
+            session.commit()
+
+        with SessionLocal() as session:
+            r = session.query(Report).filter_by(id=report_id).first()
+            if r:
+                r.has_paper_report = 2
+                session.commit()
+
+        logger.info(
+            f"↩️ أُعيد فتح التقرير المعلَّق #{report_id}"
+            f"{f' — بواسطة {performed_by}' if performed_by else ''}"
+        )
+        return True
+    except Exception as exc:
+        logger.error(f"❌ فشل إعادة فتح #{report_id}: {exc}", exc_info=True)
+        return False
+
+
+def get_recently_closed(limit: int = 10) -> list[dict]:
+    """آخر ما أُغلِق — ليعرف الأدمن **ماذا** أغلق لا أن يتذكّره.
+
+    ⚠️ زر التراجع وحده لا يكفي: من ضغط إغلاقاً ولم يعرف أي تقرير كان
+    يحتاج أن **يرى** ما أُغلِق. هذه القائمة تجيب السؤالين معاً — ماذا
+    أُغلِق، ومن أين يُعاد فتحه.
+    """
+    try:
+        with SessionLocal() as session:
+            rows = (session.query(PendingReport)
+                    .filter(PendingReport.status == "completed",
+                            PendingReport.completed_at.isnot(None))
+                    .order_by(PendingReport.completed_at.desc())
+                    .limit(limit).all())
+            out = []
+            for p in rows:
+                waited = (p.completed_at - p.created_at).days if p.created_at else 0
+                out.append({
+                    "report_id": p.report_id,
+                    "patient_name": p.patient_name or "—",
+                    "translator_name": p.translator_name or "—",
+                    "department": p.department or "—",
+                    "closed_at": p.completed_at,
+                    "days_waited": waited,
+                    "uploaded_before_close": p.uploaded_before_close,
+                    "expected_count": max(1, int(p.expected_count or 1)),
+                })
+            return out
+    except Exception as exc:
+        logger.error(f"❌ تعذّر جلب آخر ما أُغلِق: {exc}", exc_info=True)
+        return []

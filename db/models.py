@@ -1051,6 +1051,11 @@ class PendingReport(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=True, index=True)
     completed_at = Column(DateTime, nullable=True)  # متى تم إكمال المرافقات
     days_waiting = Column(Integer, default=0, nullable=True)  # عدد الأيام في الانتظار
+    # ⚠️ يُحفَظ عند الإغلاق لأن `complete_pending_upload` تضبط
+    # `uploaded_count = expected_count`، فبدونه يستحيل إعادة الفتح على
+    # التقدّم الحقيقي (١ من ٢ مثلاً) ويعود السجل بـ٢/٢ وهو «معلَّق» —
+    # حالة متناقضة. `NULL` تعني «لم يُغلَق يدوياً قطّ».
+    uploaded_before_close = Column(Integer, nullable=True)
 
     # ✅ تتبع الإكمال الجزئي — تقرير واحد قد يمثّل عدة فحوصات (مثال: فحص
     # دم + أشعة صدر) تصل نتائجها منفصلة عبر عدة جلسات رفع في "المرفقات

@@ -68,6 +68,8 @@ def _list_kb(page: int, total_pages: int, items=None, total_old: int = 0
             f"🧹 إغلاق كل ما تجاوز {_BULK_DAYS} يوماً ({total_old})",
             callback_data=f"{_PFX}:bulkask:{page}")])
 
+    rows.append([InlineKeyboardButton("🕘 آخر ما أُغلِق (تراجع)",
+                                      callback_data=f"{_PFX}:recent")])
     rows.append([InlineKeyboardButton("🔄 تحديث", callback_data=f"{_PFX}:page:{page}")])
     rows.append([InlineKeyboardButton("🔙 رجوع", callback_data="sys_menu:back")])
     return InlineKeyboardMarkup(rows)
@@ -173,6 +175,37 @@ async def _render_list(query, page: int, answered: bool = False) -> None:
         await _handle_render_error(query, exc, page=page)
 
 
+async def _render_recent(query, answered: bool = False) -> None:
+    """شاشة «آخر ما أُغلِق» — ماذا أُغلِق، ومن أين يُعاد فتحه."""
+    from services.pending_reports_service import get_recently_closed
+
+    items = get_recently_closed(10)
+    rows: list[list[InlineKeyboardButton]] = []
+    if not items:
+        body = ["🕘 آخر ما أُغلِق", "", "لم يُغلَق أي تقرير بعد."]
+    else:
+        body = ["🕘 آخر ما أُغلِق", "",
+                "اضغط على أي تقرير لإعادة فتحه كما كان.", ""]
+        for it in items:
+            when = it["closed_at"].strftime("%Y-%m-%d %H:%M") if it["closed_at"] else "—"
+            body.append(f"• {it['patient_name']}  ·  {it['translator_name']}")
+            body.append(f"   ⏳ كان منتظراً {it['days_waited']} يوماً  ·  أُغلِق {when}")
+            if it.get("report_id"):
+                rows.append([InlineKeyboardButton(
+                    f"↩️ إعادة فتح: {str(it['patient_name'])[:20]}",
+                    callback_data=f"{_PFX}:reopen:{it['report_id']}")])
+    rows.append([InlineKeyboardButton("⬅️ رجوع للقائمة",
+                                      callback_data=f"{_PFX}:page:0")])
+    try:
+        await query.edit_message_text("\n".join(body),
+                                      reply_markup=InlineKeyboardMarkup(rows))
+    except Exception as exc:
+        await _handle_render_error(query, exc, page=0)
+        return
+    if not answered:
+        await _answer_once(query)
+
+
 async def _answer_once(query, text: str | None = None) -> None:
     """الردّ على الاستعلام مرة واحدة — تيليجرام لا يسمح بأكثر من ردّ."""
     try:
@@ -240,6 +273,27 @@ async def handle_pending_reports_callback(update: Update, context: ContextTypes.
             query,
             f"✅ أُغلِق ({uploaded}/{expected})" if ok else "⚠️ تعذّر الإغلاق.")
         await _render_list(query, page, answered=True)
+        return
+
+    # ── آخر ما أُغلِق + إعادة الفتح ────────────────────────────────────
+    if action == "recent":
+        await _render_recent(query)
+        return
+
+    if action == "reopen":
+        from services.pending_reports_service import reopen_pending_report
+        try:
+            report_id = int(parts[2])
+        except (IndexError, ValueError):
+            await _answer_once(query, "⚠️ بيانات غير صالحة.")
+            return
+        ok = reopen_pending_report(report_id, performed_by=user.id)
+        await _answer_once(query, "↩️ أُعيد فتحه." if ok else "⚠️ تعذّرت إعادة الفتح.")
+        # ⚠️ **لا يُعدَّل `query.data` ولا يُستدعى المعالِج نفسه**: كائن
+        # `CallbackQuery` في PTB غير قابل للتعديل، فالإسناد يرمي استثناءً
+        # في الإنتاج بينما يمرّ صامتاً في الاختبار بـMagicMock. تُستدعى
+        # دالة الشاشة مباشرةً بدل ذلك.
+        await _render_recent(query, answered=True)
         return
 
     # ── إغلاق جماعي: تأكيد ثم تنفيذ ───────────────────────────────────
