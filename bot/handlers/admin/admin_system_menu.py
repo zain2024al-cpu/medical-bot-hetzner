@@ -59,7 +59,6 @@ def _menu_kb() -> InlineKeyboardMarkup:
         # الأدمن يرى كل السجلات بلا عزل (is_admin=True يُسقط الفلترة في
         # get_evacuation_ledger_rows تلقائياً — لا تغيير هناك).
         [InlineKeyboardButton("🖨️ طباعة مسير الإخلاء", callback_data=f"{_PFX}:pharmacy_print")],
-        [InlineKeyboardButton("🧾 طباعة الفواتير", callback_data=f"{_PFX}:pharmacy_invoices")],
         [InlineKeyboardButton("📸 صور الفواتير", callback_data=f"{_PFX}:pharmacy_invimg")],
         [InlineKeyboardButton("❌ إغلاق", callback_data=f"{_PFX}:close")],
     ])

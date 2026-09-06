@@ -530,7 +530,10 @@ def register_handlers(app) -> None:
     # اتفاقية باقي وحدات الرعاية الصحية (hc:, hcmed:, hcsup:, ...).
     app.add_handler(MessageHandler(filters.Regex(r"^🖨️ طباعة مسير الإخلاء$"), start_pharmacy_print), group=11)
     # 🧾 مسير الفواتير — نفس الوحدة ونفس المجموعة، وضعٌ مختلف بعد التاريخ.
-    app.add_handler(MessageHandler(filters.Regex(r"^🧾 طباعة الفواتير$"), start_pharmacy_invoices), group=11)
+    # 🧾 «طباعة الفواتير» مخفيّ بطلب المستخدم — `start_pharmacy_invoices`
+    # ووضع `_MODE_INVOICES` باقيان كما هما. يُعاد بإرجاع هذا السطر:
+    #   app.add_handler(MessageHandler(filters.Regex(r"^🧾 طباعة الفواتير$"),
+    #                                  start_pharmacy_invoices), group=11)
     app.add_handler(MessageHandler(filters.Regex(r"^📸 صور الفواتير$"), start_pharmacy_invoice_images), group=11)
     app.add_handler(CallbackQueryHandler(handle_callback, pattern=rf"^{_PFX}:"), group=1)
     logger.info("[pharmacy_print] handlers registered")
