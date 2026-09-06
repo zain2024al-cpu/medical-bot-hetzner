@@ -59,7 +59,6 @@ def _menu_kb() -> InlineKeyboardMarkup:
         # الأدمن يرى كل السجلات بلا عزل (is_admin=True يُسقط الفلترة في
         # get_evacuation_ledger_rows تلقائياً — لا تغيير هناك).
         [InlineKeyboardButton("🖨️ طباعة مسير الإخلاء", callback_data=f"{_PFX}:pharmacy_print")],
-        [InlineKeyboardButton("📸 صور الفواتير", callback_data=f"{_PFX}:pharmacy_invimg")],
         [InlineKeyboardButton("❌ إغلاق", callback_data=f"{_PFX}:close")],
     ])
 
@@ -141,6 +140,10 @@ async def handle_system_menu_choice(
         await start_pharmacy_print(update, context)
         return
 
+    # ⚠️ الفرعان التاليان **بلا أزرار في هذه القائمة** بطلب المستخدم:
+    # «🧾 طباعة الفواتير» أُخفي كلياً، و«📸 صور الفواتير» انتقل لصاحب
+    # صلاحية الصيدلية. يبقيان ليعمل زرٌّ في رسالة قديمة لا تزال في محادثة
+    # أدمن بدل أن يبدو معطَّلاً — وإعادة الزرّ سطرٌ واحد في `_menu_kb`.
     if data == f"{_PFX}:pharmacy_invoices":
         from modules.healthcare.pharmacy_print.flow import start_pharmacy_invoices
         await start_pharmacy_invoices(update, context)
