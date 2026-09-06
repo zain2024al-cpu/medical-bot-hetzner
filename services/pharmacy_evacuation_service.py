@@ -160,6 +160,9 @@ def _get_evacuation_ledger_rows_sync(
                     "discount_amount": fin.discount_amount or 0.0,
                     "net_amount": fin.net_amount or 0.0,
                     "source_type": source_type,
+                    # ✅ صور الفاتورة المرفوعة مع الصرف — يستهلكها مُجمِّع
+                    # صور الفواتير. من نفس الصفّ لا من استعلام ثانٍ.
+                    "image_file_ids": getattr(r, "image_file_ids", None) or "[]",
                     "_sort_dt": r.created_at or start_dt,
                 })
 

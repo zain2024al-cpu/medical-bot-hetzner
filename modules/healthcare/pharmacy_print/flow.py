@@ -58,6 +58,7 @@ async def _edit_or_reply(update: Update, text: str, kb) -> None:
 # يُصلَح والآخر يُنسى. الفرق بينهما يبدأ **بعد** اختيار التاريخ فقط.
 _MODE_MANIFEST = "manifest"
 _MODE_INVOICES = "invoices"
+_MODE_INVIMG = "invimg"      # 📸 صور الفواتير المرفوعة
 
 
 def _mode(context) -> str:
@@ -67,8 +68,12 @@ def _mode(context) -> str:
 
 
 def _title(context) -> str:
-    return ("🧾 *طباعة الفواتير*" if _mode(context) == _MODE_INVOICES
-            else "🖨️ *طباعة مسير الإخلاء*")
+    m = _mode(context)
+    if m == _MODE_INVOICES:
+        return "🧾 *طباعة الفواتير*"
+    if m == _MODE_INVIMG:
+        return "📸 *صور الفواتير*"
+    return "🖨️ *طباعة مسير الإخلاء*"
 
 
 async def start_pharmacy_invoices(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -83,6 +88,16 @@ async def start_pharmacy_invoices(update: Update, context: ContextTypes.DEFAULT_
         return
     context.user_data.pop(_KEY, None)
     context.user_data[_KEY] = {"mode": _MODE_INVOICES}
+    await _show_period_menu(update, context)
+
+
+async def start_pharmacy_invoice_images(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """📸 تجميع صور الفواتير المرفوعة في ملف — بالفترة فقط، بلا فلاتر أخرى."""
+    user = update.effective_user
+    if not user or not _is_authorized(user.id):
+        return
+    context.user_data.pop(_KEY, None)
+    context.user_data[_KEY] = {"mode": _MODE_INVIMG}
     await _show_period_menu(update, context)
 
 
@@ -172,7 +187,7 @@ async def _handle_cal_select(update: Update, context: ContextTypes.DEFAULT_TYPE,
     if step == "day":
         state["start_date"] = selected
         state["end_date"] = selected
-        if _mode(context) == _MODE_INVOICES:
+        if _mode(context) in (_MODE_INVOICES, _MODE_INVIMG):
             await _generate_and_show_export_choice(update, context)
             return
         await _show_manifest_type_menu(update, context)
@@ -190,7 +205,7 @@ async def _handle_cal_select(update: Update, context: ContextTypes.DEFAULT_TYPE,
             start, end = end, start
         state["start_date"] = start
         state["end_date"] = end
-        if _mode(context) == _MODE_INVOICES:
+        if _mode(context) in (_MODE_INVOICES, _MODE_INVIMG):
             await _generate_and_show_export_choice(update, context)
             return
         await _show_manifest_type_menu(update, context)
@@ -287,7 +302,7 @@ async def _generate_and_show_export_choice(update: Update, context: ContextTypes
     manifest_label = _MANIFEST_TYPE_LABELS.get(manifest_type, "📋 الكل")
     specialist_label = specialist_name or "📋 الكل"
 
-    if not rows and _mode(context) == _MODE_INVOICES:
+    if not rows and _mode(context) in (_MODE_INVOICES, _MODE_INVIMG):
         text = ("⚠️ لا توجد فواتير في هذه الفترة." + chr(10) + chr(10)
                 + f"من {start.strftime('%Y-%m-%d')} إلى {end.strftime('%Y-%m-%d')}")
         kb = InlineKeyboardMarkup([[InlineKeyboardButton(
@@ -316,6 +331,34 @@ async def _generate_and_show_export_choice(update: Update, context: ContextTypes
         f"إجمالي المبلغ: {total:,.2f}\n\n"
         f"اختر صيغة التصدير:"
     )
+    if _mode(context) == _MODE_INVIMG:
+        from services.pharmacy_invoice_images_pdf import count_images
+        n_img = count_images(rows)
+        if not n_img:
+            text = ("⚠️ لا توجد صور فواتير مرفوعة في هذه الفترة." + chr(10) + chr(10)
+                    + f"من {start.strftime('%Y-%m-%d')} إلى {end.strftime('%Y-%m-%d')}" + chr(10)
+                    + f"(عدد سجلات الصرف: {len(rows)} — بلا صور مرفقة)")
+            kb = InlineKeyboardMarkup([[InlineKeyboardButton(
+                "🔙 رجوع", callback_data=f"{_PFX}:back_to_period")]])
+            await _edit_or_reply(update, text, kb)
+            return
+        text = (
+            "📸 *صور الفواتير*" + chr(10) + chr(10)
+            + f"الفترة: من {start.strftime('%Y-%m-%d')} إلى {end.strftime('%Y-%m-%d')}" + chr(10)
+            + f"عدد الفواتير: {len(rows)}" + chr(10)
+            + f"عدد الصور: {n_img}" + chr(10) + chr(10)
+            # ⚠️ تنبيه صريح: الصور تُنزَّل من تليجرام واحدةً واحدة، وقد
+            # يستغرق ذلك دقائق لعشرات الصور. بلا هذا السطر يظنّ المستخدم
+            # الزرّ معطَّلاً فيضغطه مراراً.
+            + "⏳ التجميع يستغرق وقتاً بحسب عدد الصور."
+        )
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📸 تجميع وطباعة", callback_data=f"{_PFX}:export:invimg")],
+            [InlineKeyboardButton("❌ إلغاء", callback_data=f"{_PFX}:cancel")],
+        ])
+        await _edit_or_reply(update, text, kb)
+        return
+
     if _mode(context) == _MODE_INVOICES:
         # الفواتير: بلا سطرَي نوع المسير والمختص (لا فلترة بهما هنا)،
         # وبلا Excel — المطلوب ملف مطبوع منظَّم.
@@ -358,6 +401,30 @@ async def _handle_export(update: Update, context: ContextTypes.DEFAULT_TYPE, cho
     chat_id = update.effective_chat.id if update.effective_chat else None
 
     try:
+        if choice == "invimg":
+            from services.pharmacy_invoice_images_pdf import build_invoice_images_pdfs
+            try:
+                await query.answer("⏳ جارٍ تجميع الصور…")
+            except Exception:
+                logger.debug("تم تجاهل استثناء في _handle_export", exc_info=True)
+            files, n_img, failed = await build_invoice_images_pdfs(
+                rows, context.bot, start, end)
+            base = (f"صور_فواتير_{start.strftime('%Y-%m-%d')}"
+                    f"_الى_{end.strftime('%Y-%m-%d')}")
+            for idx, buf in enumerate(files, start=1):
+                name = base + (f"_جزء{idx}" if len(files) > 1 else "") + ".pdf"
+                await context.bot.send_document(
+                    chat_id=chat_id, document=buf, filename=name)
+            if failed:
+                # ⚠️ المتعذّر يُعلَن لا يُبتلَع: المستخدم يطبع ملفاً ناقصاً
+                # ويظنّه كاملاً، وهو أسوأ من معرفة النقص.
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text=f"⚠️ أُدرِجت {n_img} صورة، وتعذّر تنزيل {failed} "
+                         f"(قد تكون قديمة حُذفت من تليجرام).")
+            context.user_data.pop(_KEY, None)
+            return
+
         if choice == "invpdf":
             from services.pharmacy_invoices_pdf import build_invoices_pdf
             buf = build_invoices_pdf(rows, start, end)
@@ -464,5 +531,6 @@ def register_handlers(app) -> None:
     app.add_handler(MessageHandler(filters.Regex(r"^🖨️ طباعة مسير الإخلاء$"), start_pharmacy_print), group=11)
     # 🧾 مسير الفواتير — نفس الوحدة ونفس المجموعة، وضعٌ مختلف بعد التاريخ.
     app.add_handler(MessageHandler(filters.Regex(r"^🧾 طباعة الفواتير$"), start_pharmacy_invoices), group=11)
+    app.add_handler(MessageHandler(filters.Regex(r"^📸 صور الفواتير$"), start_pharmacy_invoice_images), group=11)
     app.add_handler(CallbackQueryHandler(handle_callback, pattern=rf"^{_PFX}:"), group=1)
     logger.info("[pharmacy_print] handlers registered")
