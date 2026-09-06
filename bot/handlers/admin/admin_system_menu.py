@@ -59,6 +59,7 @@ def _menu_kb() -> InlineKeyboardMarkup:
         # الأدمن يرى كل السجلات بلا عزل (is_admin=True يُسقط الفلترة في
         # get_evacuation_ledger_rows تلقائياً — لا تغيير هناك).
         [InlineKeyboardButton("🖨️ طباعة مسير الإخلاء", callback_data=f"{_PFX}:pharmacy_print")],
+        [InlineKeyboardButton("🧾 طباعة الفواتير", callback_data=f"{_PFX}:pharmacy_invoices")],
         [InlineKeyboardButton("❌ إغلاق", callback_data=f"{_PFX}:close")],
     ])
 
@@ -138,6 +139,11 @@ async def handle_system_menu_choice(
         # التالية (hcphprint:...) مسجَّلة مستقلة ومسبقاً فتعمل بلا تغيير.
         from modules.healthcare.pharmacy_print.flow import start_pharmacy_print
         await start_pharmacy_print(update, context)
+        return
+
+    if data == f"{_PFX}:pharmacy_invoices":
+        from modules.healthcare.pharmacy_print.flow import start_pharmacy_invoices
+        await start_pharmacy_invoices(update, context)
         return
 
     if data == f"{_PFX}:back":

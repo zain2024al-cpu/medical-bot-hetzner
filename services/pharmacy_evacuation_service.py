@@ -150,6 +150,16 @@ def _get_evacuation_ledger_rows_sync(
                     # بعد يوم الصرف الفعلي بأيام. لا تُغيّر هذا السطر لاستخدام fin.*.
                     "date": r.created_at.date() if r.created_at else start_date,
                     "manifest_type": fin.manifest_type or "A",
+                    # ✅ تفصيل الفاتورة — يستهلكه **مسير الفواتير** وحده.
+                    # أُضيف هنا لا في استعلام ثانٍ: مصدر الصفوف واحد، فلو
+                    # بُني استعلام مستقل للفواتير لتباعد عن المسير في قواعد
+                    # الفلترة (المحذوف ناعماً، ومصدر التاريخ) بلا أن ينتبه
+                    # أحد. مفاتيح إضافية لا تؤثّر على المسير — يقرأ ما يعنيه.
+                    "invoice_total": fin.invoice_total or 0.0,
+                    "discount_percent": fin.discount_percent or 0.0,
+                    "discount_amount": fin.discount_amount or 0.0,
+                    "net_amount": fin.net_amount or 0.0,
+                    "source_type": source_type,
                     "_sort_dt": r.created_at or start_dt,
                 })
 

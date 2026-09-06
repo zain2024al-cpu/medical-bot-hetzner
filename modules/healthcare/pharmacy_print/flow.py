@@ -53,16 +53,50 @@ async def _edit_or_reply(update: Update, text: str, kb) -> None:
 
 # ── Entry point ────────────────────────────────────────────────────────────────
 
+# وضعان يتشاركان **نفس** شاشة الفترة والتقويم: مسير الإخلاء ومسير
+# الفواتير. نسخ التقويم لوحدة ثانية كان سيُنتِج تقويمين يتباعدان — أحدهما
+# يُصلَح والآخر يُنسى. الفرق بينهما يبدأ **بعد** اختيار التاريخ فقط.
+_MODE_MANIFEST = "manifest"
+_MODE_INVOICES = "invoices"
+
+
+def _mode(context) -> str:
+    if context is None:
+        return _MODE_MANIFEST
+    return (context.user_data.get(_KEY, {}) or {}).get("mode", _MODE_MANIFEST)
+
+
+def _title(context) -> str:
+    return ("🧾 *طباعة الفواتير*" if _mode(context) == _MODE_INVOICES
+            else "🖨️ *طباعة مسير الإخلاء*")
+
+
+async def start_pharmacy_invoices(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """🧾 مسير الفواتير — نفس تدفّق المسير حتى اختيار التاريخ، ثم الملف.
+
+    ⚠️ بلا فلترة نوع المسير ولا الأخصائي **عمداً**: تلك تخصّ ورقة الإخلاء،
+    أما الفواتير فسؤالها «ماذا صُرِف مالياً في هذه الفترة» — وأي فلترة
+    هنا تُنقِص الإجمالي فلا يطابق دفاتر الصيدلية.
+    """
+    user = update.effective_user
+    if not user or not _is_authorized(user.id):
+        return
+    context.user_data.pop(_KEY, None)
+    context.user_data[_KEY] = {"mode": _MODE_INVOICES}
+    await _show_period_menu(update, context)
+
+
 async def start_pharmacy_print(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     if not user or not _is_authorized(user.id):
         return
     context.user_data.pop(_KEY, None)
-    await _show_period_menu(update)
+    context.user_data[_KEY] = {"mode": _MODE_MANIFEST}
+    await _show_period_menu(update, context)
 
 
-async def _show_period_menu(update: Update) -> None:
-    text = "🖨️ *طباعة مسير الإخلاء*\n\nاختر الفترة:"
+async def _show_period_menu(update: Update, context=None) -> None:
+    text = f"{_title(context)}\n\nاختر الفترة:"
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("📅 يوم واحد", callback_data=f"{_PFX}:period:day")],
         [InlineKeyboardButton("📆 من تاريخ ← إلى تاريخ", callback_data=f"{_PFX}:period:range")],
@@ -121,7 +155,10 @@ async def _show_calendar(update: Update, step: str, year: int | None = None, mon
 # ── Period selection ─────────────────────────────────────────────────────────
 
 async def _handle_period(update: Update, context: ContextTypes.DEFAULT_TYPE, kind: str) -> None:
-    context.user_data[_KEY] = {"kind": kind}
+    # ⚠️ الحالة تُستبدَل هنا كاملةً لتنظيف اختيار سابق — فيجب **حمل
+    # الوضع معها**، وإلا عاد مسير الفواتير مسيرَ إخلاء بعد اختيار الفترة
+    # ويُطالَب المستخدم بنوع مسير لا يعنيه. (ظهر في الاختبار حرفياً.)
+    context.user_data[_KEY] = {"kind": kind, "mode": _mode(context)}
     if kind == "day":
         await _show_calendar(update, step="day")
     else:
@@ -135,6 +172,9 @@ async def _handle_cal_select(update: Update, context: ContextTypes.DEFAULT_TYPE,
     if step == "day":
         state["start_date"] = selected
         state["end_date"] = selected
+        if _mode(context) == _MODE_INVOICES:
+            await _generate_and_show_export_choice(update, context)
+            return
         await _show_manifest_type_menu(update, context)
         return
 
@@ -150,6 +190,9 @@ async def _handle_cal_select(update: Update, context: ContextTypes.DEFAULT_TYPE,
             start, end = end, start
         state["start_date"] = start
         state["end_date"] = end
+        if _mode(context) == _MODE_INVOICES:
+            await _generate_and_show_export_choice(update, context)
+            return
         await _show_manifest_type_menu(update, context)
         return
 
@@ -221,7 +264,7 @@ async def _generate_and_show_export_choice(update: Update, context: ContextTypes
     start = state.get("start_date")
     end = state.get("end_date")
     if start is None or end is None:
-        await _show_period_menu(update)
+        await _show_period_menu(update, context)
         return
 
     user = update.effective_user
@@ -244,6 +287,14 @@ async def _generate_and_show_export_choice(update: Update, context: ContextTypes
     manifest_label = _MANIFEST_TYPE_LABELS.get(manifest_type, "📋 الكل")
     specialist_label = specialist_name or "📋 الكل"
 
+    if not rows and _mode(context) == _MODE_INVOICES:
+        text = ("⚠️ لا توجد فواتير في هذه الفترة." + chr(10) + chr(10)
+                + f"من {start.strftime('%Y-%m-%d')} إلى {end.strftime('%Y-%m-%d')}")
+        kb = InlineKeyboardMarkup([[InlineKeyboardButton(
+            "🔙 رجوع", callback_data=f"{_PFX}:back_to_period")]])
+        await _edit_or_reply(update, text, kb)
+        return
+
     if not rows:
         text = (
             f"⚠️ لا توجد بيانات مطابقة لمعايير البحث المحددة.\n\n"
@@ -265,6 +316,23 @@ async def _generate_and_show_export_choice(update: Update, context: ContextTypes
         f"إجمالي المبلغ: {total:,.2f}\n\n"
         f"اختر صيغة التصدير:"
     )
+    if _mode(context) == _MODE_INVOICES:
+        # الفواتير: بلا سطرَي نوع المسير والمختص (لا فلترة بهما هنا)،
+        # وبلا Excel — المطلوب ملف مطبوع منظَّم.
+        text = (
+            "✅ *جاهزة الفواتير*" + chr(10) + chr(10)
+            + f"الفترة: من {start.strftime('%Y-%m-%d')} إلى {end.strftime('%Y-%m-%d')}" + chr(10)
+            + f"عدد الفواتير: {len(rows)}" + chr(10)
+            + f"إجمالي الصافي: {total:,.2f}" + chr(10) + chr(10)
+            + "اضغط للطباعة:"
+        )
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🧾 طباعة PDF", callback_data=f"{_PFX}:export:invpdf")],
+            [InlineKeyboardButton("❌ إلغاء", callback_data=f"{_PFX}:cancel")],
+        ])
+        await _edit_or_reply(update, text, kb)
+        return
+
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("📄 PDF", callback_data=f"{_PFX}:export:pdf"),
          InlineKeyboardButton("📊 Excel", callback_data=f"{_PFX}:export:excel")],
@@ -283,13 +351,21 @@ async def _handle_export(update: Update, context: ContextTypes.DEFAULT_TYPE, cho
     start = state.get("start_date")
     end = state.get("end_date")
     if rows is None or start is None or end is None:
-        await _show_period_menu(update)
+        await _show_period_menu(update, context)
         return
 
     query = update.callback_query
     chat_id = update.effective_chat.id if update.effective_chat else None
 
     try:
+        if choice == "invpdf":
+            from services.pharmacy_invoices_pdf import build_invoices_pdf
+            buf = build_invoices_pdf(rows, start, end)
+            await context.bot.send_document(
+                chat_id=chat_id, document=buf,
+                filename=f"فواتير_الصيدلية_{start.strftime('%Y-%m-%d')}"
+                         f"_الى_{end.strftime('%Y-%m-%d')}.pdf",
+            )
         if choice in ("pdf", "both"):
             pdf_buf = build_evacuation_pdf(rows, start, end)
             await context.bot.send_document(
@@ -344,7 +420,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         ]]))
         return
     if action == "back_to_period":
-        await _show_period_menu(update)
+        await _show_period_menu(update, context)
         return
     if action == "back_to_mtype":
         await _show_manifest_type_menu(update, context)
@@ -386,5 +462,7 @@ def register_handlers(app) -> None:
     # قبل وصولها لهذه الوحدة. group=1 لكل CallbackQueryHandler بنفس
     # اتفاقية باقي وحدات الرعاية الصحية (hc:, hcmed:, hcsup:, ...).
     app.add_handler(MessageHandler(filters.Regex(r"^🖨️ طباعة مسير الإخلاء$"), start_pharmacy_print), group=11)
+    # 🧾 مسير الفواتير — نفس الوحدة ونفس المجموعة، وضعٌ مختلف بعد التاريخ.
+    app.add_handler(MessageHandler(filters.Regex(r"^🧾 طباعة الفواتير$"), start_pharmacy_invoices), group=11)
     app.add_handler(CallbackQueryHandler(handle_callback, pattern=rf"^{_PFX}:"), group=1)
     logger.info("[pharmacy_print] handlers registered")

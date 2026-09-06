@@ -208,8 +208,11 @@ def bootstrap_all() -> None:
     # want to grant one without the other.
     registry.register(
         name="pharmacy_print",
-        menu_buttons={"🖨️ طباعة مسير الإخلاء"},
-        keyboard_rows=[["🖨️ طباعة مسير الإخلاء"]],
+        # 🧾 الفواتير في نفس الوحدة عمداً: من يطبع المسير هو من يطبع
+        # الفواتير، ومصدر بياناتهما واحد. صلاحية منفصلة كانت ستُنتِج من
+        # يرى نصف الصورة المالية.
+        menu_buttons={"🖨️ طباعة مسير الإخلاء", "🧾 طباعة الفواتير"},
+        keyboard_rows=[["🖨️ طباعة مسير الإخلاء", "🧾 طباعة الفواتير"]],
         extra_wipe_keys={"_hcphprint_ledger"},
     )
 
