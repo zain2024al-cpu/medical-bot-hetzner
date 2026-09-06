@@ -40,6 +40,19 @@ def _is_authorized(user_id: int) -> bool:
     return is_admin(user_id) or user_has_module(user_id, _MODULE_KEY)
 
 
+# ⚠️ صلاحية أوسع **لصور الفواتير وحدها**: من يملك صلاحية الصيدلية المالية
+# (`pharmacy_finance`) هو من يرفع صور الفواتير أصلاً، فحرمانه من تجميعها
+# بلا معنى. أما **مسير الإخلاء يبقى على `pharmacy_print` وحدها** —
+# الفصل بين الوحدتين مقصود في `modules_bootstrap` ("an admin may want to
+# grant one without the other")، فتوسيع `_is_authorized` نفسها كان
+# سيفتح المسير أيضاً بلا طلب.
+_FINANCE_MODULE_KEY = "pharmacy_finance"
+
+
+def _is_authorized_images(user_id: int) -> bool:
+    return _is_authorized(user_id) or user_has_module(user_id, _FINANCE_MODULE_KEY)
+
+
 async def _edit_or_reply(update: Update, text: str, kb) -> None:
     query = update.callback_query
     if query:
@@ -94,7 +107,7 @@ async def start_pharmacy_invoices(update: Update, context: ContextTypes.DEFAULT_
 async def start_pharmacy_invoice_images(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """📸 تجميع صور الفواتير المرفوعة في ملف — بالفترة فقط، بلا فلاتر أخرى."""
     user = update.effective_user
-    if not user or not _is_authorized(user.id):
+    if not user or not _is_authorized_images(user.id):
         return
     context.user_data.pop(_KEY, None)
     context.user_data[_KEY] = {"mode": _MODE_INVIMG}
@@ -471,7 +484,12 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await query.answer()
     except Exception:
         logger.debug("تم تجاهل استثناء في handle_callback", exc_info=True)
-    if not user or not _is_authorized(user.id):
+    # ⚠️ الحارس يتبع **الوضع الجاري**: لولا ذلك يدخل صاحب صلاحية الصيدلية
+    # المالية شاشة الصور ثم يُحجَب عند أول ضغطة على التقويم — دخولٌ بلا
+    # إتمام، وهو أسوأ من منعه ابتداءً.
+    _ok = (_is_authorized_images(user.id) if user and _mode(context) == _MODE_INVIMG
+           else (_is_authorized(user.id) if user else False))
+    if not _ok:
         return
 
     data = query.data or ""

@@ -198,8 +198,10 @@ def bootstrap_all() -> None:
     # in admin_main_kb()), the grant only controls non-admin visibility here.
     registry.register(
         name="pharmacy_finance",
-        menu_buttons={"💰 التقرير المالي"},
-        keyboard_rows=[["💰 التقرير المالي"]],
+        # 📸 «صور الفواتير» يظهر هنا أيضاً: من يرفع الصور هو من يجمعها.
+        # الزرّ نفسه في وحدتين — معالِجه واحد وحارسه يقبل الصلاحيتين.
+        menu_buttons={"💰 التقرير المالي", "📸 صور الفواتير"},
+        keyboard_rows=[["💰 التقرير المالي", "📸 صور الفواتير"]],
         extra_wipe_keys={"_hcphfin_add"},
     )
 
