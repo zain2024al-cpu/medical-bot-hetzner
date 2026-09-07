@@ -466,7 +466,9 @@ async def _show_issuance(update: Update, context: ContextTypes.DEFAULT_TYPE, per
         return
     # الرجوع لعائلة الشخص لا للقائمة الرئيسية — الأدمن يفحص حالة بعينها
     _root = person.parent_id or person.id
-    text, kb = rn_views.build_issuance_view(person, back_to=f"{RN}:family_{_root}")
+    text, kb = rn_views.build_issuance_view(
+        person, back_to=f"{RN}:family_{_root}",
+        can_restore=rn_models.has_previous_issuance(person_id))
     await _edit(update, text, kb)
 
 
@@ -717,6 +719,16 @@ async def _dispatch_action(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     if action.startswith("issue_view_"):
         person_id = int(action[len("issue_view_"):])
+        await _show_issuance(update, context, person_id)
+        return
+
+    if action.startswith("issue_restore_"):
+        person_id = int(action[len("issue_restore_"):])
+        ok = rn_models.restore_previous_issuance(person_id)
+        await _alert(update, context,
+                     "↩️ استُرجِعت بيانات الإقامة السابقة."
+                     if ok else "⚠️ لا توجد إقامة سابقة محفوظة.",
+                     show_alert=False)
         await _show_issuance(update, context, person_id)
         return
 

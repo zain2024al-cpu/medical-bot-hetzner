@@ -206,14 +206,47 @@ def mark_submitted(person_id: int, performed_by: int | None = None) -> bool:
 
 
 def start_issuance(person_id: int, performed_by: int | None = None) -> bool:
-    """🟣 تم الإصدار — SUBMITTED → ISSUED (يبدأ جمع تاريخ الانتهاء + الملف)."""
+    """🟣 SUBMITTED → ISSUED — **يؤرشف الإقامة السابقة ثم يُفرِغ الحقول**.
+
+    ⚠️ كانت الحقول تبقى محمولة من الإقامة المنتهية، فتظهر في الشاشة وكأنها
+    الجديدة و«✅ تأكيد الإصدار» متاح **فوراً** — فيُوثَّق الإصدار المنتهي
+    إصداراً جديداً بضغطة واحدة.
+
+    ⚠️ **الأرشفة قبل الإفراغ لا بعده**: الإفراغ وحده يعني أن ضغطة خاطئة
+    على «🟣 توثيق التمديدات» تمحو بيانات إقامة قائمة **بلا رجعة**. بعد
+    الأرشفة يبقى الاسترجاع ممكناً عبر `restore_previous_issuance`.
+
+    ⚠️ **بلا تكرار**: لا يُكتَب سطر أرشيف إن كان آخرها يحمل القيم نفسها
+    (أُرشِفت عند تأكيد إصدارها) — وإلا تضخّم السجلّ بنسخ متطابقة.
+    """
     from db.session import get_db
-    from db.models import ResidencyPerson
+    from db.models import ResidencyPerson, ResidencyIssuance
 
     with get_db() as db:
         person = db.query(ResidencyPerson).filter_by(id=person_id).first()
         if not person or person.status != STATUS_SUBMITTED:
             return False
+
+        exp = (person.expiry_date or "").strip()
+        rem = (person.reminder_date or "").strip()
+        fid = (person.residency_file_id or "").strip()
+        if exp or fid or rem:
+            last = (db.query(ResidencyIssuance)
+                    .filter_by(person_id=person.id)
+                    .order_by(ResidencyIssuance.id.desc()).first())
+            same = (last is not None
+                    and (last.expiry_date or "") == exp
+                    and (last.file_id or "") == fid
+                    and (getattr(last, "reminder_date", "") or "") == rem)
+            if not same:
+                db.add(ResidencyIssuance(
+                    person_id=person.id, expiry_date=exp,
+                    reminder_date=rem, file_id=fid,
+                ))
+        person.expiry_date = ""
+        person.reminder_date = ""
+        person.residency_file_id = ""
+
         old = person.status
         person.status = STATUS_ISSUED
         _log_transition(db, person.id, old, STATUS_ISSUED, performed_by)
@@ -273,6 +306,7 @@ def confirm_issuance(person_id: int, performed_by: int | None = None) -> bool:
         old = person.status
         db.add(ResidencyIssuance(
             person_id=person.id, expiry_date=person.expiry_date,
+            reminder_date=person.reminder_date or "",
             file_id=person.residency_file_id,
         ))
         person.status = STATUS_ACTIVE
@@ -463,3 +497,35 @@ def delete_stub_person_by_name(name: str) -> int:
             logger.info(f"[residency] deleted orphaned waiting-arrival person #{person.id} for: {name}")
 
     return deleted
+
+
+def restore_previous_issuance(person_id: int) -> bool:
+    """↩️ يُعيد قيم الإقامة السابقة من الأرشيف — تراجعٌ عن ضغطة خاطئة.
+
+    يعمل **أثناء الإصدار فقط** (`ISSUED`): بعد التأكيد تصير القيم الحيّة
+    هي الإصدار الجديد، والاسترجاع حينها يمحو عملاً صحيحاً لا خطأً.
+    """
+    from db.session import get_db
+    from db.models import ResidencyPerson, ResidencyIssuance
+
+    with get_db() as db:
+        person = db.query(ResidencyPerson).filter_by(id=person_id).first()
+        if not person or person.status != STATUS_ISSUED:
+            return False
+        last = (db.query(ResidencyIssuance)
+                .filter_by(person_id=person_id)
+                .order_by(ResidencyIssuance.id.desc()).first())
+        if last is None:
+            return False
+        person.expiry_date = last.expiry_date or ""
+        person.reminder_date = getattr(last, "reminder_date", "") or ""
+        person.residency_file_id = last.file_id or ""
+    logger.info(f"[residency] استُرجِعت الإقامة السابقة  person_id={person_id}")
+    return True
+
+
+def has_previous_issuance(person_id: int) -> bool:
+    from db.session import get_db
+    from db.models import ResidencyIssuance
+    with get_db() as db:
+        return db.query(ResidencyIssuance).filter_by(person_id=person_id).count() > 0

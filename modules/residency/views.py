@@ -414,7 +414,8 @@ def build_onboard_review(queue: list[PersonRow], back_to: str | None = None) -> 
 
 # ── Issuance (🟣) ────────────────────────────────────────────────────────────
 
-def build_issuance_view(person: PersonRow, back_to: str | None = None) -> tuple[str, InlineKeyboardMarkup]:
+def build_issuance_view(person: PersonRow, back_to: str | None = None,
+                        can_restore: bool = False) -> tuple[str, InlineKeyboardMarkup]:
     expiry_mark = person.expiry_date if person.expiry_date else "➖ غير محدَّد"
     file_mark = "✅ مرفوع" if person.residency_file_id else "⬜ غير مرفوع"
     # ⚠️ التنبيه جزء من الإصدار لا خطوة لاحقة: `confirm_issuance` كان
@@ -428,11 +429,9 @@ def build_issuance_view(person: PersonRow, back_to: str | None = None) -> tuple[
         f"🔔 تاريخ التنبيه الجديد: {remind_mark}",
         f"📎 ملف الإقامة الجديدة: {file_mark}",
         _THIN,
-        # ⚠️ `start_issuance` لا يمسح قيم الإقامة السابقة، فتظهر هنا وكأنها
-        # الجديدة وزرّ التأكيد متاح فوراً — ويُوثَّق الإصدار القديم إصداراً
-        # جديداً. المسح التلقائي مرفوض: ضغطةٌ خاطئة على «🟣 توثيق» كانت
-        # ستمحو بيانات إقامة قائمة. فيُنبَّه المستخدم صراحةً بدل ذلك.
-        "⚠️ القيم أعلاه محمولة من الإقامة السابقة — حدّثها **الثلاث** قبل التأكيد.",
+        # الحقول تُفرَّغ عند بدء الإصدار (`start_issuance`) بعد أرشفة
+        # الإقامة السابقة، فما يظهر هنا هو الجديد وحده لا المحمول.
+        "أدخل الثلاثة ثم أكّد. لا شيء يضيع: السابقة محفوظة ويمكن استرجاعها.",
     ]
     rows = [
         [InlineKeyboardButton("📅 تاريخ الانتهاء الجديد", callback_data=f"{RN}:issue_expiry_{person.id}")],
@@ -441,6 +440,9 @@ def build_issuance_view(person: PersonRow, back_to: str | None = None) -> tuple[
     ]
     if person.expiry_date and person.reminder_date and person.residency_file_id:
         rows.append([InlineKeyboardButton("✅ تأكيد الإصدار", callback_data=f"{RN}:issue_confirm_{person.id}")])
+    if can_restore:
+        rows.append([InlineKeyboardButton(
+            "↩️ استرجاع الإقامة السابقة", callback_data=f"{RN}:issue_restore_{person.id}")])
     rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data=back_to or f"{RN}:menu")])
     return "\n".join(lines), InlineKeyboardMarkup(rows)
 

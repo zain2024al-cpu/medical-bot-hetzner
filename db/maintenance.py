@@ -153,6 +153,7 @@ class DatabaseMaintenance:
                 _migrate_column(conn, "pending_reports", "expected_count", "INTEGER")
                 _migrate_column(conn, "pending_reports", "uploaded_count", "INTEGER")
                 _migrate_column(conn, "pending_reports", "uploaded_before_close", "INTEGER")
+                _migrate_column(conn, "res_issuance_history", "reminder_date", "VARCHAR(50)")
                 # ✅ تصنيف مسير الصيدلية عند الطباعة (A/B/C) — الصفوف القديمة
                 # تحصل على NULL، تُعامَل كـ"A" افتراضياً في كود القراءة.
                 _migrate_column(conn, "pharmacy_financial_records", "manifest_type", "VARCHAR(5)")

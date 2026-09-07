@@ -888,6 +888,9 @@ class ResidencyIssuance(Base):
     id          = Column(Integer, primary_key=True, autoincrement=True)
     person_id   = Column(Integer, nullable=False, index=True)   # FK → res_persons.id
     expiry_date = Column(String(50),  default="")
+    # ⚠️ يُحفَظ ليكتمل الاسترجاع: بدونه يعود تاريخ الانتهاء والملف ويبقى
+    # التنبيه ضائعاً، فتُعاد الحالة ناقصةً وتبدو سليمة.
+    reminder_date = Column(String(50), default="", nullable=True)
     file_id     = Column(String(255), default="")
     issued_at   = Column(DateTime, default=datetime.utcnow, index=True, nullable=True)
 
