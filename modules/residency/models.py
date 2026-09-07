@@ -250,8 +250,8 @@ def save_issuance_file(person_id: int, file_id: str) -> bool:
 def confirm_issuance(person_id: int, performed_by: int | None = None) -> bool:
     """
     "✅ تأكيد الإصدار" — يتطلَّب expiry_date وresidency_file_id مكتملَين
-    مسبقاً (عبر set_issuance_expiry/save_issuance_file). ISSUED → ACTIVE،
-    وreminder_date يُصفَّر لبدء دورة تنبيه جديدة يدوياً (لا حساب تلقائي).
+    مسبقاً (عبر set_issuance_expiry/save_issuance_file). ISSUED → ACTIVE.
+    يتطلَّب أيضاً reminder_date الجديد (يُدخَل ضمن شاشة الإصدار).
 
     ✅ يُضاف أيضاً سطر أرشفة في ResidencyIssuance (بجانب تحديث الحقول
     الحيّة على الشخص كالمعتاد) — حفاظاً على الإصدار السابق قبل أن
@@ -264,7 +264,11 @@ def confirm_issuance(person_id: int, performed_by: int | None = None) -> bool:
         person = db.query(ResidencyPerson).filter_by(id=person_id).first()
         if not person or person.status != STATUS_ISSUED:
             return False
-        if not person.expiry_date or not person.residency_file_id:
+        # ⚠️ التنبيه صار **شرطاً** كالانتهاء والملف. كان يُصفَّر هنا
+        # (`reminder_date = ""`) «لبدء دورة يدوية»، فبقي الشخص نشطاً بلا
+        # تنبيه ولا ينتقل إلى «معلّق انتهاء» إلا بعد انتهاء إقامته فعلاً —
+        # أي بعد فوات غرض التنبيه. صار يُدخَل ضمن الإصدار نفسه.
+        if not person.expiry_date or not person.residency_file_id                 or not (person.reminder_date or "").strip():
             return False
         old = person.status
         db.add(ResidencyIssuance(
@@ -272,7 +276,7 @@ def confirm_issuance(person_id: int, performed_by: int | None = None) -> bool:
             file_id=person.residency_file_id,
         ))
         person.status = STATUS_ACTIVE
-        person.reminder_date = ""
+        # ⛔ لا يُصفَّر التنبيه — أُدخِل مع الإصدار ويجب أن يبقى.
         _log_transition(db, person.id, old, STATUS_ACTIVE, performed_by)
     logger.info(f"[residency] issuance confirmed  person_id={person_id} → ACTIVE")
     return True

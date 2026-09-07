@@ -720,6 +720,15 @@ async def _dispatch_action(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await _show_issuance(update, context, person_id)
         return
 
+    if action.startswith("issue_remind_"):
+        person_id = int(action[len("issue_remind_"):])
+        context.user_data[_CTX_CAL_TARGET] = {"kind": "issue_remind", "person_id": person_id}
+        now = _today()
+        text, kb = build_calendar(now.year, now.month, RN,
+                                  back_callback=f"{RN}:issue_view_{person_id}")
+        await _edit(update, text, kb)
+        return
+
     if action.startswith("issue_expiry_"):
         person_id = int(action[len("issue_expiry_"):])
         context.user_data[_CTX_CAL_TARGET] = {"kind": "issue_expiry", "person_id": person_id}
@@ -947,8 +956,9 @@ async def _handle_calendar_action(update: Update, context: ContextTypes.DEFAULT_
                 or kind == "legacy_move_remind"
                 or kind == "legacy_reminder"
                 or kind == "editf_remind"
+                or kind == "issue_remind"
             )
-            _is_expiry = kind in ("legacy_expiry", "editf_expiry")
+            _is_expiry = kind in ("legacy_expiry", "editf_expiry", "issue_expiry")
             if _is_remind:
                 _err = validate_reminder(_p.expiry_date, date_iso)
             elif _is_expiry:
@@ -961,6 +971,10 @@ async def _handle_calendar_action(update: Update, context: ContextTypes.DEFAULT_
             rn_models.set_reminder_date(person_id, date_iso)
             context.user_data.pop(_CTX_CAL_TARGET, None)
             await _show_onboard_step(update, context, target["root_id"])
+        elif target["kind"] == "issue_remind":
+            rn_models.set_reminder_date(person_id, date_iso)
+            context.user_data.pop(_CTX_CAL_TARGET, None)
+            await _show_issuance(update, context, person_id)
         elif target["kind"] == "issue_expiry":
             rn_models.set_issuance_expiry(person_id, date_iso)
             context.user_data.pop(_CTX_CAL_TARGET, None)

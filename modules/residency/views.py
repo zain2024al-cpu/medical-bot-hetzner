@@ -417,17 +417,29 @@ def build_onboard_review(queue: list[PersonRow], back_to: str | None = None) -> 
 def build_issuance_view(person: PersonRow, back_to: str | None = None) -> tuple[str, InlineKeyboardMarkup]:
     expiry_mark = person.expiry_date if person.expiry_date else "➖ غير محدَّد"
     file_mark = "✅ مرفوع" if person.residency_file_id else "⬜ غير مرفوع"
+    # ⚠️ التنبيه جزء من الإصدار لا خطوة لاحقة: `confirm_issuance` كان
+    # يُصفّره، فيعود الشخص «نشطاً» بلا تنبيه ولا ينتقل إلى «معلّق انتهاء»
+    # إلا **بعد** انتهاء إقامته فعلاً — أي بعد فوات الغرض من التنبيه.
+    remind_mark = person.reminder_date if person.reminder_date else "➖ غير محدَّد"
     lines = [
         _DIVIDER, "🟣  **توثيق التمديدات المصدره — استكمال البيانات**", "",
         f"👤 {person.name}",
         f"📅 تاريخ الانتهاء الجديد: {expiry_mark}",
+        f"🔔 تاريخ التنبيه الجديد: {remind_mark}",
         f"📎 ملف الإقامة الجديدة: {file_mark}",
+        _THIN,
+        # ⚠️ `start_issuance` لا يمسح قيم الإقامة السابقة، فتظهر هنا وكأنها
+        # الجديدة وزرّ التأكيد متاح فوراً — ويُوثَّق الإصدار القديم إصداراً
+        # جديداً. المسح التلقائي مرفوض: ضغطةٌ خاطئة على «🟣 توثيق» كانت
+        # ستمحو بيانات إقامة قائمة. فيُنبَّه المستخدم صراحةً بدل ذلك.
+        "⚠️ القيم أعلاه محمولة من الإقامة السابقة — حدّثها **الثلاث** قبل التأكيد.",
     ]
     rows = [
         [InlineKeyboardButton("📅 تاريخ الانتهاء الجديد", callback_data=f"{RN}:issue_expiry_{person.id}")],
+        [InlineKeyboardButton("🔔 تاريخ التنبيه الجديد", callback_data=f"{RN}:issue_remind_{person.id}")],
         [InlineKeyboardButton("📎 رفع ملف الإقامة الجديدة", callback_data=f"{RN}:issue_file_{person.id}")],
     ]
-    if person.expiry_date and person.residency_file_id:
+    if person.expiry_date and person.reminder_date and person.residency_file_id:
         rows.append([InlineKeyboardButton("✅ تأكيد الإصدار", callback_data=f"{RN}:issue_confirm_{person.id}")])
     rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data=back_to or f"{RN}:menu")])
     return "\n".join(lines), InlineKeyboardMarkup(rows)
