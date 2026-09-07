@@ -24,7 +24,14 @@ PRINT_DOC_OPTIONS = [
     Option(id="tickets",   label="التذاكر",         icon="🎫"),
     Option(id="formc",     label="فورم سي",         icon="📋"),
     Option(id="otherdocs", label="وثائق أخرى",      icon="📄"),
+    # ⚠️ **خارج التحديد الافتراضي عمداً** (انظر `preselected_ids` في
+    # `flow.py`): تفعيله يضيف صورة لكل إصدار سابق فيثقل الملف. السلوك
+    # الافتراضي يبقى «آخر إقامة فقط» كما كان، والكل يُطلَب صراحةً.
+    Option(id="prevres",   label="الإصدارات السابقة", icon="🗂"),
 ]
+
+# الخيارات المُفعَّلة تلقائياً عند فتح شاشة الطباعة.
+PRINT_DEFAULT_IDS = [o.id for o in PRINT_DOC_OPTIONS if o.id != "prevres"]
 
 
 def build_main_menu(counts: dict) -> tuple[str, InlineKeyboardMarkup]:

@@ -211,6 +211,27 @@ def get_latest_issuance(person_id: int) -> IssuanceRow | None:
         )
 
 
+def get_all_issuances(person_id: int) -> list[IssuanceRow]:
+    """كل إصدارات الشخص — الأحدث أولاً.
+
+    ⚠️ الترتيب بـ`id` تنازلياً لا بـ`issued_at`: صفوف قديمة قد تحمل
+    `issued_at = NULL` فتسقط لآخر القائمة بترتيب خاطئ، بينما `id`
+    تصاعديّ دائماً بترتيب الإدخال الحقيقي.
+    """
+    from db.session import get_db
+    from db.models import ResidencyIssuance
+
+    with get_db() as db:
+        rows = (db.query(ResidencyIssuance)
+                .filter_by(person_id=person_id)
+                .order_by(ResidencyIssuance.id.desc()).all())
+        return [IssuanceRow(
+            person_id=r.person_id, expiry_date=r.expiry_date or "",
+            file_id=r.file_id or "",
+            issued_at=r.issued_at.strftime("%Y-%m-%d") if r.issued_at else "",
+        ) for r in rows]
+
+
 def get_documents_for_person(person_id: int) -> list[DocumentRow]:
     """Form C أولاً إن وُجدت، ثم بقية الوثائق بترتيب الإضافة."""
     from db.session import get_db

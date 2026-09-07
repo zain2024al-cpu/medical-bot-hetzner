@@ -841,7 +841,7 @@ async def _dispatch_action(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             return_to=_RKEY_PRINT_CATS,
             icon="🖨️",
             min_select=0,
-            preselected_ids=[o.id for o in rn_views.PRINT_DOC_OPTIONS],
+            preselected_ids=list(rn_views.PRINT_DEFAULT_IDS),
         )
         return
 
@@ -1311,8 +1311,29 @@ async def _build_person_pdf_dict(
         else:
             residence_doc = {"source": None, "date": "", "file_bytes": None}
 
+    # 🗂 الإصدارات السابقة — تُطبَع كاملةً عند طلبها فقط.
+    # ⚠️ يُستثنى الإصدار المطبوع أصلاً في «صورة الإقامة» حتى لا يتكرّر
+    # في الملف مرتين — والمقارنة بـ`file_id` لا بالتاريخ، فقد يتساوى
+    # تاريخا إصدارين أُدخِلا في يوم واحد.
+    prev_issuances = []
+    if "prevres" in selected:
+        _printed_fid = None
+        if residence_doc and residence_doc.get("source") == "إصدار رسمي":
+            _lat = rn_repo.get_latest_issuance(person.id)
+            _printed_fid = _lat.file_id if _lat else None
+        for iss in rn_repo.get_all_issuances(person.id):
+            if not iss.file_id or iss.file_id == _printed_fid:
+                continue
+            prev_issuances.append({
+                "date": iss.issued_at or "",
+                "expiry": iss.expiry_date or "",
+                "file_bytes": await _download_file_bytes(context, iss.file_id),
+            })
+
     return {
         "name": person.name, "role": role, "status_text": status_line(person.status),
+        "prevres_selected": "prevres" in selected,
+        "prev_issuances": prev_issuances,
         # ✅ **الاختيار يُمرَّر صراحةً** لا يُستنتَج من فراغ البيانات:
         # قسم فارغ لأن المستخدم ألغاه ≠ قسم فارغ لأنه لا بيانات فيه.
         # الأول يُحذَف كلياً، والثاني يُعرَض بـ"لا يوجد".

@@ -367,6 +367,26 @@ def build_case_pdf(case: dict) -> io.BytesIO:
                 _items = [P("لا توجد إقامة مرفوعة.", "note")]
             block.extend(_section(P("🪪 صورة الإقامة (الأحدث):", "body_b"), _items))
 
+        # (5-ب) 🗂 الإصدارات السابقة — عند طلبها فقط.
+        # ⚠️ يُفرَّق بين «لم تُطلَب» و«طُلِبت ولا يوجد»: الأولى تُحذَف كلياً،
+        # والثانية تُعرَض بسطر صريح — وإلا ظنّ القارئ أن الأرشيف فارغ بينما
+        # هو لم يطلبه أصلاً. (نفس قاعدة الصورة الشخصية والوثائق.)
+        if person.get("prevres_selected"):
+            _prev = person.get("prev_issuances") or []
+            block.append(Spacer(1, 0.15 * cm))
+            if not _prev:
+                _items = [P("لا توجد إصدارات سابقة محفوظة.", "note")]
+            else:
+                _items = []
+                for _i, _iss in enumerate(_prev, start=1):
+                    _d = _iss.get("date") or "—"
+                    _e = _iss.get("expiry") or "—"
+                    _items.append(P(f"{_i}. تاريخ الإصدار: {_d}  —  ينتهي: {_e}", "body"))
+                    _items.extend(_attachment_flowables(
+                        f"إقامة سابقة {_i}", _iss.get("file_bytes"), person["name"]))
+            block.extend(_section(
+                P(f"🗂 الإصدارات السابقة ({len(_prev)}):", "body_b"), _items))
+
         # (6،7) Form C أولاً ثم بقية الوثائق — مع إسقاط تكرار الصورة الشخصية
         docs = _docs_all
         kept = []
