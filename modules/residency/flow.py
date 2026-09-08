@@ -734,6 +734,15 @@ async def _dispatch_action(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     if action.startswith("issue_remind_"):
         person_id = int(action[len("issue_remind_"):])
+        # يُمنَع **قبل فتح التقويم** لا بعد اختيار اليوم: تنقّلٌ في تقويم
+        # ثم رفضٌ في آخر خطوة عملٌ ضائع.
+        _pp = rn_repo.get_person(person_id)
+        if _pp is not None and not (_pp.expiry_date or "").strip():
+            await _alert(update, context,
+                         "⚠️ أدخل «📅 تاريخ الانتهاء الجديد» أولاً، "
+                         "ثم عُد لتاريخ التنبيه.")
+            await _show_issuance(update, context, person_id)
+            return
         context.user_data[_CTX_CAL_TARGET] = {"kind": "issue_remind", "person_id": person_id}
         now = datetime.utcnow()        # نفس مصدر فرع الانتهاء أدناه
         text, kb = build_calendar(now.year, now.month, RN,
@@ -909,6 +918,13 @@ async def _dispatch_action(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         return
 
 
+_NEED_EXPIRY_MSG = (
+    "⚠️ أدخل **تاريخ الانتهاء أولاً**." + chr(10) + chr(10)
+    + "تاريخ التنبيه يُحسب بالنسبة إليه، فبلا انتهاء لا يمكن "
+      "التأكّد من أنه يسبقه."
+)
+
+
 async def _handle_calendar_action(update: Update, context: ContextTypes.DEFAULT_TYPE, action: str, uid: int) -> None:
     query = update.callback_query
     target = context.user_data.get(_CTX_CAL_TARGET)
@@ -986,7 +1002,18 @@ async def _handle_calendar_action(update: Update, context: ContextTypes.DEFAULT_
             # الرسمية) ويُصحَّح التنبيه بعده — انظر فرع `issue_expiry` أدناه.
             _is_expiry = kind in ("legacy_expiry", "editf_expiry")
             if _is_remind:
-                _err = validate_reminder(_p.expiry_date, date_iso)
+                # ⚠️ **الانتهاء أولاً ثم التنبيه** — بطلب المستخدم صراحةً.
+                # بلا انتهاء لا شيء يُقارَن به، فيمرّ أي تاريخ بلا فحص
+                # (أُثبِت: تنبيه بعد الانتهاء بـ٣٥ يوماً قُبِل صامتاً).
+                #
+                # ⛔ `onboard_remind` **مستثنى**: تدفّق «معلّق من الوصول»
+                # يجمع الصورة والتنبيه فقط، **ولا تاريخ انتهاء فيه أصلاً**
+                # (انظر `_build_onboard_state`). فرضُ القاعدة عليه يُجمّده
+                # كلياً — والاستثناء لأن الحقل غير موجود لا تساهلاً.
+                if kind != "onboard_remind" and not (_p.expiry_date or "").strip():
+                    _err = _NEED_EXPIRY_MSG
+                else:
+                    _err = validate_reminder(_p.expiry_date, date_iso)
             elif _is_expiry:
                 _err = validate_expiry(_p.reminder_date, date_iso)
         if _err:
