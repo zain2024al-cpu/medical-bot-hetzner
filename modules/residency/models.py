@@ -118,6 +118,29 @@ def save_photo(person_id: int, file_id: str) -> bool:
     return True
 
 
+def _reevaluate_after_activation(where: str) -> None:
+    """يُعيد تقييم الاستحقاق فور **تفعيل** شخص، لا عند تغيير تاريخ فقط.
+
+    ⚠️ `_reevaluate_after_date_change` تُغطّي «تغيّر التاريخ»، وهذه تُغطّي
+    الوجه الآخر: **الحالة هي التي تغيّرت** بينما التاريخ مستحقّ سلفاً.
+    فمن يُنقَل من «الحالات السابقة» إلى «نشطة» وتنبيهه ماضٍ — أو تنتهي
+    إقامته بعد أيام — كان يبقى «نشطاً» حتى مهمة الـ٠٩:٠٠ التالية، بينما
+    المستخدم يتوقّع «معلّق انتهاء» فوراً. (بلاغ حقيقي: حالة باقٍ على
+    انتهائها خمسة أيام ظهرت نشطة.)
+
+    القاعدة نفسها المُعاد استخدامها لا نسخة منها — فلا يتباعد المسار
+    اليدوي عن التلقائي.
+    """
+    try:
+        from services.residency_status_service import run_daily_expiry_check
+        moved = run_daily_expiry_check()
+        if moved:
+            logger.info(f"[residency] إعادة تقييم بعد {where}: انتقل {moved}")
+    except Exception as exc:
+        # النقل نجح — فشل إعادة التقييم لا يُبطِله؛ ستلتقطه المهمة اليومية.
+        logger.error(f"[residency] تعذّرت إعادة التقييم بعد {where}: {exc}")
+
+
 def _reevaluate_after_date_change(person_id: int) -> None:
     """يُعيد تقييم الاستحقاق فور حفظ تاريخ — فيسري التاريخ الماضي حالاً.
 
@@ -186,6 +209,7 @@ def bulk_activate_request(root_id: int, performed_by: int | None = None) -> int:
             count += 1
 
     logger.info(f"[residency] bulk_activate_request root_id={root_id}: {count} person(s) → ACTIVE")
+    _reevaluate_after_activation("التفعيل الجماعي")
     return count
 
 
@@ -313,6 +337,7 @@ def confirm_issuance(person_id: int, performed_by: int | None = None) -> bool:
         # ⛔ لا يُصفَّر التنبيه — أُدخِل مع الإصدار ويجب أن يبقى.
         _log_transition(db, person.id, old, STATUS_ACTIVE, performed_by)
     logger.info(f"[residency] issuance confirmed  person_id={person_id} → ACTIVE")
+    _reevaluate_after_activation("تأكيد الإصدار")
     return True
 
 
@@ -415,6 +440,7 @@ def move_family_to_status(root_id: int, new_status: str, performed_by: int | Non
     logger.info(
         f"[residency] move_family_to_status root_id={root_id} → {new_status}: {count} person(s)"
     )
+    _reevaluate_after_activation("النقل من الحالات السابقة")
     return count
 
 
