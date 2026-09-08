@@ -1053,3 +1053,145 @@ def purge_deletable_family(key: str) -> tuple:
     except Exception as exc:
         logger.error(f"[pcdel] فشل الحذف key={key}: {exc}", exc_info=True)
         return False, str(exc)[:150]
+
+
+# ════════════════════════════════════════════════════════════════════
+# ✏️ تصحيح اسم مريض/مرافق أُدخِل خطأً
+# ════════════════════════════════════════════════════════════════════
+# ⚠️ **الاسم هو رابط الأنظمة**: لا مفاتيح أجنبية بين سجلّ المرضى والوصول
+# والإقامة — المطابقة بالاسم الحرفي. فتصحيحه في جدول واحد **يشطر الشخص**:
+# يظهر بالاسم الجديد في مكان وبالقديم في آخر، ويصير شخصين.
+#
+# ⚠️ **والتصحيح بالاسم وحده كارثة هنا**: الحالة التي دفعت لهذه الميزة هي
+# مرافقٌ أُدخِل **باسم المريض نفسه**. فتحديث «كل صفّ اسمه كذا» كان
+# سيُصحّح المريض والمرافق معاً ويُبقي الخطأ مقلوباً. لذلك يُحدَّد الصفّ
+# **بالبنية** (معرّف الشخص وروابط عائلته) ثم يُتحقَّق أن اسمه هو القديم.
+
+
+def get_family_for_rename(patient_id: int) -> dict | None:
+    """المريض ومرافقوه كما يراهم سجلّ المرضى — لاختيار من يُصحَّح اسمه."""
+    from db.session import SessionLocal
+    from db.models import Patient
+    try:
+        with SessionLocal() as s:
+            root = s.query(Patient).filter_by(id=patient_id).first()
+            if not root:
+                return None
+            comps = (s.query(Patient)
+                     .filter_by(companion_of_id=root.id)
+                     .order_by(Patient.id.asc()).all())
+            return {
+                "id": root.id, "name": root.full_name or "—",
+                "companions": [{"id": c.id, "name": c.full_name or "—"} for c in comps],
+            }
+    except Exception as exc:
+        logger.error(f"❌ get_family_for_rename({patient_id}): {exc}", exc_info=True)
+        return None
+
+
+def preview_rename(patient_id: int) -> dict:
+    """أين سيُصحَّح الاسم — يُعرَض قبل التنفيذ لا بعده."""
+    from db.session import SessionLocal
+    from db.models import Patient, ArrivalPatient, ArrivalCompanion, ResidencyPerson
+    out = {"name": "", "is_companion": False, "patients": 0,
+           "arrival": 0, "arrival_companions": 0, "residency": 0}
+    try:
+        with SessionLocal() as s:
+            p = s.query(Patient).filter_by(id=patient_id).first()
+            if not p:
+                return out
+            old = (p.full_name or "").strip()
+            out["name"] = old
+            out["is_companion"] = bool(p.companion_of_id)
+            out["patients"] = 1
+
+            if p.companion_of_id:
+                root = s.query(Patient).filter_by(id=p.companion_of_id).first()
+                root_name = (root.full_name or "").strip() if root else ""
+                ap = (s.query(ArrivalPatient)
+                      .filter(ArrivalPatient.name == root_name).first()) if root_name else None
+                if ap:
+                    out["arrival_companions"] = (
+                        s.query(ArrivalCompanion)
+                        .filter(ArrivalCompanion.patient_id == ap.id,
+                                ArrivalCompanion.name == old).count())
+                rp_root = (s.query(ResidencyPerson)
+                           .filter(ResidencyPerson.name == root_name,
+                                   ResidencyPerson.parent_id.is_(None)).first()) if root_name else None
+                if rp_root:
+                    out["residency"] = (
+                        s.query(ResidencyPerson)
+                        .filter(ResidencyPerson.parent_id == rp_root.id,
+                                ResidencyPerson.name == old).count())
+            else:
+                out["arrival"] = (s.query(ArrivalPatient)
+                                  .filter(ArrivalPatient.name == old).count())
+                out["residency"] = (s.query(ResidencyPerson)
+                                    .filter(ResidencyPerson.name == old,
+                                            ResidencyPerson.parent_id.is_(None)).count())
+    except Exception as exc:
+        logger.error(f"❌ preview_rename({patient_id}): {exc}", exc_info=True)
+    return out
+
+
+def rename_person(patient_id: int, new_name: str, performed_by: int | None = None) -> tuple[bool, str, dict]:
+    """يُصحّح الاسم في الأنظمة الثلاثة معاً. يُرجِع (نجح، رسالة، تفصيل)."""
+    from db.session import SessionLocal
+    from db.models import Patient, ArrivalPatient, ArrivalCompanion, ResidencyPerson
+
+    new_name = (new_name or "").strip()
+    if len(new_name) < 3:
+        return False, "الاسم قصير جداً.", {}
+
+    changed = {"patients": 0, "arrival": 0, "arrival_companions": 0, "residency": 0}
+    try:
+        with SessionLocal() as s:
+            p = s.query(Patient).filter_by(id=patient_id).first()
+            if not p:
+                return False, "لم يُعثر على الشخص.", {}
+            old = (p.full_name or "").strip()
+            if old == new_name:
+                return False, "الاسم الجديد مطابق للقديم.", {}
+
+            if p.companion_of_id:
+                root = s.query(Patient).filter_by(id=p.companion_of_id).first()
+                root_name = (root.full_name or "").strip() if root else ""
+                ap = (s.query(ArrivalPatient)
+                      .filter(ArrivalPatient.name == root_name).first()) if root_name else None
+                if ap:
+                    for row in s.query(ArrivalCompanion).filter(
+                            ArrivalCompanion.patient_id == ap.id,
+                            ArrivalCompanion.name == old).all():
+                        row.name = new_name
+                        changed["arrival_companions"] += 1
+                rp_root = (s.query(ResidencyPerson)
+                           .filter(ResidencyPerson.name == root_name,
+                                   ResidencyPerson.parent_id.is_(None)).first()) if root_name else None
+                if rp_root:
+                    for row in s.query(ResidencyPerson).filter(
+                            ResidencyPerson.parent_id == rp_root.id,
+                            ResidencyPerson.name == old).all():
+                        row.name = new_name
+                        changed["residency"] += 1
+            else:
+                for row in s.query(ArrivalPatient).filter(ArrivalPatient.name == old).all():
+                    row.name = new_name
+                    changed["arrival"] += 1
+                for row in s.query(ResidencyPerson).filter(
+                        ResidencyPerson.name == old,
+                        ResidencyPerson.parent_id.is_(None)).all():
+                    row.name = new_name
+                    changed["residency"] += 1
+
+            # ⚠️ سجلّ المرضى **آخِراً**: بقية الاستعلامات تُطابِق باسم
+            # المريض الجذر، فتغييره قبلها يكسر مطابقتها.
+            p.full_name = new_name
+            changed["patients"] = 1
+            s.commit()
+
+        logger.info(f"✏️ تصحيح اسم #{patient_id}: «{old}» ← «{new_name}» "
+                    f"بواسطة {performed_by} · {changed}")
+        return True, "تم التصحيح.", changed
+    except Exception as exc:
+        logger.error(f"❌ rename_person({patient_id}): {exc}", exc_info=True)
+        return False, "حدث خطأ أثناء التصحيح.", {}

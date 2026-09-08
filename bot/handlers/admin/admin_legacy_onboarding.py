@@ -358,11 +358,100 @@ async def _show_list(query, page: int, search: str = "") -> None:
     # ↩️ تصحيح إدخال خاطئ (عدد مرافقين غلط، تواريخ غلط…) بلا فقدان المريض
     kb.append([InlineKeyboardButton(
         "↩️ تصحيح إدخال سابق", callback_data=f"{LEGO}:undo:0")])
+    # ✏️ تصحيح اسم أُدخِل خطأً — بلا إلغاء الإدخال كلّه
+    kb.append([InlineKeyboardButton(
+        "✏️ تعديل اسم مريض/مرافق", callback_data=f"{LEGO}:ren:0")])
     kb.append([InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")])
 
     await query.edit_message_text(
         text, reply_markup=InlineKeyboardMarkup(kb), parse_mode=ParseMode.MARKDOWN
     )
+
+
+_REN_WAIT = "_lego_rename_wait"      # {"pid": int, "page": int}
+
+
+async def _show_rename_list(query, page: int = 0) -> None:
+    """المُدخَلون — لاختيار عائلة ثم الشخص المراد تصحيح اسمه."""
+    from services.patients_service import get_legacy_onboarded_patients
+
+    rows, total, pages = get_legacy_onboarded_patients(page, 8)
+    if not rows:
+        text = ("✏️ **تعديل اسم**" + chr(10) + chr(10)
+                + "لا يوجد أي مريض مُدخَل عبر «🏠 الحالات الموجودة» بعد.")
+        kb = [[InlineKeyboardButton("🔙 رجوع", callback_data=f"{LEGO}:all")]]
+    else:
+        text = ("✏️ **تعديل اسم**" + chr(10) + chr(10)
+                + f"📊 **العدد:** {total}   •   📄 **صفحة:** {page + 1} من {pages}" + chr(10) + chr(10)
+                + "اختر الحالة، ثم الشخص المراد تصحيح اسمه:")
+        kb = []
+        for r in rows:
+            suffix = f" (+{r['companions']} مرافق)" if r["companions"] else ""
+            kb.append([InlineKeyboardButton(
+                f"👤 {r['name']}{suffix}",
+                callback_data=f"{LEGO}:renfam:{r['id']}:{page}")])
+        nav = []
+        if page > 0:
+            nav.append(InlineKeyboardButton("◀️ السابق", callback_data=f"{LEGO}:ren:{page - 1}"))
+        if page < pages - 1:
+            nav.append(InlineKeyboardButton("التالي ▶️", callback_data=f"{LEGO}:ren:{page + 1}"))
+        if nav:
+            kb.append(nav)
+        kb.append([InlineKeyboardButton("🔙 رجوع", callback_data=f"{LEGO}:all")])
+    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb),
+                                  parse_mode="Markdown")
+
+
+async def _show_rename_family(query, pid: int, page: int) -> None:
+    """المريض ومرافقوه — كلٌّ زرّ مستقل.
+
+    ⚠️ الاختيار **بالمعرّف لا بالاسم**: الحالة التي دفعت لهذه الميزة هي
+    مرافقٌ يحمل اسم المريض نفسه، فزرّان بنفس النصّ لا يُميَّزان إلا
+    بمعرّفهما — ولذلك تُذكَر الصفة بجانب كلٍّ.
+    """
+    from services.patients_service import get_family_for_rename
+
+    fam = get_family_for_rename(pid)
+    if not fam:
+        await _show_rename_list(query, page)
+        return
+    lines = ["✏️ **تعديل اسم**", "", f"👤 المريض: {fam['name']}"]
+    kb = [[InlineKeyboardButton(f"✏️ المريض: {fam['name'][:22]}",
+                                callback_data=f"{LEGO}:renpick:{fam['id']}:{page}")]]
+    for c in fam["companions"]:
+        lines.append(f"   👥 مرافق: {c['name']}")
+        kb.append([InlineKeyboardButton(f"✏️ مرافق: {c['name'][:22]}",
+                                        callback_data=f"{LEGO}:renpick:{c['id']}:{page}")])
+    lines.append("")
+    lines.append("اختر من تريد تصحيح اسمه.")
+    kb.append([InlineKeyboardButton("🔙 رجوع", callback_data=f"{LEGO}:ren:{page}")])
+    await query.edit_message_text(chr(10).join(lines),
+                                  reply_markup=InlineKeyboardMarkup(kb),
+                                  parse_mode="Markdown")
+
+
+async def _show_rename_prompt(query, context, pid: int, page: int) -> None:
+    from services.patients_service import preview_rename
+
+    pv = preview_rename(pid)
+    if not pv.get("name"):
+        await _show_rename_list(query, page)
+        return
+    context.user_data[_REN_WAIT] = {"pid": pid, "page": page}
+    role = "مرافق" if pv["is_companion"] else "مريض"
+    places = []
+    if pv["patients"]:           places.append(f"سجلّ المرضى ({pv['patients']})")
+    if pv["arrival"]:            places.append(f"الوصول ({pv['arrival']})")
+    if pv["arrival_companions"]: places.append(f"مرافقو الوصول ({pv['arrival_companions']})")
+    if pv["residency"]:          places.append(f"الإقامة ({pv['residency']})")
+
+    text = ("✏️ **تعديل اسم**" + chr(10) + chr(10)
+            + f"الاسم الحالي ({role}):" + chr(10) + f"**{pv['name']}**" + chr(10) + chr(10)
+            + "سيُصحَّح في: " + ("، ".join(places) if places else "سجلّ المرضى فقط") + chr(10) + chr(10)
+            + "✍️ اكتب الاسم الصحيح الآن.")
+    kb = [[InlineKeyboardButton("🔙 إلغاء", callback_data=f"{LEGO}:renfam:{pid}:{page}")]]
+    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb),
+                                  parse_mode="Markdown")
 
 
 async def _show_undo_list(query, page: int = 0) -> None:
@@ -616,6 +705,23 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await _show_list(query, page, ud.get(_SEARCH_Q_KEY, ""))
         return
 
+    # ── ✏️ تعديل اسم ─────────────────────────────────────────────────────
+    if action.startswith("ren:"):
+        ud.pop(_REN_WAIT, None)
+        await _show_rename_list(query, int(action.split(":")[1]))
+        return
+
+    if action.startswith("renfam:"):
+        _, pid, page = action.split(":")
+        ud.pop(_REN_WAIT, None)
+        await _show_rename_family(query, int(pid), int(page))
+        return
+
+    if action.startswith("renpick:"):
+        _, pid, page = action.split(":")
+        await _show_rename_prompt(query, context, int(pid), int(page))
+        return
+
     # ── ↩️ تصحيح إدخال سابق ──────────────────────────────────────────────
     if action.startswith("undo:"):
         LegoSession.clear(ud)
@@ -814,6 +920,38 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     خاصة بهذه الشاشة."""
     ud = context.user_data
     msg = update.message
+
+    # ── ✏️ الاسم الجديد ──────────────────────────────────────────────
+    # ⚠️ **قبل فرع البحث**: كلاهما يستقبل نصّاً حراً، ولو تُرِك بعده لابتلع
+    # البحثُ الاسمَ الجديد لو بقي مفتاحه عالقاً من شاشة سابقة.
+    if ud.get(_REN_WAIT):
+        from services.patients_service import rename_person, get_family_for_rename
+        st = ud.get(_REN_WAIT) or {}
+        new_name = ((msg.text or "").strip() if msg else "")
+        if len(new_name) < 3:
+            await msg.reply_text("⚠️ اكتب الاسم كاملاً (٣ أحرف على الأقل).")
+            return
+        ok, why, changed = rename_person(
+            st.get("pid"), new_name,
+            performed_by=update.effective_user.id if update.effective_user else None)
+        ud.pop(_REN_WAIT, None)
+        if not ok:
+            await msg.reply_text(f"⚠️ {why}")
+            return
+        bits = []
+        if changed.get("patients"):           bits.append("سجلّ المرضى")
+        if changed.get("arrival"):            bits.append("الوصول")
+        if changed.get("arrival_companions"): bits.append("مرافقو الوصول")
+        if changed.get("residency"):          bits.append("الإقامة")
+        await msg.reply_text(
+            "✅ **صُحِّح الاسم**" + chr(10) + chr(10)
+            + f"الاسم الجديد: **{new_name}**" + chr(10)
+            + "حُدِّث في: " + ("، ".join(bits) if bits else "سجلّ المرضى")
+            + chr(10) + chr(10)
+            + "_السجلات الطبية القديمة (التقارير، الأدوية…) تحتفظ بالاسم "
+              "كما كُتب وقتها._",
+            parse_mode="Markdown")
+        return
 
     # ── البحث السريع (قبل وجود أي جلسة فورمة) ────────────────────────
     if ud.get(_SEARCH_WAIT_KEY):
