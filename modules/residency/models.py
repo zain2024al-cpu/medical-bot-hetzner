@@ -529,3 +529,48 @@ def has_previous_issuance(person_id: int) -> bool:
     from db.models import ResidencyIssuance
     with get_db() as db:
         return db.query(ResidencyIssuance).filter_by(person_id=person_id).count() > 0
+
+
+def freeze_person(person_id: int, performed_by: int | None = None) -> bool:
+    """✈️ تجميد من سافر — يبقى صفّه وحالته، ويخرج من كل قوائم العمل."""
+    from datetime import datetime as _dtm
+    from db.session import get_db
+    from db.models import ResidencyPerson
+
+    with get_db() as db:
+        p = db.query(ResidencyPerson).filter_by(id=person_id).first()
+        if not p or p.frozen_at is not None:
+            return False
+        p.frozen_at = _dtm.utcnow()
+        p.frozen_by = performed_by
+    logger.info(f"[residency] ✈️ جُمِّد person_id={person_id} بواسطة {performed_by}")
+    return True
+
+
+def unfreeze_person(person_id: int, performed_by: int | None = None) -> bool:
+    """↩️ إلغاء التجميد — يعود لحالته **كما كانت** لأنها لم تُغيَّر أصلاً."""
+    from db.session import get_db
+    from db.models import ResidencyPerson
+
+    with get_db() as db:
+        p = db.query(ResidencyPerson).filter_by(id=person_id).first()
+        if not p or p.frozen_at is None:
+            return False
+        p.frozen_at = None
+        p.frozen_by = None
+    logger.info(f"[residency] ↩️ أُلغي تجميد person_id={person_id}")
+    return True
+
+
+def freeze_family(root_id: int, performed_by: int | None = None) -> int:
+    """تجميد المريض ومرافقيه — يُرجِع عدد من جُمِّد فعلاً (المجمَّد سلفاً لا يُعدّ)."""
+    from db.session import get_db
+    from db.models import ResidencyPerson
+
+    ids = []
+    with get_db() as db:
+        rows = (db.query(ResidencyPerson)
+                .filter((ResidencyPerson.id == root_id)
+                        | (ResidencyPerson.parent_id == root_id)).all())
+        ids = [r.id for r in rows]
+    return sum(1 for pid in ids if freeze_person(pid, performed_by))

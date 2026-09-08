@@ -843,6 +843,11 @@ class ResidencyPerson(Base):
     created_by         = Column(Integer, nullable=True, index=True)
     created_at         = Column(DateTime, default=datetime.utcnow, index=True, nullable=True)
     updated_at         = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
+    # ✈️ تجميد من سافر — **علامة لا حالة**: الحالة تبقى كما هي فيعود
+    # الشخص إليها بالضبط عند إلغاء التجميد. حالةٌ سادسة كانت ستُضيّع
+    # موضعه في دورة الحياة وتخلط «متوقّف» بـ«مرحلة عمل».
+    frozen_at          = Column(DateTime, nullable=True, index=True)
+    frozen_by          = Column(Integer, nullable=True)
 
 
 class ResidencyStatusLog(Base):

@@ -39,6 +39,9 @@ def run_daily_expiry_check() -> int:
             db.query(ResidencyPerson)
             .filter(
                 ResidencyPerson.status == STATUS_ACTIVE,
+                # ✈️ المجمَّد لا يُحرَّك: من سافر لا تُتابَع إقامته، وتحريكه
+                # يُعيده لقوائم العمل من الباب الخلفي رغم تجميده.
+                ResidencyPerson.frozen_at.is_(None),
                 or_(_due(ResidencyPerson.reminder_date),
                     _due(ResidencyPerson.expiry_date)),
             )

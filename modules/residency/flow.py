@@ -67,7 +67,7 @@ async def _edit(update: Update, text: str, kb) -> None:
 
 async def _show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     counts = rn_repo.get_status_counts()
-    text, kb = rn_views.build_main_menu(counts)
+    text, kb = rn_views.build_main_menu(counts, frozen_count=rn_repo.count_frozen())
     await _edit(update, text, kb)
 
 
@@ -864,6 +864,48 @@ async def _dispatch_action(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         context.user_data[_CTX_SEARCH_ACTIVE] = True
         text, kb = rn_views.build_search_prompt()
         await _edit(update, text, kb)
+        return
+
+    # ── ✈️ تجميد من سافر ────────────────────────────────────────────────
+    if action == "frozen":
+        text, kb = rn_views.build_frozen_list(rn_repo.get_frozen_people())
+        await _edit(update, text, kb)
+        return
+
+    if action.startswith("frzfam_"):
+        root_id = int(action[len("frzfam_"):])
+        n = rn_models.freeze_family(root_id, performed_by=uid)
+        await _alert(update, context,
+                     f"✈️ جُمِّد {n} — خرجوا من قوائم المتابعة."
+                     if n else "لا يوجد من يُجمَّد.", show_alert=False)
+        await _show_family(update, context, root_id, uid)
+        return
+
+    if action.startswith("frz_"):
+        person_id = int(action[len("frz_"):])
+        ok = rn_models.freeze_person(person_id, performed_by=uid)
+        root_id = rn_repo.get_root_id_for_person(person_id)
+        await _alert(update, context,
+                     "✈️ جُمِّد — خرج من قوائم المتابعة ولن يتحرّك تلقائياً."
+                     if ok else "⚠️ مجمَّد أصلاً.", show_alert=False)
+        if root_id:
+            await _show_family(update, context, root_id, uid)
+        return
+
+    if action.startswith("unfrz_"):
+        person_id = int(action[len("unfrz_"):])
+        ok = rn_models.unfreeze_person(person_id, performed_by=uid)
+        await _alert(update, context,
+                     "↩️ عاد إلى حالته السابقة." if ok else "⚠️ غير مجمَّد.",
+                     show_alert=False)
+        # يعود لشاشة المجمَّدين إن جاء منها، وإلا لعائلته
+        if (context.user_data or {}).get(_CTX_LAST_STATUS) is None:
+            text, kb = rn_views.build_frozen_list(rn_repo.get_frozen_people())
+            await _edit(update, text, kb)
+            return
+        root_id = rn_repo.get_root_id_for_person(person_id)
+        if root_id:
+            await _show_family(update, context, root_id, uid)
         return
 
     # ── 📤 تصدير جدول الحالات (PDF / Excel) ──────────────────────────────

@@ -34,7 +34,7 @@ PRINT_DOC_OPTIONS = [
 PRINT_DEFAULT_IDS = [o.id for o in PRINT_DOC_OPTIONS if o.id != "prevres"]
 
 
-def build_main_menu(counts: dict) -> tuple[str, InlineKeyboardMarkup]:
+def build_main_menu(counts: dict, frozen_count: int = 0) -> tuple[str, InlineKeyboardMarkup]:
     lines = [_DIVIDER, "🪪  **الإقامة**", "", "اختر القسم:"]
     rows = []
     for s in STATUS_ORDER:
@@ -44,6 +44,9 @@ def build_main_menu(counts: dict) -> tuple[str, InlineKeyboardMarkup]:
         rows.append([InlineKeyboardButton(f"{icon} {label} ({n})", callback_data=f"{RN}:status_{s}")])
     rows.append([InlineKeyboardButton("🔍 البحث", callback_data=f"{RN}:search")])
     rows.append([InlineKeyboardButton("📋 سجل الإقامات", callback_data=f"{RN}:log")])
+    if frozen_count:
+        rows.append([InlineKeyboardButton(
+            f"🧊 المجمَّدون — سافروا ({frozen_count})", callback_data=f"{RN}:frozen")])
     rows.append([InlineKeyboardButton("📊 التقارير", callback_data=f"{RN}:reports")])
     rows.append([InlineKeyboardButton("📤 تصدير جدول (PDF / Excel)", callback_data=f"{RN}:export")])
     return "\n".join(lines), InlineKeyboardMarkup(rows)
@@ -140,6 +143,10 @@ def build_status_list(status: str, families: list[FamilyRow],
 
 def _person_action_button(person: PersonRow, *, is_root: bool) -> InlineKeyboardButton | None:
     role = "المريض" if is_root else f"مرافق"
+    # ✈️ المجمَّد بلا أزرار عمل: زرّ «تم التقديم» لمن سافر بلا معنى، وضغطه
+    # يُعيده لدورة العمل من حيث لا يُقصَد.
+    if (person.frozen_at or "").strip():
+        return None
     if person.status == STATUS_WAITING_ARRIVAL:
         return InlineKeyboardButton(
             f"▶️ استكمال بيانات {role}: {person.name[:20]}",
@@ -269,6 +276,22 @@ def build_family_detail(
         rows.append([InlineKeyboardButton(
             f"📄 الوثائق ({n}) — {c.name[:18]}", callback_data=f"{RN}:docs_{c.id}",
         )])
+
+    # ✈️ التجميد — للشخص وحده أو للعائلة كلها
+    _members = [root] + list(family.companions)
+    _live = [p for p in _members if not (p.frozen_at or "").strip()]
+    if _live:
+        for p in _live:
+            rows.append([InlineKeyboardButton(
+                f"✈️ سافر — تجميد {p.name[:18]}", callback_data=f"{RN}:frz_{p.id}")])
+        if len(_live) > 1:
+            rows.append([InlineKeyboardButton(
+                f"✈️ تجميد العائلة كلها ({len(_live)})",
+                callback_data=f"{RN}:frzfam_{root.id}")])
+    for p in _members:
+        if (p.frozen_at or "").strip():
+            rows.append([InlineKeyboardButton(
+                f"↩️ إلغاء تجميد {p.name[:18]}", callback_data=f"{RN}:unfrz_{p.id}")])
 
     rows.append([InlineKeyboardButton("🖨️ طباعة ملف الحالة", callback_data=f"{RN}:print_{root.id}")])
     rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data=back_to or f"{RN}:menu")])
@@ -637,4 +660,22 @@ def build_legacy_target_chooser(family: FamilyRow) -> tuple[str, InlineKeyboardM
         for s in STATUS_ORDER if s != STATUS_LEGACY_PENDING
     ]
     rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:family_{family.root.id}")])
+    return "\n".join(lines), InlineKeyboardMarkup(rows)
+
+
+def build_frozen_list(people: list[PersonRow]) -> tuple[str, InlineKeyboardMarkup]:
+    """🧊 من سافروا — خارج كل قوائم العمل حتى يُلغى تجميدهم."""
+    lines = [_DIVIDER, "🧊  **المجمَّدون — سافروا**", ""]
+    rows = []
+    if not people:
+        lines.append("لا يوجد مجمَّدون.")
+    else:
+        lines.append(f"{len(people)} شخصاً خارج قوائم المتابعة:")
+        lines.append(_THIN)
+        for p in people:
+            lines.append(f"👤 {p.name}")
+            lines.append(f"   {status_line(p.status)}  ·  جُمِّد {p.frozen_at}")
+            rows.append([InlineKeyboardButton(
+                f"↩️ إلغاء تجميد {p.name[:20]}", callback_data=f"{RN}:unfrz_{p.id}")])
+    rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data=f"{RN}:menu")])
     return "\n".join(lines), InlineKeyboardMarkup(rows)

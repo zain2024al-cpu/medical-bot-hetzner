@@ -19,6 +19,8 @@ class PersonRow:
     # ✅ تاريخ آخر إصدار — يُملأ عند معالجة "🏠 معلّقات من الحالات السابقة"
     # فقط؛ فارغ لكل من جاء عبر تدفق الوصول الاعتيادي.
     last_issue_date: str = ""
+    # ✈️ نصّ تاريخ التجميد ("" = غير مجمَّد) — تُبنى منه علامة الشاشة.
+    frozen_at: str = ""
 
 
 @dataclass(frozen=True)
@@ -52,6 +54,8 @@ def _to_row(p) -> PersonRow:
         photo_file_id=p.photo_file_id or "", reminder_date=p.reminder_date or "",
         expiry_date=p.expiry_date or "", residency_file_id=p.residency_file_id or "",
         last_issue_date=getattr(p, "last_issue_date", "") or "",
+        frozen_at=(getattr(p, "frozen_at", None).strftime("%Y-%m-%d")
+                   if getattr(p, "frozen_at", None) else ""),
     )
 
 
@@ -90,7 +94,8 @@ def get_status_counts() -> dict:
 
     counts = {s: 0 for s in STATUS_ORDER}
     with get_db() as db:
-        people = db.query(ResidencyPerson).all()
+        people = (db.query(ResidencyPerson)
+                  .filter(ResidencyPerson.frozen_at.is_(None)).all())
         by_status_roots: dict[str, set] = {s: set() for s in STATUS_ORDER}
         for p in people:
             root_id = p.parent_id if p.parent_id else p.id
@@ -108,7 +113,12 @@ def get_requests_by_status(status: str) -> list[FamilyRow]:
 
     rows: list[FamilyRow] = []
     with get_db() as db:
-        matching = db.query(ResidencyPerson).filter_by(status=status).all()
+        # ⚠️ المجمَّد (سافر) خارج القوائم: يبقى صفّه وحالته كما هما، لكنه
+        # لا يُحسب عملاً قائماً. الفلترة على **الشخص** لا العائلة — فعائلة
+        # سافر أحد أفرادها تبقى ظاهرة لبقيّتها.
+        matching = (db.query(ResidencyPerson)
+                    .filter(ResidencyPerson.status == status,
+                            ResidencyPerson.frozen_at.is_(None)).all())
         root_ids: list[int] = []
         seen = set()
         for p in matching:
@@ -230,6 +240,26 @@ def get_all_issuances(person_id: int) -> list[IssuanceRow]:
             file_id=r.file_id or "",
             issued_at=r.issued_at.strftime("%Y-%m-%d") if r.issued_at else "",
         ) for r in rows]
+
+
+def get_frozen_people() -> list[PersonRow]:
+    """المجمَّدون (من سافروا) — الأحدث تجميداً أولاً."""
+    from db.session import get_db
+    from db.models import ResidencyPerson
+
+    with get_db() as db:
+        rows = (db.query(ResidencyPerson)
+                .filter(ResidencyPerson.frozen_at.isnot(None))
+                .order_by(ResidencyPerson.frozen_at.desc()).all())
+        return [_to_row(r) for r in rows]
+
+
+def count_frozen() -> int:
+    from db.session import get_db
+    from db.models import ResidencyPerson
+    with get_db() as db:
+        return db.query(ResidencyPerson).filter(
+            ResidencyPerson.frozen_at.isnot(None)).count()
 
 
 def get_documents_for_person(person_id: int) -> list[DocumentRow]:
