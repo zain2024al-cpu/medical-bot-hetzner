@@ -735,9 +735,10 @@ async def _dispatch_action(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     if action.startswith("issue_remind_"):
         person_id = int(action[len("issue_remind_"):])
         context.user_data[_CTX_CAL_TARGET] = {"kind": "issue_remind", "person_id": person_id}
-        now = _today()
+        now = datetime.utcnow()        # نفس مصدر فرع الانتهاء أدناه
         text, kb = build_calendar(now.year, now.month, RN,
-                                  back_callback=f"{RN}:issue_view_{person_id}")
+                                  back_callback=f"{RN}:issue_view_{person_id}",
+                                  quick_jump=True)
         await _edit(update, text, kb)
         return
 
@@ -745,7 +746,11 @@ async def _dispatch_action(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         person_id = int(action[len("issue_expiry_"):])
         context.user_data[_CTX_CAL_TARGET] = {"kind": "issue_expiry", "person_id": person_id}
         now = datetime.utcnow()
-        text, kb = build_calendar(now.year, now.month, RN, back_callback=f"{RN}:issue_view_{person_id}")
+        # ⚠️ `quick_jump` هنا ضرورة لا تحسين: انتهاء الإقامة الجديدة بعد
+        # **سنة كاملة**، فالتنقّل شهراً شهراً ١٢ ضغطة، والتنبيه ١١.
+        text, kb = build_calendar(now.year, now.month, RN,
+                                  back_callback=f"{RN}:issue_view_{person_id}",
+                                  quick_jump=True)
         await _edit(update, text, kb)
         return
 
@@ -932,7 +937,11 @@ async def _handle_calendar_action(update: Update, context: ContextTypes.DEFAULT_
 
     if sub in ("cal_prev", "cal_next", "cal_yprev", "cal_ynext", "cal_setmonth"):
         y, m = int(parts[1]), int(parts[2])
-        text, kb = build_calendar(y, m, RN, back_callback=_back_cb(), quick_jump=is_legacy)
+        # ⚠️ كانت `quick_jump=is_legacy`، فتختفي أزرار السنة **بعد أول
+        # ضغطة سهم** حتى في التقويمات التي بُنيت بها (الاستكمال والتوثيق) —
+        # يراها المستخدم مرة ثم تغيب بلا سبب ظاهر. وكل تواريخ هذه الوحدة
+        # (تنبيه · انتهاء · آخر إصدار) بعيدة بطبيعتها، فتُفعَّل دائماً.
+        text, kb = build_calendar(y, m, RN, back_callback=_back_cb(), quick_jump=True)
         await query.edit_message_text(text, reply_markup=kb, parse_mode="Markdown")
         return
 
