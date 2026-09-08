@@ -123,8 +123,27 @@ def build_status_list(status: str, families: list[FamilyRow],
             bdg = family_badge(fam, _since)
             note = f" — {bdg}" if bdg else ""
             lines.append(f"👤 {fam.root.name}{comp_note}{note}")
+
+            # ⚠️ **من في هذه الحالة فعلاً؟** لكل شخص دورة حياة مستقلة، فقد
+            # يكون المرافق معلّقاً والمريض نشطاً. والقائمة تُعنون العائلة
+            # باسم المريض دائماً، فيظهر الاسم نفسه في قائمتين ويبدو أن
+            # الحالة «لم تخرج من النشطة» — بينما هما شخصان مختلفان.
+            # (بلاغ حقيقي: الجرعي ومرافقه.)
+            _matched = [p for p in ([fam.root] + list(fam.companions))
+                        if p.status == status]
+            _others = [p for p in _matched if p.id != fam.root.id]
+            if _others and fam.root.status != status:
+                _who = "، ".join(p.name for p in _others)
+                lines.append(f"   🔹 في هذه الحالة: {_who}")
+                btn = f"📂 {fam.root.name[:13]} ↳ {_others[0].name[:13]}"
+            elif _others:
+                lines.append(f"   🔹 معه أيضاً: {'، '.join(p.name for p in _others)}")
+                btn = f"📂 {fam.root.name[:22]}{note}"
+            else:
+                btn = f"📂 {fam.root.name[:22]}{note}"
+
             rows.append([InlineKeyboardButton(
-                f"📂 {fam.root.name[:22]}{note}", callback_data=f"{RN}:family_{fam.root.id}",
+                btn, callback_data=f"{RN}:family_{fam.root.id}",
             )])
 
         nav = []
