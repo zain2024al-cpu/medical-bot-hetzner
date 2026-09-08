@@ -970,7 +970,12 @@ async def _handle_calendar_action(update: Update, context: ContextTypes.DEFAULT_
                 or kind == "editf_remind"
                 or kind == "issue_remind"
             )
-            _is_expiry = kind in ("legacy_expiry", "editf_expiry", "issue_expiry")
+            # ⚠️ `issue_expiry` **مستثنى عمداً**: شاشة التوثيق تبدأ فارغة،
+            # فقد يُدخَل التنبيه أولاً بلا ما يُقارَن به ثم يأتي الانتهاء.
+            # رفضُ الانتهاء حينها يحبس المستخدم: يُمنَع من إدخال التاريخ
+            # **الصحيح** بسبب تنبيه خاطئ سبقه. يُقبَل الانتهاء (وهو الحقيقة
+            # الرسمية) ويُصحَّح التنبيه بعده — انظر فرع `issue_expiry` أدناه.
+            _is_expiry = kind in ("legacy_expiry", "editf_expiry")
             if _is_remind:
                 _err = validate_reminder(_p.expiry_date, date_iso)
             elif _is_expiry:
@@ -990,6 +995,18 @@ async def _handle_calendar_action(update: Update, context: ContextTypes.DEFAULT_
         elif target["kind"] == "issue_expiry":
             rn_models.set_issuance_expiry(person_id, date_iso)
             context.user_data.pop(_CTX_CAL_TARGET, None)
+            # ⚠️ **إعادة فحص التنبيه بالانتهاء الجديد**: الشاشة تبدأ فارغة،
+            # فالتنبيه المُدخَل أولاً يمرّ بلا فحص (لا انتهاء يُقارَن به).
+            # بلا هذه الخطوة يبقى تنبيه بعد الانتهاء ويُؤكَّد الإصدار وهو
+            # لا يفيد شيئاً. يُلغى ويُطلَب من جديد بدل قبول قيمة عقيمة.
+            _pp = rn_repo.get_person(person_id)
+            _bad = (validate_reminder(date_iso, _pp.reminder_date)
+                    if _pp and (_pp.reminder_date or "").strip() else None)
+            if _bad:
+                rn_models.set_reminder_date(person_id, "")
+                await _alert(update, context,
+                             "⚠️ تاريخ التنبيه الذي أدخلته لا يسبق الانتهاء "
+                             "الجديد — أُلغي، فأعد إدخاله.")
             await _show_issuance(update, context, person_id)
         elif is_edit:
             # ✏️ تصحيح تاريخ — يكتب فوق القديم ويعود لشاشة التعديل
