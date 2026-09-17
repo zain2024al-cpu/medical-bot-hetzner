@@ -150,6 +150,9 @@ async def user_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 s.add(tr)
                 s.commit()
                 created_at = tr.created_at
+                # يُلتقَط داخل الجلسة: بعد خروجها يصير الكائن منفصلاً
+                # وقراءة `tr.id` قد ترمي DetachedInstanceError.
+                row_id = tr.id
                 logger.info(f"مستخدم جديد ينتظر الموافقة: {user.first_name} (ID: {tg_id})")
                 
                 # إرسال تنبيه للأدمن فوراً
@@ -172,10 +175,27 @@ async def user_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     
                     for admin_id in ADMIN_IDS:
                         try:
+                            # ⚠️ **بادئة `aum:` ومعرّف الصفّ** — لا
+                            # `approve:{tg_id}`. الكولباك القديم كان
+                            # **بلا أي معالِج مُسجَّل إطلاقاً**: المعالِج
+                            # الوحيد نمطه `^aum:act:approve:\d+$`، فكانت
+                            # أزرار هذا الإشعار ميتة تماماً ويضطر الأدمن
+                            # للدخول إلى «إدارة المستخدمين ← المعلّقون».
+                            #
+                            # ⚠️ والمعرّف **معرّف الصفّ لا تليجرام**:
+                            # المعالِج يبحث بـ`Translator.id == …`، فتمرير
+                            # `tg_id` كان سيوافق على **مستخدم آخر** صادف
+                            # أن رقم صفّه يساوي معرّف تليجرام — أو يفشل
+                            # صامتاً. تبديل البادئة وحده كان سيُنتِج عطلاً
+                            # أسوأ من الصمت الحالي.
                             keyboard = InlineKeyboardMarkup([
                                 [
-                                    InlineKeyboardButton("✅ قبول", callback_data=f"approve:{tg_id}"),
-                                    InlineKeyboardButton("❌ رفض", callback_data=f"reject:{tg_id}")
+                                    InlineKeyboardButton(
+                                        "✅ قبول",
+                                        callback_data=f"aum:act:approve:{row_id}"),
+                                    InlineKeyboardButton(
+                                        "❌ رفض",
+                                        callback_data=f"aum:act:reject:{row_id}"),
                                 ]
                             ])
                             
