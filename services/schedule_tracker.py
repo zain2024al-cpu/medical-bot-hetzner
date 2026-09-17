@@ -106,12 +106,13 @@ class ScheduleTracker:
                         )
                         
                         # تسجيل التذكير
+                        # ⚠️ اسم الحقل `notification_text` لا `message`،
+                        # ولا وجود لـ`is_sent`/`sent_at` في الموديل — تمريرها
+                        # يرفع TypeError قبل أي حفظ.
                         notification = TranslatorNotification(
                             translator_name=record.translator_name,
                             notification_type="reminder",
-                            message=message,
-                            is_sent=True,
-                            sent_at=datetime.now()
+                            notification_text=message,
                         )
                         s.add(notification)
                         
@@ -156,12 +157,13 @@ class ScheduleTracker:
                         )
                         
                         # تسجيل التذكير
+                        # ⚠️ اسم الحقل `notification_text` لا `message`،
+                        # ولا وجود لـ`is_sent`/`sent_at` في الموديل — تمريرها
+                        # يرفع TypeError قبل أي حفظ.
                         notification = TranslatorNotification(
                             translator_name=record.translator_name,
                             notification_type="final_reminder",
-                            message=message,
-                            is_sent=True,
-                            sent_at=datetime.now()
+                            notification_text=message,
                         )
                         s.add(notification)
                         

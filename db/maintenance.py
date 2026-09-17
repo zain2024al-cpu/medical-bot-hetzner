@@ -232,6 +232,23 @@ class DatabaseMaintenance:
                 # ("🏠 معلّقات من الحالات السابقة" في وحدة الإقامة).
                 _migrate_column(conn, "res_persons", "last_issue_date", "VARCHAR(50)")
                 _migrate_column(conn, "reports", "group_chat_id", "VARCHAR(64)")
+                # ✅ **نفس عطب `daily_patients` أعلاه، في ثلاثة جداول أخرى**:
+                # الموديل يعرّف `translator_id` وقاعدة السيرفر لا تحمله، وأي
+                # `s.query(Model)` يختار كل أعمدة الموديل فيسقط بـ
+                # `no such column`. انكشفت بالصدفة عند دمج هويّة مترجم —
+                # فالثلاثة كانت تسقط صامتةً منذ إنشائها:
+                #   • followup_tracking ⇒ مهمة استخراج المتابعات (٩ مساءً)
+                #     تسقط كل ليلة ويُبتلَع خطؤها في `except` — ولهذا بقي
+                #     الجدول فارغاً دائماً حتى وُثِّق فراغه في تعليقات أخرى
+                #     كأنه أمر طبيعي (services/tomorrow_appointments.py).
+                #   • translator_notifications وtranslator_schedules ⇒ أي قراءة.
+                # ولا يظهر شيء من هذا محلياً: القاعدة المحلية تُبنى من الموديل.
+                _migrate_column(conn, "followup_tracking", "translator_id", "INTEGER")
+                _migrate_column(conn, "followup_tracking", "translator_name", "VARCHAR(255)")
+                _migrate_column(conn, "translator_notifications", "translator_id", "INTEGER")
+                _migrate_column(conn, "translator_notifications", "translator_name", "VARCHAR(255)")
+                _migrate_column(conn, "translator_schedules", "translator_id", "INTEGER")
+                _migrate_column(conn, "translator_schedules", "translator_name", "VARCHAR(255)")
                 logger.info("🔎 Migration check finished.")
 
                 if check == "ok":

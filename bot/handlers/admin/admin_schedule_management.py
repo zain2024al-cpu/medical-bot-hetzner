@@ -475,13 +475,14 @@ async def send_reminders_to_late_translators(update: Update, context: ContextTyp
             translator = s.query(Translator).filter_by(full_name=record.translator_name).first()
             
             if translator:
-                # إرسال التذكير (هنا يمكن إضافة منطق إرسال رسالة)
+                # ⚠️ الحقول أسماؤها `notification_text` لا `message`، ولا وجود
+                # لـ`is_sent`/`sent_at` في الموديل إطلاقاً. تمريرها كان يرفع
+                # TypeError **قبل** أي حفظ، فيموت المعالِج صامتاً: الأدمن يضغط
+                # الزر فلا رسالة ولا تذكير ولا خطأ ظاهر.
                 notification = TranslatorNotification(
                     translator_name=record.translator_name,
                     notification_type="reminder",
-                    message=f"تذكير: لم يتم رفع التقارير المطلوبة لليوم {today.strftime('%Y-%m-%d')}",
-                    is_sent=True,
-                    sent_at=datetime.now()
+                    notification_text=f"تذكير: لم يتم رفع التقارير المطلوبة لليوم {today.strftime('%Y-%m-%d')}",
                 )
                 s.add(notification)
                 
