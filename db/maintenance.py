@@ -249,6 +249,31 @@ class DatabaseMaintenance:
                 _migrate_column(conn, "translator_notifications", "translator_name", "VARCHAR(255)")
                 _migrate_column(conn, "translator_schedules", "translator_id", "INTEGER")
                 _migrate_column(conn, "translator_schedules", "translator_name", "VARCHAR(255)")
+                # ✅ وبقيّة أعمدة الجداول نفسها — كشفها `scripts/audit_schema.py`
+                # بعد إصلاح عمود المترجم: الانحراف لم يكن عموداً واحداً بل
+                # جداول وُلدت بأشكال أخرى كاملة. ⚠️ `notification_text` تحديداً
+                # يُكتَب فيه زر «تذكير للمترجمين المتأخرين» — فبدونه يسقط
+                # الإدراج نفسه بعد أن صار الزر يعمل.
+                _migrate_column(conn, "admin_notes", "admin_id", "INTEGER")
+                _migrate_column(conn, "admin_notes", "admin_name", "VARCHAR(255)")
+                _migrate_column(conn, "admin_notes", "target_user_id", "INTEGER")
+                _migrate_column(conn, "admin_notes", "updated_at", "DATETIME")
+                _migrate_column(conn, "followup_tracking", "patient_name", "VARCHAR(255)")
+                _migrate_column(conn, "followup_tracking", "patient_phone", "VARCHAR(50)")
+                _migrate_column(conn, "followup_tracking", "department", "VARCHAR(255)")
+                _migrate_column(conn, "followup_tracking", "status", "VARCHAR(50)")
+                _migrate_column(conn, "translator_notifications", "notification_text", "TEXT")
+                _migrate_column(conn, "translator_notifications", "is_read", "BOOLEAN")
+                _migrate_column(conn, "translator_schedules", "schedule_date", "DATETIME")
+                _migrate_column(conn, "translator_schedules", "shift_start", "VARCHAR(50)")
+                _migrate_column(conn, "translator_schedules", "shift_end", "VARCHAR(50)")
+                _migrate_column(conn, "translator_schedules", "status", "VARCHAR(50)")
+                _migrate_column(conn, "translator_schedules", "updated_at", "DATETIME")
+                # ⚠️ `user_activity` **لا يُعالَج هنا**: ينقصه `id` نفسه —
+                # المفتاح الأساسي، ولا يُضاف بـALTER في sqlite. الجدول على
+                # الخادم وُلد من تعريف آخر تماماً (services/user_tracker.py
+                # المحذوف)، فعلاجه إعادة بناء لا إضافة عمود:
+                # scripts/rebuild_user_activity.py
                 logger.info("🔎 Migration check finished.")
 
                 if check == "ok":
