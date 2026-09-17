@@ -38,20 +38,44 @@ LINE = "─" * 64
 _EMPTY = "''"
 
 
-def data_tables() -> list[str]:
-    """الجداول التي تحمل هويّة المترجم في بياناتها.
+def real_columns(conn, table: str) -> set[str]:
+    """أعمدة الجدول **كما هي في الملف** لا كما يصفها النموذج."""
+    return {r[1] for r in conn.exec_driver_sql(f"PRAGMA table_info({table})").fetchall()}
 
-    تُشتقّ من نموذج القاعدة لا من قائمة مكتوبة يدوياً: أي جدول جديد يحمل
-    الحقلين يدخل الدمج تلقائياً، فلا يبقى تاريخ خارج النقل لأن أحداً نسي
-    تحديث قائمة في سكربت. `translators` نفسه خارج القائمة — لا يحمل
-    `translator_name`، ويُعالَج على حدة لأن الآيدي فيه مفتاح أساسي.
+
+def _existing_tables(conn) -> set[str]:
+    return {r[0] for r in conn.exec_driver_sql(
+        "SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()}
+
+
+def plan_tables(conn) -> tuple[list[tuple[str, bool]], list[tuple[str, str]]]:
+    """(الجداول المشمولة، الجداول المتخطّاة وسببها).
+
+    المرشَّحون يُشتقّون من نموذج القاعدة — فأي جدول جديد يحمل الحقلين يدخل
+    الدمج تلقائياً بلا تحديث قائمة في سكربت. لكن الشمول يُقرَّر من **الملف
+    نفسه**: القاعدة على الخادم انحرفت عن النموذج فعلياً (`followup_tracking`
+    موجود بلا `translator_id`)، والثقة بالنموذج وحده تُفجِّر السكربت في
+    منتصفه. و`translator_name` يُعامَل اختيارياً — وجود `translator_id`
+    وحده يكفي لنقل الهويّة.
+
+    `translators` خارج القائمة: لا يحمل `translator_name`، ويُعالَج على حدة
+    لأن الآيدي فيه مفتاح أساسي.
     """
-    out = []
+    have = _existing_tables(conn)
+    targets, skipped = [], []
     for t in Base.metadata.sorted_tables:
-        cols = {c.name for c in t.columns}
-        if {"translator_id", "translator_name"} <= cols:
-            out.append(t.name)
-    return sorted(out)
+        model_cols = {c.name for c in t.columns}
+        if not {"translator_id", "translator_name"} <= model_cols:
+            continue
+        if t.name not in have:
+            skipped.append((t.name, "الجدول غير موجود في القاعدة"))
+            continue
+        cols = real_columns(conn, t.name)
+        if "translator_id" not in cols:
+            skipped.append((t.name, "لا عمود translator_id في القاعدة"))
+            continue
+        targets.append((t.name, "translator_name" in cols))
+    return sorted(targets), sorted(skipped)
 
 
 def _scalar(conn, sql, **p):
@@ -59,8 +83,9 @@ def _scalar(conn, sql, **p):
 
 
 def survey(conn, old: int, new: int) -> dict:
+    targets, skipped = plan_tables(conn)
     rows = {}
-    for t in data_tables():
+    for t, _has_name in targets:
         rows[t] = (
             _scalar(conn, f"SELECT COUNT(*) FROM {t} WHERE translator_id = :i", i=old),
             _scalar(conn, f"SELECT COUNT(*) FROM {t} WHERE translator_id = :i", i=new),
@@ -71,7 +96,17 @@ def survey(conn, old: int, new: int) -> dict:
                               "WHERE translator_id = :i"), {"i": i}).first()
         return {"translator_id": r[0], "name": r[1]} if r else None
 
+    # نفس درس الانحراف يسري على الجداول الجانبية: كلٌّ منها يُفحَص قبل
+    # قراءته بدل افتراض وجوده.
+    have = _existing_tables(conn)
+    has_users = "users" in have
+    has_modules = "user_module_access" in have
+    has_submitted = ("reports" in have
+                     and "submitted_by_user_id" in real_columns(conn, "reports"))
+
     def user_row(i):
+        if not has_users:
+            return None
         r = conn.execute(text(
             "SELECT id, full_name, first_name, is_approved, is_active, is_suspended "
             "FROM users WHERE tg_user_id = :i"), {"i": i}).first()
@@ -81,19 +116,26 @@ def survey(conn, old: int, new: int) -> dict:
                 "is_approved": r[3], "is_active": r[4], "is_suspended": r[5]}
 
     def modules(i):
+        if not has_modules:
+            return []
         return [x[0] for x in conn.execute(text(
             "SELECT module_key FROM user_module_access "
             "WHERE tg_user_id = :i AND is_active = 1"), {"i": i}).fetchall()]
 
     return {
+        "targets": targets, "skipped": skipped,
+        "has_users": has_users, "has_modules": has_modules,
+        "has_submitted": has_submitted,
         "tables": rows,
         "dir_old": dir_row(old), "dir_new": dir_row(new),
         "user_old": user_row(old), "user_new": user_row(new),
         "mod_old": modules(old), "mod_new": modules(new),
         "submitted_old": _scalar(
-            conn, "SELECT COUNT(*) FROM reports WHERE submitted_by_user_id = :i", i=old),
+            conn, "SELECT COUNT(*) FROM reports WHERE submitted_by_user_id = :i",
+            i=old) if has_submitted else 0,
         "submitted_new": _scalar(
-            conn, "SELECT COUNT(*) FROM reports WHERE submitted_by_user_id = :i", i=new),
+            conn, "SELECT COUNT(*) FROM reports WHERE submitted_by_user_id = :i",
+            i=new) if has_submitted else 0,
     }
 
 
@@ -116,20 +158,31 @@ def print_survey(s: dict, old: int, new: int) -> int:
             print(f"   {label} {tid}: — لا صفّ —")
 
     print("\n🔑 صلاحيات الوحدات (user_module_access):")
-    print(f"   القديم: {', '.join(s['mod_old']) or '—'}")
-    print(f"   الجديد: {', '.join(s['mod_new']) or '—'}")
-    missing = [m for m in s["mod_old"] if m not in s["mod_new"]]
-    if missing:
-        print(f"   ↪ ستُنسَخ إلى الجديد: {', '.join(missing)}")
+    if not s["has_modules"]:
+        print("   — الجدول غير موجود في القاعدة —")
+    else:
+        print(f"   القديم: {', '.join(s['mod_old']) or '—'}")
+        print(f"   الجديد: {', '.join(s['mod_new']) or '—'}")
+        missing = [m for m in s["mod_old"] if m not in s["mod_new"]]
+        if missing:
+            print(f"   ↪ ستُنسَخ إلى الجديد: {', '.join(missing)}")
 
     print("\n📊 الصفوف:")
     total = 0
     for t, (o, n) in s["tables"].items():
         total += o
         print(f"   {'➡' if o else ' '} {t:26s} القديم={o:<6d} الجديد={n}")
-    print(f"\n   📄 reports.submitted_by_user_id: "
-          f"القديم={s['submitted_old']}  الجديد={s['submitted_new']}")
-    total += s["submitted_old"]
+    if s["has_submitted"]:
+        print(f"\n   📄 reports.submitted_by_user_id: "
+              f"القديم={s['submitted_old']}  الجديد={s['submitted_new']}")
+        total += s["submitted_old"]
+
+    # ⚠️ الانحراف يُعلَن ولا يُبتلَع: جدول متخطّىً يعني تاريخاً باقياً تحت
+    # الآيدي القديم، وإخفاؤه يجعل الدمج يبدو تامّاً وهو ليس كذلك.
+    if s["skipped"]:
+        print("\n⚠️ جداول متخطّاة (انحراف القاعدة عن النموذج):")
+        for t, why in s["skipped"]:
+            print(f"   ⊘ {t:26s} {why}")
     print(f"\n   ▸ إجمالي ما سيُنقَل: {total} صفّاً")
     return total
 
@@ -144,41 +197,50 @@ def backup_db() -> str:
 def apply_merge(conn, old: int, new: int, name: str, keep_old_user: bool) -> None:
     """⚠️ تُستدعى **داخل** معاملة صريحة — لا تفتحها ولا تُنهيها بنفسها."""
     now = datetime.utcnow().isoformat(sep=" ")
+    targets, _skipped = plan_tables(conn)
+    have = _existing_tables(conn)
 
-    for t in data_tables():
-        r = conn.execute(text(
-            f"UPDATE {t} SET translator_id = :new, translator_name = :name "
-            f"WHERE translator_id = :old"), {"new": new, "old": old, "name": name})
+    for t, has_name in targets:
+        setter = ("translator_id = :new, translator_name = :name" if has_name
+                  else "translator_id = :new")
+        p = {"new": new, "old": old}
+        if has_name:
+            p["name"] = name
+        r = conn.execute(text(f"UPDATE {t} SET {setter} WHERE translator_id = :old"), p)
         if r.rowcount:
             print(f"   ➡ {t}: {r.rowcount}")
 
     # توحيد الاسم على الصفوف الموجودة أصلاً تحت الآيدي الجديد، وإلا ظهر
     # المترجم الواحد باسمين في الشاشة الواحدة بعد الدمج.
-    for t in data_tables():
+    for t, has_name in targets:
+        if not has_name:
+            continue
         conn.execute(text(
             f"UPDATE {t} SET translator_name = :name "
             f"WHERE translator_id = :new AND IFNULL(translator_name, {_EMPTY}) <> :name"),
             {"new": new, "name": name})
 
-    r = conn.execute(text("UPDATE reports SET submitted_by_user_id = :new "
-                          "WHERE submitted_by_user_id = :old"), {"new": new, "old": old})
-    if r.rowcount:
-        print(f"   ➡ reports.submitted_by_user_id: {r.rowcount}")
+    if "reports" in have and "submitted_by_user_id" in real_columns(conn, "reports"):
+        r = conn.execute(text("UPDATE reports SET submitted_by_user_id = :new "
+                              "WHERE submitted_by_user_id = :old"), {"new": new, "old": old})
+        if r.rowcount:
+            print(f"   ➡ reports.submitted_by_user_id: {r.rowcount}")
 
     # الصلاحيات: تُنسَخ الناقصة فقط — (tg_user_id, module_key) قيد فريد،
     # ونسخ ما هو موجود يُفشل العملية كلها.
-    miss = conn.execute(text(
-        "SELECT module_key FROM user_module_access "
-        "WHERE tg_user_id = :old AND is_active = 1 AND module_key NOT IN "
-        "(SELECT module_key FROM user_module_access WHERE tg_user_id = :new)"),
-        {"old": old, "new": new}).fetchall()
-    for (mk,) in miss:
-        conn.execute(text(
-            "INSERT INTO user_module_access (tg_user_id, module_key, granted_at, is_active) "
-            "VALUES (:tg, :mk, :at, 1)"), {"tg": new, "mk": mk, "at": now})
-        print(f"   🔑 صلاحية منقولة: {mk}")
-    conn.execute(text("UPDATE user_module_access SET is_active = 0, revoked_at = :at "
-                      "WHERE tg_user_id = :old AND is_active = 1"), {"old": old, "at": now})
+    if "user_module_access" in have:
+        miss = conn.execute(text(
+            "SELECT module_key FROM user_module_access "
+            "WHERE tg_user_id = :old AND is_active = 1 AND module_key NOT IN "
+            "(SELECT module_key FROM user_module_access WHERE tg_user_id = :new)"),
+            {"old": old, "new": new}).fetchall()
+        for (mk,) in miss:
+            conn.execute(text(
+                "INSERT INTO user_module_access (tg_user_id, module_key, granted_at, is_active) "
+                "VALUES (:tg, :mk, :at, 1)"), {"tg": new, "mk": mk, "at": now})
+            print(f"   🔑 صلاحية منقولة: {mk}")
+        conn.execute(text("UPDATE user_module_access SET is_active = 0, revoked_at = :at "
+                          "WHERE tg_user_id = :old AND is_active = 1"), {"old": old, "at": now})
 
     # الدليل: صفّ واحد بالآيدي الجديد، ثم يُحذف القديم.
     if conn.execute(text("SELECT 1 FROM translators WHERE translator_id = :i"),
@@ -196,7 +258,7 @@ def apply_merge(conn, old: int, new: int, name: str, keep_old_user: bool) -> Non
 
     # الحساب القديم يُعطَّل: تركه معتمداً يعني هويّة موازية تستطيع الدخول
     # والكتابة بعد أن نُقل تاريخها كلّه إلى غيرها.
-    if not keep_old_user:
+    if not keep_old_user and "users" in have:
         if conn.execute(text(
                 "UPDATE users SET is_approved = 0, is_active = 0, updated_at = :at "
                 "WHERE tg_user_id = :old"), {"old": old, "at": now}).rowcount:
