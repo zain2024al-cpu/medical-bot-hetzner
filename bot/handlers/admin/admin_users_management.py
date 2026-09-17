@@ -64,6 +64,22 @@ def _resolve_translator_directory_name(tg_user_id: int | None) -> str | None:
     return None
 
 
+def _dir_id_for_name(name: str) -> int | None:
+    """الآيدي المرتبط باسم في دليل المترجمين — الاتجاه المعاكس لسابقتها.
+
+    يُستعمل لإظهار الآيدي القديم للأدمن حين يصطدم اسم بآيدي غيره، فالرسالة
+    بلا الآيديين لا تدلّه على شيء يتصرّف به.
+    """
+    try:
+        with SessionLocal() as s:
+            row = s.query(TranslatorDirectory).filter(
+                TranslatorDirectory.name == name).first()
+            return row.translator_id if row else None
+    except Exception as e:
+        logger.error("aum: failed to resolve directory id for name [%s]: %s", name, e)
+        return None
+
+
 def _display_name(user: Translator) -> str:
     """الاسم المعروض: النظيف من دليل المترجمين إن وُجد تطابق، وإلا الاسم الخام من تيليجرام."""
     raw = (user.full_name or "").strip() or f"User {user.id}"
@@ -430,6 +446,22 @@ async def handle_translator_name_for_approved_user(update: Update, context: Cont
     status = _db_add_translator_ex(text, telegram_id=tg)
     if status is None:
         await msg.reply_text("❌ حدث خطأ في الحفظ في قاعدة البيانات. حاول مرة أخرى:")
+        return AWAIT_TRANSLATOR_NAME
+
+    if status == "id_mismatch":
+        # ⚠️ حالة «المترجم غيّر حسابه»: الاسم قائم بآيدي قديم يحمل تاريخه
+        # كلّه. لا يُربَط تلقائياً — نقل التاريخ قرار يُتَّخذ صراحةً لا أثر
+        # جانبي لكتابة اسم. ولا تُنهى المحادثة: يبقى الأدمن في خطوة الاسم
+        # ليكتب اسماً مميِّزاً إن كان شخصاً آخر، أو يضغط «تخطي».
+        old_id = _dir_id_for_name(text)
+        await msg.reply_text(
+            f"⚠️ الاسم «{text}» مرتبط مسبقاً في دليل المترجمين بآيدي آخر"
+            + (f" ({old_id})" if old_id else "") + ".\n"
+            f"🆔 آيدي هذا المستخدم: {tg}\n\n"
+            "لم يُربَط تلقائياً حتى لا ينقطع تاريخ تقاريره وتقييماته القديمة.\n\n"
+            "▸ نفس الشخص غيّر حسابه؟ يلزم دمج الهويّتين (يُنفَّذ من الخادم).\n"
+            "▸ شخص آخر؟ أدخل اسماً مختلفاً يميّزه، أو اضغط «تخطي»."
+        )
         return AWAIT_TRANSLATOR_NAME
 
     if status in ("inserted", "backfilled"):

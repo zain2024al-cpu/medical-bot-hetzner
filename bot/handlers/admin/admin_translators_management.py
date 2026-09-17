@@ -46,6 +46,7 @@ def _db_add_translator_ex(name: str, telegram_id: int | None = None) -> str | No
       "backfilled"       — an existing row (no real id yet) got telegram_id set
       "exists"           — existing row untouched (already fine / no id given)
       "conflict_skipped" — telegram_id belongs to a different existing name; nothing done
+      "id_mismatch"      — the name is already bound to a *different* real id; nothing done
       None               — DB error
     """
     try:
@@ -63,6 +64,20 @@ def _db_add_translator_ex(name: str, telegram_id: int | None = None) -> str | No
                         s.commit()
                         logger.info("TD: backfilled id for existing translator [%s] -> %s", name, telegram_id)
                         return "backfilled"
+                # ⚠️ الاسم مرتبط بآيدي حقيقي **آخر** — يحدث حين يغيّر مترجم
+                # حسابه في تليجرام فيُضاف من جديد بنفس الاسم. لا يُلمَس شيء:
+                # تغيير الآيدي على الصفّ وحده يقطع تاريخه كلّه عن صاحبه بلا
+                # أثر ظاهر. لكنّه **ليس** "exists" أيضاً — الإبلاغ عنه نجاحاً
+                # هو ما أوهم الأدمن أن الربط تمّ بينما لم يحدث شيء إطلاقاً.
+                # الدمج الصحيح: scripts/merge_translator_identity.py
+                if (telegram_id is not None
+                        and _has_real_telegram_id(existing.translator_id)
+                        and existing.translator_id != telegram_id):
+                    logger.warning(
+                        "TD: name [%s] already bound to id %s — refusing to rebind to %s",
+                        name, existing.translator_id, telegram_id
+                    )
+                    return "id_mismatch"
                 logger.info("TD: translator already exists in DB: [%s]", name)
                 return "exists"
 
@@ -84,11 +99,6 @@ def _db_add_translator_ex(name: str, telegram_id: int | None = None) -> str | No
     except Exception as e:
         logger.error("TD: failed to add translator [%s]: %s", name, e)
         return None
-
-
-def _db_add_translator(name: str, telegram_id: int | None = None) -> bool:
-    """Bool-friendly wrapper over _db_add_translator_ex for simple add flows."""
-    return _db_add_translator_ex(name, telegram_id=telegram_id) is not None
 
 
 def _find_translator_by_id(telegram_id: int):
@@ -380,8 +390,8 @@ async def _finalize_add_translator(reply_target, context, name: str, telegram_id
 
     names.append(name)
 
-    db_ok = _db_add_translator(name, telegram_id=telegram_id)
-    if not db_ok:
+    status = _db_add_translator_ex(name, telegram_id=telegram_id)
+    if status is None:
         logger.error("TD: DB write failed for add [%s] id=%s — aborting file write", name, telegram_id)
         text = "❌ **خطأ في الحفظ في قاعدة البيانات**\n\nلم يتم الحفظ."
         if edit:
@@ -390,11 +400,29 @@ async def _finalize_add_translator(reply_target, context, name: str, telegram_id
             await reply_target.reply_text(text, parse_mode=ParseMode.MARKDOWN)
         return ConversationHandler.END
 
+    # ⚠️ الاسم مرتبط بآيدي آخر: لا يُكتَب في الملف ولا يُعلَن نجاحاً. كتابته
+    # في الملف وحده تُنتج اسماً بلا آيدي في القاعدة — تقارير باسم صحيح لا
+    # تنسب إلى صاحبها في أي تقييم.
+    if status == "id_mismatch":
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_translators")]])
+        text = (
+            f"⚠️ **الاسم مرتبط بآيدي آخر:** {name}\n\n"
+            f"🆔 الآيدي المُدخَل: {telegram_id}\n\n"
+            "لم يُربَط حتى لا ينقطع تاريخ التقارير والتقييمات القديمة.\n"
+            "إن كان نفس الشخص غيّر حسابه فالمطلوب دمج الهويّتين، "
+            "وإن كان شخصاً آخر فأدخله باسم مختلف يميّزه."
+        )
+        if edit:
+            await reply_target.edit_message_text(text, reply_markup=keyboard, parse_mode=ParseMode.MARKDOWN)
+        else:
+            await reply_target.reply_text(text, reply_markup=keyboard, parse_mode=ParseMode.MARKDOWN)
+        return ConversationHandler.END
+
     file_ok = save_translator_names_to_file(names)
     if not file_ok:
         logger.warning("TD: file write failed after DB success for add [%s] — DB is authoritative", name)
 
-    logger.info("TD add complete: [%s]  id=%s  db=%s  file=%s", name, telegram_id, db_ok, file_ok)
+    logger.info("TD add complete: [%s]  id=%s  db=%s  file=%s", name, telegram_id, status, file_ok)
 
     keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_translators")]])
     id_line = f"\n🆔 **الآيدي:** {telegram_id}" if telegram_id else ""
