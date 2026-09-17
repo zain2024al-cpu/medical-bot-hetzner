@@ -20,6 +20,16 @@ _ARABIC_RE = re.compile(r'[؀-ۿ]')
 _TRANSLATORS_CACHE = None
 _CACHE_TIMEOUT = 60  # seconds
 
+_MIN_REAL_TELEGRAM_ID = 100_000
+
+
+def _has_real_telegram_id(translator_id) -> bool:
+    """نفس عتبة `admin_translators_management` — آيدي تليجرام حقيقي لا رقم صفّ."""
+    return isinstance(translator_id, int) and translator_id >= _MIN_REAL_TELEGRAM_ID
+
+
+# ⚠️ قائمة **تاريخية** تُزرَع مرة عند قاعدة فارغة. الدليل في القاعدة هو
+# المرجع بعدها — لا تُضَف أسماء هنا، تُضاف من شاشة إدارة المترجمين.
 TRANSLATORS_SEED = [
     {"translator_id": 7345544036, "name": "ادريس"},
     {"translator_id": 1997643031, "name": "حسن"},
@@ -60,14 +70,19 @@ def seed_translators_directory() -> int:
                 ).first()
 
                 if existing:
-                    updated = False
-                    if existing.translator_id != translator_id:
+                    # ⚠️ **بذرة تزرع ولا تفرض**. كانت تكتب الآيدي والاسم
+                    # المُثبَّتين هنا فوق الصفّ الموجود في **كل إقلاع** — أي
+                    # أن أي تغيير يجريه الأدمن على أحد هذه الأسماء الستة عشر
+                    # يُمحى عند إعادة التشغيل التالية بلا أثر:
+                    #   • دمج مترجم غيّر حسابه: يعود الآيدي القديم، ثم
+                    #     `sync_reports_translator_ids` يسحب تقاريره كلها
+                    #     خلفه لأن اسمه يطابق الدليل — فيُلغى الدمج كاملاً
+                    #     بعد أن أعلن نجاحه.
+                    #   • إعادة تسمية مترجم: يعود الاسم القديم.
+                    # يُستثنى الصفّ بلا آيدي حقيقي: ملؤه هو الغرض الأصلي
+                    # من البذرة ولا يمحو شيئاً.
+                    if not _has_real_telegram_id(existing.translator_id):
                         existing.translator_id = translator_id
-                        updated = True
-                    if existing.name != name:
-                        existing.name = name
-                        updated = True
-                    if updated:
                         added_or_updated += 1
                 else:
                     session.add(TranslatorDirectory(translator_id=translator_id, name=name))
