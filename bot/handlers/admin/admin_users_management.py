@@ -18,6 +18,7 @@ from telegram.ext import (
 )
 from sqlalchemy import func
 
+from bot.handlers.admin.decorators import require_admin
 from bot.shared_auth import is_admin
 from core.access.access_service import resolve_tg_user_id
 from db.models import Translator, TranslatorDirectory
@@ -454,13 +455,21 @@ async def handle_translator_name_for_approved_user(update: Update, context: Cont
         # جانبي لكتابة اسم. ولا تُنهى المحادثة: يبقى الأدمن في خطوة الاسم
         # ليكتب اسماً مميِّزاً إن كان شخصاً آخر، أو يضغط «تخطي».
         old_id = _dir_id_for_name(text)
+        kb = None
+        if old_id:
+            kb = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔁 نفس الشخص — اعرض الدمج",
+                                      callback_data=f"aum:mrg:{old_id}:{tg}")],
+                [InlineKeyboardButton("⏭️ تخطي", callback_data="aum:skip_translator_link")],
+            ])
         await msg.reply_text(
             f"⚠️ الاسم «{text}» مرتبط مسبقاً في دليل المترجمين بآيدي آخر"
             + (f" ({old_id})" if old_id else "") + ".\n"
             f"🆔 آيدي هذا المستخدم: {tg}\n\n"
             "لم يُربَط تلقائياً حتى لا ينقطع تاريخ تقاريره وتقييماته القديمة.\n\n"
-            "▸ نفس الشخص غيّر حسابه؟ يلزم دمج الهويّتين (يُنفَّذ من الخادم).\n"
-            "▸ شخص آخر؟ أدخل اسماً مختلفاً يميّزه، أو اضغط «تخطي»."
+            "▸ نفس الشخص غيّر حسابه؟ اضغط «نفس الشخص» لنقل تاريخه كاملاً.\n"
+            "▸ شخص آخر؟ أدخل اسماً مختلفاً يميّزه، أو اضغط «تخطي».",
+            reply_markup=kb,
         )
         return AWAIT_TRANSLATOR_NAME
 
@@ -480,6 +489,107 @@ async def handle_translator_name_for_approved_user(update: Update, context: Cont
     else:
         await msg.reply_text(f"✅ تم حفظ الاسم: {text}\n👥 سيظهر عند إنشاء تقرير جديد.")
 
+    return ConversationHandler.END
+
+
+def _parse_merge_ids(data: str) -> tuple[int, int] | None:
+    parts = (data or "").split(":")
+    if len(parts) != 4 or not (parts[2].isdigit() and parts[3].isdigit()):
+        return None
+    old, new = int(parts[2]), int(parts[3])
+    return None if old == new else (old, new)
+
+
+@require_admin
+async def handle_merge_preview(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """يعرض ما سينتقل قبل أي تغيير — الدمج لا يُراجَع بعد وقوعه."""
+    query = update.callback_query
+    await query.answer()
+
+    ids = _parse_merge_ids(query.data)
+    if not ids:
+        await query.edit_message_text("❌ طلب دمج غير صالح.", reply_markup=_home_kb())
+        return ConversationHandler.END
+    old, new = ids
+
+    try:
+        from services.translator_merge_service import preview, resolve_name
+        p = preview(old, new)
+        name = resolve_name(p)
+    except Exception as e:
+        logger.error("aum: merge preview failed %s→%s: %s", old, new, e, exc_info=True)
+        await query.edit_message_text("❌ تعذّر حساب المعاينة.", reply_markup=_home_kb())
+        return ConversationHandler.END
+
+    if not name:
+        await query.edit_message_text("❌ لا اسم في الدليل لأيٍّ من الآيديين.",
+                                      reply_markup=_home_kb())
+        return ConversationHandler.END
+
+    lines = [f"🔁 **دمج هويّة:** «{name}»", "",
+             f"من الآيدي القديم: `{old}`", f"إلى الآيدي الجديد: `{new}`", ""]
+    moved = [(t, o) for t, (o, _n) in p["tables"].items() if o]
+    if moved:
+        lines.append("📊 سينتقل:")
+        lines += [f"   • {t}: {o}" for t, o in moved]
+    if p["has_submitted"] and p["submitted_old"]:
+        lines.append(f"   • ملكية التقارير: {p['submitted_old']}")
+    gain = [m for m in p["mod_old"] if m not in p["mod_new"]]
+    if gain:
+        lines.append(f"🔑 صلاحيات ستُنقَل: {', '.join(gain)}")
+    # ⚠️ الجداول المتخطّاة تُعرَض: إخفاؤها يجعل الدمج يبدو تامّاً وهو ليس كذلك.
+    if p["skipped"]:
+        lines.append("⚠️ جداول خارج الدمج (انحراف القاعدة): "
+                     + "، ".join(t for t, _w in p["skipped"]))
+    lines += ["", f"▸ الإجمالي: **{p['total']}** صفّاً",
+              "", "بعد الدمج: الحساب القديم يُعطَّل، ويظهر الاسم مرة واحدة.",
+              "⚠️ لا تراجع عن هذه العملية."]
+
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ نفّذ الدمج", callback_data=f"aum:mrgok:{old}:{new}")],
+        [InlineKeyboardButton("❌ إلغاء", callback_data="aum:skip_translator_link")],
+    ])
+    await query.edit_message_text("\n".join(lines), reply_markup=kb, parse_mode="Markdown")
+    return AWAIT_TRANSLATOR_NAME
+
+
+@require_admin
+async def handle_merge_apply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """ينفّذ الدمج بعد تأكيد صريح."""
+    query = update.callback_query
+    await query.answer()
+
+    ids = _parse_merge_ids(query.data)
+    if not ids:
+        await query.edit_message_text("❌ طلب دمج غير صالح.", reply_markup=_home_kb())
+        return ConversationHandler.END
+    old, new = ids
+
+    context.user_data.pop('aum_pending_translator_tg_id', None)
+    try:
+        from services.translator_merge_service import merge, preview, resolve_name
+        name = resolve_name(preview(old, new))
+        if not name:
+            await query.edit_message_text("❌ لا اسم في الدليل لأيٍّ من الآيديين.",
+                                          reply_markup=_home_kb())
+            return ConversationHandler.END
+        res = merge(old, new, name)
+    except Exception as e:
+        logger.error("aum: merge failed %s→%s: %s", old, new, e, exc_info=True)
+        # ⚠️ الخدمة تتراجع كاملةً عند أي فشل، فالقول «لم يتغيّر شيء» صادق.
+        await query.edit_message_text(
+            "❌ فشل الدمج — لم يتغيّر شيء في القاعدة.", reply_markup=_home_kb())
+        return ConversationHandler.END
+
+    lines = [f"✅ **تمّ دمج هويّة «{name}»**", "",
+             f"نُقل {res['total']} صفّاً إلى الآيدي `{new}`."]
+    if res["granted"]:
+        lines.append(f"🔑 صلاحيات منقولة: {', '.join(res['granted'])}")
+    if res["user_disabled"]:
+        lines.append("🚫 عُطِّل الحساب القديم.")
+    lines.append("👥 سيظهر الاسم مرة واحدة عند إنشاء تقرير جديد.")
+    await query.edit_message_text("\n".join(lines), reply_markup=_home_kb(),
+                                  parse_mode="Markdown")
     return ConversationHandler.END
 
 
@@ -557,11 +667,17 @@ def register(app):
         states={
             AWAIT_TRANSLATOR_NAME: [
                 CallbackQueryHandler(handle_skip_translator_link, pattern="^aum:skip_translator_link$"),
+                # ⚠️ أضيق أولاً: `aum:mrgok:` يبدأ بما يطابقه نمط `aum:mrg:`
+                # لو كُتب بلا نهاية محدَّدة — فكلاهما مُقيَّد بـ`$` وبعدد الأرقام.
+                CallbackQueryHandler(handle_merge_apply, pattern=r"^aum:mrgok:\d+:\d+$"),
+                CallbackQueryHandler(handle_merge_preview, pattern=r"^aum:mrg:\d+:\d+$"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_translator_name_for_approved_user),
             ],
         },
         fallbacks=[
             CallbackQueryHandler(handle_skip_translator_link, pattern="^aum:skip_translator_link$"),
+            CallbackQueryHandler(handle_merge_apply, pattern=r"^aum:mrgok:\d+:\d+$"),
+            CallbackQueryHandler(handle_merge_preview, pattern=r"^aum:mrg:\d+:\d+$"),
         ],
         per_chat=True,
         per_user=True,
@@ -570,6 +686,12 @@ def register(app):
         name="aum_approve_conv",
     )
     app.add_handler(approve_conv, group=1)
+
+    # ✅ أزرار الدمج مُسجَّلة عالمياً أيضاً وقبل الموزّع العام: المحادثة قد
+    # تكون انتهت (تخطٍّ سابق، أو إعادة تشغيل للبوت) والزر باقياً في رسالة
+    # قديمة — بلا هذا يبتلعها الموزّع العام بـ«إجراء غير معروف».
+    app.add_handler(CallbackQueryHandler(handle_merge_apply, pattern=r"^aum:mrgok:\d+:\d+$"), group=1)
+    app.add_handler(CallbackQueryHandler(handle_merge_preview, pattern=r"^aum:mrg:\d+:\d+$"), group=1)
 
     # callbacks الخاصة بالشاشة الجديدة فقط
     app.add_handler(CallbackQueryHandler(handle_callbacks, pattern=r"^aum:"), group=1)
