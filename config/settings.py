@@ -64,7 +64,7 @@ HEALTHCARE_GROUP_ID = os.getenv("HEALTHCARE_GROUP_ID", "")
 GENERAL_SERVICES_GROUP_ID = os.getenv("GENERAL_SERVICES_GROUP_ID", "")
 
 # 🪪 معرف مجموعة الإقامات (نشر أحداث الإقامات)
-RESIDENCY_GROUP_ID = os.getenv("RESIDENCY_GROUP_ID", "")
+RESIDENCY_GROUP_ID = os.getenv("RESIDENCY_GROUP_ID", "-1002157820401")
 
 # 🔕 إيقاف إشعار الأدمن الخاص لتقارير الخدمات العامة والإقامات.
 # الافتراضي "1" = مُفعَّل (السلوك الأصلي بلا تغيير). اضبطه على 0 أثناء

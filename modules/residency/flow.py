@@ -778,6 +778,19 @@ async def _dispatch_action(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         if not ok:
             await _alert(update, context, "⚠️ أكمل تاريخ الانتهاء والملف أولاً.")
             return
+        # 🪪 النشر في مجموعة الإقامات — **بعد** نجاح التوثيق وحفظه.
+        # ⚠️ ولا يُفشِله: التوثيق تمّ في القاعدة، وفشل الشبكة أو صلاحيات
+        # المجموعة لا يُلغي عملاً صحيحاً. يُبلَّغ به ولا يُبتلَع — فشلٌ
+        # صامت هنا يعني فريقاً ينتظر ملفاً لن يصل.
+        try:
+            from services.residency_group_publish import publish_issuance
+            published = await publish_issuance(context.bot, person_id)
+        except Exception as exc:
+            logger.error(f"[residency] تعذّر نشر الإقامة {person_id}: {exc}", exc_info=True)
+            published = False
+        if not published:
+            await _alert(update, context,
+                         "✅ تم التوثيق، لكن تعذّر نشر الملف في المجموعة.")
         root_id = rn_repo.get_root_id_for_person(person_id)
         if root_id:
             await _show_family(update, context, root_id, uid)
