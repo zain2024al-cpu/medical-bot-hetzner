@@ -37,6 +37,60 @@ def _migrate_column(conn, table: str, column: str, sql_type: str) -> None:
         logger.error(f"❌ Migration: FAILED to add column '{table}.{column}': {exc}", exc_info=True)
 
 
+def _ensure_indexes(conn) -> None:
+    """يبني أي فهرس يعرّفه النموذج ولا يحمله الملف.
+
+    ⚠️ **`ALTER TABLE ADD COLUMN` لا يبني فهرساً أبداً**، ولو كان العمود
+    مُعرَّفاً بـ`index=True`. فكل عمود أُضيف بترحيل هنا بقي بلا فهرسه —
+    `res_persons.frozen_at` و`patients.archived_at` وغيرهما، وهي أعمدة
+    تُرشَّح بها استعلامات يومية. لا يسقط شيء، لكنه بطءٌ صامت يزداد مع
+    نموّ الجداول ولا يظهر في أي سجلّ.
+
+    ⚠️ **ولا يُرفَع أي فشل**: اسم فهرس قد يكون محجوزاً بفهرس جدولٍ آخر
+    (يحدث بعد `ALTER TABLE ... RENAME` الذي ينقل فهارس الجدول معه).
+    تخطّي واحد لا يمنع بناء البقية.
+    """
+    from db.models import Base
+
+    try:
+        tables = {r[0] for r in conn.execute(text(
+            "SELECT name FROM sqlite_master WHERE type = 'table'")).fetchall()}
+        have = {r[0] for r in conn.execute(text(
+            "SELECT name FROM sqlite_master WHERE type = 'index'")).fetchall()}
+    except Exception as exc:
+        logger.error(f"❌ Indexes: failed to read schema: {exc}")
+        return
+
+    built = 0
+    for t in Base.metadata.sorted_tables:
+        if t.name not in tables:
+            continue
+        cols = {r[1] for r in conn.execute(text(f"PRAGMA table_info({t.name})")).fetchall()}
+        # ⚠️ فهارس **هذا الجدول** لا الأسماء في القاعدة كلها: الاسم قد
+        # يكون معلَّقاً بجدول آخر (بعد RENAME) فيبدو موجوداً وهو ليس له.
+        own = {r[1] for r in conn.execute(text(f"PRAGMA index_list({t.name})")).fetchall()}
+        for ix in t.indexes:
+            if ix.name in own:
+                continue
+            if ix.name in have:
+                logger.warning(
+                    f"⚠️ Indexes: name '{ix.name}' is taken by another table — "
+                    f"'{t.name}' stays without it.")
+                continue
+            # فهرس على عمود لم يُضَف بعد يفشل — يُترَك لدورة قادمة
+            if {c.name for c in ix.columns} - cols:
+                continue
+            try:
+                ix.create(bind=conn, checkfirst=True)
+                conn.commit()
+                built += 1
+                logger.info(f"✅ Indexes: built '{ix.name}' on '{t.name}'.")
+            except Exception as exc:
+                logger.warning(f"⚠️ Indexes: skipped '{ix.name}' on '{t.name}': {exc}")
+    if built:
+        logger.info(f"🔎 Indexes: built {built} missing index(es).")
+
+
 class DatabaseMaintenance:
     """
     Tools to strengthen, repair, and maintain the SQLite database.
@@ -275,6 +329,8 @@ class DatabaseMaintenance:
                 # المحذوف)، فعلاجه إعادة بناء لا إضافة عمود:
                 # scripts/rebuild_user_activity.py
                 logger.info("🔎 Migration check finished.")
+                # الأعمدة المُضافة أعلاه تصل بلا فهارسها — تُبنى هنا.
+                _ensure_indexes(conn)
 
                 if check == "ok":
                     logger.info("✅ Database is healthy.")
