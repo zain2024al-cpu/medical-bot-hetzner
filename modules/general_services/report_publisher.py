@@ -11,7 +11,9 @@ from typing import Optional
 
 from telegram import InputMediaPhoto
 
-from config.settings import ADMIN_IDS, GENERAL_SERVICES_GROUP_ID, GS_NOTIFY_ADMINS
+from config.settings import (
+    ADMIN_IDS, GENERAL_SERVICES_GROUP_ID, GS_ARRIVALS_GROUP_ID, GS_NOTIFY_ADMINS,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -55,9 +57,10 @@ async def publish(bot, data: GSPublishData) -> None:
         except Exception as exc:
             logger.warning(f"[gs_publisher] submitter copy failed user={data.created_by_id}: {exc}")
 
-    group_id = _resolve_group_id()
+    group_id = _resolve_group_id(data.workflow_type)
     if not group_id:
-        logger.debug("[gs_publisher] GENERAL_SERVICES_GROUP_ID not configured — skipping")
+        logger.warning("[gs_publisher] لا مجموعة مضبوطة لتقارير %s — تُخطّى المجموعة",
+                       data.workflow_type)
         return
 
     try:
@@ -101,8 +104,19 @@ async def _send_images(bot, group_id, data: GSPublishData) -> None:
         logger.warning(f"[gs_publisher] media group failed: {exc}")
 
 
-def _resolve_group_id() -> int | str | None:
-    gid = GENERAL_SERVICES_GROUP_ID
+def _resolve_group_id(workflow_type: str = "") -> int | str | None:
+    """مجموعة النشر لهذا النوع من التقارير.
+
+    تقارير **الوصول** لها مجموعتها الخاصة، وبقية الخدمات العامة
+    (المغادرة والخدمات) تبقى في مجموعتها كما كانت.
+
+    السطر الثاني (`or GENERAL_SERVICES_GROUP_ID`) دفاعيّ: إعداد الوصول لا
+    يكون فارغاً في التشغيل الفعلي (له افتراضي مُثبَّت)، لكنه يمنع ضياع
+    تقرير الوصول لو صار فارغاً يوماً — يصل مجموعةً غير مثالية بدل ألّا
+    يصل أحداً.
+    """
+    gid = GS_ARRIVALS_GROUP_ID if workflow_type == "arrivals" else ""
+    gid = gid or GENERAL_SERVICES_GROUP_ID
     if not gid:
         return None
     try:
