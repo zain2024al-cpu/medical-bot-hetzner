@@ -389,9 +389,19 @@ def build_doc_file_prompt(person: PersonRow, doc_name: str) -> tuple[str, Inline
 
 # ── Onboarding (🟡) ──────────────────────────────────────────────────────────
 
+# (مفتاح الوثيقة، أيقونتها، تسميتها، اسم حقلها في ArrivalDocsRow) — بترتيب العرض.
+ARRIVAL_DOC_KINDS = [
+    ("passport",  "🛂", "جواز السفر", "passport_file_id"),
+    ("visa",      "📋", "التأشيرة",   "visa_file_id"),
+    ("tickets",   "🎫", "التذاكر",    "tickets_file_id"),
+    ("residence", "🪪", "الإقامة",    "residence_file_id"),
+]
+
+
 def build_arrival_summary(
     root: PersonRow, arrival: ArrivalDocsRow | None, companions: list[PersonRow],
     back_to: str | None = None,
+    companion_docs: dict[int, ArrivalDocsRow | None] | None = None,
 ) -> tuple[str, InlineKeyboardMarkup]:
     """شاشة ملخّص بيانات الوصول — تظهر عند فتح طلب ضمن "🟡 معلّق من
     الوصول"، قبل بدء استكمال الصورة/تاريخ التنبيه، حتى يراجع الإداري
@@ -423,16 +433,44 @@ def build_arrival_summary(
             f"  الإقامة: {_mark(arrival.residence_file_id)}",
         ]
 
+    companion_docs = companion_docs or {}
     if companions:
         lines += ["", f"🤝 *المرافقون ({len(companions)}):*"]
         for c in companions:
-            lines.append(f"  • {c.name}")
+            cd = companion_docs.get(c.id)
+            if cd is None:
+                lines.append(f"  • {c.name}  ⚠️ لا بيانات وصول مطابقة")
+            else:
+                marks = "  ".join(
+                    f"{icon}{_mark(getattr(cd, field))}"
+                    for _k, icon, _l, field in ARRIVAL_DOC_KINDS)
+                lines.append(f"  • {c.name}   {marks}")
 
-    kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("▶️ ابدأ استكمال البيانات", callback_data=f"{RN}:onboard_resume_{root.id}")],
-        [InlineKeyboardButton("⬅️ رجوع", callback_data=back_to or f"{RN}:menu")],
-    ])
-    return "\n".join(lines), kb
+    # 📎 زرّ لكل وثيقة **موجودة** فعلاً — الوثيقة الناقصة لا زرّ لها، فلا
+    # يضغط الإداري زراً يقود إلى «لا يوجد ملف». callback_data يحمل معرّف
+    # الشخص ومفتاح الوثيقة فقط (لا اسماً ولا file_id): حدّ تليجرام ٦٤ بايتاً،
+    # والملف نفسه يُحلَّل من سجلّ الوصول وقت الضغط لا وقت العرض.
+    rows: list[list[InlineKeyboardButton]] = []
+
+    def _doc_buttons(person_id: int, docs: ArrivalDocsRow | None, suffix: str = "") -> None:
+        if docs is None:
+            return
+        btns = [
+            InlineKeyboardButton(f"{icon} {label}{suffix}",
+                                 callback_data=f"{RN}:arrdoc_{person_id}_{key}")
+            for key, icon, label, field in ARRIVAL_DOC_KINDS
+            if getattr(docs, field)
+        ]
+        for i in range(0, len(btns), 2):
+            rows.append(btns[i:i + 2])
+
+    _doc_buttons(root.id, arrival)
+    for c in companions:
+        _doc_buttons(c.id, companion_docs.get(c.id), suffix=f" — {c.name[:12]}")
+
+    rows.append([InlineKeyboardButton("▶️ ابدأ استكمال البيانات", callback_data=f"{RN}:onboard_resume_{root.id}")])
+    rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data=back_to or f"{RN}:menu")])
+    return "\n".join(lines), InlineKeyboardMarkup(rows)
 
 
 def build_onboard_photo_prompt(

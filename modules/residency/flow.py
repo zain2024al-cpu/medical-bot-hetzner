@@ -125,8 +125,15 @@ async def _show_family(update: Update, context: ContextTypes.DEFAULT_TYPE, root_
 
 async def _show_arrival_summary(update: Update, context: ContextTypes.DEFAULT_TYPE, family: rn_repo.FamilyRow) -> None:
     arrival = rn_repo.get_arrival_patient_docs_by_name(family.root.name)
+    # ⚠️ مطابقة بالاسم الحرفي كما في الطباعة: المرافق ← ArrivalCompanion،
+    # لا ArrivalPatient. اسم بلا سجلّ وصول يُعطي None فيُعلَن في الشاشة.
+    companion_docs = {
+        c.id: rn_repo.get_arrival_companion_docs_by_name(c.name)
+        for c in family.companions
+    }
     text, kb = rn_views.build_arrival_summary(
-        family.root, arrival, family.companions, back_to=_back_to_list(context))
+        family.root, arrival, family.companions, back_to=_back_to_list(context),
+        companion_docs=companion_docs)
     await _edit(update, text, kb)
 
 
@@ -825,6 +832,33 @@ async def _dispatch_action(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         root_id = rn_repo.get_root_id_for_person(person_id)
         if root_id:
             await _show_family(update, context, root_id, uid)
+        return
+
+    if action.startswith("arrdoc_"):
+        # 📎 فتح وثيقة رفعها مختص الخدمات في الوصول — من شاشة ملخّص الوصول.
+        # الوثيقة تُحلَّل من سجلّ الوصول **وقت الضغط** لا تُحمَل في الزرّ:
+        # callback_data محدود بـ٦٤ بايتاً، وزرٌّ قديم في رسالة بقيت مفتوحة
+        # لا يجوز أن يفتح ما لم يعد صحيحاً.
+        parts = action.split("_", 2)
+        kinds = {k: (icon, label, field) for k, icon, label, field in rn_views.ARRIVAL_DOC_KINDS}
+        try:
+            person = rn_repo.get_person(int(parts[1]))
+            spec = kinds.get(parts[2])
+        except (ValueError, IndexError):
+            person, spec = None, None
+        if person is None or spec is None:
+            await _alert(update, context, "⚠️ طلب وثيقة غير صالح.")
+            return
+        icon, label, field = spec
+        arrival = (
+            rn_repo.get_arrival_patient_docs_by_name(person.name) if person.parent_id is None
+            else rn_repo.get_arrival_companion_docs_by_name(person.name)
+        )
+        file_id = (getattr(arrival, field, "") or "") if arrival else ""
+        if not file_id:
+            await _alert(update, context, f"لا يوجد ملف {label} مرفوع في الوصول.")
+            return
+        await _send_file(update, context, file_id, f"{icon} {label} — {person.name}")
         return
 
     if action.startswith("resview_"):
