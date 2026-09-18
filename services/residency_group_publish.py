@@ -84,8 +84,11 @@ def build_caption(person, parent_name: str | None) -> str:
 
 
 def _group_id():
-    from config.settings import RESIDENCY_GROUP_ID
-    gid = RESIDENCY_GROUP_ID
+    # ⚠️ `RESIDENCY_ISSUANCE_GROUP_ID` لا `RESIDENCY_GROUP_ID`: الثاني
+    # مضبوط في `.env` على الخادم بمجموعة قديمة لا يستعملها شيء، فالقراءة
+    # منه كانت تُرسل الملفات إلى مجموعة غير المقصودة بلا أي خطأ ظاهر.
+    from config.settings import RESIDENCY_ISSUANCE_GROUP_ID
+    gid = RESIDENCY_ISSUANCE_GROUP_ID
     if not gid:
         return None
     try:
@@ -98,7 +101,7 @@ async def publish_issuance(bot, person_id: int) -> bool:
     """ينشر ملف الإقامة في مجموعة الإقامات. يُرجِع هل نُشر فعلاً."""
     gid = _group_id()
     if gid is None:
-        logger.warning("[residency.publish] RESIDENCY_GROUP_ID غير مضبوط — أُلغي النشر")
+        logger.warning("[residency.publish] RESIDENCY_ISSUANCE_GROUP_ID غير مضبوط — أُلغي النشر")
         return False
 
     from modules.residency import repository as rn_repo
