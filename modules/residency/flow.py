@@ -30,6 +30,8 @@ _CTX_CAL_TARGET = "_rn_cal_target"           # {"kind": "onboard_remind"|"issue_
 _CTX_SEARCH_ACTIVE = "_rn_search_active"
 _CTX_DOC_NAME_ACTIVE = "_rn_doc_name_active"  # {"person_id": int} — بانتظار اسم وثيقة "أخرى" نصّياً
 _CTX_PRINT_ROOT_ID = "_rn_print_root_id"      # root_id بانتظار نتيجة شاشة اختيار وثائق الطباعة
+# ✅ معرّفات مَن تُخطّيت صورهم الشخصية في هذه الجلسة — {int, ...}
+_CTX_PHOTO_SKIPPED = "_rn_photo_skipped"
 _RKEY_PRINT_CATS = "rn.print_categories"
 # ✅ الحالة الهدف المُختارة، محفوظة أثناء جمع تواريخ التنبيه الناقصة قبل
 # تنفيذ النقل — {"root_id": int, "status": str}.
@@ -270,10 +272,31 @@ async def _start_edit_field(update: Update, context: ContextTypes.DEFAULT_TYPE,
 
 # ── Onboarding (🟡) ──────────────────────────────────────────────────────────
 
-def _build_onboard_state(root_id: int) -> dict:
+def _skipped_photos(context: ContextTypes.DEFAULT_TYPE) -> set[int]:
+    """مَن تُخطّيت صورهم في هذه الجلسة.
+
+    ⚠️ **خارج `_clear_transient_state` عمداً**: تلك تُنظَّف عند كل عرض
+    لخطوة، فلو حُفِظ التخطّي فيها لعاد الشخص إلى شاشة الصورة فوراً.
+    """
+    if context.user_data is None:
+        return set()
+    return context.user_data.setdefault(_CTX_PHOTO_SKIPPED, set())
+
+
+def _build_onboard_state(root_id: int, skipped: set[int] | None = None) -> dict:
+    """الخطوة التالية في طابور التسجيل — تُشتقّ من نقص البيانات نفسه.
+
+    ⚠️ `skipped` هي الاستثناء الوحيد: الصورة الشخصية قد لا تكون متوفّرة
+    وقت التسجيل، ولأن الخطوة تُشتقّ من خلوّ `photo_file_id` كان الطابور
+    يعيد الشخص نفسه إلى شاشة الصورة أبداً فلا يكمل الأدمن التسجيل.
+    التخطّي **لا يُحفَظ في القاعدة**: قرار «ليس الآن» يخصّ هذه الجلسة،
+    والصورة تبقى ناقصة ظاهرةً في شاشة المراجعة وفي «تعديل البيانات»
+    حيث تُضاف لاحقاً — فلا يتحوّل التخطّي إلى نسيان دائم.
+    """
+    skipped = skipped or set()
     queue = rn_repo.get_onboarding_queue(root_id)
     for i, p in enumerate(queue):
-        if not p.photo_file_id:
+        if not p.photo_file_id and p.id not in skipped:
             return {"root_id": root_id, "queue_ids": [q.id for q in queue], "index": i, "step": "photo"}
         if not p.reminder_date:
             return {"root_id": root_id, "queue_ids": [q.id for q in queue], "index": i, "step": "reminder"}
@@ -281,7 +304,7 @@ def _build_onboard_state(root_id: int) -> dict:
 
 
 async def _show_onboard_step(update: Update, context: ContextTypes.DEFAULT_TYPE, root_id: int) -> None:
-    state = _build_onboard_state(root_id)
+    state = _build_onboard_state(root_id, _skipped_photos(context))
     _clear_transient_state(context)
 
     if state["step"] == "review":
@@ -649,6 +672,14 @@ async def _dispatch_action(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     if action.startswith("onboard_resume_"):
         person_id = int(action[len("onboard_resume_"):])
+        root_id = rn_repo.get_root_id_for_person(person_id) or person_id
+        await _show_onboard_step(update, context, root_id)
+        return
+
+    if action.startswith("onboard_skipphoto_"):
+        # ⏭️ الصورة غير متوفّرة الآن — يُتخطّى هذا الشخص وحده ويمضي الطابور.
+        person_id = int(action[len("onboard_skipphoto_"):])
+        _skipped_photos(context).add(person_id)
         root_id = rn_repo.get_root_id_for_person(person_id) or person_id
         await _show_onboard_step(update, context, root_id)
         return

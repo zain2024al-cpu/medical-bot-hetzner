@@ -441,9 +441,13 @@ def build_onboard_photo_prompt(
     text = (
         f"{_DIVIDER}\n📷  **الصورة الشخصية ({idx}/{total})**\n\n"
         f"الشخص: {person.name}\n\nأرسل الصورة الآن."
+        "\n\n_إن لم تكن متوفّرة الآن، تخطَّها وأضفها لاحقاً من «✏️ تعديل البيانات»._"
     )
-    kb = InlineKeyboardMarkup([[InlineKeyboardButton(
-        "⬅️ رجوع", callback_data=back_to or f"{RN}:menu")]])
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("⏭️ تخطي — أضيفها لاحقاً",
+                              callback_data=f"{RN}:onboard_skipphoto_{person.id}")],
+        [InlineKeyboardButton("⬅️ رجوع", callback_data=back_to or f"{RN}:menu")],
+    ])
     return text, kb
 
 
@@ -453,6 +457,14 @@ def build_onboard_review(queue: list[PersonRow], back_to: str | None = None) -> 
         photo_mark = "✅" if p.photo_file_id else "⬜"
         lines.append(f"👤 {p.name}  —  صورة {photo_mark}  🔔 {p.reminder_date or '—'}")
     lines.append(_THIN)
+    # ⚠️ النقص يُذكَر صراحةً لا بعلامة ⬜ وحدها: الصورة المُتخطّاة قصدُها
+    # «لاحقاً» لا «أبداً»، وسطرٌ يقول أين تُضاف هو الفرق بين التأجيل
+    # والنسيان.
+    missing = [p.name for p in queue if not p.photo_file_id]
+    if missing:
+        lines.append(f"📷 بلا صورة: {'، '.join(missing)}")
+        lines.append("_تُضاف لاحقاً من «✏️ تعديل البيانات» — الحفظ لا ينتظرها._")
+        lines.append(_THIN)
     root_id = queue[0].id if queue else 0
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("✅ حفظ الإقامة", callback_data=f"{RN}:onboard_save_{root_id}")],
