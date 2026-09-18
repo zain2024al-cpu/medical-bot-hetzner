@@ -612,6 +612,19 @@ async def handle_new_consult_followup_time_hour(update: Update, context: Context
     await query.answer()
     hour = query.data.split(":", 1)[1]
 
+    # 🕐 «أوقات أخرى» — **طلبُ قائمةٍ أوسع لا ساعةٌ مختارة**.
+    # ⚠️ هذا المعالِج مشترك بين مسارين يعرضان لوحتين مختلفتين: مسار
+    # تأجيل الموعد (app_reschedule) يعرض ساعات شائعة فقط ومعها هذا الزر،
+    # وبقية المسارات تعرض الأربع والعشرين كاملةً فلا زر فيها. وبلا هذا
+    # الفرع كان `int("more")` يرفع ValueError فيموت التدفّق في منتصفه —
+    # المستخدم يضغط الزر فلا يحدث شيء ولا يكمل تقريره.
+    if hour == "more":
+        await query.edit_message_reply_markup(
+            reply_markup=_build_followup_hour_keyboard())
+        # لا تغيير للحالة: الضغطة التالية ساعةٌ فعلية يلتقطها هذا
+        # المعالِج نفسه في نفس الحالة.
+        return None
+
     # حفظ الوقت مباشرة بدون اختيار الدقائق (الدقائق = 00)
     minute = "00"
     time_value = f"{hour}:{minute}"
