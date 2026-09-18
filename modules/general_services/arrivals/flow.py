@@ -1950,6 +1950,9 @@ async def _dispatch_callback_inner(
                 # 📎 ملفات الوثائق نفسها تظهر في المجموعة بعد النصّ — النصّ
                 # وحده يقول «✅ مرفق» ولا يُري شيئاً.
                 documents=collect_arrival_documents(session.completed_patients),
+                # 📨 لا نسخ خاصة للأدمن ولا للمُدخِل — المجموعة تكفي (طلب
+                # المستخدم). تعود تلقائياً كاحتياط إن لم تستلم المجموعة التقرير.
+                private_copies=False,
             ),
         )
 

@@ -31,24 +31,44 @@ class GSPublishData:
     # ⚠️ مستقلّة عن `images`: تلك صور تُرسَل فور النصّ كألبوم، وهذه وثائق
     # نوعها مجهول (صورة أو ملف) وتُرسَل فرادى بالترتيب وبوصف صاحبها.
     documents:        list[dict] = field(default_factory=list)
+    # 📨 نسخ خاصة (أدمن + مُدخِل) بجانب المجموعة. ⚠️ الافتراضي True فلا يتغيّر
+    # شيء للمغادرة والخدمات العامة؛ الوصول يُعطِّله لأن له مجموعته، وتعود
+    # النسخ الخاصة تلقائياً **فقط** إن لم تستلم المجموعة التقرير.
+    private_copies:   bool = True
     created_by_id:    Optional[int] = None
     created_by_name:  str = ""
     record_date:      str = field(default_factory=lambda: datetime.utcnow().isoformat())
 
 
-async def publish(bot, data: GSPublishData) -> None:
-    """Publish a GS record to admins + the GS group + the submitting user."""
-    text = _build_text(data)
+async def _send_text(bot, chat_id, text: str) -> bool:
+    """يرسل نصّ التقرير. يُرجِع هل وصل.
 
+    ⚠️ Markdown أولاً ثم نصّ عادي: القيم المُدخَلة (أسماء، ملاحظات) قد تحمل
+    `_ * [` فيرفض تليجرام الرسالة كلها بـ`can't parse entities`. وهذا كان
+    احتمالاً نظرياً مأمون العاقبة ما دامت النسخ الخاصة تصل الأدمن؛ أما وقد
+    صارت المجموعة قناة الوصول الوحيدة، فالرفض يعني تقريراً لا يصل أحداً.
+    الأسطر الخام (`*`) تظهر في النسخة العادية، وهذا أهون من الضياع.
+    """
+    try:
+        await bot.send_message(chat_id=chat_id, text=text, parse_mode="Markdown")
+        return True
+    except Exception as first:
+        try:
+            await bot.send_message(chat_id=chat_id, text=text)
+            logger.warning(f"[gs_publisher] Markdown رُفض إلى {chat_id} ({first}) — وصل نصّاً عادياً")
+            return True
+        except Exception as second:
+            logger.warning(f"[gs_publisher] فشل الإرسال إلى {chat_id}: {first} / {second}")
+            return False
+
+
+async def _send_private_copies(bot, data: GSPublishData, text: str) -> None:
     notified_user_ids: set[int] = set()
 
     if GS_NOTIFY_ADMINS:
         for admin_id in ADMIN_IDS:
-            try:
-                await bot.send_message(chat_id=admin_id, text=text, parse_mode="Markdown")
+            if await _send_text(bot, admin_id, text):
                 notified_user_ids.add(admin_id)
-            except Exception as exc:
-                logger.warning(f"[gs_publisher] admin notify failed admin={admin_id}: {exc}")
     else:
         logger.info("[gs_publisher] GS_NOTIFY_ADMINS=0 — تُخطّى إشعارات الأدمن الخاصة")
 
@@ -57,27 +77,38 @@ async def publish(bot, data: GSPublishData) -> None:
     # مُدرَجاً في ADMIN_IDS أو عضو صلاحية وحدة فقط. مستقل تماماً عن
     # GS_NOTIFY_ADMINS/إعداد مجموعة الخدمات — طلب المستخدم صراحةً.
     if data.created_by_id and data.created_by_id not in notified_user_ids:
-        try:
-            await bot.send_message(chat_id=data.created_by_id, text=text, parse_mode="Markdown")
-        except Exception as exc:
-            logger.warning(f"[gs_publisher] submitter copy failed user={data.created_by_id}: {exc}")
+        await _send_text(bot, data.created_by_id, text)
+
+
+async def publish(bot, data: GSPublishData) -> None:
+    """Publish a GS record to the GS group (+ private copies unless disabled)."""
+    text = _build_text(data)
+
+    if data.private_copies:
+        await _send_private_copies(bot, data, text)
 
     group_id = _resolve_group_id(data.workflow_type)
+    group_ok = False
     if not group_id:
         logger.warning("[gs_publisher] لا مجموعة مضبوطة لتقارير %s — تُخطّى المجموعة",
                        data.workflow_type)
-        return
+    else:
+        group_ok = await _send_text(bot, group_id, text)
 
-    try:
-        await bot.send_message(chat_id=group_id, text=text, parse_mode="Markdown")
-    except Exception as exc:
-        logger.warning(f"[gs_publisher] group text send failed: {exc}")
+        if data.images:
+            await _send_images(bot, group_id, data)
 
-    if data.images:
-        await _send_images(bot, group_id, data)
+        if data.documents:
+            _spawn_documents_delivery(bot, group_id, data)
 
-    if data.documents:
-        _spawn_documents_delivery(bot, group_id, data)
+    # ⚠️ **الاحتياط**: النسخ الخاصة أُلغيت لهذا النوع، فالمجموعة قناته الوحيدة.
+    # إن لم تستلم التقرير (بوت أُخرج منها، صلاحية نُزعت، مجموعة غير مضبوطة)
+    # صارت النسخ الخاصة هي ما يمنع أن يضيع التقرير بصمت — البيانات محفوظة في
+    # القاعدة، لكن لا أحد يعلم أنها وصلت.
+    if not data.private_copies and not group_ok:
+        logger.warning("[gs_publisher] المجموعة لم تستلم تقرير %s — نُسَخ خاصة احتياطية",
+                       data.workflow_type)
+        await _send_private_copies(bot, data, text)
 
 
 def _build_text(data: GSPublishData) -> str:
