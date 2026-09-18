@@ -1936,6 +1936,7 @@ async def _dispatch_callback_inner(
         ]
 
         from modules.general_services.report_publisher import GSPublishData, publish as _publish
+        from modules.general_services.arrivals.group_documents import collect_arrival_documents
         await _publish(
             bot=context.bot,
             data=GSPublishData(
@@ -1946,6 +1947,9 @@ async def _dispatch_callback_inner(
                 created_by_id=  user.id   if user else None,
                 created_by_name=user.full_name if user else "",
                 record_date=session.created_at,
+                # 📎 ملفات الوثائق نفسها تظهر في المجموعة بعد النصّ — النصّ
+                # وحده يقول «✅ مرفق» ولا يُري شيئاً.
+                documents=collect_arrival_documents(session.completed_patients),
             ),
         )
 

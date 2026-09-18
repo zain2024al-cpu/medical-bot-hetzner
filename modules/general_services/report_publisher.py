@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -26,6 +27,10 @@ class GSPublishData:
     workflow_icon:    str           # emoji
     body_lines:       list[str]     # pre-formatted Arabic lines for the report body
     images:           list[dict] = field(default_factory=list)  # UploadedFile.to_dict() list
+    # 📎 ملفات تُنشَر في المجموعة **بعد** النصّ، كلٌّ بوصفه: [{"file_id", "caption"}].
+    # ⚠️ مستقلّة عن `images`: تلك صور تُرسَل فور النصّ كألبوم، وهذه وثائق
+    # نوعها مجهول (صورة أو ملف) وتُرسَل فرادى بالترتيب وبوصف صاحبها.
+    documents:        list[dict] = field(default_factory=list)
     created_by_id:    Optional[int] = None
     created_by_name:  str = ""
     record_date:      str = field(default_factory=lambda: datetime.utcnow().isoformat())
@@ -71,6 +76,9 @@ async def publish(bot, data: GSPublishData) -> None:
     if data.images:
         await _send_images(bot, group_id, data)
 
+    if data.documents:
+        _spawn_documents_delivery(bot, group_id, data)
+
 
 def _build_text(data: GSPublishData) -> str:
     from modules.general_services.views import format_arabic_datetime
@@ -102,6 +110,92 @@ async def _send_images(bot, group_id, data: GSPublishData) -> None:
         await bot.send_media_group(chat_id=group_id, media=media)
     except Exception as exc:
         logger.warning(f"[gs_publisher] media group failed: {exc}")
+
+
+# ⚠️ مراجع قوية للمهام الخلفية: `create_task` لا يحتفظ بمرجع لمهمته، والمهمة
+# التي لا مرجع لها قد يجمعها جامع المهملات قبل أن تنتهي — فتضيع بقيّة
+# الملفات بلا أثر.
+_BG_TASKS: set[asyncio.Task] = set()
+
+# فاصل بين الملفات — تليجرام يحدّ الإرسال إلى مجموعة بنحو ٢٠ رسالة في
+# الدقيقة. `RetryAfter` أدناه هو الضمان الفعلي؛ هذا الفاصل يخفّف الاصطدام
+# به فقط.
+_DOC_SPACING_SEC = 0.4
+_MAX_RETRY_AFTER = 3
+
+
+def _retry_seconds(exc) -> float:
+    ra = getattr(exc, "retry_after", 1)
+    return float(ra.total_seconds() if hasattr(ra, "total_seconds") else ra)
+
+
+async def _send_one_document(bot, group_id, file_id: str, caption: str) -> bool:
+    """يُرسِل ملفاً واحداً. يُرجِع هل نُشر.
+
+    ⚠️ `file_id` في تليجرام **مرتبط بنوعه**: مُعرِّف صورة يُرفَض من
+    `sendDocument` والعكس. والوثيقة تُرفَع صورةً أو ملف صورة ولا يُخزَّن
+    النوع — فتُجرَّب الطريقتان، الصورة أولاً لأنها الأشيع. `RetryAfter`
+    (قيد المعدّل) يُنتظَر ثم يُعاد **الملف نفسه** لا يُتخطّى: تخطّيه يعني
+    وثيقةً ناقصة في المجموعة بلا أن ينتبه أحد.
+    """
+    from telegram.error import RetryAfter
+
+    for method, key in ((bot.send_photo, "photo"), (bot.send_document, "document")):
+        for _ in range(_MAX_RETRY_AFTER):
+            try:
+                await method(chat_id=group_id, caption=caption, **{key: file_id})
+                return True
+            except RetryAfter as exc:
+                wait = _retry_seconds(exc) + 1
+                logger.info(f"[gs_publisher] قيد معدّل — انتظار {wait:.0f}ث ثم إعادة")
+                await asyncio.sleep(wait)
+            except Exception as exc:
+                logger.debug(f"[gs_publisher] {key} رُفض ({exc}) — تجربة النوع الآخر")
+                break  # غالباً نوع خاطئ: جرّب الطريقة الأخرى
+    return False
+
+
+async def _deliver_documents(bot, group_id, data: GSPublishData) -> None:
+    total = len(data.documents)
+    failed: list[str] = []
+    for i, doc in enumerate(data.documents):
+        ok = await _send_one_document(bot, group_id, doc["file_id"], doc.get("caption", ""))
+        if not ok:
+            failed.append(doc.get("caption", "") or doc["file_id"][:12])
+            logger.error(f"[gs_publisher] تعذّر نشر ملف: {doc.get('caption', '')!r}")
+        if i < total - 1:
+            await asyncio.sleep(_DOC_SPACING_SEC)
+
+    logger.info(f"[gs_publisher] وثائق {data.workflow_type}: نُشر {total - len(failed)}/{total}")
+
+    # ⚠️ الفشل يُبلَّغ به مُدخِلُ الدفعة ولا يُبتلَع بسطر سجلّ: هذه المهمة تعمل
+    # في الخلفية بعد أن رأى نجاح الحفظ، فبلا هذا يظنّ أن المجموعة اكتملت.
+    if failed and data.created_by_id:
+        lines = [f"⚠️ تعذّر نشر {len(failed)} من {total} ملف وثائق في المجموعة:"]
+        lines += [f"• {c}" for c in failed[:10]]
+        if len(failed) > 10:
+            lines.append(f"… و{len(failed) - 10} أخرى")
+        try:
+            await bot.send_message(chat_id=data.created_by_id, text=chr(10).join(lines))
+        except Exception as exc:
+            logger.warning(f"[gs_publisher] تعذّر إبلاغ المُدخِل بفشل الوثائق: {exc}")
+
+
+def _spawn_documents_delivery(bot, group_id, data: GSPublishData) -> None:
+    """يُطلِق إرسال الوثائق في الخلفية ولا ينتظره.
+
+    ⚠️ لا `await` مباشر: عشرات الملفات مع قيد معدّل تليجرام قد تستغرق دقائق،
+    وشاشة نجاح الحفظ تنتظر هذه الدالة — فيبدو البوت معلَّقاً بعد أن نجح الحفظ.
+    """
+    async def _run():
+        try:
+            await _deliver_documents(bot, group_id, data)
+        except Exception:
+            logger.exception("[gs_publisher] فشل غير متوقَّع في نشر الوثائق")
+
+    task = asyncio.get_running_loop().create_task(_run())
+    _BG_TASKS.add(task)
+    task.add_done_callback(_BG_TASKS.discard)
 
 
 def _resolve_group_id(workflow_type: str = "") -> int | str | None:
