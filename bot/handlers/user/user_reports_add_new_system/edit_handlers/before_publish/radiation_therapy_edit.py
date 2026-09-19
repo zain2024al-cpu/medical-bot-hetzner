@@ -71,7 +71,8 @@ async def handle_radiation_therapy_edit_field_selection(update: Update, context:
             "followup_reason": "✍️ سبب العودة",
         }
         
-        field_display_name = field_names.get(field_key, field_key)
+        from ...utils import edit_field_display_name
+        field_display_name = edit_field_display_name(flow_type, field_key, field_names)
         
         # تنظيف القيمة الحالية للعرض
         if isinstance(current_value, str) and len(current_value) > 200:

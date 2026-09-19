@@ -154,7 +154,8 @@ async def handle_treatment_endoscopy_edit_field_selection(update: Update, contex
         context.user_data["edit_field_key"] = field_key
         context.user_data["edit_flow_type"] = flow_type
 
-        field_display_name = _FIELD_NAMES.get(field_key, field_key)
+        from ...utils import edit_field_display_name
+        field_display_name = edit_field_display_name(flow_type, field_key, _FIELD_NAMES)
         if isinstance(current_value, str) and len(current_value) > 200:
             current_value_display = current_value[:200] + "..."
         else:

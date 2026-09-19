@@ -40,6 +40,35 @@ def escape_md_v1(text) -> str:
     from shared.text_safety import escape_markdown_v1
     return escape_markdown_v1(text)
 
+
+def edit_field_display_name(flow_type, field_key, field_names=None) -> str:
+    """اسم الحقل للعرض في شاشات «تعديل قبل النشر» — **جاهز للحشر في Markdown**.
+
+    ⚠️ **كانت كل شاشة تعرض المفتاح الخام حين يغيب عن قاموسها الخاص**
+    (`field_names.get(field_key, field_key)`). والمفتاح `complaint_text`
+    أو `translator_name` فيه شرطة سفلية، وهي في Markdown v1 تفتح كياناً
+    مائلاً لا يُغلَق ⇒ `Can't parse entities` ⇒ تنهار الشاشة كلها عند
+    اختيار الحقل. قِيس فعلياً: ٤٣ من ١١٤ (معالج × مسار × حقل) كانت تنهار.
+    السبب أن لكل ملف تعديل قاموساً خاصاً يتأخر عن سجلّ الحقول
+    (`field_registry`) الذي تُبنى منه أزرار القائمة نفسها — فتسمية زرٍّ
+    ما ليست بالضرورة عند معالجه.
+
+    الترتيب: قاموس المعالِج (فلا يتغيّر ما كان يعمل) ← تسمية السجلّ (مصدر
+    الحقيقة، وهي نفسها على الزرّ الذي ضُغط) ← المفتاح بمسافات بدل
+    الشرطات. والنتيجة **تُهرَّب دائماً**: تسمية جديدة في السجلّ لا يجوز أن
+    تُسقِط شاشة إن حملت محرفاً خاصاً يوماً.
+    """
+    name = (field_names or {}).get(field_key)
+    if not name:
+        try:
+            from .flows.shared import get_editable_fields_by_flow_type
+            name = dict(get_editable_fields_by_flow_type(flow_type)).get(field_key)
+        except Exception:
+            name = None
+    if not name:
+        name = str(field_key).replace("_", " ")
+    return escape_md_v1(name)
+
 # ثوابت
 MONTH_NAMES_AR = {
     1: "يناير", 2: "فبراير", 3: "مارس", 4: "أبريل",

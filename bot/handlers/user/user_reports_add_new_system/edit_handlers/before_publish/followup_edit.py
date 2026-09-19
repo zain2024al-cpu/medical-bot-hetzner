@@ -72,7 +72,8 @@ async def handle_followup_edit_field_selection(update: Update, context: ContextT
             "followup_reason": "✍️ سبب العودة",
         }
         
-        field_display_name = field_names.get(field_key, field_key)
+        from ...utils import edit_field_display_name
+        field_display_name = edit_field_display_name(flow_type, field_key, field_names)
         
         # ✅ التحقق من room_number - فقط لـ "متابعة في الرقود"
         if field_key == "room_number" and medical_action != "متابعة في الرقود":
