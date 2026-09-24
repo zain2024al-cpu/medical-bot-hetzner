@@ -148,7 +148,6 @@ def build_case_pdf(case: dict) -> io.BytesIO:
     from reportlab.lib.enums import TA_RIGHT, TA_CENTER
     from reportlab.platypus import (
         SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether,
-        CondPageBreak,
     )
 
     C = _colors()
@@ -245,12 +244,19 @@ def build_case_pdf(case: dict) -> io.BytesIO:
             img = _embed_image(data, *file_max)
             if img is not None:
                 img.hAlign = "RIGHT"
-                # ⚠️ **لا** KeepTogether هنا: تعشيشها داخل `_section`
-                # يجعل (عنوان القسم + التسمية + صورة 13سم) كتلة واحدة لا
-                # تتّسع في بقية الصفحة أبداً، فتُدفَع كلها وتترك 53% فراغاً
-                # (قِيس فعلياً). التسمية تُضَمّ للعنوان في `_section`،
-                # والصورة تتدفّق خلفها فتملأ ما تبقّى.
-                return [P(f"- {label}", "body"), img]
+                # ⚠️ التسمية تُقرَن بصورتها **وحدها** (KeepTogether) — لا
+                # بعنوان القسم أيضاً. كان القرن الثلاثي (عنوان + تسمية +
+                # صورة ١٣سم) عبر `_section` كتلة واحدة لا تتّسع أبداً في
+                # بقية الصفحة، فتُدفَع كلها وتترك 53% فراغاً (قِيس فعلياً).
+                # فأُزيل القرن بالعنوان — لكن ترك التسمية بلا قرن بصورتها
+                # كشف عطباً معاكساً مرصوداً فعلياً (ملف الحالة #48، صفحة
+                # نصفها فارغ): التسمية صغيرة فتتّسع وتُطبَع، ثم صورتها
+                # وحدها لا تتّسع فتُؤجَّل إلى الصفحة التالية — تسمية معلَّقة
+                # فوق فراغ بحجم الصورة تقريباً. القرن الثنائي (تسمية+صورة
+                # فقط، بلا عنوان) ينقلهما معاً حين لا يتّسعان، بلا ذلك
+                # الفراغ وبلا عودة الهدر الثلاثي (`_section` تتعرّف على
+                # هذا القرن ولا تضمّ العنوان إليه — انظرها أدناه).
+                return [KeepTogether([P(f"- {label}", "body"), img])]
             return [P(f"- {label} ✅ (تعذّر عرض الصورة)", "note")]
         if kind == "pdf":
             pdf_attachments.append((f"{person_name} — {label}", data))
@@ -279,14 +285,22 @@ def build_case_pdf(case: dict) -> io.BytesIO:
         return a == b
 
     def _section(header, items: list) -> list:
-        """عنوان القسم مضموماً لأول عنصر فيه.
+        """عنوان القسم مضموماً لأول عنصر فيه — **إلا** حين يكون ذلك
+        العنصر تسميةً مقرونة بصورتها مسبقاً (`KeepTogether` من
+        `_attachment_flowables`). ضمّ عنوان القسم إلى ذلك القرن يُعيد
+        بناء نفس الكتلة الثلاثية (عنوان + تسمية + صورة) التي ثبت أنها
+        تهدر 53% من الصفحة حين لا تتّسع (انظر تعليق `_attachment_
+        flowables`) — فيتدفّق العنوان وحده بدلاً من ذلك، وما تبقّى من
+        `items` (القرن نفسه) يتبعه حرّاً.
 
-        ⚠️ `CondPageBreak(5cm)` لم يكفِ: يحجز ٥سم بينما العنصر التالي قد
-        يكون صورة بارتفاع ١٣سم، فينكسر بعد العنوان ويترك فراغاً كبيراً.
-        ضمّ العنوان لأول عنصر يجعل ReportLab ينقلهما معاً أو يُبقيهما معاً.
+        ⚠️ `CondPageBreak(5cm)` جُرِّب سابقاً ولم يكفِ: يحجز ٥سم بينما
+        العنصر التالي قد يكون صورة بارتفاع ١٣سم، فينكسر بعد العنوان
+        ويترك فراغاً كبيراً بذاته — نفس فئة العطب من زاوية أخرى.
         """
         if not items:
             return [header]
+        if isinstance(items[0], KeepTogether):
+            return [header] + items
         return [KeepTogether([header, items[0]])] + items[1:]
 
     def _is_photo_label(label: str) -> bool:
@@ -421,8 +435,7 @@ def build_case_pdf(case: dict) -> io.BytesIO:
         story.append(Spacer(1, 0.5 * cm))
 
     # ── جدول ملخّص ────────────────────────────────────────────────────────────
-    story.append(P("📊 ملخّص الحالة", "h2"))
-    story.append(Spacer(1, 0.2 * cm))
+    summary_title = P("📊 ملخّص الحالة", "h2")
 
     REVERSED_LABELS = ["عدد الوثائق", "آخر إصدار", "حالة الإقامة", "الصفة", "الشخص"]
     col_pct = {"عدد الوثائق": 0.15, "آخر إصدار": 0.2, "حالة الإقامة": 0.25, "الصفة": 0.15, "الشخص": 0.25}
@@ -455,7 +468,22 @@ def build_case_pdf(case: dict) -> io.BytesIO:
         ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
         ("RIGHTPADDING", (0, 0), (-1, -1), 5), ("LEFTPADDING", (0, 0), (-1, -1), 5),
     ]))
-    story.append(t)
+    # ⚠️ العنوان والجدول يُقرَنان معاً (لا الجدول وحده): بلا هذا القرن،
+    # عنوان "ملخّص الحالة" قد يرتسم وحده في نهاية صفحة والجدول كلّه
+    # يُؤجَّل لصفحة جديدة — عنوان معلَّق بلا جدوله (رُصِد فعلياً أثناء
+    # اختبار هذا الإصلاح). وبلا KeepTogether على الجدول نفسه، ينكسر
+    # بصفوفه حين لا يتّسع كاملاً فقد يُترَك صفّ واحد وحيداً في صفحة شبه
+    # فارغة (رُصِد فعلياً أيضاً: صفّ مرافق واحد انفرد بصفحة). لعائلة
+    # عادية (مريض ومرافقوه، أفراد قليلون) هذه الكتلة صغيرة دائماً فربطها
+    # مأمون. عائلة كبيرة جداً تحتاج انكساراً حقيقياً عبر صفحات متعددة —
+    # فالربط يُقصَر عليها دون الكبيرة (٢٥ فأقل، سخيّ لواقع هذا البوت)
+    # بدل فرضه دائماً وربما إفشال عرض جدول ضخم لا يتّسع في أي صفحة
+    # فارغة أصلاً.
+    summary_block = [summary_title, Spacer(1, 0.2 * cm), t]
+    if len(people) <= 25:
+        story.append(KeepTogether(summary_block))
+    else:
+        story.extend(summary_block)
 
     doc.build(story, onFirstPage=_on_page, onLaterPages=_on_page)
     buf.seek(0)
@@ -469,6 +497,9 @@ def build_case_pdf(case: dict) -> io.BytesIO:
     from reportlab.pdfgen import canvas as canvas_mod
 
     def _divider_page_bytes(label: str) -> bytes:
+        """صفحة كاملة لعبارة تعريف — تُستعمَل **فقط** حين لا توجد صفحة
+        محتوى حقيقية لدمج شريط عليها (المرفق تعذّر فتحه أصلاً). ليست
+        الحالة الشائعة — انظر `_stamp_attachment_banner` لتلك."""
         dbuf = io.BytesIO()
         c = canvas_mod.Canvas(dbuf, pagesize=A4)
         w, h = A4
@@ -483,20 +514,59 @@ def build_case_pdf(case: dict) -> io.BytesIO:
         dbuf.seek(0)
         return dbuf.getvalue()
 
+    _BANNER_H = 1.15 * cm
+
+    def _stamp_attachment_banner(first_page, label: str) -> None:
+        """يعرّف صاحب المرفق بشريط رأس ضيّق على أول صفحة منه — بدل صفحة
+        A4 كاملة لسطرين (كانت تصنع ٤ صفحات فارغة من ١١ في ملف اختباري
+        حقيقي: إقامة+Form C لكل من مريض ومرافقه، أُبلِغ عنه صراحةً).
+
+        ⚠️ **لا يُغطّى أي جزء من المستند الأصلي**: القماش (mediabox) يُوسَّع
+        لأعلى بمقدار الشريط فقط قبل الدمج. الإحداثيات في PDF تنبت من
+        الزاوية السفلى اليسرى، فالمحتوى القائم (0..ph) يبقى في مكانه
+        تماماً، والمساحة الجديدة (ph..ph+الشريط) تظهر **فوقه** فارغة —
+        فيُرسَم الشريط فيها حصراً بلا تراكب مع أي جزء من الوثيقة الأصلية
+        (ختم رسمي، رأسية حكومية، ونحوها). جُرِّب فعلياً بمقارنة محتوى
+        الصفحة قبل وبعد — سليم بايتاً بايت.
+        """
+        pw = float(first_page.mediabox.width)
+        ph = float(first_page.mediabox.height)
+        new_h = ph + _BANNER_H
+
+        obuf = io.BytesIO()
+        c = canvas_mod.Canvas(obuf, pagesize=(pw, new_h))
+        c.setFillColor(C["primary"])
+        c.rect(0, ph, pw, _BANNER_H, stroke=0, fill=1)
+        c.setFont(FNB, 10.5)
+        c.setFillColor(C["white"])
+        c.drawCentredString(pw / 2, ph + _BANNER_H / 2 - 0.13 * cm, _ar(f"📎 {label}"))
+        c.showPage()
+        c.save()
+        obuf.seek(0)
+
+        first_page.mediabox.upper_right = (pw, new_h)
+        if first_page.cropbox is not None:
+            first_page.cropbox.upper_right = (pw, new_h)
+        first_page.merge_page(PdfReader(obuf).pages[0])
+
     writer = PdfWriter()
     for page in PdfReader(buf).pages:
         writer.add_page(page)
 
     for label, raw in pdf_attachments:
-        for page in PdfReader(io.BytesIO(_divider_page_bytes(label))).pages:
-            writer.add_page(page)
         try:
-            for page in PdfReader(io.BytesIO(raw)).pages:
-                writer.add_page(page)
+            pages = list(PdfReader(io.BytesIO(raw)).pages)
+            if not pages:
+                raise ValueError("PDF بلا صفحات")
         except Exception as exc:
             logger.warning(f"[residency_case_pdf] failed to merge pdf attachment {label!r}: {exc}")
             for page in PdfReader(io.BytesIO(_divider_page_bytes(f"{label} — تعذّر فتح الملف"))).pages:
                 writer.add_page(page)
+            continue
+
+        _stamp_attachment_banner(pages[0], label)
+        for page in pages:
+            writer.add_page(page)
 
     out = io.BytesIO()
     writer.write(out)
