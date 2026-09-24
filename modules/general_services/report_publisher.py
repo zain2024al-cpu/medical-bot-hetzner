@@ -27,9 +27,11 @@ class GSPublishData:
     workflow_icon:    str           # emoji
     body_lines:       list[str]     # pre-formatted Arabic lines for the report body
     images:           list[dict] = field(default_factory=list)  # UploadedFile.to_dict() list
-    # 📎 ملفات تُنشَر في المجموعة **بعد** النصّ، كلٌّ بوصفه: [{"file_id", "caption"}].
-    # ⚠️ مستقلّة عن `images`: تلك صور تُرسَل فور النصّ كألبوم، وهذه وثائق
-    # نوعها مجهول (صورة أو ملف) وتُرسَل فرادى بالترتيب وبوصف صاحبها.
+    # 📎 وثائق تُجمَّع في ملف PDF واحد منظَّم (غلاف + صفحة لكل وثيقة بعنوان
+    # يعرّف صاحبها) وتُنشَر في المجموعة **بعد** النصّ: [{"file_id", "caption"}].
+    # ⚠️ مستقلّة عن `images`: تلك صور تُرسَل فور النصّ كألبوم مباشر، وهذه
+    # وثائق نوعها مجهول (صورة أو ملف) كانت تُرسَل فرادى فتضيع بين إشعارات
+    # المجموعة — فصارت ملفاً واحداً بدلاً من ذلك (طلب المستخدم صراحةً).
     documents:        list[dict] = field(default_factory=list)
     # 📨 نسخ خاصة (أدمن + مُدخِل) بجانب المجموعة. ⚠️ الافتراضي True فلا يتغيّر
     # شيء للمغادرة والخدمات العامة؛ الوصول يُعطِّله لأن له مجموعته، وتعود
@@ -148,10 +150,10 @@ async def _send_images(bot, group_id, data: GSPublishData) -> None:
 # الملفات بلا أثر.
 _BG_TASKS: set[asyncio.Task] = set()
 
-# فاصل بين الملفات — تليجرام يحدّ الإرسال إلى مجموعة بنحو ٢٠ رسالة في
-# الدقيقة. `RetryAfter` أدناه هو الضمان الفعلي؛ هذا الفاصل يخفّف الاصطدام
-# به فقط.
-_DOC_SPACING_SEC = 0.4
+# فاصل بين ملفّات الوثائق المتعدّدة (نادراً ما يتجاوز الأمر ملفاً واحداً؛
+# يحدث فقط حين تتجاوز الدفعة حدّ الحجم ويُقسَّم الناتج) — يخفّف الاصطدام
+# بقيد معدّل تليجرام لرفع الملفات.
+_DOC_SPACING_SEC = 0.6
 _MAX_RETRY_AFTER = 3
 
 
@@ -160,52 +162,74 @@ def _retry_seconds(exc) -> float:
     return float(ra.total_seconds() if hasattr(ra, "total_seconds") else ra)
 
 
-async def _send_one_document(bot, group_id, file_id: str, caption: str) -> bool:
-    """يُرسِل ملفاً واحداً. يُرجِع هل نُشر.
+async def _send_one_pdf(bot, group_id, buf, filename: str, caption: str) -> bool:
+    """يرفع ملف PDF واحداً. يُرجِع هل نُشر.
 
-    ⚠️ `file_id` في تليجرام **مرتبط بنوعه**: مُعرِّف صورة يُرفَض من
-    `sendDocument` والعكس. والوثيقة تُرفَع صورةً أو ملف صورة ولا يُخزَّن
-    النوع — فتُجرَّب الطريقتان، الصورة أولاً لأنها الأشيع. `RetryAfter`
-    (قيد المعدّل) يُنتظَر ثم يُعاد **الملف نفسه** لا يُتخطّى: تخطّيه يعني
-    وثيقةً ناقصة في المجموعة بلا أن ينتبه أحد.
+    ⚠️ `RetryAfter` (قيد معدّل الرفع) يُنتظَر ثم يُعاد **الملف نفسه** لا
+    يُتخطّى: تخطّيه يعني جزءاً كاملاً من الوثائق ضائعاً في المجموعة بلا
+    أن ينتبه أحد.
     """
     from telegram.error import RetryAfter
 
-    for method, key in ((bot.send_photo, "photo"), (bot.send_document, "document")):
-        for _ in range(_MAX_RETRY_AFTER):
-            try:
-                await method(chat_id=group_id, caption=caption, **{key: file_id})
-                return True
-            except RetryAfter as exc:
-                wait = _retry_seconds(exc) + 1
-                logger.info(f"[gs_publisher] قيد معدّل — انتظار {wait:.0f}ث ثم إعادة")
-                await asyncio.sleep(wait)
-            except Exception as exc:
-                logger.debug(f"[gs_publisher] {key} رُفض ({exc}) — تجربة النوع الآخر")
-                break  # غالباً نوع خاطئ: جرّب الطريقة الأخرى
+    for _ in range(_MAX_RETRY_AFTER):
+        try:
+            buf.seek(0)
+            await bot.send_document(chat_id=group_id, document=buf, filename=filename,
+                                    caption=caption)
+            return True
+        except RetryAfter as exc:
+            wait = _retry_seconds(exc) + 1
+            logger.info(f"[gs_publisher] قيد معدّل — انتظار {wait:.0f}ث ثم إعادة رفع الملف")
+            await asyncio.sleep(wait)
+        except Exception as exc:
+            logger.error(f"[gs_publisher] فشل رفع ملف الوثائق {filename!r}: {exc}")
+            return False
     return False
 
 
 async def _deliver_documents(bot, group_id, data: GSPublishData) -> None:
-    total = len(data.documents)
-    failed: list[str] = []
-    for i, doc in enumerate(data.documents):
-        ok = await _send_one_document(bot, group_id, doc["file_id"], doc.get("caption", ""))
-        if not ok:
-            failed.append(doc.get("caption", "") or doc["file_id"][:12])
-            logger.error(f"[gs_publisher] تعذّر نشر ملف: {doc.get('caption', '')!r}")
-        if i < total - 1:
-            await asyncio.sleep(_DOC_SPACING_SEC)
+    """يجمع وثائق الدفعة في ملف PDF واحد منظَّم (أو أكثر إن تجاوز الحجم
+    حدّ الرفع) ويرفعه إلى المجموعة — بدل صور متفرّقة تضيع بين إشعاراتها.
+    """
+    from modules.general_services.views import format_arabic_datetime
+    from services.arrival_documents_pdf import build_arrival_documents_pdfs
 
-    logger.info(f"[gs_publisher] وثائق {data.workflow_type}: نُشر {total - len(failed)}/{total}")
+    batch_label = (f"{data.workflow_icon} {data.workflow_label} — "
+                   f"{format_arabic_datetime(data.record_date)}")
+    try:
+        files, included, dl_failed = await build_arrival_documents_pdfs(
+            data.documents, bot, batch_label)
+    except Exception:
+        logger.exception("[gs_publisher] فشل بناء ملف وثائق %s", data.workflow_type)
+        files, included, dl_failed = [], 0, len(data.documents)
+
+    up_failed = 0
+    if included:
+        for i, buf in enumerate(files, start=1):
+            suffix = f"_{i}" if len(files) > 1 else ""
+            filename = f"وثائق_{data.workflow_type}{suffix}.pdf"
+            caption = f"📎 وثائق الدفعة ({included} وثيقة)" if len(files) == 1 else (
+                f"📎 وثائق الدفعة — الجزء {i} من {len(files)}")
+            ok = await _send_one_pdf(bot, group_id, buf, filename, caption)
+            if not ok:
+                up_failed += 1
+            if i < len(files):
+                await asyncio.sleep(_DOC_SPACING_SEC)
+
+    logger.info(f"[gs_publisher] وثائق {data.workflow_type}: {included} وثيقة في "
+                f"{len(files) - up_failed}/{len(files)} ملف (تعذّر تنزيل {dl_failed})")
 
     # ⚠️ الفشل يُبلَّغ به مُدخِلُ الدفعة ولا يُبتلَع بسطر سجلّ: هذه المهمة تعمل
     # في الخلفية بعد أن رأى نجاح الحفظ، فبلا هذا يظنّ أن المجموعة اكتملت.
-    if failed and data.created_by_id:
-        lines = [f"⚠️ تعذّر نشر {len(failed)} من {total} ملف وثائق في المجموعة:"]
-        lines += [f"• {c}" for c in failed[:10]]
-        if len(failed) > 10:
-            lines.append(f"… و{len(failed) - 10} أخرى")
+    if (dl_failed or up_failed or not included) and data.created_by_id:
+        lines = []
+        if not included:
+            lines.append("⚠️ تعذّر تجميع أي وثيقة في ملف — راجع الدفعة من البوت.")
+        elif dl_failed:
+            lines.append(f"⚠️ تعذّر تنزيل {dl_failed} وثيقة عند تجميعها في الملف "
+                         f"(بقيت {included} في الملف المرفوع).")
+        if up_failed:
+            lines.append(f"⚠️ تعذّر رفع {up_failed} من {len(files)} ملف وثائق إلى المجموعة.")
         try:
             await bot.send_message(chat_id=data.created_by_id, text=chr(10).join(lines))
         except Exception as exc:
