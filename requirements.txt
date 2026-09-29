@@ -1,58 +1,64 @@
+# ⚠️ الإصدارات كلها مثبَّتة بـ== على القيمة الفعلية العاملة على الخادم
+# (venv/bin/pip freeze، 2026-09-30) — لا تخمين ولا أحدث إصدار متاح.
+# بند مفتوح سابق (كان ٢ فقط من ٤١ مثبَّتاً): >= يسمح بدخول أي إصدار جديد
+# غير مفحوص عند إعادة التثبيت، بما فيه إصدار مُخترَق. تحديث أي حزمة هنا
+# بعد هذا التثبيت قرار نشر متعمَّد يحتاج فحصاً وموافقة، لا تحديثاً تلقائياً.
+
 # Core Bot & Telegram
 aiogram==3.7.0
 python-telegram-bot==20.6
-aiofiles>=23.2.1
+aiofiles==23.2.1
 
 # Async & HTTP
-aiohttp>=3.8.0
-asyncio-contextmanager>=1.0.0
-nest-asyncio>=1.5.0
+aiohttp==3.9.5
+asyncio-contextmanager==1.0.1
+nest-asyncio==1.6.0
 
 # Database
-SQLAlchemy>=2.0.0
-pymongo>=4.0.0
-redis>=4.0.0
+SQLAlchemy==2.0.51
+pymongo==4.17.0
+redis==8.0.1
 
 # PDF & Image Processing
-reportlab>=4.0.0
-Pillow>=9.0.0
-pypdf>=4.0.0
-matplotlib>=3.5.0
-arabic-reshaper>=3.0.0
-python-bidi>=0.6.0
-Jinja2>=3.1.0
-weasyprint>=60.0
-fpdf2>=2.7.0
-img2pdf>=0.5.0
-rapidfuzz>=3.0.0
+reportlab==5.0.0
+Pillow==12.3.0
+pypdf==6.14.2
+matplotlib==3.11.0
+arabic-reshaper==3.0.1
+python-bidi==0.6.11
+Jinja2==3.1.6
+weasyprint==69.0
+fpdf2==2.8.7
+img2pdf==0.6.3
+rapidfuzz==3.14.5
 
 # Utilities
-python-dotenv>=0.19.0
-APScheduler>=3.7.0
-requests>=2.25.0
-pydantic>=2.0.0
-PyYAML>=5.4.0
-python-dateutil>=2.8.0
-pytz>=2021.3
-psutil>=5.9.0
+python-dotenv==1.2.2
+APScheduler==3.11.3
+requests==2.34.2
+pydantic==2.7.4
+PyYAML==6.0.3
+python-dateutil==2.9.0.post0
+pytz==2026.2
+psutil==7.2.2
 
 # Data Processing (minimal)
-pandas>=1.3.0,<3.0.0
-openpyxl>=2.4.0
+pandas==2.3.3
+openpyxl==3.1.5
 
 # Image Processing
-opencv-python-headless>=4.5.0
-easyocr>=1.6.0
-numpy>=1.21.0
-scipy>=1.7.0
-scikit-learn>=1.0.0
-scikit-image>=0.19.0
+opencv-python-headless==5.0.0.93
+easyocr==1.7.2
+numpy==2.5.1
+scipy==1.18.0
+scikit-learn==1.9.0
+scikit-image==0.26.0
 
 # Web Processing
-beautifulsoup4>=4.10.0
-lxml>=4.6.0
+beautifulsoup4==4.15.0
+lxml==6.1.1
 
 # Optional AI
-openai>=0.27.0
-groq>=0.0.8
-deep-translator>=1.11.0
+openai==2.45.0
+groq==1.5.0
+deep-translator==1.11.4
