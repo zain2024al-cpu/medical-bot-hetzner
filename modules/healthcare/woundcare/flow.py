@@ -1100,11 +1100,11 @@ async def _handle_hc_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
 # ── Handler registration ──────────────────────────────────────────────────────
 
 def register_result_routes() -> None:
-    _register_route(_RKEY_PATIENT,      _on_patient)
-    _register_route(_RKEY_DEPARTMENTS,  _on_department)
-    _register_route(_RKEY_DESCRIPTION,  _on_condition)
-    _register_route(_RKEY_SUPPLIES,     _on_supplies)
-    _register_route(_RKEY_IMAGES,       _on_images)
+    _register_route(_RKEY_PATIENT,      _on_patient,     guard=_is_authorized)
+    _register_route(_RKEY_DEPARTMENTS,  _on_department,  guard=_is_authorized)
+    _register_route(_RKEY_DESCRIPTION,  _on_condition,   guard=_is_authorized)
+    _register_route(_RKEY_SUPPLIES,     _on_supplies,    guard=_is_authorized)
+    _register_route(_RKEY_IMAGES,       _on_images,      guard=_is_authorized)
     logger.info(
         f"[woundcare] result routes registered: "
         f"{_RKEY_PATIENT}, {_RKEY_DEPARTMENTS}, {_RKEY_DESCRIPTION}, "

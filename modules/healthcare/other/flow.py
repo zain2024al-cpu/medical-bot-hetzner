@@ -546,9 +546,9 @@ async def _handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 
 def register_result_routes() -> None:
-    _register_route(_RKEY_PATIENT, _on_patient)
-    _register_route(_RKEY_OPERATIONS, _on_operations)
-    _register_route(_RKEY_IMAGES, _on_images)
+    _register_route(_RKEY_PATIENT, _on_patient, guard=_is_authorized)
+    _register_route(_RKEY_OPERATIONS, _on_operations, guard=_is_authorized)
+    _register_route(_RKEY_IMAGES, _on_images, guard=_is_authorized)
     logger.info("[other_hc] result routes registered")
 
 

@@ -24,21 +24,34 @@ logger = logging.getLogger(__name__)
 
 # key → async callable(result, update, context)
 ResultHandler = Callable[[Any, Any, Any], Awaitable[None]]
+# key → callable(user_id) -> bool
+Guard = Callable[[int], bool]
 
 _registry: dict[str, ResultHandler] = {}
+_guards: dict[str, Guard] = {}
 
 
-def register(key: str, handler: ResultHandler) -> None:
+def register(key: str, handler: ResultHandler, *, guard: Guard | None = None) -> None:
     """
     Register a completion handler for a given return_to key.
 
     key     — unique dotted string, e.g. "healthcare.woundcare.patient"
     handler — async def handler(result, update, context)
+    guard   — اختياري: callable(user_id) -> bool يُعاد التحقّق منه فعلياً عند
+              اكتمال الاختيار (لا فقط عند فتح الشاشة). كل شاشات multiselect/
+              selectors تبقى مفتوحة لدقائق، وصلاحية المستخدم قد تُلغى أثناء
+              ذلك — بلا guard يُكمِل حتى النهاية رغم إلغاء صلاحيته. الفشل أو
+              رفع استثناء داخل guard يُرفَض احتياطاً (fail-closed)، نفس
+              اتفاقية `scripts/audit_callback_auth.py`.
 
-    Registering the same key twice overwrites the previous handler.
+    Registering the same key twice overwrites the previous handler/guard.
     """
     _registry[key] = handler
-    logger.debug(f"[result_router] registered key={key!r}")
+    if guard is not None:
+        _guards[key] = guard
+    else:
+        _guards.pop(key, None)
+    logger.debug(f"[result_router] registered key={key!r} guard={'yes' if guard else 'no'}")
 
 
 async def route(
@@ -51,6 +64,8 @@ async def route(
     Dispatch a selector result to the registered handler.
 
     If no handler is registered for key, logs a warning and does nothing.
+    If a guard was registered for key, it is re-checked here against the
+    current user before the handler runs — see `register()`.
     Shared systems should prefer result objects with a `cancelled` flag.
     """
     if not key:
@@ -61,6 +76,19 @@ async def route(
     if handler is None:
         logger.warning(f"[result_router] no handler registered for key={key!r}")
         return
+
+    guard = _guards.get(key)
+    if guard is not None:
+        uid = update.effective_user.id if update and update.effective_user else 0
+        try:
+            allowed = bool(guard(uid))
+        except Exception as exc:
+            logger.error(f"[result_router] guard for key={key!r} raised: {exc}", exc_info=True)
+            allowed = False   # fail-closed
+        if not allowed:
+            logger.warning(f"[result_router] guard rejected key={key!r} user={uid}")
+            return
+
     try:
         await handler(result, update, context)
     except Exception as exc:

@@ -696,9 +696,9 @@ async def _handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 # ── Registration ──────────────────────────────────────────────────────────────
 
 def register_result_routes() -> None:
-    _register_route(_RKEY_PATIENT,     _on_patient)
-    _register_route(_RKEY_DEPARTMENTS, _on_department)
-    _register_route(_RKEY_IMAGES,      _on_images)
+    _register_route(_RKEY_PATIENT,     _on_patient,    guard=_is_authorized)
+    _register_route(_RKEY_DEPARTMENTS, _on_department, guard=_is_authorized)
+    _register_route(_RKEY_IMAGES,      _on_images,     guard=_is_authorized)
     logger.info("[supplies] result routes registered")
 
 

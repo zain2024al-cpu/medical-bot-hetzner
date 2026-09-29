@@ -568,5 +568,5 @@ def register_handlers(app) -> None:
 
 
 def register_result_routes() -> None:
-    _patient_router.register(_RKEY_PATIENT, _on_patient)
-    _register_route(_RKEY_IMAGES, _on_images)
+    _patient_router.register(_RKEY_PATIENT, _on_patient, guard=_is_authorized)
+    _register_route(_RKEY_IMAGES, _on_images, guard=_is_authorized)

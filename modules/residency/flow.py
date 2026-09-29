@@ -1572,5 +1572,5 @@ def register_result_routes() -> None:
     """نتيجة شاشة اختيار وثائق الطباعة (msel) — محرِّك الاختيار المتعدد
     نفسه مسجَّل عالمياً مسبقاً في bot/handlers_registry.py، هذا فقط
     يربط مفتاح النتيجة بدالّتنا."""
-    _register_route(_RKEY_PRINT_CATS, _on_print_categories)
+    _register_route(_RKEY_PRINT_CATS, _on_print_categories, guard=_is_authorized)
     logger.info(f"[residency] result routes registered: {_RKEY_PRINT_CATS}")

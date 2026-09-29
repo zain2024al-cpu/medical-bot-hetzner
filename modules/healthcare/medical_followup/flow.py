@@ -930,12 +930,12 @@ async def _handle_hcfu_callback(update: Update, context: ContextTypes.DEFAULT_TY
 # ── Registration ──────────────────────────────────────────────────────────────
 
 def register_result_routes() -> None:
-    _register_route(_RKEY_PATIENT,     _on_patient)
-    _register_route(_RKEY_DEPARTMENTS, _on_department)
-    _register_route(_RKEY_PROC_TYPE,   _on_proc_type)
-    _register_route(_RKEY_COMPLAINT,   _on_complaint)
-    _register_route(_RKEY_MEDS_SUPPLY, _on_meds_supply)
-    _register_route(_RKEY_IMAGES,      _on_images)
+    _register_route(_RKEY_PATIENT,     _on_patient,     guard=_is_authorized)
+    _register_route(_RKEY_DEPARTMENTS, _on_department,  guard=_is_authorized)
+    _register_route(_RKEY_PROC_TYPE,   _on_proc_type,   guard=_is_authorized)
+    _register_route(_RKEY_COMPLAINT,   _on_complaint,   guard=_is_authorized)
+    _register_route(_RKEY_MEDS_SUPPLY, _on_meds_supply, guard=_is_authorized)
+    _register_route(_RKEY_IMAGES,      _on_images,      guard=_is_authorized)
     logger.info("[followup] result routes registered")
 
 

@@ -571,5 +571,5 @@ def register_handlers(app) -> None:
 
 
 def register_result_routes() -> None:
-    _register_route(_RKEY_ARRIVALS, _on_arrivals_selected)
-    _register_route(_RKEY_IMAGES,   _on_images)
+    _register_route(_RKEY_ARRIVALS, _on_arrivals_selected, guard=_is_authorized)
+    _register_route(_RKEY_IMAGES,   _on_images, guard=_is_authorized)

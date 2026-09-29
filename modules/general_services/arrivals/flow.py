@@ -632,8 +632,8 @@ async def _on_c_name_selected(result, update: Update, context: ContextTypes.DEFA
 
 
 def register_result_routes() -> None:
-    _register_route(_RKEY_P_NAME, _on_p_name_selected)
-    _register_route(_RKEY_C_NAME, _on_c_name_selected)
+    _register_route(_RKEY_P_NAME, _on_p_name_selected, guard=_is_authorized)
+    _register_route(_RKEY_C_NAME, _on_c_name_selected, guard=_is_authorized)
     logger.info(f"[arrivals] result routes registered: {_RKEY_P_NAME}, {_RKEY_C_NAME}")
 
 

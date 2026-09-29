@@ -278,7 +278,7 @@ async def _on_invimg_types_selected(result: MultiSelectResult, update: Update, c
     await _generate_and_show_export_choice(update, context)
 
 
-_register_route(_RKEY_INVIMG_TYPES, _on_invimg_types_selected)
+_register_route(_RKEY_INVIMG_TYPES, _on_invimg_types_selected, guard=_is_authorized_images)
 
 
 # ── اختيار نوع المسير (فلتر A/B/C/الكل) ──────────────────────────────────────
