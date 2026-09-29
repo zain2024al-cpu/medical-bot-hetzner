@@ -14,6 +14,9 @@ from telegram.ext import ContextTypes, CallbackQueryHandler, MessageHandler, fil
 
 from bot.shared_auth import is_admin
 from core.access.access_service import user_has_module
+from shared.multiselect import Option, MultiSelectResult
+from shared.multiselect import engine as multiselect
+from shared.result_router import register as _register_route
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +37,26 @@ _MANIFEST_TYPE_LABELS = {
     "C": "↪️ إخلاء لجهة أخرى",
     None: "📋 الكل",
 }
+
+# ✅ فلترة اختيارية لزرّ "📸 صور الفواتير" وحده — بالضبط بطلب المستخدم:
+# "الكل أو فردي أو اختياري". توليفة حقيقية (multiselect) لا اختيار مفرد
+# كمسير الإخلاء أعلاه: الثلاثة معاً = الكل، واحد فقط = فردي، أي مجموعة
+# جزئية = اختياري — بلا حاجة لخيار "الكل" منفصل، فتحديد الثلاثة معاً
+# يطابقه فعلياً (انظر التعليق المطابق في pharmacy_evacuation_service.py).
+_RKEY_INVIMG_TYPES = "hcphprint.invimg_types"
+
+_INVOICE_TYPE_OPTIONS = [
+    Option(id="A", label="نسبة ثابتة (22%)", icon="🅰️"),
+    Option(id="B", label="نسبة مختلفة", icon="🅱️"),
+    Option(id="C", label="إخلاء لجهة أخرى", icon="↪️"),
+]
+
+
+def _invoice_types_label(types: list[str] | None) -> str:
+    names = {"A": "🅰️ ثابتة", "B": "🅱️ مختلفة", "C": "↪️ لجهة أخرى"}
+    if not types or set(types) >= {"A", "B", "C"}:
+        return "📋 الكل"
+    return " + ".join(names[t] for t in types if t in names)
 
 
 def _is_authorized(user_id: int) -> bool:
@@ -200,7 +223,10 @@ async def _handle_cal_select(update: Update, context: ContextTypes.DEFAULT_TYPE,
     if step == "day":
         state["start_date"] = selected
         state["end_date"] = selected
-        if _mode(context) in (_MODE_INVOICES, _MODE_INVIMG):
+        if _mode(context) == _MODE_INVIMG:
+            await _show_invimg_type_multiselect(update, context)
+            return
+        if _mode(context) == _MODE_INVOICES:
             await _generate_and_show_export_choice(update, context)
             return
         await _show_manifest_type_menu(update, context)
@@ -218,11 +244,41 @@ async def _handle_cal_select(update: Update, context: ContextTypes.DEFAULT_TYPE,
             start, end = end, start
         state["start_date"] = start
         state["end_date"] = end
-        if _mode(context) in (_MODE_INVOICES, _MODE_INVIMG):
+        if _mode(context) == _MODE_INVIMG:
+            await _show_invimg_type_multiselect(update, context)
+            return
+        if _mode(context) == _MODE_INVOICES:
             await _generate_and_show_export_choice(update, context)
             return
         await _show_manifest_type_menu(update, context)
         return
+
+
+# ── فلتر توليفة A/B/C لزرّ "📸 صور الفواتير" (multiselect حقيقي) ─────────────
+
+async def _show_invimg_type_multiselect(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """الثلاثة محدَّدة سلفاً (= الكل بلا أي ضغطة إضافية)؛ المستخدم يُلغي
+    تحديد ما لا يريده لطباعة فردية أو توليفة مختارة."""
+    await multiselect.open(
+        update, context,
+        title="📸 اختر فئات الفواتير المطلوب تجميع صورها",
+        options=_INVOICE_TYPE_OPTIONS,
+        return_to=_RKEY_INVIMG_TYPES,
+        icon="📸", min_select=1,
+        preselected_ids=["A", "B", "C"],
+    )
+
+
+async def _on_invimg_types_selected(result: MultiSelectResult, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if result.cancelled:
+        await _show_period_menu(update, context)
+        return
+    state = context.user_data.setdefault(_KEY, {})
+    state["invimg_manifest_types"] = result.ids
+    await _generate_and_show_export_choice(update, context)
+
+
+_register_route(_RKEY_INVIMG_TYPES, _on_invimg_types_selected)
 
 
 # ── اختيار نوع المسير (فلتر A/B/C/الكل) ──────────────────────────────────────
@@ -298,6 +354,10 @@ async def _generate_and_show_export_choice(update: Update, context: ContextTypes
     user = update.effective_user
     manifest_type = state.get("manifest_type")  # None = الكل، بلا فلترة
     specialist_name = state.get("specialist_name")  # None = كل المختصين
+    # ✅ فلتر توليفة A/B/C — يخصّ "📸 صور الفواتير" وحده (انظر
+    # _show_invimg_type_multiselect). بقية الأوضاع None فتبقى بلا فلترة
+    # توليفة، وتستمر manifest_type أعلاه على حالها لمسير الإخلاء.
+    invimg_types = state.get("invimg_manifest_types") if _mode(context) == _MODE_INVIMG else None
     # ✅ عزل: كل مستخدم يطبع مسيره الخاص (ما أدخله هو فقط)، إلا الأدمن
     # فيرى الكل — نفس قاعدة العزل المعتمدة في pharmacy_finance.
     # specialist_name فلتر مستقل تماماً: "من أدخل السجل" لا علاقة له
@@ -308,6 +368,7 @@ async def _generate_and_show_export_choice(update: Update, context: ContextTypes
         requester_id=user.id if user else None,
         is_admin=bool(user and is_admin(user.id)),
         specialist_name=specialist_name,
+        manifest_types=invimg_types,
     )
     state["rows"] = rows
     context.user_data[_KEY] = state
@@ -318,6 +379,8 @@ async def _generate_and_show_export_choice(update: Update, context: ContextTypes
     if not rows and _mode(context) in (_MODE_INVOICES, _MODE_INVIMG):
         text = ("⚠️ لا توجد فواتير في هذه الفترة." + chr(10) + chr(10)
                 + f"من {start.strftime('%Y-%m-%d')} إلى {end.strftime('%Y-%m-%d')}")
+        if _mode(context) == _MODE_INVIMG:
+            text += chr(10) + f"الفئات: {_invoice_types_label(invimg_types)}"
         kb = InlineKeyboardMarkup([[InlineKeyboardButton(
             "🔙 رجوع", callback_data=f"{_PFX}:back_to_period")]])
         await _edit_or_reply(update, text, kb)
@@ -350,6 +413,7 @@ async def _generate_and_show_export_choice(update: Update, context: ContextTypes
         if not n_img:
             text = ("⚠️ لا توجد صور فواتير مرفوعة في هذه الفترة." + chr(10) + chr(10)
                     + f"من {start.strftime('%Y-%m-%d')} إلى {end.strftime('%Y-%m-%d')}" + chr(10)
+                    + f"الفئات: {_invoice_types_label(invimg_types)}" + chr(10)
                     + f"(عدد سجلات الصرف: {len(rows)} — بلا صور مرفقة)")
             kb = InlineKeyboardMarkup([[InlineKeyboardButton(
                 "🔙 رجوع", callback_data=f"{_PFX}:back_to_period")]])
@@ -358,6 +422,7 @@ async def _generate_and_show_export_choice(update: Update, context: ContextTypes
         text = (
             "📸 *صور الفواتير*" + chr(10) + chr(10)
             + f"الفترة: من {start.strftime('%Y-%m-%d')} إلى {end.strftime('%Y-%m-%d')}" + chr(10)
+            + f"الفئات: {_invoice_types_label(invimg_types)}" + chr(10)
             + f"عدد الفواتير: {len(rows)}" + chr(10)
             + f"عدد الصور: {n_img}" + chr(10) + chr(10)
             # ⚠️ تنبيه صريح: الصور تُنزَّل من تليجرام واحدةً واحدة، وقد

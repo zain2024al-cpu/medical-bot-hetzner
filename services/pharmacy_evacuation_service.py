@@ -41,10 +41,15 @@ def _format_dispense_statement(item_count, kind: str) -> str:
 async def get_evacuation_ledger_rows(
     start_date: date, end_date: date, manifest_type: str | None = None,
     *, requester_id: int | None = None, is_admin: bool = False,
-    specialist_name: str | None = None,
+    specialist_name: str | None = None, manifest_types: list[str] | None = None,
 ) -> list[dict]:
     """manifest_type: "A" | "B" | "C" لتقييد المسير على تصنيف واحد فقط،
     أو None لعدم الفلترة (كل التصنيفات معاً — السلوك القديم بلا تغيير).
+
+    ✅ manifest_types: فلتر توليفة (يستهلكه مسير الفواتير وحده) — قائمة أي
+    توليفة من "A"/"B"/"C" معاً (فردية أو مختارة أو الثلاث كلها = بلا فلترة
+    فعلياً). عند تمريرها تُتجاهَل manifest_type أعلاه تماماً؛ None يعني
+    استخدام manifest_type المفرد كالسابق (مسير الإخلاء بلا تغيير).
 
     ⚠️ start_date/end_date يُطبَّقان دائماً على تاريخ سجل الصرف الأصلي
     (MedicationRecord/SuppliesRecord.created_at) — وليس على تاريخ إدخال
@@ -64,15 +69,16 @@ async def get_evacuation_ledger_rows(
     شيء آخر. قيمة None ⇒ كل المختصين معاً (السلوك القديم بلا تغيير)."""
     return await asyncio.to_thread(
         _get_evacuation_ledger_rows_sync, start_date, end_date, manifest_type,
-        requester_id, is_admin, specialist_name,
+        requester_id, is_admin, specialist_name, manifest_types,
     )
 
 
 def _get_evacuation_ledger_rows_sync(
     start_date: date, end_date: date, manifest_type: str | None = None,
     requester_id: int | None = None, is_admin: bool = False,
-    specialist_name: str | None = None,
+    specialist_name: str | None = None, manifest_types: list[str] | None = None,
 ) -> list[dict]:
+    from sqlalchemy import or_
     from db.session import SessionLocal
     from db.models import MedicationRecord, SuppliesRecord, PharmacyFinancialRecord
 
@@ -115,7 +121,27 @@ def _get_evacuation_ledger_rows_sync(
                 (PharmacyFinancialRecord.is_deleted.is_(None))
                 | (PharmacyFinancialRecord.is_deleted == False),  # noqa: E712
             )
-            if manifest_type:
+            if manifest_types is not None:
+                # ✅ فلتر توليفة (يستهلكه زرّ "📸 صور الفواتير" وحده) — أي
+                # مجموعة من "A"/"B"/"C" معاً، بنفس معاملة NULL كـ"A" لكل
+                # تصنيف على حدة. الثلاثة معاً ⇒ يطابق بلا فلترة فعلياً
+                # (لا سجل يُستبعَد) فلا حاجة لحالة خاصة بـ"الكل".
+                clauses = []
+                for mt in manifest_types:
+                    if mt == "A":
+                        clauses.append(
+                            (PharmacyFinancialRecord.manifest_type == "A")
+                            | (PharmacyFinancialRecord.manifest_type.is_(None))
+                        )
+                    else:
+                        clauses.append(PharmacyFinancialRecord.manifest_type == mt)
+                if clauses:
+                    financial_query = financial_query.filter(or_(*clauses))
+                else:
+                    # قائمة فارغة (لا ينبغي حدوثها، multiselect يفرض min_select=1)
+                    # ⇒ لا نتائج، لا كل النتائج، حتى لا يُطبَع شيء لم يُطلَب.
+                    financial_query = financial_query.filter(False)
+            elif manifest_type:
                 # ✅ السجلات القديمة (قبل إضافة هذا التصنيف) لها manifest_type
                 # فارغ في القاعدة — تُعامَل كـ"A" في كل مكان آخر بالكود، لذا
                 # فلترة A تشمل أيضاً NULL حتى تبقى ظاهرة في المسير كسابقاً.
