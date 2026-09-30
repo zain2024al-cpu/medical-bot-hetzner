@@ -366,11 +366,12 @@ async def main():
         # 🪪 3. الانتقال التلقائي للإقامة: نشط ← معلّق انتهاء (الساعة 9:00 صباحاً)
         # ⚠️ نظام كامل (2026-08-15) — لكل شخص (مريض/مرافق) تاريخ تنبيه
         # مستقل يدوي؛ هذه المهمّة تحوّل من وصل تاريخه تلقائياً إلى
-        # "🔴 معلّق انتهاء الإقامة" — كتابة فقط، بلا أي رسالة تلغرام
-        # (التنبيه يتحقق داخل البوت عبر العدّاد/القائمة عند فتحه).
-        from services.residency_status_service import run_daily_expiry_check
+        # "🔴 معلّق انتهاء الإقامة"، وتُنبِّه مجموعة الإقامة بمن انتقل
+        # فعلياً (بطلب المستخدم — كانت كتابة صامتة بلا أي رسالة تلغرام،
+        # فمن لا يفتح الشاشة يدوياً لا يعلم). صفر نتائج ⇒ بلا رسالة إطلاقاً.
+        from services.residency_status_service import send_residency_expiry_alert
         app.job_queue.run_daily(
-            lambda context: asyncio.create_task(asyncio.to_thread(run_daily_expiry_check)),
+            lambda context: send_residency_expiry_alert(context.application),
             time=dt_time(hour=9, minute=0, tzinfo=tz),
             name="daily_residency_status_check"
         )
@@ -378,9 +379,11 @@ async def main():
         # كل يوم يكون البوت فيه متوقّفاً عند تلك اللحظة (إعادة تشغيل، نشر،
         # انقطاع) يضيع بلا تعويض، فتبقى حالات منتهية في "النشطة" إلى الأبد.
         # الفحص فكرته «من استحقّ حتى اليوم» لا «من استحقّ اليوم»، فتكراره
-        # آمن ولا يُنتِج أثراً مضاعفاً: من انتقل خرج من شرط ACTIVE.
+        # آمن ولا يُنتِج أثراً مضاعفاً: من انتقل خرج من شرط ACTIVE. نفس
+        # التنبيه هنا أيضاً — انقطاعٌ يغطّي يوم انتقال كامل يستحقّ إشعاراً
+        # بقدر الانتقال اليومي العادي، لا أقل.
         app.job_queue.run_once(
-            lambda context: asyncio.create_task(asyncio.to_thread(run_daily_expiry_check)),
+            lambda context: send_residency_expiry_alert(context.application),
             when=15,
             name="residency_status_catchup_on_start",
         )

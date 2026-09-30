@@ -135,7 +135,7 @@ def _reevaluate_after_activation(where: str) -> None:
         from services.residency_status_service import run_daily_expiry_check
         moved = run_daily_expiry_check()
         if moved:
-            logger.info(f"[residency] إعادة تقييم بعد {where}: انتقل {moved}")
+            logger.info(f"[residency] إعادة تقييم بعد {where}: انتقل {len(moved)}")
     except Exception as exc:
         # النقل نجح — فشل إعادة التقييم لا يُبطِله؛ ستلتقطه المهمة اليومية.
         logger.error(f"[residency] تعذّرت إعادة التقييم بعد {where}: {exc}")
@@ -162,7 +162,7 @@ def _reevaluate_after_date_change(person_id: int) -> None:
         moved = run_daily_expiry_check()
         if moved:
             logger.info(f"[residency] إعادة تقييم بعد تغيير تاريخ "
-                        f"person_id={person_id}: انتقل {moved}")
+                        f"person_id={person_id}: انتقل {len(moved)}")
     except Exception as exc:
         # الحفظ نجح — فشل إعادة التقييم لا يجوز أن يُبطِله. ستلتقطه
         # المهمة اليومية أو التعويض عند الإقلاع لاحقاً.
