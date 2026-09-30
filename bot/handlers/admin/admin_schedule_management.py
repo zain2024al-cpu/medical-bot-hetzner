@@ -590,6 +590,11 @@ async def handle_manage_patients(update: Update, context: ContextTypes.DEFAULT_T
         # التجريبية التي بقيت ظاهرة في البوتين).
         [InlineKeyboardButton("🗑️ حذف اسم نهائياً", callback_data="pcdel:menu")],
         [InlineKeyboardButton("✏️ تعديل اسم", callback_data="edit_patient_name")],
+        # ✅ نوع ظهور المريض (عام/صيدلية فقط/تشناي) كان يُحدَّد عند الإضافة
+        # فقط بلا أي طريقة لتغييره لاحقاً — مريض أُضيف بالخطأ "تشناي" يبقى
+        # حبيس شاشات تشناي وحدها للأبد. نفس خيارات "➕ إضافة اسم جديد"
+        # الثلاثة بالضبط (ptype:general/pharmacy/chennai).
+        [InlineKeyboardButton("🔄 تغيير النوع", callback_data="edit_patient_type")],
         [InlineKeyboardButton("🗑️ حذف اسم", callback_data="delete_patient_name")],
         [InlineKeyboardButton("🔙 رجوع", callback_data="sys_menu:back")]
     ])
@@ -1651,6 +1656,173 @@ async def handle_edit_name_input(update: Update, context: ContextTypes.DEFAULT_T
         return ConversationHandler.END
 
 
+# =============================================================================
+# 🔄 تغيير نوع ظهور مريض موجود (عام / صيدلية فقط / تشناي)
+# =============================================================================
+# ⚠️ بلا أي خطوة إدخال نصّي (اختيار أزرار فقط) — معالِجات مستقلة عن
+# patient_names_conv عمداً، نفس اتفاقية parch:/pcdel: أدناه، لا حاجة
+# لإقحامها في آلة حالات التعديل/الإضافة الأكبر.
+
+_PTYPE_LABELS = {
+    None: "🌍 جميع المستخدمين",
+    "general": "🌍 جميع المستخدمين",
+    "pharmacy_only": "💊 مرضى صرف الأدوية والمستلزمات الطبية",
+    "chennai": "🏙️ مرضى تشناي",
+}
+
+
+def _ptype_label(t) -> str:
+    return _PTYPE_LABELS.get(t, f"❓ {t}")
+
+
+@require_admin
+async def handle_edit_patient_type_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """قائمة مرضى مُصفّحة لاختيار من سيتغيّر نوعه — نفس تصفّح '✏️ تعديل اسم'."""
+    query = update.callback_query
+    await query.answer()
+
+    page = 0
+    if query.data.startswith("edit_patient_type_page:"):
+        try:
+            page = int(query.data.split(":")[1])
+        except Exception:
+            page = 0
+
+    ITEMS_PER_PAGE = 8
+    try:
+        from services.patients_service import get_patients_paginated
+        patients, total_count, total_pages = get_patients_paginated(page=page, per_page=ITEMS_PER_PAGE)
+    except Exception as e:
+        logger.error(f"❌ خطأ في تحميل المرضى: {e}")
+        patients, total_count, total_pages = [], 0, 0
+
+    # ⚠️ "companion" مستبعَد أصلاً من get_patients_paginated. "companion_parent"
+    # يُستبعَد هنا أيضاً: نوعه يُستخدَم لتجميع مرافقيه في شاشات أخرى (شاشة
+    # الحذف) — تغييره هنا كان سيُفقِد ذلك التجميع بصمت بلا فائدة موازية
+    # (هذه الشاشة لعلاج "نوع ظهور" خاطئ، لا لمرضى المرافقين البنيويين).
+    patients = [p for p in patients if p.get('patient_type') != 'companion_parent']
+
+    if not patients:
+        await query.edit_message_text(
+            "⚠️ **لا توجد أسماء لتغيير نوعها**",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")]]),
+            parse_mode=ParseMode.MARKDOWN
+        )
+        return
+
+    keyboard = []
+    for patient in patients:
+        context.user_data.setdefault('patient_names_cache', {})[patient['id']] = patient['name']
+        label = _ptype_label(patient.get('patient_type'))
+        keyboard.append([InlineKeyboardButton(
+            f"🔄 {patient['name']} — {label}",
+            callback_data=f"sel_ptype:{patient['id']}"
+        )])
+
+    nav_buttons = []
+    if page > 0:
+        nav_buttons.append(InlineKeyboardButton("◀️ السابق", callback_data=f"edit_patient_type_page:{page - 1}"))
+    if page < total_pages - 1:
+        nav_buttons.append(InlineKeyboardButton("التالي ▶️", callback_data=f"edit_patient_type_page:{page + 1}"))
+    if nav_buttons:
+        keyboard.append(nav_buttons)
+    keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")])
+
+    await query.edit_message_text(
+        f"🔄 **تغيير نوع ظهور مريض**\n\n"
+        f"📊 **العدد:** {total_count} | 📄 الصفحة: {page + 1}/{total_pages}\n\n"
+        f"اختر الاسم المراد تغيير نوعه:",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode=ParseMode.MARKDOWN
+    )
+
+
+@require_admin
+async def handle_select_patient_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """عرض النوع الحالي + أزرار الأنواع الثلاثة (نفس خيارات الإضافة)."""
+    query = update.callback_query
+    await query.answer()
+
+    parts = query.data.split(':')
+    if len(parts) < 2 or not parts[1].isdigit():
+        await query.edit_message_text("❌ خطأ في البيانات")
+        return
+    patient_id = int(parts[1])
+
+    name = context.user_data.get('patient_names_cache', {}).get(patient_id, '')
+    current_type = None
+    try:
+        from services.patients_service import get_patient_by_id
+        patient = get_patient_by_id(patient_id)
+        if patient:
+            name = name or patient.get('name', f'مريض #{patient_id}')
+            current_type = patient.get('patient_type')
+    except Exception:
+        pass
+    name = name or f'مريض #{patient_id}'
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🌍 جميع المستخدمين", callback_data=f"set_ptype:{patient_id}:general")],
+        [InlineKeyboardButton("💊 صيدلية فقط", callback_data=f"set_ptype:{patient_id}:pharmacy")],
+        [InlineKeyboardButton("🏙️ مرضى تشناي", callback_data=f"set_ptype:{patient_id}:chennai")],
+        [InlineKeyboardButton("🔙 رجوع", callback_data="edit_patient_type")],
+    ])
+    await query.edit_message_text(
+        f"🔄 **تغيير نوع ظهور المريض**\n\n"
+        f"📝 **الاسم:** {name}\n"
+        f"👁️ **النوع الحالي:** {_ptype_label(current_type)}\n\n"
+        f"اختر النوع الجديد:",
+        reply_markup=keyboard,
+        parse_mode=ParseMode.MARKDOWN
+    )
+
+
+@require_admin
+async def handle_set_patient_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تنفيذ التغيير الفعلي عبر update_patient_type()."""
+    query = update.callback_query
+    await query.answer()
+
+    parts = query.data.split(':')
+    if len(parts) < 3 or not parts[1].isdigit():
+        await query.edit_message_text("❌ خطأ في البيانات")
+        return
+    patient_id = int(parts[1])
+    choice = parts[2]
+
+    new_type = {"pharmacy": "pharmacy_only", "chennai": "chennai"}.get(choice)  # general → None
+    new_label = _ptype_label(new_type)
+
+    name = context.user_data.get('patient_names_cache', {}).get(patient_id, f'مريض #{patient_id}')
+    old_type = None
+    try:
+        from services.patients_service import get_patient_by_id
+        existing = get_patient_by_id(patient_id)
+        if existing:
+            old_type = existing.get('patient_type')
+    except Exception:
+        pass
+
+    keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="manage_patients")]])
+    try:
+        from services.patients_service import update_patient_type
+        success = update_patient_type(patient_id, new_type)
+        if success:
+            await query.edit_message_text(
+                f"✅ **تم تغيير النوع بنجاح**\n\n"
+                f"📝 **الاسم:** {name}\n"
+                f"📝 **من:** {_ptype_label(old_type)}\n"
+                f"📝 **إلى:** {new_label}",
+                reply_markup=keyboard,
+                parse_mode=ParseMode.MARKDOWN
+            )
+        else:
+            await query.edit_message_text("❌ **فشل تغيير النوع**", reply_markup=keyboard, parse_mode=ParseMode.MARKDOWN)
+    except Exception as e:
+        logger.error(f"Error updating patient type: {e}")
+        await query.edit_message_text(f"❌ **خطأ في الحفظ:** {str(e)}", reply_markup=keyboard, parse_mode=ParseMode.MARKDOWN)
+
+
 # ================================================
 # إدارة المستشفيات
 # ================================================
@@ -2184,6 +2356,11 @@ def register(app):
     app.add_handler(CallbackQueryHandler(handle_edit_patient_name, pattern="^edit_patient_name$"))
     app.add_handler(CallbackQueryHandler(handle_edit_patient_name, pattern="^edit_patient_page:\\d+$"))
     app.add_handler(CallbackQueryHandler(handle_select_edit, pattern="^edit_patient:\\d+$"))
+    # 🔄 تغيير نوع ظهور مريض موجود — أزرار فقط، بلا إدخال نصّي، فمستقلة عن patient_names_conv
+    app.add_handler(CallbackQueryHandler(handle_edit_patient_type_menu, pattern="^edit_patient_type$"))
+    app.add_handler(CallbackQueryHandler(handle_edit_patient_type_menu, pattern="^edit_patient_type_page:\\d+$"))
+    app.add_handler(CallbackQueryHandler(handle_select_patient_type, pattern="^sel_ptype:\\d+$"))
+    app.add_handler(CallbackQueryHandler(handle_set_patient_type, pattern="^set_ptype:\\d+:(general|pharmacy|chennai)$"))
     # 🧳 أرشيف المسافرين — إخفاء/إعادة أسماء المرضى عن قوائم المستخدمين
     app.add_handler(CallbackQueryHandler(handle_patient_archive_menu, pattern="^parch:menu$"))
     app.add_handler(CallbackQueryHandler(handle_patient_archive_pick, pattern="^parch:pick:\\d+$"))

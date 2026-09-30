@@ -354,6 +354,36 @@ def update_patient(patient_id: int, new_name: str) -> bool:
         return False
 
 
+def update_patient_type(patient_id: int, new_type: Optional[str]) -> bool:
+    """
+    تعديل نوع ظهور مريض موجود (general/None، pharmacy_only، chennai).
+
+    ⚠️ لا يُستخدَم لتحويل "companion"/"companion_parent" — تلك أنواع
+    بنيوية مرتبطة بـ companion_of_id، والمستدعي (شاشة الأدمن) يستبعدها
+    من قائمة الاختيار أصلاً بنفس استبعاد get_patients_paginated لـ
+    "companion".
+    """
+    try:
+        from db.session import SessionLocal
+        from db.models import Patient
+
+        with SessionLocal() as session:
+            patient = session.query(Patient).filter_by(id=patient_id).first()
+            if patient:
+                old_type = patient.patient_type
+                patient.patient_type = new_type
+                session.commit()
+                logger.info(f"Updated patient #{patient_id} type from {old_type!r} to {new_type!r}")
+                return True
+            else:
+                logger.warning(f"Patient with id {patient_id} not found")
+                return False
+
+    except Exception as e:
+        logger.error(f"Error updating patient type: {e}")
+        return False
+
+
 def delete_patient(patient_id: int) -> bool:
     """
     حذف مريض. ✅ إن كان هذا المريض "companion_parent" (له مرافقون مرتبطون
